@@ -1,0 +1,48 @@
+Identifier
+	- String or quoted string with "
+	- Name of output column
+	- TableAlias
+
+QualifiedName
+	- Multiple Identifier's separated with dot
+	- Column reference in expressions
+	
+
+
+----------- QUERY BODY ---------------------
+
+SELECT	an.artname		'artname'			<---- [  alias and field name and output name
+,
+ARRAY					<---- ARRAY output
+(
+		sku_id
+	,	attr1_id
+	,	OBJECT 			<---- OBJECT OUTPUT (picks first object)
+	(
+		price_sales
+	,	club_id
+		FROM price
+		WHERE ...
+	)
+	FROM aa				<----- FROM (object/array)
+	WHERE ...
+)						'articleAttribute'	
+FROM source _s
+inner join articleName an 			<--- Non populating join. Will produce tuples 
+  on an.art_id == _s.art_id
+inner articleAttribute aa (			<--- Populating join with parenthesis. Will merge rows onto source. Will not produce tuples
+	on	aa.art_id == _source._art_id
+	LIMIT 1
+	GROUP BY .... 
+	HAVING ....
+	ORDER BY ...
+)
+LIMIT 1
+WHERE ...
+ORDER BY ...
+
+---------------------------- EXPRESSIONS -----------------------
+
+- References are dot noted with DotExpressions (aa.art_id)
+- 
+

@@ -1,0 +1,58 @@
+Information schema
+------------------
+
+Standard SQL
+------------
+
+Catalog		
+	Usually refers to a database
+
+Schema
+	A schema within a database
+
+Object
+	Table, view, function, index etc.
+
+
+How this maps in Payloadbuilder
+-------------------------------
+
+Catalog
+	This is a provider of schemas. The main hooking point
+	to provide payload builder with data.
+	Usually a connection to a datastore such as Elasticsearch, SQL-server
+	etc.
+	
+Schema
+	This is typically a database within the catalog
+	
+Object
+	A table or view or similar.
+	
+Objects are referenced via dot noted parts that consist of
+a Catalog, Schema and an Object. (Or even more detailed path,
+which is implementation specific)
+
+Ie.
+
+Select 	a.art_id
+FROM	SqlServer.RamosVnpTestMain.article a
+
+Where SqlServer is the name of the registered catalog provider.
+RamosVnpTestMain refers to a database that is implementation specific
+to the catalog implementation.
+article referes to a table or view object.
+
+A query can be made with a predefined Catalog/schema and hence can be omitted.
+in query.
+	
+Examples
+--------
+
+Sqlserver
+	Table/view reference SqlServer.RamosVnpTestMain.article
+	Would also be possible to buld a catalog of the format
+	"SqlServer.Test29.RamosVnpTestMain.article"
+	
+	
+	
