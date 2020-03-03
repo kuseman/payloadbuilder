@@ -2,12 +2,10 @@ grammar PayloadBuilderQuery;
 @lexer::header {
 //CSOFF
 //@formatter:off
-package com.viskan.payloadbuilder.parser;
 }
 @parser::header {
 //CSOFF
 //@formatter:off
-package com.viskan.payloadbuilder.parser;
 }
 
 query

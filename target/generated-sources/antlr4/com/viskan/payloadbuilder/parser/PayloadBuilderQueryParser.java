@@ -1,8 +1,8 @@
-// Generated from PayloadBuilderQuery.g4 by ANTLR 4.7.1
+// Generated from com\viskan\payloadbuilder\parser\PayloadBuilderQuery.g4 by ANTLR 4.7.1
+package com.viskan.payloadbuilder.parser;
 
 //CSOFF
 //@formatter:off
-package com.viskan.payloadbuilder.parser;
 
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
@@ -146,6 +146,11 @@ public class PayloadBuilderQueryParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_query; }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitQuery(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final QueryContext query() throws RecognitionException {
@@ -253,6 +258,11 @@ public class PayloadBuilderQueryParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_selectItem; }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitSelectItem(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final SelectItemContext selectItem() throws RecognitionException {
@@ -364,6 +374,11 @@ public class PayloadBuilderQueryParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_nestedSelectItem; }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitNestedSelectItem(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final NestedSelectItemContext nestedSelectItem() throws RecognitionException {
@@ -443,6 +458,11 @@ public class PayloadBuilderQueryParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_errorCapturingIdentifier; }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitErrorCapturingIdentifier(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final ErrorCapturingIdentifierContext errorCapturingIdentifier() throws RecognitionException {
@@ -491,9 +511,19 @@ public class PayloadBuilderQueryParser extends Parser {
 			return getRuleContext(IdentifierContext.class,i);
 		}
 		public ErrorIdentContext(ErrorCapturingIdentifierExtraContext ctx) { copyFrom(ctx); }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitErrorIdent(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 	public static class RealIdentContext extends ErrorCapturingIdentifierExtraContext {
 		public RealIdentContext(ErrorCapturingIdentifierExtraContext ctx) { copyFrom(ctx); }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitRealIdent(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final ErrorCapturingIdentifierExtraContext errorCapturingIdentifierExtra() throws RecognitionException {
@@ -562,6 +592,11 @@ public class PayloadBuilderQueryParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_sortItem; }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitSortItem(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final SortItemContext sortItem() throws RecognitionException {
@@ -642,6 +677,11 @@ public class PayloadBuilderQueryParser extends Parser {
 			return getRuleContext(PrimaryContext.class,0);
 		}
 		public PrimaryExpressionContext(ExpressionContext ctx) { copyFrom(ctx); }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitPrimaryExpression(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 	public static class LogicalNotContext extends ExpressionContext {
 		public TerminalNode NOT() { return getToken(PayloadBuilderQueryParser.NOT, 0); }
@@ -649,6 +689,11 @@ public class PayloadBuilderQueryParser extends Parser {
 			return getRuleContext(ExpressionContext.class,0);
 		}
 		public LogicalNotContext(ExpressionContext ctx) { copyFrom(ctx); }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitLogicalNot(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 	public static class InExpressionContext extends ExpressionContext {
 		public ExpressionContext left;
@@ -667,6 +712,11 @@ public class PayloadBuilderQueryParser extends Parser {
 			return getToken(PayloadBuilderQueryParser.COMMA, i);
 		}
 		public InExpressionContext(ExpressionContext ctx) { copyFrom(ctx); }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitInExpression(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 	public static class ComparisonExpressionContext extends ExpressionContext {
 		public ExpressionContext left;
@@ -685,6 +735,11 @@ public class PayloadBuilderQueryParser extends Parser {
 		public TerminalNode GREATERTHAN() { return getToken(PayloadBuilderQueryParser.GREATERTHAN, 0); }
 		public TerminalNode GREATERTHANEQUAL() { return getToken(PayloadBuilderQueryParser.GREATERTHANEQUAL, 0); }
 		public ComparisonExpressionContext(ExpressionContext ctx) { copyFrom(ctx); }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitComparisonExpression(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 	public static class ArithmeticBinaryContext extends ExpressionContext {
 		public ExpressionContext left;
@@ -702,6 +757,11 @@ public class PayloadBuilderQueryParser extends Parser {
 		public TerminalNode PLUS() { return getToken(PayloadBuilderQueryParser.PLUS, 0); }
 		public TerminalNode MINUS() { return getToken(PayloadBuilderQueryParser.MINUS, 0); }
 		public ArithmeticBinaryContext(ExpressionContext ctx) { copyFrom(ctx); }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitArithmeticBinary(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 	public static class ArithmeticUnaryContext extends ExpressionContext {
 		public Token op;
@@ -711,6 +771,11 @@ public class PayloadBuilderQueryParser extends Parser {
 		public TerminalNode MINUS() { return getToken(PayloadBuilderQueryParser.MINUS, 0); }
 		public TerminalNode PLUS() { return getToken(PayloadBuilderQueryParser.PLUS, 0); }
 		public ArithmeticUnaryContext(ExpressionContext ctx) { copyFrom(ctx); }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitArithmeticUnary(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 	public static class NullPredicateContext extends ExpressionContext {
 		public ExpressionContext expression() {
@@ -720,6 +785,11 @@ public class PayloadBuilderQueryParser extends Parser {
 		public TerminalNode NULL() { return getToken(PayloadBuilderQueryParser.NULL, 0); }
 		public TerminalNode NOT() { return getToken(PayloadBuilderQueryParser.NOT, 0); }
 		public NullPredicateContext(ExpressionContext ctx) { copyFrom(ctx); }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitNullPredicate(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 	public static class LogicalBinaryContext extends ExpressionContext {
 		public ExpressionContext left;
@@ -734,6 +804,11 @@ public class PayloadBuilderQueryParser extends Parser {
 		public TerminalNode AND() { return getToken(PayloadBuilderQueryParser.AND, 0); }
 		public TerminalNode OR() { return getToken(PayloadBuilderQueryParser.OR, 0); }
 		public LogicalBinaryContext(ExpressionContext ctx) { copyFrom(ctx); }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitLogicalBinary(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final ExpressionContext expression() throws RecognitionException {
@@ -995,6 +1070,11 @@ public class PayloadBuilderQueryParser extends Parser {
 			return getRuleContext(QnameContext.class,0);
 		}
 		public DereferenceContext(PrimaryContext ctx) { copyFrom(ctx); }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitDereference(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 	public static class LambdaExpressionContext extends PrimaryContext {
 		public List<IdentifierContext> identifier() {
@@ -1007,12 +1087,22 @@ public class PayloadBuilderQueryParser extends Parser {
 			return getRuleContext(ExpressionContext.class,0);
 		}
 		public LambdaExpressionContext(PrimaryContext ctx) { copyFrom(ctx); }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitLambdaExpression(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 	public static class ColumnReferenceContext extends PrimaryContext {
 		public QnameContext qname() {
 			return getRuleContext(QnameContext.class,0);
 		}
 		public ColumnReferenceContext(PrimaryContext ctx) { copyFrom(ctx); }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitColumnReference(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 	public static class SubscriptContext extends PrimaryContext {
 		public PrimaryContext value;
@@ -1024,24 +1114,44 @@ public class PayloadBuilderQueryParser extends Parser {
 			return getRuleContext(ExpressionContext.class,0);
 		}
 		public SubscriptContext(PrimaryContext ctx) { copyFrom(ctx); }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitSubscript(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 	public static class NestedExpressionContext extends PrimaryContext {
 		public ExpressionContext expression() {
 			return getRuleContext(ExpressionContext.class,0);
 		}
 		public NestedExpressionContext(PrimaryContext ctx) { copyFrom(ctx); }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitNestedExpression(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 	public static class FunctionCallExpressionContext extends PrimaryContext {
 		public FunctionCallContext functionCall() {
 			return getRuleContext(FunctionCallContext.class,0);
 		}
 		public FunctionCallExpressionContext(PrimaryContext ctx) { copyFrom(ctx); }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitFunctionCallExpression(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 	public static class LiteralExpressionContext extends PrimaryContext {
 		public LiteralContext literal() {
 			return getRuleContext(LiteralContext.class,0);
 		}
 		public LiteralExpressionContext(PrimaryContext ctx) { copyFrom(ctx); }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitLiteralExpression(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final PrimaryContext primary() throws RecognitionException {
@@ -1245,6 +1355,11 @@ public class PayloadBuilderQueryParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_functionCall; }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitFunctionCall(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final FunctionCallContext functionCall() throws RecognitionException {
@@ -1317,6 +1432,11 @@ public class PayloadBuilderQueryParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_literal; }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitLiteral(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final LiteralContext literal() throws RecognitionException {
@@ -1388,6 +1508,11 @@ public class PayloadBuilderQueryParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_compareOperator; }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitCompareOperator(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final CompareOperatorContext compareOperator() throws RecognitionException {
@@ -1435,6 +1560,11 @@ public class PayloadBuilderQueryParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_qname; }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitQname(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final QnameContext qname() throws RecognitionException {
@@ -1484,6 +1614,11 @@ public class PayloadBuilderQueryParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_identifier; }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitIdentifier(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final IdentifierContext identifier() throws RecognitionException {
@@ -1522,6 +1657,11 @@ public class PayloadBuilderQueryParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_numericLiteral; }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitNumericLiteral(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final NumericLiteralContext numericLiteral() throws RecognitionException {
@@ -1551,6 +1691,11 @@ public class PayloadBuilderQueryParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_decimalLiteral; }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitDecimalLiteral(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final DecimalLiteralContext decimalLiteral() throws RecognitionException {
@@ -1580,6 +1725,11 @@ public class PayloadBuilderQueryParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_stringLiteral; }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitStringLiteral(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final StringLiteralContext stringLiteral() throws RecognitionException {
@@ -1610,6 +1760,11 @@ public class PayloadBuilderQueryParser extends Parser {
 			super(parent, invokingState);
 		}
 		@Override public int getRuleIndex() { return RULE_booleanLiteral; }
+		@Override
+		public <T> T accept(ParseTreeVisitor<? extends T> visitor) {
+			if ( visitor instanceof PayloadBuilderQueryVisitor ) return ((PayloadBuilderQueryVisitor<? extends T>)visitor).visitBooleanLiteral(this);
+			else return visitor.visitChildren(this);
+		}
 	}
 
 	public final BooleanLiteralContext booleanLiteral() throws RecognitionException {

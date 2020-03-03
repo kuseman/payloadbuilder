@@ -17,7 +17,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 /** Test {@link MapToRowFunction} */
-public class TestMapToRowFunction extends Assert
+public class MapToRowFunctionTest extends Assert
 {
     private final MapToRowFunction f = new MapToRowFunction(new Catalog("test"));
 

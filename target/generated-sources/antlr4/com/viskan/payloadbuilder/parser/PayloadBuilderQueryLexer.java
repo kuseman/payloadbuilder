@@ -1,8 +1,8 @@
-// Generated from PayloadBuilderQuery.g4 by ANTLR 4.7.1
+// Generated from com\viskan\payloadbuilder\parser\PayloadBuilderQuery.g4 by ANTLR 4.7.1
+package com.viskan.payloadbuilder.parser;
 
 //CSOFF
 //@formatter:off
-package com.viskan.payloadbuilder.parser;
 
 import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.CharStream;
