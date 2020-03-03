@@ -4,7 +4,7 @@ import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.CatalogRegistry;
-import com.viskan.payloadbuilder.catalog.FunctionInfo;
+import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
 import com.viskan.payloadbuilder.operator.NestedLoop;
 import com.viskan.payloadbuilder.operator.Operator;
 import com.viskan.payloadbuilder.operator.OperatorContext;
@@ -36,6 +36,21 @@ public class CodeGeneratorTest extends Assert
     private final CatalogRegistry catalogRegistry = new CatalogRegistry();
     private final QueryParser parser = new QueryParser();
     private final CodeGenerator codeGenerator = new CodeGenerator();
+    
+    @Test
+    public void test_dereference() throws Exception
+    {
+        TableAlias alias = TableAlias.of(null, "article", "a");
+        alias.setColumns(new String[] {"a"});
+        Row row = Row.of(alias, 0, new Object[] { asList(
+                Row.of(alias, 0, new Object[] { 1 }),
+                Row.of(alias, 1, new Object[] { 2 }),
+                Row.of(alias, 2, new Object[] { 3 }),
+                Row.of(alias, 3, new Object[] { 4 })
+                )});
+        
+        assertExpression(true, row, "a.filter(a -> a.a = 2).a");
+    }
     
     @Test
     public void test_1() throws Exception
@@ -82,7 +97,7 @@ public class CodeGeneratorTest extends Assert
     public void test_schema() throws Exception
     {
         Catalog utils = new Catalog("UTILS");
-        utils.registerScalarFunction(new FunctionInfo(utils, "uuid")
+        utils.registerScalarFunction(new ScalarFunctionInfo(utils, "uuid")
         {
             @Override
             public ExpressionCode generateCode(CodeGenratorContext context, ExpressionCode parentCode, List<Expression> arguments)

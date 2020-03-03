@@ -1,6 +1,6 @@
 package com.viskan.payloadbuilder.parser.tree;
 
-import com.viskan.payloadbuilder.catalog.FunctionInfo;
+import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
 import com.viskan.payloadbuilder.codegen.CodeGenratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
 
@@ -12,9 +12,9 @@ import java.util.List;
 public class QualifiedFunctionCallExpression extends Expression
 {
     private final List<Expression> arguments;
-    private final FunctionInfo functionInfo;
+    private final ScalarFunctionInfo functionInfo;
     
-    public QualifiedFunctionCallExpression(List<Expression> arguments, FunctionInfo functionInfo)
+    public QualifiedFunctionCallExpression(List<Expression> arguments, ScalarFunctionInfo functionInfo)
     {
         this.functionInfo = requireNonNull(functionInfo, "functionInfo");
         this.arguments = requireNonNull(arguments, "arguments");

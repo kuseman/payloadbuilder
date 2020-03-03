@@ -10,6 +10,10 @@ import gnu.trove.map.hash.THashMap;
 /** Context used during selection of operator tree */
 public class OperatorContext
 {
+    /** When using populating join, the current parent rows are provided here for
+     * child operators to utilize */
+    private List<Row> parentRows;
+    
     /** Reference to parent row during selection inside projections */
     private Row parentProjectionRow;
  
@@ -17,6 +21,16 @@ public class OperatorContext
      * TODO: need qualified name here later on
      *  */
     private Map<String, List<Object>> indexLookupValues;
+    
+    public List<Row> getParentRows()
+    {
+        return parentRows;
+    }
+    
+    public void setParentRows(List<Row> parentRows)
+    {
+        this.parentRows = parentRows;
+    }
     
     public Row getParentProjectionRow()
     {

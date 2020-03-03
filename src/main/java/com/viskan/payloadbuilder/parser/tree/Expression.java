@@ -4,6 +4,8 @@ import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.codegen.CodeGenratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
 
+import org.apache.commons.lang3.NotImplementedException;
+
 /** Base class for expressions */
 public abstract class Expression
 {
@@ -27,6 +29,6 @@ public abstract class Expression
      */
     public Object eval(Object evaluationContext, Row row)
     {
-        return null;
+        throw new NotImplementedException("eval: " + getClass().getSimpleName());
     }
 }

@@ -1,7 +1,7 @@
 package com.viskan.payloadbuilder.catalog._default;
 
 import com.viskan.payloadbuilder.catalog.Catalog;
-import com.viskan.payloadbuilder.catalog.FunctionInfo;
+import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
 import com.viskan.payloadbuilder.codegen.CodeGenratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
 import com.viskan.payloadbuilder.parser.tree.Expression;
@@ -10,7 +10,7 @@ import com.viskan.payloadbuilder.parser.tree.LambdaExpression;
 import java.util.List;
 
 /** Filter input argument with a lambda */
-class FilterFunction extends FunctionInfo
+class FilterFunction extends ScalarFunctionInfo
 {
     FilterFunction(Catalog catalog)
     {

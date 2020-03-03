@@ -1,7 +1,7 @@
 package com.viskan.payloadbuilder.catalog._default;
 
 import com.viskan.payloadbuilder.catalog.Catalog;
-import com.viskan.payloadbuilder.catalog.FunctionInfo;
+import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
 import com.viskan.payloadbuilder.codegen.CodeGenratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
 import com.viskan.payloadbuilder.parser.tree.Expression;
@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** Hash function. Hahses arguments using Objects.hash */
-class HashFunction extends FunctionInfo
+class HashFunction extends ScalarFunctionInfo
 {
     HashFunction(Catalog catalog)
     {

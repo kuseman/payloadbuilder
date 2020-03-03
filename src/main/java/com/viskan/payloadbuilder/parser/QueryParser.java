@@ -2,7 +2,7 @@ package com.viskan.payloadbuilder.parser;
 
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.CatalogRegistry;
-import com.viskan.payloadbuilder.catalog.FunctionInfo;
+import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
 import com.viskan.payloadbuilder.catalog._default.DefaultCatalog;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.ArithmeticBinaryContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.ArithmeticUnaryContext;
@@ -263,7 +263,7 @@ public class QueryParser
                 catalog = catalogRegistry.getDefault();
             }
 
-            FunctionInfo functionInfo = catalog.getScalarFunction(functionName);
+            ScalarFunctionInfo functionInfo = catalog.getScalarFunction(functionName);
             if (functionInfo == null)
             {
                 throw new IllegalArgumentException("Could not find a function named: " + (qname.getLast() + " in catalog: " + catalog.getName()));
@@ -296,7 +296,7 @@ public class QueryParser
              */
             if (leftDereference != null)
             {
-                arg = arg != null ? new DereferenceExpression(leftDereference, arg) : leftDereference;
+                arg = arg != null ? new DereferenceExpression(leftDereference, (QualifiedReferenceExpression) arg) : leftDereference;
             }
             if (arg != null)
             {

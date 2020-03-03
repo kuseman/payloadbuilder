@@ -33,6 +33,26 @@ public interface PayloadBuilderQueryVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitNestedSelectItem(PayloadBuilderQueryParser.NestedSelectItemContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link PayloadBuilderQueryParser#errorCapturingIdentifier}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitErrorCapturingIdentifier(PayloadBuilderQueryParser.ErrorCapturingIdentifierContext ctx);
+	/**
+	 * Visit a parse tree produced by the {@code errorIdent}
+	 * labeled alternative in {@link PayloadBuilderQueryParser#errorCapturingIdentifierExtra}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitErrorIdent(PayloadBuilderQueryParser.ErrorIdentContext ctx);
+	/**
+	 * Visit a parse tree produced by the {@code realIdent}
+	 * labeled alternative in {@link PayloadBuilderQueryParser#errorCapturingIdentifierExtra}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitRealIdent(PayloadBuilderQueryParser.RealIdentContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link PayloadBuilderQueryParser#sortItem}.
 	 * @param ctx the parse tree
 	 * @return the visitor result

@@ -30,6 +30,7 @@ import org.apache.commons.collections.iterators.FilterIterator;
 import org.apache.commons.collections.iterators.ObjectGraphIterator;
 import org.apache.commons.collections.iterators.TransformIterator;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.time.StopWatch;
@@ -291,17 +292,17 @@ public class OperatorTest extends Assert
                 new CachedSupplier<>(() -> IntStream.range(1, 200).mapToObj(i -> new Object[] {i, i}).collect(Collectors.toList())));
 
         Random rnd = new Random();
-        
+
         Map<Object, List<Object[]>> values = new THashMap<>(2500, 1.0f);
-        IntStream.range(1, 3500000).forEach(i -> 
+        IntStream.range(1, 3500000).forEach(i ->
         {
             Object[] ar = new Object[] {i % 2500 + 1, i, rnd.nextInt(300), rnd.nextInt(300), rnd.nextInt(300)};
-            values.computeIfAbsent(ar[0], key -> new ArrayList<>(3500000/2500)).add(ar);
+            values.computeIfAbsent(ar[0], key -> new ArrayList<>(3500000 / 2500)).add(ar);
         });
-        
-//        Map<Object, List<Object[]>> values = IntStream.range(1, 5000000)
-//                .mapToObj(i -> new Object[] {i / 200, i, rnd.nextInt(300), rnd.nextInt(300), rnd.nextInt(300)})
-//                .collect(Collectors.groupingBy(ar -> ar[0]));
+
+        //        Map<Object, List<Object[]>> values = IntStream.range(1, 5000000)
+        //                .mapToObj(i -> new Object[] {i / 200, i, rnd.nextInt(300), rnd.nextInt(300), rnd.nextInt(300)})
+        //                .collect(Collectors.groupingBy(ar -> ar[0]));
 
         @SuppressWarnings("unchecked")
         Operator articleAttributeScan = context ->
@@ -312,18 +313,18 @@ public class OperatorTest extends Assert
             {
                 System.out.println("Index lookup");
                 // Index lookup
-                return new ObjectGraphIterator(indexLookupValues.iterator(), t -> 
+                return new ObjectGraphIterator(indexLookupValues.iterator(), t ->
                 {
                     if (t instanceof List)
                     {
-                        return ((List<Object>)t).iterator();
+                        return ((List<Object>) t).iterator();
                     }
                     else if (t instanceof Object[])
                     {
                         pos.increment();
                         return Row.of(articleAttributeMeta, pos.intValue(), (Object[]) t);
                     }
-                    
+
                     return IteratorUtils.getIterator(values.get(t));
                 });
             }
@@ -331,20 +332,20 @@ public class OperatorTest extends Assert
             {
                 System.out.println("Table scan");
                 // Table scan
-                return new ObjectGraphIterator(values.values().iterator(), t -> 
+                return new ObjectGraphIterator(values.values().iterator(), t ->
                 {
-                   if (t instanceof List)
-                   {
-                       return ((List<Object>)t).iterator();
-                   }
-                   
-                   pos.increment();
-                   return Row.of(articleAttributeMeta, pos.intValue(), (Object[]) t);
+                    if (t instanceof List)
+                    {
+                        return ((List<Object>) t).iterator();
+                    }
+
+                    pos.increment();
+                    return Row.of(articleAttributeMeta, pos.intValue(), (Object[]) t);
                 });
             }
         };
         Operator join = new HashMatch(
-//                sourceScan,
+                //                sourceScan,
                 new KeyLookup(sourceScan, "art_id", row -> row.getObject(1)),
                 articleAttributeScan,
                 new ColumnPathHashFunction("s.art_id"),
@@ -352,7 +353,7 @@ public class OperatorTest extends Assert
                 new ColumnPathBiPredicate("s.art_id", "aa.art_id"),
                 (outer, inner) -> outer);
 
-        for (int i=0;i<100;i++)
+        for (int i = 0; i < 100; i++)
         {
             StopWatch sw = new StopWatch();
             sw.start();
@@ -364,230 +365,362 @@ public class OperatorTest extends Assert
                 rowCount++;
             }
             sw.stop();
-            System.out.println(sw.toString() + " Row count: " + rowCount +  ", Memory: " + FileUtils.byteCountToDisplaySize(Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()));
+            System.out.println(sw.toString() + " Row count: " + rowCount + ", Memory: " + FileUtils.byteCountToDisplaySize(Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()));
         }
     }
-    
-//    @Test
-//    public void test_campaign() throws CompileException, InstantiationException, IllegalAccessException
-//    {
-//        for (int i = 0; i < 100; i++)
-//        {
-//            loadCampaign();
-//        }
-//    }
-//    
-//    @SuppressWarnings("unchecked")
-//    public <T> Set<T> asSet(T...items)
-//    {
-//        return new HashSet<>(asList(items));
-//    }
 
-//    @Test
-//    public void loadCampaign() throws CompileException, InstantiationException, IllegalAccessException
-//    {
-//        /*
-//         * from source s
-//         * inner join campaign c (
-//         *   ON (c.includeArtIds in (-1, s.art_id) OR c.includeSkuIds in (-1, s.sku_id))
-//         *   AND NOT (c.excludeArtIds in (s.art_id) OR c.excludeSkuIds in (s.sku_id))
-//         * )
-//         *
-//         * ====>
-//         *
-//         * - How to turn an array into a table?
-//         * -
-//         *
-//         * from source s
-//         * inner join campaign c (
-//         *   on
-//         *   (
-//         *     c.apply_to_articles = -1
-//         *     OR
-//         *     (
-//         *       c.includeArtIds = s.art_id
-//         *       OR c.includeSkuIds = s.sku_id
-//         *     )
-//         *   )
-//         *   AND NOT
-//         *   (
-//         *     c.excludeArtId = s.art_id
-//         *     OR c.excludeSkuIds = s.sku_id
-//         *   )
-//         * )
-//         *
-//         *
-//         */
-//
-//        TableAlias sourceMeta = TableAlias.of(null, "source", "s");
-//        sourceMeta.setColumns(new String[] {"art_id", "sku_id"});
-//        TableAlias campaignMeta = TableAlias.of(sourceMeta, "campaign", "c");
-//        campaignMeta.setColumns(new String[] {"apply_to_articles", "includeArtIds", "includeSkuIds", "excludeArtIds", "excludeSkuIds"});
-//
-//        Random rnd = new Random();
-//        // _source (art_id, sku_id)
-//        Operator sourceScan = new ListScan(
-//                sourceMeta,
-//                new CachedSupplier<>(() -> IntStream.range(1, 300000).mapToObj(i -> new Object[] {i, i / 5 + i}).collect(Collectors.toList())));
-//
-//        // articleAttribute ("apply_to_articles", "includeArtIds", "includeSkuIds", "excludeArtIds", "excludeSkuIds")
-//        Operator campaignScan = new ListScan(
-//                campaignMeta,
-//                new CachedSupplier<>(() -> IntStream.range(1, 200)
-//                        .mapToObj(i -> new Object[] {0,  asList(rnd.nextInt(300000), rnd.nextInt(300000), rnd.nextInt(300000), rnd.nextInt(300000)), asList(rnd.nextInt(1000)),
-//                                asList(rnd.nextInt(1000)), asList(rnd.nextInt(1000))})
-//                        .collect(Collectors.toList())));
-//
-//        /*
-//             (
-//                 c.apply_to_articles = 1
-//                 OR
-//                 c.includeArtIds in (s.art_id)
-//                 OR
-//                 c.includeSkuIds in (s.sku_id)
-//             )
-//             AND NOT
-//             (
-//                c.excludeArtIds in (s.art_id)
-//                OR
-//                c.excludeSkuIds in (s.sku_id)
-//             )
-//        */
-//        
-//        CodeGenerator gen = new CodeGenerator();
-//        gen.generateBiPredicate(campaignMeta, expression)
-//
-////        BiFunction<Row, Row, Object> pred = new BinaryBiExpression(
-////                new BinaryBiExpression(
-////                        new BinaryBiExpression(
-////                                new ColumnPathBiExpression("apply_to_articles", 0, true),
-////                                new ConstantBiExpression(1),
-////                                Operand.EQ),
-////                        new BinaryBiExpression(
-////                                new InExpression(
-////                                        new ColumnPathBiExpression("includeArtIds", 1, true),
-////                                        asList(new ColumnPathBiExpression("art_id", 0, false))),
-////                                new InExpression(
-////                                        new ColumnPathBiExpression("includeSkuIds", 2, true),
-////                                        asList(new ColumnPathBiExpression("sku_id", 1, false))),
-////                                Operand.OR),
-////                        Operand.OR),
-////                new NotBiExpression(
-////                        new BinaryBiExpression(
-////                                new InExpression(
-////                                        new ColumnPathBiExpression("excludeArtIds", 3, true),
-////                                        asList(new ColumnPathBiExpression("art_id", 0, false))),
-////                                new InExpression(
-////                                        new ColumnPathBiExpression("excludeSkuIds", 4, true),
-////                                        asList(new ColumnPathBiExpression("sku_id", 1, false))),
-////                                Operand.OR)),
-////                Operand.AND);
-//
-//        StopWatch sw = new StopWatch();
-//        BiFunction<Row, Row, Object> predJanino = null;
-//        for (int i = 0; i < 1; i++)
-//        {
-//            sw.reset();
-//            sw.start();
-//
-//            ClassBodyEvaluator cbe = new ClassBodyEvaluator();
-//            cbe.setDefaultImports(new String[] {"com.viskan.payloadbuilder.Row", "java.util.Objects", "java.util.Collection"});
-//            cbe.setImplementedInterfaces(new Class[] {BiFunction.class});
-//
-//            StringBuilder sb = new StringBuilder();
-//            sb.append("public Object apply(Object a, Object b) { ");
-//            sb.append("Row outer = (Row) a; Row inner = (Row) b;");
-//            sb.append("return ");
-//            ((CodeGen) pred).append(sb);
-//            sb.append(";");
-//            sb.append("}");
-//
-//            System.out.println(sb.toString());
-//            cbe.cook(sb.toString());
-//
-//            Class<?> clazz = cbe.getClazz();
-//            predJanino = (BiFunction<Row, Row, Object>) clazz.newInstance();
-//
-//            sw.stop();
-//            System.out.println("Time: " + sw.toString());
-//        }
-//
-//        BiFunction<Row, Row, Object> p = predJanino;
-//
-//        Operator op = new NestedLoop(
-//                sourceScan,
-//                campaignScan,
-//                (outer, inner) ->
-//                {
-//
-//                                        return ((Boolean) pred.apply(outer, inner)).booleanValue();
-////                    return ((Boolean) p.apply(outer, inner)).booleanValue();
-//
-//                    //                    Object result = null;
-//                    //                    try
-//                    //                    {
-//                    //                        result = se.evaluate(new Object[] { outer, inner });
-//                    //                    }
-//                    //                    catch (InvocationTargetException e)
-//                    //                    {
-//                    //                        e.printStackTrace();
-//                    //                    }
-//
-//                    //                    boolean predRes = ((Boolean) pred.apply(outer, inner)).booleanValue();
-//
-//                    //                    if (!Objects.equals(result, predRes))
-//                    //                    {
-//                    //                        System.err.println("FEL");
-//                    //                    }
-//                    //                    return false;
-//                    //                    return ((Boolean) result).booleanValue();
-//                },
-//
-//                //                (outer, inner) -> (((Integer) inner.getObject(0)).intValue() == 1
-//                //                    ||
-//                //                    (((Collection) inner.getObject(1)).contains(outer.getObject(0))
-//                //                        ||
-//                //                        ((Collection) inner.getObject(2)).contains(outer.getObject(1))))
-//                //                    &&
-//                //                    !(((Collection) inner.getObject(3)).contains(outer.getObject(0))
-//                //                        ||
-//                //                        ((Collection) inner.getObject(4)).contains(outer.getObject(1))),
-//                RowMerger.DEFAULT);
-//
-//        for (int i = 0; i < 100; i++)
-//        {
-//            sw.reset();
-//            sw.start();
-//
-//            Iterator<Row> it = op.open(new OperatorContext());
-//            int rowCount = 0;
-//            int innerCount = 0;
-//            
-//            List<Row> rows = new ArrayList<>();
-//            
-//            while (it.hasNext())
-//            {
-//                Row row = it.next();
-//                rows.add(row);
-//                innerCount += row.getChildRows(0).size();
-//                rowCount++;
-//            }
-//
-//            System.out.println("Row count: " + rowCount + " Inner count: " +  innerCount + ", Memory: " + FileUtils.byteCountToDisplaySize(Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) + " Time: "
-//                + sw.toString());
-//            
-////            int h=0;
-////            TIntHashSet hs = new TIntHashSet();
-////            for (Row r : new ParentChildRowsIteraor(rows, 0))
-////            {
-////                if (hs.add(r.getPos()))
-////                {
-////                    System.out.println((++h) + " " +r);                    
-////                }
-////            }
-//            
-//        }
-//    }
+    @Test
+    public void test_tvf()
+    {
+        TableAlias a = TableAlias.of(null, "source", "s");
+        a.setColumns(new String[] {"article_attribute"});
+        Row r = Row.of(a, 0, new Object[] {
+                ofEntries(entry("attribute1", ofEntries(
+                        entry("buckets", asList(
+                                ofEntries(entry("key", 1), entry("count", 10)),
+                                ofEntries(entry("key", 2), entry("count", 20)))))))});
+
+        /*
+         * 
+         * 
+         * source
+         *   articleAttribute (hashjoin <- sources provided)
+         *   article
+         *
+         * source
+         * articleAttribute     (hashjoin <- scan)
+         *
+         */
+        MapExtract o = new MapExtract(new String[] {"article_attribute", "attribute1", "buckets"});
+
+        OperatorContext ctx = new OperatorContext();
+        ctx.setParentRows(asList(r));
+        Iterator<Row> it = o.open(ctx);
+
+        while (it.hasNext())
+        {
+            System.out.println(it.next());
+        }
+    }
+
+    /** Extracts rows from parent rows.
+     * Traverses a map structure and builds rows on the fly
+     * */
+    private static class MapExtract implements Operator
+    {
+        private final String[] parts;
+
+        MapExtract(String[] parts)
+        {
+            this.parts = parts;
+        }
+
+        @Override
+        public Iterator<Row> open(OperatorContext context)
+        {
+            final Iterator<Row> it = context.getParentRows().iterator();
+            return new Iterator<Row>()
+            {
+                int pos = 0;
+                Row next;
+                Iterator<Map<String, Object>> mapIt;
+                TableAlias parent;
+                TableAlias alias = null;
+
+                @Override
+                public boolean hasNext()
+                {
+                    return next != null || setNext();
+                }
+
+                @Override
+                public Row next()
+                {
+                    Row r = next;
+                    next = null;
+                    return r;
+                }
+
+                boolean setNext()
+                {
+                    while (next == null)
+                    {
+                        if (mapIt == null)
+                        {
+                            if (!it.hasNext())
+                            {
+                                return false;
+                            }
+
+                            Row r = it.next();
+
+                            if (parent == null)
+                            {
+                                parent = r.getTableAlias();
+                            }
+
+                            // Dig down the path
+                            Map<String, Object> current = (Map<String, Object>) r.getObject(parts[0]);
+                            for (int i = 1; i < parts.length - 1; i++)
+                            {
+                                current = (Map<String, Object>) current.get(parts[i]);
+                            }
+
+                            Object last = current.get(parts[parts.length - 1]);
+                            mapIt = IteratorUtils.getIterator(last);
+                            continue;
+                        }
+                        else if (!mapIt.hasNext())
+                        {
+                            mapIt = null;
+                            continue;
+                        }
+
+                        Map<String, Object> item = mapIt.next();
+
+                        if (alias == null)
+                        {
+                            alias = TableAlias.of(parent, "mapExtract", "_mapExtract");
+                            alias.setColumns(item.keySet().toArray(ArrayUtils.EMPTY_STRING_ARRAY));
+                        }
+
+                        int length = alias.getColumns().length;
+                        Object[] values = new Object[length];
+                        for (int i = 0; i < length; i++)
+                        {
+                            values[i] = item.get(alias.getColumns()[i]);
+                        }
+
+                        next = Row.of(alias, pos++, values);
+                    }
+
+                    return next != null;
+                }
+            };
+        }
+
+    }
+
+    //    @Test
+    //    public void test_campaign() throws CompileException, InstantiationException, IllegalAccessException
+    //    {
+    //        for (int i = 0; i < 100; i++)
+    //        {
+    //            loadCampaign();
+    //        }
+    //    }
+    //
+    //    @SuppressWarnings("unchecked")
+    //    public <T> Set<T> asSet(T...items)
+    //    {
+    //        return new HashSet<>(asList(items));
+    //    }
+
+    //    @Test
+    //    public void loadCampaign() throws CompileException, InstantiationException, IllegalAccessException
+    //    {
+    //        /*
+    //         * from source s
+    //         * inner join campaign c (
+    //         *   ON (c.includeArtIds in (-1, s.art_id) OR c.includeSkuIds in (-1, s.sku_id))
+    //         *   AND NOT (c.excludeArtIds in (s.art_id) OR c.excludeSkuIds in (s.sku_id))
+    //         * )
+    //         *
+    //         * ====>
+    //         *
+    //         * - How to turn an array into a table?
+    //         * -
+    //         *
+    //         * from source s
+    //         * inner join campaign c (
+    //         *   on
+    //         *   (
+    //         *     c.apply_to_articles = -1
+    //         *     OR
+    //         *     (
+    //         *       c.includeArtIds = s.art_id
+    //         *       OR c.includeSkuIds = s.sku_id
+    //         *     )
+    //         *   )
+    //         *   AND NOT
+    //         *   (
+    //         *     c.excludeArtId = s.art_id
+    //         *     OR c.excludeSkuIds = s.sku_id
+    //         *   )
+    //         * )
+    //         *
+    //         *
+    //         */
+    //
+    //        TableAlias sourceMeta = TableAlias.of(null, "source", "s");
+    //        sourceMeta.setColumns(new String[] {"art_id", "sku_id"});
+    //        TableAlias campaignMeta = TableAlias.of(sourceMeta, "campaign", "c");
+    //        campaignMeta.setColumns(new String[] {"apply_to_articles", "includeArtIds", "includeSkuIds", "excludeArtIds", "excludeSkuIds"});
+    //
+    //        Random rnd = new Random();
+    //        // _source (art_id, sku_id)
+    //        Operator sourceScan = new ListScan(
+    //                sourceMeta,
+    //                new CachedSupplier<>(() -> IntStream.range(1, 300000).mapToObj(i -> new Object[] {i, i / 5 + i}).collect(Collectors.toList())));
+    //
+    //        // articleAttribute ("apply_to_articles", "includeArtIds", "includeSkuIds", "excludeArtIds", "excludeSkuIds")
+    //        Operator campaignScan = new ListScan(
+    //                campaignMeta,
+    //                new CachedSupplier<>(() -> IntStream.range(1, 200)
+    //                        .mapToObj(i -> new Object[] {0,  asList(rnd.nextInt(300000), rnd.nextInt(300000), rnd.nextInt(300000), rnd.nextInt(300000)), asList(rnd.nextInt(1000)),
+    //                                asList(rnd.nextInt(1000)), asList(rnd.nextInt(1000))})
+    //                        .collect(Collectors.toList())));
+    //
+    //        /*
+    //             (
+    //                 c.apply_to_articles = 1
+    //                 OR
+    //                 c.includeArtIds in (s.art_id)
+    //                 OR
+    //                 c.includeSkuIds in (s.sku_id)
+    //             )
+    //             AND NOT
+    //             (
+    //                c.excludeArtIds in (s.art_id)
+    //                OR
+    //                c.excludeSkuIds in (s.sku_id)
+    //             )
+    //        */
+    //
+    //        CodeGenerator gen = new CodeGenerator();
+    //        gen.generateBiPredicate(campaignMeta, expression)
+    //
+    ////        BiFunction<Row, Row, Object> pred = new BinaryBiExpression(
+    ////                new BinaryBiExpression(
+    ////                        new BinaryBiExpression(
+    ////                                new ColumnPathBiExpression("apply_to_articles", 0, true),
+    ////                                new ConstantBiExpression(1),
+    ////                                Operand.EQ),
+    ////                        new BinaryBiExpression(
+    ////                                new InExpression(
+    ////                                        new ColumnPathBiExpression("includeArtIds", 1, true),
+    ////                                        asList(new ColumnPathBiExpression("art_id", 0, false))),
+    ////                                new InExpression(
+    ////                                        new ColumnPathBiExpression("includeSkuIds", 2, true),
+    ////                                        asList(new ColumnPathBiExpression("sku_id", 1, false))),
+    ////                                Operand.OR),
+    ////                        Operand.OR),
+    ////                new NotBiExpression(
+    ////                        new BinaryBiExpression(
+    ////                                new InExpression(
+    ////                                        new ColumnPathBiExpression("excludeArtIds", 3, true),
+    ////                                        asList(new ColumnPathBiExpression("art_id", 0, false))),
+    ////                                new InExpression(
+    ////                                        new ColumnPathBiExpression("excludeSkuIds", 4, true),
+    ////                                        asList(new ColumnPathBiExpression("sku_id", 1, false))),
+    ////                                Operand.OR)),
+    ////                Operand.AND);
+    //
+    //        StopWatch sw = new StopWatch();
+    //        BiFunction<Row, Row, Object> predJanino = null;
+    //        for (int i = 0; i < 1; i++)
+    //        {
+    //            sw.reset();
+    //            sw.start();
+    //
+    //            ClassBodyEvaluator cbe = new ClassBodyEvaluator();
+    //            cbe.setDefaultImports(new String[] {"com.viskan.payloadbuilder.Row", "java.util.Objects", "java.util.Collection"});
+    //            cbe.setImplementedInterfaces(new Class[] {BiFunction.class});
+    //
+    //            StringBuilder sb = new StringBuilder();
+    //            sb.append("public Object apply(Object a, Object b) { ");
+    //            sb.append("Row outer = (Row) a; Row inner = (Row) b;");
+    //            sb.append("return ");
+    //            ((CodeGen) pred).append(sb);
+    //            sb.append(";");
+    //            sb.append("}");
+    //
+    //            System.out.println(sb.toString());
+    //            cbe.cook(sb.toString());
+    //
+    //            Class<?> clazz = cbe.getClazz();
+    //            predJanino = (BiFunction<Row, Row, Object>) clazz.newInstance();
+    //
+    //            sw.stop();
+    //            System.out.println("Time: " + sw.toString());
+    //        }
+    //
+    //        BiFunction<Row, Row, Object> p = predJanino;
+    //
+    //        Operator op = new NestedLoop(
+    //                sourceScan,
+    //                campaignScan,
+    //                (outer, inner) ->
+    //                {
+    //
+    //                                        return ((Boolean) pred.apply(outer, inner)).booleanValue();
+    ////                    return ((Boolean) p.apply(outer, inner)).booleanValue();
+    //
+    //                    //                    Object result = null;
+    //                    //                    try
+    //                    //                    {
+    //                    //                        result = se.evaluate(new Object[] { outer, inner });
+    //                    //                    }
+    //                    //                    catch (InvocationTargetException e)
+    //                    //                    {
+    //                    //                        e.printStackTrace();
+    //                    //                    }
+    //
+    //                    //                    boolean predRes = ((Boolean) pred.apply(outer, inner)).booleanValue();
+    //
+    //                    //                    if (!Objects.equals(result, predRes))
+    //                    //                    {
+    //                    //                        System.err.println("FEL");
+    //                    //                    }
+    //                    //                    return false;
+    //                    //                    return ((Boolean) result).booleanValue();
+    //                },
+    //
+    //                //                (outer, inner) -> (((Integer) inner.getObject(0)).intValue() == 1
+    //                //                    ||
+    //                //                    (((Collection) inner.getObject(1)).contains(outer.getObject(0))
+    //                //                        ||
+    //                //                        ((Collection) inner.getObject(2)).contains(outer.getObject(1))))
+    //                //                    &&
+    //                //                    !(((Collection) inner.getObject(3)).contains(outer.getObject(0))
+    //                //                        ||
+    //                //                        ((Collection) inner.getObject(4)).contains(outer.getObject(1))),
+    //                RowMerger.DEFAULT);
+    //
+    //        for (int i = 0; i < 100; i++)
+    //        {
+    //            sw.reset();
+    //            sw.start();
+    //
+    //            Iterator<Row> it = op.open(new OperatorContext());
+    //            int rowCount = 0;
+    //            int innerCount = 0;
+    //
+    //            List<Row> rows = new ArrayList<>();
+    //
+    //            while (it.hasNext())
+    //            {
+    //                Row row = it.next();
+    //                rows.add(row);
+    //                innerCount += row.getChildRows(0).size();
+    //                rowCount++;
+    //            }
+    //
+    //            System.out.println("Row count: " + rowCount + " Inner count: " +  innerCount + ", Memory: " + FileUtils.byteCountToDisplaySize(Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) + " Time: "
+    //                + sw.toString());
+    //
+    ////            int h=0;
+    ////            TIntHashSet hs = new TIntHashSet();
+    ////            for (Row r : new ParentChildRowsIteraor(rows, 0))
+    ////            {
+    ////                if (hs.add(r.getPos()))
+    ////                {
+    ////                    System.out.println((++h) + " " +r);
+    ////                }
+    ////            }
+    //
+    //        }
+    //    }
 
     @Test
     public void test1() throws JsonProcessingException

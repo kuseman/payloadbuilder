@@ -12,13 +12,13 @@ import java.util.List;
 
 import org.apache.directory.api.util.exception.NotImplementedException;
 
-/** Definition of a function */
-public abstract class FunctionInfo
+/** Definition of a scalar function */
+public abstract class ScalarFunctionInfo
 {
     private final Catalog catalog;
     private final String name;
 
-    protected FunctionInfo(Catalog catalog, String name)
+    public ScalarFunctionInfo(Catalog catalog, String name)
     {
         this.catalog = requireNonNull(catalog, "catalog");
         this.name = requireNonNull(name, "name");

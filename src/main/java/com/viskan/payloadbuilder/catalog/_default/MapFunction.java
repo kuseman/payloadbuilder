@@ -1,7 +1,7 @@
 package com.viskan.payloadbuilder.catalog._default;
 
 import com.viskan.payloadbuilder.catalog.Catalog;
-import com.viskan.payloadbuilder.catalog.FunctionInfo;
+import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
 import com.viskan.payloadbuilder.codegen.CodeGenratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
 import com.viskan.payloadbuilder.parser.tree.Expression;
@@ -10,7 +10,7 @@ import com.viskan.payloadbuilder.parser.tree.LambdaExpression;
 import java.util.List;
 
 /** Map function. Maps input into another form */
-class MapFunction extends FunctionInfo
+class MapFunction extends ScalarFunctionInfo
 {
     MapFunction(Catalog catalog)
     {

@@ -33,6 +33,16 @@ nestedSelectItem
    CPAREN
  ;
  
+errorCapturingIdentifier
+    : identifier errorCapturingIdentifierExtra
+    ;
+
+// extra left-factoring grammar
+errorCapturingIdentifierExtra
+    : (MINUS identifier)+    #errorIdent
+    |                        #realIdent
+    ;
+ 
 //join
 // : type=(INNER | LEFT) JOIN qname identifier
 //   ((populatingJoin, (populatingJoin)| ON expression
