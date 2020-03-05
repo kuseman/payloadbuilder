@@ -2,16 +2,17 @@ package com.viskan.payloadbuilder.parser.tree;
 
 import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.TableAlias;
-import com.viskan.payloadbuilder.codegen.CodeGenratorContext;
+import com.viskan.payloadbuilder.codegen.CodeGeneratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
+import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 import com.viskan.payloadbuilder.utils.MapUtils;
 
 import static java.util.Objects.requireNonNull;
-import static org.apache.commons.lang3.StringUtils.isBlank;
 
-import java.util.List;
+import java.util.Iterator;
 import java.util.Map;
-import java.util.Objects;
+
+import org.apache.commons.lang.ArrayUtils;
 
 /** Expression of a qualified name type.
  * Column reference with a nested path.
@@ -19,62 +20,91 @@ import java.util.Objects;
  **/
 public class QualifiedReferenceExpression extends Expression
 {
-    protected final QualifiedName qname;
+    private final QualifiedName qname;
+    /** Unique id for this reference expression. Used to
+     * for storing {@link QualifiedReferenceContainer} in evaluation context  */
+    private final int uniqueId;
+    /** If this references a lambda parameter, this points to it's unique id
+     * in current scope. Used to retrieve the current lambda value from evaluation context */
+    private final int lambdaId;
 
-    public QualifiedReferenceExpression(QualifiedName qname)
+    public QualifiedReferenceExpression(QualifiedName qname, int lambdaId)
     {
         this.qname = requireNonNull(qname, "qname");
+        this.uniqueId = 0;
+        this.lambdaId = lambdaId;
     }
 
     public QualifiedName getQname()
     {
         return qname;
     }
-    
-    @SuppressWarnings("unchecked")
-    @Override
-    public Object eval(Object evaluationContext, Row row)
+
+    public int getUniqueId()
     {
-        int size = qname.getParts().size();
-        int partStart = 0;
-        
-        TableAlias alias = row.getTableAlias();
-        
-        // Prio 1. Alias of the current rows alias
-        if (alias.getAlias().equals(qname.getFirst()))
+        return uniqueId;
+    }
+    
+    public int getLambdaId()
+    {
+        return lambdaId;
+    }
+    
+    @Override
+    public Object eval(EvaluationContext evaluationContext, Row row)
+    {
+        // This is a lambda reference, pick current value from context
+        if (lambdaId >= 0)
         {
-            partStart++;
+            return evaluationContext.getLambdaValue(lambdaId);
         }
         
-//        else
+        return row.getObject(qname.getFirst());
+//        QualifiedReferenceContainer container = evaluationContext.getContainer(qname, uniqueId);
+//        return container.getValue(row);
+        
+//        
+//        
+//        int size = qname.getParts().size();
+//        int partStart = 0;
+//        
+//        TableAlias alias = row.getTableAlias();
+//        
+//        // Prio 1. Alias of the current rows alias
+//        if (alias.getAlias().equals(qname.getFirst()))
 //        {
-//        alias = alias.getChildAlias(qname.getAlias());
-//        if (alias != null)
-//        {
-//            List<Row> childRows = row.getChildRows(alias.getParentIndex());
-//            // TODO: traverse child rows
+//            partStart++;
+//        }
+//        
+////        else
+////        {
+////        alias = alias.getChildAlias(qname.getAlias());
+////        if (alias != null)
+////        {
+////            List<Row> childRows = row.getChildRows(alias.getParentIndex());
+////            // TODO: traverse child rows
+////
+////            throw new NotImplementedException("Implement child rows traversal");
+////        }
+////        else
+////        {
+//            // TODO: Not a child select check parent
+//            // else traverse Map if any
 //
-//            throw new NotImplementedException("Implement child rows traversal");
-//        }
-//        else
-//        {
-            // TODO: Not a child select check parent
-            // else traverse Map if any
-
-            Object current = row.getObject(qname.getParts().get(partStart));
-            if (current instanceof Map)
-            {
-                return MapUtils.traverse((Map<Object, Object>) current, qname.getParts().subList(partStart + 1, size)); 
-            }
-            else
-            {
-                throw new IllegalArgumentException("Cannot traverse object: " + current);
-            }
-//        }
+//            Object current = row.getObject(qname.getParts().get(partStart));
+//            if (current instanceof Map)
+//            {
+//                return MapUtils.traverse((Map<Object, Object>) current, qname.getParts().subList(partStart + 1, size)); 
+//            }
+//            else
+//            {
+//                throw new IllegalArgumentException("Cannot traverse object: " + current);
+//            }
+////        }
     }
 
     @Override
-    public ExpressionCode generateCode(CodeGenratorContext context, ExpressionCode parentCode)
+    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
     {
         // TODO: Fix column reference
         //       1. Cache ordinal
@@ -93,22 +123,21 @@ public class QualifiedReferenceExpression extends Expression
             return code;
         }
 
-        String rowName = "row";
-        List<String> parts = qname.getParts();
+//        List<String> parts = qname.getParts();
         String column = qname.getParts().get(0);
 
-        if (context.biPredicate)
-        {
-            String alias = qname.getAlias();
-            // Blank alias or inner alias => inner row else outer
-            rowName = isBlank(alias) || Objects.equals(alias, context.tableAlias.getAlias()) ? "r_in" : "r_out";
-            if (parts.size() > 1)
-            {
-                // Only one nest level supported for now
-                column = parts.get(1);
-            }
-
-        }
+//        if (context.biPredicate)
+//        {
+//            String alias = qname.getAlias();
+//            // Blank alias or inner alias => inner row else outer
+//            rowName = isBlank(alias) || Objects.equals(alias, context.tableAlias.getAlias()) ? "r_in" : "r_out";
+//            if (parts.size() > 1)
+//            {
+//                // Only one nest level supported for now
+//                column = parts.get(1);
+//            }
+//
+//        }
 
         //        String inputVariableName = rowName + "_" + column;
         //        if (context.addedVars.add(inputVariableName))
@@ -134,12 +163,12 @@ public class QualifiedReferenceExpression extends Expression
         code.setCode(String.format(
                 "Object %s = %s.getObject(\"%s\");\n"
                     + "boolean %s = %s == null;\n",
-                code.getResVar(), rowName, column, code.getIsNull(), code.getResVar()));
+                code.getResVar(), context.getRowVarName(), column, code.getIsNull(), code.getResVar()));
         return code;
     }
 
     @Override
-    public <TR, TC> TR accept(TreeVisitor<TR, TC> visitor, TC context)
+    public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
     }
@@ -162,9 +191,108 @@ public class QualifiedReferenceExpression extends Expression
      * 2. Traverse Iterator
      * 3. Traverse Map
      **/
-    public class QualifiedReferenceContainer
+    public static class QualifiedReferenceContainer
     {
-        // Number of steps to traverse up 
+        /** Cached information for {@link Row} input */
         private int parentSteps;
+        private int[] childRowsPath;
+        private int ordinal;
+        
+        private final QualifiedName qname;
+        
+        public QualifiedReferenceContainer(QualifiedName qname)
+        {
+            this.qname = qname;
+        }
+        
+        @SuppressWarnings("unchecked")
+        private Object getValue(Object input, int partStart)
+        {
+            if (input instanceof Row)
+            {
+                return getValue((Row) input);
+            }
+            else if (input instanceof Map)
+            {
+                // Assumes the whole part chain is combined maps
+                return MapUtils.traverse((Map<Object, Object>) input, qname.getParts().subList(partStart, qname.getParts().size()));
+            }
+            else if (input instanceof Iterator)
+            {
+                return getValue((Iterator) input);
+                
+            }
+            return null;
+        }
+        
+        /** Get value for arbitrary object input
+         * Can be a Map iterator etc.
+         * */
+        Object getValue(Object input)
+        {
+            return getValue(input, 0);
+                    
+        }
+
+        /** Get value for itetator */
+        Object getValue(Iterator<Object> iterator)
+        {                
+            /*
+             * Iterator input.
+             * Example:
+             * 
+             * filter(articleAttribute, aa -> aa.sku_id > 0).price
+             * |-------------------------------------------| |----|
+             * Dereference left----^
+             * Qualified right --------------------------------^
+             * 
+             * Filter returns an iterator
+             * And is given to this qualified expression with parts "price"
+             * 
+             */
+            if (iterator.hasNext())
+            {
+                Object o = iterator.next();
+                return getValue(o);
+            }
+            
+            return null;
+        }
+        
+        /** Get value for for */
+        Object getValue(Row row)
+        {
+            if (row == null)
+            {
+                return null;
+            }
+            // TODO: Cache traversal steps
+            //       Make sure that cached TableAlias belongs to rows table alias        
+            
+            // 1. Alias it self
+            if (row.getTableAlias().getAlias().equals(qname.getFirst()))
+            {
+                return getValue(row.getObject(qname.getFirst()), 1);
+            }
+            
+            // 2. Child alias
+            TableAlias childAlias = row.getTableAlias().getChildAlias(qname.getFirst());
+            if (childAlias != null)
+            {
+                return "child alias " + qname.getFirst();
+            }
+            
+            // 3. Parent
+            // TODO:
+            
+            // 4. Column
+            int ordinal = ArrayUtils.indexOf(row.getTableAlias().getColumns(), qname.getFirst());
+            return row.getObject(ordinal);
+        }
+
+        /** Clear state. */
+        public void clear()
+        {
+        }
     }
 }

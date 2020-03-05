@@ -1,7 +1,10 @@
 package com.viskan.payloadbuilder.parser.tree;
 
-import com.viskan.payloadbuilder.codegen.CodeGenratorContext;
+import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.codegen.CodeGeneratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
+import com.viskan.payloadbuilder.evaluation.EvaluationContext;
+import com.viskan.payloadbuilder.evaluation.ExpressionMath;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
@@ -30,7 +33,31 @@ public class InExpression extends Expression
     }
     
     @Override
-    public ExpressionCode generateCode(CodeGenratorContext context, ExpressionCode parentCode)
+    public Object eval(EvaluationContext evaluationContext, Row row)
+    {
+        Object value = expression.eval(evaluationContext, row);
+        if (value == null)
+        {
+            return null;
+        }
+        
+        for (Expression arg : arguments)
+        {
+            Object argValue = arg.eval(evaluationContext, row);
+            if (argValue == null)
+            {
+                continue;
+            }
+            if (ExpressionMath.inValue(value, argValue))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    @Override
+    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
     {
         ExpressionCode childCode = expression.generateCode(context, parentCode);
         ExpressionCode code = ExpressionCode.code(context);
@@ -48,7 +75,7 @@ public class InExpression extends Expression
             + "  %s\n"
             + "  if (!%s)\n"
             + "  {\n"
-            + "    %s = inValue(%s, %s);\n"
+            + "    %s = ExpressionMath.inValue(%s, %s);\n"
             + "    %s = false;\n"
             + "  }\n"
             + "}\n";
@@ -76,7 +103,7 @@ public class InExpression extends Expression
     }
     
     @Override
-    public <TR, TC> TR accept(TreeVisitor<TR, TC> visitor, TC context)
+    public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
     }

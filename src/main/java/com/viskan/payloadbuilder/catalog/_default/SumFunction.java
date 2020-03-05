@@ -8,6 +8,6 @@ class SumFunction extends ScalarFunctionInfo
 {
     SumFunction(Catalog catalog)
     {
-        super(catalog, "sum");
+        super(catalog, "sum", Type.SCALAR);
     }
 }

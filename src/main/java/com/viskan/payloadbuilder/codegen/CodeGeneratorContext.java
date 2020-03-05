@@ -10,12 +10,29 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /** Context used during code generation */
-public class CodeGenratorContext
+public class CodeGeneratorContext
 {
     private final Map<String, AtomicInteger> varCountByPreix = new HashMap<>();
-    
+    // Generating a bi predicate
+    // Row associations are outer and inner else row
+    // TableAlias should reference inner relation
+//    public boolean biPredicate;
+    public TableAlias tableAlias;
+//    boolean pretty;
+    private final long now = System.currentTimeMillis();
+    private final String rowVarName = "row";
     // Current lambda parameters in scope
     private final Set<String> lambdaParameters = new HashSet<>();
+    
+    public long getNow()
+    {
+        return now;
+    }
+    
+    public String getRowVarName()
+    {
+        return rowVarName;
+    }
     
     /** Allocate a new unique variable name */
     public String newVar(String prefix)
@@ -41,12 +58,4 @@ public class CodeGenratorContext
     {
         return lambdaParameters.contains(identifier);
     }
-    
-    // Generating a bi predicate
-    // Row associations are outer and inner else row
-    // TableAlias should reference inner relation
-    public boolean biPredicate;
-    public TableAlias tableAlias;
-    boolean pretty;
-
 }

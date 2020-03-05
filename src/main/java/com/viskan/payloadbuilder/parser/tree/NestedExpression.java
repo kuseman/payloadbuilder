@@ -1,7 +1,9 @@
 package com.viskan.payloadbuilder.parser.tree;
 
-import com.viskan.payloadbuilder.codegen.CodeGenratorContext;
+import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.codegen.CodeGeneratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
+import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 
 import static java.util.Objects.requireNonNull;
 
@@ -32,13 +34,19 @@ public class NestedExpression extends Expression
     }
     
     @Override
-    public ExpressionCode generateCode(CodeGenratorContext context, ExpressionCode parentCode)
+    public Object eval(EvaluationContext evaluationContext, Row row)
+    {
+        return expression.eval(evaluationContext, row);
+    }
+    
+    @Override
+    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
     {
         return expression.generateCode(context, parentCode);
     }
     
     @Override
-    public <TR, TC> TR accept(TreeVisitor<TR, TC> visitor, TC context)
+    public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
     }

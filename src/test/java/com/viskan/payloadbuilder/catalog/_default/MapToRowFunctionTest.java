@@ -33,7 +33,7 @@ public class MapToRowFunctionTest extends Assert
                                 ofEntries(true, entry("key", 11), entry("count", 15)))))))
         });
         TableAlias func = TableAlias.of(a, "a", "a");
-        Object value = new QualifiedReferenceExpression(new QualifiedName(asList("a", "article_attribute", "attribute1", "buckets"))).eval(null, row);
+        Object value = new QualifiedReferenceExpression(new QualifiedName(asList("a", "article_attribute", "attribute1", "buckets")), -1).eval(null, row);
         
         Iterator<Row> it = f.open(new OperatorContext(), func, asList(value));
         while (it.hasNext())

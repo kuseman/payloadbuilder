@@ -5,6 +5,6 @@ import com.viskan.payloadbuilder.Row;
 import java.util.function.Predicate;
 
 /** Base class for predicates */
-public abstract class BasePredicate extends BaseExpression implements Predicate<Row>
+public abstract class BasePredicate implements Predicate<Row>
 {
 }

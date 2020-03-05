@@ -11,10 +11,8 @@ public class Catalog
 {
     /** Name of the catalog */
     private final String name;
-    /** Scalar functions */
-    private final Map<String, ScalarFunctionInfo> scalarFunctionByName = new HashMap<>();
-    // TODO: table's
-    //       table functions
+    /** Functions */
+    private final Map<String, FunctionInfo> functionByName = new HashMap<>();
     
     public Catalog(String name)
     {
@@ -27,15 +25,15 @@ public class Catalog
     }
 
     /** Register function */
-    public void registerScalarFunction(ScalarFunctionInfo functionInfo)
+    public void registerFunction(FunctionInfo functionInfo)
     {
         requireNonNull(functionInfo);
-        scalarFunctionByName.put(functionInfo.getName().toLowerCase(), functionInfo);
+        functionByName.put(functionInfo.getName().toLowerCase(), functionInfo);
     }
 
     /** Get function info by name */
-    public ScalarFunctionInfo getScalarFunction(String name)
+    public FunctionInfo getFunction(String name)
     {
-        return scalarFunctionByName.get(requireNonNull(name).toLowerCase());
+        return functionByName.get(requireNonNull(name).toLowerCase());
     }
 }

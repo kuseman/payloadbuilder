@@ -7,7 +7,7 @@ QualifiedName
 	- Multiple Identifier's separated with dot
 	- Column reference in expressions
 	
-
+Populating joins should be applied first before non populating ones
 
 ----------- QUERY BODY ---------------------
 

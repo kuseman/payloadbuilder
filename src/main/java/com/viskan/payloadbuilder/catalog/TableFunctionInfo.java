@@ -2,10 +2,7 @@ package com.viskan.payloadbuilder.catalog;
 
 import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.TableAlias;
-import com.viskan.payloadbuilder.catalog._default.DefaultCatalog;
 import com.viskan.payloadbuilder.operator.OperatorContext;
-
-import static java.util.Objects.requireNonNull;
 
 import java.util.Iterator;
 import java.util.List;
@@ -13,21 +10,22 @@ import java.util.List;
 /** Definition of a table valued function
  * These functions are applied row by row.
  **/
-public abstract class TableFunctionInfo
+public abstract class TableFunctionInfo extends FunctionInfo
 {
-    private final Catalog catalog;
-    private final String name;
+//    private final Catalog catalog;
+//    private final String name;
 
-    public TableFunctionInfo(Catalog catalog, String name)
+    public TableFunctionInfo(Catalog catalog, String name, Type type)
     {
-        this.catalog = requireNonNull(catalog, "catalog");
-        this.name = requireNonNull(name, "name");
+        super(catalog, name, type);
+//        this.catalog = requireNonNull(catalog, "catalog");
+//        this.name = requireNonNull(name, "name");
     }
     
-    public String getName()
-    {
-        return name;
-    }
+//    public String getName()
+//    {
+//        return name;
+//    }
 
     /** Open iterator for this function 
      * @param context Context
@@ -36,9 +34,9 @@ public abstract class TableFunctionInfo
      **/
     public abstract Iterator<Row> open(OperatorContext context, TableAlias tableAlias, List<Object> arguments);
     
-    @Override
-    public String toString()
-    {
-        return (DefaultCatalog.NAME.equals(catalog.getName()) ? "" : (catalog.getName() + ".")) + name;
-    }
+//    @Override
+//    public String toString()
+//    {
+//        return (DefaultCatalog.NAME.equals(catalog.getName()) ? "" : (catalog.getName() + ".")) + name;
+//    }
 }

@@ -38,7 +38,6 @@ public class CodeGenerator
     {
         ExpressionCode code = generate(expression, tableAlias, true);
         String generatedCode = String.format(BI_PREDICATE, code.code, code.isNull, code.resVar);
-        System.out.println(generatedCode);
         return compile(generatedCode, BaseBiPredicate.class, "BiPredicate");
     }
 
@@ -47,7 +46,6 @@ public class CodeGenerator
     {
         ExpressionCode code = generate(expression, tableAlias, false);
         String generatedCode = String.format(PREDICATE, code.code, code.isNull, code.resVar);
-        System.out.println(generatedCode);
         return compile(generatedCode, BasePredicate.class, "Predicate");
     }
 
@@ -56,17 +54,16 @@ public class CodeGenerator
     {
         ExpressionCode code = generate(expression, tableAlias, false);
         String generatedCode = String.format(FUNCTION, code.code, code.isNull, code.resVar);
-        System.out.println(generatedCode);
         return compile(generatedCode, BaseFunction.class, "Function");
     }
     
     /** Generate code for expression */
     private ExpressionCode generate(Expression expression, TableAlias tableAlias, boolean biPredicate)
     {
-        CodeGenratorContext context = new CodeGenratorContext();
-        context.biPredicate = biPredicate;
+        CodeGeneratorContext context = new CodeGeneratorContext();
+//        context.biPredicate = biPredicate;
         context.tableAlias = tableAlias;
-        context.pretty = false;
+//        context.pretty = false;
         return expression.generateCode(context, null);
     }
 
@@ -79,7 +76,9 @@ public class CodeGenerator
         cbe.setExtendedClass(baseClass);
         cbe.setDefaultImports(
                 new String[] {
-                        "com.viskan.payloadbuilder.Row"
+                        "com.viskan.payloadbuilder.Row",
+                        "com.viskan.payloadbuilder.utils.*",
+                        "com.viskan.payloadbuilder.evaluation.ExpressionMath"
                 });
 
         try

@@ -57,11 +57,23 @@
             <version>3.0.0</version>
         </dependency>
          -->
+         
+         <!-- TEST -->
+         <dependency>
+            <groupId>org.openjdk.jmh</groupId>
+            <artifactId>jmh-core</artifactId>
+            <version>1.23</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openjdk.jmh</groupId>
+            <artifactId>jmh-generator-annprocess</artifactId>
+            <version>1.23</version>
+            <scope>provided</scope> 
+         </dependency>
          <dependency>
             <groupId>com.fifesoft</groupId>
             <artifactId>rsyntaxtextarea</artifactId>
             <version>3.0.8</version>
-            <scope>test</scope>
         </dependency>
          
          
@@ -75,6 +87,20 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.8.1</version>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.openjdk.jmh</groupId>
+                            <artifactId>jmh-generator-annprocess</artifactId>
+                            <version>1.23</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.antlr</groupId>
                 <artifactId>antlr4-maven-plugin</artifactId>

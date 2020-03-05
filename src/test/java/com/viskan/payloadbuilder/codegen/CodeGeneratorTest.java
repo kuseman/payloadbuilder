@@ -4,7 +4,9 @@ import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.CatalogRegistry;
+import com.viskan.payloadbuilder.catalog.FunctionInfo.Type;
 import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
+import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 import com.viskan.payloadbuilder.operator.NestedLoop;
 import com.viskan.payloadbuilder.operator.Operator;
 import com.viskan.payloadbuilder.operator.OperatorContext;
@@ -89,18 +91,19 @@ public class CodeGeneratorTest extends Assert
         assertExpression(true, row, "f is null");
         assertExpression(true, row, "f is null and a");
         assertExpression(994, row, "hash(1,2)");
+        assertExpression(null, row, "hash(1,null)");
         
         assertExpression(-2L, row, "-2");
     }
     
     @Test
-    public void test_schema() throws Exception
+    public void test_catalog() throws Exception
     {
         Catalog utils = new Catalog("UTILS");
-        utils.registerScalarFunction(new ScalarFunctionInfo(utils, "uuid")
+        utils.registerFunction(new ScalarFunctionInfo(utils, "uuid", Type.SCALAR)
         {
             @Override
-            public ExpressionCode generateCode(CodeGenratorContext context, ExpressionCode parentCode, List<Expression> arguments)
+            public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode, List<Expression> arguments)
             {
                 ExpressionCode code = ExpressionCode.code(context);
                 code.setCode(String.format(
@@ -111,9 +114,9 @@ public class CodeGeneratorTest extends Assert
             }
             
             @Override
-            public Object eval(Row row)
+            public Object eval(EvaluationContext context, List<Expression> arguments, Row row)
             {
-                return null;
+                return java.util.UUID.randomUUID().toString();
             }
         });
         catalogRegistry.registerCatalog(utils);
@@ -640,6 +643,7 @@ public class CodeGeneratorTest extends Assert
             Expression expr = parser.parseExpression(catalogRegistry, expression);
             BaseFunction function = codeGenerator.generateFunction(alias, expr);
             assertEquals(expression, value, function.apply(row));
+            assertEquals("Eval: " + expression, value, expr.eval(new EvaluationContext(), row));
         }
         catch (Exception e)
         {

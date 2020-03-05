@@ -83,7 +83,7 @@ public class ApplyOperatorTest extends Assert
 
         Range(int to)
         {
-            super(new Catalog("test"), "Range");
+            super(new Catalog("test"), "Range", Type.TABLE);
             this.to = to;
         }
 

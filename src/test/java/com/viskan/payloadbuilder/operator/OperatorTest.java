@@ -36,6 +36,7 @@ import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.time.StopWatch;
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -43,6 +44,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import gnu.trove.map.hash.THashMap;
 
+@Ignore
 public class OperatorTest extends Assert
 {
     /*

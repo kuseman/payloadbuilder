@@ -1,7 +1,10 @@
 package com.viskan.payloadbuilder.parser.tree;
 
-import com.viskan.payloadbuilder.codegen.CodeGenratorContext;
+import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.codegen.CodeGeneratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
+import com.viskan.payloadbuilder.evaluation.EvaluationContext;
+import com.viskan.payloadbuilder.evaluation.ExpressionMath;
 
 import static java.util.Objects.requireNonNull;
 
@@ -46,7 +49,14 @@ public class ArithmeticUnaryExpression extends Expression
     }
     
     @Override
-    public ExpressionCode generateCode(CodeGenratorContext context, ExpressionCode parentCode)
+    public Object eval(EvaluationContext evaluationContext, Row row)
+    {
+        Object result = expression.eval(evaluationContext, row);
+        return result != null ? ExpressionMath.negate(result) : null;
+    }
+    
+    @Override
+    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
     {
         ExpressionCode childCode = expression.generateCode(context, parentCode);
         ExpressionCode code = ExpressionCode.code(context);
@@ -55,7 +65,7 @@ public class ArithmeticUnaryExpression extends Expression
         switch (type)
         {
             case MINUS:
-                method = "negate";
+                method = "ExpressionMath.negate";
                 break;
             case PLUS:
                 throw new NotImplementedException("unary plus");
@@ -83,7 +93,7 @@ public class ArithmeticUnaryExpression extends Expression
     }
     
     @Override
-    public <TR, TC> TR accept(TreeVisitor<TR, TC> visitor, TC context)
+    public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
     }

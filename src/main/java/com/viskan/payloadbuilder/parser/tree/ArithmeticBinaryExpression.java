@@ -1,8 +1,15 @@
 package com.viskan.payloadbuilder.parser.tree;
 
-import com.viskan.payloadbuilder.codegen.CodeGenratorContext;
+import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.codegen.CodeGeneratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
+import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 
+import static com.viskan.payloadbuilder.evaluation.ExpressionMath.add;
+import static com.viskan.payloadbuilder.evaluation.ExpressionMath.divide;
+import static com.viskan.payloadbuilder.evaluation.ExpressionMath.modulo;
+import static com.viskan.payloadbuilder.evaluation.ExpressionMath.multiply;
+import static com.viskan.payloadbuilder.evaluation.ExpressionMath.subtract;
 import static java.util.Objects.requireNonNull;
 
 public class ArithmeticBinaryExpression extends Expression
@@ -51,7 +58,34 @@ public class ArithmeticBinaryExpression extends Expression
     }
     
     @Override
-    public ExpressionCode generateCode(CodeGenratorContext context, ExpressionCode parentCode)
+    public Object eval(EvaluationContext evaluationContext, Row row)
+    {
+        Object leftResult = left.eval(evaluationContext, row);
+        Object rightResult = right.eval(evaluationContext, row);
+        
+        if (leftResult == null || rightResult == null)
+        {
+            return null;
+        }
+        
+        switch (type)
+        {
+            case ADD:
+                return add(leftResult, rightResult);
+            case SUBTRACT:
+                return subtract(leftResult, rightResult);
+            case MULTIPLY:
+                return multiply(leftResult, rightResult);
+            case DIVIDE:
+                return divide(leftResult, rightResult);
+            case MODULUS:
+                return modulo(leftResult, rightResult);
+                default:
+                    throw new IllegalArgumentException("Unknown operator " + type);
+        }    }
+    
+    @Override
+    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
     {
         ExpressionCode leftCode = left.generateCode(context, parentCode);
         ExpressionCode rightCode = right.generateCode(context, parentCode);
@@ -61,38 +95,42 @@ public class ArithmeticBinaryExpression extends Expression
         switch (type)
         {
             case ADD:
-                method = "add";
+                method = "ExpressionMath.add";
                 break;
             case SUBTRACT:
-                method = "subtract";
+                method = "ExpressionMath.subtract";
                 break;
             case MULTIPLY:
-                method = "multiply";
+                method = "ExpressionMath.multiply";
                 break;
             case DIVIDE:
-                method = "divide";
+                method = "ExpressionMath.divide";
                 break;
             case MODULUS:
-                method = "modulo";
+                method = "ExpressionMath.modulo";
                 break;
         }
 
         String template = "%s"
-            + "%s"
             + "Object %s = null;\n"
             + "boolean %s = true;\n"
-            + "if (!%s && !%s)\n"
+            + "if (!%s)\n"
             + "{\n"
-            + "  %s = %s(%s, %s);\n"
-            + "  %s = false;\n"
+            + "  %s"
+            + "  if (!%s)\n"
+            + "  {"
+            + "    %s = %s(%s, %s);\n"
+            + "    %s = false;\n"
+            + "  }\n"
             + "}\n";
 
         code.setCode(String.format(template,
                 leftCode.getCode(),
-                rightCode.getCode(),
                 code.getResVar(),
                 code.getIsNull(),
-                leftCode.getIsNull(), rightCode.getIsNull(),
+                leftCode.getIsNull(), 
+                rightCode.getCode(),
+                rightCode.getIsNull(),
                 code.getResVar(), method, leftCode.getResVar(), rightCode.getResVar(),
                 code.getIsNull()));
 
@@ -100,7 +138,7 @@ public class ArithmeticBinaryExpression extends Expression
     }
     
     @Override
-    public <TR, TC> TR accept(TreeVisitor<TR, TC> visitor, TC context)
+    public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
     }

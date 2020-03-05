@@ -1,6 +1,6 @@
 package com.viskan.payloadbuilder.parser.tree;
 
-import com.viskan.payloadbuilder.codegen.CodeGenratorContext;
+import com.viskan.payloadbuilder.codegen.CodeGeneratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
 
 import static java.util.Objects.requireNonNull;
@@ -12,13 +12,22 @@ public class LambdaExpression extends Expression
 {
     private final List<String> identifiers;
     private final Expression expression;
+    /**
+     * <pre>
+     *  Unique ids for identifying lambda identifiers.
+     * Used to retrieve the underlying value contained in the identifier
+     * during evaluation.
+     * </pre>
+     */
+    private final int[] lambdaIds;
 
-    public LambdaExpression(List<String> identifiers, Expression expression)
+    public LambdaExpression(List<String> identifiers, Expression expression, int[] lambdaIds)
     {
         this.identifiers = requireNonNull(identifiers, "identifiers");
         this.expression = requireNonNull(expression);
+        this.lambdaIds = lambdaIds;
     }
-    
+
     public List<String> getIdentifiers()
     {
         return identifiers;
@@ -29,10 +38,15 @@ public class LambdaExpression extends Expression
         return expression;
     }
     
-    @Override
-    public <TR, TC> TR accept(TreeVisitor<TR, TC> visitor, TC context)
+    public int[] getLambdaIds()
     {
-        throw new IllegalArgumentException("Labmda expressions");
+        return lambdaIds;
+    }
+
+    @Override
+    public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
+    {
+        return visitor.visit(this, context);
     }
 
     @Override
@@ -46,9 +60,9 @@ public class LambdaExpression extends Expression
     {
         throw new IllegalArgumentException("Labmda expressions");
     }
-    
+
     @Override
-    public ExpressionCode generateCode(CodeGenratorContext context, ExpressionCode parentCode)
+    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
     {
         throw new IllegalArgumentException("Labmda expressions");
     }

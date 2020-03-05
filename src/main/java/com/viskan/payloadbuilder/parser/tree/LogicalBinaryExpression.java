@@ -1,7 +1,9 @@
 package com.viskan.payloadbuilder.parser.tree;
 
-import com.viskan.payloadbuilder.codegen.CodeGenratorContext;
+import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.codegen.CodeGeneratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
+import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 
 import static java.util.Objects.requireNonNull;
 
@@ -22,7 +24,6 @@ public class LogicalBinaryExpression extends Expression
     {
         return type;
     }
-    
     
     public Expression getLeft()
     {
@@ -47,7 +48,56 @@ public class LogicalBinaryExpression extends Expression
     }
     
     @Override
-    public ExpressionCode generateCode(CodeGenratorContext context, ExpressionCode parentCode)
+    public Object eval(EvaluationContext evaluationContext, Row row)
+    {
+        Object lr = left.eval(evaluationContext, row);
+        if (type == Type.AND)
+        {
+            /* False if either side is false or null */
+            if (lr != null && !(Boolean) lr)
+            {
+                return false;
+            }
+            
+            Object rr = right.eval(evaluationContext, row);
+
+            if (rr != null && !(Boolean) rr)
+            {
+                return false;
+            }
+            
+            if (rr == null || lr == null)
+            {
+                return null;
+            }
+            
+            return true;
+        }
+
+        /* OR 3vl
+         True if either side is true or null */
+        if (lr != null && (Boolean) lr)
+        {
+            return true;
+        }
+        
+        Object rr = right.eval(evaluationContext, row);
+        
+        if (rr != null && (Boolean) rr)
+        {
+            return true;
+        }
+        
+        if (lr == null || rr == null)
+        {
+            return null;
+        }
+
+        return false;
+    }
+    
+    @Override
+    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
     {
         ExpressionCode leftCode = left.generateCode(context, parentCode);
         ExpressionCode rightCode = right.generateCode(context, parentCode);
@@ -179,7 +229,7 @@ public class LogicalBinaryExpression extends Expression
     }
     
     @Override
-    public <TR, TC> TR accept(TreeVisitor<TR, TC> visitor, TC context)
+    public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
     }

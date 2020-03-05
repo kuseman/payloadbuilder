@@ -9,49 +9,55 @@ grammar PayloadBuilderQuery;
 }
 
 query
- : SELECT selectItem (COMMA selectItem)*
-   FROM from=qname alias=identifier
+ : SELECT selectItem (',' selectItem)*
+   (FROM tableSourceJoined)?
    (WHERE where=expression)?
-   (ORDERBY sortItem (COMMA sortItem)*)?
+   (GROUPBY groupBy+=expression (',' groupBy+=expression)*)?
+   (ORDERBY sortItem (',' sortItem)*)?
    EOF
  ;
 
 selectItem
  : 
  ( ((OBJECT | ARRAY) nestedSelectItem) | expression) (AS? identifier)?
-// | qname DOT Asterix
-// | Asterix
  ;
  
 nestedSelectItem
- : OPAREN
-   selectItem (COMMA selectItem)*
-   (FROM from=qname)?
+ : '('
+   selectItem (',' selectItem)*
+   (FROM qname)?
    (WHERE where=expression)?
-   CPAREN
+   ')'
  ;
  
-errorCapturingIdentifier
-    : identifier errorCapturingIdentifierExtra
-    ;
+tableSourceJoined
+ : tableSource joinItem*
+ ;
 
-// extra left-factoring grammar
-errorCapturingIdentifierExtra
-    : (MINUS identifier)+    #errorIdent
-    |                        #realIdent
-    ;
+joinItem
+ : populatingJoinPart
+ | joinPart
+ ;
+
+populatingJoinPart
+ : '{'
+   joinItem*
+   (GROUPBY groupBy+=expression (',' groupBy+=expression)*)?
+   (ORDERBY sortItem (',' sortItem)*)?
+   (HAVING having=expression)?
+   '}'
+ ;
+
+tableSource
+ : qname			identifier
+ | functionCall		identifier
+ ;
  
-//join
-// : type=(INNER | LEFT) JOIN qname identifier
-//   ((populatingJoin, (populatingJoin)| ON expression
-// ;
-//
-//populatingJoin
-// : '('
-//     
-//   ')'
-// ;
-//
+joinPart
+ : (INNER | LEFT) JOIN tableSourceJoined ON expression
+ | (CROSS | OUTER) APPLY tableSourceJoined
+;
+
 sortItem
  : expression order=(ASC | DESC)? 
    (NULLS nullOrder=(FIRST | LAST))?						
@@ -70,7 +76,7 @@ expression
    right=expression											#comparisonExpression
  | left=expression 
    NOT? IN 
-   OPAREN expression (COMMA expression)* CPAREN				#inExpression
+   '(' expression (',' expression)* ')'						#inExpression
  | expression IS NOT? NULL  								#nullPredicate
  | NOT expression                                           #logicalNot
  | left=expression 
@@ -85,12 +91,12 @@ primary
  | '(' identifier (',' identifier)+ ')' '->' expression  	#lambdaExpression
  | value=primary '[' index=expression ']'    				#subscript	
  | qname													#columnReference
- | left=primary DOT (functionCall | qname)					#dereference	
+ | left=primary '.' (functionCall | qname)					#dereference	
  | '(' expression ')' 										#nestedExpression			
  ;
 
 functionCall
- : qname OPAREN ( expression (COMMA expression)*)? CPAREN
+ : qname '(' ( expression (',' expression)*)? ')'
  ;
  
 literal
@@ -111,7 +117,7 @@ compareOperator
  ; 
 
 qname
- : identifier (DOT identifier)*
+ : identifier ('.' identifier)*
  ;
 
 identifier
@@ -135,37 +141,36 @@ booleanLiteral
  : TRUE | FALSE 
  ;
  
-// Common tokens 
-OPAREN: '(';
-CPAREN: ')';
- 
-AND		: 'and';
-ARRAY	: 'array';
-AS		: 'as';
-ASC		: 'asc';
-COMMA	: ',';
-DESC	: 'desc';
-DOT		: '.';
-EXISTS	: 'exists';
-FALSE	: 'false';
-FIRST	: 'first';
-FROM	: 'from';
-IN		: 'in';
-INNER	: 'inner';
-IS      : 'is';
-JOIN	: 'join';
-LAST	: 'last';
-LEFT	: 'left';
-NOT		: 'not';
-NULL	: 'null';
-NULLS	: 'nulls';
-OBJECT	: 'object';
-ON		: 'on';
-OR		: 'or';
-ORDERBY	: 'order by';
-SELECT	: 'select';
-TRUE	: 'true';
-WHERE	: 'where';
+// Tokens
+AND		: A N D;//'and';
+ARRAY	: A R R A Y;//'array';
+AS		: A S;//'as';
+ASC		: A S C;//'asc';
+APPLY	: A P P L Y;//'apply';
+CROSS   : C R O S S;//'cross';
+DESC	: D E S C;//'desc';
+FALSE	: F A L S E;//'false';
+FIRST	: F I R S T;//'first';
+FROM	: F R O M;//'from';
+GROUPBY : G R O U P ' ' B Y;//'group by';
+HAVING  : H A V I N G;
+IN		: I N;//'in';
+INNER	: I N N E R;//'inner';
+IS      : I S;//'is';
+JOIN	: J O I N;//'join';
+LAST	: L A S T;//'last';
+LEFT	: L E F T;//'left';
+NOT		: N O T;//'not';
+NULL	: N U L L;//'null';
+NULLS	: N U L L S;//'nulls';
+OBJECT	: O B J E C T;//'object';
+ON		: O N;//'on';
+OR		: O R;//'or';
+ORDERBY	: O R D E R ' ' B Y;//'order by';
+OUTER   : O U T E R;//'outer';
+SELECT	: S E L E C T;//'select';
+TRUE	: T R U E;//'true';
+WHERE	: W H E R E;//'where';
 
 ASTERISK			: '*';
 EQUALS				: '=';
@@ -217,4 +222,32 @@ fragment LETTER
 fragment DIGIT 
  : [0-9]
  ;
+ 
+fragment A : [aA]; 
+fragment B : [bB];
+fragment C : [cC];
+fragment D : [dD];
+fragment E : [eE];
+fragment F : [fF];
+fragment G : [gG];
+fragment H : [hH];
+fragment I : [iI];
+fragment J : [jJ];
+fragment K : [kK];
+fragment L : [lL];
+fragment M : [mM];
+fragment N : [nN];
+fragment O : [oO];
+fragment P : [pP];
+fragment Q : [qQ];
+fragment R : [rR];
+fragment S : [sS];
+fragment T : [tT];
+fragment U : [uU];
+fragment V : [vV];
+fragment W : [wW];
+fragment X : [xX];
+fragment Y : [yY];
+fragment Z : [zZ];
+ 
  

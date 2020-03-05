@@ -1,25 +1,51 @@
 package com.viskan.payloadbuilder.catalog._default;
 
+import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
-import com.viskan.payloadbuilder.codegen.CodeGenratorContext;
+import com.viskan.payloadbuilder.codegen.CodeGeneratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
+import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 import com.viskan.payloadbuilder.parser.tree.Expression;
 import com.viskan.payloadbuilder.parser.tree.LambdaExpression;
 
+import static java.util.Arrays.asList;
+
 import java.util.List;
+
+import org.apache.commons.collections.IteratorUtils;
+import org.apache.commons.collections.iterators.TransformIterator;
 
 /** Map function. Maps input into another form */
 class MapFunction extends ScalarFunctionInfo
 {
     MapFunction(Catalog catalog)
     {
-        super(catalog, "map");
+        super(catalog, "map", Type.SCALAR);
+    }
+    
+    @Override
+    public List<Class<? extends Expression>> getInputTypes()
+    {
+        return asList(Expression.class, LambdaExpression.class);
+    }
+    
+    @Override
+    public Object eval(EvaluationContext context, List<Expression> arguments, Row row)
+    {
+        Object argResult = arguments.get(0).eval(context, row);
+        LambdaExpression le = (LambdaExpression) arguments.get(1);
+        int lambdaId = le.getLambdaIds()[0];
+        return new TransformIterator(IteratorUtils.getIterator(argResult), input -> 
+        {
+            context.setLambdaValue(lambdaId, input);
+            return le.getExpression().eval(context, row);   
+        });
     }
     
     @Override
     public ExpressionCode generateCode(
-            CodeGenratorContext context,
+            CodeGeneratorContext context,
             ExpressionCode parentCode,
             List<Expression> arguments)
     {
@@ -52,7 +78,7 @@ class MapFunction extends ScalarFunctionInfo
         String template = 
                 "%s"
               + "boolean %s = false;\n"
-              + "java.util.Iterator %s = new org.apache.commons.collections.iterators.TransformIterator(getIterator(%s), new org.apache.commons.collections.Transformer()\n"
+              + "java.util.Iterator %s = new org.apache.commons.collections.iterators.TransformIterator(IteratorUtils.getIterator(%s), new org.apache.commons.collections.Transformer()\n"
               + "{\n"
               + "  public Object transform(Object object)\n"
               + "  {\n"

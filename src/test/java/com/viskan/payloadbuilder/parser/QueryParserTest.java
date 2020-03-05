@@ -27,6 +27,15 @@ public class QueryParserTest extends Assert
     }
     
     @Test
+    public void test_joins()
+    {
+        assertQuery("select art_id from article a");
+        assertQuery("select art_id from article a inner join articleAttribute aa on aa.art_id = a.art_id");
+        assertQuery("select art_id from article a { inner join articleAttribute aa on aa.art_id = a.art_id }");
+        assertQuery("select art_id from article a { inner join articleAttribute aa { inner join articlePrice ap {} on ap.sku_id = aa.sku_id } on aa.art_id = a.art_id }");
+    }
+    
+    @Test
     public void test_expressions()
     {
         assertExpression("1");
@@ -48,12 +57,19 @@ public class QueryParserTest extends Assert
     }
     
     @Test
-    public void test_dotExpression()
+    public void test_lambda_and_scopes()
     {
         assertExpression("articleAttribute.filter(a -> a.sku_id > 0)");
         assertExpression("articleAttribute.filter(a -> a.sku_id > 0).map(aa -> aa.sku_id).sum()");
         assertExpression("articleAttribute.filter(a -> a.sku_id > 0).price.map(p -> p.price_sales).sum()");
-        
+
+        assertExpression("articleAttribute.map(aa -> aa.price.map(ap -> ap.campaigns.map(c -> c.camp_name)))");
+
+        assertExpression("articleAttribute.map(aa -> aa.price.map(ap -> ap.campaigns.map(c -> c.camp_name)))");
+
+        // Reuse lambda parameter in sibling scope
+        assertExpression("articleAttribute.map(aa -> aa.price.map(a -> a.price_sales) and aa.balance.map(a -> a.balance_disp))");
+
         // Should not dereference non qualified expressions
         assertExpressionFail(IllegalArgumentException.class, "'rere'.filter(a -> a.sku_id > 0)");
         // Lambda parameter already in use

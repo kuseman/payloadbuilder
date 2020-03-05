@@ -4,6 +4,7 @@ import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.catalog.CatalogRegistry;
 import com.viskan.payloadbuilder.codegen.CodeGenerator;
+import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 import com.viskan.payloadbuilder.parser.QueryParser;
 import com.viskan.payloadbuilder.parser.tree.Expression;
 
@@ -15,8 +16,8 @@ import org.apache.commons.collections.IteratorUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
-/** Tests functions etc. in default schema */
-public class DefaultSchemaTest extends Assert
+/** Tests functions etc. in default catalog */
+public class DefaultCatalogTest extends Assert
 {
     private final CodeGenerator codeGenerator = new CodeGenerator();
     private final QueryParser parser = new QueryParser();
@@ -29,6 +30,12 @@ public class DefaultSchemaTest extends Assert
         assertFunction(null, null, "hash(null,true)");
         assertFunction(1262, null, "hash(true)");
         assertFunction(1115, null, "hash(1,123)");
+    }
+    
+    @Test
+    public void test_function_now()
+    {
+        assertFunction(true, null, "now() > 0");
     }
 
     @Test
@@ -63,6 +70,14 @@ public class DefaultSchemaTest extends Assert
             actual = IteratorUtils.toList((Iterator) actual);
         }
 
-        assertEquals(expected, actual);
+        assertEquals("Code gen", expected, actual);
+        
+        actual = e.eval(new EvaluationContext(), row);
+        if (actual instanceof Iterator)
+        {
+            actual = IteratorUtils.toList((Iterator) actual);
+        }
+
+        assertEquals("Eval", expected, actual);
     }
 }

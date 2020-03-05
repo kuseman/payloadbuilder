@@ -15,9 +15,10 @@ public class DefaultCatalog
         catalogRegistry.registerCatalog(catalog);
         
         /** Register funtions */
-        catalog.registerScalarFunction(new HashFunction(catalog));
-        catalog.registerScalarFunction(new FilterFunction(catalog));
-        catalog.registerScalarFunction(new MapFunction(catalog));
-        catalog.registerScalarFunction(new SumFunction(catalog));
+        catalog.registerFunction(new HashFunction(catalog));
+        catalog.registerFunction(new FilterFunction(catalog));
+        catalog.registerFunction(new MapFunction(catalog));
+        catalog.registerFunction(new SumFunction(catalog));
+        catalog.registerFunction(new NowFunction(catalog));
     }
 }

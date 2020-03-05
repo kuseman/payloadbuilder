@@ -33,7 +33,7 @@ public class ExpressionCode
     /** Create a new code from context
      * Generates a new result and isnull variable 
      **/
-    public static ExpressionCode code(CodeGenratorContext context)
+    public static ExpressionCode code(CodeGeneratorContext context)
     {
         ExpressionCode ec = new ExpressionCode();
         ec.resVar = context.newVar("res");

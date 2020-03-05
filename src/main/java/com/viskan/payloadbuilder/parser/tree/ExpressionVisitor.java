@@ -1,8 +1,8 @@
 package com.viskan.payloadbuilder.parser.tree;
 
-public interface TreeVisitor<TR, TC>
+/** Visitor definition of expressions */
+public interface ExpressionVisitor<TR, TC>
 {
-    /** Expressions */
     TR visit(LiteralNullExpression expression, TC context);
     TR visit(LiteralBooleanExpression expression, TC context);
     TR visit(LiteralNumericExpression expression, TC context);
@@ -19,4 +19,5 @@ public interface TreeVisitor<TR, TC>
     TR visit(NullPredicateExpression expression, TC context);
     TR visit(QualifiedFunctionCallExpression expression, TC context);
     TR visit(DereferenceExpression expression, TC context);
+    TR visit(LambdaExpression expression, TC context);
 }

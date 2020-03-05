@@ -32,7 +32,7 @@ class MapToRowFunction extends TableFunctionInfo
 {
     MapToRowFunction(Catalog catalog)
     {
-        super(catalog, "mapToRow");
+        super(catalog, "mapToRow", Type.TABLE);
     }
     
     @Override

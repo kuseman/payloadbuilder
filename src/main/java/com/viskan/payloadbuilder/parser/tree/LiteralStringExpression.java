@@ -1,6 +1,6 @@
 package com.viskan.payloadbuilder.parser.tree;
 
-import com.viskan.payloadbuilder.codegen.CodeGenratorContext;
+import com.viskan.payloadbuilder.codegen.CodeGeneratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
 
 import static java.util.Objects.requireNonNull;
@@ -16,7 +16,7 @@ public class LiteralStringExpression extends LiteralExpression
     }
     
     @Override
-    public ExpressionCode generateCode(CodeGenratorContext context, ExpressionCode parentCode)
+    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
     {
         ExpressionCode code = ExpressionCode.code(context);
         String template = "String %s = \"%s\";\n"
@@ -26,7 +26,7 @@ public class LiteralStringExpression extends LiteralExpression
     }
     
     @Override
-    public <TR, TC> TR accept(TreeVisitor<TR, TC> visitor, TC context)
+    public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
     }

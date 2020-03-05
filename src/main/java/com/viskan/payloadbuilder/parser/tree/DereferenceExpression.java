@@ -1,9 +1,14 @@
 package com.viskan.payloadbuilder.parser.tree;
 
-import com.viskan.payloadbuilder.codegen.CodeGenratorContext;
+import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.codegen.CodeGeneratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
+import com.viskan.payloadbuilder.evaluation.EvaluationContext;
+import com.viskan.payloadbuilder.parser.tree.QualifiedReferenceExpression.QualifiedReferenceContainer;
 
 import static java.util.Objects.requireNonNull;
+
+import java.util.Iterator;
 
 public class DereferenceExpression extends Expression
 {
@@ -27,7 +32,28 @@ public class DereferenceExpression extends Expression
     }
     
     @Override
-    public ExpressionCode generateCode(CodeGenratorContext context, ExpressionCode parentCode)
+    public Object eval(EvaluationContext evaluationContext, Row row)
+    {
+        Object leftResult = left.eval(evaluationContext, row);
+        
+        /** Extract first result from iterator */
+        if (leftResult instanceof Iterator)
+        {
+            @SuppressWarnings("unchecked")
+            Iterator<Object> it = (Iterator<Object>) leftResult;
+            leftResult = it.hasNext() ? it.next() : null;
+        }
+        if (leftResult == null)
+        {
+            return null;
+        }
+        
+        QualifiedReferenceContainer container = evaluationContext.getContainer(right.getQname(), right.getUniqueId());
+        return container.getValue(leftResult);
+    }
+    
+    @Override
+    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
     {
         /*
          * a.func().b
@@ -66,7 +92,7 @@ public class DereferenceExpression extends Expression
     }
 
     @Override
-    public <TR, TC> TR accept(TreeVisitor<TR, TC> visitor, TC context)
+    public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
     }
