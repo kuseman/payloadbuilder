@@ -4,7 +4,7 @@ import static java.util.Objects.requireNonNull;
 
 import org.apache.commons.lang.NotImplementedException;
 
-public abstract class TableSource
+public abstract class TableSource extends ANode
 {
     protected final String alias;
     

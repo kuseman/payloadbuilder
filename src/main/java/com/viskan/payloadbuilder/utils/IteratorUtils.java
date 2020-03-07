@@ -2,7 +2,6 @@ package com.viskan.payloadbuilder.utils;
 
 import com.viskan.payloadbuilder.Row;
 
-import static java.util.Collections.emptyIterator;
 import static java.util.Objects.requireNonNull;
 
 import java.util.Collection;
@@ -25,15 +24,9 @@ public class IteratorUtils
     @SuppressWarnings("unchecked")
     public static Iterator<Object> getIterator(Object obj)
     {
-        if (obj == null)
-        {
-            return emptyIterator();
-
-        }
-        else if (obj instanceof Iterator)
+        if (obj instanceof Iterator)
         {
             return (Iterator) obj;
-
         }
         else if (obj instanceof Collection)
         {
@@ -49,11 +42,11 @@ public class IteratorUtils
         {
             return new EnumerationIterator((Enumeration) obj);
         }
-        else if (obj.getClass().isArray())
+        else if (obj != null && obj.getClass().isArray())
         {
             return new ArrayIterator(obj);
         }
-        
+
         return new SingletonIterator(obj);
     }
 

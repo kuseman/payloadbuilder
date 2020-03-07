@@ -67,7 +67,7 @@ public class DereferenceExpression extends Expression
         System.out.println(right);
         
         ExpressionCode leftCode = left.generateCode(context, parentCode);
-        ExpressionCode code = ExpressionCode.code(context);
+        ExpressionCode code = ExpressionCode.code(context, leftCode);
         
         String template = 
                 "%s"

@@ -9,7 +9,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.function.BiFunction;
-import java.util.function.BiPredicate;
+import java.util.function.Predicate;
 import java.util.function.ToIntFunction;
 
 import org.apache.commons.lang3.StringUtils;
@@ -25,7 +25,7 @@ class HashMatch implements Operator
     private final Operator inner;
     private final ToIntFunction<Row> outerHashFunction;
     private final ToIntFunction<Row> innerHashFunction;
-    private final BiPredicate<Row, Row> equalsFunction;
+    private final Predicate<Row> predicate;
     private final BiFunction<Row, Row, Row> rowMerger;
 
     HashMatch(
@@ -33,14 +33,14 @@ class HashMatch implements Operator
             Operator inner,
             ToIntFunction<Row> outerHashFunction,
             ToIntFunction<Row> innerHashFunction,
-            BiPredicate<Row, Row> equalsFunction,
+            Predicate<Row> predicate,
             BiFunction<Row, Row, Row> rowMerger)
     {
         this.outer = outer;
         this.inner = inner;
         this.outerHashFunction = outerHashFunction;
         this.innerHashFunction = innerHashFunction;
-        this.equalsFunction = equalsFunction;
+        this.predicate = predicate;
         this.rowMerger = rowMerger;
     }
 
@@ -127,10 +127,17 @@ class HashMatch implements Operator
 
                     Row currentOuter = outerIt.next();
 
-                    if (equalsFunction.test(currentOuter, currentInner))
+                    Row prevParent = currentInner.getParent();
+                    currentInner.setParent(currentOuter);
+                    
+                    if (predicate.test(currentInner))
                     {
                         next = rowMerger.apply(currentOuter, currentInner);
                     }
+                    else
+                    {
+                        currentInner.setParent(prevParent);
+                    }                   
                 }
 
                 return next != null;

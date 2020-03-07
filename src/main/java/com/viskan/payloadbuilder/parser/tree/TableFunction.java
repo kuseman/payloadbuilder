@@ -27,4 +27,16 @@ public class TableFunction extends TableSource
     {
         return arguments;
     }
+    
+    @Override
+    public <TR, TC> TR accept(TreeVisitor<TR, TC> visitor, TC context)
+    {
+        return visitor.visit(this, context);                
+    }
+    
+    @Override
+    public String toString()
+    {
+        return functionInfo + " " + alias;
+    }
 }

@@ -12,20 +12,10 @@ import java.util.List;
  **/
 public abstract class TableFunctionInfo extends FunctionInfo
 {
-//    private final Catalog catalog;
-//    private final String name;
-
     public TableFunctionInfo(Catalog catalog, String name, Type type)
     {
         super(catalog, name, type);
-//        this.catalog = requireNonNull(catalog, "catalog");
-//        this.name = requireNonNull(name, "name");
     }
-    
-//    public String getName()
-//    {
-//        return name;
-//    }
 
     /** Open iterator for this function 
      * @param context Context
@@ -33,10 +23,4 @@ public abstract class TableFunctionInfo extends FunctionInfo
      * @param arguments Arguments to function
      **/
     public abstract Iterator<Row> open(OperatorContext context, TableAlias tableAlias, List<Object> arguments);
-    
-//    @Override
-//    public String toString()
-//    {
-//        return (DefaultCatalog.NAME.equals(catalog.getName()) ? "" : (catalog.getName() + ".")) + name;
-//    }
 }

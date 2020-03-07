@@ -1,5 +1,6 @@
 package com.viskan.payloadbuilder.parser.tree;
 
+import static java.util.Arrays.asList;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.join;
@@ -57,4 +58,20 @@ public class QualifiedName
         return new QualifiedName(parts.subList(from, to));
     }
 
+    @Override
+    public int hashCode()
+    {
+        return parts.hashCode();
+    }
+    
+    @Override
+    public boolean equals(Object obj)
+    {
+        return obj instanceof QualifiedName && parts.equals(((QualifiedName) obj).parts);
+    }
+
+    public static QualifiedName of(String ... parts)
+    {
+        return new QualifiedName(asList(parts));
+    }
 }

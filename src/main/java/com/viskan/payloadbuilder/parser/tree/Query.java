@@ -5,7 +5,7 @@ import static java.util.stream.Collectors.joining;
 
 import java.util.List;
 
-public class Query
+public class Query extends ANode
 {
     private final List<SelectItem> selectItems;
     private final JoinedTableSource from;
@@ -49,6 +49,12 @@ public class Query
     public List<SortItem> getOrderBy()
     {
         return orderBy;
+    }
+    
+    @Override
+    public <TR, TC> TR accept(TreeVisitor<TR, TC> visitor, TC context)
+    {
+        return visitor.visit(this, context);
     }
     
     @Override

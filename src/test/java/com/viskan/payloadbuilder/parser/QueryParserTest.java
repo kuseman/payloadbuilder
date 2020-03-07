@@ -118,6 +118,7 @@ public class QueryParserTest extends Assert
     {
         Query q = parser.parseQuery(catalogRegistry, query);
         System.out.println(q);
+        System.out.println();
     }
     
     private void assertExpressionFail(Class<? extends Exception> expected, String expression)

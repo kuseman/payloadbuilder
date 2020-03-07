@@ -14,11 +14,17 @@ public class DefaultCatalog
         Catalog catalog = new Catalog(NAME);
         catalogRegistry.registerCatalog(catalog);
         
-        /** Register funtions */
+        // Scalar funtions
+        catalog.registerFunction(new ConcatFunction(catalog));
         catalog.registerFunction(new HashFunction(catalog));
         catalog.registerFunction(new FilterFunction(catalog));
         catalog.registerFunction(new MapFunction(catalog));
         catalog.registerFunction(new SumFunction(catalog));
         catalog.registerFunction(new NowFunction(catalog));
+        catalog.registerFunction(new FlatMapFunction(catalog));
+        
+        // Table functions
+        catalog.registerFunction(new Range(catalog));
+        catalog.registerFunction(new MapToRowFunction(catalog));
     }
 }

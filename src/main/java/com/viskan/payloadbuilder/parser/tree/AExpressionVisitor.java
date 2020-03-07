@@ -1,122 +1,152 @@
 package com.viskan.payloadbuilder.parser.tree;
 
+import java.util.List;
+
 /** Visitor adapter for expression visitors */
 public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR, TC>
 {
+    /** Default result 
+     * @param context Context for visitor
+     **/
+    protected TR defaultResult(TC context)
+    {
+        return null;
+    }
+
+    /** Aggregate results */
+    @SuppressWarnings("unused")
+    protected TR aggregate(TR result, TR nextResult)
+    {
+        return nextResult;
+    }
+    
     @Override
     public TR visit(LiteralNullExpression expression, TC context)
     {
-        return null;
+        return defaultResult(context);
     }
 
     @Override
     public TR visit(LiteralBooleanExpression expression, TC context)
     {
-        return null;
+        return defaultResult(context);
     }
 
     @Override
     public TR visit(LiteralNumericExpression expression, TC context)
     {
-        return null;
+        return defaultResult(context);
     }
 
     @Override
     public TR visit(LiteralDecimalExpression expression, TC context)
     {
-        return null;
+        return defaultResult(context);
     }
 
     @Override
     public TR visit(LiteralStringExpression expression, TC context)
     {
-        return null;
+        return defaultResult(context);
     }
 
     @Override
     public TR visit(ComparisonExpression expression, TC context)
     {
-        expression.getLeft().accept(this, context);
-        expression.getRight().accept(this, context);
-        return null;
+        return visitChildren(context, expression.getLeft(), expression.getRight());
     }
 
     @Override
     public TR visit(ArithmeticUnaryExpression expression, TC context)
     {
-        expression.getExpression().accept(this, context);
-        return null;
+        return visitChildren(context, expression.getExpression());
     }
 
     @Override
     public TR visit(ArithmeticBinaryExpression expression, TC context)
     {
-        expression.getLeft().accept(this, context);
-        expression.getRight().accept(this, context);
-        return null;
+        return visitChildren(context, expression.getLeft(), expression.getRight());
     }
 
     @Override
     public TR visit(LogicalBinaryExpression expression, TC context)
     {
-        expression.getLeft().accept(this, context);
-        expression.getRight().accept(this, context);
-        return null;
+        return visitChildren(context, expression.getLeft(), expression.getRight());
     }
 
     @Override
     public TR visit(LogicalNotExpression expression, TC context)
     {
-        expression.getExpression().accept(this, context);
-        return null;
+        return visitChildren(context, expression.getExpression());
     }
 
     @Override
     public TR visit(InExpression expression, TC context)
     {
-        expression.getExpression().accept(this, context);
-        expression.getArguments().forEach(arg -> arg.accept(this, context));
-        return null;
+        return visitChildren(context, expression.getArguments(), expression.getExpression());
     }
 
     @Override
     public TR visit(QualifiedReferenceExpression expression, TC context)
     {
-        return null;
+        return defaultResult(context);
     }
 
     @Override
     public TR visit(NestedExpression expression, TC context)
     {
-        expression.getExpression().accept(this, context);
-        return null;
+        return visitChildren(context, expression.getExpression());
     }
 
     @Override
     public TR visit(NullPredicateExpression expression, TC context)
     {
-        return null;
+        return defaultResult(context);
     }
 
     @Override
     public TR visit(QualifiedFunctionCallExpression expression, TC context)
     {
-        expression.getArguments().forEach(arg -> arg.accept(this, context));
-        return null;
+        return visitChildren(context, expression.getArguments(), (Expression[]) null);
     }
 
     @Override
     public TR visit(DereferenceExpression expression, TC context)
     {
-        expression.getLeft().accept(this, context);
-        expression.getRight().accept(this, context);
-        return null;
+        return visitChildren(context, expression.getLeft(), expression.getRight());
     }
 
     @Override
     public TR visit(LambdaExpression expression, TC context)
     {
-        expression.getExpression().accept(this, context);
-        return null;
+        return visitChildren(context, expression.getExpression());
+    }
+    
+    private TR visitChildren(TC context, Expression ... args)
+    {
+        return visitChildren(context, null, args);
+    }
+    
+    private TR visitChildren(TC context, List<Expression> expressions, Expression ... args)
+    {
+        TR result = defaultResult(context);
+        if (expressions != null)
+        {
+            for (Expression e : expressions)
+            {
+                TR value = e.accept(this, context);
+                result = aggregate(result, value);
+            }
+        }
+        
+        if (args != null)
+        {
+            for (Expression e : args)
+            {
+                TR value = e.accept(this, context);
+                result = aggregate(result, value);
+            }
+        }
+        return result;
     }
 }

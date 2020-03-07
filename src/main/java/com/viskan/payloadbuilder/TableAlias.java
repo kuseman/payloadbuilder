@@ -1,22 +1,49 @@
 package com.viskan.payloadbuilder;
 
+import com.viskan.payloadbuilder.parser.tree.QualifiedName;
+
+import static java.util.Arrays.asList;
+import static java.util.Objects.requireNonNull;
+
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.IntStream;
+
+import org.apache.commons.lang3.StringUtils;
 
 /** Domain of a table alias */
 public class TableAlias
 {
-    private TableAlias parent;
-    private String alias;
-    private String table;
+    private final TableAlias parent;
+    private final QualifiedName table;
+    private final String alias;
+    private final List<TableAlias> childAliases = new ArrayList<>();
     private String[] columns;
-    private List<TableAlias> childAliases;
+
+    public TableAlias(
+            TableAlias parent,
+            QualifiedName table,
+            String alias,
+            String[] columns)
+    {
+        this.parent = parent;
+        this.table = requireNonNull(table, "table");
+        this.alias = requireNonNull(alias, "alias");
+        this.columns = columns;
+
+        if (parent != null)
+        {
+            parent.childAliases.add(this);
+            parentIndex = parent.childAliases.size() - 1;
+        }
+    }
 
     // Index of rows of this type in parent row
     int parentIndex;
 
-    public String getTable()
+    public QualifiedName getTable()
     {
         return table;
     }
@@ -25,12 +52,12 @@ public class TableAlias
     {
         return alias;
     }
-    
+
     public TableAlias getParent()
     {
         return parent;
     }
-    
+
     public TableAlias getChildAlias(String alias)
     {
         if (childAliases == null)
@@ -44,10 +71,10 @@ public class TableAlias
                 return child;
             }
         }
-        
+
         return null;
     }
-    
+
     public String[] getColumns()
     {
         return columns;
@@ -57,42 +84,64 @@ public class TableAlias
     {
         this.columns = columns;
     }
-    
+
     public int getParentIndex()
     {
         return parentIndex;
     }
-    
-    /** TODO: Should not be public */
-    public void setParentIndex(int parentIndex)
+
+    /** Print alias hierarchy */
+    public String printHierarchy(int indent)
     {
-        this.parentIndex = parentIndex;
+        StringBuilder sb = new StringBuilder();
+        sb.append(StringUtils.repeat(' ', indent * 2));
+        sb.append(toString());
+        if (columns != null)
+        {
+            sb.append(" ").append(Arrays.toString(columns));
+        }
+        sb.append(System.lineSeparator());
+
+        if (childAliases != null)
+        {
+            childAliases.forEach(a -> sb.append(a.printHierarchy(indent + 1)));
+        }
+
+        return sb.toString();
     }
-    
+
+    // NOTE! No hashCode or equals since
+    //       this structure is used during build and changes while located in
+    //       a Map and hence cannot have other than identity hashCode//equals
+
     @Override
     public String toString()
     {
-        return table + " ( " + alias + ")";
+        return table + " (" + alias + ")";
     }
 
-    /** Construct a table meta from provided table name*/
+    /** Used for test verification only */
+    public boolean isEqual(TableAlias other)
+    {
+        return table.equals(other.table)
+            &&
+            alias.equals(other.alias)
+            &&
+            Objects.deepEquals(columns, other.columns)
+            &&
+            childAliases.size() == other.childAliases.size()
+            &&
+            IntStream.range(0, childAliases.size()).allMatch(i -> childAliases.get(i).isEqual(other.childAliases.get(i)));
+    }
+
     public static TableAlias of(TableAlias parent, String table, String alias)
     {
-        TableAlias m = new TableAlias();
-        m.parent = parent;
-        m.table = table;
-        m.alias = alias;
-        
-        if (parent != null)
-        {
-            if (parent.childAliases == null)
-            {
-                parent.childAliases = new ArrayList<>();
-            }
-            parent.childAliases.add(m);
-            m.parentIndex = parent.childAliases.size() - 1;
-        }
-        
-        return m;
+        return TableAlias.of(parent, new QualifiedName(asList(table)), alias);
+    }
+
+    /** Construct a table alias from provided table name */
+    public static TableAlias of(TableAlias parent, QualifiedName table, String alias)
+    {
+        return new TableAlias(parent, table, alias, null);
     }
 }

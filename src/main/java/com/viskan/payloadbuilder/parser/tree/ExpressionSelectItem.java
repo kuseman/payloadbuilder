@@ -11,6 +11,17 @@ public class ExpressionSelectItem extends SelectItem
         super(identifier);
         this.expression = requireNonNull(expression, "expression");
     }
+    
+    public Expression getExpression()
+    {
+        return expression;
+    }
+    
+    @Override
+    public <TR, TC> TR accept(TreeVisitor<TR, TC> visitor, TC context)
+    {
+        return visitor.visit(this, context);
+    }
 
     @Override
     public String toString()

@@ -30,6 +30,7 @@ public class Row
         this.tableAlias = source.tableAlias;
         this.values = source.values;
         this.childRows = copyChildRows();
+        this.parent = source.parent;
     }
 
     private List<List<Row>> copyChildRows()
@@ -108,6 +109,16 @@ public class Row
     public TableAlias getTableAlias()
     {
         return tableAlias;
+    }
+    
+    public Row getParent()
+    {
+        return parent;
+    }
+    
+    public void setParent(Row parent)
+    {
+        this.parent = parent;
     }
     
     /**

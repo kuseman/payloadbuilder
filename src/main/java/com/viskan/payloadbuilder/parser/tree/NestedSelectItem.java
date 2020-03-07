@@ -8,22 +8,51 @@ import java.util.List;
 public class NestedSelectItem extends SelectItem
 {
     private final List<SelectItem> selectItems;
-    private final QualifiedName from;
+    private final Expression from;
     private final Expression where;
+    private final List<SortItem> orderBy;
     private final Type type;
 
     public NestedSelectItem(
             Type type,
             List<SelectItem> selectItems,
-            QualifiedName from,
+            Expression from,
             Expression where,
-            String identifier)
+            String identifier,
+            List<SortItem> orderBy)
     {
         super(identifier);
         this.type = requireNonNull(type, "type");
         this.selectItems = requireNonNull(selectItems, "selectItems");
         this.from = from;
         this.where = where;
+        this.orderBy = orderBy;
+    }
+    
+    public Expression getFrom()
+    {
+        return from;
+    }
+    
+    public List<SelectItem> getSelectItems()
+    {
+        return selectItems;
+    }
+    
+    public Expression getWhere()
+    {
+        return where;
+    }
+    
+    public List<SortItem> getOrderBy()
+    {
+        return orderBy;
+    }
+    
+    @Override
+    public <TR, TC> TR accept(TreeVisitor<TR, TC> visitor, TC context)
+    {
+        return visitor.visit(this, context);
     }
 
     @Override

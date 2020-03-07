@@ -13,9 +13,9 @@ import static java.util.Collections.emptyList;
 import java.util.List;
 
 /** Now function, returns the current unix epoch */
-public class NowFunction extends ScalarFunctionInfo
+class NowFunction extends ScalarFunctionInfo
 {
-    public NowFunction(Catalog catalog)
+    NowFunction(Catalog catalog)
     {
         super(catalog, "now", Type.SCALAR);
     }

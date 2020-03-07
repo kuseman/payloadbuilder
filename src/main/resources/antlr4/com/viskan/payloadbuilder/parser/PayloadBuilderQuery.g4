@@ -25,8 +25,9 @@ selectItem
 nestedSelectItem
  : '('
    selectItem (',' selectItem)*
-   (FROM qname)?
+   (FROM from=expression)?
    (WHERE where=expression)?
+   (ORDERBY sortItem (',' sortItem)*)?
    ')'
  ;
  
@@ -43,8 +44,8 @@ populatingJoinPart
  : '{'
    joinItem*
    (GROUPBY groupBy+=expression (',' groupBy+=expression)*)?
+   (WHERE where=expression)?
    (ORDERBY sortItem (',' sortItem)*)?
-   (HAVING having=expression)?
    '}'
  ;
 

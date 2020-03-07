@@ -2,7 +2,7 @@ package com.viskan.payloadbuilder.parser.tree;
 
 import org.apache.commons.lang.NotImplementedException;
 
-public abstract class JoinItem
+public abstract class AJoin extends ANode
 {
     @Override
     public String toString()

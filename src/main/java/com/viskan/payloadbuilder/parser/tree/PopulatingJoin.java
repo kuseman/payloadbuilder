@@ -6,26 +6,26 @@ import java.util.List;
 
 /** Populating join type. Does not produce
  * tuples but instead populates outer rows with join rows */
-public class PopulatingJoin extends JoinItem
+public class PopulatingJoin extends AJoin
 {
     private final List<SortItem> orderBy;
     private final List<Expression> groupBy;
-    private final List<JoinItem> joins;
-    private final Expression having;
+    private final List<AJoin> joins;
+    private final Expression where;
     
     public PopulatingJoin(
             List<SortItem> orderBy,
             List<Expression> groupBy,
-            List<JoinItem> joins,
-            Expression having)
+            List<AJoin> joins,
+            Expression where)
     {
         this.orderBy = requireNonNull(orderBy, "orderBy");
         this.groupBy = requireNonNull(groupBy, "groupBy");
         this.joins = requireNonNull(joins, "joins");
-        this.having = having;
+        this.where = where;
     }
     
-    public List<JoinItem> getJoins()
+    public List<AJoin> getJoins()
     {
         return joins;
     }
@@ -40,9 +40,15 @@ public class PopulatingJoin extends JoinItem
         return groupBy;
     }
     
-    public Expression getHaving()
+    public Expression getWhere()
     {
-        return having;
+        return where;
+    }
+    
+    @Override
+    public <TR, TC> TR accept(TreeVisitor<TR, TC> visitor, TC context)
+    {
+        return visitor.visit(this, context);                
     }
     
     @Override

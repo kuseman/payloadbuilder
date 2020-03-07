@@ -2,17 +2,34 @@ package com.viskan.payloadbuilder.parser.tree;
 
 import static java.util.Objects.requireNonNull;
 
-public class SortItem
+public class SortItem extends ANode
 {
-    private final Expression sort;
+    private final Expression expression;
     private final Order order;
     private final NullOrder nullOrder;
     
-    public SortItem(Expression sort, Order order, NullOrder nullOrder)
+    public SortItem(Expression expression, Order order, NullOrder nullOrder)
     {
-        this.sort = requireNonNull(sort, "sort");
+        this.expression = requireNonNull(expression, "expression");
         this.order = requireNonNull(order, "order");
         this.nullOrder = requireNonNull(nullOrder, "nullOrder");
+    }
+    
+    public Expression getExpression()
+    {
+        return expression;
+    }
+    
+    @Override
+    public <TR, TC> TR accept(TreeVisitor<TR, TC> visitor, TC context)
+    {
+        return visitor.visit(this, context);                
+    }
+    
+    @Override
+    public String toString()
+    {
+        return expression + " " + order + (nullOrder != NullOrder.UNDEFINED ? (" NULLS " + nullOrder) : "");
     }
     
     public enum NullOrder
@@ -23,11 +40,5 @@ public class SortItem
     public enum Order
     {
         ASC,DESC;
-    }
-    
-    @Override
-    public String toString()
-    {
-        return sort + " " + order + (nullOrder != NullOrder.UNDEFINED ? (" NULLS " + nullOrder) : "");
     }
 }

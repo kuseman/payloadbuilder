@@ -1,44 +1,46 @@
 package com.viskan.payloadbuilder.catalog;
 
 import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.codegen.CodeGeneratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
 import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 import com.viskan.payloadbuilder.parser.tree.Expression;
 
 import java.util.List;
+import java.util.Set;
+import java.util.function.Function;
 
 import org.apache.commons.lang3.NotImplementedException;
 
 /** Definition of a scalar function */
 public abstract class ScalarFunctionInfo extends FunctionInfo
 {
-//    private final Catalog catalog;
-//    private final String name;
-
     public ScalarFunctionInfo(Catalog catalog, String name, Type type)
     {
         super(catalog, name, type);
-//        this.catalog = requireNonNull(catalog, "catalog");
-//        this.name = requireNonNull(name, "name");
     }
-    
-//    public String getName()
-//    {
-//        return name;
-//    }
-//    
-//    /** Returns expression types wanted as input */
-//    public List<Class<? extends Expression>> getInputTypes()
-//    {
-//        return null;
-//    }
-//    
-//    /** Data type of this function */
-//    public Class<?> getDataType()
-//    {
-//        return Object.class;
-//    }
+
+    /**
+     * Resolves resulting aliases for this function for provided parent aliases.
+     * <pre>
+     * Example:
+     * "concat(aa, aa.ap)"
+     * This has source as parent alias and will resolve both arguments as resulting aliases
+     * [aa, ap]
+     * 
+     * Example:
+     * "aa.filter(aa, x -> x.sku_id > 0)"
+     * Resulting alias of a filter is the first arg alias ie. [aa]
+     * </pre>
+     * @param parentAliases Parent aliases in context to this function
+     * @param arguments Argument expressions to this function
+     * @param aliasResolver Resolver for resolving arguments aliases
+     **/
+    public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Expression> arguments, Function<Expression, Set<TableAlias>> aliasResolver)
+    {
+        return parentAliases;
+    }
     
     /** Evaluate this function */
     @SuppressWarnings("unused")
@@ -56,16 +58,4 @@ public abstract class ScalarFunctionInfo extends FunctionInfo
     {
         throw new NotImplementedException("generate code: " + getClass().getSimpleName());
     }
-
-//    /** Is this function nullable */
-//    public boolean isNullable()
-//    {
-//        return true;
-//    }
-//    
-//    @Override
-//    public String toString()
-//    {
-//        return (DefaultCatalog.NAME.equals(catalog.getName()) ? "" : (catalog.getName() + ".")) + name;
-//    }
 }

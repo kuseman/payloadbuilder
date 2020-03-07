@@ -23,7 +23,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
-import java.util.function.BiPredicate;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -218,7 +218,7 @@ public class CodeGeneratorTest extends Assert
 
 
         CodeGenerator gen = new CodeGenerator();
-        BiPredicate<Row, Row> predicate = gen.generateBiPredicate(campaignMeta, e);
+        Predicate<Row> predicate = gen.generatePredicate(campaignMeta, e);
         
 //        BiPredicate<Row, Row> predicate = getBiPredicate(expression, campaignMeta);
         //                ExpressionCodeGenVisitorTest::test;// getBiPredicate(expression, campaignMeta);

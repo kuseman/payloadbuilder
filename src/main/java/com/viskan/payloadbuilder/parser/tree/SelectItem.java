@@ -1,6 +1,6 @@
 package com.viskan.payloadbuilder.parser.tree;
 
-public abstract class SelectItem
+public abstract class SelectItem extends ANode
 {
     protected final String identifier;
 

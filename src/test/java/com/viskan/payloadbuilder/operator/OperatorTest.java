@@ -125,7 +125,7 @@ public class OperatorTest extends Assert
                 priceScan,
                 t -> (int) t.getObject(1),
                 t -> (int) t.getObject(1),
-                (o, i) -> Objects.equals(o.getObject(1), i.getObject(1)),
+                row -> Objects.equals(row.getParent().getObject(1), row.getObject(1)),
                 RowMerger.DEFAULT));
 
         return new GroupBy(priceScan, row -> row.getObject(1));
@@ -167,7 +167,7 @@ public class OperatorTest extends Assert
                 priceScan,
                 t -> (int) t.getObject(1),
                 t -> (int) t.getObject(1),
-                (o, i) -> Objects.equals(o.getObject(1), i.getObject(1)),
+                row -> Objects.equals(row.getParent().getObject(1), row.getObject(1)),
                 RowMerger.COPY);
 
         // _source.art_id == articleAttribute.art_id
@@ -176,7 +176,7 @@ public class OperatorTest extends Assert
                 aa_ap,
                 t -> (int) t.getObject(1),
                 t -> (int) t.getObject(0),
-                (o, i) -> Objects.equals(o.getObject(1), i.getObject(0)),
+                row -> Objects.equals(row.getParent().getObject(1), row.getObject(0)),
                 DEFAULT));
 
         return op;
@@ -239,7 +239,7 @@ public class OperatorTest extends Assert
                 priceScan,
                 new ColumnPathHashFunction("aa.sku_id"),
                 new ColumnPathHashFunction("ap.sku_id"),
-                new ColumnPathBiPredicate("aa.sku_id", "ap.sku_id"),
+                new ColumnPathPredicate("aa.sku_id", "ap.sku_id"),
                 DEFAULT));
 
         // articleAttribute.attr1_id == attribute1.attr1_id
@@ -248,7 +248,7 @@ public class OperatorTest extends Assert
                 attribute1Scan,
                 new ColumnPathHashFunction("aa.attr1_id"),
                 new ColumnPathHashFunction("a1.attr1_id"),
-                new ColumnPathBiPredicate("aa.attr1_id", "a1.attr1_id"),
+                new ColumnPathPredicate("aa.attr1_id", "a1.attr1_id"),
                 DEFAULT));
 
         // articleAttribute.attr2_id == attribute2.attr2_id
@@ -257,7 +257,7 @@ public class OperatorTest extends Assert
                 attribute2Scan,
                 new ColumnPathHashFunction("aa.attr2_id"),
                 new ColumnPathHashFunction("a2.attr2_id"),
-                new ColumnPathBiPredicate("aa.attr2_id", "a2.attr2_id"),
+                new ColumnPathPredicate("aa.attr2_id", "a2.attr2_id"),
                 DEFAULT));
 
         // articleAttribute.attr3_id == attribute3.attr3_id
@@ -266,7 +266,7 @@ public class OperatorTest extends Assert
                 attribute3Scan,
                 new ColumnPathHashFunction("aa.attr3_id"),
                 new ColumnPathHashFunction("a3.attr3_id"),
-                new ColumnPathBiPredicate("aa.attr3_id", "a3.attr3_id"),
+                new ColumnPathPredicate("aa.attr3_id", "a3.attr3_id"),
                 DEFAULT));
 
         // _source.art_id == articleAttribute.art_id
@@ -275,7 +275,7 @@ public class OperatorTest extends Assert
                 aa_a3,
                 new ColumnPathHashFunction("s.art_id"),
                 new ColumnPathHashFunction("aa.art_id"),
-                new ColumnPathBiPredicate("s.art_id", "aa.art_id"),
+                new ColumnPathPredicate("s.art_id", "aa.art_id"),
                 DEFAULT));
 
         return op;
@@ -352,7 +352,7 @@ public class OperatorTest extends Assert
                 articleAttributeScan,
                 new ColumnPathHashFunction("s.art_id"),
                 new ColumnPathHashFunction("aa.art_id"),
-                new ColumnPathBiPredicate("s.art_id", "aa.art_id"),
+                new ColumnPathPredicate("s.art_id", "aa.art_id"),
                 (outer, inner) -> outer);
 
         for (int i = 0; i < 100; i++)

@@ -18,6 +18,12 @@ public class Table extends TableSource
     }
     
     @Override
+    public <TR, TC> TR accept(TreeVisitor<TR, TC> visitor, TC context)
+    {
+        return visitor.visit(this, context);                
+    }
+    
+    @Override
     public String toString()
     {
         return table + " " + alias;

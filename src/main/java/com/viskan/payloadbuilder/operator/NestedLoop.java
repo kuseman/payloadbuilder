@@ -6,7 +6,7 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.Iterator;
 import java.util.function.BiFunction;
-import java.util.function.BiPredicate;
+import java.util.function.Predicate;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -15,10 +15,10 @@ public class NestedLoop implements Operator
 {
     private final Operator outer;
     private final Operator inner;
-    private final BiPredicate<Row, Row> predicate;
+    private final Predicate<Row> predicate;
     private final BiFunction<Row, Row, Row> rowMerger;
 
-    public NestedLoop(Operator outer, Operator inner, BiPredicate<Row, Row> predicate, BiFunction<Row, Row, Row> rowMerger)
+    public NestedLoop(Operator outer, Operator inner, Predicate<Row> predicate, BiFunction<Row, Row, Row> rowMerger)
     {
         this.outer = requireNonNull(outer);
         this.inner = requireNonNull(inner);
@@ -78,9 +78,16 @@ public class NestedLoop implements Operator
 
                     Row currentInner = ii.next();
 
-                    if (predicate.test(currentOuter, currentInner))
+                    Row prevParent = currentInner.getParent();
+                    currentInner.setParent(currentOuter);
+                    
+                    if (predicate.test(currentInner))
                     {
                         next = rowMerger.apply(currentOuter, currentInner);
+                    }
+                    else
+                    {
+                        currentInner.setParent(prevParent);
                     }
                 }
 

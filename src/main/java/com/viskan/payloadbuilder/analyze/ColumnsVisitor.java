@@ -1,6 +1,8 @@
 package com.viskan.payloadbuilder.analyze;
 
 import com.viskan.payloadbuilder.TableAlias;
+import com.viskan.payloadbuilder.catalog.LambdaFunction;
+import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
 import com.viskan.payloadbuilder.parser.tree.AExpressionVisitor;
 import com.viskan.payloadbuilder.parser.tree.Expression;
 import com.viskan.payloadbuilder.parser.tree.LambdaExpression;
@@ -8,14 +10,19 @@ import com.viskan.payloadbuilder.parser.tree.QualifiedFunctionCallExpression;
 import com.viskan.payloadbuilder.parser.tree.QualifiedName;
 import com.viskan.payloadbuilder.parser.tree.QualifiedReferenceExpression;
 
+import static org.apache.commons.collections.CollectionUtils.isEmpty;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Set;
 
+import org.apache.commons.lang3.tuple.Pair;
+
+import avro.shaded.com.google.common.base.Objects;
 import gnu.trove.map.TIntObjectMap;
-import gnu.trove.map.hash.THashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
+import gnu.trove.set.hash.THashSet;
 
 /**
  * Extracts columns used for each alias in a expression
@@ -30,16 +37,15 @@ import gnu.trove.map.hash.TIntObjectHashMap;
  *
  * a: [col1, col2]
  * b: [col1, col2]
- * 
+ *
  * Example select field with lambda expression:
- * 
+ *
  * aa.filter(sku -> sku.attr1_id == 0).count();
- * 
+ *
  * aa: [attr1_id]
- * 
  * </pre>
  */
-public class ColumnsVisitor extends AExpressionVisitor<Void, ColumnsVisitor.Context>
+public class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsVisitor.Context>
 {
     private static final ColumnsVisitor VISITOR = new ColumnsVisitor();
 
@@ -50,40 +56,64 @@ public class ColumnsVisitor extends AExpressionVisitor<Void, ColumnsVisitor.Cont
     /** Context used during visitor */
     static class Context
     {
-        // Current alias in scope
-        TableAlias parentAlias;
-        // Previous alias found by a QualifiedExpression
-        TableAlias qualifiedAlias;
-        
-        Map<TableAlias, List<String>> columnsByQualifedName = new THashMap<>();
-        TIntObjectMap<TableAlias> lambdaAliasById = new TIntObjectHashMap<>();
+        /**
+         * The aliases that was the result after processing the expression.
+         *
+         * <pre>
+         * Ie.
+         * Parent alias: s
+         * Expression: "aa"
+         * Will yield aa as resulting alias
+         *
+         * Parent alias: s
+         * Expression: "aa.map(x -> x.sku_id)"
+         * Will yield s as result because the output it not an alias
+         *
+         * Parent alias: s
+         * Expression: "aa.concat(ra.flatMap(x -> x.aa))"
+         * Will yield [s/aa, s/ra/aa] as result
+         * </pre>
+         **/
+        Set<TableAlias> parentAliases = new THashSet<>();
+        /** Columns by alias found */
+        Map<TableAlias, Set<String>> columnsByAlias;
+        /** Lambda bindings. Holds which lambda id points to which alias */
+        TIntObjectMap<Set<TableAlias>> lambdaAliasById = new TIntObjectHashMap<>();
     }
 
     /**
-     * Extracts columns be alias for provided expression
+     * Extracts columns per alias for provided expression Reusing a map to populate result
      **/
-    public static Map<TableAlias, List<String>> getColumnsByAlias(TableAlias alias, Expression expression)
+    public static Set<TableAlias> getColumnsByAlias(Map<TableAlias, Set<String>> map, TableAlias alias, Expression expression)
     {
         Context ctx = new Context();
-        ctx.parentAlias = alias;
-        expression.accept(VISITOR, ctx);
-        return ctx.columnsByQualifedName;
+        // Start with input alias
+        ctx.parentAliases.add(alias);
+        ctx.columnsByAlias = map;
+        Set<TableAlias> result = expression.accept(VISITOR, ctx);
+        return result.isEmpty() ? ctx.parentAliases : result;
+    }
+    
+    @Override
+    protected Set<TableAlias> defaultResult(Context context)
+    {
+        return context.parentAliases;
     }
 
     @Override
-    public Void visit(QualifiedReferenceExpression expression, Context context)
+    public Set<TableAlias> visit(QualifiedReferenceExpression expression, Context context)
     {
         QualifiedName qname = expression.getQname();
         List<String> parts = new ArrayList<>(qname.getParts());
-        TableAlias tableAlias;
-        
+        Set<TableAlias> tableAliases = context.parentAliases;
+
         // Lambda reference => resolve table alias
         if (expression.getLambdaId() >= 0)
         {
-            tableAlias = context.lambdaAliasById.get(expression.getLambdaId());
+            tableAliases = context.lambdaAliasById.get(expression.getLambdaId());
             
             // No alias connected to this lambda, return columns are unknown
-            if (tableAlias == null)
+            if (tableAliases == null)
             {
                 return null;
             }
@@ -91,119 +121,120 @@ public class ColumnsVisitor extends AExpressionVisitor<Void, ColumnsVisitor.Cont
             // Remove first part since it's resolved to an alias due to lambda
             parts.remove(0);
         }
-        // Else pick context alias
-        else
-        {
-            tableAlias = context.parentAlias;
-        }
-        
-        // More parts left to dig
-        if (parts.size() > 0)
-        {
-            TableAlias prev = tableAlias;
-            tableAlias = getFromQualifiedName(tableAlias, parts);
-            
-            // Table alias did not change, ie. we did not find a an alias
-            if (prev != tableAlias)
-            {
-                // Set the found alias to context
-                context.qualifiedAlias = tableAlias;
-            }
-        }
-        
-        // No parts left, return
+
+        // Nothing left to process
         if (parts.isEmpty())
         {
             return null;
         }
         
-        String column = parts.get(0);
-        List<String> columns = context.columnsByQualifedName.computeIfAbsent(tableAlias, key -> new ArrayList<>());
-        columns.add(column);
-        return null;
-    }
-    
-    @Override
-    public Void visit(QualifiedFunctionCallExpression expression, Context context)
-    {
-        if (expression.getArguments().isEmpty())
+        Set<TableAlias> output = new THashSet<>();
+        for (TableAlias alias : tableAliases)
         {
-            return null;
-        }
+            List<String> tempParts = new ArrayList<>(parts);
+            TableAlias tempAlias = getFromQualifiedName(alias, tempParts);
 
-        if (expression.getArguments().stream().anyMatch(e -> e instanceof LambdaExpression))
-        {
-            /*
-             * aa.filter(sku -> sku.sku_id > 0)
-             * 
-             * - First visit aa and resolve alias aa
-             * - Then bind lamda identifier "sku" to alias
-             *   aa to then resolve sku_id to alias aa
-             */
-            
-            // First visit the 1:st argument to function to identify
-            // the alias scope for this lambda function
-            expression.getArguments().get(0).accept(this, context);
-            
-            // Connect lambda expressions to table alias set by first argument expression
-            for (Expression arg : expression.getArguments())
+            if (tempParts.isEmpty())
             {
-                if (arg instanceof LambdaExpression)
+                output.add(tempAlias);
+                continue;
+            }
+
+            Set<String> columns = context.columnsByAlias.computeIfAbsent(tempAlias, key -> new THashSet<>());
+            String column = tempParts.get(0);
+            columns.add(column);
+        }
+        
+        return output;
+    }
+
+    @Override
+    public Set<TableAlias> visit(QualifiedFunctionCallExpression expression, Context context)
+    {
+        ScalarFunctionInfo functionInfo = expression.getFunctionInfo();
+        
+        // Store parent aliases before resolving this function call
+        Set<TableAlias> parentAliases = context.parentAliases;
+        // Bind lambda parameters
+        if (functionInfo instanceof LambdaFunction)
+        {
+            List<Pair<Expression, LambdaExpression>> lambdaBindings = ((LambdaFunction) functionInfo).getLambdaBindings(expression.getArguments());
+            for (Pair<Expression, LambdaExpression> pair : lambdaBindings)
+            {
+                Set<TableAlias> lambdaAliases = pair.getLeft().accept(this, context);
+                if (isEmpty(lambdaAliases))
                 {
-                    LambdaExpression le = (LambdaExpression) arg;
-                    for (int id : le.getLambdaIds())
-                    {
-                        context.lambdaAliasById.put(id, context.qualifiedAlias);
-                    }
-                    
-                    le.getExpression().accept(this, context);
-                    
-                    // Clear lambda aliases
-                    for (int id : le.getLambdaIds())
-                    {
-                        context.lambdaAliasById.remove(id);
-                    }
+                    continue;
+                }
+                
+                for (int id : pair.getRight().getLambdaIds())
+                {
+                    context.lambdaAliasById.put(id, lambdaAliases);
                 }
             }
-            
-            return null;
         }
 
-        return super.visit(expression, context);
+        // Visit all arguments
+        expression.getArguments().forEach(a -> a.accept(this, context));
+        
+        // Resolve alias from function
+        Set<TableAlias> result = functionInfo.resolveAlias(parentAliases, expression.getArguments(), e -> e.accept(this, context));
+        if (isEmpty(result))
+        {
+            result = parentAliases;
+        }
+            
+        context.parentAliases = result;
+        return result;
     }
 
+    /** Find relative alias to provided according to parts.
+     * Note! Removes found parts from list 
+     **/
     private TableAlias getFromQualifiedName(TableAlias parent, List<String> parts)
     {
         TableAlias result = parent;
-        while (result != null)
+        while (result != null && parts.size() > 0)
         {
-            if (parts.size() == 0)
-            {
-                break;
-            }
-            
             String part = parts.get(0);
 
-            // 1. Alias pointing to current, move to next part
-            if (Objects.equals(part, result.getAlias()))
+            // 1. Alias match, move on
+            if (Objects.equal(part, result.getAlias()))
             {
                 parts.remove(0);
                 continue;
             }
 
-            // 2. Child alias, dig down and move on
+            // 2. Child alias
             TableAlias alias = result.getChildAlias(part);
             if (alias != null)
             {
-                result = alias;
                 parts.remove(0);
+                result = alias;
                 continue;
             }
-            
-            // Nothing found for current part, break loop
+
+            // 3. Parent alias match upwards
+            alias = result.getParent();
+            while (alias != null)
+            {
+                if (Objects.equal(part, alias.getAlias()))
+                {
+                    break;
+                }
+                alias = alias.getParent();
+            }
+            if (alias != null)
+            {
+                parts.remove(0);
+                result = alias;
+                continue;
+            }
+
+            // No match here, then break, no alias in hierarchy => unknown column
             break;
         }
-        
+
         return result;
     }
 }

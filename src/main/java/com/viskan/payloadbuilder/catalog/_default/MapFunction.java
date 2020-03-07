@@ -1,7 +1,9 @@
-package com.viskan.payloadbuilder.catalog._default;
+package com.viskan .payloadbuilder.catalog._default;
 
 import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.catalog.Catalog;
+import com.viskan.payloadbuilder.catalog.LambdaFunction;
 import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
 import com.viskan.payloadbuilder.codegen.CodeGeneratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
@@ -10,18 +12,42 @@ import com.viskan.payloadbuilder.parser.tree.Expression;
 import com.viskan.payloadbuilder.parser.tree.LambdaExpression;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.singletonList;
 
+import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
+import java.util.function.Function;
 
 import org.apache.commons.collections.IteratorUtils;
 import org.apache.commons.collections.iterators.TransformIterator;
+import org.apache.commons.lang3.tuple.Pair;
 
 /** Map function. Maps input into another form */
-class MapFunction extends ScalarFunctionInfo
+class MapFunction extends ScalarFunctionInfo implements LambdaFunction
 {
     MapFunction(Catalog catalog)
     {
         super(catalog, "map", Type.SCALAR);
+    }
+    
+    @Override
+    public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Expression> arguments, Function<Expression, Set<TableAlias>> aliasResolver)
+    {
+        // Map function has resulting alias as the mapping lambda
+        return aliasResolver.apply(arguments.get(1));
+    }
+    
+    @Override
+    public List<Pair<Expression, LambdaExpression>> getLambdaBindings(List<Expression> arguments)
+    {
+        return singletonList(Pair.of(arguments.get(0), (LambdaExpression) arguments.get(1)));
+    }
+
+    @Override
+    public Class<?> getDataType()
+    {
+        return Iterator.class;
     }
     
     @Override
@@ -34,6 +60,10 @@ class MapFunction extends ScalarFunctionInfo
     public Object eval(EvaluationContext context, List<Expression> arguments, Row row)
     {
         Object argResult = arguments.get(0).eval(context, row);
+        if (argResult == null)
+        {
+            return null;
+        }
         LambdaExpression le = (LambdaExpression) arguments.get(1);
         int lambdaId = le.getLambdaIds()[0];
         return new TransformIterator(IteratorUtils.getIterator(argResult), input -> 
@@ -50,7 +80,11 @@ class MapFunction extends ScalarFunctionInfo
             List<Expression> arguments)
     {
         ExpressionCode inputCode = arguments.get(0).generateCode(context, parentCode);
-        ExpressionCode code = ExpressionCode.code(context);
+        ExpressionCode code = ExpressionCode.code(context, inputCode);
+        code.addImport("com.viskan.payloadbuilder.utils.IteratorUtils");
+        code.addImport("java.util.Iterator");
+        code.addImport("org.apache.commons.collections.iterators.TransformIterator");
+        code.addImport("org.apache.commons.collections.Transformer");
         
         LambdaExpression le = (LambdaExpression) arguments.get(1);
         
@@ -58,43 +92,34 @@ class MapFunction extends ScalarFunctionInfo
         ExpressionCode lambdaCode = le.getExpression().generateCode(context, parentCode);
         context.removeLambdaParameters(le.getIdentifiers());
         
-        /*
-         * Object res0;             // input
-         * boolean isNull_0;
-         * 
-         * java.util.Iterator it = getIterator(res0);
-         * res1 = new org.apache.commons.collections.iterators.TransformIterator(it, new org.apache.commons.collections.Transfomer()
-         * {
-         *   Object transform(Object object)
-         *   {
-         *     %lambda_code%
-         *   }
-         * });
-         * 
-         */
-
-        // TODO: isnull input, output
-        
         String template = 
                 "%s"
-              + "boolean %s = false;\n"
-              + "java.util.Iterator %s = new org.apache.commons.collections.iterators.TransformIterator(IteratorUtils.getIterator(%s), new org.apache.commons.collections.Transformer()\n"
+              + "boolean %s = true;\n"
+              + "Iterator %s = null;\n"
+              + "if (!%s)\n"
               + "{\n"
-              + "  public Object transform(Object object)\n"
+              + "  %s = new TransformIterator(IteratorUtils.getIterator(%s), new Transformer()\n"
               + "  {\n"
-              + "    Object %s = object;\n"
-              + "    %s"
-              + "    return %s;\n"
-              + "  }\n"
-              + "});\n";
+              + "    public Object transform(Object object)\n"
+              + "    {\n"
+              + "      Object %s = object;\n"
+              + "      %s"
+              + "      return %s;\n"
+              + "    }\n"
+              + "  });\n"
+              + "  %s = false;\n"
+              + "}\n";
         
         code.setCode(String.format(template,
                 inputCode.getCode(),
                 code.getIsNull(),
+                code.getResVar(),
+                inputCode.getIsNull(),
                 code.getResVar(), inputCode.getResVar(),
                 le.getIdentifiers().get(0),
                 lambdaCode.getCode(),
-                lambdaCode.getResVar()));
+                lambdaCode.getResVar(),
+                code.getIsNull()));
         
         return code;    
     }

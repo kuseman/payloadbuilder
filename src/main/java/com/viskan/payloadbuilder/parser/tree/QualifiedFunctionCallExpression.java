@@ -21,6 +21,11 @@ public class QualifiedFunctionCallExpression extends Expression
         this.functionInfo = requireNonNull(functionInfo, "functionInfo");
         this.arguments = requireNonNull(arguments, "arguments");
     }
+
+    public ScalarFunctionInfo getFunctionInfo()
+    {
+        return functionInfo;
+    }
     
     public List<Expression> getArguments()
     {
