@@ -31,6 +31,7 @@ public class ColumnVisitorTest extends Assert
         TableAlias articleAttribute = TableAlias.of(source, "articleAttribute", "aa");
         TableAlias articlePrice = TableAlias.of(articleAttribute, "ariclePrice", "ap");
         TableAlias.of(articleAttribute, "aricleBalance", "ab");
+        TableAlias articleBrand = TableAlias.of(source, "aricleBrand", "aBrand");
 
         Set<TableAlias> actual;
         Expression e;
@@ -177,5 +178,12 @@ public class ColumnVisitorTest extends Assert
         actual = ColumnsVisitor.getColumnsByAlias(columnsByAlias, articlePrice, e);
         assertEquals(asSet(articlePrice), actual);
         assertEquals(ofEntries(entry(articleAttribute, asSet("sku_id")), entry(articlePrice, asSet("sku_id"))), columnsByAlias);
+
+        // Traverse up in hierarchy and then down
+        columnsByAlias.clear();
+        e = parser.parseExpression(catalogRegistry, "aBrand.articleBrandId = a.articleBrandId");
+        actual = ColumnsVisitor.getColumnsByAlias(columnsByAlias, articleBrand, e);
+        assertEquals(asSet(articleBrand), actual);
+        assertEquals(ofEntries(entry(articleBrand, asSet("articleBrandId")), entry(article, asSet("articleBrandId"))), columnsByAlias);
     }
 }

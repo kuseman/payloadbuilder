@@ -4,7 +4,7 @@ import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.operator.OperatorTest.BinaryExpression.Operand;
 
-import static com.viskan.payloadbuilder.operator.RowMerger.DEFAULT;
+import static com.viskan.payloadbuilder.operator.DefaultRowMerger.DEFAULT;
 import static com.viskan.payloadbuilder.utils.MapUtils.entry;
 import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
 import static java.util.Arrays.asList;
@@ -120,13 +120,13 @@ public class OperatorTest extends Assert
                 priceMeta,
                 new CachedSupplier<>(() -> IntStream.range(1, 500000).mapToObj(i -> new Object[] {rnd.nextFloat() * 1000, i / 5}).collect(Collectors.toList())));
 
-        Operator aa_ap = new Distinct(new HashMatch(
+        Operator aa_ap = new Distinct(new HashJoin(
                 articleAttributeScan,
                 priceScan,
                 t -> (int) t.getObject(1),
                 t -> (int) t.getObject(1),
                 row -> Objects.equals(row.getParent().getObject(1), row.getObject(1)),
-                RowMerger.DEFAULT));
+                DefaultRowMerger.DEFAULT));
 
         return new GroupBy(priceScan, row -> row.getObject(1));
     }
@@ -162,16 +162,16 @@ public class OperatorTest extends Assert
                 new CachedSupplier<>(() -> IntStream.range(1, 500000).mapToObj(i -> new Object[] {rnd.nextFloat(), i / 5}).collect(Collectors.toList())));
 
         // articleAttribute.sku_id == price.sku_id
-        Operator aa_ap = new HashMatch(
+        Operator aa_ap = new HashJoin(
                 articleAttributeScan,
                 priceScan,
                 t -> (int) t.getObject(1),
                 t -> (int) t.getObject(1),
                 row -> Objects.equals(row.getParent().getObject(1), row.getObject(1)),
-                RowMerger.COPY);
+                DefaultRowMerger.COPY);
 
         // _source.art_id == articleAttribute.art_id
-        Operator op = new Distinct(new HashMatch(
+        Operator op = new Distinct(new HashJoin(
                 sourceScan,
                 aa_ap,
                 t -> (int) t.getObject(1),
@@ -234,7 +234,7 @@ public class OperatorTest extends Assert
                 new CachedSupplier<>(() -> IntStream.range(1, 300).mapToObj(i -> new Object[] {rnd.nextGaussian(), i}).collect(Collectors.toList())));
 
         // articleAttribute.sku_id == price.sku_id
-        Operator aa_ap = new Distinct(new HashMatch(
+        Operator aa_ap = new Distinct(new HashJoin(
                 articleAttributeScan,
                 priceScan,
                 new ColumnPathHashFunction("aa.sku_id"),
@@ -243,7 +243,7 @@ public class OperatorTest extends Assert
                 DEFAULT));
 
         // articleAttribute.attr1_id == attribute1.attr1_id
-        Operator aa_a1 = new Distinct(new HashMatch(
+        Operator aa_a1 = new Distinct(new HashJoin(
                 aa_ap,
                 attribute1Scan,
                 new ColumnPathHashFunction("aa.attr1_id"),
@@ -252,7 +252,7 @@ public class OperatorTest extends Assert
                 DEFAULT));
 
         // articleAttribute.attr2_id == attribute2.attr2_id
-        Operator aa_a2 = new Distinct(new HashMatch(
+        Operator aa_a2 = new Distinct(new HashJoin(
                 aa_a1,
                 attribute2Scan,
                 new ColumnPathHashFunction("aa.attr2_id"),
@@ -261,7 +261,7 @@ public class OperatorTest extends Assert
                 DEFAULT));
 
         // articleAttribute.attr3_id == attribute3.attr3_id
-        Operator aa_a3 = new Distinct(new HashMatch(
+        Operator aa_a3 = new Distinct(new HashJoin(
                 aa_a2,
                 attribute3Scan,
                 new ColumnPathHashFunction("aa.attr3_id"),
@@ -270,7 +270,7 @@ public class OperatorTest extends Assert
                 DEFAULT));
 
         // _source.art_id == articleAttribute.art_id
-        Operator op = new Distinct(new HashMatch(
+        Operator op = new Distinct(new HashJoin(
                 sourceScan,
                 aa_a3,
                 new ColumnPathHashFunction("s.art_id"),
@@ -346,7 +346,7 @@ public class OperatorTest extends Assert
                 });
             }
         };
-        Operator join = new HashMatch(
+        Operator join = new HashJoin(
                 //                sourceScan,
                 new KeyLookup(sourceScan, "art_id", row -> row.getObject(1)),
                 articleAttributeScan,

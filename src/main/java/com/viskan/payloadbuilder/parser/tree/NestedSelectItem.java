@@ -49,6 +49,11 @@ public class NestedSelectItem extends SelectItem
         return orderBy;
     }
     
+    public Type getType()
+    {
+        return type;
+    }
+    
     @Override
     public <TR, TC> TR accept(TreeVisitor<TR, TC> visitor, TC context)
     {
@@ -78,6 +83,7 @@ public class NestedSelectItem extends SelectItem
     
     public enum Type
     {
-        OBJECT,ARRAY;
+        OBJECT,
+        ARRAY;
     }
 }

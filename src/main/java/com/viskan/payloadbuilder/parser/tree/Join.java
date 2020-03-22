@@ -5,20 +5,22 @@ import static java.util.Objects.requireNonNull;
 /** Standard join producing tuples */
 public class Join extends AJoin
 {
-    private final JoinedTableSource joinedTableSource;
     private final Expression condition;
     private final JoinType type;
 
-    public Join(JoinedTableSource joinedTableSource, JoinType type, Expression condition)
+    public Join(
+            TableSource tableSource,
+            JoinType type,
+            Expression condition)
     {
-        this.joinedTableSource = requireNonNull(joinedTableSource, "joinedTableSource");
+        super(tableSource);
         this.type = requireNonNull(type, "type");
         this.condition = requireNonNull(condition, "condition");
     }
     
-    public JoinedTableSource getJoinedTableSource()
+    public JoinType getType()
     {
-        return joinedTableSource;
+        return type;
     }
     
     public Expression getCondition()
@@ -35,7 +37,7 @@ public class Join extends AJoin
     @Override
     public String toString()
     {
-        return type + " JOIN " + joinedTableSource + "\tON " +  condition;
+        return type + " JOIN " + getTableSource() + "\tON " +  condition;
     }
 
     public enum JoinType

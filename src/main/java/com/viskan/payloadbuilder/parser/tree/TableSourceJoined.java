@@ -5,12 +5,29 @@ import static java.util.stream.Collectors.joining;
 
 import java.util.List;
 
-public class JoinedTableSource extends ANode
+public class TableSourceJoined extends ANode
 {
+    /*
+     * source
+     *   inner join article 
+     *   inner join articleAttrbute
+     *   inner join 
+     *   
+     * JoinedTableSource
+     *   outer: source
+     *   joins:
+     *     Join (inner)
+     *       article
+     *     Join (inner)
+     *       articleAttribute
+     *   
+     */
+    
+    
     private final TableSource tableSource;
     private final List<AJoin> joins;
     
-    public JoinedTableSource(TableSource tableSource, List<AJoin> joins)
+    public TableSourceJoined(TableSource tableSource, List<AJoin> joins)
     {
         this.tableSource = requireNonNull(tableSource, "tableSource");
         this.joins = requireNonNull(joins, "joins");

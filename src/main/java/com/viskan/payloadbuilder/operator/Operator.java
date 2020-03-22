@@ -19,4 +19,10 @@ public interface Operator
     {
         return toString();
     }
+    
+    /** Returns estimated row size */
+    default int estimatedRowSize()
+    {
+        return -1;
+    }
 }

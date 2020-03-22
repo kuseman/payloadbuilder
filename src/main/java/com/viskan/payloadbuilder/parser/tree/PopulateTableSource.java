@@ -6,28 +6,30 @@ import java.util.List;
 
 /** Populating join type. Does not produce
  * tuples but instead populates outer rows with join rows */
-public class PopulatingJoin extends AJoin
+public class PopulateTableSource extends TableSource
 {
+    private final TableSourceJoined tableSourceJoined;
     private final List<SortItem> orderBy;
     private final List<Expression> groupBy;
-    private final List<AJoin> joins;
     private final Expression where;
     
-    public PopulatingJoin(
+    public PopulateTableSource(
+            TableSourceJoined tableSourceJoined,
+            String alias,
             List<SortItem> orderBy,
             List<Expression> groupBy,
-            List<AJoin> joins,
             Expression where)
     {
+        super(alias, true);
+        this.tableSourceJoined = requireNonNull(tableSourceJoined, "tableSourceJoined");
         this.orderBy = requireNonNull(orderBy, "orderBy");
         this.groupBy = requireNonNull(groupBy, "groupBy");
-        this.joins = requireNonNull(joins, "joins");
         this.where = where;
     }
     
-    public List<AJoin> getJoins()
+    public TableSourceJoined getTableSourceJoined()
     {
-        return joins;
+        return tableSourceJoined;
     }
     
     public List<SortItem> getOrderBy()
@@ -55,9 +57,9 @@ public class PopulatingJoin extends AJoin
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
-        sb.append("{").append(System.lineSeparator());
-        joins.forEach(j -> sb.append("\t").append(j.toString()).append(System.lineSeparator()));
-        sb.append("}").append(System.lineSeparator());
+        sb.append("[").append(System.lineSeparator());
+        sb.append(tableSourceJoined).append(System.lineSeparator());
+        sb.append("]").append(System.lineSeparator());
         return sb.toString();
     }
 }

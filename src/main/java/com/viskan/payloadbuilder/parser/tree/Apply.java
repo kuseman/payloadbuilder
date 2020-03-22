@@ -4,18 +4,14 @@ import static java.util.Objects.requireNonNull;
 
 public class Apply extends AJoin
 {
-    private final JoinedTableSource joinedTableSource;
     private final ApplyType type;
     
-    public Apply(JoinedTableSource joinedTableSource, ApplyType type)
+    public Apply(
+            TableSource tableSource,
+            ApplyType type)
     {
-        this.joinedTableSource = requireNonNull(joinedTableSource, "joinedTableSource");
+        super(tableSource);
         this.type = requireNonNull(type, "type");
-    }
-    
-    public JoinedTableSource getJoinedTableSource()
-    {
-        return joinedTableSource;
     }
     
     public ApplyType getType()

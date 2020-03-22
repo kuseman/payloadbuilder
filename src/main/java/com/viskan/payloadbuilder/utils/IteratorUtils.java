@@ -53,7 +53,7 @@ public class IteratorUtils
     /**
      * Returns an iterator that iterates all parents child rows for a specific child rows index.
      */
-    public Iterable<Row> getChildRowsIterator(List<Row> parents, int childRowsIndex)
+    public static Iterable<Row> getChildRowsIterator(Iterator<Row> parents, int childRowsIndex)
     {
         requireNonNull(parents, "parents");
         return new ChildRowsIteraor(parents, childRowsIndex);
@@ -62,12 +62,12 @@ public class IteratorUtils
     /** */
     private static class ChildRowsIteraor implements Iterable<Row>
     {
-        private final List<Row> parentRows;
+        private final Iterator<Row> parents;
         private final int childIndex;
 
-        ChildRowsIteraor(List<Row> parentRows, int childIndex)
+        ChildRowsIteraor(Iterator<Row> parents, int childIndex)
         {
-            this.parentRows = parentRows;
+            this.parents = parents;
             this.childIndex = childIndex;
         }
 
@@ -77,7 +77,6 @@ public class IteratorUtils
             return new Iterator<Row>()
             {
                 Row next;
-                int parentIndex = 0;
                 List<Row> childRows;
                 int currentChildIndex = 0;
 
@@ -101,12 +100,12 @@ public class IteratorUtils
                     {
                         if (childRows == null)
                         {
-                            if (parentIndex >= parentRows.size())
+                            if (!parents.hasNext())
                             {
                                 return false;
                             }
-
-                            Row parentRow = parentRows.get(parentIndex++);
+                            
+                            Row parentRow = parents.next();
                             childRows = parentRow.getChildRows(childIndex);
                             currentChildIndex = 0;
                         }

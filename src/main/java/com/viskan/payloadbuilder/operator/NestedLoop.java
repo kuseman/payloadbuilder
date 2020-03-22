@@ -5,7 +5,6 @@ import com.viskan.payloadbuilder.Row;
 import static java.util.Objects.requireNonNull;
 
 import java.util.Iterator;
-import java.util.function.BiFunction;
 import java.util.function.Predicate;
 
 import org.apache.commons.lang3.StringUtils;
@@ -16,14 +15,21 @@ public class NestedLoop implements Operator
     private final Operator outer;
     private final Operator inner;
     private final Predicate<Row> predicate;
-    private final BiFunction<Row, Row, Row> rowMerger;
-
-    public NestedLoop(Operator outer, Operator inner, Predicate<Row> predicate, BiFunction<Row, Row, Row> rowMerger)
+    private final RowMerger rowMerger;
+    private final boolean populating;
+    
+    public NestedLoop(Operator outer, Operator inner, Predicate<Row> predicate, boolean populating)
     {
-        this.outer = requireNonNull(outer);
-        this.inner = requireNonNull(inner);
-        this.predicate = requireNonNull(predicate);
-        this.rowMerger = requireNonNull(rowMerger);
+        this(outer, inner, predicate, DefaultRowMerger.DEFAULT, populating);
+    }
+    
+    public NestedLoop(Operator outer, Operator inner, Predicate<Row> predicate, RowMerger rowMerger, boolean populating)
+    {
+        this.outer = requireNonNull(outer, "outer");
+        this.inner = requireNonNull(inner, "inner");
+        this.predicate = requireNonNull(predicate, "predicate");
+        this.rowMerger = requireNonNull(rowMerger, "rowMerger");
+        this.populating = populating;
     }
 
     @Override
@@ -35,6 +41,7 @@ public class NestedLoop implements Operator
             Row next;
             Row currentOuter;
             Iterator<Row> ii;
+            boolean hit;
 
             @Override
             public Row next()
@@ -54,7 +61,7 @@ public class NestedLoop implements Operator
             {
                 while (next == null)
                 {
-                    if (!it.hasNext())
+                    if (ii == null && !it.hasNext())
                     {
                         return false;
                     }
@@ -62,6 +69,7 @@ public class NestedLoop implements Operator
                     if (currentOuter == null)
                     {
                         currentOuter = it.next();
+                        hit = false;
                     }
 
                     if (ii == null)
@@ -72,22 +80,24 @@ public class NestedLoop implements Operator
                     if (!ii.hasNext())
                     {
                         ii = null;
+                        if (populating && hit)
+                        {
+                            next = currentOuter;
+                        }
+                            
                         currentOuter = null;
                         continue;
                     }
 
                     Row currentInner = ii.next();
-
-                    Row prevParent = currentInner.getParent();
-                    currentInner.setParent(currentOuter);
-                    
-                    if (predicate.test(currentInner))
+                    if (currentInner.evaluatePredicate(currentOuter, predicate))
                     {
-                        next = rowMerger.apply(currentOuter, currentInner);
-                    }
-                    else
-                    {
-                        currentInner.setParent(prevParent);
+                        next = rowMerger.merge(currentOuter, currentInner, populating);
+                        if (populating)
+                        {
+                            next = null;
+                        }
+                        hit = true;
                     }
                 }
 
@@ -100,7 +110,7 @@ public class NestedLoop implements Operator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        return "NESTED LOOP" + System.lineSeparator()
+        return "NESTED LOOP" + (populating ? " (POPULATE)" : "") + System.lineSeparator()
             +
             indentString + outer.toString(indent + 1) + System.lineSeparator()
             +

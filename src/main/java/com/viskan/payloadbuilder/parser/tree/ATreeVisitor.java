@@ -28,7 +28,7 @@ public abstract class ATreeVisitor<TR, TC> implements TreeVisitor<TR, TC>
     }
 
     @Override
-    public TR visit(JoinedTableSource joinedTableSource, TC context)
+    public TR visit(TableSourceJoined joinedTableSource, TC context)
     {
         joinedTableSource.getTableSource().accept(this, context);
         joinedTableSource.getJoins().forEach(j -> j.accept(this, context));
@@ -69,7 +69,7 @@ public abstract class ATreeVisitor<TR, TC> implements TreeVisitor<TR, TC>
     {
         return null;
     }
-
+    
     @Override
     public TR visit(TableFunction tableFunction, TC context)
     {
@@ -78,30 +78,30 @@ public abstract class ATreeVisitor<TR, TC> implements TreeVisitor<TR, TC>
     }
 
     @Override
-    public TR visit(Join join, TC context)
+    public TR visit(PopulateTableSource populatingJoin, TC context)
     {
-        join.getJoinedTableSource().accept(this, context);
-        visit(join.getCondition(), context);
-        return null;
-    }
-
-    @Override
-    public TR visit(Apply apply, TC context)
-    {
-        apply.getJoinedTableSource().accept(this, context);
-        return null;
-    }
-
-    @Override
-    public TR visit(PopulatingJoin populatingJoin, TC context)
-    {
-        populatingJoin.getJoins().forEach(j -> j.accept(this, context));
+        populatingJoin.getTableSourceJoined().accept(this, context);
         populatingJoin.getGroupBy().forEach(e -> visit(e, context));
         if (populatingJoin.getWhere() != null)
         {
             visit(populatingJoin.getWhere(), context);
         }
         populatingJoin.getOrderBy().forEach(o -> o.accept(this, context));
+        return null;
+    }
+    
+    @Override
+    public TR visit(Join join, TC context)
+    {
+        join.getTableSource().accept(this, context);
+        visit(join.getCondition(), context);
+        return null;
+    }
+    
+    @Override
+    public TR visit(Apply apply, TC context)
+    {
+        apply.getTableSource().accept(this, context);
         return null;
     }
 }

@@ -38,4 +38,9 @@ public class CatalogRegistry
     {
         return catalogByName.get(isBlank(name) ? DefaultCatalog.NAME : name);
     }
+    
+    // TODO: handle table resolving. Default catalog would be different for tables
+    //       to avoid needing to write "CATALOG.tablename" everywhere
+    //       Will be inconsistent with scalar function that would resolve to default/builtin
+    //       CatalogResolver ? Defaults to built-in for functions and throws for tables
 }

@@ -194,45 +194,32 @@ public class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsV
     private TableAlias getFromQualifiedName(TableAlias parent, List<String> parts)
     {
         TableAlias result = parent;
-        while (result != null && parts.size() > 0)
+        TableAlias current = parent;
+        
+        while (current != null && parts.size() > 0)
         {
             String part = parts.get(0);
 
             // 1. Alias match, move on
-            if (Objects.equal(part, result.getAlias()))
+            if (Objects.equal(part, current.getAlias()))
             {
+                result = current;
                 parts.remove(0);
                 continue;
             }
 
             // 2. Child alias
-            TableAlias alias = result.getChildAlias(part);
+            TableAlias alias = current.getChildAlias(part);
             if (alias != null)
             {
                 parts.remove(0);
                 result = alias;
+                current = alias;
                 continue;
             }
 
             // 3. Parent alias match upwards
-            alias = result.getParent();
-            while (alias != null)
-            {
-                if (Objects.equal(part, alias.getAlias()))
-                {
-                    break;
-                }
-                alias = alias.getParent();
-            }
-            if (alias != null)
-            {
-                parts.remove(0);
-                result = alias;
-                continue;
-            }
-
-            // No match here, then break, no alias in hierarchy => unknown column
-            break;
+            current = current.getParent();
         }
 
         return result;

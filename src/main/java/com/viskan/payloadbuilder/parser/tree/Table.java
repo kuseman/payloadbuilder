@@ -8,7 +8,7 @@ public class Table extends TableSource
 
     public Table(QualifiedName table, String alias)
     {
-        super(alias);
+        super(alias, false);
         this.table = requireNonNull(table, "table");
     }
     

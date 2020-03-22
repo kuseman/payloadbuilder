@@ -19,7 +19,7 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 /**
  * Hash match operator. Hashes outer operator and probes the inner operator
  */
-class HashMatch implements Operator
+class HashJoin implements Operator
 {
     private final Operator outer;
     private final Operator inner;
@@ -28,7 +28,7 @@ class HashMatch implements Operator
     private final Predicate<Row> predicate;
     private final BiFunction<Row, Row, Row> rowMerger;
 
-    HashMatch(
+    HashJoin(
             Operator outer,
             Operator inner,
             ToIntFunction<Row> outerHashFunction,
@@ -74,6 +74,9 @@ class HashMatch implements Operator
     private Iterator<Row> probeIterator(TIntObjectHashMap<List<Row>> table, OperatorContext context)
     {
         final Iterator<Row> ii = inner.open(context);
+        
+        // If populating -> probe and then iterate table
+        
         return new Iterator<Row>()
         {
             Row next;
@@ -162,7 +165,7 @@ class HashMatch implements Operator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        return "HASH MATCH (outer keys: " + outerHashFunction.toString() + ", inner keys: " + innerHashFunction.toString() + ")" + System.lineSeparator()
+        return "HASH JOIN (outer keys: " + outerHashFunction.toString() + ", inner keys: " + innerHashFunction.toString() + ")" + System.lineSeparator()
             +
             indentString + outer.toString(indent + 1) + System.lineSeparator()
             +

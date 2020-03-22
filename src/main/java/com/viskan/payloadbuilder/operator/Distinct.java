@@ -4,12 +4,12 @@ import com.viskan.payloadbuilder.Row;
 
 import static java.util.Objects.requireNonNull;
 
+import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.Set;
+import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
-
-import gnu.trove.set.hash.TLinkedHashSet;
+import org.roaringbitmap.RoaringBitmap;
 
 /** Distinct operator.
  * Only returns distinct rows from down stream operator 
@@ -26,11 +26,17 @@ class Distinct implements Operator
     @Override
     public Iterator<Row> open(OperatorContext context)
     {
-        Set<Row> rows = new TLinkedHashSet<>();
+        RoaringBitmap bitmap = new RoaringBitmap();
+        List<Row> rows = new ArrayList<>();
         Iterator<Row> it = operator.open(context);
         while (it.hasNext())
         {
-            rows.add(it.next());
+            Row row = it.next();
+            System.out.println(row.getTableAlias().getTable() + "  " + row.getPos());
+            if (bitmap.checkedAdd(row.getPos()))
+            {
+                rows.add(row);
+            }
         }
         return rows.iterator();
     }

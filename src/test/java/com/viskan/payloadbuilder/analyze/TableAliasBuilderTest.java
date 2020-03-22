@@ -19,7 +19,7 @@ public class TableAliasBuilderTest extends Assert
     @Test
     public void test_invalid_alias_hierarchy()
     {
-        Query query = parser.parseQuery(catalogRegistry, "select a from tableA a { inner join tableB a {} on a.id = a.id }");
+        Query query = parser.parseQuery(catalogRegistry, "select a from tableA a inner join tableB a on a.id = a.id ");
         try
         {
             TableAliasBuilder.build(query);
@@ -30,7 +30,7 @@ public class TableAliasBuilderTest extends Assert
             assertTrue(e.getMessage(), e.getMessage().contains("already exists in parent hierarchy"));
         }
         
-        query = parser.parseQuery(catalogRegistry, "select a from tableA a { inner join tableB b {} on b.id = a.id inner join tableC b {} on b.id = a.id }");
+        query = parser.parseQuery(catalogRegistry, "select a from tableA a inner join [tableB] b on b.id = a.id inner join [tableC] b on b.id = a.id");
         try
         {
             TableAliasBuilder.build(query);
@@ -40,7 +40,6 @@ public class TableAliasBuilderTest extends Assert
         {
             assertTrue(e.getMessage(), e.getMessage().contains("already exists as child"));
         }
-        
     }
     
     @Test
@@ -78,39 +77,40 @@ public class TableAliasBuilderTest extends Assert
                + "        from aa.concat(aa.ap)"
                + "      ) arr2 "
                + "from article a "
-               + "{"
-               + "   inner join articleAttribute aa "
-               + "   {"
-               + "     inner join articlePrice ap {} "
-               + "       on ap.sku_id = aa.sku_id "
-               + "       and ap.price_sales > 0"
-               + "     inner join attribute1 a1 {} "
-               + "       on a1.attr1_id = aa.attr1_id "
-               + "       and a1.lang_id = 1"
-               + "     inner join attribute2 a2 {} "
-               + "       on a2.attr2_id = aa.attr2_id "
-               + "       and a2.lang_id = 1"
-               + "     inner join attribute3 a3 {} "
-               + "       on a3.attr3_id = aa.attr3_id "
-               + "       and a3.lang_id = 1"
-               + "     where ap.price_org > 0"
-               + "     order by a2.attr2_no "
-               + "   }"
-               + "     on aa.art_id = a.art_id "
-               + "     and aa.active_flg"
-               + "     and aa.internet_flg"
-               + "     and a.articleType = 'regular'"
-               + "   inner join articleProperty ap "
-               + "   {"
-               + "     group by propertykey_id "
-               + "   }"
-               + "     on ap.art_id = a.art_id "
-               + "}"
-               + "CROSS APPLY range(10) r"
-               + "{"
-               + "  inner join attribute1 a1 "
+               + "inner join "
+               + "["
+               + "  articleAttribute aa "
+               + "  inner join [articlePrice] ap "
+               + "    on ap.sku_id = aa.sku_id "
+               + "    and ap.price_sales > 0"
+               + "  inner join [attribute1] a1 "
+               + "    on a1.attr1_id = aa.attr1_id "
+               + "    and a1.lang_id = 1"
+               + "  inner join [attribute2] a2 "
+               + "    on a2.attr2_id = aa.attr2_id "
+               + "    and a2.lang_id = 1"
+               + "  inner join [attribute3] a3 "
+               + "    on a3.attr3_id = aa.attr3_id "
+               + "    and a3.lang_id = 1"
+               + "  where ap.price_org > 0"
+               + "  order by a2.attr2_no "
+               + "] aa "
+               + "  on aa.art_id = a.art_id "
+               + "  and aa.active_flg"
+               + "  and aa.internet_flg"
+               + "  and a.articleType = 'regular'"
+               + "inner join "
+               + "["
+               + "  articleProperty"
+               + "  group by propertykey_id "
+               + "] ap"
+               + "  on ap.art_id = a.art_id "
+               + "CROSS APPLY "
+               + "["
+               + "  range(10) r"
+               + "  inner join [attribute1] a1 "
                + "    on a1.someId = r.Value"
-               + "} "
+               + "] r "
                + "where not a.add_on_flg "
                + "group by a.note_id "
                +" order by a.stamp_dat_cr");

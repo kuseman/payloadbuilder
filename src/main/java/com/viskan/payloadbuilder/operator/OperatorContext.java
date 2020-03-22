@@ -2,6 +2,8 @@ package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.Row;
 
+import static java.util.Collections.emptyList;
+
 import java.util.List;
 import java.util.Map;
 
@@ -10,9 +12,8 @@ import gnu.trove.map.hash.THashMap;
 /** Context used during selection of operator tree */
 public class OperatorContext
 {
-    /** When using populating join, the current parent rows are provided here for
-     * child operators to utilize */
-    private List<Row> parentRows;
+    /** Spool storage */
+    Map<String, List<Row>> spooledRowsByKey = new THashMap<>();
     
     /** Reference to parent row during selection inside projections */
     private Row parentProjectionRow;
@@ -22,14 +23,15 @@ public class OperatorContext
      *  */
     private Map<String, List<Object>> indexLookupValues;
     
-    public List<Row> getParentRows()
+    /** Store spool rows with key */
+    public void storeSpoolRows(String key, List<Row> rows)
     {
-        return parentRows;
+        spooledRowsByKey.put(key, rows);
     }
     
-    public void setParentRows(List<Row> parentRows)
+    public List<Row> getSpoolRows(String key)
     {
-        this.parentRows = parentRows;
+        return spooledRowsByKey.getOrDefault(key, emptyList());
     }
     
     public Row getParentProjectionRow()

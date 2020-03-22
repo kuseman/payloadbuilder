@@ -13,7 +13,7 @@ public class TableFunction extends TableSource
 
     public TableFunction(TableFunctionInfo functionInfo, List<Expression> arguments, String alias)
     {
-        super(alias);
+        super(alias, false);
         this.functionInfo = requireNonNull(functionInfo, "functionInfo");
         this.arguments = requireNonNull(arguments, "arguments");
     }

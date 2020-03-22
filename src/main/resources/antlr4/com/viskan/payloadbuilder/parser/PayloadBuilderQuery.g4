@@ -19,7 +19,7 @@ query
 
 selectItem
  : 
- ( ((OBJECT | ARRAY) nestedSelectItem) | expression) (AS? identifier)?
+ (((OBJECT | ARRAY) nestedSelectItem) | expression) (AS? identifier)?
  ;
  
 nestedSelectItem
@@ -32,31 +32,27 @@ nestedSelectItem
  ;
  
 tableSourceJoined
- : tableSource joinItem*
- ;
-
-joinItem
- : populatingJoinPart
- | joinPart
- ;
-
-populatingJoinPart
- : '{'
-   joinItem*
-   (GROUPBY groupBy+=expression (',' groupBy+=expression)*)?
-   (WHERE where=expression)?
-   (ORDERBY sortItem (',' sortItem)*)?
-   '}'
+ : tableSource joinPart*
  ;
 
 tableSource
- : qname			identifier
- | functionCall		identifier
+ : qname			identifier?
+ | functionCall		identifier?
+ | populateQuery	identifier?
+ ;
+
+populateQuery
+ : '['
+   tableSourceJoined
+   (GROUPBY groupBy+=expression (',' groupBy+=expression)*)?
+   (WHERE where=expression)?
+   (ORDERBY sortItem (',' sortItem)*)?
+   ']'
  ;
  
 joinPart
- : (INNER | LEFT) JOIN tableSourceJoined ON expression
- | (CROSS | OUTER) APPLY tableSourceJoined
+ : (INNER | LEFT) JOIN tableSource ON expression
+ | (CROSS | OUTER) APPLY tableSource
 ;
 
 sortItem

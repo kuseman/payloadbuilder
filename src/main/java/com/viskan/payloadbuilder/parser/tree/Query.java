@@ -8,13 +8,13 @@ import java.util.List;
 public class Query extends ANode
 {
     private final List<SelectItem> selectItems;
-    private final JoinedTableSource from;
+    private final TableSourceJoined from;
     private final Expression where;
     private final List<Expression> groupBy;
     private final List<SortItem> orderBy;
     
     public Query(List<SelectItem> selectItems,
-            JoinedTableSource from,
+            TableSourceJoined from,
             Expression where,
             List<Expression> groupBy,
             List<SortItem> orderBy)
@@ -31,7 +31,7 @@ public class Query extends ANode
         return selectItems;
     }
     
-    public JoinedTableSource getFrom()
+    public TableSourceJoined getFrom()
     {
         return from;
     }

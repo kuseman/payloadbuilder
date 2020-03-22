@@ -2,41 +2,14 @@ package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.Row;
 
-import java.util.function.BiFunction;
-
-/** Merges outer and inner row */
-public class RowMerger implements BiFunction<Row, Row, Row>
+/** Definition of a row merger that merges to joined rows. */
+public interface RowMerger
 {
-    /** Default merger. Merges inner row into outer */
-    public static final RowMerger DEFAULT = new RowMerger(-1, false);
-    /** Copy merger. Copied outer row before merge */
-    public static final RowMerger COPY = new RowMerger(-1, true);
-
-    /** Limit number of merged rows */
-    private final int limit;
-    /** Copy outer row before merge */
-    private final boolean copy;
-
-    public RowMerger(int limit, boolean copy)
-    {
-        this.limit = limit;
-        this.copy = copy;
-    }
-
-    @Override
-    public Row apply(Row outer, Row inner)
-    {
-        Row result = outer;
-        if (copy)
-        {
-            result = new Row(result, inner.getPos());
-        }
-        result.merge(inner, limit);
-        return result;
-    }
-
-    static RowMerger limit(int limit)
-    {
-        return new RowMerger(limit, false);
-    }
+    /** Merge outer and inner row.
+     * @param outer Outer row that is joined
+     * @param inner Inner row that is joined
+     * @param populating True if the join is populating. ie inner row is added to outer
+     * without creating a new tuple.
+     **/
+    Row merge(Row outer, Row inner, boolean populating);
 }

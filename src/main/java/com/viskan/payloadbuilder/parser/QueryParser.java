@@ -22,7 +22,7 @@ import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.LogicalBinaryC
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.LogicalNotContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.NestedExpressionContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.NullPredicateContext;
-import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.PopulatingJoinPartContext;
+import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.PopulateQueryContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.QnameContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.QueryContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.SelectItemContext;
@@ -43,7 +43,6 @@ import com.viskan.payloadbuilder.parser.tree.FunctionCall;
 import com.viskan.payloadbuilder.parser.tree.InExpression;
 import com.viskan.payloadbuilder.parser.tree.Join;
 import com.viskan.payloadbuilder.parser.tree.Join.JoinType;
-import com.viskan.payloadbuilder.parser.tree.JoinedTableSource;
 import com.viskan.payloadbuilder.parser.tree.LambdaExpression;
 import com.viskan.payloadbuilder.parser.tree.LiteralBooleanExpression;
 import com.viskan.payloadbuilder.parser.tree.LiteralDecimalExpression;
@@ -55,7 +54,7 @@ import com.viskan.payloadbuilder.parser.tree.LogicalNotExpression;
 import com.viskan.payloadbuilder.parser.tree.NestedExpression;
 import com.viskan.payloadbuilder.parser.tree.NestedSelectItem;
 import com.viskan.payloadbuilder.parser.tree.NullPredicateExpression;
-import com.viskan.payloadbuilder.parser.tree.PopulatingJoin;
+import com.viskan.payloadbuilder.parser.tree.PopulateTableSource;
 import com.viskan.payloadbuilder.parser.tree.QualifiedFunctionCallExpression;
 import com.viskan.payloadbuilder.parser.tree.QualifiedName;
 import com.viskan.payloadbuilder.parser.tree.QualifiedReferenceExpression;
@@ -67,9 +66,12 @@ import com.viskan.payloadbuilder.parser.tree.SortItem.Order;
 import com.viskan.payloadbuilder.parser.tree.Table;
 import com.viskan.payloadbuilder.parser.tree.TableFunction;
 import com.viskan.payloadbuilder.parser.tree.TableSource;
+import com.viskan.payloadbuilder.parser.tree.TableSourceJoined;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
+import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.util.HashMap;
 import java.util.List;
@@ -149,7 +151,7 @@ public class QueryParser
         private final Map<String, Integer> lambdaParameters = new HashMap<>();
         private Expression leftDereference;
         private Expression prevLeftDereference;
-
+        
         public AstBuilder(CatalogRegistry catalogRegistry)
         {
             this.catalogRegistry = catalogRegistry;
@@ -159,7 +161,7 @@ public class QueryParser
         public Object visitQuery(QueryContext ctx)
         {
             List<SelectItem> selectItems = ctx.selectItem().stream().map(s -> (SelectItem) visit(s)).collect(toList());
-            JoinedTableSource joinedTableSource = ctx.tableSourceJoined() != null ? (JoinedTableSource) visit(ctx.tableSourceJoined()) : null;
+            TableSourceJoined joinedTableSource = ctx.tableSourceJoined() != null ? (TableSourceJoined) visit(ctx.tableSourceJoined()) : null;
             Expression where = getExpression(ctx.where);
             List<Expression> groupBy = ctx.groupBy != null ? ctx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
             List<SortItem> orderBy = ctx.sortItem() != null ? ctx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
@@ -194,34 +196,24 @@ public class QueryParser
         public Object visitTableSourceJoined(TableSourceJoinedContext ctx)
         {
             TableSource tableSource = (TableSource) visit(ctx.tableSource());
-            List<AJoin> joins = ctx.joinItem().stream().map(j -> (AJoin) visit(j)).collect(toList());
-            return new JoinedTableSource(tableSource, joins);
-        }
-
-        @Override
-        public Object visitPopulatingJoinPart(PopulatingJoinPartContext ctx)
-        {
-            List<AJoin> joins = ctx.joinItem().stream().map(j -> (AJoin) visit(j)).collect(toList());
-            List<Expression> groupBy = ctx.groupBy != null ? ctx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
-            List<SortItem> orderBy = ctx.sortItem() != null ? ctx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
-            Expression where = ctx.where != null ? getExpression(ctx.where) : null;
-            return new PopulatingJoin(orderBy, groupBy, joins, where);
+            List<AJoin> joins = ctx.joinPart().stream().map(j -> (AJoin) visit(j)).collect(toList());
+            return new TableSourceJoined(tableSource, joins);
         }
 
         @Override
         public Object visitJoinPart(JoinPartContext ctx)
         {
-            JoinedTableSource joinedTableSource = (JoinedTableSource) visit(ctx.tableSourceJoined());
+            TableSource tableSource = (TableSource) visit(ctx.tableSource());
 
             if (ctx.JOIN() != null)
             {
                 Expression condition = ctx.expression() != null ? (Expression) visit(ctx.expression()) : null;
                 Join.JoinType joinType = ctx.INNER() != null ? JoinType.INNER : JoinType.LEFT;
-                return new Join(joinedTableSource, joinType, condition);
+                return new Join(tableSource, joinType, condition);
             }
 
             ApplyType applyType = ctx.OUTER() != null ? ApplyType.OUTER : ApplyType.CROSS;
-            return new Apply(joinedTableSource, applyType);
+            return new Apply(tableSource, applyType);
         }
 
         @Override
@@ -236,10 +228,31 @@ public class QueryParser
                     throw new IllegalArgumentException("Expected a table function but got: " + functionCall.getFunctionInfo());
                 }
                 return new TableFunction((TableFunctionInfo) functionCall.getFunctionInfo(), functionCall.getArguments(), alias);
+            }
+            else if (ctx.populateQuery() != null)
+            {
+                if (isBlank(alias))
+                {
+                    throw new IllegalArgumentException("Populate table source must have an alias");
+                }
+                
+                PopulateQueryContext populateQueryCtx = ctx.populateQuery();
 
+                TableSourceJoined tableSourceJoined = (TableSourceJoined) visit(populateQueryCtx.tableSourceJoined());
+                
+                if (tableSourceJoined.getTableSource() instanceof PopulateTableSource)
+                {
+                    throw new IllegalArgumentException("Top level table source in populate cannot be a populate source");
+                }
+                
+                List<Expression> groupBy = populateQueryCtx.groupBy != null ? populateQueryCtx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
+                List<SortItem> orderBy = populateQueryCtx.sortItem() != null ? populateQueryCtx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
+                Expression where = populateQueryCtx.where != null ? getExpression(populateQueryCtx.where) : null;
+                
+                return new PopulateTableSource(tableSourceJoined, alias, orderBy, groupBy, where);
             }
 
-            return new Table(getQualifiedName(ctx.qname()), alias);
+            return new Table(getQualifiedName(ctx.qname()), defaultIfNull(alias, ""));
         }
 
         @Override

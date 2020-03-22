@@ -10,7 +10,7 @@ import java.util.Map;
 import org.apache.commons.lang3.ArrayUtils;
 
 /** Projection that projects an object output */
-class ObjectProjection implements Projection
+public class ObjectProjection implements Projection
 {
     static final Projection[] EMPTY_PROJECTION_ARRAY = new Projection[0];
     private final Operator selection;
@@ -18,7 +18,7 @@ class ObjectProjection implements Projection
     private final String[] columns;
     private final int length;
 
-    ObjectProjection(Map<String, Projection> projections)
+    public ObjectProjection(Map<String, Projection> projections)
     {
         this(projections, null);
     }
@@ -36,8 +36,6 @@ class ObjectProjection implements Projection
     {
         Row rowToUse = row;
 
-        // If there is a selection for this object projection
-        // then iterate it and break after first iteration
         if (selection != null)
         {
             OperatorContext context = new OperatorContext();

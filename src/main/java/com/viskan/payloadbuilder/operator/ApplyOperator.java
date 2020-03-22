@@ -1,58 +1,42 @@
 package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
-import com.viskan.payloadbuilder.catalog.TableFunctionInfo;
-import com.viskan.payloadbuilder.parser.tree.Expression;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 
-/** Operator that applies the apply operator */
-class ApplyOperator implements Operator
+/** OPerator that handles apply operations */
+public class ApplyOperator implements Operator
 {
-    private final Operator left;
-    private final TableFunctionInfo functionInfo;
-    private final Type type;
-    private final List<Expression> arguments;
-    private final RowMerger rowMerger;
-
-    ApplyOperator(
-            Operator left,
-            Type type,
-            TableFunctionInfo functionInfo,
-            List<Expression> arguments,
-            RowMerger rowMerger)
+    private final Operator outer;
+    private final Operator inner;
+    private final boolean populating;
+    
+    public ApplyOperator(Operator outer, Operator inner, boolean populating)
     {
-        this.rowMerger = rowMerger;
-        this.left = requireNonNull(left, "left");
-        this.type = requireNonNull(type, "type");
-        this.functionInfo = requireNonNull(functionInfo, "functionInfo");
-        this.arguments = requireNonNull(arguments, "arguments");
+        this.outer = requireNonNull(outer, "outer");
+        this.inner = requireNonNull(inner, "inner");
+        this.populating = populating;
     }
-
+    
     @Override
     public Iterator<Row> open(OperatorContext context)
     {
-        final Iterator<Row> li = left.open(context);
+        final Iterator<Row> it = outer.open(context);
         return new Iterator<Row>()
         {
-            TableAlias tableAlias;
-            int size = arguments.size();
-            List<Object> args = new ArrayList<>(size);
-            Iterator<Row> tableIt;
-            Row currentOuter;
             Row next;
+            Row currentOuter;
+            Iterator<Row> ii;
+            boolean hit;
 
             @Override
             public Row next()
             {
-                Row result = next;
+                Row r = next;
                 next = null;
-                return result;
+                return r;
             }
 
             @Override
@@ -65,43 +49,49 @@ class ApplyOperator implements Operator
             {
                 while (next == null)
                 {
-                    if (tableIt == null)
+                    if (ii == null && !it.hasNext())
                     {
-                        if (!li.hasNext())
-                        {
-                            return false;
-                        }
+                        return false;
+                    }
 
-                        currentOuter = li.next();
+                    if (currentOuter == null)
+                    {
+                        currentOuter = it.next();
+                        hit = false;
+                    }
 
-                        // TODO: fix table alias, provide in context or in constructor
-                        if (tableAlias == null)
-                        {
-                            tableAlias = TableAlias.of(currentOuter.getTableAlias(), functionInfo.getName(), "_" + functionInfo.getName());
-                        }
+                    if (ii == null)
+                    {
+                        ii = inner.open(context);
+                    }
 
-                        for (int i = 0; i < size; i++)
-                        {
-                            args.set(i, arguments.get(i).eval(null, currentOuter));
-                        }
-
-                        tableIt = functionInfo.open(context, tableAlias, args);
-
-                        // No hits from function and outer => just return row
-                        if (type == Type.OUTER && !tableIt.hasNext())
+                    if (!ii.hasNext())
+                    {
+                        ii = null;
+                        if (populating && hit)
                         {
                             next = currentOuter;
                         }
-
+                            
+                        currentOuter = null;
                         continue;
                     }
-                    else if (!tableIt.hasNext())
-                    {
-                        tableIt = null;
-                        continue;
-                    }
+                    
+                    Row prevOuter = context.getCurrentOuter();
+                    context.setCurrentOuter(currentOuter);
+                    
+//                    context.set
+                    
 
-                    next = rowMerger.apply(currentOuter, tableIt.next());
+//                    if (currentInner.evaluatePredicate(currentOuter, predicate))
+//                    {
+//                        next = rowMerger.merge(currentOuter, currentInner, populating);
+//                        if (populating)
+//                        {
+//                            next = null;
+//                        }
+//                        hit = true;
+//                    }
                 }
 
                 return next != null;
@@ -109,8 +99,4 @@ class ApplyOperator implements Operator
         };
     }
 
-    enum Type
-    {
-        CROSS, OUTER;
-    }
 }

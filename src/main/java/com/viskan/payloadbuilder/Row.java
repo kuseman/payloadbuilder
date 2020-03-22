@@ -4,8 +4,8 @@ import static java.util.stream.Collectors.joining;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedList;
 import java.util.List;
+import java.util.function.Predicate;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -16,7 +16,13 @@ public class Row
     // If this is a tuple row then subPos is the other rows position
     private int subPos;
     protected TableAlias tableAlias;
-    private Row parent;
+    
+    /** Collection of parents that this row belongs to */
+    private List<Row> parents;
+    
+    /** Temporary collection of parents during predicate evaluation */
+    private final List<Row> predicateParent = new ArrayList<>(1);
+    
     private Object[] values;
     private List<List<Row>> childRows;
 
@@ -29,21 +35,21 @@ public class Row
         this.subPos = subPos;
         this.tableAlias = source.tableAlias;
         this.values = source.values;
-        this.childRows = copyChildRows();
-        this.parent = source.parent;
+        this.childRows = copyChildRows(source);
+        this.parents = source.parents;
     }
 
-    private List<List<Row>> copyChildRows()
+    private List<List<Row>> copyChildRows(Row source)
     {
-        if (childRows == null)
+        if (source.childRows == null)
         {
             return null;
         }
         
-        List<List<Row>> copy = new ArrayList<>(childRows.size());
-        for (List<Row> rows : childRows)
+        List<List<Row>> copy = new ArrayList<>(source.childRows.size());
+        for (List<Row> rows : source.childRows)
         {
-            copy.add(new LinkedList<>(rows));
+            copy.add(new ArrayList<>(rows));
         }
         
         return copy;
@@ -111,14 +117,22 @@ public class Row
         return tableAlias;
     }
     
-    public Row getParent()
+    public List<Row> getParents()
     {
-        return parent;
+        if (!predicateParent.isEmpty())
+        {
+            return predicateParent;
+        }
+        return getRealParents();
     }
     
-    public void setParent(Row parent)
+    private List<Row> getRealParents()
     {
-        this.parent = parent;
+        if (parents == null)
+        {
+            parents = new ArrayList<>();
+        }
+        return parents;
     }
     
     /**
@@ -146,8 +160,23 @@ public class Row
 
         if (limit < 0 || rows.size() < limit)
         {
+            inner.getRealParents().add(this);
             rows.add(inner);
         }
+    }
+    
+    /** Evaluate this row with provided parent and predicate
+     * Temporary sets provided parent as parent row before evaluating
+     * and then reverts.
+     * This is because the parent might not be a real parent (only known
+     * after evaluation). 
+     **/
+    public boolean evaluatePredicate(Row parent, Predicate<Row> predicate)
+    {
+        predicateParent.add(parent);
+        boolean result = predicate.test(this);
+        predicateParent.clear();
+        return result;
     }
 
     /** Construct a row with provided meta values and position */

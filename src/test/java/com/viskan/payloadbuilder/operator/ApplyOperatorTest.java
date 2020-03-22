@@ -23,7 +23,7 @@ public class ApplyOperatorTest extends Assert
     {
         TableAlias a = TableAlias.of(null, "table", "t");
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
-        ApplyOperator op = new ApplyOperator(left, Type.CROSS, new Range(2), emptyList(), RowMerger.COPY);
+        ApplyOperator op = new ApplyOperator(left, Type.CROSS, new Range(2), emptyList(), DefaultRowMerger.COPY);
 
         Iterator<Row> it = op.open(new OperatorContext());
         int count = 0;
@@ -42,7 +42,7 @@ public class ApplyOperatorTest extends Assert
     {
         TableAlias a = TableAlias.of(null, "table", "t");
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
-        ApplyOperator op = new ApplyOperator(left, Type.CROSS, new Range(2), emptyList(), RowMerger.DEFAULT);
+        ApplyOperator op = new ApplyOperator(left, Type.CROSS, new Range(2), emptyList(), DefaultRowMerger.DEFAULT);
 
         Iterator<Row> it = new Distinct(op).open(new OperatorContext());
         int count = 0;
@@ -62,7 +62,7 @@ public class ApplyOperatorTest extends Assert
     {
         TableAlias a = TableAlias.of(null, "table", "t");
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
-        ApplyOperator op = new ApplyOperator(left, Type.OUTER, new Range(0), emptyList(), RowMerger.DEFAULT);
+        ApplyOperator op = new ApplyOperator(left, Type.OUTER, new Range(0), emptyList(), DefaultRowMerger.DEFAULT);
 
         Iterator<Row> it = op.open(new OperatorContext());
         int count = 0;

@@ -14,6 +14,8 @@ public class Catalog
     /** Functions */
     private final Map<String, FunctionInfo> functionByName = new HashMap<>();
     
+    private OperatorFactory operatorFactory;
+    
     public Catalog(String name)
     {
         this.name = requireNonNull(name, "name");
@@ -22,6 +24,16 @@ public class Catalog
     public String getName()
     {
         return name;
+    }
+    
+    public OperatorFactory getOperatorFactory()
+    {
+        return operatorFactory;
+    }
+    
+    public void setOperatorFactory(OperatorFactory operatorFactory)
+    {
+        this.operatorFactory = operatorFactory;
     }
 
     /** Register function */

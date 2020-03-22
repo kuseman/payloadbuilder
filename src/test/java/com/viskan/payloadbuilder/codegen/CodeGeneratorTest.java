@@ -12,7 +12,7 @@ import com.viskan.payloadbuilder.operator.Operator;
 import com.viskan.payloadbuilder.operator.OperatorContext;
 import com.viskan.payloadbuilder.operator.OperatorTest.CachedSupplier;
 import com.viskan.payloadbuilder.operator.OperatorTest.ListScan;
-import com.viskan.payloadbuilder.operator.RowMerger;
+import com.viskan.payloadbuilder.operator.DefaultRowMerger;
 import com.viskan.payloadbuilder.parser.QueryParser;
 import com.viskan.payloadbuilder.parser.tree.Expression;
 
@@ -227,7 +227,7 @@ public class CodeGeneratorTest extends Assert
                 sourceScan,
                 campaignScan,
                 predicate,
-                RowMerger.DEFAULT);
+                DefaultRowMerger.DEFAULT);
 
         for (int i = 0; i < 100; i++)
         {
