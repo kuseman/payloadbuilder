@@ -61,6 +61,7 @@ public abstract class ATreeVisitor<TR, TC> implements TreeVisitor<TR, TC>
         {
             visit(nestedSelectItem.getWhere(), context);
         }
+        nestedSelectItem.getOrderBy().forEach(si -> si.accept(this, context));
         return null;
     }
 

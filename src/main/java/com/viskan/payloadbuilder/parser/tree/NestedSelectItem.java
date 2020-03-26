@@ -21,7 +21,7 @@ public class NestedSelectItem extends SelectItem
             String identifier,
             List<SortItem> orderBy)
     {
-        super(identifier);
+        super(identifier, identifier != null);
         this.type = requireNonNull(type, "type");
         this.selectItems = requireNonNull(selectItems, "selectItems");
         this.from = from;

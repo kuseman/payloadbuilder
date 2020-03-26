@@ -7,30 +7,16 @@ import com.viskan.payloadbuilder.catalog.CatalogRegistry;
 import com.viskan.payloadbuilder.catalog.FunctionInfo.Type;
 import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
 import com.viskan.payloadbuilder.evaluation.EvaluationContext;
-import com.viskan.payloadbuilder.operator.NestedLoop;
-import com.viskan.payloadbuilder.operator.Operator;
-import com.viskan.payloadbuilder.operator.OperatorContext;
-import com.viskan.payloadbuilder.operator.OperatorTest.CachedSupplier;
-import com.viskan.payloadbuilder.operator.OperatorTest.ListScan;
-import com.viskan.payloadbuilder.operator.DefaultRowMerger;
 import com.viskan.payloadbuilder.parser.QueryParser;
 import com.viskan.payloadbuilder.parser.tree.Expression;
 
 import static java.util.Arrays.asList;
 
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Random;
 import java.util.Set;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.time.StopWatch;
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Test;
 
 public class CodeGeneratorTest extends Assert
@@ -176,79 +162,79 @@ public class CodeGeneratorTest extends Assert
         return new HashSet<>(asList(items));
     }
 
-    @Ignore
-    @Test
-    public void test_performance() throws Exception
-    {
-        TableAlias sourceMeta = TableAlias.of(null, "source", "s");
-        sourceMeta.setColumns(new String[] {"art_id", "sku_id"});
-        TableAlias campaignMeta = TableAlias.of(sourceMeta, "campaign", "c");
-        campaignMeta.setColumns(new String[] {"apply_to_articles", "includeArtIds", "includeSkuIds", "excludeArtIds", "excludeSkuIds"});
-
-        Random rnd = new Random();
-        // _source (art_id, sku_id)
-        Operator sourceScan = new ListScan(
-                sourceMeta,
-                new CachedSupplier<>(() -> IntStream.range(1, 300000).mapToObj(i -> new Object[] {i, i / 5 + i}).collect(Collectors.toList())));
-
-        // articleAttribute ("apply_to_articles", "includeArtIds", "includeSkuIds", "excludeArtIds", "excludeSkuIds")
-        Operator campaignScan = new ListScan(
-                campaignMeta,
-                new CachedSupplier<>(() -> IntStream.range(1, 200)
-                        .mapToObj(i -> new Object[] {0, asList(rnd.nextInt(300000), rnd.nextInt(300000), rnd.nextInt(300000), rnd.nextInt(300000)), asList(rnd.nextInt(1000)),
-                                asList(rnd.nextInt(1000)), asList(rnd.nextInt(1000))})
-                        .collect(Collectors.toList())));
-
-        //        "(c.apply_to_articles = 1 or ( s.art_id in (c.includeArtIds) or s.sku_id in (c.includeSkuIds) ))"
-
-        String expression = "(c.apply_to_articles = 1 or (s.art_id in (c.includeArtIds) or s.sku_id in (c.includeSkuIds)))  and not (s.art_id in (c.excludeArtIds) or s.sku_id in (c.excludeSkuIds) )";
-
-        /*
-         *  Input r_in_apply_to_articles = new Input("apply_to_articles");
-            Input r_out_art_id = new Input("art_id");
-            Input r_in_includeArtIds = new Input("includeArtIds");
-            Input r_out_sku_id = new Input("sku_id");
-            Input r_in_includeSkuIds = new Input("includeSkuIds");
-            Input r_in_excludeArtIds = new Input("excludeArtIds");
-            Input r_in_excludeSkuIds = new Input("excludeSkuIds");
-         *
-         */
-        
-        Expression e = parser.parseExpression(catalogRegistry, expression);
-
-
-        CodeGenerator gen = new CodeGenerator();
-        Predicate<Row> predicate = gen.generatePredicate(campaignMeta, e);
-        
-//        BiPredicate<Row, Row> predicate = getBiPredicate(expression, campaignMeta);
-        //                ExpressionCodeGenVisitorTest::test;// getBiPredicate(expression, campaignMeta);
-
-        Operator op = new NestedLoop(
-                sourceScan,
-                campaignScan,
-                predicate,
-                DefaultRowMerger.DEFAULT);
-
-        for (int i = 0; i < 100; i++)
-        {
-            StopWatch sw = new StopWatch();
-            sw.start();
-            int rowCount = 0;
-            int innerCount = 0;
-            Iterator<Row> it = op.open(new OperatorContext());
-            while (it.hasNext())
-            {
-                Row row = it.next();
-                innerCount += row.getChildRows(0).size();
-                rowCount++;
-            }
-            sw.stop();
-            System.out.println("Row count: " + rowCount + " Inner count: " + innerCount + ", Memory: "
-                + FileUtils.byteCountToDisplaySize(Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) + " Time: "
-                + sw.toString());
-        }
-
-    }
+//    @Ignore
+//    @Test
+//    public void test_performance() throws Exception
+//    {
+//        TableAlias sourceMeta = TableAlias.of(null, "source", "s");
+//        sourceMeta.setColumns(new String[] {"art_id", "sku_id"});
+//        TableAlias campaignMeta = TableAlias.of(sourceMeta, "campaign", "c");
+//        campaignMeta.setColumns(new String[] {"apply_to_articles", "includeArtIds", "includeSkuIds", "excludeArtIds", "excludeSkuIds"});
+//
+//        Random rnd = new Random();
+//        // _source (art_id, sku_id)
+//        Operator sourceScan = new ListScan(
+//                sourceMeta,
+//                new CachedSupplier<>(() -> IntStream.range(1, 300000).mapToObj(i -> new Object[] {i, i / 5 + i}).collect(Collectors.toList())));
+//
+//        // articleAttribute ("apply_to_articles", "includeArtIds", "includeSkuIds", "excludeArtIds", "excludeSkuIds")
+//        Operator campaignScan = new ListScan(
+//                campaignMeta,
+//                new CachedSupplier<>(() -> IntStream.range(1, 200)
+//                        .mapToObj(i -> new Object[] {0, asList(rnd.nextInt(300000), rnd.nextInt(300000), rnd.nextInt(300000), rnd.nextInt(300000)), asList(rnd.nextInt(1000)),
+//                                asList(rnd.nextInt(1000)), asList(rnd.nextInt(1000))})
+//                        .collect(Collectors.toList())));
+//
+//        //        "(c.apply_to_articles = 1 or ( s.art_id in (c.includeArtIds) or s.sku_id in (c.includeSkuIds) ))"
+//
+//        String expression = "(c.apply_to_articles = 1 or (s.art_id in (c.includeArtIds) or s.sku_id in (c.includeSkuIds)))  and not (s.art_id in (c.excludeArtIds) or s.sku_id in (c.excludeSkuIds) )";
+//
+//        /*
+//         *  Input r_in_apply_to_articles = new Input("apply_to_articles");
+//            Input r_out_art_id = new Input("art_id");
+//            Input r_in_includeArtIds = new Input("includeArtIds");
+//            Input r_out_sku_id = new Input("sku_id");
+//            Input r_in_includeSkuIds = new Input("includeSkuIds");
+//            Input r_in_excludeArtIds = new Input("excludeArtIds");
+//            Input r_in_excludeSkuIds = new Input("excludeSkuIds");
+//         *
+//         */
+//        
+//        Expression e = parser.parseExpression(catalogRegistry, expression);
+//
+//
+//        CodeGenerator gen = new CodeGenerator();
+//        Predicate<Row> predicate = gen.generatePredicate(campaignMeta, e);
+//        
+////        BiPredicate<Row, Row> predicate = getBiPredicate(expression, campaignMeta);
+//        //                ExpressionCodeGenVisitorTest::test;// getBiPredicate(expression, campaignMeta);
+//
+//        Operator op = new NestedLoop(
+//                sourceScan,
+//                campaignScan,
+//                predicate,
+//                DefaultRowMerger.DEFAULT);
+//
+//        for (int i = 0; i < 100; i++)
+//        {
+//            StopWatch sw = new StopWatch();
+//            sw.start();
+//            int rowCount = 0;
+//            int innerCount = 0;
+//            Iterator<Row> it = op.open(new OperatorContext());
+//            while (it.hasNext())
+//            {
+//                Row row = it.next();
+//                innerCount += row.getChildRows(0).size();
+//                rowCount++;
+//            }
+//            sw.stop();
+//            System.out.println("Row count: " + rowCount + " Inner count: " + innerCount + ", Memory: "
+//                + FileUtils.byteCountToDisplaySize(Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) + " Time: "
+//                + sw.toString());
+//        }
+//
+//    }
 
     @Test
     public void test_qualifiednames() throws Exception

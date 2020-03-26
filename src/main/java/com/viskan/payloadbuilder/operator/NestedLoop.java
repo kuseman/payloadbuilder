@@ -1,11 +1,12 @@
 package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 
 import static java.util.Objects.requireNonNull;
 
 import java.util.Iterator;
-import java.util.function.Predicate;
+import java.util.function.BiPredicate;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -14,16 +15,16 @@ public class NestedLoop implements Operator
 {
     private final Operator outer;
     private final Operator inner;
-    private final Predicate<Row> predicate;
+    private final BiPredicate<EvaluationContext, Row> predicate;
     private final RowMerger rowMerger;
     private final boolean populating;
-    
-    public NestedLoop(Operator outer, Operator inner, Predicate<Row> predicate, boolean populating)
+
+    public NestedLoop(Operator outer, Operator inner, BiPredicate<EvaluationContext, Row> predicate, boolean populating)
     {
         this(outer, inner, predicate, DefaultRowMerger.DEFAULT, populating);
     }
-    
-    public NestedLoop(Operator outer, Operator inner, Predicate<Row> predicate, RowMerger rowMerger, boolean populating)
+
+    public NestedLoop(Operator outer, Operator inner, BiPredicate<EvaluationContext, Row> predicate, RowMerger rowMerger, boolean populating)
     {
         this.outer = requireNonNull(outer, "outer");
         this.inner = requireNonNull(inner, "inner");
@@ -84,13 +85,13 @@ public class NestedLoop implements Operator
                         {
                             next = currentOuter;
                         }
-                            
+
                         currentOuter = null;
                         continue;
                     }
 
                     Row currentInner = ii.next();
-                    if (currentInner.evaluatePredicate(currentOuter, predicate))
+                    if (currentInner.evaluatePredicate(currentOuter, context.getEvaluationContext(), predicate))
                     {
                         next = rowMerger.merge(currentOuter, currentInner, populating);
                         if (populating)
@@ -104,6 +105,31 @@ public class NestedLoop implements Operator
                 return next != null;
             }
         };
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return 17 + (outer.hashCode() * 37) + (inner.hashCode() * 37);
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof NestedLoop)
+        {
+            NestedLoop that = (NestedLoop) obj;
+            return outer.equals(that.outer)
+                &&
+                inner.equals(that.inner)
+                &&
+                predicate.equals(that.predicate)
+                &&
+                rowMerger.equals(that.rowMerger)
+                &&
+                populating == that.populating;
+        }
+        return false;
     }
 
     @Override

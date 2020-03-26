@@ -39,6 +39,22 @@ public class DefaultRowMerger implements RowMerger
         result.merge(inner, limit);
         return result;
     }
+    
+    @Override
+    public int hashCode()
+    {
+        return limit;
+    }
+    
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof DefaultRowMerger)
+        {
+            return limit == ((DefaultRowMerger) obj).limit;
+        }
+        return false;
+    }
 
     /** Create a limiting row merger */
     static DefaultRowMerger limit(int limit)

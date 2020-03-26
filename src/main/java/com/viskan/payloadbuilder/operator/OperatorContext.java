@@ -1,6 +1,7 @@
 package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 
 import static java.util.Collections.emptyList;
 
@@ -12,17 +13,15 @@ import gnu.trove.map.hash.THashMap;
 /** Context used during selection of operator tree */
 public class OperatorContext
 {
+    /** Context used when evaluating expressions */
+    private final EvaluationContext evaluationContext = new EvaluationContext();
+    
     /** Spool storage */
-    Map<String, List<Row>> spooledRowsByKey = new THashMap<>();
+    private final Map<String, List<Row>> spooledRowsByKey = new THashMap<>();
     
     /** Reference to parent row during selection inside projections */
     private Row parentProjectionRow;
  
-    /** Lookup index values by key
-     * TODO: need qualified name here later on
-     *  */
-    private Map<String, List<Object>> indexLookupValues;
-    
     /** Store spool rows with key */
     public void storeSpoolRows(String key, List<Row> rows)
     {
@@ -44,18 +43,8 @@ public class OperatorContext
         this.parentProjectionRow = parentProjectionRow;
     }
     
-    public List<Object> getIndexLookupValues(String key)
+    public EvaluationContext getEvaluationContext()
     {
-        return indexLookupValues != null ? indexLookupValues.get(key) : null;
-    }
-    
-    public void addIndexLookupValues(String key, List<Object> values)
-    {
-        if (indexLookupValues == null)
-        {
-            indexLookupValues = new THashMap<>();
-        }
-        
-        indexLookupValues.put(key, values);
+        return evaluationContext;
     }
 }

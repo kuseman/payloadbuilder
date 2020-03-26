@@ -85,10 +85,21 @@ public class QualifiedReferenceExpression extends Expression
 
             // 3. Parent alias match upwards
             current = current.getParent();
-            resultRow = (Row) CollectionUtils.get(resultRow.getParents(), 0);
+            resultRow = resultRow.getParents().size() > 0 ? (Row) CollectionUtils.get(resultRow.getParents(), 0) : null;
         }
 
-        return resultRow != null ? resultRow.getObject(parts.get(partIndex)) : null;
+        if (resultRow == null)
+        {
+            return null;
+        }
+        
+        current = resultRow.getTableAlias().getChildAlias(parts.get(partIndex));
+        if (current != null)
+        {
+            return resultRow.getChildRows(current.getParentIndex());
+        }
+        
+        return resultRow.getObject(parts.get(partIndex));
     }
 
     @Override
@@ -218,6 +229,25 @@ public class QualifiedReferenceExpression extends Expression
     public boolean isNullable()
     {
         return true;
+    }
+    
+    @Override
+    public int hashCode()
+    {
+        return qname.hashCode();
+    }
+    
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof QualifiedReferenceExpression)
+        {
+            QualifiedReferenceExpression e = (QualifiedReferenceExpression) obj;
+            return qname.equals(e.qname)
+                    &&
+                    lambdaId == e.lambdaId;
+        }
+        return false;
     }
 
     @Override

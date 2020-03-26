@@ -1294,15 +1294,17 @@ public class OperatorTest extends Assert
         }
     }
 
-    static class MapWriter implements OutputWriter
+    public static class MapWriter implements OutputWriter
     {
         //        Stack<Map<String, Object>> objectStack = new Stack<>();
         //        Stack<List<Object>> listStack = new Stack<>();
         //
         //        String currentField;
 
-        StringBuilder sb = new StringBuilder();
+        public StringBuilder sb = new StringBuilder();
 
+        
+        
         Map<String, Object> getAndReset()
         {
             return null;

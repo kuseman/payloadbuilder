@@ -29,6 +29,7 @@ import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.SelectItemCont
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.SortItemContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.TableSourceContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.TableSourceJoinedContext;
+import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.TopExpressionContext;
 import com.viskan.payloadbuilder.parser.tree.AJoin;
 import com.viskan.payloadbuilder.parser.tree.Apply;
 import com.viskan.payloadbuilder.parser.tree.Apply.ApplyType;
@@ -76,6 +77,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 
 import org.antlr.v4.runtime.BaseErrorListener;
@@ -100,7 +102,7 @@ public class QueryParser
     /** Parse expression */
     public Expression parseExpression(CatalogRegistry catalogRegistry, String expression)
     {
-        return getTree(catalogRegistry, expression, p -> p.expression());
+        return getTree(catalogRegistry, expression, p -> p.topExpression());
     }
 
     @SuppressWarnings("unchecked")
@@ -161,11 +163,31 @@ public class QueryParser
         public Object visitQuery(QueryContext ctx)
         {
             List<SelectItem> selectItems = ctx.selectItem().stream().map(s -> (SelectItem) visit(s)).collect(toList());
+            
+            Optional<SelectItem> item = selectItems.stream().filter(si -> isBlank(si.getIdentifier())).findAny();
+
+            if (item.isPresent())
+            {
+                throw new IllegalArgumentException("Select items on ROOT level must have aliaes. Item: " + item.get());
+            }
+            
             TableSourceJoined joinedTableSource = ctx.tableSourceJoined() != null ? (TableSourceJoined) visit(ctx.tableSourceJoined()) : null;
+            
+            if (joinedTableSource.getTableSource() instanceof PopulateTableSource)
+            {
+                throw new IllegalArgumentException("Table source in FROM clause cannot be of populating type.");
+            }
+            
             Expression where = getExpression(ctx.where);
             List<Expression> groupBy = ctx.groupBy != null ? ctx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
             List<SortItem> orderBy = ctx.sortItem() != null ? ctx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
             return new Query(selectItems, joinedTableSource, where, groupBy, orderBy);
+        }
+        
+        @Override
+        public Object visitTopExpression(TopExpressionContext ctx)
+        {
+            return getExpression(ctx.expression());
         }
 
         @Override
@@ -184,6 +206,30 @@ public class QueryParser
                 Expression from = getExpression(ctx.nestedSelectItem().from);
                 Expression where = getExpression(ctx.nestedSelectItem().where);
 
+                if (type == NestedSelectItem.Type.ARRAY)
+                {
+                    if (from == null)
+                    {
+                        throw new IllegalArgumentException("ARRAY select requires a from clause: " + selectItems);
+                    }
+                    
+                    Optional<SelectItem> item = selectItems.stream().filter(si -> !isBlank(si.getIdentifier()) && si.isExplicitIdentifier()).findAny();
+                    
+                    if (item.isPresent())
+                    {
+                        throw new IllegalArgumentException("Select items inside an ARRAY select cannot have aliaes. Item: " + item.get());
+                    }
+                }
+                else
+                {
+                    Optional<SelectItem> item = selectItems.stream().filter(si -> isBlank(si.getIdentifier())).findAny();
+
+                    if (item.isPresent())
+                    {
+                        throw new IllegalArgumentException("Select items inside an OBJECT select must have aliaes. Item: " + item.get());
+                    }
+                }
+                
                 List<SortItem> orderBy = ctx.nestedSelectItem().sortItem() != null ? ctx.nestedSelectItem().sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : null;
                 
                 return new NestedSelectItem(type, selectItems, from, where, identifier, orderBy);
@@ -513,7 +559,7 @@ public class QueryParser
             {
                 if (lambdaParameters.containsKey(i))
                 {
-                    throw new IllegalArgumentException("Lambda identifier " + i + " is already in scope.");
+                    throw new IllegalArgumentException("Lambda identifier " + i + " is already defined in scope.");
                 }
 
                 lambdaParameters.put(i, lambdaParameters.size());
@@ -604,47 +650,6 @@ public class QueryParser
             text = text.substring(1, text.length() - 1);
             return new LiteralStringExpression(text);
         }
-
-        //        private FunctionInfo getFunction(FunctionCallContext ctx, boolean scalar)
-        //        {
-        //            QualifiedName qname = getQualifiedName(ctx.qname());
-        //            int size = qname.getParts().size();
-        //
-        //            /*
-        //             * func()                       <- default
-        //             * Utils.func()                 <- catalog
-        //             * field.func()                 <- dereference
-        //             * field.field.Utils.func()     <- dereference with catalog
-        //             *
-        //             * If there is a leftDereference
-        //             *
-        //             * Left: field.func()
-        //             *
-        //             * func()                       <- default
-        //             * Utils.func()                 <- catalog
-        //             * field.func()                 <- dereference
-        //             * field.field.Utils.func()     <- dereference with catalog
-        //             *
-        //             */
-        //
-        //            String functionName = qname.getLast();
-        //            String potentialCatalog = size == 1 ? DefaultCatalog.NAME : qname.getParts().get(size - 2);
-        //
-        //            Catalog catalog = catalogRegistry.getCatalog(potentialCatalog);
-        //            boolean catalogHit = catalog != null;
-        //            if (catalog == null)
-        //            {
-        //                // Assume default catalog if none potential found
-        //                catalog = catalogRegistry.getDefault();
-        //            }
-        //
-        //            FunctionInfo functionInfo = scalar ? catalog.getScalarFunction(functionName) : catalog.getTableFunction(functionName);
-        //            if (functionInfo == null)
-        //            {
-        //                throw new IllegalArgumentException("Could not find a function named: " + (qname.getLast() + " in catalog: " + catalog.getName()));
-        //            }
-        //            return functionInfo;
-        //        }
 
         private SortItem getSortItem(SortItemContext ctx)
         {

@@ -1,6 +1,7 @@
 package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -8,8 +9,7 @@ import static java.util.Collections.singletonList;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.function.BiFunction;
-import java.util.function.Predicate;
+import java.util.function.BiPredicate;
 import java.util.function.ToIntFunction;
 
 import org.apache.commons.lang3.StringUtils;
@@ -25,16 +25,16 @@ class HashJoin implements Operator
     private final Operator inner;
     private final ToIntFunction<Row> outerHashFunction;
     private final ToIntFunction<Row> innerHashFunction;
-    private final Predicate<Row> predicate;
-    private final BiFunction<Row, Row, Row> rowMerger;
+    private final BiPredicate<EvaluationContext, Row> predicate;
+    private final RowMerger rowMerger;
 
     HashJoin(
             Operator outer,
             Operator inner,
             ToIntFunction<Row> outerHashFunction,
             ToIntFunction<Row> innerHashFunction,
-            Predicate<Row> predicate,
-            BiFunction<Row, Row, Row> rowMerger)
+            BiPredicate<EvaluationContext, Row> predicate,
+            RowMerger rowMerger)
     {
         this.outer = outer;
         this.inner = inner;
@@ -129,18 +129,10 @@ class HashJoin implements Operator
                     }
 
                     Row currentOuter = outerIt.next();
-
-                    Row prevParent = currentInner.getParent();
-                    currentInner.setParent(currentOuter);
-                    
-                    if (predicate.test(currentInner))
+                    if (currentInner.evaluatePredicate(currentOuter, context.getEvaluationContext(), predicate))
                     {
-                        next = rowMerger.apply(currentOuter, currentInner);
+                        next = rowMerger.merge(currentOuter, currentInner, false);
                     }
-                    else
-                    {
-                        currentInner.setParent(prevParent);
-                    }                   
                 }
 
                 return next != null;

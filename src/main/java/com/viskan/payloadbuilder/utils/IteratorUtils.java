@@ -22,7 +22,7 @@ public class IteratorUtils
 
     /** Get iterator from provided object */
     @SuppressWarnings("unchecked")
-    public static Iterator<Object> getIterator(Object obj)
+    public static <T> Iterator<T> getIterator(Object obj)
     {
         if (obj instanceof Iterator)
         {

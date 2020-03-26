@@ -8,8 +8,23 @@ public class ExpressionSelectItem extends SelectItem
 
     public ExpressionSelectItem(Expression expression, String identifier)
     {
-        super(identifier);
+        super(getIdentifier(expression, identifier), identifier != null);
         this.expression = requireNonNull(expression, "expression");
+    }
+    
+    private static String getIdentifier(Expression expression, String identifier)
+    {
+        if (identifier != null)
+        {
+            return identifier;
+        }
+        
+        if (expression instanceof QualifiedReferenceExpression)
+        {
+            return ((QualifiedReferenceExpression) expression).getQname().getLast();
+        }
+        
+        return null;
     }
     
     public Expression getExpression()

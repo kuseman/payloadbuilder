@@ -33,7 +33,23 @@ public class CachingOperator implements Operator
         }
         return rows.iterator();
     }
-    
+
+    @Override
+    public int hashCode()
+    {
+        return target.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof CachingOperator)
+        {
+            return target.equals(((CachingOperator) obj).target);
+        }
+        return super.equals(obj);
+    }
+
     @Override
     public String toString(int indent)
     {

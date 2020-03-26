@@ -5,8 +5,13 @@ import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.CatalogRegistry;
 import com.viskan.payloadbuilder.catalog.OperatorFactory;
 import com.viskan.payloadbuilder.catalog.TableFunctionInfo;
+import com.viskan.payloadbuilder.operator.ArrayProjection;
 import com.viskan.payloadbuilder.operator.CachingOperator;
+import com.viskan.payloadbuilder.operator.ExpressionOperator;
+import com.viskan.payloadbuilder.operator.ExpressionPredicate;
+import com.viskan.payloadbuilder.operator.ExpressionProjection;
 import com.viskan.payloadbuilder.operator.NestedLoop;
+import com.viskan.payloadbuilder.operator.ObjectProjection;
 import com.viskan.payloadbuilder.operator.Operator;
 import com.viskan.payloadbuilder.operator.Projection;
 import com.viskan.payloadbuilder.parser.tree.ATreeVisitor;
@@ -15,9 +20,11 @@ import com.viskan.payloadbuilder.parser.tree.Expression;
 import com.viskan.payloadbuilder.parser.tree.ExpressionSelectItem;
 import com.viskan.payloadbuilder.parser.tree.Join;
 import com.viskan.payloadbuilder.parser.tree.NestedSelectItem;
+import com.viskan.payloadbuilder.parser.tree.NestedSelectItem.Type;
 import com.viskan.payloadbuilder.parser.tree.PopulateTableSource;
 import com.viskan.payloadbuilder.parser.tree.QualifiedName;
 import com.viskan.payloadbuilder.parser.tree.Query;
+import com.viskan.payloadbuilder.parser.tree.SelectItem;
 import com.viskan.payloadbuilder.parser.tree.Table;
 import com.viskan.payloadbuilder.parser.tree.TableFunction;
 import com.viskan.payloadbuilder.parser.tree.TableSource;
@@ -26,17 +33,20 @@ import com.viskan.payloadbuilder.parser.tree.TableSourceJoined;
 import static com.viskan.payloadbuilder.utils.CollectionUtils.asSet;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.lang3.BooleanUtils;
+import org.apache.commons.lang3.tuple.Pair;
 
 import gnu.trove.map.hash.THashMap;
 
-/** Operator that creates an operator from a query */
-public class OperatorVisitor2 extends ATreeVisitor<Void, OperatorVisitor2.Context>
+/** Builder that constructs a {@link Operator} and {@link Projection} for
+ * a {@link Query} */
+public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
 {
-    private static final OperatorVisitor2 VISITOR = new OperatorVisitor2();
+    private static final OperatorBuilder VISITOR = new OperatorBuilder();
     
     /** Context used during visiting tree */
     static class Context
@@ -86,52 +96,14 @@ public class OperatorVisitor2 extends ATreeVisitor<Void, OperatorVisitor2.Contex
     }
     
     /** Create operator */
-    public static Operator create(CatalogRegistry catalogRegistry, Query query)
+    public static Pair<Operator, Projection> create(CatalogRegistry catalogRegistry, Query query)
     {
         Context context = new Context();
         context.catalogRegistry = catalogRegistry;
         query.accept(VISITOR, context);
         context.columnsByAlias.entrySet().forEach(e -> e.getKey().setColumns(e.getValue().toArray(EMPTY_STRING_ARRAY)));
-        return context.operator;
+        return Pair.of(context.operator, context.projection);
     }
-    
-    /*
-     * 
-op0 = spool("parents", scan(source))
-
-op1 = spool("parents", join(op0, scanWithSpool("parents", article)))
-
--- (aa)
-
-op2 = scanWithSpool("parents", articleAttribute)
-op3 = spool("parents", join(op2, scanWithSpool("parents", articlePrice)))
-
-op4 = join(op3, scanWithSpool("parents", attribute1))
-    
--- (/aa)
-
-op5 = join(op1, op4)
-
--------
-
-op0 = scan(source)
-
-op1 = scan(article)
-op2 = join(op0, op1)
-
--- (aa)
-
-op3 = scan(articleAttribute)
-op4 = scan(aticlePrice)
-op5 = join(op3, op4)
-
--- (/aa)
-
-op6 = join(op2, op5)
-
-
-
-     */
     
     @Override
     public Void visit(Query query, Context context)
@@ -150,7 +122,17 @@ op6 = join(op2, op5)
             context.parent = context.parent.getParent();
         }
         
-        query.getSelectItems().forEach(s -> s.accept(this, context));
+        Map<String, Projection> rootProjections = new LinkedHashMap<>();
+        
+        query.getSelectItems().forEach(s -> 
+        { 
+            s.accept(this, context);
+            rootProjections.put(s.getIdentifier(), context.projection);
+        });
+
+        // TODO: wrap operator with where, order by group by
+        
+        context.projection = new ObjectProjection(rootProjections);
         return null;
     }
     
@@ -158,42 +140,64 @@ op6 = join(op2, op5)
     public Void visit(NestedSelectItem nestedSelectItem, Context context)
     {
         Set<TableAlias> aliases = asSet(context.parent);
-        if (nestedSelectItem.getFrom() != null)
+        Operator fromOperator = null;
+        Expression from = nestedSelectItem.getFrom();
+        if (from != null)
         {
-            aliases = ColumnsVisitor.getColumnsByAlias(context.columnsByAlias, context.parent, nestedSelectItem.getFrom());
+            fromOperator = new ExpressionOperator(from);
+            aliases = ColumnsVisitor.getColumnsByAlias(context.columnsByAlias, context.parent, from);
         }
-
+        
+        Map<String, Projection> projections = new LinkedHashMap<>();
+        boolean projectionsAdded = false;
+        
         // Use found aliases and traverse select items, order and where
         TableAlias parent = context.parent;
         for (TableAlias alias : aliases)
         {
             context.parent = alias;
-            nestedSelectItem.getSelectItems().forEach(s -> s.accept(this, context));
+            for (SelectItem s : nestedSelectItem.getSelectItems())
+            { 
+                s.accept(this, context);
+                if (!projectionsAdded)
+                {
+                    projections.put(s.getIdentifier(), context.projection);
+                }
+            }
 
+            projectionsAdded = true;
+            
             if (nestedSelectItem.getWhere() != null)
             {
+                // TODO: wrap from operator with where
                 visit(nestedSelectItem.getWhere(), context);
             }
 
             if (nestedSelectItem.getOrderBy() != null)
             {
+                // TODO: wrap from operator with order by
                 nestedSelectItem.getOrderBy().forEach(si -> si.accept(this, context));
             }
         }
         
+        if (nestedSelectItem.getType() == Type.ARRAY)
+        {
+            context.projection = new ArrayProjection(new ArrayList<>(projections.values()), fromOperator);
+        }
+        else
+        {
+            context.projection = new ObjectProjection(projections, fromOperator);
+        }
         context.parent = parent;
         return null;
     }
     
     @Override
-    public Void visit(ExpressionSelectItem expressionSelectItem, Context context)
+    public Void visit(ExpressionSelectItem selectItem, Context context)
     {
-        context.projection = (writer, row) ->
-        {
-            Object object = expressionSelectItem.getExpression().eval(null, row);
-            writer.writeFieldName(expressionSelectItem.getIdentifier());
-            writer.writeValue(object);
-        };
+        Expression expression = selectItem.getExpression();
+        visit(expression, context);
+        context.projection = new ExpressionProjection(expression);
         return null;
     }
 
@@ -224,7 +228,7 @@ op6 = join(op2, op5)
         
         // TODO: Code generation
         // TODO: emit NULL rows (LEFT JOIN)
-        context.operator = new NestedLoop(outer, new CachingOperator(inner), row -> BooleanUtils.isTrue((Boolean) join.getCondition().eval(null, row)), tableSource.isPopulating());
+        context.operator = new NestedLoop(outer, new CachingOperator(inner), new ExpressionPredicate(join.getCondition()), tableSource.isPopulating());
         visit(join.getCondition(), context);
         return null;
     }
@@ -245,7 +249,7 @@ op6 = join(op2, op5)
         // Apply => nested loop without predicate. 
         // TODO: emit NULL rows (OUTER APPLY)
         // TODO: might need an apply operator instead of nested loop
-        context.operator = new NestedLoop(outer, new CachingOperator(inner), row -> true, tableSource.isPopulating());
+        context.operator = new NestedLoop(outer, new CachingOperator(inner), (eCtx, row) -> true, tableSource.isPopulating());
         return null;
     }
     
@@ -280,13 +284,19 @@ op6 = join(op2, op5)
     @Override
     public Void visit(Table table, Context context)
     {
-        context.appendTableAlias(table.getTable(), table.getAlias());
-        
-        Catalog catalog = context.catalogRegistry.getCatalog(table.getTable().getFirst());
+        QualifiedName tableName = table.getTable();
+        Catalog catalog = context.catalogRegistry.getCatalog(tableName.getFirst());
         if (catalog == null)
         {
             catalog = context.catalogRegistry.getDefault();
         }
+        else
+        {
+            // Remove catalog name from table name
+            tableName = tableName.extract(1, tableName.getParts().size());
+        }
+        
+        context.appendTableAlias(tableName, table.getAlias());
         
         OperatorFactory operatorFactory = catalog.getOperatorFactory();
         if (operatorFactory == null)
@@ -294,7 +304,7 @@ op6 = join(op2, op5)
             throw new IllegalArgumentException("No operator factory registerd for catalog: " + catalog.getName());
         }
         
-        context.operator = operatorFactory.create(context.parent);
+        context.operator = operatorFactory.create(tableName, context.parent);
         return null;
     }
     
@@ -311,5 +321,4 @@ op6 = join(op2, op5)
         
         return null;
     }
-    
 }

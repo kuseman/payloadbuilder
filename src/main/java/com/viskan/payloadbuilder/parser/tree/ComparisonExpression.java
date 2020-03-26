@@ -102,7 +102,7 @@ public class ComparisonExpression extends Expression
         }
 
         code.setCode(String.format(
-                      "%s"
+                "%s"
                     + "boolean %s = true;\n"
                     + "boolean %s = false;\n"
                     + "if (!%s)\n"
@@ -116,8 +116,8 @@ public class ComparisonExpression extends Expression
                     + "}\n",
                 leftCode.getCode(),
                 code.getIsNull(),
-                code.getResVar(), 
-                leftCode.getIsNull(), 
+                code.getResVar(),
+                leftCode.getIsNull(),
                 rightCode.getCode(),
                 rightCode.getIsNull(),
                 code.getResVar(), cmpOp, leftCode.getResVar(), rightCode.getResVar(),
@@ -142,6 +142,30 @@ public class ComparisonExpression extends Expression
     public String toString()
     {
         return left.toString() + " " + type.value + " " + right.toString();
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return 17 +
+            (37 * type.hashCode()) +
+            (37 * left.hashCode()) +
+            (37 * right.hashCode());
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof ComparisonExpression)
+        {
+            ComparisonExpression e = (ComparisonExpression) obj;
+            return type.equals(e.type)
+                &&
+                left.equals(e.left)
+                &&
+                right.equals(e.right);
+        }
+        return super.equals(obj);
     }
 
     @Override

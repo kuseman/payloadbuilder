@@ -4,10 +4,17 @@ package com.viskan.payloadbuilder.parser.tree;
 public abstract class SelectItem extends ANode
 {
     protected final String identifier;
+    private final boolean explicitIdentifier;
 
-    public SelectItem(String identifier)
+    public SelectItem(String identifier, boolean explicitIdentifier)
     {
         this.identifier = identifier;
+        this.explicitIdentifier = explicitIdentifier;
+    }
+    
+    public boolean isExplicitIdentifier()
+    {
+        return explicitIdentifier;
     }
     
     public String getIdentifier()

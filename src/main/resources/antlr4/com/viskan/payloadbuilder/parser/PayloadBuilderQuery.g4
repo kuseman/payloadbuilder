@@ -61,6 +61,10 @@ sortItem
  ;
  
 // Expressions
+
+topExpression
+ : expression EOF
+ ;
  
 expression
  : primary                                              	#primaryExpression

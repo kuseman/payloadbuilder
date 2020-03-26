@@ -1,11 +1,13 @@
 package com.viskan.payloadbuilder;
 
+import com.viskan.payloadbuilder.evaluation.EvaluationContext;
+
 import static java.util.stream.Collectors.joining;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.function.Predicate;
+import java.util.function.BiPredicate;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -171,10 +173,10 @@ public class Row
      * This is because the parent might not be a real parent (only known
      * after evaluation). 
      **/
-    public boolean evaluatePredicate(Row parent, Predicate<Row> predicate)
+    public boolean evaluatePredicate(Row parent, EvaluationContext context, BiPredicate<EvaluationContext, Row> predicate)
     {
         predicateParent.add(parent);
-        boolean result = predicate.test(this);
+        boolean result = predicate.test(context, this);
         predicateParent.clear();
         return result;
     }
