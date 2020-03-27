@@ -205,6 +205,7 @@ public class QueryParser
                 List<SelectItem> selectItems = ctx.nestedSelectItem().selectItem().stream().map(s -> (SelectItem) visit(s)).collect(toList());
                 Expression from = getExpression(ctx.nestedSelectItem().from);
                 Expression where = getExpression(ctx.nestedSelectItem().where);
+                List<SortItem> orderBy = ctx.nestedSelectItem().sortItem() != null ? ctx.nestedSelectItem().sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : null;
 
                 if (type == NestedSelectItem.Type.ARRAY)
                 {
@@ -230,7 +231,14 @@ public class QueryParser
                     }
                 }
                 
-                List<SortItem> orderBy = ctx.nestedSelectItem().sortItem() != null ? ctx.nestedSelectItem().sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : null;
+                if (from == null && where != null)
+                {
+                    throw new IllegalArgumentException("Cannot have a WHERE clause without a FROM clause: "  + selectItems);
+                }
+                else if (from == null && !orderBy.isEmpty())
+                {
+                    throw new IllegalArgumentException("Cannot have an ORDER BY clause without a FROM clause: " + selectItems);
+                }
                 
                 return new NestedSelectItem(type, selectItems, from, where, identifier, orderBy);
             }

@@ -3,6 +3,8 @@ package com.viskan.payloadbuilder.parser.tree;
 import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 
+import avro.shaded.com.google.common.base.Objects;
+
 public abstract class LiteralExpression extends Expression
 {
     private final Object objectValue;
@@ -33,5 +35,22 @@ public abstract class LiteralExpression extends Expression
     public Class<?> getDataType()
     {
         return objectValue != null ? objectValue.getClass() : super.getDataType();
+    }
+    
+    @Override
+    public int hashCode()
+    {
+        return 17 + 
+                37 * (objectValue != null ? objectValue.hashCode() : 0);
+    }
+    
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof LiteralExpression)
+        {
+            return Objects.equal(objectValue, ((LiteralExpression) obj).objectValue);
+        }
+        return false;
     }
 }

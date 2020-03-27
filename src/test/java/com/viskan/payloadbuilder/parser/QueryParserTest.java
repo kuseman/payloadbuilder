@@ -20,6 +20,8 @@ public class QueryParserTest extends Assert
         assertQueryFail(IllegalArgumentException.class, "Select items inside an OBJECT", "select object(10) col from source s");
         assertQueryFail(IllegalArgumentException.class, "Select items on ROOT level", "select 'value' from source s");
         assertQueryFail(IllegalArgumentException.class, "Table source in FROM clause", "select s.id from [source] s");
+        assertQueryFail(IllegalArgumentException.class, "Cannot have a WHERE clause without a FROM clause", "select object(s.id where false) from [source] s");
+        assertQueryFail(IllegalArgumentException.class, "Cannot have an ORDER BY clause without a FROM clause", "select object(s.id order by 1) from [source] s");
     }
 
     @Test

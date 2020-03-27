@@ -165,7 +165,7 @@ public class ComparisonExpression extends Expression
                 &&
                 right.equals(e.right);
         }
-        return super.equals(obj);
+        return false;
     }
 
     @Override

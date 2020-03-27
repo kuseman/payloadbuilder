@@ -10,6 +10,7 @@ import com.viskan.payloadbuilder.operator.CachingOperator;
 import com.viskan.payloadbuilder.operator.ExpressionOperator;
 import com.viskan.payloadbuilder.operator.ExpressionPredicate;
 import com.viskan.payloadbuilder.operator.ExpressionProjection;
+import com.viskan.payloadbuilder.operator.Filter;
 import com.viskan.payloadbuilder.operator.NestedLoop;
 import com.viskan.payloadbuilder.operator.ObjectProjection;
 import com.viskan.payloadbuilder.operator.Operator;
@@ -111,9 +112,13 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
         query.getFrom().accept(this, context);
         if (query.getWhere() != null)
         {
+            context.operator = new Filter(context.operator, new ExpressionPredicate(query.getWhere()));
             visit(query.getWhere(), context);
         }
+
+        // TODO: wrap context.operator with order by
         query.getOrderBy().forEach(o -> o.accept(this, context));
+        // TODO: wrap context.operator with group by
         query.getGroupBy().forEach(e -> visit(e, context));
         
         // Reset alias to root before processing select items
@@ -130,8 +135,6 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
             rootProjections.put(s.getIdentifier(), context.projection);
         });
 
-        // TODO: wrap operator with where, order by group by
-        
         context.projection = new ObjectProjection(rootProjections);
         return null;
     }
@@ -169,7 +172,7 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
             
             if (nestedSelectItem.getWhere() != null)
             {
-                // TODO: wrap from operator with where
+                fromOperator = new Filter(fromOperator, new ExpressionPredicate(nestedSelectItem.getWhere()));
                 visit(nestedSelectItem.getWhere(), context);
             }
 
@@ -266,16 +269,15 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
         
         tsj.getJoins().forEach(j -> j.accept(this, context));
 
-        Operator populateOperator = context.operator;
-        
-        populatingJoin.getGroupBy().forEach(e -> visit(e, context));
         if (populatingJoin.getWhere() != null)
         {
+            context.operator = new Filter(context.operator, new ExpressionPredicate(populatingJoin.getWhere()));
             visit(populatingJoin.getWhere(), context);
         }
+        // TODO: wrap context.operator with group by
+        populatingJoin.getGroupBy().forEach(e -> visit(e, context));
+        // TODO: wrap context.operator with order by etc.
         populatingJoin.getOrderBy().forEach(o -> o.accept(this, context));
-        
-        // TODO: wrap populateOperator with order by etc.
         
         context.parent = parent;
         return null;

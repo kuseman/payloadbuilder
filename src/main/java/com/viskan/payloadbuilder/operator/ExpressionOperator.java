@@ -13,15 +13,33 @@ import java.util.Iterator;
 public class ExpressionOperator implements Operator
 {
     private final Expression expression;
+
     public ExpressionOperator(Expression expression)
     {
         this.expression = requireNonNull(expression, "expression");
     }
-    
+
     @Override
     public Iterator<Row> open(OperatorContext context)
     {
         Object result = expression.eval(context.getEvaluationContext(), context.getParentProjectionRow());
         return result == null ? emptyIterator() : IteratorUtils.getIterator(result);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return 17 +
+            37 * expression.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof ExpressionOperator)
+        {
+            return expression.equals(((ExpressionOperator) obj).expression);
+        }
+        return false;
     }
 }
