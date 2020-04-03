@@ -12,11 +12,10 @@ import static java.util.Objects.requireNonNull;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.apache.commons.collections.CollectionUtils;
-import org.apache.commons.lang.ArrayUtils;
-
-import avro.shaded.com.google.common.base.Objects;
+import org.apache.commons.lang3.ArrayUtils;
 
 /**
  * Expression of a qualified name type. Column reference with a nested path. Ie. field.subField.value
@@ -67,7 +66,7 @@ public class QualifiedReferenceExpression extends Expression
             String part = parts.get(partIndex);
 
             // 1. Alias match, move on
-            if (Objects.equal(part, current.getAlias()))
+            if (Objects.equals(part, current.getAlias()))
             {
                 partIndex ++;
                 continue;
@@ -79,13 +78,14 @@ public class QualifiedReferenceExpression extends Expression
             {
                 partIndex ++;
                 current = alias;
-                resultRow = (Row) CollectionUtils.get(resultRow.getChildRows(alias.getParentIndex()), 0);
+                List<Row> childAlias = resultRow.getChildRows(alias.getParentIndex());
+                resultRow = !childAlias.isEmpty() ? (Row) CollectionUtils.get(childAlias, 0) : null;
                 continue;
             }
 
             // 3. Parent alias match upwards
             current = current.getParent();
-            resultRow = resultRow.getParents().size() > 0 ? (Row) CollectionUtils.get(resultRow.getParents(), 0) : null;
+            resultRow = !resultRow.getParents().isEmpty() ? (Row) CollectionUtils.get(resultRow.getParents(), 0) : null;
         }
 
         if (resultRow == null)

@@ -19,9 +19,8 @@ public class QueryParserTest extends Assert
         assertQueryFail(IllegalArgumentException.class, "Select items inside an ARRAY", "select array(10 col1, 20 col2 from s) col from source s");
         assertQueryFail(IllegalArgumentException.class, "Select items inside an OBJECT", "select object(10) col from source s");
         assertQueryFail(IllegalArgumentException.class, "Select items on ROOT level", "select 'value' from source s");
-        assertQueryFail(IllegalArgumentException.class, "Table source in FROM clause", "select s.id from [source] s");
-        assertQueryFail(IllegalArgumentException.class, "Cannot have a WHERE clause without a FROM clause", "select object(s.id where false) from [source] s");
-        assertQueryFail(IllegalArgumentException.class, "Cannot have an ORDER BY clause without a FROM clause", "select object(s.id order by 1) from [source] s");
+        assertQueryFail(IllegalArgumentException.class, "Cannot have a WHERE clause without a FROM clause", "select object(s.id where false) from source s");
+        assertQueryFail(IllegalArgumentException.class, "Cannot have an ORDER BY clause without a FROM clause", "select object(s.id order by 1) from source s");
     }
 
     @Test
@@ -41,11 +40,33 @@ public class QueryParserTest extends Assert
     public void test_joins()
     {
         assertQuery("select art_id from article a");
+        
+        // Regular joins
         assertQuery("select art_id from article a inner join articleAttribute aa on aa.art_id = a.art_id");
-        assertQuery("select art_id from article a inner join [articleAttribute] aa on aa.art_id = a.art_id ");
-        assertQuery("select art_id from article a inner join [articleAttribute aa inner join [articlePrice] ap on ap.sku_id = aa.sku_id ] aa on aa.art_id = a.art_id ");
+        assertQuery("select art_id from article a left join articleAttribute aa on aa.art_id = a.art_id");
+        
+        // Apply joins
+        assertQuery("select art_id from article a cross apply articleAttribute aa");
+        assertQuery("select art_id from article a outer apply articleAttribute aa");
+        assertQuery("select art_id from article a outer apply range(10) r");
+        
+        // Populate joins
+        assertQuery("select art_id from article a cross populate (articleAttribute on art_id = a.art_id) aa ");
+        assertQuery("select art_id from article a outer populate (articleAttribute on art_id = a.art_id) aa ");
+        
+        // Nested
+        assertQuery("select art_id from article a cross populate (articleAttribute aa on aa.art_id = a.art_id inner join articlePrice ap on ap.sku_id = aa.sku_id) aa  ");
+        assertQuery("select art_id from article a cross populate (articleAttribute aa on aa.art_id = a.art_id outer populate (articlePrice on sku_id = aa.sku_id) ap) aa  ");
+        
+        // TODO: more parser tests, where, orderby, group by
     }
 
+    @Test
+    public void test_ands()
+    {
+        assertExpression("a and (b or c)");
+    }
+    
     @Test
     public void test_expressions()
     {

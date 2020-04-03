@@ -153,7 +153,7 @@ public class QueryParser
         private final Map<String, Integer> lambdaParameters = new HashMap<>();
         private Expression leftDereference;
         private Expression prevLeftDereference;
-        
+
         public AstBuilder(CatalogRegistry catalogRegistry)
         {
             this.catalogRegistry = catalogRegistry;
@@ -163,27 +163,21 @@ public class QueryParser
         public Object visitQuery(QueryContext ctx)
         {
             List<SelectItem> selectItems = ctx.selectItem().stream().map(s -> (SelectItem) visit(s)).collect(toList());
-            
+
             Optional<SelectItem> item = selectItems.stream().filter(si -> isBlank(si.getIdentifier())).findAny();
 
             if (item.isPresent())
             {
                 throw new IllegalArgumentException("Select items on ROOT level must have aliaes. Item: " + item.get());
             }
-            
+
             TableSourceJoined joinedTableSource = ctx.tableSourceJoined() != null ? (TableSourceJoined) visit(ctx.tableSourceJoined()) : null;
-            
-            if (joinedTableSource.getTableSource() instanceof PopulateTableSource)
-            {
-                throw new IllegalArgumentException("Table source in FROM clause cannot be of populating type.");
-            }
-            
             Expression where = getExpression(ctx.where);
             List<Expression> groupBy = ctx.groupBy != null ? ctx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
             List<SortItem> orderBy = ctx.sortItem() != null ? ctx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
             return new Query(selectItems, joinedTableSource, where, groupBy, orderBy);
         }
-        
+
         @Override
         public Object visitTopExpression(TopExpressionContext ctx)
         {
@@ -213,9 +207,9 @@ public class QueryParser
                     {
                         throw new IllegalArgumentException("ARRAY select requires a from clause: " + selectItems);
                     }
-                    
+
                     Optional<SelectItem> item = selectItems.stream().filter(si -> !isBlank(si.getIdentifier()) && si.isExplicitIdentifier()).findAny();
-                    
+
                     if (item.isPresent())
                     {
                         throw new IllegalArgumentException("Select items inside an ARRAY select cannot have aliaes. Item: " + item.get());
@@ -230,16 +224,16 @@ public class QueryParser
                         throw new IllegalArgumentException("Select items inside an OBJECT select must have aliaes. Item: " + item.get());
                     }
                 }
-                
+
                 if (from == null && where != null)
                 {
-                    throw new IllegalArgumentException("Cannot have a WHERE clause without a FROM clause: "  + selectItems);
+                    throw new IllegalArgumentException("Cannot have a WHERE clause without a FROM clause: " + selectItems);
                 }
                 else if (from == null && !orderBy.isEmpty())
                 {
                     throw new IllegalArgumentException("Cannot have an ORDER BY clause without a FROM clause: " + selectItems);
                 }
-                
+
                 return new NestedSelectItem(type, selectItems, from, where, identifier, orderBy);
             }
 
@@ -257,15 +251,15 @@ public class QueryParser
         @Override
         public Object visitJoinPart(JoinPartContext ctx)
         {
-            TableSource tableSource = (TableSource) visit(ctx.tableSource());
-
             if (ctx.JOIN() != null)
             {
+                TableSource tableSource = (TableSource) visit(ctx.tableSource());
                 Expression condition = ctx.expression() != null ? (Expression) visit(ctx.expression()) : null;
                 Join.JoinType joinType = ctx.INNER() != null ? JoinType.INNER : JoinType.LEFT;
                 return new Join(tableSource, joinType, condition);
             }
 
+            TableSource tableSource = (TableSource) visit(ctx.tableSource());
             ApplyType applyType = ctx.OUTER() != null ? ApplyType.OUTER : ApplyType.CROSS;
             return new Apply(tableSource, applyType);
         }
@@ -287,23 +281,22 @@ public class QueryParser
             {
                 if (isBlank(alias))
                 {
-                    throw new IllegalArgumentException("Populate table source must have an alias");
+                    throw new IllegalArgumentException("Populate query must have an alias");
                 }
-                
-                PopulateQueryContext populateQueryCtx = ctx.populateQuery();
 
+                PopulateQueryContext populateQueryCtx = ctx.populateQuery();
                 TableSourceJoined tableSourceJoined = (TableSourceJoined) visit(populateQueryCtx.tableSourceJoined());
-                
+
                 if (tableSourceJoined.getTableSource() instanceof PopulateTableSource)
                 {
-                    throw new IllegalArgumentException("Top level table source in populate cannot be a populate source");
+                    throw new IllegalArgumentException("Table source in populate query cannot be a populate table source");
                 }
-                
+
+                Expression where = populateQueryCtx.where != null ? getExpression(populateQueryCtx.where) : null;
                 List<Expression> groupBy = populateQueryCtx.groupBy != null ? populateQueryCtx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
                 List<SortItem> orderBy = populateQueryCtx.sortItem() != null ? populateQueryCtx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
-                Expression where = populateQueryCtx.where != null ? getExpression(populateQueryCtx.where) : null;
-                
-                return new PopulateTableSource(tableSourceJoined, alias, orderBy, groupBy, where);
+
+                return new PopulateTableSource(alias, tableSourceJoined, where, groupBy, orderBy);
             }
 
             return new Table(getQualifiedName(ctx.qname()), defaultIfNull(alias, ""));

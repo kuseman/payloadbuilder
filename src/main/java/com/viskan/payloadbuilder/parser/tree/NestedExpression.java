@@ -52,6 +52,22 @@ public class NestedExpression extends Expression
     }
     
     @Override
+    public int hashCode()
+    {
+        return 37 * expression.hashCode();
+    }
+    
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof NestedExpression)
+        {
+            return expression.equals(((NestedExpression) obj).expression);
+        }
+        return false;
+    }
+    
+    @Override
     public String toString()
     {
         return "(" + expression.toString() + ")";

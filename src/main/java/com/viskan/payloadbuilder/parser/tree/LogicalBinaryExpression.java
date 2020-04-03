@@ -12,7 +12,7 @@ public class LogicalBinaryExpression extends Expression
     private final Type type;
     private final Expression left;
     private final Expression right;
-    
+
     public LogicalBinaryExpression(Type type, Expression left, Expression right)
     {
         this.type = requireNonNull(type, "type");
@@ -24,12 +24,12 @@ public class LogicalBinaryExpression extends Expression
     {
         return type;
     }
-    
+
     public Expression getLeft()
     {
         return left;
     }
-    
+
     public Expression getRight()
     {
         return right;
@@ -40,13 +40,13 @@ public class LogicalBinaryExpression extends Expression
     {
         return Boolean.class;
     }
-    
+
     @Override
     public boolean isNullable()
     {
         return left.isNullable() || right.isNullable();
     }
-    
+
     @Override
     public Object eval(EvaluationContext evaluationContext, Row row)
     {
@@ -58,19 +58,19 @@ public class LogicalBinaryExpression extends Expression
             {
                 return false;
             }
-            
+
             Object rr = right.eval(evaluationContext, row);
 
             if (rr != null && !(Boolean) rr)
             {
                 return false;
             }
-            
+
             if (rr == null || lr == null)
             {
                 return null;
             }
-            
+
             return true;
         }
 
@@ -80,14 +80,14 @@ public class LogicalBinaryExpression extends Expression
         {
             return true;
         }
-        
+
         Object rr = right.eval(evaluationContext, row);
-        
+
         if (rr != null && (Boolean) rr)
         {
             return true;
         }
-        
+
         if (lr == null || rr == null)
         {
             return null;
@@ -95,7 +95,7 @@ public class LogicalBinaryExpression extends Expression
 
         return false;
     }
-    
+
     @Override
     public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
     {
@@ -225,23 +225,47 @@ public class LogicalBinaryExpression extends Expression
             }
         }
 
-        return code;    
+        return code;
     }
-    
+
     @Override
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
     }
-    
+
     @Override
     public String toString()
     {
         return left.toString() + " " + type + " " + right.toString();
     }
-    
-    public enum Type 
+
+    @Override
+    public int hashCode()
     {
-        AND,OR;
+        return 17 +
+            (37 * left.hashCode()) +
+            (37 * right.hashCode()) +
+            (37 * type.hashCode());
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof LogicalBinaryExpression)
+        {
+            LogicalBinaryExpression e = (LogicalBinaryExpression) obj;
+            return left.equals(e.getLeft())
+                &&
+                right.equals(e.getRight())
+                &&
+                type == e.type;
+        }
+        return false;
+    }
+
+    public enum Type
+    {
+        AND, OR;
     }
 }

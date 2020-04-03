@@ -3,6 +3,7 @@ package com.viskan.payloadbuilder.operator;
 import com.viskan.payloadbuilder.Row;
 
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.StringUtils.repeat;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -11,12 +12,12 @@ import java.util.List;
 /** Caches provided operator to allow rewinds (Used in inner operator for nested loop) */
 public class CachingOperator implements Operator
 {
-    private final Operator target;
+    private final Operator operator;
     private List<Row> rows = null;
 
     public CachingOperator(Operator target)
     {
-        this.target = requireNonNull(target, "target");
+        this.operator = requireNonNull(target, "operator");
     }
 
     @Override
@@ -25,7 +26,7 @@ public class CachingOperator implements Operator
         if (rows == null)
         {
             rows = new ArrayList<>();
-            Iterator<Row> it = target.open(context);
+            Iterator<Row> it = operator.open(context);
             while (it.hasNext())
             {
                 rows.add(it.next());
@@ -37,7 +38,7 @@ public class CachingOperator implements Operator
     @Override
     public int hashCode()
     {
-        return target.hashCode();
+        return operator.hashCode();
     }
 
     @Override
@@ -45,7 +46,7 @@ public class CachingOperator implements Operator
     {
         if (obj instanceof CachingOperator)
         {
-            return target.equals(((CachingOperator) obj).target);
+            return operator.equals(((CachingOperator) obj).operator);
         }
         return super.equals(obj);
     }
@@ -53,6 +54,9 @@ public class CachingOperator implements Operator
     @Override
     public String toString(int indent)
     {
-        return "CACHING " + target.toString(indent + 1);
+        String indentString = repeat("  ", indent);
+        return "CACHING" + System.lineSeparator()
+            +
+            indentString + operator.toString(indent + 1);
     }
 }

@@ -2,13 +2,14 @@ package com.viskan.payloadbuilder.parser.tree;
 
 import static java.util.Objects.requireNonNull;
 
+/** A table */
 public class Table extends TableSource
 {
     private final QualifiedName table;
 
     public Table(QualifiedName table, String alias)
     {
-        super(alias, false);
+        super(alias);
         this.table = requireNonNull(table, "table");
     }
     

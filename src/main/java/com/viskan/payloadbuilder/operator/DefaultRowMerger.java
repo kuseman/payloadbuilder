@@ -24,19 +24,18 @@ public class DefaultRowMerger implements RowMerger
         Row result = outer;
         
         // No populating join, create a copy of outer row
-        // and re-add it to parents before merging inner row
         if (!populating)
         {
             result = new Row(result, inner.getPos());
-            int aliasIndex = outer.getTableAlias().getParentIndex();
-            for (Row p : outer.getParents())
-            {
-                List<Row> childRows = p.getChildRows(aliasIndex);
-                childRows.add(result);
-            }
         }
         
-        result.merge(inner, limit);
+        // Parent is always populated
+        inner.getParents().add(result);
+        List<Row> childRows = result.getChildRows(inner.getTableAlias().getParentIndex());
+        if (limit < 0 || childRows.size() < limit)
+        {
+            childRows.add(inner);
+        }
         return result;
     }
     

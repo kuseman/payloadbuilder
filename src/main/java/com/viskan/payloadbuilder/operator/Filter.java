@@ -9,6 +9,7 @@ import java.util.Iterator;
 import java.util.function.BiPredicate;
 
 import org.apache.commons.collections.iterators.FilterIterator;
+import org.apache.commons.lang3.StringUtils;
 
 /** Filtering operator */
 public class Filter implements Operator
@@ -48,5 +49,14 @@ public class Filter implements Operator
                 predicate.equals(f.predicate);
         }
         return false;
+    }
+    
+    @Override
+    public String toString(int indent)
+    {
+        String indentString = StringUtils.repeat("  ", indent);
+        return "FILTER (" + predicate + ")" + System.lineSeparator()
+            +
+            indentString + operator.toString(indent + 1);
     }
 }

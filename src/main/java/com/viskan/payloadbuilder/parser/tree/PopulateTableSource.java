@@ -9,18 +9,18 @@ import java.util.List;
 public class PopulateTableSource extends TableSource
 {
     private final TableSourceJoined tableSourceJoined;
-    private final List<SortItem> orderBy;
-    private final List<Expression> groupBy;
     private final Expression where;
+    private final List<Expression> groupBy;
+    private final List<SortItem> orderBy;
     
     public PopulateTableSource(
-            TableSourceJoined tableSourceJoined,
             String alias,
-            List<SortItem> orderBy,
+            TableSourceJoined tableSourceJoined,
+            Expression where,
             List<Expression> groupBy,
-            Expression where)
+            List<SortItem> orderBy)
     {
-        super(alias, true);
+        super(alias);
         this.tableSourceJoined = requireNonNull(tableSourceJoined, "tableSourceJoined");
         this.orderBy = requireNonNull(orderBy, "orderBy");
         this.groupBy = requireNonNull(groupBy, "groupBy");
@@ -50,7 +50,7 @@ public class PopulateTableSource extends TableSource
     @Override
     public <TR, TC> TR accept(TreeVisitor<TR, TC> visitor, TC context)
     {
-        return visitor.visit(this, context);                
+        return visitor.visit(this, context);
     }
     
     @Override

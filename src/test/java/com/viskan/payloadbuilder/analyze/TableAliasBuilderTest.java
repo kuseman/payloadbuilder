@@ -43,6 +43,38 @@ public class TableAliasBuilderTest extends Assert
     }
     
     @Test
+    public void test_mixed_populate()
+    {
+        Query query = parser.parseQuery(catalogRegistry,
+                "select aa.sku_id "
+                    + "from source s "
+                    + "inner join [article] a "
+                    + "  on a.art_id = s.art_id "
+                    + "inner join "
+                    + "["
+                    + "  articleAttribute aa"
+                    + "  inner join articlePrice ap"
+                    + "    on ap.sku_id = aa.sku_id"
+                    + "  inner join [attribute1] a1"
+                    + "    on a1.attr1_id = aa.attr1_id"
+                    + "] aa "
+                    + "  on aa.art_id = s.art_id "
+                    + "");
+        TableAlias actual = TableAliasBuilder.build(query);
+        
+        TableAlias source = new TableAlias(null, of("source"), "s", new String[] {"art_id"});
+        TableAlias article = new TableAlias(source, of("article"), "a", new String[] {"art_id"});
+        TableAlias articleAttribute = new TableAlias(source, of("articleAttribute"), "aa", new String[] { "sku_id", "attr1_id", "art_id" });
+        new TableAlias(articleAttribute, of("articlePrice"), "ap", new String[] { "sku_id" });
+        new TableAlias(articleAttribute, of("attribute1"), "a1", new String[] { "attr1_id" });
+
+        System.out.println(source.printHierarchy(0));
+        System.out.println(actual.printHierarchy(0));
+        
+        assertTrue("Alias hierarchy should be equal", article.isEqual(actual));
+    }
+    
+    @Test
     public void test()
     {
         Query query = parser.parseQuery(catalogRegistry, 

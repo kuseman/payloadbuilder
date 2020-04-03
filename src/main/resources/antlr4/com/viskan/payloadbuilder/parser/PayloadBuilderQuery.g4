@@ -41,6 +41,12 @@ tableSource
  | populateQuery	identifier?
  ;
 
+joinPart
+ : (INNER | LEFT) JOIN tableSource ON expression
+ | (CROSS | OUTER) APPLY tableSource
+ //| (CROSS | OUTER) POPULATE populateQuery identifier
+;
+
 populateQuery
  : '['
    tableSourceJoined
@@ -49,11 +55,6 @@ populateQuery
    (ORDERBY sortItem (',' sortItem)*)?
    ']'
  ;
- 
-joinPart
- : (INNER | LEFT) JOIN tableSource ON expression
- | (CROSS | OUTER) APPLY tableSource
-;
 
 sortItem
  : expression order=(ASC | DESC)? 
@@ -143,35 +144,36 @@ booleanLiteral
  ;
  
 // Tokens
-AND		: A N D;//'and';
-ARRAY	: A R R A Y;//'array';
-AS		: A S;//'as';
-ASC		: A S C;//'asc';
-APPLY	: A P P L Y;//'apply';
-CROSS   : C R O S S;//'cross';
-DESC	: D E S C;//'desc';
-FALSE	: F A L S E;//'false';
-FIRST	: F I R S T;//'first';
-FROM	: F R O M;//'from';
-GROUPBY : G R O U P ' ' B Y;//'group by';
+AND		: A N D;
+ARRAY	: A R R A Y;
+AS		: A S;
+ASC		: A S C;
+APPLY	: A P P L Y;
+CROSS   : C R O S S;
+DESC	: D E S C;
+FALSE	: F A L S E;
+FIRST	: F I R S T;
+FROM	: F R O M;
+GROUPBY : G R O U P ' ' B Y;
 HAVING  : H A V I N G;
-IN		: I N;//'in';
-INNER	: I N N E R;//'inner';
-IS      : I S;//'is';
-JOIN	: J O I N;//'join';
-LAST	: L A S T;//'last';
-LEFT	: L E F T;//'left';
-NOT		: N O T;//'not';
-NULL	: N U L L;//'null';
-NULLS	: N U L L S;//'nulls';
-OBJECT	: O B J E C T;//'object';
-ON		: O N;//'on';
-OR		: O R;//'or';
-ORDERBY	: O R D E R ' ' B Y;//'order by';
-OUTER   : O U T E R;//'outer';
-SELECT	: S E L E C T;//'select';
-TRUE	: T R U E;//'true';
-WHERE	: W H E R E;//'where';
+IN		: I N;
+INNER	: I N N E R;
+IS      : I S;
+JOIN	: J O I N;
+LAST	: L A S T;
+LEFT	: L E F T;
+NOT		: N O T;
+NULL	: N U L L;
+NULLS	: N U L L S;
+OBJECT	: O B J E C T;
+ON		: O N;
+OR		: O R;
+ORDERBY	: O R D E R ' ' B Y;
+OUTER   : O U T E R;
+POPULATE: P O P U L A T E;
+SELECT	: S E L E C T;
+TRUE	: T R U E;
+WHERE	: W H E R E;
 
 ASTERISK			: '*';
 EQUALS				: '=';
@@ -196,23 +198,26 @@ DECIMAL
  ;
 
 STRING
- : ['] ( ~['\r\n\\] | '\\' ~[\r\n] )* [']
+ : '\'' ( ~'\'' | '\'\'' )* '\''
+ ;
+
+QUOTED_IDENTIFIER
+ : '"' ( ~'"' | '""' )* '"'
  ;
 
 IDENTIFIER
  : (LETTER | '_') (LETTER | DIGIT | '_' | '@')*
  ;
 
-QUOTED_IDENTIFIER
- : '"' ( ~'"' | '""' )* '"'
- | '\'' (~'\'' | '\'\'')* '\''
+LINE_COMMENT
+ : '--' ~[\r\n]* '\r'? '\n'? -> skip
  ;
- 
-Comment
+
+BLOCK_COMMENT
  : ( '//' ~[\r\n]* | '/*' .*? '*/' ) -> skip
  ;
  
-Space
+SPACE
  : [ \t\r\n\u000C] -> skip
  ;
  

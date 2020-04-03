@@ -2,7 +2,7 @@ package com.viskan.payloadbuilder.parser.tree;
 
 import static java.util.Objects.requireNonNull;
 
-/** Standard join producing tuples */
+/** Inner, left join */
 public class Join extends AJoin
 {
     private final Expression condition;

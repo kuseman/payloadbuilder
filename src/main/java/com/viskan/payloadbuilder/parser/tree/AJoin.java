@@ -2,7 +2,7 @@ package com.viskan.payloadbuilder.parser.tree;
 
 import static java.util.Objects.requireNonNull;
 
-import org.apache.commons.lang.NotImplementedException;
+import org.apache.commons.lang3.NotImplementedException;
 
 public abstract class AJoin extends ANode
 {

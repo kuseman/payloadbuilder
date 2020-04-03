@@ -7,10 +7,9 @@ import static java.util.Objects.requireNonNull;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Objects;
 
 import org.apache.commons.lang3.ArrayUtils;
-
-import avro.shaded.com.google.common.base.Objects;
 
 /** Projection that projects an object output */
 public class ObjectProjection implements Projection
@@ -76,7 +75,7 @@ public class ObjectProjection implements Projection
         if (obj instanceof ObjectProjection)
         {
             ObjectProjection p = (ObjectProjection) obj;
-            return Objects.equal(selection, p.selection)
+            return Objects.equals(selection, p.selection)
                 &&
                 Arrays.equals(projections, p.projections)
                 &&

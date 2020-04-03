@@ -21,6 +21,8 @@ public class TableAlias
     private final String alias;
     private final List<TableAlias> childAliases = new ArrayList<>();
     private String[] columns;
+    // Index of rows of this type in parent row
+    private int parentIndex;
 
     public TableAlias(
             TableAlias parent,
@@ -40,8 +42,6 @@ public class TableAlias
         }
     }
 
-    // Index of rows of this type in parent row
-    int parentIndex;
 
     public QualifiedName getTable()
     {

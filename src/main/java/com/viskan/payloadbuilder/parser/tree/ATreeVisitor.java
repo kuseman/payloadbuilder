@@ -82,11 +82,11 @@ public abstract class ATreeVisitor<TR, TC> implements TreeVisitor<TR, TC>
     public TR visit(PopulateTableSource populatingJoin, TC context)
     {
         populatingJoin.getTableSourceJoined().accept(this, context);
-        populatingJoin.getGroupBy().forEach(e -> visit(e, context));
         if (populatingJoin.getWhere() != null)
         {
             visit(populatingJoin.getWhere(), context);
         }
+        populatingJoin.getGroupBy().forEach(e -> visit(e, context));
         populatingJoin.getOrderBy().forEach(o -> o.accept(this, context));
         return null;
     }

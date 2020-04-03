@@ -3,7 +3,7 @@ package com.viskan.payloadbuilder.parser.tree;
 import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 
-import avro.shaded.com.google.common.base.Objects;
+import java.util.Objects;
 
 public abstract class LiteralExpression extends Expression
 {
@@ -49,7 +49,7 @@ public abstract class LiteralExpression extends Expression
     {
         if (obj instanceof LiteralExpression)
         {
-            return Objects.equal(objectValue, ((LiteralExpression) obj).objectValue);
+            return Objects.equals(objectValue, ((LiteralExpression) obj).objectValue);
         }
         return false;
     }

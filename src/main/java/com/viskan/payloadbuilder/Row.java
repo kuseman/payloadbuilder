@@ -96,12 +96,23 @@ public class Row
     
     public List<Row> getChildRows(int index)
     {
-        if (childRows == null || index < 0 || index >= childRows.size())
+        if (childRows == null)
         {
-            return null;
+            childRows = new ArrayList<>(5);
+        }
+
+        List<Row> rows = null;
+        if (childRows.size() < index + 1)
+        {
+            rows = new ArrayList<>();
+            childRows.add(rows);
+        }
+        else
+        {
+            rows = childRows.get(index);
         }
         
-        return childRows.get(index);
+        return rows;
     }
 
     public int getPos()
@@ -137,35 +148,35 @@ public class Row
         return parents;
     }
     
-    /**
-     * Merge provided inner row
-     * @param inner Row to merge
-     * @param limit Limit the count of inner rows to merge
-     **/
-    public void merge(Row inner, int limit)
-    {
-        if (childRows == null)
-        {
-            childRows = new ArrayList<>(5);
-        }
-
-        List<Row> rows = null;
-        if (childRows.size() < inner.tableAlias.parentIndex + 1)
-        {
-            rows = new ArrayList<>();
-            childRows.add(rows);
-        }
-        else
-        {
-            rows = childRows.get(inner.tableAlias.parentIndex);
-        }
-
-        if (limit < 0 || rows.size() < limit)
-        {
-            inner.getRealParents().add(this);
-            rows.add(inner);
-        }
-    }
+//    /**
+//     * Merge provided inner row
+//     * @param inner Row to merge
+//     * @param limit Limit the count of inner rows to merge
+//     **/
+//    public void merge(Row inner, int limit)
+//    {
+//        if (childRows == null)
+//        {
+//            childRows = new ArrayList<>(5);
+//        }
+//
+//        List<Row> rows = null;
+//        if (childRows.size() < inner.tableAlias.parentIndex + 1)
+//        {
+//            rows = new ArrayList<>();
+//            childRows.add(rows);
+//        }
+//        else
+//        {
+//            rows = childRows.get(inner.tableAlias.parentIndex);
+//        }
+//
+//        if (limit < 0 || rows.size() < limit)
+//        {
+//            inner.getRealParents().add(this);
+//            rows.add(inner);
+//        }
+//    }
     
     /** Evaluate this row with provided parent and predicate
      * Temporary sets provided parent as parent row before evaluating

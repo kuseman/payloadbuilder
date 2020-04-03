@@ -6,6 +6,7 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 
+/** Table function */
 public class TableFunction extends TableSource
 {
     private final TableFunctionInfo functionInfo;
@@ -13,7 +14,7 @@ public class TableFunction extends TableSource
 
     public TableFunction(TableFunctionInfo functionInfo, List<Expression> arguments, String alias)
     {
-        super(alias, false);
+        super(alias);
         this.functionInfo = requireNonNull(functionInfo, "functionInfo");
         this.arguments = requireNonNull(arguments, "arguments");
     }

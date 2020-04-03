@@ -18,13 +18,13 @@ public class NestedLoop implements Operator
     private final BiPredicate<EvaluationContext, Row> predicate;
     private final RowMerger rowMerger;
     private final boolean populating;
-
-    public NestedLoop(Operator outer, Operator inner, BiPredicate<EvaluationContext, Row> predicate, boolean populating)
-    {
-        this(outer, inner, predicate, DefaultRowMerger.DEFAULT, populating);
-    }
-
-    public NestedLoop(Operator outer, Operator inner, BiPredicate<EvaluationContext, Row> predicate, RowMerger rowMerger, boolean populating)
+    
+    public NestedLoop(
+            Operator outer,
+            Operator inner,
+            BiPredicate<EvaluationContext, Row> predicate,
+            RowMerger rowMerger,
+            boolean populating)
     {
         this.outer = requireNonNull(outer, "outer");
         this.inner = requireNonNull(inner, "inner");
@@ -128,6 +128,7 @@ public class NestedLoop implements Operator
                 rowMerger.equals(that.rowMerger)
                 &&
                 populating == that.populating;
+                
         }
         return false;
     }
@@ -136,7 +137,8 @@ public class NestedLoop implements Operator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        return "NESTED LOOP" + (populating ? " (POPULATE)" : "") + System.lineSeparator()
+        String description = String.format("NESTED LOOP (POPULATING: %s, PREDICATE: %s)", populating, predicate);
+        return description + System.lineSeparator()
             +
             indentString + outer.toString(indent + 1) + System.lineSeparator()
             +

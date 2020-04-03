@@ -24,6 +24,11 @@ public class RowSpool implements Operator
         this.downstream = requireNonNull(downstream, "downstream");
     }
     
+    public String getKey()
+    {
+        return key;
+    }
+
     @Override
     public Iterator<Row> open(OperatorContext context)
     {
@@ -36,13 +41,37 @@ public class RowSpool implements Operator
         context.storeSpoolRows(key, rows);
         return downstream.open(context);
     }
-    
+
     @Override
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        return "SPOOL (key=" + key + ") " + System.lineSeparator()  +
-                indentString + operator.toString(indent + 1) + System.lineSeparator() + 
-                indentString + downstream.toString(indent + 1); 
+        return "SPOOL (key=" + key + ") " + System.lineSeparator() +
+            indentString + operator.toString(indent + 1) + System.lineSeparator() +
+            indentString + downstream.toString(indent + 1);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return 17 +
+            37 * key.hashCode() +
+            37 * operator.hashCode() +
+            37 * downstream.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof RowSpool)
+        {
+            RowSpool rs = (RowSpool) obj;
+            return key.equals(rs.key)
+                &&
+                operator.equals(rs.operator)
+                &&
+                downstream.equals(rs.downstream);
+        }
+        return false;
     }
 }

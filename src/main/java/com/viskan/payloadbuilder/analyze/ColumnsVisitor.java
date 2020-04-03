@@ -15,11 +15,11 @@ import static org.apache.commons.collections.CollectionUtils.isEmpty;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import org.apache.commons.lang3.tuple.Pair;
 
-import avro.shaded.com.google.common.base.Objects;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.hash.THashSet;
@@ -201,7 +201,7 @@ public class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsV
             String part = parts.get(0);
 
             // 1. Alias match, move on
-            if (Objects.equal(part, current.getAlias()))
+            if (Objects.equals(part, current.getAlias()))
             {
                 result = current;
                 parts.remove(0);
