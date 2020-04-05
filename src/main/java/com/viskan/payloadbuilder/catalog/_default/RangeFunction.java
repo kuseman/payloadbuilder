@@ -13,9 +13,17 @@ import java.util.stream.IntStream;
 /** Range table valued function that emits row in range */
 class Range extends TableFunctionInfo
 {
+    private static final String[] COLUMNS = new String[] {"Value"};
+
     Range(Catalog catalog)
     {
         super(catalog, "range", Type.TABLE);
+    }
+
+    @Override
+    public String[] getColumns()
+    {
+        return COLUMNS;
     }
 
     @Override
@@ -34,11 +42,6 @@ class Range extends TableFunctionInfo
             from = ((Number) arguments.get(0)).intValue();
             to = ((Number) arguments.get(1)).intValue();
         }
-        
-        if (tableAlias.getColumns() == null)
-        {
-            tableAlias.setColumns(new String[] { "Value" });
-        }
-        return IntStream.range(from, to).mapToObj(i -> Row.of(tableAlias, i, new Object[] { i + 1 })).iterator();
+        return IntStream.range(from, to).mapToObj(i -> Row.of(tableAlias, i, new Object[] {i + 1})).iterator();
     }
 }

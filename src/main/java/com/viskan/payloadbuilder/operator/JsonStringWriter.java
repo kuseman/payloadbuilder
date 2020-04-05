@@ -1,5 +1,7 @@
 package com.viskan.payloadbuilder.operator;
 
+import java.util.Iterator;
+
 /** Writer that writes output as JSON string */
 public class JsonStringWriter implements OutputWriter
 {
@@ -25,6 +27,19 @@ public class JsonStringWriter implements OutputWriter
     @Override
     public void writeValue(Object value)
     {
+        if (value instanceof Iterator)
+        {
+            @SuppressWarnings("unchecked")
+            Iterator<Object> it = (Iterator<Object>) value;
+            startArray();
+            while (it.hasNext())
+            {
+                writeValue(it.next());
+            }
+            endArray();
+            return;
+        }
+        
         if (value instanceof String)
         {
             sb.append("\"");

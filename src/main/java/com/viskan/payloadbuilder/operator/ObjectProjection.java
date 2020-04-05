@@ -38,9 +38,10 @@ public class ObjectProjection implements Projection
     {
         Row rowToUse = row;
 
+        Row prevParentRow = context.getParentRow();
         if (selection != null)
         {
-            context.setParentProjectionRow(row);
+            context.setParentRow(row);
             Iterator<Row> it = selection.open(context);
             rowToUse = it.hasNext() ? it.next() : null;
         }
@@ -58,6 +59,8 @@ public class ObjectProjection implements Projection
             projections[i].writeValue(writer, context, rowToUse);
         }
         writer.endObject();
+        
+        context.setParentRow(prevParentRow);
     }
 
     @Override

@@ -6,6 +6,7 @@ import com.viskan.payloadbuilder.codegen.ExpressionCode;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 
+import java.util.Arrays;
 import java.util.List;
 
 public class LambdaExpression extends Expression
@@ -37,7 +38,7 @@ public class LambdaExpression extends Expression
     {
         return expression;
     }
-    
+
     public int[] getLambdaIds()
     {
         return lambdaIds;
@@ -68,12 +69,35 @@ public class LambdaExpression extends Expression
     }
 
     @Override
+    public int hashCode()
+    {
+        return 17 +
+            37 * identifiers.hashCode() +
+            37 * expression.hashCode() +
+            37 * Arrays.hashCode(lambdaIds);
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof LambdaExpression)
+        {
+            LambdaExpression le = (LambdaExpression) obj;
+            return identifiers.equals(le.identifiers)
+                &&
+                expression.equals(le.expression)
+                &&
+                Arrays.equals(lambdaIds, le.lambdaIds);
+        }
+        return false;
+    }
+
+    @Override
     public String toString()
     {
         return (identifiers.size() > 1 ? "(" : "") +
             identifiers.stream().map(i -> i.toString()).collect(joining(",")) +
             (identifiers.size() > 1 ? ")" : "") +
             " -> " + expression.toString();
-
     }
 }

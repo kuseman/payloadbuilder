@@ -108,7 +108,19 @@ public class QualifiedReferenceExpression extends Expression
         // This is a lambda reference, pick current value from context
         if (lambdaId >= 0)
         {
-            return evaluationContext.getLambdaValue(lambdaId);
+            Object value = evaluationContext.getLambdaValue(lambdaId);
+            
+            if (qname.getParts().size() > 1)
+            {
+                if (value instanceof Row)
+                {
+                    return getValue((Row) value, qname.getParts().subList(1, qname.getParts().size()));
+                }
+                
+                throw new IllegalArgumentException("Cannot dereference value: " + value);
+            }
+            
+            return value;
         }
 
         return getValue(row, qname.getParts());

@@ -22,7 +22,7 @@ public class ExpressionOperator implements Operator
     @Override
     public Iterator<Row> open(OperatorContext context)
     {
-        Object result = expression.eval(context.getEvaluationContext(), context.getParentProjectionRow());
+        Object result = expression.eval(context.getEvaluationContext(), context.getParentRow());
         return result == null ? emptyIterator() : IteratorUtils.getIterator(result);
     }
 

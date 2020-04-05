@@ -22,6 +22,7 @@ public class DefaultCatalog
         catalog.registerFunction(new SumFunction(catalog));
         catalog.registerFunction(new NowFunction(catalog));
         catalog.registerFunction(new FlatMapFunction(catalog));
+        catalog.registerFunction(new RandomInt(catalog));
         
         // Table functions
         catalog.registerFunction(new Range(catalog));

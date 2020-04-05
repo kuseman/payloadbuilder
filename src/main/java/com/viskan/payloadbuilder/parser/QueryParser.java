@@ -275,7 +275,7 @@ public class QueryParser
                 {
                     throw new IllegalArgumentException("Expected a table function but got: " + functionCall.getFunctionInfo());
                 }
-                return new TableFunction((TableFunctionInfo) functionCall.getFunctionInfo(), functionCall.getArguments(), alias);
+                return new TableFunction((TableFunctionInfo) functionCall.getFunctionInfo(), functionCall.getArguments(), defaultIfNull(alias, ""));
             }
             else if (ctx.populateQuery() != null)
             {

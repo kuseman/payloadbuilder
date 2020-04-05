@@ -22,7 +22,8 @@ public class ArrayProjection implements Projection
     @Override
     public void writeValue(OutputWriter writer, OperatorContext context, Row row)
     {
-        context.setParentProjectionRow(row);
+        Row prevParentRow = context.getParentRow();
+        context.setParentRow(row);
         int size = projections.size();
 
         writer.startArray();
@@ -36,5 +37,27 @@ public class ArrayProjection implements Projection
             }
         }
         writer.endArray();
+        context.setParentRow(prevParentRow);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return 17 +
+            37 * selection.hashCode() +
+            37 * projections.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof ArrayProjection)
+        {
+            ArrayProjection p = (ArrayProjection) obj;
+            return selection.equals(p.selection)
+                &&
+                projections.equals(p.projections);
+        }
+        return false;
     }
 }

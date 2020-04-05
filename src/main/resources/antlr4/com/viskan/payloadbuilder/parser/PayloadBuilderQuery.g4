@@ -44,14 +44,13 @@ tableSource
 joinPart
  : (INNER | LEFT) JOIN tableSource ON expression
  | (CROSS | OUTER) APPLY tableSource
- //| (CROSS | OUTER) POPULATE populateQuery identifier
 ;
 
 populateQuery
  : '['
    tableSourceJoined
-   (GROUPBY groupBy+=expression (',' groupBy+=expression)*)?
    (WHERE where=expression)?
+   (GROUPBY groupBy+=expression (',' groupBy+=expression)*)?
    (ORDERBY sortItem (',' sortItem)*)?
    ']'
  ;

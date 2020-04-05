@@ -17,29 +17,24 @@ public class ArithmeticBinaryExpression extends Expression
     private final Type type;
     private final Expression left;
     private final Expression right;
-    
+
     public ArithmeticBinaryExpression(Type type, Expression left, Expression right)
     {
         this.type = requireNonNull(type, "type");
         this.left = requireNonNull(left, "left");
         this.right = requireNonNull(right, "right");
     }
-    
-    @Override
-    public String toString()
-    {
-        return left.toString() + " " + type.value + " " + right.toString();
-    }
-    
+
     public Type getType()
     {
         return type;
     }
+
     public Expression getLeft()
     {
         return left;
     }
-    
+
     public Expression getRight()
     {
         return right;
@@ -50,24 +45,24 @@ public class ArithmeticBinaryExpression extends Expression
     {
         return left.isNullable() || right.isNullable();
     }
-    
+
     @Override
     public Class<?> getDataType()
     {
         return left.getDataType();
     }
-    
+
     @Override
     public Object eval(EvaluationContext evaluationContext, Row row)
     {
         Object leftResult = left.eval(evaluationContext, row);
         Object rightResult = right.eval(evaluationContext, row);
-        
+
         if (leftResult == null || rightResult == null)
         {
             return null;
         }
-        
+
         switch (type)
         {
             case ADD:
@@ -80,10 +75,11 @@ public class ArithmeticBinaryExpression extends Expression
                 return divide(leftResult, rightResult);
             case MODULUS:
                 return modulo(leftResult, rightResult);
-                default:
-                    throw new IllegalArgumentException("Unknown operator " + type);
-        }    }
-    
+            default:
+                throw new IllegalArgumentException("Unknown operator " + type);
+        }
+    }
+
     @Override
     public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
     {
@@ -128,7 +124,7 @@ public class ArithmeticBinaryExpression extends Expression
                 leftCode.getCode(),
                 code.getResVar(),
                 code.getIsNull(),
-                leftCode.getIsNull(), 
+                leftCode.getIsNull(),
                 rightCode.getCode(),
                 rightCode.getIsNull(),
                 code.getResVar(), method, leftCode.getResVar(), rightCode.getResVar(),
@@ -136,28 +132,59 @@ public class ArithmeticBinaryExpression extends Expression
 
         return code;
     }
-    
+
     @Override
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
     }
-    
-    public enum Type 
+
+    @Override
+    public String toString()
+    {
+        return left.toString() + " " + type.value + " " + right.toString();
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return 17 +
+            (37 * left.hashCode()) +
+            (37 * right.hashCode()) +
+            (37 * type.hashCode());
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof ArithmeticBinaryExpression)
+        {
+            ArithmeticBinaryExpression e = (ArithmeticBinaryExpression) obj;
+            return left.equals(e.getLeft())
+                &&
+                right.equals(e.getRight())
+                &&
+                type == e.type;
+        }
+        return false;
+    }
+
+    public enum Type
     {
         ADD("+"),
         SUBTRACT("-"),
         MULTIPLY("*"),
         DIVIDE("/"),
         MODULUS("%");
+
         private final String value;
 
-        Type(String value) 
+        Type(String value)
         {
             this.value = value;
         }
 
-        public String getValue() 
+        public String getValue()
         {
             return value;
         }

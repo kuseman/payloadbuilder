@@ -19,8 +19,8 @@ public class OperatorContext
     /** Spool storage */
     private final Map<String, List<Row>> spooledRowsByKey = new THashMap<>();
     
-    /** Reference to parent row during selection inside projections */
-    private Row parentProjectionRow;
+    /** Reference to parent row. Used in projections, correlated sub queries */
+    private Row parentRow;
  
     /** Store spool rows with key */
     public void storeSpoolRows(String key, List<Row> rows)
@@ -33,14 +33,14 @@ public class OperatorContext
         return spooledRowsByKey.getOrDefault(key, emptyList());
     }
     
-    public Row getParentProjectionRow()
+    public Row getParentRow()
     {
-        return parentProjectionRow;
+        return parentRow;
     }
-    
-    public void setParentProjectionRow(Row parentProjectionRow)
+
+    public void setParentRow(Row parentRow)
     {
-        this.parentProjectionRow = parentProjectionRow;
+        this.parentRow = parentRow;
     }
     
     public EvaluationContext getEvaluationContext()

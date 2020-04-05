@@ -17,6 +17,12 @@ public abstract class TableFunctionInfo extends FunctionInfo
         super(catalog, name, type);
     }
 
+    /** Returns columns for this function or null if this function's columns is dynamic. */
+    public String[] getColumns()
+    {
+        return null;
+    }
+    
     /** Open iterator for this function 
      * @param context Context
      * @param tableAlias Table alias used for this function

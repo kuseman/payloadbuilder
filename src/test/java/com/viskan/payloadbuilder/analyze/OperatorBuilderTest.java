@@ -4,6 +4,8 @@ import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.catalog.CatalogRegistry;
 import com.viskan.payloadbuilder.catalog.OperatorFactory;
+import com.viskan.payloadbuilder.catalog.TableFunctionInfo;
+import com.viskan.payloadbuilder.operator.ArrayProjection;
 import com.viskan.payloadbuilder.operator.CachingOperator;
 import com.viskan.payloadbuilder.operator.DefaultRowMerger;
 import com.viskan.payloadbuilder.operator.ExpressionOperator;
@@ -18,6 +20,7 @@ import com.viskan.payloadbuilder.operator.OperatorContext;
 import com.viskan.payloadbuilder.operator.Projection;
 import com.viskan.payloadbuilder.operator.RowSpool;
 import com.viskan.payloadbuilder.operator.RowSpoolScan;
+import com.viskan.payloadbuilder.operator.TableFunctionOperator;
 import com.viskan.payloadbuilder.parser.QueryParser;
 import com.viskan.payloadbuilder.parser.tree.QualifiedName;
 import com.viskan.payloadbuilder.parser.tree.Query;
@@ -25,6 +28,7 @@ import com.viskan.payloadbuilder.parser.tree.Query;
 import static com.viskan.payloadbuilder.parser.tree.QualifiedName.of;
 import static com.viskan.payloadbuilder.utils.MapUtils.entry;
 import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
+import static java.util.Arrays.asList;
 import static java.util.Collections.emptyIterator;
 
 import java.util.ArrayList;
@@ -37,6 +41,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.time.StopWatch;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /** Test of {@link OperatorVisitor} */
@@ -83,6 +88,58 @@ public class OperatorBuilderTest extends Assert
         {
             assertTrue(e.getMessage(), e.getMessage().contains("defined multiple times for parent"));
         }
+    }
+
+    @Test
+    public void test_table_function()
+    {
+        String query = "select r.Value * r1.Value * r2.Value mul, r.Value r, r1.filter(x -> x.Value > 10).map(x -> x.Value) r1, r2.Value r2, array(Value from r1) r1A from range(randomInt(100), randomInt(100) + 100) r inner join [range(randomInt(100))] r1 on r1.Value <= r.Value inner join range(randomInt(100), randomInt(100) + 100) r2 on r2.Value = r.Value";
+        QueryResult queryResult = getQueryResult(query);
+
+        TableFunctionInfo range = (TableFunctionInfo) catalogRegistry.getDefault().getFunction("range");
+        QualifiedName rangeQname = QualifiedName.of("DEFAULT", "range");
+
+        TableAlias r = TableAlias.of(null, rangeQname, "r");
+        r.setColumns(new String[] {"Value"});
+        TableAlias r1 = TableAlias.of(r, rangeQname, "r1");
+        r1.setColumns(new String[] {"Value"});
+        TableAlias r2 = TableAlias.of(r, rangeQname, "r2");
+        r2.setColumns(new String[] {"Value"});
+
+        Operator expected = new NestedLoop(
+                new NestedLoop(
+                        new TableFunctionOperator(r, range, asList(
+                                parser.parseExpression(catalogRegistry, "randomInt(100)"),
+                                parser.parseExpression(catalogRegistry, "randomInt(100) + 100"))),
+                        new CachingOperator(new TableFunctionOperator(r1, range, asList(
+                                parser.parseExpression(catalogRegistry, "randomInt(100)")))),
+                        new ExpressionPredicate(parser.parseExpression(catalogRegistry, "r1.Value <= r.Value")),
+                        DefaultRowMerger.DEFAULT,
+                        true,
+                        false),
+                new CachingOperator(
+                        new TableFunctionOperator(r2, range, asList(
+                                parser.parseExpression(catalogRegistry, "randomInt(100)"),
+                                parser.parseExpression(catalogRegistry, "randomInt(100) + 100")))),
+                new ExpressionPredicate(parser.parseExpression(catalogRegistry, "r2.Value = r.Value")),
+                DefaultRowMerger.DEFAULT,
+                false,
+                false);
+
+        //        System.out.println(expected.toString(1));
+        //        System.out.println(queryResult.operator.toString(1));
+
+        assertEquals(expected, queryResult.operator);
+
+        Projection expectedProjection = new ObjectProjection(ofEntries(true,
+                entry("mul", new ExpressionProjection(parser.parseExpression(catalogRegistry, "r.Value * r1.Value * r2.Value"))),
+                entry("r", new ExpressionProjection(parser.parseExpression(catalogRegistry, "r.Value"))),
+                entry("r1", new ExpressionProjection(parser.parseExpression(catalogRegistry, "r1.filter(x -> x.Value > 10).map(x -> x.Value)"))),
+                entry("r2", new ExpressionProjection(parser.parseExpression(catalogRegistry, "r2.Value"))),
+                entry("r1A", new ArrayProjection(asList(
+                        new ExpressionProjection(parser.parseExpression(catalogRegistry, "Value"))), new ExpressionOperator(parser.parseExpression(catalogRegistry, "r1"))))));
+
+        assertEquals(expectedProjection, queryResult.projection);
     }
 
     @Test
@@ -133,7 +190,8 @@ public class OperatorBuilderTest extends Assert
                                 new CachingOperator(queryResult.tableOperators.get(1)),
                                 new ExpressionPredicate(parser.parseExpression(catalogRegistry, "a.art_id = s.art_id")),
                                 DefaultRowMerger.DEFAULT,
-                                true)),
+                                true,
+                                false)),
                 new NestedLoop(
                         new RowSpoolScan("parents"),
                         new CachingOperator(
@@ -148,17 +206,20 @@ public class OperatorBuilderTest extends Assert
                                                                 new CachingOperator(queryResult.tableOperators.get(3)),
                                                                 new ExpressionPredicate(parser.parseExpression(catalogRegistry, "ap.sku_id = aa.sku_id")),
                                                                 DefaultRowMerger.DEFAULT,
+                                                                false,
                                                                 false)),
                                                 new NestedLoop(
                                                         new RowSpoolScan("parents"),
                                                         new CachingOperator(queryResult.tableOperators.get(4)),
                                                         new ExpressionPredicate(parser.parseExpression(catalogRegistry, "a1.attr1_id = aa.attr1_id")),
                                                         DefaultRowMerger.DEFAULT,
-                                                        true)),
+                                                        true,
+                                                        false)),
                                         new ExpressionPredicate(parser.parseExpression(catalogRegistry, "ap.price_sales > 0")))),
                         new ExpressionPredicate(parser.parseExpression(catalogRegistry, "aa.art_id = s.art_id")),
                         DefaultRowMerger.DEFAULT,
-                        true));
+                        true,
+                        false));
 
         assertEquals(expected, queryResult.operator);
 
@@ -168,6 +229,7 @@ public class OperatorBuilderTest extends Assert
         assertEquals(expectedProjection, queryResult.projection);
     }
 
+    @Ignore
     @Test
     public void test()
     {
@@ -243,7 +305,7 @@ public class OperatorBuilderTest extends Assert
                     public Iterator<Row> open(OperatorContext c)
                     {
                         Random rand = new Random();
-//                        System.out.println(tableAlias + " " + Arrays.toString(tableAlias.getColumns()));
+                        //                        System.out.println(tableAlias + " " + Arrays.toString(tableAlias.getColumns()));
                         //                System.out.println("Parents: " + c.getSpoolRows("parents"));
                         //                System.out.println();
 
@@ -300,33 +362,33 @@ public class OperatorBuilderTest extends Assert
             }
         });
 
-        for (int i=0;i<100;i++)
+        for (int i = 0; i < 100; i++)
         {
-        
-        StopWatch sw = new StopWatch();
-        sw.start();
-        
-        Pair<Operator, Projection> pair = OperatorBuilder.create(catalogRegistry, query);
-        Operator operator = pair.getLeft();
-        Projection projection = pair.getRight();
-//        System.err.println(operator.toString(1));
-        JsonStringWriter writer = new JsonStringWriter();
 
-        OperatorContext context = new OperatorContext();
-        Iterator<Row> it = operator.open(context);
-        while (it.hasNext())
-        {
-            Row row = it.next();
-            projection.writeValue(writer, context, row);
-            writer.getAndReset();
-            //            System.out.println(row);
-            //            System.out.println();
+            StopWatch sw = new StopWatch();
+            sw.start();
 
-        }
-        
-        sw.stop();
-        System.out.println("TIme: " + sw.toString() + ", mem: " + FileUtils.byteCountToDisplaySize((Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory())));
-        
+            Pair<Operator, Projection> pair = OperatorBuilder.create(catalogRegistry, query);
+            Operator operator = pair.getLeft();
+            Projection projection = pair.getRight();
+            //        System.err.println(operator.toString(1));
+            JsonStringWriter writer = new JsonStringWriter();
+
+            OperatorContext context = new OperatorContext();
+            Iterator<Row> it = operator.open(context);
+            while (it.hasNext())
+            {
+                Row row = it.next();
+                projection.writeValue(writer, context, row);
+                writer.getAndReset();
+                //            System.out.println(row);
+                //            System.out.println();
+
+            }
+
+            sw.stop();
+            System.out.println("TIme: " + sw.toString() + ", mem: " + FileUtils.byteCountToDisplaySize((Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory())));
+
         }
     }
 
@@ -454,7 +516,7 @@ public class OperatorBuilderTest extends Assert
     }
 
     @Test
-    public void test_nestedLoop()
+    public void test_join()
     {
         String query = "select s.id1, a.id2 from source s inner join article a on s.art_id = a.art_id";
         QueryResult result = getQueryResult(query);
@@ -471,6 +533,7 @@ public class OperatorBuilderTest extends Assert
                                 new CachingOperator(result.tableOperators.get(1)),
                                 new ExpressionPredicate(parser.parseExpression(catalogRegistry, "s.art_id = a.art_id")),
                                 DefaultRowMerger.DEFAULT,
+                                false,
                                 false)),
                 result.operator);
 
@@ -482,7 +545,152 @@ public class OperatorBuilderTest extends Assert
     }
 
     @Test
-    public void test_nestedLoop_populate()
+    public void test_apply()
+    {
+        String query = "select s.id1, a.id2 from source s cross apply article a";
+        QueryResult result = getQueryResult(query);
+
+        // Assert aliaes
+        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"id1"});
+        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"id2"});
+        assertTrue(source.isEqual(result.aliases.get(0)));
+
+        Operator expected = new RowSpool("parents", result.tableOperators.get(0),
+                new NestedLoop(
+                        new RowSpoolScan("parents"),
+                        new CachingOperator(result.tableOperators.get(1)),
+                        null,
+                        DefaultRowMerger.DEFAULT,
+                        false,
+                        false));
+
+        assertEquals(expected, result.operator);
+
+        assertEquals(
+                new ObjectProjection(ofEntries(true,
+                        entry("id1", new ExpressionProjection(parser.parseExpression(catalogRegistry, "s.id1"))),
+                        entry("id2", new ExpressionProjection(parser.parseExpression(catalogRegistry, "a.id2"))))),
+                result.projection);
+    }
+
+    @Test
+    public void test_outer_apply()
+    {
+        String query = "select s.id1, a.id2 from source s outer apply article a";
+        QueryResult result = getQueryResult(query);
+
+        // Assert aliaes
+        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"id1"});
+        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"id2"});
+        assertTrue(source.isEqual(result.aliases.get(0)));
+
+        Operator expected = new RowSpool("parents", result.tableOperators.get(0),
+                new NestedLoop(
+                        new RowSpoolScan("parents"),
+                        new CachingOperator(result.tableOperators.get(1)),
+                        null,
+                        DefaultRowMerger.DEFAULT,
+                        false,
+                        true));
+
+        assertEquals(expected, result.operator);
+
+        assertEquals(
+                new ObjectProjection(ofEntries(true,
+                        entry("id1", new ExpressionProjection(parser.parseExpression(catalogRegistry, "s.id1"))),
+                        entry("id2", new ExpressionProjection(parser.parseExpression(catalogRegistry, "a.id2"))))),
+                result.projection);
+    }
+
+    @Test
+    public void test_outer_apply_with_populate()
+    {
+        String query = "select s.id1, a.id2 from source s outer apply [article] a";
+        QueryResult result = getQueryResult(query);
+
+        // Assert aliaes
+        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"id1"});
+        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"id2"});
+        assertTrue(source.isEqual(result.aliases.get(0)));
+
+        Operator expected = new RowSpool("parents", result.tableOperators.get(0),
+                new NestedLoop(
+                        new RowSpoolScan("parents"),
+                        new CachingOperator(result.tableOperators.get(1)),
+                        null,
+                        DefaultRowMerger.DEFAULT,
+                        true,
+                        true));
+
+        assertEquals(expected, result.operator);
+
+        assertEquals(
+                new ObjectProjection(ofEntries(true,
+                        entry("id1", new ExpressionProjection(parser.parseExpression(catalogRegistry, "s.id1"))),
+                        entry("id2", new ExpressionProjection(parser.parseExpression(catalogRegistry, "a.id2"))))),
+                result.projection);
+    }
+
+    @Test
+    public void test_left_join()
+    {
+        String query = "select s.id1, a.id2 from source s left join article a on s.art_id = a.art_id";
+        QueryResult result = getQueryResult(query);
+
+        // Assert aliaes
+        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
+        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"art_id", "id2"});
+        assertTrue(source.isEqual(result.aliases.get(0)));
+
+        assertEquals(
+                new RowSpool("parents", result.tableOperators.get(0),
+                        new NestedLoop(
+                                new RowSpoolScan("parents"),
+                                new CachingOperator(result.tableOperators.get(1)),
+                                new ExpressionPredicate(parser.parseExpression(catalogRegistry, "s.art_id = a.art_id")),
+                                DefaultRowMerger.DEFAULT,
+                                false,
+                                true)),
+                result.operator);
+
+        assertEquals(
+                new ObjectProjection(ofEntries(true,
+                        entry("id1", new ExpressionProjection(parser.parseExpression(catalogRegistry, "s.id1"))),
+                        entry("id2", new ExpressionProjection(parser.parseExpression(catalogRegistry, "a.id2"))))),
+                result.projection);
+    }
+
+    @Test
+    public void test_left_join_with_populate()
+    {
+        String query = "select s.id1, a.id2 from source s left join [article] a on s.art_id = a.art_id";
+        QueryResult result = getQueryResult(query);
+
+        // Assert aliaes
+        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
+        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"art_id", "id2"});
+        assertTrue(source.isEqual(result.aliases.get(0)));
+
+        assertEquals(
+                new RowSpool("parents", result.tableOperators.get(0),
+                        new NestedLoop(
+                                new RowSpoolScan("parents"),
+                                new CachingOperator(result.tableOperators.get(1)),
+                                new ExpressionPredicate(parser.parseExpression(catalogRegistry, "s.art_id = a.art_id")),
+                                DefaultRowMerger.DEFAULT,
+                                true,
+                                true)),
+                result.operator);
+
+        assertEquals(
+                new ObjectProjection(ofEntries(true,
+                        entry("id1", new ExpressionProjection(parser.parseExpression(catalogRegistry, "s.id1"))),
+                        entry("id2", new ExpressionProjection(parser.parseExpression(catalogRegistry, "a.id2"))))),
+                result.projection);
+    }
+
+    @Test
+    public void test_join_populate()
     {
         String query = "select s.id1, a.id2 from source s inner join [article] a on a.art_id = s.art_id";
         QueryResult result = getQueryResult(query);
@@ -501,7 +709,8 @@ public class OperatorBuilderTest extends Assert
                                 new CachingOperator(result.tableOperators.get(1)),
                                 new ExpressionPredicate(parser.parseExpression(catalogRegistry, "a.art_id = s.art_id")),
                                 DefaultRowMerger.DEFAULT,
-                                true)),
+                                true,
+                                false)),
                 result.operator);
 
         assertEquals(
@@ -512,9 +721,9 @@ public class OperatorBuilderTest extends Assert
     }
 
     @Test
-    public void test_nestedLoop_with_filter()
+    public void test_join_with_filter()
     {
-        String query = "select s.id1, a.id2 from source s inner join [article where note_id > 0] a on a.art_id = s.art_id where s.id3 > 0";
+        String query = "select s.id1, a.id2 from source s inner join [article where note_id > 0] a on a.art_id = s.art_id where s.id3 > 0 and a.id2 = 10";
         QueryResult result = getQueryResult(query);
 
         // Assert aliaes
@@ -523,18 +732,19 @@ public class OperatorBuilderTest extends Assert
         assertTrue(source.isEqual(result.aliases.get(0)));
         assertTrue(article.isEqual(result.aliases.get(1)));
 
-        assertEquals(
-                new Filter(
-                        new RowSpool("parents",
-                                result.tableOperators.get(0),
-                                new NestedLoop(
-                                        new RowSpoolScan("parents"),
-                                        new CachingOperator(new Filter(result.tableOperators.get(1), new ExpressionPredicate(parser.parseExpression(catalogRegistry, "note_id > 0")))),
-                                        new ExpressionPredicate(parser.parseExpression(catalogRegistry, "a.art_id = s.art_id")),
-                                        DefaultRowMerger.DEFAULT,
-                                        true)),
-                        new ExpressionPredicate(parser.parseExpression(catalogRegistry, "s.id3 > 0"))),
-                result.operator);
+        Operator expected = new Filter(
+                new RowSpool("parents",
+                        new Filter(result.tableOperators.get(0), new ExpressionPredicate(parser.parseExpression(catalogRegistry, "s.id3 > 0"))),
+                        new NestedLoop(
+                                new RowSpoolScan("parents"),
+                                new CachingOperator(new Filter(result.tableOperators.get(1), new ExpressionPredicate(parser.parseExpression(catalogRegistry, "note_id > 0")))),
+                                new ExpressionPredicate(parser.parseExpression(catalogRegistry, "a.art_id = s.art_id")),
+                                DefaultRowMerger.DEFAULT,
+                                true,
+                                false)),
+                new ExpressionPredicate(parser.parseExpression(catalogRegistry, "a.id2 = 10")));
+
+        assertEquals(expected, result.operator);
 
         assertEquals(
                 new ObjectProjection(ofEntries(true,
@@ -554,20 +764,19 @@ public class OperatorBuilderTest extends Assert
         TableAlias article = new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"art_id", "active_flg", "id2", "note_id"});
         assertTrue(source.isEqual(result.aliases.get(0)));
         assertTrue(article.isEqual(result.aliases.get(1)));
-        
-        Operator expected = new Filter(
-                        new RowSpool("parents",
-                                result.tableOperators.get(0),
-                                new NestedLoop(
-                                        new RowSpoolScan("parents"),
-                                        new CachingOperator(new Filter(result.tableOperators.get(1), new ExpressionPredicate(parser.parseExpression(catalogRegistry, "a.active_flg and note_id > 0")))),
-                                        new ExpressionPredicate(parser.parseExpression(catalogRegistry, "a.art_id = s.art_id")),
-                                        DefaultRowMerger.DEFAULT,
-                                        true)),
-                        new ExpressionPredicate(parser.parseExpression(catalogRegistry, "s.id3 > 0")));
-        
+
+        Operator expected = new RowSpool("parents",
+                new Filter(result.tableOperators.get(0), new ExpressionPredicate(parser.parseExpression(catalogRegistry, "s.id3 > 0"))),
+                new NestedLoop(
+                        new RowSpoolScan("parents"),
+                        new CachingOperator(new Filter(result.tableOperators.get(1), new ExpressionPredicate(parser.parseExpression(catalogRegistry, "a.active_flg and note_id > 0")))),
+                        new ExpressionPredicate(parser.parseExpression(catalogRegistry, "a.art_id = s.art_id")),
+                        DefaultRowMerger.DEFAULT,
+                        true,
+                        false));
+
         assertEquals(expected, result.operator);
-        
+
         assertEquals(
                 new ObjectProjection(ofEntries(true,
                         entry("arr", new ObjectProjection(ofEntries(true,
