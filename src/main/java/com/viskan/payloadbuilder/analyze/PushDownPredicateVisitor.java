@@ -41,13 +41,15 @@ import org.apache.commons.lang3.tuple.Pair;
  *   on expression.
  * </pre>
  **/
-public class PredicateVisitor extends AExpressionVisitor<Void, PredicateVisitor.Context>
+public class PushDownPredicateVisitor extends AExpressionVisitor<Void, PushDownPredicateVisitor.Context>
 {
-    private static final PredicateVisitor VISITOR = new PredicateVisitor();
+    private static final PushDownPredicateVisitor VISITOR = new PushDownPredicateVisitor();
 
-    private PredicateVisitor()
+    private PushDownPredicateVisitor()
     {
     }
+    
+    // TODO: Comparison with null should not be pushed down
 
     // Context used during visiting
     static class Context

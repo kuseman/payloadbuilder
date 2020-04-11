@@ -24,6 +24,7 @@ public class NestedLoopTest extends Assert
         TableAlias r = TableAlias.of(a, "range", "r");
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
         NestedLoop op = new NestedLoop(
+                "",
                 left,
                 new TableFunctionOperator(r, new Range(2), emptyList()),
                 null,   // Null predicate => cross
@@ -52,6 +53,7 @@ public class NestedLoopTest extends Assert
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
         
         NestedLoop op = new NestedLoop(
+                "",
                 left,
                 new TableFunctionOperator(r, new Range(2), emptyList()),
                 null,   // Null predicate => cross
@@ -80,6 +82,7 @@ public class NestedLoopTest extends Assert
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
         
         NestedLoop op = new NestedLoop(
+                "",
                 left,
                 new TableFunctionOperator(r, new Range(0), emptyList()),
                 null,   // Null predicate => cross
@@ -108,6 +111,7 @@ public class NestedLoopTest extends Assert
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
         
         NestedLoop op = new NestedLoop(
+                "",
                 left,
                 new TableFunctionOperator(r, new Range(2), emptyList()),
                 // Even parent rows are joined
@@ -150,6 +154,7 @@ public class NestedLoopTest extends Assert
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
         
         NestedLoop op = new NestedLoop(
+                "",
                 left,
                 new TableFunctionOperator(r, new Range(2), emptyList()),
                 // Even parent rows are joined
@@ -178,8 +183,8 @@ public class NestedLoopTest extends Assert
 
         assertEquals(9, count);
     }
-
-    private static class Range extends TableFunctionInfo
+    
+    static class Range extends TableFunctionInfo
     {
         private final int to;
 

@@ -84,6 +84,6 @@ public class NullPredicateExpression extends Expression
     @Override
     public String toString()
     {
-        return expression + " IS" + (not ? " NOT " : "") + "NULL";
+        return expression + " IS " + (not ? " NOT " : "") + "NULL";
     }
 }

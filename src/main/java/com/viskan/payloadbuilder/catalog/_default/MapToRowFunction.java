@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.collections.IteratorUtils;
-import org.apache.commons.lang3.ArrayUtils;
 
 /** Table value function that extracts row from maps in target rows
  * <pre> 
@@ -21,10 +20,13 @@ import org.apache.commons.lang3.ArrayUtils;
  * 
  * SELECT field
  * FROM source s
- * OUTER APPLY mapToRow(s.article_attribute.attribute1.buckets) attribute1Buckets (
- *   INNER JOIN attribute1 a1
- *      ON a1.attr1_id == attribute1Buckets.key
- * )
+ * OUTER APPLY
+ * [
+ *   mapToRow(s.article_attribute.attribute1.buckets) a1Buckets
+ *   INNER JOIN [attribute1] a1
+ *     ON a1.attr1_id == a1Buckets.key
+ *   ORDER BY a1.attr1_code
+ * ] attribute1
  * 
  * </pre>
  * */
@@ -42,14 +44,14 @@ class MapToRowFunction extends TableFunctionInfo
         final Iterator it = IteratorUtils.getIterator(value);
         return new Iterator<Row>()
         {
-            String[] columns;
+            int length = tableAlias.getColumns().length;
             int pos = 0;
             Row next;
 
             @Override
             public boolean hasNext()
             {
-                return next != null || setNext();
+                return setNext();
             }
 
             @Override
@@ -72,18 +74,10 @@ class MapToRowFunction extends TableFunctionInfo
                     // TODO: type check and throw
                     @SuppressWarnings("unchecked")
                     Map<String, Object> item = (Map<String, Object>) it.next();
-
-                    if (columns == null)
-                    {
-                        columns = item.keySet().toArray(ArrayUtils.EMPTY_STRING_ARRAY);
-                        tableAlias.setColumns(columns);
-                    }
-
-                    int length = columns.length;
                     Object[] values = new Object[length];
                     for (int i = 0; i < length; i++)
                     {
-                        values[i] = item.get(columns[i]);
+                        values[i] = item.get(tableAlias.getColumns()[i]);
                     }
 
                     next = Row.of(tableAlias, pos++, values);

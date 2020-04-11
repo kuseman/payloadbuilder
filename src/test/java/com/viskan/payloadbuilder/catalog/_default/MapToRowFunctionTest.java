@@ -33,14 +33,23 @@ public class MapToRowFunctionTest extends Assert
                                 ofEntries(true, entry("key", 11), entry("count", 15)))))))
         });
         TableAlias func = TableAlias.of(a, "a", "a");
+        func.setColumns(new String[] { "key", "count" });
         Object value = new QualifiedReferenceExpression(new QualifiedName(asList("a", "article_attribute", "attribute1", "buckets")), -1).eval(null, row);
         
         Iterator<Row> it = f.open(new OperatorContext(), func, asList(value));
         while (it.hasNext())
         {
             Row r = it.next();
-            assertArrayEquals(new String[] { "key", "count" }, r.getTableAlias().getColumns());
-            System.out.println(r);
+            if (r.getPos() == 0)
+            {
+                assertEquals(10, r.getObject(0));
+                assertEquals(20, r.getObject(1));
+            }
+            else
+            {
+                assertEquals(11, r.getObject(0));
+                assertEquals(15, r.getObject(1));
+            }
         }
     }
 

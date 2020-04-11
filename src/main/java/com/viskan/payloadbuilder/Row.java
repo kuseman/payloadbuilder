@@ -1,13 +1,10 @@
 package com.viskan.payloadbuilder;
 
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
-
 import static java.util.stream.Collectors.joining;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.function.BiPredicate;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -27,6 +24,9 @@ public class Row
     
     private Object[] values;
     private List<List<Row>> childRows;
+    
+    /** Temporary flag used by physical operators during join */
+    public boolean match;
 
     Row()
     {}
@@ -148,6 +148,16 @@ public class Row
         return parents;
     }
     
+    public void setPredicateParent(Row parent)
+    {
+        predicateParent.add(parent);
+    }
+    
+    public void clearPredicateParent()
+    {
+        predicateParent.clear();
+    }
+    
 //    /**
 //     * Merge provided inner row
 //     * @param inner Row to merge
@@ -184,13 +194,13 @@ public class Row
      * This is because the parent might not be a real parent (only known
      * after evaluation). 
      **/
-    public boolean evaluatePredicate(Row parent, EvaluationContext context, BiPredicate<EvaluationContext, Row> predicate)
-    {
-        predicateParent.add(parent);
-        boolean result = predicate.test(context, this);
-        predicateParent.clear();
-        return result;
-    }
+//    public boolean evaluatePredicate(Row parent, EvaluationContext context, BiPredicate<EvaluationContext, Row> predicate)
+//    {
+//        predicateParent.add(parent);
+//        boolean result = predicate.test(context, this);
+//        predicateParent.clear();
+//        return result;
+//    }
 
     /** Construct a row with provided meta values and position */
     public static Row of(TableAlias table, int pos, Object... values)

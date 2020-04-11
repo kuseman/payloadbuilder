@@ -39,6 +39,6 @@ public class LiteralStringExpression extends LiteralExpression
     @Override
     public String toString()
     {
-        return value;
+        return "'" + value + "'";
     }
 }

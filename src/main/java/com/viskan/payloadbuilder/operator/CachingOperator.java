@@ -15,6 +15,9 @@ public class CachingOperator implements Operator
     private final Operator operator;
     private List<Row> rows = null;
 
+    /* Statistics */
+    private int executionCount;
+
     public CachingOperator(Operator target)
     {
         this.operator = requireNonNull(target, "operator");
@@ -23,6 +26,7 @@ public class CachingOperator implements Operator
     @Override
     public Iterator<Row> open(OperatorContext context)
     {
+        executionCount++;
         if (rows == null)
         {
             rows = new ArrayList<>();
@@ -55,7 +59,7 @@ public class CachingOperator implements Operator
     public String toString(int indent)
     {
         String indentString = repeat("  ", indent);
-        return "CACHING" + System.lineSeparator()
+        return "CACHING (EXECUTION COUNT: " + executionCount + ")" + System.lineSeparator()
             +
             indentString + operator.toString(indent + 1);
     }

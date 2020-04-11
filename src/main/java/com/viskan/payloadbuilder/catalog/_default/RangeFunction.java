@@ -42,6 +42,6 @@ class Range extends TableFunctionInfo
             from = ((Number) arguments.get(0)).intValue();
             to = ((Number) arguments.get(1)).intValue();
         }
-        return IntStream.range(from, to).mapToObj(i -> Row.of(tableAlias, i, new Object[] {i + 1})).iterator();
+        return IntStream.range(from, to).mapToObj(i -> Row.of(tableAlias, i, new Object[] {i})).iterator();
     }
 }

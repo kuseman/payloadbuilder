@@ -101,7 +101,7 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
     @Override
     public TR visit(NullPredicateExpression expression, TC context)
     {
-        return defaultResult(context);
+        return visitChildren(context, expression.getExpression());
     }
 
     @Override
@@ -127,7 +127,7 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
         return visitChildren(context, null, args);
     }
     
-    private TR visitChildren(TC context, List<Expression> expressions, Expression ... args)
+    protected TR visitChildren(TC context, List<Expression> expressions, Expression ... args)
     {
         TR result = defaultResult(context);
         if (expressions != null)

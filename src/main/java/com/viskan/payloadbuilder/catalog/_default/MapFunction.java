@@ -121,6 +121,6 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
                 lambdaCode.getResVar(),
                 code.getIsNull()));
         
-        return code;    
+        return code;
     }
 }

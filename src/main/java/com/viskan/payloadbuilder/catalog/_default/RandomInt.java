@@ -3,6 +3,8 @@ package com.viskan.payloadbuilder.catalog._default;
 import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
+import com.viskan.payloadbuilder.codegen.CodeGeneratorContext;
+import com.viskan.payloadbuilder.codegen.ExpressionCode;
 import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 import com.viskan.payloadbuilder.parser.tree.Expression;
 
@@ -23,7 +25,39 @@ class RandomInt extends ScalarFunctionInfo
     @Override
     public Object eval(EvaluationContext context, List<Expression> arguments, Row row)
     {
-        int bound = ((Number) arguments.get(0).eval(context, row)).intValue();
+        Object boundObj = arguments.get(0).eval(context, row);
+        if (boundObj == null)
+        {
+            return null;
+        }
+        int bound = ((Number) boundObj).intValue();
         return random.nextInt(bound);
+    }
+    
+    @Override
+    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode, List<Expression> arguments)
+    {
+        ExpressionCode code = ExpressionCode.code(context);
+        code.addImport("java.util.Random");
+        
+        ExpressionCode argCode = arguments.get(0).generateCode(context, parentCode);
+        
+        code.setCode(String.format(
+              "%s"
+            + "boolean %s = true;\n"
+            + "int %s = 0;\n"
+            + "if (!%s)\n"
+            + "{\n"
+            + "  %s = false;\n"
+            + "  %s = new java.util.Random().nextInt(((Number) %s).intValue());\n"
+            + "}\n",
+            argCode.getCode(),
+            code.getIsNull(),
+            code.getResVar(),
+            argCode.getIsNull(),
+            code.getIsNull(),
+            code.getResVar(),
+            argCode.getResVar()));
+        return code;
     }
 }

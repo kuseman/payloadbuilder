@@ -10,10 +10,12 @@ import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 import com.viskan.payloadbuilder.operator.ArrayProjection;
 import com.viskan.payloadbuilder.operator.CachingOperator;
 import com.viskan.payloadbuilder.operator.DefaultRowMerger;
+import com.viskan.payloadbuilder.operator.ExpressionHashFunction;
 import com.viskan.payloadbuilder.operator.ExpressionOperator;
 import com.viskan.payloadbuilder.operator.ExpressionPredicate;
 import com.viskan.payloadbuilder.operator.ExpressionProjection;
 import com.viskan.payloadbuilder.operator.Filter;
+import com.viskan.payloadbuilder.operator.HashMatch;
 import com.viskan.payloadbuilder.operator.NestedLoop;
 import com.viskan.payloadbuilder.operator.ObjectProjection;
 import com.viskan.payloadbuilder.operator.Operator;
@@ -55,6 +57,7 @@ import java.util.function.BiPredicate;
 import org.apache.commons.lang3.tuple.Pair;
 
 import gnu.trove.map.hash.THashMap;
+import gnu.trove.set.hash.THashSet;
 
 /**
  * Builder that constructs a {@link Operator} and {@link Projection} for a {@link Query}
@@ -71,7 +74,7 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
     {
         private CatalogRegistry catalogRegistry;
         private TableAlias parent;
-        private final Map<TableAlias, Set<String>> columnsByAlias = new THashMap<>();
+        Map<TableAlias, Set<String>> columnsByAlias = new THashMap<>();
 
         /** Resulting operator */
         private Operator operator;
@@ -83,24 +86,30 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
          * Alias that should override provided alias to {@link #appendTableAlias(QualifiedName, String)} Used in populating joins
          */
         private String alias;
-        
+
         /** Should new parent be set upon calling {@link #appendTableAlias(QualifiedName, String)} */
         private boolean setParent;
-        
-        /**  Flag that says if parent joins should be spooled. This is needed to let table implementations make use of parent rows when fetching data. */
+
+        /**
+         * Flag that says if parent joins should be spooled. This is needed to let table implementations make use of parent rows when fetching data.
+         */
         private boolean spoolParents;
 
         /** Predicate pushed down from join to table source */
         private Expression pushedDownPredicate;
 
         /** Appends table alias to hierarchy */
-        private TableAlias appendTableAlias(QualifiedName table, String alias)
+        private TableAlias appendTableAlias(QualifiedName table, String alias, String[] columns)
         {
             String aliasToUse = this.alias != null ? this.alias : alias;
 
             if (parent == null)
             {
                 parent = TableAlias.of(null, table, aliasToUse);
+                if (columns != null)
+                {
+                    parent.setColumns(columns);
+                }
                 return parent;
             }
             else
@@ -121,6 +130,10 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
                 }
 
                 TableAlias newAlias = TableAlias.of(parent, table, aliasToUse);
+                if (columns != null)
+                {
+                    newAlias.setColumns(columns);
+                }
                 if (setParent)
                 {
                     parent = newAlias;
@@ -137,7 +150,13 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
         Context context = new Context();
         context.catalogRegistry = catalogRegistry;
         query.accept(VISITOR, context);
-        context.columnsByAlias.entrySet().forEach(e -> e.getKey().setColumns(e.getValue().toArray(EMPTY_STRING_ARRAY)));
+        context.columnsByAlias.entrySet().forEach(e ->
+        {
+            if (e.getKey().getColumns() == null)
+            {
+                e.getKey().setColumns(e.getValue().toArray(EMPTY_STRING_ARRAY));
+            }
+        });
         return Pair.of(context.operator, context.projection);
     }
 
@@ -145,7 +164,7 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
     public Void visit(Query query, Context context)
     {
         TableSourceJoined tsj = query.getFrom();
-        
+
         Expression where = query.getWhere();
         Expression pushedDownPredicate = null;
         if (where != null)
@@ -157,13 +176,13 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
               inner join article a
                 on a.id = s.id
               inner join brand b
-                on b.id = a.bid 
+                on b.id = a.bid
               where s.id > 0        <--- Pusehd down soutce
               and a.id2 < 10        <--- Can be pushed to article
               and b.id3 != 10       <--- can be pushed to brand
-              
+            
             */
-            Pair<Expression, Expression> pushDownPair = PredicateVisitor.analyze(where, tsj.getTableSource().getAlias());
+            Pair<Expression, Expression> pushDownPair = PushDownPredicateVisitor.analyze(where, tsj.getTableSource().getAlias());
             if (pushDownPair != null)
             {
                 pushedDownPredicate = pushDownPair.getKey();
@@ -171,7 +190,7 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
                 where = pushDownPair.getValue();
             }
         }
-        
+
         tsj.getTableSource().accept(this, context);
 
         // Collect columns from pushed down predicate
@@ -179,7 +198,7 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
         {
             visit(pushedDownPredicate, context);
         }
-        
+
         List<AJoin> joins = tsj.getJoins();
         int size = joins.size();
         for (int i = 0; i < size; i++)
@@ -243,20 +262,20 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
             {
                 visit(nestedSelectItem.getWhere(), context);
             }
-            
+
             if (nestedSelectItem.getOrderBy() != null)
             {
                 nestedSelectItem.getOrderBy().forEach(si -> si.accept(this, context));
             }
-                
+
             projectionsAdded = true;
         }
-        
+
         if (nestedSelectItem.getWhere() != null)
         {
             fromOperator = new Filter(fromOperator, new ExpressionPredicate(nestedSelectItem.getWhere()));
         }
-        
+
         if (nestedSelectItem.getOrderBy() != null)
         {
             // TODO: wrap from operator with order by
@@ -298,18 +317,27 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
 
         Expression condition = join.getCondition();
 
-        // Analyze expression to see if there is push down candidates
-        Pair<Expression, Expression> pushDownPair = PredicateVisitor.analyze(join.getCondition(), tableSource.getAlias());
-        if (pushDownPair.getKey() != null)
+        if (join.getType() == JoinType.INNER)
         {
-            context.pushedDownPredicate = pushDownPair.getKey();
-            condition = pushDownPair.getValue();
+            // TODO: Push down to outer alias
+            /*  Select source s
+             *  inner join article a
+             *    on  a.art_id = s.art_id
+             *    and s.active_flg  <----- can be pushed into source
+             *
+             *
+             */
+            // Analyze expression to see if there is push down candidates
+            Pair<Expression, Expression> pushDownPair = PushDownPredicateVisitor.analyze(join.getCondition(), tableSource.getAlias());
+            if (pushDownPair.getKey() != null)
+            {
+                context.pushedDownPredicate = pushDownPair.getKey();
+                condition = pushDownPair.getValue();
+            }
         }
 
-        tableSource.accept(this, context);
-        
-        // TODO: context.isCorrelated should be set if tableSource is correlated
-        
+        boolean isCorrelated = detectCorrelated(tableSource, context);
+
         Operator inner = context.operator;
 
         // If inner operator needs parents spooled, then reuse that spool for outer operator to
@@ -318,11 +346,14 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
 
         // TODO: Code generation
         Operator joinOperator = createJoin(
+                join.getType() == JoinType.LEFT ? "LEFT" : "INNER" + " JOIN",
+                tableSource.getAlias(),
                 joinOuter,
                 joinInner,
                 condition,
                 tableSource instanceof PopulateTableSource,
-                join.getType() == JoinType.LEFT);
+                join.getType() == JoinType.LEFT,
+                isCorrelated);
 
         visit(join.getCondition(), context);
         context.operator = context.spoolParents ? new RowSpool("parents", outer, joinOperator) : joinOperator;
@@ -334,23 +365,27 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
     {
         Operator outer = context.operator;
         TableSource tableSource = apply.getTableSource();
-        tableSource.accept(this, context);
+
+        boolean isCorrelated = detectCorrelated(tableSource, context);
 
         // TODO: context.isCorrelated should be set if tableSource is correlated
-        
+
         Operator inner = context.operator;
 
         // If inner operator needs parents spooled, then reuse that spool for outer operator to
         Operator joinOuter = context.spoolParents ? RowSpoolScan.PARENTS_SPOOL_SCAN : outer;
         Operator joinInner = inner;
-        
+
         Operator joinOperator = createJoin(
+                apply.getType() == ApplyType.OUTER ? "OUTER" : "CROSS" + " APPLY",
+                tableSource.getAlias(),
                 joinOuter,
                 joinInner,
                 null,   // Apply does not have any condition
                 tableSource instanceof PopulateTableSource,
-                apply.getType() == ApplyType.OUTER);
-        
+                apply.getType() == ApplyType.OUTER,
+                isCorrelated);
+
         context.operator = context.spoolParents ? new RowSpool("parents", outer, joinOperator) : joinOperator;
         return null;
     }
@@ -367,7 +402,7 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
         if (where != null)
         {
             // Analyze expression to see if there is push down candidates
-            Pair<Expression, Expression> pushDownPair = PredicateVisitor.analyze(where, tableSource.getAlias());
+            Pair<Expression, Expression> pushDownPair = PushDownPredicateVisitor.analyze(where, tableSource.getAlias());
             if (pushDownPair.getKey() != null)
             {
                 pushedDownPredicate = pushDownPair.getKey();
@@ -445,7 +480,7 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
             tableName = tableName.extract(1, tableName.getParts().size());
         }
 
-        TableAlias tableAlias = context.appendTableAlias(tableName, table.getAlias());
+        TableAlias tableAlias = context.appendTableAlias(tableName, table.getAlias(), null);
 
         OperatorFactory operatorFactory = catalog.getOperatorFactory();
         if (operatorFactory == null)
@@ -466,34 +501,89 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
     @Override
     public Void visit(TableFunction tableFunction, Context context)
     {
-        final TableFunctionInfo functionInfo = tableFunction.getFunctionInfo();
-        TableAlias tableAlias = context.appendTableAlias(QualifiedName.of(functionInfo.getCatalog().getName(), functionInfo.getName()), tableFunction.getAlias());
+        TableFunctionInfo functionInfo = tableFunction.getFunctionInfo();
+        TableAlias tableAlias = context.appendTableAlias(
+                QualifiedName.of(functionInfo.getCatalog().getName(), functionInfo.getName()),
+                tableFunction.getAlias(),
+                functionInfo.getColumns());
         tableFunction.getArguments().forEach(a -> visit(a, context));
         context.spoolParents = false;
         context.operator = new TableFunctionOperator(tableAlias, functionInfo, tableFunction.getArguments());
         return null;
     }
 
+    private boolean detectCorrelated(TableSource tableSource, Context context)
+    {
+        // Store aliases before visiting table source to be able to detect if this join is correlated
+        Map<TableAlias, Set<String>> columnsByAlias = context.columnsByAlias;
+        context.columnsByAlias = new THashMap<>();
+
+        // If there are any references to current parent
+        // or any parent or parents children, then table source is correlated
+        Set<TableAlias> parents = new THashSet<>();
+        parents.add(context.parent);
+        TableAlias current = context.parent.getParent();
+        while (current != null)
+        {
+            parents.add(current);
+            parents.addAll(current.getChildAliases());
+            current = current.getParent();
+        }
+
+        tableSource.accept(this, context);
+
+        boolean isCorrelated = context.columnsByAlias.keySet().stream().anyMatch(alias -> parents.contains(alias));
+
+        columnsByAlias.putAll(context.columnsByAlias);
+        context.columnsByAlias = columnsByAlias;
+
+        return isCorrelated;
+    }
+
     private Operator createJoin(
+            String logicalOperator,
+            String innerAlias,
             Operator outer,
             Operator inner,
             Expression condition,
             boolean populating,
-            boolean emitEmptyOuterRows)
+            boolean emitEmptyOuterRows,
+            boolean isCorrelated)
     {
         // TODO: hash join detector, merge join detector
+
+        if (condition != null && !isCorrelated)
+        {
+            Pair<List<Expression>, List<Expression>> hashJoinPair = HashJoinDetector.detect(condition, innerAlias);
+
+            if (!hashJoinPair.getKey().isEmpty())
+            {
+                return new HashMatch(
+                        logicalOperator,
+                        outer,
+                        inner,
+                        new ExpressionHashFunction(hashJoinPair.getValue()),
+                        new ExpressionHashFunction(hashJoinPair.getKey()),
+                        new ExpressionPredicate(condition),
+                        DefaultRowMerger.DEFAULT,
+                        populating,
+                        emitEmptyOuterRows);
+            }
+        }
 
         // Nested loop needs a cache around inner operator
         // due to multiple loops
         // But if the inner is a spool then it's already cached
+        // If this is a correlated join, then an inner cache is also impossible
         Operator innerOperator = inner;
-        if (!(inner instanceof RowSpoolScan))
+        if (!(inner instanceof RowSpoolScan) && !(inner instanceof CachingOperator) && !isCorrelated)
         {
             innerOperator = new CachingOperator(innerOperator);
         }
 
         BiPredicate<EvaluationContext, Row> predicate = condition != null ? new ExpressionPredicate(condition) : null;
         Operator join = new NestedLoop(
+                logicalOperator,
                 outer,
                 innerOperator,
                 predicate,

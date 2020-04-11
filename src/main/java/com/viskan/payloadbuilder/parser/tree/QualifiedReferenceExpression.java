@@ -83,9 +83,14 @@ public class QualifiedReferenceExpression extends Expression
                 continue;
             }
 
+            if (current.getParent() == null)
+            {
+                break;
+            }
             // 3. Parent alias match upwards
-            current = current.getParent();
+//            current = current.getParent();
             resultRow = !resultRow.getParents().isEmpty() ? (Row) CollectionUtils.get(resultRow.getParents(), 0) : null;
+            current = resultRow != null ? resultRow.getTableAlias() : null;
         }
 
         if (resultRow == null)
@@ -99,7 +104,15 @@ public class QualifiedReferenceExpression extends Expression
             return resultRow.getChildRows(current.getParentIndex());
         }
         
-        return resultRow.getObject(parts.get(partIndex));
+        Object result = resultRow.getObject(parts.get(partIndex));
+        if (result instanceof Map && partIndex < parts.size() -1)
+        {
+            @SuppressWarnings("unchecked")
+            Map<Object, Object> map = (Map<Object, Object>) result;
+            return MapUtils.traverse(map, parts.subList(partIndex + 1, parts.size()));
+        }
+        
+        return result;
     }
 
     @Override
@@ -115,6 +128,16 @@ public class QualifiedReferenceExpression extends Expression
                 if (value instanceof Row)
                 {
                     return getValue((Row) value, qname.getParts().subList(1, qname.getParts().size()));
+                }
+                else if (value instanceof Map)
+                {
+                    @SuppressWarnings("unchecked")
+                    Map<Object, Object> map = (Map<Object, Object>) value;
+                    value = MapUtils.traverse(map, qname.getParts());
+                    if (value instanceof Map)
+                    {
+                        return ((Map) value).get(qname.getLast());
+                    }
                 }
                 
                 throw new IllegalArgumentException("Cannot dereference value: " + value);

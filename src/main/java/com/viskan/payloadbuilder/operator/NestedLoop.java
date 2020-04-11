@@ -14,14 +14,19 @@ import org.apache.commons.lang3.StringUtils;
 /** Operator the join two other operators using nested loop */
 public class NestedLoop implements Operator
 {
+    private final String logicalOperator;
     private final Operator outer;
     private final Operator inner;
     private final BiPredicate<EvaluationContext, Row> predicate;
     private final RowMerger rowMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
-
+    
+    /* Statistics */
+    private int executionCount;
+    
     public NestedLoop(
+            String logicalOperator,
             Operator outer,
             Operator inner,
             BiPredicate<EvaluationContext, Row> predicate,
@@ -29,6 +34,7 @@ public class NestedLoop implements Operator
             boolean populating,
             boolean emitEmptyOuterRows)
     {
+        this.logicalOperator = requireNonNull(logicalOperator, "logicalOperator");
         this.outer = requireNonNull(outer, "outer");
         this.inner = requireNonNull(inner, "inner");
         this.predicate = predicate;
@@ -40,7 +46,9 @@ public class NestedLoop implements Operator
     @Override
     public Iterator<Row> open(OperatorContext context)
     {
+        final Row contextParent = context.getParentRow();
         final Iterator<Row> it = outer.open(context);
+        executionCount++;
         return new Iterator<Row>()
         {
             Row next;
@@ -68,6 +76,7 @@ public class NestedLoop implements Operator
                 {
                     if (ii == null && !it.hasNext())
                     {
+                        context.setParentRow(contextParent);
                         return false;
                     }
 
@@ -93,12 +102,16 @@ public class NestedLoop implements Operator
                         }
 
                         ii = null;
+                        
                         currentOuter = null;
                         continue;
                     }
 
+                    currentOuter.setPredicateParent(contextParent);
                     Row currentInner = ii.next();
-                    if (predicate == null || currentInner.evaluatePredicate(currentOuter, context.getEvaluationContext(), predicate))
+                    currentInner.setPredicateParent(currentOuter);
+                    
+                    if (predicate == null || predicate.test(context.getEvaluationContext(), currentInner))
                     {
                         next = rowMerger.merge(currentOuter, currentInner, populating);
                         if (populating)
@@ -107,9 +120,12 @@ public class NestedLoop implements Operator
                         }
                         hit = true;
                     }
+                    
+                    currentInner.clearPredicateParent();
+                    currentOuter.clearPredicateParent();
                 }
 
-                return next != null;
+                return true;
             }
         };
     }
@@ -145,7 +161,12 @@ public class NestedLoop implements Operator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        String description = String.format("NESTED LOOP (POPULATING: %s, OUTER: %s, PREDICATE: %s)", populating, emitEmptyOuterRows, predicate);
+        String description = String.format("NESTED LOOP (%s) (POPULATING: %s, OUTER: %s, EXECUTION COUNT: %s, PREDICATE: %s)",
+                logicalOperator,
+                populating,
+                emitEmptyOuterRows,
+                executionCount,
+                predicate);
         return description + System.lineSeparator()
             +
             indentString + outer.toString(indent + 1) + System.lineSeparator()

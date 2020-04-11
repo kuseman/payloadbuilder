@@ -57,6 +57,11 @@ public class TableAlias
     {
         return parent;
     }
+    
+    public List<TableAlias> getChildAliases()
+    {
+        return childAliases;
+    }
 
     public TableAlias getChildAlias(String alias)
     {

@@ -1,8 +1,9 @@
 package com.viskan.payloadbuilder;
 
+import static org.apache.commons.collections.CollectionUtils.isEmpty;
+
 import java.util.List;
 
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.iterators.TransformIterator;
 
 /** Grouped row */
@@ -12,7 +13,7 @@ public class GroupedRow extends Row
 
     public GroupedRow(List<Row> rows, int pos)
     {
-        if (CollectionUtils.isEmpty(rows))
+        if (isEmpty(rows))
         {
             throw new RuntimeException("Rows cannot be empty.");
         }

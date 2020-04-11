@@ -13,9 +13,6 @@ import org.apache.commons.lang3.BooleanUtils;
 /** Predicate that operates over an expression */
 public class ExpressionPredicate implements BiPredicate<EvaluationContext, Row>
 {
-    /** True predicate */
-    public final static BiPredicate<EvaluationContext, Row> TRUE = (eCtx, row) -> true;
-    
     private final Expression predicate;
     
     public ExpressionPredicate(Expression predicate)

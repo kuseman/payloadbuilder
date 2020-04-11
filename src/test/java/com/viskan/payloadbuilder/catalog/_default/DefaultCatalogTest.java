@@ -37,6 +37,13 @@ public class DefaultCatalogTest extends Assert
     {
         assertFunction(true, null, "now() > 0");
     }
+    
+    @Test
+    public void test_randomInt()
+    {
+        assertFunction(true, null, "randomInt(10) + 1 > 0");
+        assertFunction(null, null, "randomInt(null) + 1 > 0");
+    }
 
     @Test
     public void test_function_filter()
@@ -72,7 +79,7 @@ public class DefaultCatalogTest extends Assert
         assertFunction(asList(-2L, -4L, -6L, 0L, 2L, 4L, 6L), row, "a.map(a -> a * 2)");
         assertFunction(asList(-1L, -2L, -3L, 0L, 1L, 2L, 3L), row, "map(a.map(a -> a * 2), a -> a / 2)");
     }
-
+    
     @Test
     public void test_function_flatMap()
     {
@@ -89,10 +96,11 @@ public class DefaultCatalogTest extends Assert
     private void assertFunction(Object expected, Row row, String expression)
     {
         TableAlias alias = row == null ? TableAlias.of(null, "table", "t") : row.getTableAlias();
+        row = row != null ? row : Row.of(alias, 0, new Object[0]);
         Expression e = parser.parseExpression(catalogRegistry, expression);
         Object actual;
-
-        actual = codeGenerator.generateFunction(TableAlias.of(alias, "table", "t"), e).apply(row);
+        
+        actual = codeGenerator.generateFunction(alias, e).apply(row);
         if (actual instanceof Iterator)
         {
             actual = IteratorUtils.toList((Iterator) actual);
