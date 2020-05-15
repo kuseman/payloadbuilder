@@ -1,4 +1,4 @@
-package com.viskan.payloadbuilder.catalog._default;
+package com.viskan.payloadbuilder.catalog.builtin;
 
 import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.TableAlias;
@@ -19,7 +19,7 @@ import org.junit.Test;
 /** Test {@link MapToRowFunction} */
 public class MapToRowFunctionTest extends Assert
 {
-    private final MapToRowFunction f = new MapToRowFunction(new Catalog("test"));
+    private final MapToRowFunction f = new MapToRowFunction(new Catalog("test") {});
 
     @Test
     public void test()

@@ -19,6 +19,7 @@ import java.util.Set;
 import org.junit.Assert;
 import org.junit.Test;
 
+/** Test of {@link CodeGenerator} */
 public class CodeGeneratorTest extends Assert
 {
     private final CatalogRegistry catalogRegistry = new CatalogRegistry();
@@ -38,6 +39,28 @@ public class CodeGeneratorTest extends Assert
                 )});
         
         assertExpression(true, row, "a.filter(a -> a.a = 2).a");
+    }
+    
+    @Test
+    public void test_auto_cast_strings() throws Exception
+    {
+        assertFail(IllegalArgumentException.class, "true = '1.0'");
+        assertFail(IllegalArgumentException.class, "1 = '1.0'");
+        
+        assertExpression(true, null, "1 = '1'");
+        assertExpression(true, null, "'1' = 1");
+        assertExpression(true, null, "1.12 = '1.12'");
+        assertExpression(true, null, "'1.12' = 1.12");
+        
+        assertExpression(true, null, "'1' > 0");
+        assertExpression(true, null, "1 > '0'");
+        assertExpression(true, null, "'1' >= 0");
+        assertExpression(true, null, "1 >= '0'");
+        
+        assertExpression(false, null, "'1' < 0");
+        assertExpression(false, null, "1 < '0'");
+        assertExpression(false, null, "'1' <= 0");
+        assertExpression(false, null, "1 <= '0'");
     }
     
     @Test
@@ -85,7 +108,7 @@ public class CodeGeneratorTest extends Assert
     @Test
     public void test_catalog() throws Exception
     {
-        Catalog utils = new Catalog("UTILS");
+        Catalog utils = new Catalog("UTILS") {};
         utils.registerFunction(new ScalarFunctionInfo(utils, "uuid", Type.SCALAR)
         {
             @Override

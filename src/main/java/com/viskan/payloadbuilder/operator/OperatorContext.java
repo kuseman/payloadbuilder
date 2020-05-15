@@ -22,6 +22,9 @@ public class OperatorContext
     /** Reference to parent row. Used in projections, correlated sub queries */
     private Row parentRow;
  
+    /** Outer rows set if outer operator is {@link BatchMergeJoin} */
+    private List<Row> outerRows;
+    
     /** Store spool rows with key */
     public void storeSpoolRows(String key, List<Row> rows)
     {
@@ -46,5 +49,15 @@ public class OperatorContext
     public EvaluationContext getEvaluationContext()
     {
         return evaluationContext;
+    }
+    
+    public List<Row> getOuterRows()
+    {
+        return outerRows;
+    }
+
+    public void setOuterRows(List<Row> outerRows)
+    {
+        this.outerRows = outerRows;
     }
 }

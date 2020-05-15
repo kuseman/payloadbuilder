@@ -1,20 +1,20 @@
-package com.viskan.payloadbuilder.catalog._default;
+package com.viskan.payloadbuilder.catalog.builtin;
 
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.CatalogRegistry;
 
-/** Default catalog with built in functions etc. */
-public class DefaultCatalog
+/** Built in catalog with functions etc. */
+public class BuiltinCatalog
 {
-    public static final String NAME = "DEFAULT";
+    public static final String NAME = "BUILTIN";
     
-    /** Register default schema */
+    /** Register built in catalog */
     public static void register(CatalogRegistry catalogRegistry)
     {
-        Catalog catalog = new Catalog(NAME);
+        Catalog catalog = new BuiltInCatalog();
         catalogRegistry.registerCatalog(catalog);
         
-        // Scalar funtions
+        // Scalar functions
         catalog.registerFunction(new ConcatFunction(catalog));
         catalog.registerFunction(new HashFunction(catalog));
         catalog.registerFunction(new FilterFunction(catalog));
@@ -27,5 +27,13 @@ public class DefaultCatalog
         // Table functions
         catalog.registerFunction(new Range(catalog));
         catalog.registerFunction(new MapToRowFunction(catalog));
+    }
+    
+    private static class BuiltInCatalog extends Catalog
+    {
+        BuiltInCatalog()
+        {
+            super(NAME);
+        }
     }
 }

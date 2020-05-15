@@ -7,8 +7,6 @@ import com.viskan.payloadbuilder.operator.ExpressionProjection;
 import com.viskan.payloadbuilder.operator.NestedLoop;
 import com.viskan.payloadbuilder.operator.ObjectProjection;
 import com.viskan.payloadbuilder.operator.Operator;
-import com.viskan.payloadbuilder.operator.RowSpool;
-import com.viskan.payloadbuilder.operator.RowSpoolScan;
 import com.viskan.payloadbuilder.parser.tree.QualifiedName;
 
 import static com.viskan.payloadbuilder.utils.MapUtils.entry;
@@ -17,7 +15,7 @@ import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
 import org.junit.Test;
 
 /** Test of {@link OperatorBuilder} building applys */
-public class OperatorBuilderApplyTest extends OperatorBuilderTest
+public class OperatorBuilderApplyTest extends AOperatorBuilderTest
 {
     @Test
     public void test_cross_apply()
@@ -29,17 +27,16 @@ public class OperatorBuilderApplyTest extends OperatorBuilderTest
         TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"id1"});
         new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"id2"});
 
-        assertTrue("Alias hierarchy should be equal", source.isEqual(result.aliases.get(0)));
+        assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
-        Operator expected = new RowSpool("parents", result.tableOperators.get(0),
-                new NestedLoop(
-                        "",
-                        new RowSpoolScan("parents"),
-                        new CachingOperator(result.tableOperators.get(1)),
-                        null,
-                        DefaultRowMerger.DEFAULT,
-                        false,
-                        false));
+        Operator expected = new NestedLoop(
+                "",
+                result.tableOperators.get(0),
+                new CachingOperator(result.tableOperators.get(1)),
+                null,
+                DefaultRowMerger.DEFAULT,
+                false,
+                false);
 
         assertEquals(expected, result.operator);
 
@@ -60,18 +57,20 @@ public class OperatorBuilderApplyTest extends OperatorBuilderTest
         TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"id1"});
         new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"id2"});
 
-        assertTrue("Alias hierarchy should be equal", source.isEqual(result.aliases.get(0)));
+        assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
-        Operator expected = new RowSpool("parents", result.tableOperators.get(0),
-                new NestedLoop(
-                        "",
-                        new RowSpoolScan("parents"),
-                        new CachingOperator(result.tableOperators.get(1)),
-                        null,
-                        DefaultRowMerger.DEFAULT,
-                        true,
-                        false));
+        Operator expected = new NestedLoop(
+                "",
+                result.tableOperators.get(0),
+                new CachingOperator(result.tableOperators.get(1)),
+                null,
+                DefaultRowMerger.DEFAULT,
+                true,
+                false);
 
+//        System.out.println(expected.toString(1));
+//        System.err.println(result.operator.toString(1));
+        
         assertEquals(expected, result.operator);
 
         assertEquals(
@@ -91,17 +90,16 @@ public class OperatorBuilderApplyTest extends OperatorBuilderTest
         TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"id1"});
         new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"id2"});
 
-        assertTrue("Alias hierarchy should be equal", source.isEqual(result.aliases.get(0)));
+        assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
-        Operator expected = new RowSpool("parents", result.tableOperators.get(0),
-                new NestedLoop(
-                        "",
-                        new RowSpoolScan("parents"),
-                        new CachingOperator(result.tableOperators.get(1)),
-                        null,
-                        DefaultRowMerger.DEFAULT,
-                        false,
-                        true));
+        Operator expected = new NestedLoop(
+                "",
+                result.tableOperators.get(0),
+                new CachingOperator(result.tableOperators.get(1)),
+                null,
+                DefaultRowMerger.DEFAULT,
+                false,
+                true);
 
         assertEquals(expected, result.operator);
 
@@ -122,17 +120,16 @@ public class OperatorBuilderApplyTest extends OperatorBuilderTest
         TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"id1"});
         new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"id2"});
 
-        assertTrue("Alias hierarchy should be equal", source.isEqual(result.aliases.get(0)));
+        assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
-        Operator expected = new RowSpool("parents", result.tableOperators.get(0),
-                new NestedLoop(
-                        "",
-                        new RowSpoolScan("parents"),
-                        new CachingOperator(result.tableOperators.get(1)),
-                        null,
-                        DefaultRowMerger.DEFAULT,
-                        true,
-                        true));
+        Operator expected = new NestedLoop(
+                "",
+                result.tableOperators.get(0),
+                new CachingOperator(result.tableOperators.get(1)),
+                null,
+                DefaultRowMerger.DEFAULT,
+                true,
+                true);
 
         assertEquals(expected, result.operator);
 

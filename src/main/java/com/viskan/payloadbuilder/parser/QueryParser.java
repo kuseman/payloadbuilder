@@ -6,7 +6,7 @@ import com.viskan.payloadbuilder.catalog.FunctionInfo;
 import com.viskan.payloadbuilder.catalog.LambdaFunction;
 import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
 import com.viskan.payloadbuilder.catalog.TableFunctionInfo;
-import com.viskan.payloadbuilder.catalog._default.DefaultCatalog;
+import com.viskan.payloadbuilder.catalog.builtin.BuiltinCatalog;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.ArithmeticBinaryContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.ArithmeticUnaryContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.ColumnReferenceContext;
@@ -172,6 +172,10 @@ public class QueryParser
             }
 
             TableSourceJoined joinedTableSource = ctx.tableSourceJoined() != null ? (TableSourceJoined) visit(ctx.tableSourceJoined()) : null;
+            if (joinedTableSource != null && joinedTableSource.getTableSource() instanceof PopulateTableSource)
+            {
+                throw new IllegalArgumentException("Top table source cannot be a populating table source.");
+            }
             Expression where = getExpression(ctx.where);
             List<Expression> groupBy = ctx.groupBy != null ? ctx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
             List<SortItem> orderBy = ctx.sortItem() != null ? ctx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
@@ -381,14 +385,14 @@ public class QueryParser
              */
 
             String functionName = qname.getLast();
-            String potentialCatalog = size == 1 ? DefaultCatalog.NAME : qname.getParts().get(size - 2);
+            String potentialCatalog = size == 1 ? BuiltinCatalog.NAME : qname.getParts().get(size - 2);
 
             Catalog catalog = catalogRegistry.getCatalog(potentialCatalog);
             boolean catalogHit = catalog != null;
             if (catalog == null)
             {
-                // Assume default catalog if none potential found
-                catalog = catalogRegistry.getDefault();
+                // Assume built in catalog if none potential found
+                catalog = catalogRegistry.getBuiltin();
             }
 
             FunctionInfo functionInfo = catalog.getFunction(functionName);

@@ -22,6 +22,7 @@ public class NestedLoop implements Operator
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
     
+    /* TODO: need to put this into context, state here wont work when the query plan will be cached */
     /* Statistics */
     private int executionCount;
     

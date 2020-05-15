@@ -33,6 +33,6 @@ public class DereferenceExpressionTest extends Assert
                 ofEntries(entry("id", 2)))
                 });
         
-        e.eval(ctx, row);
+        System.out.println(e.eval(ctx, row));
     }
 }

@@ -1,6 +1,6 @@
 package com.viskan.payloadbuilder.catalog;
 
-import com.viskan.payloadbuilder.catalog._default.DefaultCatalog;
+import com.viskan.payloadbuilder.catalog.builtin.BuiltinCatalog;
 import com.viskan.payloadbuilder.parser.tree.Expression;
 
 import static java.util.Objects.requireNonNull;
@@ -57,7 +57,7 @@ public abstract class FunctionInfo
     @Override
     public String toString()
     {
-        return (DefaultCatalog.NAME.equals(catalog.getName()) ? "" : (catalog.getName() + ".")) + name;
+        return (BuiltinCatalog.NAME.equals(catalog.getName()) ? "" : (catalog.getName() + ".")) + name;
     }
 
     @Override

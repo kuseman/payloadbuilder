@@ -1,4 +1,4 @@
-package com.viskan .payloadbuilder.catalog._default;
+package com.viskan.payloadbuilder.catalog.builtin;
 
 import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.TableAlias;
@@ -10,6 +10,7 @@ import com.viskan.payloadbuilder.codegen.ExpressionCode;
 import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 import com.viskan.payloadbuilder.parser.tree.Expression;
 import com.viskan.payloadbuilder.parser.tree.LambdaExpression;
+import com.viskan.payloadbuilder.utils.IteratorUtils;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
@@ -19,22 +20,22 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 
-import org.apache.commons.collections.IteratorUtils;
-import org.apache.commons.collections.iterators.TransformIterator;
+import org.apache.commons.collections.Transformer;
+import org.apache.commons.collections.iterators.ObjectGraphIterator;
 import org.apache.commons.lang3.tuple.Pair;
 
-/** Map function. Maps input into another form */
-class MapFunction extends ScalarFunctionInfo implements LambdaFunction
+/** Flat map function. Flat maps input */
+class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
 {
-    MapFunction(Catalog catalog)
+    FlatMapFunction(Catalog catalog)
     {
-        super(catalog, "map", Type.SCALAR);
+        super(catalog, "flatmap", Type.SCALAR);
     }
     
     @Override
     public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Expression> arguments, Function<Expression, Set<TableAlias>> aliasResolver)
     {
-        // Map function has resulting alias as the mapping lambda
+        // Result of flat map is the result of the lambda
         return aliasResolver.apply(arguments.get(1));
     }
     
@@ -43,7 +44,7 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
     {
         return singletonList(Pair.of(arguments.get(0), (LambdaExpression) arguments.get(1)));
     }
-
+    
     @Override
     public Class<?> getDataType()
     {
@@ -66,11 +67,27 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
         }
         LambdaExpression le = (LambdaExpression) arguments.get(1);
         int lambdaId = le.getLambdaIds()[0];
-        return new TransformIterator(IteratorUtils.getIterator(argResult), input -> 
+        return new ObjectGraphIterator(IteratorUtils.getIterator(argResult), new Transformer()
         {
-            context.setLambdaValue(lambdaId, input);
-            return le.getExpression().eval(context, row);   
-        });
+            Iterator<Object> it;
+            
+            @Override
+            public Object transform(Object input)
+            {
+                if (it == null)
+                {
+                    context.setLambdaValue(lambdaId, input);
+                    Object value = le.getExpression().eval(context, row);
+                    it = IteratorUtils.getIterator(value);
+                    return it;
+                }
+                else if (!it.hasNext())
+                {
+                    it = null;
+                }
+                return input;
+            }
+        }); 
     }
     
     @Override
@@ -83,7 +100,7 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
         ExpressionCode code = ExpressionCode.code(context, inputCode);
         code.addImport("com.viskan.payloadbuilder.utils.IteratorUtils");
         code.addImport("java.util.Iterator");
-        code.addImport("org.apache.commons.collections.iterators.TransformIterator");
+        code.addImport("org.apache.commons.collections.iterators.ObjectGraphIterator");
         code.addImport("org.apache.commons.collections.Transformer");
         
         LambdaExpression le = (LambdaExpression) arguments.get(1);
@@ -98,13 +115,23 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
               + "Iterator %s = null;\n"
               + "if (!%s)\n"
               + "{\n"
-              + "  %s = new TransformIterator(IteratorUtils.getIterator(%s), new Transformer()\n"
+              + "  %s = new ObjectGraphIterator(IteratorUtils.getIterator(%s), new Transformer()\n"
               + "  {\n"
-              + "    public Object transform(Object object)\n"
+              + "    Iterator<Object> it;\n"
+              + "    public Object transform(Object input)\n"
               + "    {\n"
-              + "      Object %s = object;\n"
-              + "      %s"
-              + "      return %s;\n"
+              + "      if (it == null)\n"
+              + "      {\n"
+              + "        Object %s = input;\n"
+              + "        %s"
+              + "        it = IteratorUtils.getIterator(%s);\n"
+              + "        return it;\n"
+              + "      }\n"
+              + "      else if (!it.hasNext())\n"
+              + "      {\n"
+              + "        it=null;\n"
+              + "      }\n"
+              + "      return input;\n"
               + "    }\n"
               + "  });\n"
               + "  %s = false;\n"
@@ -121,6 +148,6 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
                 lambdaCode.getResVar(),
                 code.getIsNull()));
         
-        return code;
+        return code;    
     }
 }

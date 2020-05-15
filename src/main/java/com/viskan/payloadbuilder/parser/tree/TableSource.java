@@ -19,9 +19,16 @@ public abstract class TableSource extends ANode
         return alias;
     }
     
+    /** Return table (if aplicable) for this table source */
+    public QualifiedName getTable()
+    {
+        return null;
+    }
+    
     @Override
     public String toString()
     {
         throw new NotImplementedException(getClass().getSimpleName().toString());
     }
+
 }

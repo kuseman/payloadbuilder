@@ -1,4 +1,4 @@
-package com.viskan.payloadbuilder.catalog._default;
+package com.viskan.payloadbuilder.catalog.builtin;
 
 import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.TableAlias;
@@ -20,22 +20,22 @@ import java.util.Set;
 import java.util.function.Function;
 
 import org.apache.commons.collections.IteratorUtils;
-import org.apache.commons.collections.iterators.FilterIterator;
+import org.apache.commons.collections.iterators.TransformIterator;
 import org.apache.commons.lang3.tuple.Pair;
 
-/** Filter input argument with a lambda */
-class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
+/** Map function. Maps input into another form */
+class MapFunction extends ScalarFunctionInfo implements LambdaFunction
 {
-    FilterFunction(Catalog catalog)
+    MapFunction(Catalog catalog)
     {
-        super(catalog, "filter", Type.SCALAR);
+        super(catalog, "map", Type.SCALAR);
     }
-
+    
     @Override
     public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Expression> arguments, Function<Expression, Set<TableAlias>> aliasResolver)
     {
-        // Resulting alias is the result of argument 0
-        return aliasResolver.apply(arguments.get(0));
+        // Map function has resulting alias as the mapping lambda
+        return aliasResolver.apply(arguments.get(1));
     }
     
     @Override
@@ -43,7 +43,7 @@ class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
     {
         return singletonList(Pair.of(arguments.get(0), (LambdaExpression) arguments.get(1)));
     }
-    
+
     @Override
     public Class<?> getDataType()
     {
@@ -66,11 +66,10 @@ class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
         }
         LambdaExpression le = (LambdaExpression) arguments.get(1);
         int lambdaId = le.getLambdaIds()[0];
-        return new FilterIterator(IteratorUtils.getIterator(argResult), input ->
+        return new TransformIterator(IteratorUtils.getIterator(argResult), input -> 
         {
             context.setLambdaValue(lambdaId, input);
-            Boolean result = (Boolean) le.getExpression().eval(context, row);
-            return result != null && result.booleanValue();
+            return le.getExpression().eval(context, row);   
         });
     }
     
@@ -84,8 +83,8 @@ class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
         ExpressionCode code = ExpressionCode.code(context, inputCode);
         code.addImport("com.viskan.payloadbuilder.utils.IteratorUtils");
         code.addImport("java.util.Iterator");
-        code.addImport("org.apache.commons.collections.iterators.FilterIterator");
-        code.addImport("org.apache.commons.collections.Predicate");
+        code.addImport("org.apache.commons.collections.iterators.TransformIterator");
+        code.addImport("org.apache.commons.collections.Transformer");
         
         LambdaExpression le = (LambdaExpression) arguments.get(1);
         
@@ -99,9 +98,9 @@ class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
               + "Iterator %s = null;\n"
               + "if (!%s)\n"
               + "{\n"
-              + "  %s = new FilterIterator(IteratorUtils.getIterator(%s), new Predicate()\n"
+              + "  %s = new TransformIterator(IteratorUtils.getIterator(%s), new Transformer()\n"
               + "  {\n"
-              + "    public boolean evaluate(Object object)\n"
+              + "    public Object transform(Object object)\n"
               + "    {\n"
               + "      Object %s = object;\n"
               + "      %s"

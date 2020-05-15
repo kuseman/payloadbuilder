@@ -1,8 +1,12 @@
 package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.TableObject;
+
+import static java.util.Collections.emptyList;
 
 import java.util.Iterator;
+import java.util.List;
 
 /** Definition of a selection operator */
 public interface Operator
@@ -21,8 +25,14 @@ public interface Operator
     }
     
     /** Returns estimated row size */
-    default int estimatedRowSize()
+    default int getEstimatedRowSize()
     {
         return -1;
+    }
+    
+    /** Return sort items that this operator come sorted by */
+    default List<TableObject> getSortItems()
+    {
+        return emptyList();
     }
 }

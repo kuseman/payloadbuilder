@@ -13,6 +13,7 @@ public class Table extends TableSource
         this.table = requireNonNull(table, "table");
     }
     
+    @Override
     public QualifiedName getTable()
     {
         return table;

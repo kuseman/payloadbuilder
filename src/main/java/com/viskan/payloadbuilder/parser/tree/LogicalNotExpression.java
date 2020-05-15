@@ -81,6 +81,22 @@ public class LogicalNotExpression extends Expression
     }
     
     @Override
+    public int hashCode()
+    {
+        return expression.hashCode();
+    }
+    
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof LogicalNotExpression)
+        {
+            return expression.equals(((LogicalNotExpression) obj).expression);
+        }
+        return false;
+    }
+    
+    @Override
     public String toString()
     {
         return "NOT " + expression.toString();

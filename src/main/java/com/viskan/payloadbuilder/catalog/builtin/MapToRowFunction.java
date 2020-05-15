@@ -1,4 +1,4 @@
-package com.viskan.payloadbuilder.catalog._default;
+package com.viskan.payloadbuilder.catalog.builtin;
 
 import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.TableAlias;

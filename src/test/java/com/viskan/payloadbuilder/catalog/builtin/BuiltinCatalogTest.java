@@ -1,4 +1,4 @@
-package com.viskan.payloadbuilder.catalog._default;
+package com.viskan.payloadbuilder.catalog.builtin;
 
 import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.TableAlias;
@@ -16,8 +16,8 @@ import org.apache.commons.collections.IteratorUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
-/** Tests functions etc. in default catalog */
-public class DefaultCatalogTest extends Assert
+/** Tests functions etc. in built in catalog */
+public class BuiltinCatalogTest extends Assert
 {
     private final CodeGenerator codeGenerator = new CodeGenerator();
     private final QueryParser parser = new QueryParser();

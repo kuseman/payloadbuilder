@@ -115,7 +115,7 @@ public class NestedLoopTest extends Assert
                 left,
                 new TableFunctionOperator(r, new Range(2), emptyList()),
                 // Even parent rows are joined
-                (ctx, row) -> row.getParents().get(0).getPos() % 2 == 0,
+                (ctx, row) -> row.getParent().getPos() % 2 == 0,
                 DefaultRowMerger.DEFAULT,
                 false,
                 true);
@@ -158,7 +158,7 @@ public class NestedLoopTest extends Assert
                 left,
                 new TableFunctionOperator(r, new Range(2), emptyList()),
                 // Even parent rows are joined
-                (ctx, row) -> row.getParents().get(0).getPos() % 2 == 0,
+                (ctx, row) -> row.getParent().getPos() % 2 == 0,
                 DefaultRowMerger.DEFAULT,
                 true,
                 true);
@@ -190,7 +190,7 @@ public class NestedLoopTest extends Assert
 
         Range(int to)
         {
-            super(new Catalog("test"), "Range", Type.TABLE);
+            super(new Catalog("test") {}, "Range", Type.TABLE);
             this.to = to;
         }
 

@@ -51,12 +51,12 @@ public class QueryParserTest extends Assert
         assertQuery("select art_id from article a outer apply range(10) r");
         
         // Populate joins
-        assertQuery("select art_id from article a cross populate (articleAttribute on art_id = a.art_id) aa ");
-        assertQuery("select art_id from article a outer populate (articleAttribute on art_id = a.art_id) aa ");
+        assertQuery("select art_id from article a inner join [articleAttribute] aa on aa.art_id = a.art_id ");
+        assertQuery("select art_id from article a left join [articleAttribute] aa on art_id = a.art_id ");
         
         // Nested
-        assertQuery("select art_id from article a cross populate (articleAttribute aa on aa.art_id = a.art_id inner join articlePrice ap on ap.sku_id = aa.sku_id) aa  ");
-        assertQuery("select art_id from article a cross populate (articleAttribute aa on aa.art_id = a.art_id outer populate (articlePrice on sku_id = aa.sku_id) ap) aa  ");
+        assertQuery("select art_id from article a inner join [articleAttribute aa  inner join articlePrice ap on ap.sku_id = aa.sku_id] aa on aa.art_id = a.art_id ");
+        assertQuery("select art_id from article a inner join [articleAttribute aa  left join [articlePrice] ap on ap.sku_id = aa.sku_id] aa on aa.art_id = a.art_id ");
         
         // TODO: more parser tests, where, orderby, group by
     }

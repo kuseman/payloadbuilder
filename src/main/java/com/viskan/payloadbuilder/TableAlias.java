@@ -27,6 +27,14 @@ public class TableAlias
     public TableAlias(
             TableAlias parent,
             QualifiedName table,
+            String alias)
+    {
+        this(parent, table, alias, null);
+    }
+
+    public TableAlias(
+            TableAlias parent,
+            QualifiedName table,
             String alias,
             String[] columns)
     {
@@ -42,7 +50,6 @@ public class TableAlias
         }
     }
 
-
     public QualifiedName getTable()
     {
         return table;
@@ -57,10 +64,33 @@ public class TableAlias
     {
         return parent;
     }
-    
+
     public List<TableAlias> getChildAliases()
     {
         return childAliases;
+    }
+
+    /** Find table alias for provided alias relative to this */
+    public TableAlias findAlias(String alias)
+    {
+        TableAlias current = this;
+        while (current != null)
+        {
+            if (current.alias.equals(alias))
+            {
+                return current;
+            }
+
+            TableAlias child = current.getChildAlias(alias);
+            if (child != null)
+            {
+                return child;
+            }
+
+            current = current.parent;
+        }
+
+        return null;
     }
 
     public TableAlias getChildAlias(String alias)
@@ -147,6 +177,6 @@ public class TableAlias
     /** Construct a table alias from provided table name */
     public static TableAlias of(TableAlias parent, QualifiedName table, String alias)
     {
-        return new TableAlias(parent, table, alias, null);
+        return new TableAlias(parent, table, alias);
     }
 }

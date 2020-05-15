@@ -24,7 +24,7 @@ public class HashMatchTest extends Assert
                 c -> emptyIterator(),
                 (c, row) -> (Integer) row.getObject(0),
                 (c, row) -> (Integer) row.getObject(0),
-                (ctx, row) -> (int) row.getObject(0) == (int) row.getParents().get(0).getObject(0),
+                (ctx, row) -> (int) row.getObject(0) == (int) row.getParent().getObject(0),
                 DefaultRowMerger.DEFAULT,
                 false,
                 false);
@@ -44,7 +44,7 @@ public class HashMatchTest extends Assert
                 new TableFunctionOperator(r, new NestedLoopTest.Range(5), emptyList()),
                 (c, row) -> (Integer) row.getObject(0),
                 (c, row) -> (Integer) row.getObject(0),
-                (ctx, row) -> (int) row.getObject(0) == (int) row.getParents().get(0).getObject(0),
+                (ctx, row) -> (int) row.getObject(0) == (int) row.getParent().getObject(0),
                 DefaultRowMerger.DEFAULT,
                 false,
                 false);
@@ -74,7 +74,7 @@ public class HashMatchTest extends Assert
                 right,
                 (c, row) -> (Integer) row.getObject(0),
                 (c, row) -> (Integer) row.getObject(0),
-                (ctx, row) -> (int) row.getObject(0) == (int) row.getParents().get(0).getObject(0),
+                (ctx, row) -> (int) row.getObject(0) == (int) row.getParent().getObject(0),
                 DefaultRowMerger.DEFAULT,
                 true,
                 false);
@@ -106,11 +106,11 @@ public class HashMatchTest extends Assert
         Operator right = context -> IntStream.range(1, 7).mapToObj(i -> Row.of(t, i - 1, new Object[] {i})).iterator();
         HashMatch op = new HashMatch(
                 "",
-                left,
                 right,
+                left,
                 (c, row) -> (Integer) row.getObject(0),
                 (c, row) -> (Integer) row.getObject(0),
-                (ctx, row) -> (int) row.getObject(0) == (int) row.getParents().get(0).getObject(0),
+                (ctx, row) -> (int) row.getObject(0) == (int) row.getParent().getObject(0),
                 DefaultRowMerger.DEFAULT,
                 true,
                 false);
@@ -141,7 +141,7 @@ public class HashMatchTest extends Assert
                 right,
                 (c, row) -> (Integer) row.getObject(0),
                 (c, row) -> (Integer) row.getObject(0),
-                (ctx, row) -> (int) row.getObject(0) == (int) row.getParents().get(0).getObject(0),
+                (ctx, row) -> (int) row.getObject(0) == (int) row.getParent().getObject(0),
                 DefaultRowMerger.DEFAULT,
                 false,
                 true);
@@ -179,7 +179,7 @@ public class HashMatchTest extends Assert
                 right,
                 (c, row) -> (Integer) row.getObject(0),
                 (c, row) -> (Integer) row.getObject(0),
-                (ctx, row) -> (int) row.getObject(0) == (int) row.getParents().get(0).getObject(0),
+                (ctx, row) -> (int) row.getObject(0) == (int) row.getParent().getObject(0),
                 DefaultRowMerger.DEFAULT,
                 true,
                 true);

@@ -1,6 +1,6 @@
 package com.viskan.payloadbuilder.catalog;
 
-import com.viskan.payloadbuilder.catalog._default.DefaultCatalog;
+import com.viskan.payloadbuilder.catalog.builtin.BuiltinCatalog;
 
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -12,18 +12,29 @@ import java.util.Map;
 public class CatalogRegistry
 {
     private final Map<String, Catalog> catalogByName = new HashMap<>();
-    private final Catalog defaultCatalog;
+    private final Catalog builtinCatalog;
+    private Catalog defaultCatalog;
     
     public CatalogRegistry()
     {
         // Register default catalog
-        DefaultCatalog.register(this);
-        defaultCatalog = getCatalog(DefaultCatalog.NAME);
+        BuiltinCatalog.register(this);
+        builtinCatalog = getCatalog(BuiltinCatalog.NAME);
     }
     
-    public Catalog getDefault()
+    public Catalog getBuiltin()
+    {
+        return builtinCatalog;
+    }
+    
+    public Catalog getDefaultCatalog()
     {
         return defaultCatalog;
+    }
+    
+    public void setDefaultCatalog(Catalog defaultCatalog)
+    {
+        this.defaultCatalog = defaultCatalog;
     }
     
     /** Register catalog */
@@ -36,7 +47,7 @@ public class CatalogRegistry
     /** Get catalog */
     public Catalog getCatalog(String name)
     {
-        return catalogByName.get(isBlank(name) ? DefaultCatalog.NAME : name);
+        return catalogByName.get(isBlank(name) ? BuiltinCatalog.NAME : name);
     }
     
     // TODO: handle table resolving. Default catalog would be different for tables

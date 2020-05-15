@@ -112,9 +112,23 @@ public final class ExpressionMath
     @SuppressWarnings("unchecked")
     public static boolean gt(Object left, Object right)
     {
-        if (left instanceof Number && right instanceof Number)
+        if (left instanceof Number)
         {
-            return gt((Number) left, (Number) right);
+            Number l = (Number) left;
+            Number r = convert(l, right, true);
+            if (r != null)
+            {
+                return gt(l, r);
+            }
+        }
+        else if (right instanceof Number)
+        {
+            Number r = (Number) right;
+            Number l = convert(r, left, true);
+            if (l != null)
+            {
+                return gt(l, r);
+            }
         }
         else if (left instanceof Boolean && right instanceof Boolean)
         {
@@ -134,9 +148,23 @@ public final class ExpressionMath
     @SuppressWarnings("unchecked")
     public static boolean gte(Object left, Object right)
     {
-        if (left instanceof Number && right instanceof Number)
+        if (left instanceof Number)
         {
-            return gte((Number) left, (Number) right);
+            Number l = (Number) left;
+            Number r = convert(l, right, true);
+            if (r != null)
+            {
+                return gte(l, r);
+            }
+        }
+        else if (right instanceof Number)
+        {
+            Number r = (Number) right;
+            Number l = convert(r, left, true);
+            if (l != null)
+            {
+                return gte(l, r);
+            }
         }
         else if (left instanceof Boolean && right instanceof Boolean)
         {
@@ -156,9 +184,23 @@ public final class ExpressionMath
     @SuppressWarnings("unchecked")
     public static boolean lt(Object left, Object right)
     {
-        if (left instanceof Number && right instanceof Number)
+        if (left instanceof Number)
         {
-            return lt((Number) left, (Number) right);
+            Number l = (Number) left;
+            Number r = convert(l, right, true);
+            if (r != null)
+            {
+                return lt(l, r);
+            }
+        }
+        else if (right instanceof Number)
+        {
+            Number r = (Number) right;
+            Number l = convert(r, left, true);
+            if (l != null)
+            {
+                return lt(l, r);
+            }
         }
         else if (left instanceof Boolean && right instanceof Boolean)
         {
@@ -178,9 +220,23 @@ public final class ExpressionMath
     @SuppressWarnings("unchecked")
     public static boolean lte(Object left, Object right)
     {
-        if (left instanceof Number && right instanceof Number)
+        if (left instanceof Number)
         {
-            return lte((Number) left, (Number) right);
+            Number l = (Number) left;
+            Number r = convert(l, right, true);
+            if (r != null)
+            {
+                return lte(l, r);
+            }
+        }
+        else if (right instanceof Number)
+        {
+            Number r = (Number) right;
+            Number l = convert(r, left, true);
+            if (l != null)
+            {
+                return lte(l, r);
+            }
         }
         else if (left instanceof Boolean && right instanceof Boolean)
         {
@@ -201,13 +257,27 @@ public final class ExpressionMath
     {
         return eq(left, right, true);
     }
-    
+
     @SuppressWarnings("unchecked")
     public static boolean eq(Object left, Object right, boolean throwIfNotComparable)
     {
-        if (left instanceof Number && right instanceof Number)
+        if (left instanceof Number)
         {
-            return eq((Number) left, (Number) right);
+            Number l = (Number) left;
+            Number r = convert(l, right, throwIfNotComparable);
+            if (r != null)
+            {
+                return eq(l, r);
+            }
+        }
+        else if (right instanceof Number)
+        {
+            Number r = (Number) right;
+            Number l = convert(r, left, throwIfNotComparable);
+            if (l != null)
+            {
+                return eq(l, r);
+            }
         }
         else if (left instanceof Boolean && right instanceof Boolean)
         {
@@ -220,7 +290,7 @@ public final class ExpressionMath
             {
                 throw new IllegalArgumentException("Cannot compare " + left + " and " + right);
             }
-            
+
             return false;
         }
 
@@ -685,6 +755,50 @@ public final class ExpressionMath
     private static boolean isDecimal(Number number)
     {
         return number instanceof Double || number instanceof Float;
+    }
+
+    /** Converts an object to a number (if applicable) taking the number type into consideration */
+    private static Number convert(Number number, Object other, boolean throwIfConvertible)
+    {
+        if (other instanceof Number)
+        {
+            return (Number) other;
+        }
+
+        if (!(other instanceof String))
+        {
+            return null;
+        }
+
+        String string = (String) other;
+        try
+        {
+            if (number instanceof Double)
+            {
+                return Double.parseDouble(string);
+            }
+            else if (number instanceof Float)
+            {
+                return Float.parseFloat(string);
+            }
+            else if (number instanceof Long)
+            {
+                return Long.parseLong(string);
+            }
+            else if (number instanceof Integer)
+            {
+                return Integer.parseInt(string);
+            }
+        }
+        catch (NumberFormatException e)
+        {
+            if (throwIfConvertible)
+            {
+                throw new IllegalArgumentException("Cannot convert value " + other + " to datatype " + number.getClass().getSimpleName());
+            }
+        }
+
+        return null;
     }
 
     public static boolean inValue(Object value, Object arg)

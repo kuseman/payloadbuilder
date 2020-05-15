@@ -32,6 +32,12 @@ public class PopulateTableSource extends TableSource
         return tableSourceJoined;
     }
     
+    @Override
+    public QualifiedName getTable()
+    {
+        return tableSourceJoined.getTableSource().getTable();
+    }
+    
     public List<SortItem> getOrderBy()
     {
         return orderBy;

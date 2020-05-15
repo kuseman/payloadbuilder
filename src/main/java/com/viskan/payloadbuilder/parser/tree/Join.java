@@ -31,7 +31,7 @@ public class Join extends AJoin
     @Override
     public <TR, TC> TR accept(TreeVisitor<TR, TC> visitor, TC context)
     {
-        return visitor.visit(this, context);                
+        return visitor.visit(this, context);
     }
     
     @Override

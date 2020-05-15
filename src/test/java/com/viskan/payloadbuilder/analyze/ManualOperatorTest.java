@@ -2,14 +2,13 @@ package com.viskan.payloadbuilder.analyze;
 
 import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.TableAlias;
+import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.CatalogRegistry;
-import com.viskan.payloadbuilder.catalog.OperatorFactory;
 import com.viskan.payloadbuilder.operator.JsonStringWriter;
 import com.viskan.payloadbuilder.operator.Operator;
 import com.viskan.payloadbuilder.operator.OperatorContext;
 import com.viskan.payloadbuilder.operator.Projection;
 import com.viskan.payloadbuilder.parser.QueryParser;
-import com.viskan.payloadbuilder.parser.tree.QualifiedName;
 import com.viskan.payloadbuilder.parser.tree.Query;
 
 import static java.util.stream.Collectors.joining;
@@ -33,19 +32,11 @@ public class ManualOperatorTest extends Assert
     @Test
     public void test()
     {
-
         String queryString = "select t.name, t.isDirectory, t.size, t2.name t2name from temp t inner join temp.temp2 t2 on t.name = t2.name ";
         Query query = parser.parseQuery(catalogRegistry, queryString);
 
-        catalogRegistry.getDefault().setOperatorFactory(new OperatorFactory()
+        Catalog c = new Catalog("FS")
         {
-
-            @Override
-            public boolean requiresParents(QualifiedName qname)
-            {
-                return false;
-            }
-
             private DirectoryStream<Path> getStream(Path path)
             {
                 try
@@ -57,16 +48,16 @@ public class ManualOperatorTest extends Assert
                     throw new RuntimeException("Error streaming directory " + path, e);
                 }
             }
-
+            
             @Override
-            public Operator create(QualifiedName qname, TableAlias tableAlias)
+            public Operator getScanOperator(TableAlias tableAlias)
             {
                 return new Operator()
                 {
                     @Override
                     public Iterator<Row> open(OperatorContext context)
                     {
-                        String stringPath = qname.getParts().stream().collect(joining("/", "C:/", ""));
+                        String stringPath = tableAlias.getTable().getParts().stream().collect(joining("/", "C:/", ""));
                         Path path = Paths.get(stringPath);
                         final DirectoryStream<Path> directoryStream = getStream(path);
                         return new Iterator<Row>()
@@ -118,11 +109,13 @@ public class ManualOperatorTest extends Assert
                     @Override
                     public String toString()
                     {
-                        return qname.toString();
+                        return tableAlias.getTable().toString();
                     }
                 };
             }
-        });
+        }; 
+        
+        catalogRegistry.setDefaultCatalog(c);
 
         Pair<Operator, Projection> pair = OperatorBuilder.create(catalogRegistry, query);
 

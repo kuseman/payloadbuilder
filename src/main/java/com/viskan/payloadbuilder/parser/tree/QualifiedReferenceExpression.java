@@ -55,6 +55,7 @@ public class QualifiedReferenceExpression extends Expression
         return lambdaId;
     }
     
+    /** Get value for provided row and parts */
     private Object getValue(Row row, List<String> parts)
     {
         TableAlias current = row.getTableAlias();
@@ -87,9 +88,12 @@ public class QualifiedReferenceExpression extends Expression
             {
                 break;
             }
+            
+            // TODO: access parent collection
+            
+            
             // 3. Parent alias match upwards
-//            current = current.getParent();
-            resultRow = !resultRow.getParents().isEmpty() ? (Row) CollectionUtils.get(resultRow.getParents(), 0) : null;
+            resultRow = resultRow.getParent();
             current = resultRow != null ? resultRow.getTableAlias() : null;
         }
 
@@ -125,19 +129,17 @@ public class QualifiedReferenceExpression extends Expression
             
             if (qname.getParts().size() > 1)
             {
+                List<String> subParts = qname.getParts().subList(1, qname.getParts().size());
+                
                 if (value instanceof Row)
                 {
-                    return getValue((Row) value, qname.getParts().subList(1, qname.getParts().size()));
+                    return getValue((Row) value, subParts);
                 }
                 else if (value instanceof Map)
                 {
                     @SuppressWarnings("unchecked")
                     Map<Object, Object> map = (Map<Object, Object>) value;
-                    value = MapUtils.traverse(map, qname.getParts());
-                    if (value instanceof Map)
-                    {
-                        return ((Map) value).get(qname.getLast());
-                    }
+                    return MapUtils.traverse(map, subParts);
                 }
                 
                 throw new IllegalArgumentException("Cannot dereference value: " + value);

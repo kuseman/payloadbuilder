@@ -12,21 +12,25 @@ import org.apache.commons.collections.iterators.FilterIterator;
 import org.apache.commons.lang3.StringUtils;
 
 /** Filtering operator */
-public class Filter implements Operator
+public class FilterOperator implements Operator
 {
     private final Operator operator;
     private final BiPredicate<EvaluationContext, Row> predicate;
 
-    public Filter(Operator operator, BiPredicate<EvaluationContext, Row> predicate)
+    /* Statistics */
+    private int executionCount;
+
+    public FilterOperator(Operator operator, BiPredicate<EvaluationContext, Row> predicate)
     {
         this.operator = requireNonNull(operator);
         this.predicate = requireNonNull(predicate);
     }
-
+    
     @SuppressWarnings("unchecked")
     @Override
     public Iterator<Row> open(OperatorContext context)
     {
+        executionCount++;
         return new FilterIterator(operator.open(context), i -> predicate.test(context.getEvaluationContext(), (Row) i));
     }
 
@@ -41,9 +45,9 @@ public class Filter implements Operator
     @Override
     public boolean equals(Object obj)
     {
-        if (obj instanceof Filter)
+        if (obj instanceof FilterOperator)
         {
-            Filter f = (Filter) obj;
+            FilterOperator f = (FilterOperator) obj;
             return operator.equals(f.operator)
                 &&
                 predicate.equals(f.predicate);
@@ -55,7 +59,8 @@ public class Filter implements Operator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        return "FILTER (" + predicate + ")" + System.lineSeparator()
+        String desc = String.format("FILTER (EXECUTION COUNT: %s, PREDICATE: %s", executionCount, predicate);
+        return desc + System.lineSeparator()
             +
             indentString + operator.toString(indent + 1);
     }
