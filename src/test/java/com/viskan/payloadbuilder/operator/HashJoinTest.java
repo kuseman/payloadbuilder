@@ -12,13 +12,13 @@ import java.util.stream.IntStream;
 import org.junit.Assert;
 import org.junit.Test;
 
-/** Test {@link HashMatch} */
-public class HashMatchTest extends Assert
+/** Test {@link HashJoin} */
+public class HashJoinTest extends Assert
 {
     @Test
     public void test_inner_join_no_populate_empty()
     {
-        HashMatch op = new HashMatch(
+        HashJoin op = new HashJoin(
                 "",
                 c -> emptyIterator(),
                 c -> emptyIterator(),
@@ -38,10 +38,10 @@ public class HashMatchTest extends Assert
         TableAlias a = TableAlias.of(null, "table", "t");
         TableAlias r = TableAlias.of(a, "range", "r");
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
-        HashMatch op = new HashMatch(
+        HashJoin op = new HashJoin(
                 "",
                 left,
-                new TableFunctionOperator(r, new NestedLoopTest.Range(5), emptyList()),
+                new TableFunctionOperator(r, new NestedLoopJoinTest.Range(5), emptyList()),
                 (c, row) -> (Integer) row.getObject(0),
                 (c, row) -> (Integer) row.getObject(0),
                 (ctx, row) -> (int) row.getObject(0) == (int) row.getParent().getObject(0),
@@ -68,7 +68,7 @@ public class HashMatchTest extends Assert
         TableAlias t2 = TableAlias.of(t, "table2", "t2");
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(t, i - 1, new Object[] {i})).iterator();
         Operator right = context -> IntStream.range(1, 20).mapToObj(i -> Row.of(t2, i - 1, new Object[] {i % 10})).iterator();
-        HashMatch op = new HashMatch(
+        HashJoin op = new HashJoin(
                 "",
                 left,
                 right,
@@ -104,7 +104,7 @@ public class HashMatchTest extends Assert
         TableAlias t2 = TableAlias.of(t, "table2", "t2");
         Operator left = context -> IntStream.range(1, 20).mapToObj(i -> Row.of(t2, i - 1, new Object[] {i % 10})).iterator();
         Operator right = context -> IntStream.range(1, 7).mapToObj(i -> Row.of(t, i - 1, new Object[] {i})).iterator();
-        HashMatch op = new HashMatch(
+        HashJoin op = new HashJoin(
                 "",
                 right,
                 left,
@@ -135,7 +135,7 @@ public class HashMatchTest extends Assert
         Operator left = context -> IntStream.range(0, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
         Operator right = context -> IntStream.range(5, 15).mapToObj(i -> Row.of(b, i - 1, new Object[] {i})).iterator();
         
-        HashMatch op = new HashMatch(
+        HashJoin op = new HashJoin(
                 "",
                 left,
                 right,
@@ -173,7 +173,7 @@ public class HashMatchTest extends Assert
         Operator left = context -> IntStream.range(0, 5).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
         Operator right = context -> IntStream.range(5, 15).mapToObj(i -> Row.of(b, i - 1, new Object[] {i % 5 + 2})).iterator();
         
-        HashMatch op = new HashMatch(
+        HashJoin op = new HashJoin(
                 "",
                 left,
                 right,

@@ -6,7 +6,7 @@ import com.viskan.payloadbuilder.operator.ExpressionHashFunction;
 import com.viskan.payloadbuilder.operator.ExpressionPredicate;
 import com.viskan.payloadbuilder.operator.ExpressionProjection;
 import com.viskan.payloadbuilder.operator.FilterOperator;
-import com.viskan.payloadbuilder.operator.HashMatch;
+import com.viskan.payloadbuilder.operator.HashJoin;
 import com.viskan.payloadbuilder.operator.ObjectProjection;
 import com.viskan.payloadbuilder.operator.Operator;
 import com.viskan.payloadbuilder.parser.tree.QualifiedName;
@@ -32,7 +32,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorBuilderTest
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
-        Operator expected = new HashMatch(
+        Operator expected = new HashJoin(
                 "",
                 result.tableOperators.get(0),
                 result.tableOperators.get(1),
@@ -67,7 +67,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorBuilderTest
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
-        Operator expected = new HashMatch(
+        Operator expected = new HashJoin(
                 "",
                 result.tableOperators.get(0),
                 result.tableOperators.get(1),
@@ -102,7 +102,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorBuilderTest
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
-        Operator expected = new HashMatch(
+        Operator expected = new HashJoin(
                 "",
                 result.tableOperators.get(0),
                 result.tableOperators.get(1),
@@ -137,7 +137,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorBuilderTest
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
-        Operator expected = new HashMatch(
+        Operator expected = new HashJoin(
                 "",
                 result.tableOperators.get(0),
                 result.tableOperators.get(1),
@@ -170,7 +170,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorBuilderTest
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
         Operator expected = new FilterOperator(
-                new HashMatch(
+                new HashJoin(
                         "",
                         new FilterOperator(result.tableOperators.get(0), new ExpressionPredicate(e("s.id3 > 0"))),
                         new FilterOperator(result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg AND note_id > 0"))),

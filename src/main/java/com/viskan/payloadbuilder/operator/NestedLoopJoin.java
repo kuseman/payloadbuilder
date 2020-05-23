@@ -12,7 +12,7 @@ import java.util.function.BiPredicate;
 import org.apache.commons.lang3.StringUtils;
 
 /** Operator the join two other operators using nested loop */
-public class NestedLoop implements Operator
+public class NestedLoopJoin implements Operator
 {
     private final String logicalOperator;
     private final Operator outer;
@@ -26,7 +26,7 @@ public class NestedLoop implements Operator
     /* Statistics */
     private int executionCount;
     
-    public NestedLoop(
+    public NestedLoopJoin(
             String logicalOperator,
             Operator outer,
             Operator inner,
@@ -140,9 +140,9 @@ public class NestedLoop implements Operator
     @Override
     public boolean equals(Object obj)
     {
-        if (obj instanceof NestedLoop)
+        if (obj instanceof NestedLoopJoin)
         {
-            NestedLoop that = (NestedLoop) obj;
+            NestedLoopJoin that = (NestedLoopJoin) obj;
             return outer.equals(that.outer)
                 &&
                 inner.equals(that.inner)

@@ -9,6 +9,7 @@ import com.viskan.payloadbuilder.catalog.Index;
 import com.viskan.payloadbuilder.catalog.TableFunctionInfo;
 import com.viskan.payloadbuilder.operator.ArrayProjection;
 import com.viskan.payloadbuilder.operator.BatchOperator;
+import com.viskan.payloadbuilder.operator.BatchOperator.Reader;
 import com.viskan.payloadbuilder.operator.CachingOperator;
 import com.viskan.payloadbuilder.operator.DefaultRowMerger;
 import com.viskan.payloadbuilder.operator.ExpressionHashFunction;
@@ -16,8 +17,8 @@ import com.viskan.payloadbuilder.operator.ExpressionOperator;
 import com.viskan.payloadbuilder.operator.ExpressionPredicate;
 import com.viskan.payloadbuilder.operator.ExpressionProjection;
 import com.viskan.payloadbuilder.operator.FilterOperator;
-import com.viskan.payloadbuilder.operator.HashMatch;
-import com.viskan.payloadbuilder.operator.NestedLoop;
+import com.viskan.payloadbuilder.operator.HashJoin;
+import com.viskan.payloadbuilder.operator.NestedLoopJoin;
 import com.viskan.payloadbuilder.operator.ObjectProjection;
 import com.viskan.payloadbuilder.operator.Operator;
 import com.viskan.payloadbuilder.operator.Projection;
@@ -46,12 +47,14 @@ import static com.viskan.payloadbuilder.utils.CollectionUtils.asSet;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiFunction;
 
@@ -190,7 +193,7 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
             pushDownPredicate = analyzeResult.extractPushdownPredicate(tsj.getTableSource().getAlias(), true);
             if (pushDownPredicate != null)
             {
-                where = analyzeResult.getPredicate();                        
+                where = analyzeResult.getPredicate();
             }
         }
 
@@ -353,7 +356,7 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
             pushDownPredicate = analyzeResult.extractPushdownPredicate(tableSource.getAlias(), true);
             if (pushDownPredicate != null)
             {
-                where = analyzeResult.getPredicate();                        
+                where = analyzeResult.getPredicate();
                 context.appendPushDownPredicate(tableSource.getAlias(), pushDownPredicate);
             }
         }
@@ -404,7 +407,8 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
         TableAlias alias = context.appendTableAlias(pair.getValue(), table.getAlias(), null);
         if (context.tableIndex != null)
         {
-            context.operator = new BatchOperator(alias, emptyList(), pair.getKey().getBatchReader(context.tableIndex));
+            Reader reader = pair.getKey().getBatchReader(pair.getValue(), context.tableIndex);
+            context.operator = new BatchOperator(alias, emptyList(), reader);
             context.tableIndex = null;
         }
         else
@@ -427,33 +431,33 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
         return null;
     }
 
-//    private boolean detectCorrelated(TableSource tableSource, Context context)
-//    {
-//        // Store aliases before visiting table source to be able to detect if this join is correlated
-//        Map<TableAlias, Set<String>> columnsByAlias = context.columnsByAlias;
-//        context.columnsByAlias = new THashMap<>();
-//
-//        // If there are any references to current parent
-//        // or any parent or parents children, then table source is correlated
-//        Set<TableAlias> parents = new THashSet<>();
-//        parents.add(context.parent);
-//        TableAlias current = context.parent.getParent();
-//        while (current != null)
-//        {
-//            parents.add(current);
-//            parents.addAll(current.getChildAliases());
-//            current = current.getParent();
-//        }
-//
-//        tableSource.accept(this, context);
-//
-//        boolean isCorrelated = context.columnsByAlias.keySet().stream().anyMatch(alias -> parents.contains(alias));
-//
-//        columnsByAlias.putAll(context.columnsByAlias);
-//        context.columnsByAlias = columnsByAlias;
-//
-//        return isCorrelated;
-//    }
+    //    private boolean detectCorrelated(TableSource tableSource, Context context)
+    //    {
+    //        // Store aliases before visiting table source to be able to detect if this join is correlated
+    //        Map<TableAlias, Set<String>> columnsByAlias = context.columnsByAlias;
+    //        context.columnsByAlias = new THashMap<>();
+    //
+    //        // If there are any references to current parent
+    //        // or any parent or parents children, then table source is correlated
+    //        Set<TableAlias> parents = new THashSet<>();
+    //        parents.add(context.parent);
+    //        TableAlias current = context.parent.getParent();
+    //        while (current != null)
+    //        {
+    //            parents.add(current);
+    //            parents.addAll(current.getChildAliases());
+    //            current = current.getParent();
+    //        }
+    //
+    //        tableSource.accept(this, context);
+    //
+    //        boolean isCorrelated = context.columnsByAlias.keySet().stream().anyMatch(alias -> parents.contains(alias));
+    //
+    //        columnsByAlias.putAll(context.columnsByAlias);
+    //        context.columnsByAlias = columnsByAlias;
+    //
+    //        return isCorrelated;
+    //    }
 
     private void join(
             Context context,
@@ -480,7 +484,7 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
         }
         context.operator = joinOperator;
     }
-    
+
     private Operator createJoin(
             Context context,
             String logicalOperator,
@@ -513,7 +517,7 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
 
         boolean populating = innerTableSource instanceof PopulateTableSource;
 
-        List<AnalyzeItem> equiItems = analyzeResult != null ? analyzeResult.getEquiItems(innerAlias) : emptyList();
+        List<AnalyzeItem> equiItems = analyzeResult != null ? analyzeResult.getEquiItems(innerAlias, true) : emptyList();
 
         // TODO: correlated
 
@@ -529,7 +533,7 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
                 inner = new CachingOperator(inner);
             }
 
-            return new NestedLoop(
+            return new NestedLoopJoin(
                     logicalOperator,
                     outer,
                     inner,
@@ -539,13 +543,12 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
                     emitEmptyOuterRows);
         }
 
-        Catalog catalog;
         List<Index> indices = emptyList();
 
         if (innerTableSource.getTable() != null)
         {
             Pair<Catalog, QualifiedName> pair = getCatalogAndTable(context, innerTableSource.getTable());
-            catalog = pair.getKey();
+            Catalog catalog = pair.getKey();
             QualifiedName table = pair.getValue();
             indices = catalog.getIndices(table);
         }
@@ -553,13 +556,32 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
         // then the inner could be created and after check it's order for a potential
         // MergeJoin
 
+        /* Extract all references inner columns from equi items */
+        Set<String> columnItems = equiItems
+                .stream()
+                .map(item -> item.getColumn(innerAlias, true))
+                .filter(Objects::nonNull)
+                .collect(toSet());
+
+        Index index = null;
+
+        if (!columnItems.isEmpty())
+        {
+            /* Find the first matching index from extracted columns above*/
+            index = indices
+                    .stream()
+                    .filter(i -> columnItems.containsAll(i.getColumns()))
+                    .findFirst()
+                    .orElse(null);
+        }
+
         // No indices for inner -> HashJoin
-        if (indices.isEmpty())
+        if (index == null)
         {
             innerTableSource.accept(this, context);
             Operator inner = wrapWithPushDown(context, context.operator, innerAlias);
 
-            return new HashMatch(
+            return new HashJoin(
                     logicalOperator,
                     outer,
                     inner,
@@ -583,6 +605,27 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
                     emitEmptyOuterRows);
         }
 
+        // Hint for index usage
+        context.tableIndex = index;
+        innerTableSource.accept(this, context);
+        Operator inner = wrapWithPushDown(context, context.operator, innerAlias);
+
+
+        
+        // If outer is sorted on index keys (fully or partly)
+        //   
+        // Or of outer be sorted on index keys
+        //   => BatchMergeJoin
+        
+        // BatchHashJoin
+        
+        
+        // We have an index
+        // BatchMergeJoin
+        //   
+        // BatchHashMatch
+        //   
+        
         //        1. visit source
         //        create operator
         //          2. visit join

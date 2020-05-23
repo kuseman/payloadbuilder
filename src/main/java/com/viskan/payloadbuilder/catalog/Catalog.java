@@ -126,9 +126,9 @@ public abstract class Catalog
      * Used in {@link BatchOperator}
      * @param index Index for reader
      * */
-    public BatchOperator.Reader getBatchReader(Index index)
+    public BatchOperator.Reader getBatchReader(QualifiedName table, Index index)
     {
-        throw new IllegalArgumentException("Catalog " + name + " doesn't support batch operator. Check implementation, catalog returned index " + index);
+        throw new IllegalArgumentException("Catalog " + name + " doesn't support batch operator. Check implementation, catalog returned index for " + table);
     }
     
     /*

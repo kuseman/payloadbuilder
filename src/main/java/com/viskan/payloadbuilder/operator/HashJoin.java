@@ -21,7 +21,7 @@ import org.apache.commons.lang3.StringUtils;
 /**
  * Hash match operator. Hashes outer operator and probes the inner operator
  */
-public class HashMatch implements Operator
+public class HashJoin implements Operator
 {
     private final String logicalOperator;
     private final Operator outer;
@@ -36,7 +36,7 @@ public class HashMatch implements Operator
     /* Statistics */
     private int executionCount;
 
-    public HashMatch(
+    public HashJoin(
             String logicalOperator,
             Operator outer,
             Operator inner,
@@ -307,9 +307,9 @@ public class HashMatch implements Operator
     @Override
     public boolean equals(Object obj)
     {
-        if (obj instanceof HashMatch)
+        if (obj instanceof HashJoin)
         {
-            HashMatch that = (HashMatch) obj;
+            HashJoin that = (HashJoin) obj;
             return outer.equals(that.outer)
                 &&
                 inner.equals(that.inner)
@@ -333,7 +333,7 @@ public class HashMatch implements Operator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        String desc = String.format("HASH MATCH (%s) (POPULATING: %s, OUTER: %s, EXECUTION COUNT: %s, OUTER KEYS: %s, INNER KEYS: %s, PREDICATE: %s)",
+        String desc = String.format("HASH JOIN (%s) (POPULATING: %s, OUTER: %s, EXECUTION COUNT: %s, OUTER KEYS: %s, INNER KEYS: %s, PREDICATE: %s)",
                 logicalOperator,
                 populating,
                 emitEmptyOuterRows,

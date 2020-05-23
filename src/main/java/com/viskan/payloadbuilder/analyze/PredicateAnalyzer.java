@@ -162,7 +162,7 @@ public class PredicateAnalyzer
     /** Result of analysis */
     public static class AnalyzeResult
     {
-        private final List<AnalyzeItem> items;
+        final List<AnalyzeItem> items;
         private Expression predicate;
 
         AnalyzeResult(Expression predicate, List<AnalyzeItem> items)
@@ -215,30 +215,15 @@ public class PredicateAnalyzer
             return predicate;
         }
 
-        /**
-         * Returns true if this analyze result suits provided index ie. all index columns are present in predicate
-         *
-         * @param leftSide Left or right side of condition
-         * @param index Index to analyze
-         */
-        //        boolean matchesIndex(boolean leftSide, Index index)
-        //        {
-        //            Set<String> predicateColumns = items
-        //                    .stream()
-        //                    // Filter alias to match index alias
-        //                    .map(i -> leftSide ? i.getLeftColumn() : i.getRightColumn())
-        //                    .filter(Objects::nonNull)
-        //                    .collect(toSet());
-        //
-        //            return predicateColumns.containsAll(index.getKeys());
-        //        }
-
         /** Return equi items for provided alias */
-        public List<AnalyzeItem> getEquiItems(String alias)
+        public List<AnalyzeItem> getEquiItems(String alias, boolean includeAliasLess)
         {
-            return items.stream().filter(item -> item.isEqui(alias)).collect(toList());
+            return items.stream()
+                    .filter(item -> item.isEqui(alias)
+                        || (includeAliasLess && item.isEqui("")))
+                    .collect(toList());
         }
-        
+
         @Override
         public int hashCode()
         {
@@ -334,12 +319,33 @@ public class PredicateAnalyzer
             return (Objects.equals(alias, leftAlias) && rightAlias == null)
                 || (Objects.equals(alias, rightAlias) && leftAlias == null);
         }
-        
+
         /** Return true if this item is a equi join item matching provided alias */
         boolean isEqui(String alias)
         {
             return (Objects.equals(alias, leftAlias) && rightAlias != null)
-                    || (Objects.equals(alias, rightAlias) && leftAlias != null);
+                || (Objects.equals(alias, rightAlias) && leftAlias != null);
+        }
+
+        /**
+         * Returns the column for provided alias (if any exits)
+         * 
+         * @param includeAliasLess True if alias less columns be returned
+         */
+        public String getColumn(String alias, boolean includeAliasLess)
+        {
+            if (alias.equals(leftAlias)
+                || (includeAliasLess && "".equals(leftAlias)))
+            {
+                return leftColumn;
+            }
+            else if (alias.equals(rightAlias)
+                || (includeAliasLess && "".equals(rightAlias)))
+            {
+                return rightColumn;
+            }
+
+            return null;
         }
 
         /** Returns the predicate for this item */

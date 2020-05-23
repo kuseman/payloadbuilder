@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.BiPredicate;
-import java.util.function.ToIntBiFunction;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -19,10 +18,6 @@ import org.apache.commons.lang3.StringUtils;
  * Special variant of merge join that merges two streams by first batching outer rows
  * And push these down to inner operator that in turn returns inner rows connected to the outer rows
  * in outer row order (see below).
- * 
- * Join used when there is a suitable index on both left and right side.
- * Index operator guarantees that rows is both unique regarding index columns
- * and also comes in order of the provided rows from outer stream.
  *
  * Two inputs
  * - left key: id
@@ -45,6 +40,13 @@ import org.apache.commons.lang3.StringUtils;
  * 3 - 3,1
  * 3 - 3,2
  * 3-  3,3
+ * 
+ * Has 4 modes:
+ * 
+ * - one to one
+ * - one to many
+ * - many to one
+ * - many to many
  * </pre>
  **/
 public class BatchMergeJoin implements Operator
@@ -52,10 +54,7 @@ public class BatchMergeJoin implements Operator
     private final String logicalOperator;
     private final Operator outer;
     private final Operator inner;
-    /** Hash function of outer values */
-    private final ToIntBiFunction<EvaluationContext, Row> outerHashFunction;
-    /** Hash function of inner values. */
-    private final ToIntBiFunction<EvaluationContext, Row> innerHashFunction;
+    private final RowComparator comparator;
     private final BiPredicate<EvaluationContext, Row> predicate;
     private final RowMerger rowMerger;
     private final boolean populating;
@@ -65,28 +64,11 @@ public class BatchMergeJoin implements Operator
     /* Statistics */
     private int executionCount;
 
-    // TODO: one-to-many  (unique is top) <- DONE!
-    //       many-to-one  (unique is bottom) (BatchHashMatch)
-    //       many-to-many (Not supported since there's only one type of index)
-    /*
-     * many-to-one
-     * 
-     * article_attribute (attr1_id)        attribute1 (attr1_id)
-     * 1                                   
-     * 10
-     * 4
-     * 2
-     * 4
-     * 10
-     * 
-     */
-    
     public BatchMergeJoin(
             String logicalOperator,
             Operator outer,
             Operator inner,
-            ToIntBiFunction<EvaluationContext, Row> outerHashFunction,
-            ToIntBiFunction<EvaluationContext, Row> innerHashFunction,
+            RowComparator comparator,
             BiPredicate<EvaluationContext, Row> predicate,
             RowMerger rowMerger,
             boolean populating,
@@ -96,8 +78,7 @@ public class BatchMergeJoin implements Operator
         this.logicalOperator = logicalOperator;
         this.outer = requireNonNull(outer, "outer");
         this.inner = requireNonNull(inner, "inner");
-        this.outerHashFunction = requireNonNull(outerHashFunction, "outerHashFunction");
-        this.innerHashFunction = requireNonNull(innerHashFunction, "innerHashFunction");
+        this.comparator = requireNonNull(comparator, "comparator");
         this.predicate = requireNonNull(predicate, "predicate");
         this.rowMerger = requireNonNull(rowMerger, "rowMerger");
         this.populating = populating;
@@ -114,17 +95,33 @@ public class BatchMergeJoin implements Operator
         {
             /** Batched rows */
             private List<Row> outerRows;
-            private int outerIndex;
+            private int outerIndex = 0;
             private Iterator<Row> innerIt;
 
             private Row next;
-
-            private Row prevOuterRow;
+            /** Current process outer row */
             private Row outerRow;
-            private int currentOuterHash;
+            /** Current process inner row */
             private Row innerRow;
-            private int currentInnerHash;
-            private boolean outerRowEmited;
+            /**
+             * Index pointing to last seen larger than value for when outerRow > innerRow. Used when many-to-many when rewinding
+             */
+            private int largerThanIndex = 0;
+            /** Index of outerRows where to rewind in case of man-to-many */
+            private int rewindIndex = -1;
+
+            /** Flag used when having populating join or, left join */
+            private boolean emitOuterRows;
+
+            private void clearOuterRows()
+            {
+                largerThanIndex = 0;
+                rewindIndex = -1;
+                outerRows = null;
+                outerRow = null;
+                outerIndex = 0;
+                emitOuterRows = false;
+            }
 
             @Override
             public Row next()
@@ -144,6 +141,30 @@ public class BatchMergeJoin implements Operator
             {
                 while (next == null)
                 {
+                    // Populating mode
+                    if (emitOuterRows)
+                    {
+                        // Complete
+                        if (outerIndex > outerRows.size() - 1)
+                        {
+                            clearOuterRows();
+                            continue;
+                        }
+
+                        Row row = outerRows.get(outerIndex);
+                        // Populating and row is a match of empty outer rows should be emitted
+                        // Or non populating and no match
+                        if ((populating && (row.match || emitEmptyOuterRows))
+                            || (!populating && !row.match))
+                        {
+                            next = row;
+                            row.match = false;
+                        }
+
+                        outerIndex++;
+                        continue;
+                    }
+
                     if (outerRows == null)
                     {
                         batchOuterRows();
@@ -154,120 +175,125 @@ public class BatchMergeJoin implements Operator
 
                         context.setOuterRows(outerRows);
                         innerIt = inner.open(context);
-                    }
-
-                    // Current outer rows are processed, clear and start over
-                    if (outerIndex >= outerRows.size())
-                    {
-                        if (returnPopulatingOuterRow())
+                        if (!innerIt.hasNext())
                         {
-                            next = prevOuterRow;
-                            prevOuterRow = null;
+                            if (emitEmptyOuterRows)
+                            {
+                                emitOuterRows = true;
+                                continue;
+                            }
+
+                            outerRows = null;
                             continue;
                         }
+                    }
 
-                        outerRow = null;
-                        outerRows = null;
-                        outerIndex = 0;
+                    outerIndex = Math.min(outerIndex, outerRows.size() - 1);
+                    outerRow = outerRows.get(outerIndex);
+
+                    if (innerRow == null)
+                    {
+                        innerRow = innerIt.hasNext() ? innerIt.next() : null;
+                        if (innerRow == null)
+                        {
+                            // Populating mode, emit outer rows
+                            if (populating)
+                            {
+                                outerIndex = 0;
+                                emitOuterRows = true;
+                            }
+                            // Inner batch is ended and we haven't process all outer rows yet
+                            // process the last ones
+                            else if (emitEmptyOuterRows && outerIndex < outerRows.size() - 1)
+                            {
+                                outerIndex = largerThanIndex;
+                                emitOuterRows = true;
+                            }
+                            else
+                            {
+                                clearOuterRows();
+                            }
+                            continue;
+                        }
+                    }
+
+                    int cResult = comparator.compare(context.getEvaluationContext(), outerRow, innerRow);
+
+                    // outerRow > innerRow
+                    if (cResult > 0)
+                    {
+                        // Rewind state
+                        if (rewindIndex != -1)
+                        {
+                            outerRow = null;
+                            largerThanIndex = outerIndex;
+                            outerIndex = rewindIndex;
+                        }
+                        innerRow = null;
                         continue;
                     }
-
-                    if (outerRow == null)
+                    // outerRow < innerRow
+                    else if (cResult < 0)
                     {
-                        if (returnPopulatingOuterRow())
+                        if (rewindIndex != -1)
                         {
-                            next = prevOuterRow;
-                            prevOuterRow = null;
-                            continue;
+                            // Clear rewind status and move to
+                            // the index where outer was last seen as larger than inner
+                            outerIndex = largerThanIndex;
+                            largerThanIndex = 0;
+                            rewindIndex = -1;
                         }
-
-                        if (prevOuterRow != null)
+                        else
                         {
-                            prevOuterRow.clearPredicateParent();
+                            if (!populating && emitEmptyOuterRows)
+                            {
+                                next = outerRow;
+                            }
+                            outerIndex++;
                         }
-                        
-                        outerRow = outerRows.get(outerIndex);
-                        currentOuterHash = outerHashFunction.applyAsInt(context.getEvaluationContext(), outerRow);
-                        outerRowEmited = false;
-                        prevOuterRow = outerRow;
-                    }
-
-                    if (innerRow == null)
-                    {
-                        // Set current outerRow as context parent before retrieving next inner row
-                        Row contextParent = context.getParentRow();
-                        context.setParentRow(outerRow);
-                        innerRow = innerIt.hasNext() ? innerIt.next() : null;
-                        context.setParentRow(contextParent);
-                        if (innerRow != null)
-                        {
-                            currentInnerHash = innerHashFunction.applyAsInt(context.getEvaluationContext(), innerRow);
-                        }
-                    }
-
-                    // No more inner rows, clear outerRow and start over
-                    if (innerRow == null)
-                    {
-                        outerRow.clearPredicateParent();
                         outerRow = null;
-                        outerIndex++;
                         continue;
                     }
 
                     innerRow.setPredicateParent(outerRow);
-
-                    boolean hashMatch = currentOuterHash == currentInnerHash;
-
-                    if (hashMatch
-                        && predicate.test(context.getEvaluationContext(), innerRow))
+                    if (predicate.test(context.getEvaluationContext(), innerRow))
                     {
                         next = rowMerger.merge(outerRow, innerRow, populating);
-                        outerRowEmited = true;
+                        outerRow.match = true;
                         if (populating)
                         {
-                            outerRow.match = true;
                             next = null;
                         }
                     }
-
                     innerRow.clearPredicateParent();
 
-                    // Move outer row if no values match.
-                    // Since it's by contract that inner operator
-                    // return rows in order of the outer rows, we can safely
-                    // iterate the outer rows until a match if found
-                    if (!hashMatch)
+                    outerIndex++;
+                    outerRow = null;
+
+                    // Enter rewind mode on first equal encounter
+                    if (rewindIndex == -1)
                     {
-                        if (returnNonPopulatingOuterRow())
-                        {
-                            next = outerRow;
-                        }
-                        outerRow.clearPredicateParent();
-                        outerRow = null;
-                        outerIndex++;
+                        rewindIndex = outerIndex - 1;
+                        largerThanIndex = 0;
                     }
-                    // Otherwise move inner row
-                    else
+                    // We reached first encountered larger than index,
+                    // rewind here instead of trying next outer since we know
+                    // it's going to be non equal
+                    else if (largerThanIndex > 0 && outerIndex >= largerThanIndex)
                     {
                         innerRow = null;
+                        outerIndex = rewindIndex;
                     }
+
+                    // End of outer, clear inner and rewind
+                    if (outerIndex > outerRows.size() - 1)
+                    {
+                        innerRow = null;
+                        outerIndex = rewindIndex;
+                    }
+
                 }
                 return true;
-            }
-
-            private boolean returnNonPopulatingOuterRow()
-            {
-                return emitEmptyOuterRows
-                    && !populating
-                    && !outerRowEmited;
-            }
-
-            private boolean returnPopulatingOuterRow()
-            {
-                return populating
-                    && prevOuterRow != null
-                    && (prevOuterRow.match
-                        || emitEmptyOuterRows);
             }
 
             /** Batch outer rows and generate outer keys */
@@ -280,6 +306,12 @@ public class BatchMergeJoin implements Operator
                     return;
                 }
 
+                /* TODO: Optimization.
+                 * Input outer columns into operator
+                 * and when batch is reached keep checking rows
+                 * for equals-ness to prev row to avoid fetching
+                 * the same data from inner twice
+                */
                 int count = 0;
                 int size = batchSize > 0 ? batchSize : 100;
                 outerRows = new ArrayList<>(size);
@@ -315,8 +347,7 @@ public class BatchMergeJoin implements Operator
             BatchMergeJoin mj = (BatchMergeJoin) obj;
             return outer.equals(mj.outer)
                 && inner.equals(mj.inner)
-                && outerHashFunction.equals(mj.outerHashFunction)
-                && innerHashFunction.equals(mj.innerHashFunction)
+                && comparator.equals(mj.comparator)
                 && predicate.equals(mj.predicate)
                 && populating == mj.populating
                 && emitEmptyOuterRows == mj.emitEmptyOuterRows;
@@ -328,7 +359,7 @@ public class BatchMergeJoin implements Operator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        String description = String.format("OUTER KEYS MERGE JOIN (%s) (POPULATING: %s, OUTER: %s, EXECUTION COUNT: %s, BATCH SIZE: %s, PREDICATE: %s)",
+        String description = String.format("BATCH MERGE JOIN (%s) (POPULATING: %s, OUTER: %s, EXECUTION COUNT: %s, BATCH SIZE: %s, PREDICATE: %s)",
                 logicalOperator,
                 populating,
                 emitEmptyOuterRows,

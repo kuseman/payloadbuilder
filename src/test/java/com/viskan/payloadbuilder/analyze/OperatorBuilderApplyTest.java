@@ -4,7 +4,7 @@ import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.operator.CachingOperator;
 import com.viskan.payloadbuilder.operator.DefaultRowMerger;
 import com.viskan.payloadbuilder.operator.ExpressionProjection;
-import com.viskan.payloadbuilder.operator.NestedLoop;
+import com.viskan.payloadbuilder.operator.NestedLoopJoin;
 import com.viskan.payloadbuilder.operator.ObjectProjection;
 import com.viskan.payloadbuilder.operator.Operator;
 import com.viskan.payloadbuilder.parser.tree.QualifiedName;
@@ -29,7 +29,7 @@ public class OperatorBuilderApplyTest extends AOperatorBuilderTest
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
-        Operator expected = new NestedLoop(
+        Operator expected = new NestedLoopJoin(
                 "",
                 result.tableOperators.get(0),
                 new CachingOperator(result.tableOperators.get(1)),
@@ -59,7 +59,7 @@ public class OperatorBuilderApplyTest extends AOperatorBuilderTest
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
-        Operator expected = new NestedLoop(
+        Operator expected = new NestedLoopJoin(
                 "",
                 result.tableOperators.get(0),
                 new CachingOperator(result.tableOperators.get(1)),
@@ -92,7 +92,7 @@ public class OperatorBuilderApplyTest extends AOperatorBuilderTest
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
-        Operator expected = new NestedLoop(
+        Operator expected = new NestedLoopJoin(
                 "",
                 result.tableOperators.get(0),
                 new CachingOperator(result.tableOperators.get(1)),
@@ -122,7 +122,7 @@ public class OperatorBuilderApplyTest extends AOperatorBuilderTest
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
-        Operator expected = new NestedLoop(
+        Operator expected = new NestedLoopJoin(
                 "",
                 result.tableOperators.get(0),
                 new CachingOperator(result.tableOperators.get(1)),

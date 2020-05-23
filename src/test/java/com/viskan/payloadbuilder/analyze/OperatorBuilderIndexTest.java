@@ -120,9 +120,9 @@ public class OperatorBuilderIndexTest extends AOperatorBuilderTest
             }
 
             @Override
-            public Reader getBatchReader(Index index)
+            public Reader getBatchReader(QualifiedName table, Index index)
             {
-                Reader re = reader("reader " + index);
+                Reader re = reader("reader " + table);
                 indexReaders.add(re);
                 return re;
             }

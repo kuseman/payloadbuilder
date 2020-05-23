@@ -29,13 +29,19 @@ public class PredicateAnalyzerTest extends Assert
         assertEquals(e, actual.getPredicate());
         assertEquals(result(e, item(null, null, e("NOT (a.art_id = s.art_id)"), null, null, null)), actual);
         assertNull(actual.extractPushdownPredicate("a", false));
-        assertEquals(emptyList(), actual.getEquiItems("a"));
+        assertEquals(emptyList(), actual.getEquiItems("a", false));
         assertEquals(e, actual.getPredicate());
 
         e = e("a.art_id = s.art_id");
         actual = PredicateAnalyzer.analyze(e);
         assertEquals(result(e, item("a", "art_id", e("a.art_id"), "s", "art_id", e("s.art_id"))), actual);
-        assertEquals(asList(item("a", "art_id", e("a.art_id"), "s", "art_id", e("s.art_id"))), actual.getEquiItems("a"));
+        assertEquals(asList(item("a", "art_id", e("a.art_id"), "s", "art_id", e("s.art_id"))), actual.getEquiItems("a", false));
+        assertNull(actual.extractPushdownPredicate("a", false));
+
+        e = e("art_id = s.art_id");
+        actual = PredicateAnalyzer.analyze(e);
+        assertEquals(result(e, item("", "art_id", e("art_id"), "s", "art_id", e("s.art_id"))), actual);
+        assertEquals(asList(item("", "art_id", e("art_id"), "s", "art_id", e("s.art_id"))), actual.getEquiItems("a", true));
         assertNull(actual.extractPushdownPredicate("a", false));
 
         e = e("art_id = s.art_id");
@@ -46,26 +52,30 @@ public class PredicateAnalyzerTest extends Assert
         e = e("s.art_id = a.art_id");
         actual = PredicateAnalyzer.analyze(e);
         assertEquals(result(e, item("s", "art_id", e("s.art_id"), "a", "art_id", e("a.art_id"))), actual);
-
+        assertEquals("art_id", actual.items.get(0).getColumn("a", true));
+        assertEquals("art_id", actual.items.get(0).getColumn("s", true));
+        
         e = e("a.art_id = s.art_id OR a.active_flg");
         actual = PredicateAnalyzer.analyze(e);
         assertEquals(result(e, item(null, null, e("a.art_id = s.art_id OR a.active_flg"), null, null, null)), actual);
-
+        assertNull(actual.items.get(0).getColumn("a", true));
+        
         e = e("a.art_id = s.art_id + a.id");
         actual = PredicateAnalyzer.analyze(e);
         assertEquals(result(e, item("a", "art_id", e("a.art_id"), null, null, e("s.art_id + a.id"))), actual);
-
+        assertNull(actual.items.get(0).getColumn("s", true));
+        
         e = e("a.art_id + s.id = s.art_id");
         actual = PredicateAnalyzer.analyze(e);
         assertEquals(result(e, item(null, null, e("a.art_id + s.id"), "s", "art_id", e("s.art_id"))), actual);
-        assertEquals(emptyList(), actual.getEquiItems("a"));
-        assertEquals(emptyList(), actual.getEquiItems("s"));
+        assertEquals(emptyList(), actual.getEquiItems("a", false));
+        assertEquals(emptyList(), actual.getEquiItems("s", false));
         
         e = e("a.art_id + a.idx_id = s.art_id");
         actual = PredicateAnalyzer.analyze(e);
         assertEquals(result(e, item("a", null, e("a.art_id + a.idx_id"), "s", "art_id", e("s.art_id"))), actual);
-        assertEquals(asList(item("a", null, e("a.art_id + a.idx_id"), "s", "art_id", e("s.art_id"))), actual.getEquiItems("a"));
-        assertEquals(asList(item("a", null, e("a.art_id + a.idx_id"), "s", "art_id", e("s.art_id"))), actual.getEquiItems("s"));
+        assertEquals(asList(item("a", null, e("a.art_id + a.idx_id"), "s", "art_id", e("s.art_id"))), actual.getEquiItems("a", false));
+        assertEquals(asList(item("a", null, e("a.art_id + a.idx_id"), "s", "art_id", e("s.art_id"))), actual.getEquiItems("s", false));
 
         e = e("a.art_id = s.art_id AND s.sku_id = a.sku_id");
         actual = PredicateAnalyzer.analyze(e);
@@ -75,11 +85,11 @@ public class PredicateAnalyzerTest extends Assert
         assertEquals(asList(
                 item("a", "art_id", e("a.art_id"), "s", "art_id", e("s.art_id")),
                 item("s", "sku_id", e("s.sku_id"), "a", "sku_id", e("a.sku_id"))), 
-                actual.getEquiItems("s"));
+                actual.getEquiItems("s", false));
         assertEquals(asList(
                 item("a", "art_id", e("a.art_id"), "s", "art_id", e("s.art_id")),
                 item("s", "sku_id", e("s.sku_id"), "a", "sku_id", e("a.sku_id"))), 
-                actual.getEquiItems("a"));
+                actual.getEquiItems("a", false));
 
         e = e("a.art_id > s.art_id");
         actual = PredicateAnalyzer.analyze(e);

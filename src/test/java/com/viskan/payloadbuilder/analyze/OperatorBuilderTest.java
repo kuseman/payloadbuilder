@@ -12,9 +12,9 @@ import com.viskan.payloadbuilder.operator.ExpressionOperator;
 import com.viskan.payloadbuilder.operator.ExpressionPredicate;
 import com.viskan.payloadbuilder.operator.ExpressionProjection;
 import com.viskan.payloadbuilder.operator.FilterOperator;
-import com.viskan.payloadbuilder.operator.HashMatch;
+import com.viskan.payloadbuilder.operator.HashJoin;
 import com.viskan.payloadbuilder.operator.JsonStringWriter;
-import com.viskan.payloadbuilder.operator.NestedLoop;
+import com.viskan.payloadbuilder.operator.NestedLoopJoin;
 import com.viskan.payloadbuilder.operator.ObjectProjection;
 import com.viskan.payloadbuilder.operator.Operator;
 import com.viskan.payloadbuilder.operator.OperatorContext;
@@ -81,9 +81,9 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
         TableAlias r2 = TableAlias.of(r, rangeQname, "r2");
         r2.setColumns(new String[] {"Value"});
 
-        Operator expected = new HashMatch(
+        Operator expected = new HashJoin(
                 "",
-                new NestedLoop(
+                new NestedLoopJoin(
                         "",
                         new TableFunctionOperator(r, range, asList(
                                 e("randomInt(100)"),
@@ -160,9 +160,9 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(queryResult.alias));
 
-        Operator expected = new HashMatch(
+        Operator expected = new HashJoin(
                 "",
-                new HashMatch(
+                new HashJoin(
                         "",
                         queryResult.tableOperators.get(0),
                         queryResult.tableOperators.get(1),
@@ -173,9 +173,9 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
                         true,
                         false),
                 new FilterOperator(
-                        new HashMatch(
+                        new HashJoin(
                                 "",
-                                new HashMatch(
+                                new HashJoin(
                                         "",
                                         new FilterOperator(queryResult.tableOperators.get(2), new ExpressionPredicate(e("active_flg"))),
                                         queryResult.tableOperators.get(3),
@@ -479,64 +479,7 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
                 entry("id2", new ExpressionProjection(parser.parseExpression(catalogRegistry, "a.id2"))))),
                 result.projection);
     }
-    
-    @Test
-    public void test_nested_loop_with_pushdown()
-    {
-        String query = "select s.id1, a.id2 from source s inner join article a on a.active_flg and (a.art_id = s.art_id or s.id1 > 0)";
-        QueryResult result = getQueryResult(query);
-
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
-        new TableAlias(source, QualifiedName.of("article"), "a", new String[] { "art_id", "active_flg", "id2" });
-        assertTrue(source.isEqual(result.alias));
-
-        Operator expected = new NestedLoop(
-                "",
-                result.tableOperators.get(0),
-                new CachingOperator(new FilterOperator(result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg")))),
-                new ExpressionPredicate(e("a.art_id = s.art_id or s.id1 > 0")),
-                DefaultRowMerger.DEFAULT,
-                false,
-                false);
-        
-        assertEquals(expected, result.operator);
-
-        assertEquals(new ObjectProjection(ofEntries(true,
-                entry("id1", new ExpressionProjection(parser.parseExpression(catalogRegistry, "s.id1"))),
-                entry("id2", new ExpressionProjection(parser.parseExpression(catalogRegistry, "a.id2"))))),
-                result.projection);
-    }
-    
-    @Test
-    public void test_nested_loop_with_populate_and_pushdown()
-    {
-        String query = "select s.id1, a.id2 from source s inner join [ article a where a.internet_flg ] a on a.active_flg and (a.art_id = s.art_id or s.id1 > 0)";
-        QueryResult result = getQueryResult(query);
-
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
-        new TableAlias(source, QualifiedName.of("article"), "a", new String[] { "internet_flg", "art_id", "active_flg", "id2" });
-        assertTrue(source.isEqual(result.alias));
-
-        Operator expected = new NestedLoop(
-                "",
-                result.tableOperators.get(0),
-                new CachingOperator(new FilterOperator(result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg AND a.internet_flg")))),
-                new ExpressionPredicate(e("a.art_id = s.art_id or s.id1 > 0")),
-                DefaultRowMerger.DEFAULT,
-                true,
-                false);
-        
-//        System.out.println(expected.toString(1));
-//        System.err.println( result.operator.toString(1));
-        
-        assertEquals(expected, result.operator);
-
-        assertEquals(new ObjectProjection(ofEntries(true,
-                entry("id1", new ExpressionProjection(parser.parseExpression(catalogRegistry, "s.id1"))),
-                entry("id2", new ExpressionProjection(parser.parseExpression(catalogRegistry, "a.id2"))))),
-                result.projection);
-    }
-
+  
     @Test
     public void test_select_item_with_filter()
     {
@@ -549,7 +492,7 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
-        Operator expected = new HashMatch(
+        Operator expected = new HashJoin(
                 "",
                 new FilterOperator(result.tableOperators.get(0), new ExpressionPredicate(e("s.id3 > 0"))),
                 new FilterOperator(result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg and note_id > 0"))),
@@ -605,10 +548,10 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
 
         Operator expected =
                 // Correlated => nested loop
-                new NestedLoop(
+                new NestedLoopJoin(
                         "",
                         result.tableOperators.get(0),
-                        new HashMatch(
+                        new HashJoin(
                                 "",
                                 result.tableOperators.get(1),
                                 result.tableOperators.get(2),
