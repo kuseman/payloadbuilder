@@ -2,7 +2,6 @@ package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.TableAlias;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 
 import static java.util.Collections.emptyIterator;
 import static java.util.Objects.requireNonNull;
@@ -10,7 +9,6 @@ import static org.apache.commons.collections.CollectionUtils.isEmpty;
 
 import java.util.Iterator;
 import java.util.List;
-import java.util.function.BiFunction;
 
 /**
  * Batch operator. Used when utilizing a tables index to read values based on outer operators rows.
@@ -18,15 +16,12 @@ import java.util.function.BiFunction;
 public class BatchOperator implements Operator
 {
     private final TableAlias alias;
-    private final List<BiFunction<EvaluationContext, Row, Object>> valuesExtractors;
     private final Reader reader;
 
     public BatchOperator(
             TableAlias alias,
-            List<BiFunction<EvaluationContext, Row, Object>> valuesExtractors,
             Reader reader)
     {
-        this.valuesExtractors = requireNonNull(valuesExtractors, "valuesExtractors");
         this.alias = requireNonNull(alias, "alias");
         this.reader = requireNonNull(reader, "reader");
     }
@@ -45,34 +40,34 @@ public class BatchOperator implements Operator
         return reader.open(context, alias, outerValuesIterator);
     }
 
-    private Iterator<Object[]> outerValuesIterator(EvaluationContext context, List<Row> outerRows)
-    {
-        return new Iterator<Object[]>()
-        {
-            private final int size = valuesExtractors.size();
-            // NOTE! Use a single array of values for all rows to minimize allocations
-            private final Object[] values = new Object[valuesExtractors.size()];
-            private int outerRowsIndex = 0;
-
-            @Override
-            public boolean hasNext()
-            {
-                return outerRowsIndex < outerRows.size();
-            }
-
-            @Override
-            public Object[] next()
-            {
-                Row row = outerRows.get(outerRowsIndex++);
-                for (int i = 0; i < size; i++)
-                {
-                    values[i] = valuesExtractors.get(i).apply(context, row);
-                }
-
-                return values;
-            }
-        };
-    }
+//    private Iterator<Object[]> outerValuesIterator(EvaluationContext context, List<Row> outerRows)
+//    {
+//        return new Iterator<Object[]>()
+//        {
+//            private final int size = valuesExtractors.size();
+//            // NOTE! Use a single array of values for all rows to minimize allocations
+//            private final Object[] values = new Object[valuesExtractors.size()];
+//            private int outerRowsIndex = 0;
+//
+//            @Override
+//            public boolean hasNext()
+//            {
+//                return outerRowsIndex < outerRows.size();
+//            }
+//
+//            @Override
+//            public Object[] next()
+//            {
+//                Row row = outerRows.get(outerRowsIndex++);
+//                for (int i = 0; i < size; i++)
+//                {
+//                    values[i] = valuesExtractors.get(i).apply(context, row);
+//                }
+//
+//                return values;
+//            }
+//        };
+//    }
 
     /** Definition of a batch reader, reading rows based on outer rows */
     public interface Reader

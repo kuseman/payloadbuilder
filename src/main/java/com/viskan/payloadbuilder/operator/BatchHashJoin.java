@@ -1,25 +1,38 @@
 package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.catalog.Index;
 import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 
+import static com.viskan.payloadbuilder.operator.BatchMergeJoin.clearJoinData;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.function.BiPredicate;
-import java.util.function.ToIntBiFunction;
 
 import org.apache.commons.lang3.StringUtils;
+
+import gnu.trove.map.TIntObjectMap;
+import gnu.trove.map.hash.TIntObjectHashMap;
 
 /**
  * <pre>
  * Special variant of hash join that merges two streams by first batching outer rows
  * And push these down to inner operator that in turn returns inner rows connected to the outer rows
- * 
+ *
  * Then hashing is performed like a regular hash join
+ *
+ * from source s
+ * inner join article a
+ *   on a.art_id = sqrt(s.value)
+ *
+ * hash (sqrt(s.value))
+ * probe a.art_id
  * </pre>
  **/
 public class BatchHashJoin implements Operator
@@ -27,15 +40,15 @@ public class BatchHashJoin implements Operator
     private final String logicalOperator;
     private final Operator outer;
     private final Operator inner;
-    /** Hash function of outer values */
-    private final ToIntBiFunction<EvaluationContext, Row> outerHashFunction;
-    /** Hash function of inner values. */
-    private final ToIntBiFunction<EvaluationContext, Row> innerHashFunction;
+    private final ValuesExtractor outerValuesExtractor;
+    private final ValuesExtractor innerValuesExtractor;
     private final BiPredicate<EvaluationContext, Row> predicate;
     private final RowMerger rowMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
     private final int batchSize;
+    private final Index innerIndex;
+    private final int valuesSize;
 
     /* Statistics */
     private int executionCount;
@@ -44,23 +57,26 @@ public class BatchHashJoin implements Operator
             String logicalOperator,
             Operator outer,
             Operator inner,
-            ToIntBiFunction<EvaluationContext, Row> outerHashFunction,
-            ToIntBiFunction<EvaluationContext, Row> innerHashFunction,
+            ValuesExtractor outerValuesExtractor,
+            ValuesExtractor innerValuesExtractor,
             BiPredicate<EvaluationContext, Row> predicate,
             RowMerger rowMerger,
             boolean populating,
             boolean emitEmptyOuterRows,
+            Index innerIndex,
             int batchSize)
     {
         this.logicalOperator = logicalOperator;
         this.outer = requireNonNull(outer, "outer");
         this.inner = requireNonNull(inner, "inner");
-        this.outerHashFunction = requireNonNull(outerHashFunction, "outerHashFunction");
-        this.innerHashFunction = requireNonNull(innerHashFunction, "innerHashFunction");
+        this.outerValuesExtractor = requireNonNull(outerValuesExtractor, "outerValuesExtractor");
+        this.innerValuesExtractor = requireNonNull(innerValuesExtractor, "innerValuesExtractor");
         this.predicate = requireNonNull(predicate, "predicate");
         this.rowMerger = requireNonNull(rowMerger, "rowMerger");
         this.populating = populating;
         this.emitEmptyOuterRows = emitEmptyOuterRows;
+        this.innerIndex = requireNonNull(innerIndex, "innerIndex");
+        this.valuesSize = innerIndex.getColumns().size();
         this.batchSize = batchSize;
     }
 
@@ -73,22 +89,26 @@ public class BatchHashJoin implements Operator
         {
             /** Batched rows */
             private List<Row> outerRows;
-            private int outerIndex;
-            private Iterator<Row> innerIt;
+            private int outerRowIndex;
+            private List<Row> innerRows;
+            private int innerRowIndex;
+
+            /** Table use for hashed inner values */
+            private final TIntObjectMap<TableValue> table = new TIntObjectHashMap<>((int) (batchSize * 1.5));
 
             private Row next;
-
-            private Row prevOuterRow;
             private Row outerRow;
-            private int currentOuterHash;
-            private Row innerRow;
-            private int currentInnerHash;
-            private boolean outerRowEmited;
+
+            private final Object[] keyValues = new Object[valuesSize];
+
+            /** Flag used when having populating join or, left join */
+            private boolean emitOuterRows;
 
             @Override
             public Row next()
             {
                 Row result = next;
+                clearJoinData(result);
                 next = null;
                 return result;
             }
@@ -103,6 +123,26 @@ public class BatchHashJoin implements Operator
             {
                 while (next == null)
                 {
+                    // Populating mode
+                    if (emitOuterRows)
+                    {
+                        // Complete
+                        if (outerRowIndex > outerRows.size() - 1)
+                        {
+                            clearOuterRows();
+                            continue;
+                        }
+
+                        Row row = outerRows.get(outerRowIndex);
+                        if (row.match || emitEmptyOuterRows)
+                        {
+                            next = row;
+                        }
+
+                        outerRowIndex++;
+                        continue;
+                    }
+
                     if (outerRows == null)
                     {
                         batchOuterRows();
@@ -111,77 +151,59 @@ public class BatchHashJoin implements Operator
                             return false;
                         }
 
-                        context.setOuterRows(outerRows);
-                        innerIt = inner.open(context);
+                        hashInnerBatch();
+                        // Start probing
+                        continue;
                     }
-
-                    // Current outer rows are processed, clear and start over
-                    if (outerIndex >= outerRows.size())
+                    // Probe current outer row
+                    else if (innerRows == null)
                     {
-                        if (returnPopulatingOuterRow())
+                        // We're done
+                        if (outerRowIndex >= outerRows.size())
                         {
-                            next = prevOuterRow;
-                            prevOuterRow = null;
+                            // Populating mode, emit outer rows
+                            if (populating)
+                            {
+                                outerRowIndex = 0;
+                                emitOuterRows = true;
+                            }
+                            else
+                            {
+                                clearOuterRows();
+                            }
                             continue;
                         }
 
-                        outerRow = null;
-                        outerRows = null;
-                        outerIndex = 0;
-                        continue;
-                    }
+                        outerRow = outerRows.get(outerRowIndex);
 
-                    if (outerRow == null)
-                    {
-                        if (returnPopulatingOuterRow())
+                        TableValue tableValue = table.get(outerRow.hash);
+                        innerRows = tableValue != null ? tableValue.rows : null;
+                        if (innerRows == null || innerRows.isEmpty())
                         {
-                            next = prevOuterRow;
-                            prevOuterRow = null;
+                            if (!populating && emitEmptyOuterRows)
+                            {
+                                next = outerRow;
+                            }
+
+                            innerRows = null;
+                            outerRowIndex++;
                             continue;
                         }
-
-                        if (prevOuterRow != null)
-                        {
-                            prevOuterRow.clearPredicateParent();
-                        }
-                        
-                        outerRow = outerRows.get(outerIndex);
-                        currentOuterHash = outerHashFunction.applyAsInt(context.getEvaluationContext(), outerRow);
-                        outerRowEmited = false;
-                        prevOuterRow = outerRow;
                     }
-
-                    if (innerRow == null)
+                    else if (innerRowIndex >= innerRows.size())
                     {
-                        // Set current outerRow as context parent before retrieving next inner row
-                        Row contextParent = context.getParentRow();
-                        context.setParentRow(outerRow);
-                        innerRow = innerIt.hasNext() ? innerIt.next() : null;
-                        context.setParentRow(contextParent);
-                        if (innerRow != null)
-                        {
-                            currentInnerHash = innerHashFunction.applyAsInt(context.getEvaluationContext(), innerRow);
-                        }
-                    }
-
-                    // No more inner rows, clear outerRow and start over
-                    if (innerRow == null)
-                    {
-                        outerRow.clearPredicateParent();
-                        outerRow = null;
-                        outerIndex++;
+                        outerRowIndex++;
+                        innerRows = null;
+                        innerRowIndex = 0;
                         continue;
                     }
 
+                    Row innerRow = innerRows.get(innerRowIndex++);
                     innerRow.setPredicateParent(outerRow);
 
-                    boolean hashMatch = currentOuterHash == currentInnerHash;
-
-                    if (hashMatch
-                        && predicate.test(context.getEvaluationContext(), innerRow))
+                    if (predicate.test(context.getEvaluationContext(), innerRow))
                     {
                         next = rowMerger.merge(outerRow, innerRow, populating);
-                        outerRowEmited = true;
                         if (populating)
                         {
                             outerRow.match = true;
@@ -190,43 +212,8 @@ public class BatchHashJoin implements Operator
                     }
 
                     innerRow.clearPredicateParent();
-
-                    // Move outer row if no values match.
-                    // Since it's by contract that inner operator
-                    // return rows in order of the outer rows, we can safely
-                    // iterate the outer rows until a match if found
-                    if (!hashMatch)
-                    {
-                        if (returnNonPopulatingOuterRow())
-                        {
-                            next = outerRow;
-                        }
-                        outerRow.clearPredicateParent();
-                        outerRow = null;
-                        outerIndex++;
-                    }
-                    // Otherwise move inner row
-                    else
-                    {
-                        innerRow = null;
-                    }
                 }
                 return true;
-            }
-
-            private boolean returnNonPopulatingOuterRow()
-            {
-                return emitEmptyOuterRows
-                    && !populating
-                    && !outerRowEmited;
-            }
-
-            private boolean returnPopulatingOuterRow()
-            {
-                return populating
-                    && prevOuterRow != null
-                    && (prevOuterRow.match
-                        || emitEmptyOuterRows);
             }
 
             /** Batch outer rows and generate outer keys */
@@ -245,8 +232,6 @@ public class BatchHashJoin implements Operator
                 while (outerIt.hasNext())
                 {
                     Row row = outerIt.next();
-                    // Connect row to parent
-                    row.setPredicateParent(context.getParentRow());
                     outerRows.add(row);
                     count++;
                     if (batchSize > 0 && count >= batchSize)
@@ -254,6 +239,103 @@ public class BatchHashJoin implements Operator
                         break;
                     }
                 }
+            }
+
+            private void hashInnerBatch()
+            {
+                context.setIndex(innerIndex, outerValuesIterator(context.getEvaluationContext()));
+                Iterator<Row> it = inner.open(context);
+
+                // Hash batch
+                while (it.hasNext())
+                {
+                    Row row = it.next();
+                    int hash = populateKeyValues(innerValuesExtractor, context.getEvaluationContext(), row);
+                    TableValue tableValue = table.get(hash);
+                    if (tableValue == null)
+                    {
+                        // No key exists table for row, no need to add it
+                        continue;
+                    }
+                    tableValue.rows.add(row);
+                }
+                
+                context.setIndex(null, null);
+            }
+
+            private void clearOuterRows()
+            {
+                outerRow = null;
+                outerRows = null;
+                outerRowIndex = 0;
+                emitOuterRows = false;
+            }
+
+            private int populateKeyValues(
+                    ValuesExtractor valueExtractor,
+                    EvaluationContext context,
+                    Row row)
+            {
+                valueExtractor.extract(context, row, keyValues);
+                return hash(keyValues);
+            }
+
+            private Iterator<Object[]> outerValuesIterator(EvaluationContext context)
+            {
+                return new Iterator<Object[]>()
+                {
+                    private int outerRowsIndex = 0;
+                    private Object[] nextArray;
+
+                    @Override
+                    public boolean hasNext()
+                    {
+                        return setNext();
+                    }
+
+                    @Override
+                    public Object[] next()
+                    {
+                        if (nextArray == null)
+                        {
+                            throw new NoSuchElementException();
+                        }
+
+                        Object[] result = nextArray;
+                        nextArray = null;
+                        return result;
+                    }
+
+                    private boolean setNext()
+                    {
+                        while (nextArray == null)
+                        {
+                            if (outerRowsIndex >= outerRows.size())
+                            {
+                                return false;
+                            }
+
+                            Row row = outerRows.get(outerRowsIndex++);
+                            row.hash = populateKeyValues(outerValuesExtractor, context, row);
+                            TableValue tableValue = table.get(row.hash);
+                            if (tableValue == null)
+                            {
+                                tableValue = new TableValue();
+                                table.put(row.hash, tableValue);
+                            }
+                            
+                            if (!tableValue.addInnterValues(keyValues))
+                            {
+                                // Value already present, no need to return values to downstream
+                                continue;
+                            }
+
+                            nextArray = keyValues;
+                        }
+
+                        return true;
+                    }
+                };
             }
         };
     }
@@ -274,8 +356,8 @@ public class BatchHashJoin implements Operator
             BatchHashJoin mj = (BatchHashJoin) obj;
             return outer.equals(mj.outer)
                 && inner.equals(mj.inner)
-                && outerHashFunction.equals(mj.outerHashFunction)
-                && innerHashFunction.equals(mj.innerHashFunction)
+                && outerValuesExtractor.equals(mj.outerValuesExtractor)
+                && innerValuesExtractor.equals(mj.innerValuesExtractor)
                 && predicate.equals(mj.predicate)
                 && populating == mj.populating
                 && emitEmptyOuterRows == mj.emitEmptyOuterRows;
@@ -299,5 +381,52 @@ public class BatchHashJoin implements Operator
             indentString + outer.toString(indent + 1) + System.lineSeparator()
             +
             indentString + inner.toString(indent + 1);
+    }
+
+    /** Value used in table */
+    private static class TableValue
+    {
+        final List<Row> rows = new ArrayList<>();
+        final List<Object[]> values = new ArrayList<>();
+
+        /** Check if provided key exists in values */
+        private boolean contains(Object[] keyValues)
+        {
+            int size = values.size();
+            for (int i = 0; i < size; i++)
+            {
+                if (Arrays.equals(values.get(i), keyValues))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /** Add inner values array
+         * @return True if array was added */
+        boolean addInnterValues(Object[] keyValues)
+        {
+            if (contains(keyValues))
+            {
+                return false;
+            }
+            
+            values.add(Arrays.copyOf(keyValues, keyValues.length));
+            return true;
+        }
+    }
+
+    private static int hash(Object[] values)
+    {
+        int result = 1;
+
+        int length = values.length;
+        for (int i = 0; i < length; i++)
+        {
+            Object value = values[i];
+            result = 31 * result + (value == null ? 0 : value.hashCode());
+        }
+        return result;
     }
 }

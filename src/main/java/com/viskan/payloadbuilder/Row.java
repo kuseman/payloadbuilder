@@ -22,8 +22,10 @@ public class Row
     private Object[] values;
     private List<Row>[] childRows;
     
-    /** Temporary flag used by physical operators during join */
+    /** Temporary fields used by physical operators during join */
     public boolean match;
+    public int hash;
+    public Object[] extractedValues;
 
     Row()
     {}

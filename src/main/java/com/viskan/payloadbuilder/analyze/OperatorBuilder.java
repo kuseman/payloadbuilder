@@ -408,7 +408,7 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
         if (context.tableIndex != null)
         {
             Reader reader = pair.getKey().getBatchReader(pair.getValue(), context.tableIndex);
-            context.operator = new BatchOperator(alias, emptyList(), reader);
+            context.operator = new BatchOperator(alias, reader);
             context.tableIndex = null;
         }
         else

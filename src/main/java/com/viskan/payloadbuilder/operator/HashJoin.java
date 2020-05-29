@@ -97,27 +97,6 @@ public class HashJoin implements Operator
                 tableIterator(table, TableIteratorType.NON_MATCHED));
     };
 
-    /**
-     * NOTE! Special key class used in hash map. To avoid allocations and use int as hashcode for rows A instance of this class is used for all rows.
-     * Since hashcode is all that is needed to find potential matching rows this technique is used
-     **/
-    private static class IntKey
-    {
-        private int key;
-
-        @Override
-        public int hashCode()
-        {
-            return key;
-        }
-
-        @Override
-        public boolean equals(Object obj)
-        {
-            return true;
-        }
-    }
-
     private Map<IntKey, List<Row>> hash(OperatorContext context)
     {
         IntKey key = new IntKey();
@@ -289,6 +268,30 @@ public class HashJoin implements Operator
                 return true;
             }
         };
+    }
+
+    /**
+     * <pre>
+     * NOTE! Special key class used in hash map.
+     * To avoid allocations and use int as hashcode for rows, one instance of this class is used for all rows.
+     * Since hashcode is all that is needed to find potential matching rows this technique is used
+     * </pre>
+     **/
+    private static class IntKey
+    {
+        private int key;
+
+        @Override
+        public int hashCode()
+        {
+            return key;
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            return true;
+        }
     }
 
     private enum TableIteratorType

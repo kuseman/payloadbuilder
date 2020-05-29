@@ -1,14 +1,17 @@
 package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.catalog.Index;
 import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.function.BiPredicate;
 
 import org.apache.commons.lang3.StringUtils;
@@ -17,7 +20,7 @@ import org.apache.commons.lang3.StringUtils;
  * <pre>
  * Special variant of merge join that merges two streams by first batching outer rows
  * And push these down to inner operator that in turn returns inner rows connected to the outer rows
- * in outer row order (see below).
+ * in outer row order using it's index.
  *
  * Two inputs
  * - left key: id
@@ -54,11 +57,14 @@ public class BatchMergeJoin implements Operator
     private final String logicalOperator;
     private final Operator outer;
     private final Operator inner;
-    private final RowComparator comparator;
+    private final ValuesExtractor outerValuesExtractor;
+    private final ValuesExtractor innerValuesExtractor;
     private final BiPredicate<EvaluationContext, Row> predicate;
     private final RowMerger rowMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
+    private final Index innerIndex;
+    private final int valuesSize;
     private final int batchSize;
 
     /* Statistics */
@@ -68,22 +74,34 @@ public class BatchMergeJoin implements Operator
             String logicalOperator,
             Operator outer,
             Operator inner,
-            RowComparator comparator,
+            ValuesExtractor outerValuesExtractor,
+            ValuesExtractor innerValuesExtractor,
             BiPredicate<EvaluationContext, Row> predicate,
             RowMerger rowMerger,
             boolean populating,
             boolean emitEmptyOuterRows,
+            Index innerIndex,
             int batchSize)
     {
         this.logicalOperator = logicalOperator;
         this.outer = requireNonNull(outer, "outer");
         this.inner = requireNonNull(inner, "inner");
-        this.comparator = requireNonNull(comparator, "comparator");
+        this.outerValuesExtractor = requireNonNull(outerValuesExtractor, "outerValuesExtractor");
+        this.innerValuesExtractor = requireNonNull(innerValuesExtractor, "innerValuesExtractor");
         this.predicate = requireNonNull(predicate, "predicate");
         this.rowMerger = requireNonNull(rowMerger, "rowMerger");
         this.populating = populating;
         this.emitEmptyOuterRows = emitEmptyOuterRows;
+        this.innerIndex = requireNonNull(innerIndex, "innerIndex");
+        this.valuesSize = innerIndex.getColumns().size();
         this.batchSize = batchSize;
+    }
+    
+    static void clearJoinData(Row row)
+    {
+        row.hash = 0;
+        row.extractedValues = null;
+        row.match = false;
     }
 
     @Override
@@ -103,30 +121,27 @@ public class BatchMergeJoin implements Operator
             private Row outerRow;
             /** Current process inner row */
             private Row innerRow;
+            
+            private final Object[] keyValues = new Object[valuesSize];
+
             /**
-             * Index pointing to last seen larger than value for when outerRow > innerRow. Used when many-to-many when rewinding
+             * <pre>
+             * Index pointing to last seen larger than value for when outerRow > innerRow. 
+             * Used in many-mode when rewinding outer rows.
+             * </pre>
              */
             private int largerThanIndex = 0;
-            /** Index of outerRows where to rewind in case of man-to-many */
+            /** Index of outerRows where to rewind in case of man-mode */
             private int rewindIndex = -1;
 
             /** Flag used when having populating join or, left join */
             private boolean emitOuterRows;
 
-            private void clearOuterRows()
-            {
-                largerThanIndex = 0;
-                rewindIndex = -1;
-                outerRows = null;
-                outerRow = null;
-                outerIndex = 0;
-                emitOuterRows = false;
-            }
-
             @Override
             public Row next()
             {
                 Row result = next;
+                clearJoinData(result);
                 next = null;
                 return result;
             }
@@ -158,7 +173,6 @@ public class BatchMergeJoin implements Operator
                             || (!populating && !row.match))
                         {
                             next = row;
-                            row.match = false;
                         }
 
                         outerIndex++;
@@ -170,10 +184,11 @@ public class BatchMergeJoin implements Operator
                         batchOuterRows();
                         if (outerRows.isEmpty())
                         {
+                            context.setIndex(null, null);
                             return false;
                         }
 
-                        context.setOuterRows(outerRows);
+                        context.setIndex(innerIndex, outerValuesIterator());
                         innerIt = inner.open(context);
                         if (!innerIt.hasNext())
                         {
@@ -217,7 +232,7 @@ public class BatchMergeJoin implements Operator
                         }
                     }
 
-                    int cResult = comparator.compare(context.getEvaluationContext(), outerRow, innerRow);
+                    int cResult = compare(context.getEvaluationContext(), outerRow, innerRow);
 
                     // outerRow > innerRow
                     if (cResult > 0)
@@ -295,6 +310,46 @@ public class BatchMergeJoin implements Operator
                 }
                 return true;
             }
+            
+            private int compare(EvaluationContext context, Row outerRow, Row innerRow)
+            {
+                Object[] outerValues = outerRow.extractedValues;
+                populateKeyValues(innerValuesExtractor, context, innerRow);
+                Object[] innerValues = keyValues;
+                
+                int length = outerValues.length;
+                
+                for (int i=0;i<length;i++)
+                {
+                    @SuppressWarnings("unchecked")
+                    Comparable<Object> outer = (Comparable<Object>) outerValues[i];
+                    int c = outer.compareTo(innerValues[i]);
+                    if (c != 0)
+                    {
+                        return c;
+                    }
+                }
+                
+                return 0;
+            }
+            
+            private void clearOuterRows()
+            {
+                largerThanIndex = 0;
+                rewindIndex = -1;
+                outerRows = null;
+                outerRow = null;
+                outerIndex = 0;
+                emitOuterRows = false;
+            }
+            
+            private void populateKeyValues(
+                    ValuesExtractor valueExtractor,
+                    EvaluationContext context,
+                    Row row)
+            {
+                valueExtractor.extract(context, row, keyValues);
+            }
 
             /** Batch outer rows and generate outer keys */
             private void batchOuterRows()
@@ -306,20 +361,20 @@ public class BatchMergeJoin implements Operator
                     return;
                 }
 
-                /* TODO: Optimization.
-                 * Input outer columns into operator
-                 * and when batch is reached keep checking rows
-                 * for equals-ness to prev row to avoid fetching
-                 * the same data from inner twice
-                */
                 int count = 0;
                 int size = batchSize > 0 ? batchSize : 100;
                 outerRows = new ArrayList<>(size);
                 while (outerIt.hasNext())
                 {
                     Row row = outerIt.next();
+                    populateKeyValues(outerValuesExtractor, context.getEvaluationContext(), row);
+                    row.extractedValues = Arrays.copyOf(keyValues, keyValues.length);
+
+                    // TODO: keep extracting after last until array diffs
+                    //       to avoid fetching the same values twice from inner operator
+                    
                     // Connect row to parent
-                    row.setPredicateParent(context.getParentRow());
+//                    row.setPredicateParent(context.getParentRow());
                     outerRows.add(row);
                     count++;
                     if (batchSize > 0 && count >= batchSize)
@@ -327,6 +382,59 @@ public class BatchMergeJoin implements Operator
                         break;
                     }
                 }
+            }
+            
+            private Iterator<Object[]> outerValuesIterator()
+            {
+                return new Iterator<Object[]>()
+                {
+                    private int outerRowsIndex = 0;
+                    private Object[] nextArray;
+                    private Object[] prevArray;
+
+                    @Override
+                    public boolean hasNext()
+                    {
+                        return setNext();
+                    }
+
+                    @Override
+                    public Object[] next()
+                    {
+                        if (nextArray == null)
+                        {
+                            throw new NoSuchElementException();
+                        }
+
+                        Object[] result = nextArray;
+                        nextArray = null;
+                        return result;
+                    }
+
+                    private boolean setNext()
+                    {
+                        while (nextArray == null)
+                        {
+                            if (outerRowsIndex >= outerRows.size())
+                            {
+                                return false;
+                            }
+
+                            Row row = outerRows.get(outerRowsIndex++);
+                            
+                            // Skip already batched array
+                            if (prevArray != null && Arrays.equals(prevArray, row.extractedValues))
+                            {
+                                continue;
+                            }
+                            
+                            nextArray = row.extractedValues;
+                            prevArray = nextArray;
+                        }
+
+                        return true;
+                    }
+                };
             }
         };
     }
@@ -347,7 +455,8 @@ public class BatchMergeJoin implements Operator
             BatchMergeJoin mj = (BatchMergeJoin) obj;
             return outer.equals(mj.outer)
                 && inner.equals(mj.inner)
-                && comparator.equals(mj.comparator)
+                && outerValuesExtractor.equals(mj.outerValuesExtractor)
+                && innerValuesExtractor.equals(mj.innerValuesExtractor)
                 && predicate.equals(mj.predicate)
                 && populating == mj.populating
                 && emitEmptyOuterRows == mj.emitEmptyOuterRows;

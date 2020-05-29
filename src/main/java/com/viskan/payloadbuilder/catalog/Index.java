@@ -13,7 +13,7 @@ import java.util.List;
 public class Index
 {
     /** Columns in key */
-    protected final List<String> columns;
+    private final List<String> columns;
 
     public Index(List<String> columns)
     {

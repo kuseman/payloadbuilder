@@ -4,10 +4,13 @@ import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.catalog.Index;
 
+import static com.viskan.payloadbuilder.operator.BatchMergeJoinTest.assertRowJoinValues;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyIterator;
+import static java.util.stream.Collectors.toList;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.Random;
 import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
@@ -18,18 +21,18 @@ import org.apache.commons.lang3.time.StopWatch;
 import org.junit.Assert;
 import org.junit.Test;
 
-/** Test {@link BatchMergeJoin} */
-public class BatchMergeJoinTest extends Assert
+/** Test {@link BatchHashJoin} */
+public class BatchHashJoinTest extends Assert
 {
     private final Index index = new Index(asList("col"));
-    
+
     @Test
     public void test_inner_join_empty_outer()
     {
         Operator left = context -> emptyIterator();
         Operator right = context -> emptyIterator();
 
-        BatchMergeJoin op = new BatchMergeJoin(
+        BatchHashJoin op = new BatchHashJoin(
                 "",
                 left,
                 right,
@@ -52,7 +55,7 @@ public class BatchMergeJoinTest extends Assert
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
         Operator right = context -> emptyIterator();
 
-        BatchMergeJoin op = new BatchMergeJoin(
+        BatchHashJoin op = new BatchHashJoin(
                 "",
                 left,
                 right,
@@ -82,15 +85,17 @@ public class BatchMergeJoinTest extends Assert
         Operator right = context ->
         {
             Iterable<Object[]> it = () -> context.getOuterIndexValues();
-            return StreamSupport.stream(it.spliterator(), false)
+            List<Row> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .map(val -> Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
-                    .iterator();
+                    .collect(toList());
+
+            return inner.iterator();
         };
 
-        BatchMergeJoin op = new BatchMergeJoin(
+        BatchHashJoin op = new BatchHashJoin(
                 "",
                 left,
                 right,
@@ -107,22 +112,22 @@ public class BatchMergeJoinTest extends Assert
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
-                7,
-                8, 9, 10,
-                11
+                7,          // Batch 1
+                8, 9, 10,   // Batch 2
+                11          // Batch 3
         };
 
         int[] expectedInnerPositions = new int[] {
-                0,
-                1, 2, 3,
-                4
+                0,          // Batch 1
+                1, 2, 3,    // Batch 2
+                4           // Batch 3
         };
 
         while (it.hasNext())
         {
             Row row = it.next();
             assertRowJoinValues(row);
-            //            System.out.println(row + " " + row.getChildRows(0));
+            //                        System.out.println(row + " " + row.getChildRows(0));
             assertEquals(expectedOuterPositions[count], row.getPos());
             assertEquals(expectedInnerPositions[count], row.getChildRows(0).get(0).getPos());
             assertEquals("Val" + row.getObject(0), row.getChildRows(0).get(0).getObject(1));
@@ -146,15 +151,17 @@ public class BatchMergeJoinTest extends Assert
         Operator right = context ->
         {
             Iterable<Object[]> it = () -> context.getOuterIndexValues();
-            return StreamSupport.stream(it.spliterator(), false)
+            List<Row> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .map(val -> Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
-                    .iterator();
+                    .collect(toList());
+
+            return inner.iterator();
         };
 
-        BatchMergeJoin op = new BatchMergeJoin(
+        BatchHashJoin op = new BatchHashJoin(
                 "",
                 left,
                 right,
@@ -171,23 +178,23 @@ public class BatchMergeJoinTest extends Assert
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
-                0, 1, 2,
-                3, 4, 5,
-                6, 7, 8,
-                9, 10, 11,
+                0, 1, 2,    // Batch 1
+                3, 4, 5,    // Batch 2
+                6, 7, 8,    // Batch 3
+                9, 10, 11,  // Batch 3
         };
 
         int[] expectedInnerPositions = new int[] {
-                0,
-                1, 2, 3,
-                4
+                0,          // Batch 1
+                1, 2, 3,    // Batch 2
+                4           // Batch 3
         };
 
         while (it.hasNext())
         {
             Row row = it.next();
             assertRowJoinValues(row);
-            //                        System.out.println(row + " " + row.getChildRows(0));
+            //                                    System.out.println(row + " " + row.getChildRows(0));
             assertEquals(expectedOuterPositions[count], row.getPos());
             if ((int) row.getObject(0) >= 5 && (int) row.getObject(0) <= 9)
             {
@@ -224,7 +231,7 @@ public class BatchMergeJoinTest extends Assert
                     .iterator();
         };
 
-        BatchMergeJoin op = new BatchMergeJoin(
+        BatchHashJoin op = new BatchHashJoin(
                 "",
                 left,
                 right,
@@ -285,7 +292,7 @@ public class BatchMergeJoinTest extends Assert
                     .iterator();
         };
 
-        BatchMergeJoin op = new BatchMergeJoin(
+        BatchHashJoin op = new BatchHashJoin(
                 "",
                 left,
                 right,
@@ -349,15 +356,17 @@ public class BatchMergeJoinTest extends Assert
         Operator right = context ->
         {
             Iterable<Object[]> it = () -> context.getOuterIndexValues();
-            return StreamSupport.stream(it.spliterator(), false)
+            List<Row> rows = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .map(val -> Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
-                    .iterator();
+                    .collect(toList());
+
+            return rows.iterator();
         };
 
-        BatchMergeJoin op = new BatchMergeJoin(
+        BatchHashJoin op = new BatchHashJoin(
                 "",
                 left,
                 right,
@@ -374,22 +383,22 @@ public class BatchMergeJoinTest extends Assert
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
-                12, 13, 14,
-                15, 16, 17, 18, 19,
-                20, 21
+                12, 13, 14,         // Batch 1
+                15, 16, 17, 18, 19, // Batch 2
+                20, 21              // Batch 3
         };
 
         int[] expectedInnerPositions = new int[] {
-                0, 0, 1,
-                2, 3, 3, 4, 4,
-                5, 5
+                0, 0, 1,        // Batch 1
+                1, 2, 2, 3, 3,  // Batch 2      
+                4, 4            // Batch 2
         };
 
         while (it.hasNext())
         {
             Row row = it.next();
             assertRowJoinValues(row);
-            //                                    System.out.println(row + " " + row.getChildRows(0));
+            //                                                System.out.println(row + " " + row.getChildRows(0));
             assertEquals(expectedOuterPositions[count], row.getPos());
             assertEquals(expectedInnerPositions[count], row.getChildRows(0).get(0).getPos());
             assertEquals("Val" + row.getObject(0), row.getChildRows(0).get(0).getObject(1));
@@ -413,15 +422,17 @@ public class BatchMergeJoinTest extends Assert
         Operator right = context ->
         {
             Iterable<Object[]> it = () -> context.getOuterIndexValues();
-            return StreamSupport.stream(it.spliterator(), false)
+            List<Row> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .map(val -> Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
-                    .iterator();
+                    .collect(toList());
+
+            return inner.iterator();
         };
 
-        BatchMergeJoin op = new BatchMergeJoin(
+        BatchHashJoin op = new BatchHashJoin(
                 "",
                 left,
                 right,
@@ -449,17 +460,17 @@ public class BatchMergeJoinTest extends Assert
         };
 
         int[] expectedInnerPositions = new int[] {
-                0, 0, 1,
-                2, 3, 3,
-                4, 4, 5,
-                6
+                0, 0, 1,        // Batch 1
+                1, 2, 2,        // Batch 2      
+                3, 3, 4,        // Batch 2
+                4
         };
 
         while (it.hasNext())
         {
             Row row = it.next();
             assertRowJoinValues(row);
-            //            System.out.println(row + " " + row.getChildRows(0));
+            //                        System.out.println(row + " " + row.getChildRows(0));
             assertEquals(expectedOuterPositions[count], row.getPos());
             if ((int) row.getObject(0) >= 5 && (int) row.getObject(0) <= 9)
             {
@@ -490,16 +501,18 @@ public class BatchMergeJoinTest extends Assert
         {
             // Create 2 rows for each input row
             Iterable<Object[]> it = () -> context.getOuterIndexValues();
-            return StreamSupport.stream(it.spliterator(), false)
+            List<Row> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
                     .map(ar -> Row.of(b, posRight.getAndIncrement(), ar))
-                    .iterator();
+                    .collect(toList());
+
+            return inner.iterator();
         };
 
-        BatchMergeJoin op = new BatchMergeJoin(
+        BatchHashJoin op = new BatchHashJoin(
                 "",
                 left,
                 right,
@@ -516,24 +529,24 @@ public class BatchMergeJoinTest extends Assert
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
-                12, 13, 12, 13, 14, 14,     // Batch 1
-                15, 15, 16, 17, 16, 17,     // Batch 2
-                18, 19, 18, 19, 20, 20,     // Batch 3
-                21, 21                      // Batch 4
+                12, 12, 13, 13, 14, 14,
+                15, 15, 16, 16, 17, 17,
+                18, 18, 19, 19, 20, 20,
+                21, 21
         };
 
         int[] expectedInnerPositions = new int[] {
-                0, 0, 1, 1, 2, 3,       // Batch 1
-                4, 5, 6, 6, 7, 7,       // Batch 2
-                8, 8, 9, 9, 10, 11,     // Batch 3
-                12, 13                  // Batch 4
+                0, 1, 0, 1, 2, 3,
+                2, 3, 4, 5, 4, 5,
+                6, 7, 6, 7, 8, 9,
+                8, 9
         };
 
         while (it.hasNext())
         {
             Row row = it.next();
             assertRowJoinValues(row);
-            //                        System.out.println(row + " " + row.getChildRows(0));
+            //                                    System.out.println(row + " " + row.getChildRows(0));
             assertEquals(expectedOuterPositions[count], row.getPos());
             assertEquals(expectedInnerPositions[count], row.getChildRows(0).get(0).getPos());
             count++;
@@ -557,16 +570,18 @@ public class BatchMergeJoinTest extends Assert
         {
             // Create 2 rows for each input row
             Iterable<Object[]> it = () -> context.getOuterIndexValues();
-            return StreamSupport.stream(it.spliterator(), false)
+            List<Row> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}, new Object[] {val, 3}).stream())
                     .map(ar -> Row.of(b, posRight.getAndIncrement(), ar))
-                    .iterator();
+                    .collect(toList());
+
+            return inner.iterator();
         };
 
-        BatchMergeJoin op = new BatchMergeJoin(
+        BatchHashJoin op = new BatchHashJoin(
                 "",
                 left,
                 right,
@@ -586,17 +601,17 @@ public class BatchMergeJoinTest extends Assert
                 3, 4, 5,
                 6, 7, 8,
                 9, 10, 11,
-                12, 13, 12, 13, 14, 14,
-                15, 15, 16, 17, 16, 17,
-                18, 19, 18, 19, 20, 20,
+                12, 12, 13, 13, 14, 14,
+                15, 15, 16, 16, 17, 17,
+                18, 18, 19, 19, 20, 20,
                 21, 21, 22, 23
         };
 
         int[] expectedInnerPositions = new int[] {
-                0, 0, 1, 1, 3, 4,
-                6, 7, 9, 9, 10, 10,
-                12, 12, 13, 13, 15, 16,
-                18, 19
+                0, 1, 0, 1, 3, 4,
+                3, 4, 6, 7, 6, 7,
+                9, 10, 9, 10, 12, 13,
+                12, 13
         };
 
         Iterator<Row> it = op.open(new OperatorContext());
@@ -605,7 +620,7 @@ public class BatchMergeJoinTest extends Assert
         {
             Row row = it.next();
             assertRowJoinValues(row);
-            //                                    System.out.println(row + " " + row.getChildRows(0));
+            //                                                System.out.println(row + " " + row.getChildRows(0));
             assertEquals(expectedOuterPositions[count], row.getPos());
             if ((int) row.getObject(0) >= 5 && (int) row.getObject(0) <= 9)
             {
@@ -636,15 +651,17 @@ public class BatchMergeJoinTest extends Assert
         Operator right = context ->
         {
             Iterable<Object[]> it = () -> context.getOuterIndexValues();
-            return StreamSupport.stream(it.spliterator(), false)
+            List<Row> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .map(val -> Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
-                    .iterator();
+                    .collect(toList());
+
+            return inner.iterator();
         };
 
-        BatchMergeJoin op = new BatchMergeJoin(
+        BatchHashJoin op = new BatchHashJoin(
                 "",
                 left,
                 right,
@@ -674,7 +691,7 @@ public class BatchMergeJoinTest extends Assert
         {
             Row row = it.next();
             assertRowJoinValues(row);
-            //                                    System.out.println(row + " " + row.getChildRows(0));
+            //                                                System.out.println(row + " " + row.getChildRows(0));
             assertEquals(expectedOuterPositions[count], row.getPos());
             assertEquals(expectedInnerPositions[count], row.getChildRows(0).get(0).getPos());
             assertEquals("Val" + row.getObject(0), row.getChildRows(0).get(0).getObject(1));
@@ -698,15 +715,17 @@ public class BatchMergeJoinTest extends Assert
         Operator right = context ->
         {
             Iterable<Object[]> it = () -> context.getOuterIndexValues();
-            return StreamSupport.stream(it.spliterator(), false)
+            List<Row> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .map(val -> Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
-                    .iterator();
+                    .collect(toList());
+
+            return inner.iterator();
         };
 
-        BatchMergeJoin op = new BatchMergeJoin(
+        BatchHashJoin op = new BatchHashJoin(
                 "",
                 left,
                 right,
@@ -739,7 +758,7 @@ public class BatchMergeJoinTest extends Assert
         {
             Row row = it.next();
             assertRowJoinValues(row);
-            //                                                System.out.println(row + " " + row.getChildRows(0));
+            //                                                            System.out.println(row + " " + row.getChildRows(0));
             assertEquals(expectedOuterPositions[count], row.getPos());
             if ((int) row.getObject(0) >= 5 && (int) row.getObject(0) <= 9)
             {
@@ -776,7 +795,7 @@ public class BatchMergeJoinTest extends Assert
                     .iterator();
         };
 
-        BatchMergeJoin op = new BatchMergeJoin(
+        BatchHashJoin op = new BatchHashJoin(
                 "",
                 left,
                 right,
@@ -838,7 +857,7 @@ public class BatchMergeJoinTest extends Assert
                     .iterator();
         };
 
-        BatchMergeJoin op = new BatchMergeJoin(
+        BatchHashJoin op = new BatchHashJoin(
                 "",
                 left,
                 right,
@@ -915,7 +934,7 @@ public class BatchMergeJoinTest extends Assert
                     .iterator();
         };
 
-        BatchMergeJoin op = new BatchMergeJoin(
+        BatchHashJoin op = new BatchHashJoin(
                 "",
                 left,
                 right,
@@ -932,24 +951,24 @@ public class BatchMergeJoinTest extends Assert
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
-                12, 13, 14,     // Batch 1
-                15, 16, 17,     // Batch 2
-                18, 19, 20,     // Batch 3
-                21,             // Batch 4
+                12, 13, 14,
+                15, 16, 17,
+                18, 19, 20,
+                21,
         };
 
         int[] expectedInnerPositions = new int[] {
-                0, 1, 0, 1, 2, 3,       // Batch 1
-                4, 5, 6, 7, 6, 7,       // Batch 2
-                8, 9, 8, 9, 10, 11,     // Batch 3
-                12, 13                  // Batch 4
+                0, 1, 0, 1, 2, 3,
+                2, 3, 4, 5, 4, 5,
+                6, 7, 6, 7, 8, 9,
+                8, 9
         };
 
         while (it.hasNext())
         {
             Row row = it.next();
             assertRowJoinValues(row);
-            //                        System.out.println(row + " " + row.getChildRows(0));
+            //                                    System.out.println(row + " " + row.getChildRows(0));
             assertEquals(expectedOuterPositions[count], row.getPos());
             assertEquals(expectedInnerPositions[count * 2], row.getChildRows(0).get(0).getPos());
             assertEquals(expectedInnerPositions[(count * 2) + 1], row.getChildRows(0).get(1).getPos());
@@ -983,7 +1002,7 @@ public class BatchMergeJoinTest extends Assert
                     .iterator();
         };
 
-        BatchMergeJoin op = new BatchMergeJoin(
+        BatchHashJoin op = new BatchHashJoin(
                 "",
                 left,
                 right,
@@ -1012,9 +1031,9 @@ public class BatchMergeJoinTest extends Assert
 
         int[] expectedInnerPositions = new int[] {
                 0, 1, 0, 1, 2, 3,
-                4, 5, 6, 7, 6, 7,
-                8, 9, 8, 9, 10, 11,
-                12, 13
+                2, 3, 4, 5, 4, 5,
+                6, 7, 6, 7, 8, 9,
+                8, 9
         };
 
         while (it.hasNext())
@@ -1036,13 +1055,6 @@ public class BatchMergeJoinTest extends Assert
         }
 
         assertEquals(24, count);
-    }
-
-    static void assertRowJoinValues(Row row)
-    {
-        assertFalse(row.match);
-        assertNull(row.extractedValues);
-        assertEquals(0, row.hash);
     }
 
 //            @Ignore
@@ -1073,7 +1085,6 @@ public class BatchMergeJoinTest extends Assert
         Operator tableC = context ->
         {
             Iterable<Object[]> it = () -> context.getOuterIndexValues();
-            
             return StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .flatMap(val -> asList(
@@ -1087,10 +1098,10 @@ public class BatchMergeJoinTest extends Assert
          * from tableA a inner join [ tableB b inner join [tableC] c on c.id = b.id ] b on b.id = a.id
          */
 
-        BatchMergeJoin op = new BatchMergeJoin(
+        BatchHashJoin op = new BatchHashJoin(
                 "",
                 tableA,
-                new BatchMergeJoin(
+                new BatchHashJoin(
                         "",
                         tableB,
                         tableC,
@@ -1129,7 +1140,7 @@ public class BatchMergeJoinTest extends Assert
             {
                 Row row = it.next();
                 //                assertEquals(4, row.getChildRows(0).size());
-//                System.out.println(row + " " + row.getChildRows(0).stream().map(r -> r.toString() + " " + r.getChildRows(0)).collect(joining(", ")) );
+//                                                                System.out.println(row + " " + row.getChildRows(0).stream().map(r -> r.toString() + " " + r.getChildRows(0)).collect(joining(", ")) );
                 //            assertEquals("Val" + row.getObject(0), row.getChildRows(0).get(0).getObject(1));
                 count++;
             }
@@ -1137,5 +1148,6 @@ public class BatchMergeJoinTest extends Assert
             long mem = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
             System.out.println("Time: " + sw.toString() + " rows: " + count + " mem: " + FileUtils.byteCountToDisplaySize(mem));
         }
+        //        assertEquals(5, count);
     }
 }
