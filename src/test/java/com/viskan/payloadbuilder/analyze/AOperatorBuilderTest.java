@@ -38,7 +38,7 @@ public class AOperatorBuilderTest extends Assert
         Catalog c = new Catalog("Test")
         {
             @Override
-            public Operator getScanOperator(TableAlias alias)
+            public Operator getOperator(TableAlias alias)
             {
                 if (mAlias.getValue() == null)
                 {

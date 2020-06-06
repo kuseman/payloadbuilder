@@ -41,33 +41,33 @@ public class ComparisonExpression extends Expression
     }
 
     @Override
+    public boolean isConstant()
+    {
+        return left.isConstant() && right.isConstant();
+    }
+
+    @Override
+    public Expression fold()
+    {
+        boolean ll = left instanceof LiteralExpression;
+        boolean rl = right instanceof LiteralExpression;
+
+        if (ll && rl)
+        {
+            return LiteralExpression.create(evalInternal(
+                    ((LiteralExpression) left).getObjectValue(),
+                    ((LiteralExpression) right).getObjectValue()));
+        }
+
+        return this;
+    }
+
+    @Override
     public Object eval(EvaluationContext evaluationContext, Row row)
     {
         Object leftResult = left.eval(evaluationContext, row);
         Object rightResult = right.eval(evaluationContext, row);
-
-        if (leftResult == null || rightResult == null)
-        {
-            return null;
-        }
-
-        switch (type)
-        {
-            case EQUAL:
-                return eq(leftResult, rightResult);
-            case NOT_EQUAL:
-                return !eq(leftResult, rightResult);
-            case GREATER_THAN:
-                return gt(leftResult, rightResult);
-            case GREATER_THAN_EQUAL:
-                return gte(leftResult, rightResult);
-            case LESS_THAN:
-                return lt(leftResult, rightResult);
-            case LESS_THAN_EQUAL:
-                return lte(leftResult, rightResult);
-            default:
-                throw new IllegalArgumentException("Unkown comparison operator: " + type);
-        }
+        return evalInternal(leftResult, rightResult);
     }
 
     @Override
@@ -136,6 +136,32 @@ public class ComparisonExpression extends Expression
     public boolean isNullable()
     {
         return left.isNullable() || right.isNullable();
+    }
+
+    private Object evalInternal(Object leftResult, Object rightResult)
+    {
+        if (leftResult == null || rightResult == null)
+        {
+            return null;
+        }
+
+        switch (type)
+        {
+            case EQUAL:
+                return eq(leftResult, rightResult);
+            case NOT_EQUAL:
+                return !eq(leftResult, rightResult);
+            case GREATER_THAN:
+                return gt(leftResult, rightResult);
+            case GREATER_THAN_EQUAL:
+                return gte(leftResult, rightResult);
+            case LESS_THAN:
+                return lt(leftResult, rightResult);
+            case LESS_THAN_EQUAL:
+                return lte(leftResult, rightResult);
+            default:
+                throw new IllegalArgumentException("Unkown comparison operator: " + type);
+        }
     }
 
     @Override

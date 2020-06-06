@@ -1,7 +1,6 @@
 package com.viskan.payloadbuilder.catalog;
 
 import com.viskan.payloadbuilder.TableAlias;
-import com.viskan.payloadbuilder.operator.BatchOperator;
 import com.viskan.payloadbuilder.operator.Operator;
 import com.viskan.payloadbuilder.parser.tree.QualifiedName;
 
@@ -117,7 +116,7 @@ public abstract class Catalog
     /** Get operator for provided alias
      * @param alias Alias to retrieve operator for 
      * @param condition Condition used while fetching rows */
-    public Operator getScanOperator(TableAlias alias)
+    public Operator getOperator(TableAlias alias)
     {
         throw new IllegalArgumentException("Catalog " + name + " doesn't support scan operators.");
     }
@@ -126,10 +125,10 @@ public abstract class Catalog
      * Used in {@link BatchOperator}
      * @param index Index for reader
      * */
-    public BatchOperator.Reader getBatchReader(QualifiedName table, Index index)
-    {
-        throw new IllegalArgumentException("Catalog " + name + " doesn't support batch operator. Check implementation, catalog returned index for " + table);
-    }
+//    public BatchOperator.Reader getBatchReader(QualifiedName table, Index index)
+//    {
+//        throw new IllegalArgumentException("Catalog " + name + " doesn't support batch operator. Check implementation, catalog returned index for " + table);
+//    }
     
     /*
      * Use case:

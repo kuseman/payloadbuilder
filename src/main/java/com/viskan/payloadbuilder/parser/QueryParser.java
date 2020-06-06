@@ -195,7 +195,7 @@ public class QueryParser
             Expression expression = getExpression(ctx.expression());
             if (expression != null)
             {
-                return new ExpressionSelectItem((Expression) visit(ctx.expression()), identifier);
+                return new ExpressionSelectItem(expression, identifier);
             }
             else if (ctx.nestedSelectItem() != null)
             {
@@ -258,7 +258,7 @@ public class QueryParser
             if (ctx.JOIN() != null)
             {
                 TableSource tableSource = (TableSource) visit(ctx.tableSource());
-                Expression condition = ctx.expression() != null ? (Expression) visit(ctx.expression()) : null;
+                Expression condition = getExpression(ctx.expression());
                 Join.JoinType joinType = ctx.INNER() != null ? JoinType.INNER : JoinType.LEFT;
                 return new Join(tableSource, joinType, condition);
             }
@@ -462,8 +462,8 @@ public class QueryParser
         @Override
         public Object visitComparisonExpression(ComparisonExpressionContext ctx)
         {
-            Expression left = (Expression) visit(ctx.left);
-            Expression right = (Expression) visit(ctx.right);
+            Expression left = getExpression(ctx.left);
+            Expression right = getExpression(ctx.right);
             ComparisonExpression.Type type = null;
 
             switch (ctx.op.getType())
@@ -496,8 +496,8 @@ public class QueryParser
         @Override
         public Object visitLogicalBinary(LogicalBinaryContext ctx)
         {
-            Expression left = (Expression) visit(ctx.left);
-            Expression right = (Expression) visit(ctx.right);
+            Expression left = getExpression(ctx.left);
+            Expression right = getExpression(ctx.right);
             LogicalBinaryExpression.Type type = ctx.AND() != null ? LogicalBinaryExpression.Type.AND : LogicalBinaryExpression.Type.OR;
 
             return new LogicalBinaryExpression(type, left, right);
@@ -582,7 +582,7 @@ public class QueryParser
         @Override
         public Object visitArithmeticUnary(ArithmeticUnaryContext ctx)
         {
-            Expression expression = (Expression) visit(ctx.expression());
+            Expression expression = getExpression(ctx.expression());
             ArithmeticUnaryExpression.Type type = null;
 
             switch (ctx.op.getType())
@@ -601,8 +601,8 @@ public class QueryParser
         @Override
         public Object visitArithmeticBinary(ArithmeticBinaryContext ctx)
         {
-            Expression left = (Expression) visit(ctx.left);
-            Expression right = (Expression) visit(ctx.right);
+            Expression left = getExpression(ctx.left);
+            Expression right = getExpression(ctx.right);
             ArithmeticBinaryExpression.Type type = null;
 
             switch (ctx.op.getType())
@@ -714,7 +714,8 @@ public class QueryParser
                 return null;
             }
 
-            return (Expression) visit(ctx);
+            Expression expression = (Expression) visit(ctx);
+            return expression.fold();
         }
 
         private QualifiedName getQualifiedName(QnameContext ctx)

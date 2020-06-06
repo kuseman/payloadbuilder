@@ -12,11 +12,24 @@ public abstract class Expression
 {
     public abstract <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context);
     
+    /** Returns true if the result from this expression is nullable. Primitive result or not */
     public abstract boolean isNullable();
     
     public Class<?> getDataType()
     {
         return Object.class;
+    }
+    
+    /** Fold's expression */
+    public Expression fold()
+    {
+        return this;
+    }
+    
+    /** Returns true if this expression is constant or not */
+    public boolean isConstant()
+    {
+        return false;
     }
     
     /** Generate code for this expression

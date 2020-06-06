@@ -142,7 +142,7 @@ public final class ExpressionMath
             throw new IllegalArgumentException("Cannot compare " + left + " and " + right);
         }
 
-        return ((Comparable) left).compareTo(right) > 0;
+        return ((Comparable<Object>) left).compareTo(right) > 0;
     }
 
     @SuppressWarnings("unchecked")
@@ -178,7 +178,7 @@ public final class ExpressionMath
             throw new IllegalArgumentException("Cannot compare " + left + " and " + right);
         }
 
-        return ((Comparable) left).compareTo(right) >= 0;
+        return ((Comparable<Object>) left).compareTo(right) >= 0;
     }
 
     @SuppressWarnings("unchecked")
@@ -214,7 +214,7 @@ public final class ExpressionMath
             throw new IllegalArgumentException("Cannot compare " + left + " and " + right);
         }
 
-        return ((Comparable) left).compareTo(right) < 0;
+        return ((Comparable<Object>) left).compareTo(right) < 0;
     }
 
     @SuppressWarnings("unchecked")
@@ -250,7 +250,7 @@ public final class ExpressionMath
             throw new IllegalArgumentException("Cannot compare " + left + " and " + right);
         }
 
-        return ((Comparable) left).compareTo(right) <= 0;
+        return ((Comparable<Object>) left).compareTo(right) <= 0;
     }
 
     public static boolean eq(Object left, Object right)
@@ -294,7 +294,7 @@ public final class ExpressionMath
             return false;
         }
 
-        return ((Comparable) left).compareTo(right) == 0;
+        return ((Comparable<Object>) left).compareTo(right) == 0;
     }
 
     /* ARITHMETIC METHODS  */
@@ -758,7 +758,7 @@ public final class ExpressionMath
     }
 
     /** Converts an object to a number (if applicable) taking the number type into consideration */
-    private static Number convert(Number number, Object other, boolean throwIfConvertible)
+    private static Number convert(Number number, Object other, boolean throwIfNotConvertible)
     {
         if (other instanceof Number)
         {
@@ -792,7 +792,7 @@ public final class ExpressionMath
         }
         catch (NumberFormatException e)
         {
-            if (throwIfConvertible)
+            if (throwIfNotConvertible)
             {
                 throw new IllegalArgumentException("Cannot convert value " + other + " to datatype " + number.getClass().getSimpleName());
             }
@@ -801,11 +801,12 @@ public final class ExpressionMath
         return null;
     }
 
+    @SuppressWarnings("unchecked")
     public static boolean inValue(Object value, Object arg)
     {
         if (arg instanceof Collection)
         {
-            if (((Collection) arg).contains(value))
+            if (((Collection<Object>) arg).contains(value))
             {
                 return true;
             }

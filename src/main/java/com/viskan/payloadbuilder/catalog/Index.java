@@ -1,30 +1,30 @@
 package com.viskan.payloadbuilder.catalog;
 
-import com.viskan.payloadbuilder.operator.BatchOperator;
+import com.viskan.payloadbuilder.parser.tree.QualifiedName;
 
 import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 
-/** Index. 
- * Used on a table to define index which can be utilized by
- * a {@link BatchOperator}.
+/**
+ * Index. Used on a table to define index which can be utilized by batching operators
  **/
 public class Index
 {
-    /** Columns in key */
+    private final QualifiedName table;
     private final List<String> columns;
 
-    public Index(List<String> columns)
+    public Index(QualifiedName table, List<String> columns)
     {
+        this.table = requireNonNull(table, "table");
         this.columns = requireNonNull(columns, "columns");
     }
-    
+
     public List<String> getColumns()
     {
         return columns;
     }
-    
+
     @Override
     public int hashCode()
     {
@@ -41,10 +41,10 @@ public class Index
         }
         return false;
     }
-    
+
     @Override
     public String toString()
     {
-        return columns.toString();
+        return table + " " + columns.toString();
     }
 }

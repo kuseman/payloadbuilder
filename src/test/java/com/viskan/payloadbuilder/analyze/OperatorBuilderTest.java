@@ -275,7 +275,7 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
             Random rand = new Random();
 
             @Override
-            public Operator getScanOperator(TableAlias alias)
+            public Operator getOperator(TableAlias alias)
             {
                 boolean ap = alias.getAlias().equals("ap");
                 boolean ab = alias.getAlias().equals("ab");
@@ -597,7 +597,7 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
             Random rnd = new Random();
 
             @Override
-            public Operator getScanOperator(TableAlias alias)
+            public Operator getOperator(TableAlias alias)
             {
                 QualifiedName qname = alias.getTable();
                 if (qname.toString().equals("source"))

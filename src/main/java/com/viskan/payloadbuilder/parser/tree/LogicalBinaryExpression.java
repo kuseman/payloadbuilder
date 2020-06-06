@@ -5,6 +5,8 @@ import com.viskan.payloadbuilder.codegen.CodeGeneratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
 import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 
+import static com.viskan.payloadbuilder.parser.tree.LiteralBooleanExpression.FALSE_LITERAL;
+import static com.viskan.payloadbuilder.parser.tree.LiteralBooleanExpression.TRUE_LITERAL;
 import static java.util.Objects.requireNonNull;
 
 public class LogicalBinaryExpression extends Expression
@@ -39,6 +41,49 @@ public class LogicalBinaryExpression extends Expression
     public Class<?> getDataType()
     {
         return Boolean.class;
+    }
+
+    @Override
+    public boolean isConstant()
+    {
+        return left.isConstant() && right.isConstant();
+    }
+
+    @Override
+    public Expression fold()
+    {
+        // https://en.wikipedia.org/wiki/Null_(SQL)#Comparisons_with_NULL_and_the_three-valued_logic_.283VL.29
+        // AND - false if either side is false or null
+        if (type == Type.AND)
+        {
+            if (isFalse(left) || isFalse(right))
+            {
+                return FALSE_LITERAL;
+            }
+            else if (isTrue(left))
+            {
+                return right;
+            }
+            else if (isTrue(right))
+            {
+                return left;
+            }
+        }
+        // OR  3vl True if either side is true or null */
+        else if (isFalse(left))
+        {
+            return right;
+        }
+        else if (isFalse(right))
+        {
+            return left;
+        }
+        else if (isTrue(left) || isTrue(right))
+        {
+            return TRUE_LITERAL;
+        }
+
+        return this;
     }
 
     @Override
@@ -233,6 +278,16 @@ public class LogicalBinaryExpression extends Expression
     {
         return visitor.visit(this, context);
     }
+    
+    private boolean isTrue(Expression expression)
+    {
+        return TRUE_LITERAL.equals(expression);
+    }
+    
+    private boolean isFalse(Expression expression)
+    {
+        return FALSE_LITERAL.equals(expression);
+    }
 
     @Override
     public String toString()
@@ -254,12 +309,10 @@ public class LogicalBinaryExpression extends Expression
     {
         if (obj instanceof LogicalBinaryExpression)
         {
-            LogicalBinaryExpression e = (LogicalBinaryExpression) obj;
-            return left.equals(e.getLeft())
-                &&
-                right.equals(e.getRight())
-                &&
-                type == e.type;
+            LogicalBinaryExpression that = (LogicalBinaryExpression) obj;
+            return left.equals(that.left)
+                && right.equals(that.right)
+                && type == that.type;
         }
         return false;
     }

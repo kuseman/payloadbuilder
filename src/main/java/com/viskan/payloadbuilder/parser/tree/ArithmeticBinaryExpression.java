@@ -10,6 +10,7 @@ import static com.viskan.payloadbuilder.evaluation.ExpressionMath.divide;
 import static com.viskan.payloadbuilder.evaluation.ExpressionMath.modulo;
 import static com.viskan.payloadbuilder.evaluation.ExpressionMath.multiply;
 import static com.viskan.payloadbuilder.evaluation.ExpressionMath.subtract;
+import static com.viskan.payloadbuilder.parser.tree.LiteralNullExpression.NULL_LITERAL;
 import static java.util.Objects.requireNonNull;
 
 public class ArithmeticBinaryExpression extends Expression
@@ -41,6 +42,39 @@ public class ArithmeticBinaryExpression extends Expression
     }
 
     @Override
+    public boolean isConstant()
+    {
+        return left.isConstant() && right.isConstant();
+    }
+
+    @Override
+    public Expression fold()
+    {
+        if (left instanceof LiteralNullExpression || right instanceof LiteralNullExpression)
+        {
+            return NULL_LITERAL;
+        }
+        
+        boolean ll = left instanceof LiteralExpression;
+        boolean rl = right instanceof LiteralExpression;
+
+        if (ll || rl)
+        {
+            if (ll && rl)
+            {
+                return LiteralExpression.create(evalInternal(
+                        ((LiteralExpression) left).getObjectValue(),
+                        ((LiteralExpression) right).getObjectValue()));
+            }
+
+            // TODO: more folding. multiply 0, 1
+            //                     divide 1
+        }
+
+        return this;
+    }
+
+    @Override
     public boolean isNullable()
     {
         return left.isNullable() || right.isNullable();
@@ -57,7 +91,11 @@ public class ArithmeticBinaryExpression extends Expression
     {
         Object leftResult = left.eval(evaluationContext, row);
         Object rightResult = right.eval(evaluationContext, row);
+        return evalInternal(leftResult, rightResult);
+    }
 
+    private Object evalInternal(Object leftResult, Object rightResult)
+    {
         if (leftResult == null || rightResult == null)
         {
             return null;

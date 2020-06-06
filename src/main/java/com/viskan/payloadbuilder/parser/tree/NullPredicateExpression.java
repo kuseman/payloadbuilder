@@ -28,14 +28,39 @@ public class NullPredicateExpression extends Expression
     {
         return not;
     }
-    
+
+    @Override
+    public boolean isConstant()
+    {
+        return expression.isConstant();
+    }
+
+    @Override
+    public Expression fold()
+    {
+        if (expression instanceof LiteralExpression)
+        {
+            boolean nullValue = expression instanceof LiteralNullExpression;
+            if (not)
+            {
+                nullValue = !nullValue;
+            }
+
+            return nullValue
+                ? LiteralBooleanExpression.TRUE_LITERAL
+                : LiteralBooleanExpression.FALSE_LITERAL;
+        }
+
+        return this;
+    }
+
     @Override
     public Object eval(EvaluationContext evaluationContext, Row row)
     {
         Object result = expression.eval(evaluationContext, row);
         return not ? result != null : result == null;
     }
-    
+
     @Override
     public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
     {
@@ -85,5 +110,23 @@ public class NullPredicateExpression extends Expression
     public String toString()
     {
         return expression + " IS " + (not ? " NOT " : "") + "NULL";
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return expression.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof NullPredicateExpression)
+        {
+            NullPredicateExpression that = (NullPredicateExpression) obj;
+            return expression.equals(that.expression)
+                && not == that.not;
+        }
+        return false;
     }
 }

@@ -1,21 +1,21 @@
 package com.viskan.payloadbuilder.analyze;
 
 import com.viskan.payloadbuilder.TableAlias;
-import com.viskan.payloadbuilder.analyze.PredicateAnalyzer.AnalyzeItem;
+import com.viskan.payloadbuilder.analyze.PredicateAnalyzer.AnalyzePair;
 import com.viskan.payloadbuilder.analyze.PredicateAnalyzer.AnalyzeResult;
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.CatalogRegistry;
 import com.viskan.payloadbuilder.catalog.Index;
 import com.viskan.payloadbuilder.catalog.TableFunctionInfo;
 import com.viskan.payloadbuilder.operator.ArrayProjection;
-import com.viskan.payloadbuilder.operator.BatchOperator;
-import com.viskan.payloadbuilder.operator.BatchOperator.Reader;
+import com.viskan.payloadbuilder.operator.BatchHashJoin;
 import com.viskan.payloadbuilder.operator.CachingOperator;
 import com.viskan.payloadbuilder.operator.DefaultRowMerger;
 import com.viskan.payloadbuilder.operator.ExpressionHashFunction;
 import com.viskan.payloadbuilder.operator.ExpressionOperator;
 import com.viskan.payloadbuilder.operator.ExpressionPredicate;
 import com.viskan.payloadbuilder.operator.ExpressionProjection;
+import com.viskan.payloadbuilder.operator.ExpressionValuesExtractor;
 import com.viskan.payloadbuilder.operator.FilterOperator;
 import com.viskan.payloadbuilder.operator.HashJoin;
 import com.viskan.payloadbuilder.operator.NestedLoopJoin;
@@ -46,11 +46,11 @@ import com.viskan.payloadbuilder.parser.tree.TableSourceJoined;
 import static com.viskan.payloadbuilder.utils.CollectionUtils.asSet;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
-import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -93,15 +93,19 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
         /** Should new parent be set upon calling {@link #appendTableAlias(QualifiedName, String)} */
         private boolean setParent;
 
-        /** Table index to use for next table operator creation */
-        private Index tableIndex;
-
         /** Predicate pushed down from join to table source */
         private final Map<String, Expression> pushDownPredicateByAlias = new THashMap<>();
+
+        /** Set of expressions that defines the resulting order of rows for operator */
+        private final Set<Expression> operatorOrder = new HashSet<>();
 
         /** Appends push down predicate for provided alias */
         private void appendPushDownPredicate(String alias, Expression expression)
         {
+            if (expression == null)
+            {
+                return;
+            }
             pushDownPredicateByAlias.compute(alias, (k, v) ->
             {
                 if (v == null)
@@ -190,10 +194,11 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
             
             */
             AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(where);
-            pushDownPredicate = analyzeResult.extractPushdownPredicate(tsj.getTableSource().getAlias(), true);
-            if (pushDownPredicate != null)
+            Pair<Expression, AnalyzeResult> pair = analyzeResult.extractPushdownPredicate(tsj.getTableSource().getAlias(), true);
+            if (pair.getKey() != null)
             {
-                where = analyzeResult.getPredicate();
+                pushDownPredicate = pair.getKey();
+                where = pair.getValue().getPredicate();
             }
         }
 
@@ -322,7 +327,7 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
     public Void visit(Join join, Context context)
     {
         join(context,
-                join.getType() == JoinType.LEFT ? "LEFT" : "INNER" + " JOIN",
+                (join.getType() == JoinType.LEFT ? "LEFT" : "INNER") + " JOIN",
                 join,
                 join.getCondition(),
                 join.getType() == JoinType.LEFT);
@@ -333,7 +338,7 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
     public Void visit(Apply apply, Context context)
     {
         join(context,
-                apply.getType() == ApplyType.OUTER ? "OUTER" : "CROSS" + " APPLY",
+                (apply.getType() == ApplyType.OUTER ? "OUTER" : "CROSS") + " APPLY",
                 apply,
                 null,
                 apply.getType() == ApplyType.OUTER);
@@ -353,10 +358,11 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
         {
             // Analyze expression to see if there is push down candidates
             AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(where);
-            pushDownPredicate = analyzeResult.extractPushdownPredicate(tableSource.getAlias(), true);
-            if (pushDownPredicate != null)
+            Pair<Expression, AnalyzeResult> pair = analyzeResult.extractPushdownPredicate(tableSource.getAlias(), true);
+            if (pair.getKey() != null)
             {
-                where = analyzeResult.getPredicate();
+                pushDownPredicate = pair.getKey();
+                where = pair.getValue().getPredicate();
                 context.appendPushDownPredicate(tableSource.getAlias(), pushDownPredicate);
             }
         }
@@ -405,16 +411,16 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
     {
         Pair<Catalog, QualifiedName> pair = getCatalogAndTable(context, table.getTable());
         TableAlias alias = context.appendTableAlias(pair.getValue(), table.getAlias(), null);
-        if (context.tableIndex != null)
-        {
-            Reader reader = pair.getKey().getBatchReader(pair.getValue(), context.tableIndex);
-            context.operator = new BatchOperator(alias, reader);
-            context.tableIndex = null;
-        }
-        else
-        {
-            context.operator = pair.getKey().getScanOperator(alias);
-        }
+        //        if (context.tableIndex != null)
+        //        {
+        //            Reader reader = pair.getKey().getBatchReader(pair.getValue(), context.tableIndex);
+        //            context.operator = new BatchOperator(alias, reader);
+        //            context.tableIndex = null;
+        //        }
+        //        else
+        //        {
+        context.operator = pair.getKey().getOperator(alias);
+        //        }
         return null;
     }
 
@@ -484,46 +490,29 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
         }
         context.operator = joinOperator;
     }
-
+    
     private Operator createJoin(
             Context context,
             String logicalOperator,
             Operator outer,
             TableSource innerTableSource,
-            Expression condition,
+            final Expression joinCondition,
             boolean emitEmptyOuterRows,
             boolean isCorrelated)
     {
-        AnalyzeResult analyzeResult = null;
+        Expression condition = joinCondition;
+        AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(joinCondition);
         String innerAlias = innerTableSource.getAlias();
-
-        // Analyze push down predicate
-        if (condition != null)
-        {
-            // Analyze condition to see if we can hash join / merge join / utilize index
-            analyzeResult = PredicateAnalyzer.analyze(condition);
-
-            // Push down is only possible on inner joins
-            if (!emitEmptyOuterRows)
-            {
-                Expression pushDownPredicate = analyzeResult.extractPushdownPredicate(innerAlias, true);
-                if (pushDownPredicate != null)
-                {
-                    context.appendPushDownPredicate(innerAlias, pushDownPredicate);
-                    condition = analyzeResult.getPredicate();
-                }
-            }
-        }
-
         boolean populating = innerTableSource instanceof PopulateTableSource;
-
-        List<AnalyzeItem> equiItems = analyzeResult != null ? analyzeResult.getEquiItems(innerAlias, true) : emptyList();
-
+        List<AnalyzePair> equiPairs = analyzeResult.getEquiPairs(innerAlias, true);
+        int size = equiPairs.size();
+        
         // TODO: correlated
 
         /* No equi items in condition => NestedLoop */
-        if (equiItems.isEmpty())
+        if (size == 0)
         {
+            condition = extractPushDownPredicate(context, innerAlias, emitEmptyOuterRows, analyzeResult);
             innerTableSource.accept(this, context);
             Operator inner = wrapWithPushDown(context, context.operator, innerAlias);
 
@@ -557,9 +546,9 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
         // MergeJoin
 
         /* Extract all references inner columns from equi items */
-        Set<String> columnItems = equiItems
+        Set<String> columnItems = equiPairs
                 .stream()
-                .map(item -> item.getColumn(innerAlias, true))
+                .map(pair -> pair.getColumn(innerAlias, true))
                 .filter(Objects::nonNull)
                 .collect(toSet());
 
@@ -567,7 +556,7 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
 
         if (!columnItems.isEmpty())
         {
-            /* Find the first matching index from extracted columns above*/
+            /* Find the first matching index from extracted columns above */
             index = indices
                     .stream()
                     .filter(i -> columnItems.containsAll(i.getColumns()))
@@ -575,9 +564,21 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
                     .orElse(null);
         }
 
+        List<Expression> outerValueExpressions = new ArrayList<>(size);
+        List<Expression> innerValueExpressions = new ArrayList<>(size);
+        List<AnalyzePair> indexPairs = new ArrayList<>(size);
+        populateValueExtractors(
+                innerAlias,
+                equiPairs,
+                index,
+                outerValueExpressions,
+                innerValueExpressions,
+                indexPairs);
+
         // No indices for inner -> HashJoin
         if (index == null)
         {
+            condition = extractPushDownPredicate(context, innerAlias, emitEmptyOuterRows, analyzeResult);
             innerTableSource.accept(this, context);
             Operator inner = wrapWithPushDown(context, context.operator, innerAlias);
 
@@ -586,46 +587,62 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
                     outer,
                     inner,
                     // Collect outer hash expressions
-                    new ExpressionHashFunction(equiItems
-                            .stream()
-                            .map(item -> innerAlias.equals(item.getLeftAlias())
-                                ? item.getRightExpression()
-                                : item.getLeftExpression())
-                            .collect(toList())),
+                    new ExpressionHashFunction(outerValueExpressions),
                     // Collect inner hash expression
-                    new ExpressionHashFunction(equiItems
-                            .stream()
-                            .map(item -> innerAlias.equals(item.getLeftAlias())
-                                ? item.getLeftExpression()
-                                : item.getRightExpression())
-                            .collect(toList())),
-                    new ExpressionPredicate(analyzeResult.getPredicate()),
+                    new ExpressionHashFunction(innerValueExpressions),
+                    new ExpressionPredicate(condition),
                     DefaultRowMerger.DEFAULT,
                     populating,
                     emitEmptyOuterRows);
         }
 
-        // Hint for index usage
-        context.tableIndex = index;
+        List<AnalyzePair> pairs = new ArrayList<>(analyzeResult.pairs);
+        pairs.removeAll(indexPairs);
+
+        // Remove all pushdown candidates from index items,
+        // these are contained within index and no need to push down
+        // and is neither needed in join condition
+        indexPairs.removeIf(pair -> pair.isPushDown(innerAlias, true));
+
+        // Create a new analyze result from resulting pairs
+        pairs.addAll(indexPairs);
+        analyzeResult = new AnalyzeResult(pairs);
+
+        // Extract pushdown and new join condition
+        condition = extractPushDownPredicate(context, innerAlias, emitEmptyOuterRows, analyzeResult);
         innerTableSource.accept(this, context);
         Operator inner = wrapWithPushDown(context, context.operator, innerAlias);
 
+        constantalizeValueExtractors(outerValueExpressions, innerValueExpressions);
+        ExpressionValuesExtractor outerValuesExtractor = new ExpressionValuesExtractor(outerValueExpressions);
+        ExpressionValuesExtractor innerValuesExtractor = new ExpressionValuesExtractor(innerValueExpressions);
 
-        
+        return new BatchHashJoin(
+                logicalOperator,
+                outer,
+                inner,
+                outerValuesExtractor,
+                innerValuesExtractor,
+                new ExpressionPredicate(condition),
+                DefaultRowMerger.DEFAULT,
+                populating,
+                emitEmptyOuterRows,
+                index,
+                100);
+
         // If outer is sorted on index keys (fully or partly)
-        //   
+        //
         // Or of outer be sorted on index keys
         //   => BatchMergeJoin
-        
+
         // BatchHashJoin
-        
-        
+
         // We have an index
         // BatchMergeJoin
-        //   
+        //
         // BatchHashMatch
-        //   
-        
+        //
+
         //        1. visit source
         //        create operator
         //          2. visit join
@@ -641,9 +658,129 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
         //        - check order of inner
         //        - create join with outer and inner
 
-        throw new RuntimeException("No operator could be created for join");
+        //        throw new RuntimeException("No operator could be created for join");
     }
 
+    /**
+     * <pre> 
+     * Populates value extractors for provided index.
+     * 
+     * Example 
+     *   
+     *   Index [club_id, country_id, art_id]
+     *   Condition
+     *   a.art_id = s.art_id
+     *   a.country_id = 0
+     *   a.club_id = 10
+     *   
+     * Result:
+     *  outerValueExpressions: [10,        0,            s.art_id]
+     *  innerValueExpressions: [a.club_id, a.country_id, a.art_id] 
+     *  indexPairs:
+     *    [a.art_id,      s.art_id],
+     *    [a.country_id,  0],
+     *    [a.club_id,     10]
+     * </pre>
+     **/
+    private void populateValueExtractors(
+            String innerAlias,
+            List<AnalyzePair> equiPairs,
+            Index index,
+            List<Expression> outerValueExpressions,
+            List<Expression> innerValueExpressions,
+            List<AnalyzePair> indexPairs)
+    {
+        int size = equiPairs.size();
+        for (int i = 0; i < size; i++)
+        {
+            AnalyzePair pair = equiPairs.get(i);
+
+            // Find out the index of the
+            String column = pair.getColumn(innerAlias, true);
+            int columnIndex = 0;
+            if (index != null && column != null)
+            {
+                columnIndex = index.getColumns().indexOf(column);
+                if (columnIndex == -1)
+                {
+                    continue;
+                }
+                indexPairs.add(pair);
+            }
+
+            Pair<Expression, Expression> p = pair.getExpressionPair(innerAlias, true);
+
+            if (outerValueExpressions.size() > columnIndex)
+            {
+                outerValueExpressions.add(columnIndex, p.getRight());
+                innerValueExpressions.add(columnIndex, p.getLeft());
+            }
+            else
+            {
+                outerValueExpressions.add(p.getRight());
+                innerValueExpressions.add(p.getLeft());
+            }
+        }
+    }
+    
+    /**
+     * <pre> 
+     * Extracts pushdown predicate from provided analyze result
+     * and pushes it to context for later extract when operator is created 
+     * </pre>
+     * @return Returns the resulting join condition
+     * */
+    private Expression extractPushDownPredicate(
+            Context context,
+            String innerAlias,
+            boolean emitEmptyOuterRows,
+            AnalyzeResult analyzeResult)
+    {
+        if (!emitEmptyOuterRows)
+        {
+            Pair<Expression, AnalyzeResult> pushdownPair = analyzeResult.extractPushdownPredicate(innerAlias, true);
+            if (pushdownPair.getKey() != null)
+            {
+                context.appendPushDownPredicate(innerAlias, pushdownPair.getKey());
+                return pushdownPair.getValue().getPredicate();
+            }
+        }
+        
+        return analyzeResult.getPredicate();
+    }
+
+    /** 
+     * <pre>
+     * Replicates constants from left/right value extractors
+     * Ie. If we have an index [art_id, country_id]
+     * With the following expression extractors
+     *
+     * Outer expressions [s.art_id, 0]
+     * Inner expression  [a.art_id, a.country_id]
+     *
+     * Then we can simply replace a.country_id with 0
+     * since values will be fetched from index and we know
+     * that inner rows coming back are all having a.country_id = 0
+     * and there is no need to evaluate a.country for each inner row
+     * </pre>
+     **/
+    private void constantalizeValueExtractors(List<Expression> outerValueExpressions, List<Expression> innerValueExpressions)
+    {
+        int size = outerValueExpressions.size();
+        for (int i = 0; i < size; i++)
+        {
+            if (outerValueExpressions.get(i).isConstant())
+            {
+                innerValueExpressions.set(i, outerValueExpressions.get(i));
+            }
+            else if (innerValueExpressions.get(i).isConstant())
+            {
+                outerValueExpressions.set(i, innerValueExpressions.get(i));
+            }
+        }
+    }
+
+    /** Wraps provided operation with push down predicate filter for provided alias **/
     private Operator wrapWithPushDown(Context context, Operator operator, String alias)
     {
         Expression pushDownPredicate = context.pushDownPredicateByAlias.remove(alias);
@@ -655,6 +792,7 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
         return operator;
     }
 
+    /** Fetch catalog and resulting qualifed name from provided table */
     private Pair<Catalog, QualifiedName> getCatalogAndTable(Context context, final QualifiedName table)
     {
         requireNonNull(table, "table");

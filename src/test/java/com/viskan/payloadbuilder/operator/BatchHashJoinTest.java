@@ -3,6 +3,7 @@ package com.viskan.payloadbuilder.operator;
 import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.catalog.Index;
+import com.viskan.payloadbuilder.parser.tree.QualifiedName;
 
 import static com.viskan.payloadbuilder.operator.BatchMergeJoinTest.assertRowJoinValues;
 import static java.util.Arrays.asList;
@@ -11,6 +12,7 @@ import static java.util.stream.Collectors.toList;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.Random;
 import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
@@ -19,12 +21,13 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.time.StopWatch;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /** Test {@link BatchHashJoin} */
 public class BatchHashJoinTest extends Assert
 {
-    private final Index index = new Index(asList("col"));
+    private final Index index = new Index(QualifiedName.of("table"), asList("col"));
 
     @Test
     public void test_inner_join_empty_outer()
@@ -43,13 +46,42 @@ public class BatchHashJoinTest extends Assert
                 false,
                 false,
                 index,
-                -1);
+                1);
 
         assertFalse(op.open(new OperatorContext()).hasNext());
     }
 
     @Test
     public void test_inner_join_empty_inner()
+    {
+        TableAlias a = TableAlias.of(null, "table", "a");
+        Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
+        Operator right = context ->
+        {
+            while (context.getOuterIndexValues().hasNext())
+            {
+                context.getOuterIndexValues().next();
+            }
+            return emptyIterator();
+        };
+        BatchHashJoin op = new BatchHashJoin(
+                "",
+                left,
+                right,
+                (ctx, row, values) -> values[0] = row.getObject(0),
+                (ctx, row, values) -> values[0] = row.getObject(0),
+                (ctx, row) -> (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
+                DefaultRowMerger.DEFAULT,
+                false,
+                false,
+                index,
+                1);
+
+        assertFalse(op.open(new OperatorContext()).hasNext());
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void test_bad_implementation_of_inner_operator()
     {
         TableAlias a = TableAlias.of(null, "table", "a");
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
@@ -66,9 +98,68 @@ public class BatchHashJoinTest extends Assert
                 false,
                 false,
                 index,
-                -1);
+                2);
 
-        assertFalse(op.open(new OperatorContext()).hasNext());
+        op.open(new OperatorContext()).hasNext();
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void test_bad_implementation_of_inner_operator_2()
+    {
+        TableAlias a = TableAlias.of(null, "table", "a");
+        Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
+        Operator right = context ->
+        {
+            context.getOuterIndexValues().hasNext();
+            Object[] ar = context.getOuterIndexValues().next();
+            return asList(Row.of(a, 0, ar)).iterator();
+        };
+
+        BatchHashJoin op = new BatchHashJoin(
+                "",
+                left,
+                right,
+                (ctx, row, values) -> values[0] = row.getObject(0),
+                (ctx, row, values) -> values[0] = row.getObject(0),
+                (ctx, row) -> (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
+                DefaultRowMerger.DEFAULT,
+                false,
+                false,
+                index,
+                2);
+
+        op.open(new OperatorContext()).hasNext();
+    }
+    
+    @Test(expected = NoSuchElementException.class)
+    public void test_bad_implementation_of_inner_operator_3()
+    {
+        TableAlias a = TableAlias.of(null, "table", "a");
+        Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
+        Operator right = context ->
+        {
+            while (context.getOuterIndexValues().hasNext())
+            {
+                context.getOuterIndexValues().next();
+            }
+            context.getOuterIndexValues().next();
+            return emptyIterator();
+        };
+
+        BatchHashJoin op = new BatchHashJoin(
+                "",
+                left,
+                right,
+                (ctx, row, values) -> values[0] = row.getObject(0),
+                (ctx, row, values) -> values[0] = row.getObject(0),
+                (ctx, row) -> (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
+                DefaultRowMerger.DEFAULT,
+                false,
+                false,
+                index,
+                2);
+
+        op.open(new OperatorContext()).hasNext();
     }
 
     @Test
@@ -226,7 +317,7 @@ public class BatchHashJoinTest extends Assert
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
-                    .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
+                    .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}, new Object[] {-666, 3}).stream())
                     .map(ar -> Row.of(b, posRight.getAndIncrement(), ar))
                     .iterator();
         };
@@ -248,22 +339,22 @@ public class BatchHashJoinTest extends Assert
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
-                7, 7, 8, 8,   // Batch 1
-                9, 9, 10, 10, // Batch 2
-                11, 11        // Batch 3
+                7, 7, 8, 8,
+                9, 9, 10, 10,
+                11, 11
         };
 
         int[] expectedInnerPositions = new int[] {
-                0, 1, 2, 3, // Batch 1
-                4, 5, 6, 7, // Batch 2
-                8, 9        // Batch 3
+                0, 1, 3, 4,
+                6, 7, 9, 10,
+                12, 13
         };
 
         while (it.hasNext())
         {
             Row row = it.next();
             assertRowJoinValues(row);
-            //            System.out.println(row + " " + row.getChildRows(0));
+            //                        System.out.println(row + " " + row.getChildRows(0));
             assertEquals(expectedOuterPositions[count], row.getPos());
             assertEquals(expectedInnerPositions[count], row.getChildRows(0).get(0).getPos());
             count++;
@@ -1057,7 +1148,7 @@ public class BatchHashJoinTest extends Assert
         assertEquals(24, count);
     }
 
-//            @Ignore
+    @Ignore
     @Test
     public void test_inner_join_large()
     {
@@ -1068,7 +1159,7 @@ public class BatchHashJoinTest extends Assert
         MutableInt bPos = new MutableInt();
         MutableInt cPos = new MutableInt();
 
-        Operator tableA = context -> IntStream.range(1, 400000).mapToObj(i -> Row.of(a, i, new Object[] {i, rnd.nextBoolean()})).iterator();
+        Operator tableA = context -> IntStream.range(1, 1000000).mapToObj(i -> Row.of(a, i, new Object[] {rnd.nextInt(10000), rnd.nextBoolean()})).iterator();
         Operator tableB = context ->
         {
             Iterable<Object[]> it = () -> context.getOuterIndexValues();
@@ -1140,7 +1231,7 @@ public class BatchHashJoinTest extends Assert
             {
                 Row row = it.next();
                 //                assertEquals(4, row.getChildRows(0).size());
-//                                                                System.out.println(row + " " + row.getChildRows(0).stream().map(r -> r.toString() + " " + r.getChildRows(0)).collect(joining(", ")) );
+                //                                                                System.out.println(row + " " + row.getChildRows(0).stream().map(r -> r.toString() + " " + r.getChildRows(0)).collect(joining(", ")) );
                 //            assertEquals("Val" + row.getObject(0), row.getChildRows(0).get(0).getObject(1));
                 count++;
             }

@@ -66,7 +66,7 @@ public class BatchHashJoin implements Operator
             Index innerIndex,
             int batchSize)
     {
-        this.logicalOperator = logicalOperator;
+        this.logicalOperator = requireNonNull(logicalOperator, "logicalOperator");
         this.outer = requireNonNull(outer, "outer");
         this.inner = requireNonNull(inner, "inner");
         this.outerValuesExtractor = requireNonNull(outerValuesExtractor, "outerValuesExtractor");
@@ -92,6 +92,9 @@ public class BatchHashJoin implements Operator
             private int outerRowIndex;
             private List<Row> innerRows;
             private int innerRowIndex;
+
+            /** Reference to outer values iterator to verify that implementations of Operator fully uses the index if specified */
+            private Iterator<Object[]> outerValuesIterator;
 
             /** Table use for hashed inner values */
             private final TIntObjectMap<TableValue> table = new TIntObjectHashMap<>((int) (batchSize * 1.5));
@@ -126,20 +129,7 @@ public class BatchHashJoin implements Operator
                     // Populating mode
                     if (emitOuterRows)
                     {
-                        // Complete
-                        if (outerRowIndex > outerRows.size() - 1)
-                        {
-                            clearOuterRows();
-                            continue;
-                        }
-
-                        Row row = outerRows.get(outerRowIndex);
-                        if (row.match || emitEmptyOuterRows)
-                        {
-                            next = row;
-                        }
-
-                        outerRowIndex++;
+                        emitOuterRows();
                         continue;
                     }
 
@@ -148,6 +138,7 @@ public class BatchHashJoin implements Operator
                         batchOuterRows();
                         if (outerRows.isEmpty())
                         {
+                            verifyOuterValuesIterator();
                             return false;
                         }
 
@@ -177,8 +168,8 @@ public class BatchHashJoin implements Operator
                         outerRow = outerRows.get(outerRowIndex);
 
                         TableValue tableValue = table.get(outerRow.hash);
-                        innerRows = tableValue != null ? tableValue.rows : null;
-                        if (innerRows == null || innerRows.isEmpty())
+                        innerRows = tableValue.getRows();
+                        if (innerRows.isEmpty())
                         {
                             if (!populating && emitEmptyOuterRows)
                             {
@@ -243,7 +234,8 @@ public class BatchHashJoin implements Operator
 
             private void hashInnerBatch()
             {
-                context.setIndex(innerIndex, outerValuesIterator(context.getEvaluationContext()));
+                outerValuesIterator = outerValuesIterator(context.getEvaluationContext());
+                context.setIndex(innerIndex, outerValuesIterator);
                 Iterator<Row> it = inner.open(context);
 
                 // Hash batch
@@ -254,13 +246,40 @@ public class BatchHashJoin implements Operator
                     TableValue tableValue = table.get(hash);
                     if (tableValue == null)
                     {
-                        // No key exists table for row, no need to add it
+                        // No outer row exists for this inner rows hash, no need to add it
                         continue;
                     }
-                    tableValue.rows.add(row);
+                    tableValue.addRow(row);
                 }
                 
+                verifyOuterValuesIterator();
                 context.setIndex(null, null);
+            }
+            
+            private void emitOuterRows()
+            {
+                // Complete
+                if (outerRowIndex > outerRows.size() - 1)
+                {
+                    clearOuterRows();
+                    return;
+                }
+
+                Row row = outerRows.get(outerRowIndex);
+                if (row.match || emitEmptyOuterRows)
+                {
+                    next = row;
+                }
+
+                outerRowIndex++;
+            }
+            
+            private void verifyOuterValuesIterator()
+            {
+                if (outerValuesIterator != null && outerValuesIterator.hasNext())
+                {
+                    throw new IllegalArgumentException("Check implementation of operator with index: " + innerIndex + " not all outer values was processed.");
+                }
             }
 
             private void clearOuterRows()
@@ -326,7 +345,7 @@ public class BatchHashJoin implements Operator
                             
                             if (!tableValue.addInnterValues(keyValues))
                             {
-                                // Value already present, no need to return values to downstream
+                                // Value already present, no need to push values to downstream
                                 continue;
                             }
 
@@ -338,6 +357,19 @@ public class BatchHashJoin implements Operator
                 };
             }
         };
+    }
+    
+    private int hash(Object[] values)
+    {
+        int result = 1;
+
+        int length = values.length;
+        for (int i = 0; i < length; i++)
+        {
+            Object value = values[i];
+            result = 31 * result + (value == null ? 0 : value.hashCode());
+        }
+        return result;
     }
 
     @Override
@@ -353,14 +385,17 @@ public class BatchHashJoin implements Operator
     {
         if (obj instanceof BatchHashJoin)
         {
-            BatchHashJoin mj = (BatchHashJoin) obj;
-            return outer.equals(mj.outer)
-                && inner.equals(mj.inner)
-                && outerValuesExtractor.equals(mj.outerValuesExtractor)
-                && innerValuesExtractor.equals(mj.innerValuesExtractor)
-                && predicate.equals(mj.predicate)
-                && populating == mj.populating
-                && emitEmptyOuterRows == mj.emitEmptyOuterRows;
+            BatchHashJoin that = (BatchHashJoin) obj;
+            return logicalOperator.equals(that.logicalOperator)
+                && outer.equals(that.outer)
+                && inner.equals(that.inner)
+                && outerValuesExtractor.equals(that.outerValuesExtractor)
+                && innerValuesExtractor.equals(that.innerValuesExtractor)
+                && predicate.equals(that.predicate)
+                && rowMerger.equals(that.rowMerger)
+                && populating == that.populating
+                && emitEmptyOuterRows == that.emitEmptyOuterRows
+                && batchSize == that.batchSize;
         }
         return false;
     }
@@ -369,12 +404,15 @@ public class BatchHashJoin implements Operator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        String description = String.format("BATCH HASH JOIN (%s) (POPULATING: %s, OUTER: %s, EXECUTION COUNT: %s, BATCH SIZE: %s, PREDICATE: %s)",
+        String description = String.format("BATCH HASH JOIN (%s) (POPULATING: %s, OUTER: %s, EXECUTION COUNT: %s, BATCH SIZE: %s, INDEX: %s, OUTER VALUES: %s, INNER VALUES: %s, PREDICATE: %s)",
                 logicalOperator,
                 populating,
                 emitEmptyOuterRows,
                 executionCount,
                 batchSize,
+                innerIndex,
+                outerValuesExtractor,
+                innerValuesExtractor,
                 predicate);
         return description + System.lineSeparator()
             +
@@ -382,12 +420,12 @@ public class BatchHashJoin implements Operator
             +
             indentString + inner.toString(indent + 1);
     }
-
+    
     /** Value used in table */
     private static class TableValue
     {
-        final List<Row> rows = new ArrayList<>();
-        final List<Object[]> values = new ArrayList<>();
+        private List<Row> rows;
+        private List<Object[]> values;
 
         /** Check if provided key exists in values */
         private boolean contains(Object[] keyValues)
@@ -403,11 +441,30 @@ public class BatchHashJoin implements Operator
             return false;
         }
 
+        public void addRow(Row row)
+        {
+            if (rows == null)
+            {
+                rows = new ArrayList<>();
+            }
+            
+            rows.add(row);
+        }
+
+        public List<Row> getRows()
+        {
+            return rows != null ? rows : emptyList();
+        }
+
         /** Add inner values array
          * @return True if array was added */
         boolean addInnterValues(Object[] keyValues)
         {
-            if (contains(keyValues))
+            if (values == null)
+            {
+                values = new ArrayList<>();
+            }
+            else if (contains(keyValues))
             {
                 return false;
             }
@@ -415,18 +472,5 @@ public class BatchHashJoin implements Operator
             values.add(Arrays.copyOf(keyValues, keyValues.length));
             return true;
         }
-    }
-
-    private static int hash(Object[] values)
-    {
-        int result = 1;
-
-        int length = values.length;
-        for (int i = 0; i < length; i++)
-        {
-            Object value = values[i];
-            result = 31 * result + (value == null ? 0 : value.hashCode());
-        }
-        return result;
     }
 }

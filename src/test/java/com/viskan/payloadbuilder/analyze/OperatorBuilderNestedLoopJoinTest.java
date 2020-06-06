@@ -37,6 +37,9 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorBuilderTest
                 DefaultRowMerger.DEFAULT,
                 false,
                 false);
+
+//        System.out.println(expected.toString(1));
+//        System.err.println( result.operator.toString(1));
         
         assertEquals(expected, result.operator);
 

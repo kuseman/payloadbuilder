@@ -5,6 +5,9 @@ import com.viskan.payloadbuilder.codegen.CodeGeneratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
 import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 
+import static com.viskan.payloadbuilder.parser.tree.LiteralBooleanExpression.FALSE_LITERAL;
+import static com.viskan.payloadbuilder.parser.tree.LiteralBooleanExpression.TRUE_LITERAL;
+import static com.viskan.payloadbuilder.parser.tree.LiteralNullExpression.NULL_LITERAL;
 import static java.util.Objects.requireNonNull;
 
 public class LogicalNotExpression extends Expression
@@ -19,6 +22,28 @@ public class LogicalNotExpression extends Expression
     public Expression getExpression()
     {
         return expression;
+    }
+    
+    @Override
+    public boolean isConstant()
+    {
+        return expression.isConstant();
+    }
+    
+    @Override
+    public Expression fold()
+    {
+        if (expression instanceof LiteralNullExpression)
+        {
+            return NULL_LITERAL;
+        }
+        else if (expression instanceof LiteralBooleanExpression)
+        {
+            boolean value = ((LiteralBooleanExpression) expression).getValue();
+            return value ? FALSE_LITERAL : TRUE_LITERAL;
+        }
+
+        return this;
     }
     
     @Override

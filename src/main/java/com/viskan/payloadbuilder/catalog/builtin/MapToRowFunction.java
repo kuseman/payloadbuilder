@@ -41,7 +41,7 @@ class MapToRowFunction extends TableFunctionInfo
     public Iterator<Row> open(OperatorContext context, TableAlias tableAlias, List<Object> arguments)
     {
         final Object value = arguments.get(0);
-        final Iterator it = IteratorUtils.getIterator(value);
+        final Iterator<Object> it = IteratorUtils.getIterator(value);
         return new Iterator<Row>()
         {
             int length = tableAlias.getColumns().length;

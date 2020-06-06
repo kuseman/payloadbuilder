@@ -75,10 +75,9 @@ public class QualifiedFunctionCallExpression extends Expression
     {
         if (obj instanceof QualifiedFunctionCallExpression)
         {
-            QualifiedFunctionCallExpression qfce = (QualifiedFunctionCallExpression) obj;
-            return functionInfo.equals(qfce.functionInfo)
-                &&
-                arguments.equals(qfce.arguments);
+            QualifiedFunctionCallExpression that = (QualifiedFunctionCallExpression) obj;
+            return functionInfo.equals(that.functionInfo)
+                && arguments.equals(that.arguments);
         }
         return false;
     }

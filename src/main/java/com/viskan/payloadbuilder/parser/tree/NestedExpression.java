@@ -22,6 +22,18 @@ public class NestedExpression extends Expression
     }
     
     @Override
+    public boolean isConstant()
+    {
+        return expression.isConstant();
+    }
+    
+    @Override
+    public Expression fold()
+    {
+        return expression.fold();
+    }
+    
+    @Override
     public boolean isNullable()
     {
         return expression.isNullable();

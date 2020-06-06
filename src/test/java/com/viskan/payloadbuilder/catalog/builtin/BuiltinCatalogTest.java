@@ -93,6 +93,7 @@ public class BuiltinCatalogTest extends Assert
         assertFunction(asList(null, null, null, null), row, "a.flatMap(l -> a).filter(a -> a IS NULL)");
     }
 
+    @SuppressWarnings("unchecked")
     private void assertFunction(Object expected, Row row, String expression)
     {
         TableAlias alias = row == null ? TableAlias.of(null, "table", "t") : row.getTableAlias();
@@ -103,7 +104,7 @@ public class BuiltinCatalogTest extends Assert
         actual = codeGenerator.generateFunction(alias, e).apply(row);
         if (actual instanceof Iterator)
         {
-            actual = IteratorUtils.toList((Iterator) actual);
+            actual = IteratorUtils.toList((Iterator<Object>) actual);
         }
 
         assertEquals("Code gen", expected, actual);
@@ -111,7 +112,7 @@ public class BuiltinCatalogTest extends Assert
         actual = e.eval(new EvaluationContext(), row);
         if (actual instanceof Iterator)
         {
-            actual = IteratorUtils.toList((Iterator) actual);
+            actual = IteratorUtils.toList((Iterator<Object>) actual);
         }
 
         assertEquals("Eval", expected, actual);

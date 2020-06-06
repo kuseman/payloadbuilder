@@ -21,7 +21,7 @@ public class IteratorUtils
     }
 
     /** Get iterator from provided object */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public static <T> Iterator<T> getIterator(Object obj)
     {
         if (obj instanceof Iterator)

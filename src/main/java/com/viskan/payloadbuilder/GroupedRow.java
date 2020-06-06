@@ -22,6 +22,7 @@ public class GroupedRow extends Row
         super.tableAlias = rows.get(0).getTableAlias();
     }
     
+    @SuppressWarnings("rawtypes")
     @Override
     public Object getObject(int ordinal)
     {

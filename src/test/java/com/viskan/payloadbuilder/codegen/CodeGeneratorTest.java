@@ -369,8 +369,8 @@ public class CodeGeneratorTest extends Assert
         };
 
         TableAlias alias = TableAlias.of(null, "article", "a");
-        alias.setColumns(new String[] {"a", "b", "c"});
-        Row row = Row.of(alias, 0, new Object[] {true, false, null});
+        alias.setColumns(new String[] {"a", "b", "c", "d"});
+        Row row = Row.of(alias, 0, new Object[] {true, false, null, 10});
 
         int index = 0;
         for (String l : expression)
@@ -387,8 +387,8 @@ public class CodeGeneratorTest extends Assert
         assertExpression(false, row, "not (1 > 0)");
 
         // Test different types
-        assertFail(IllegalArgumentException.class, "true and 10");
-        assertFail(IllegalArgumentException.class, "true or 10");
+        assertFail(ClassCastException.class, row, "a and d");
+        assertFail(ClassCastException.class, row, "b or d");
     }
 
     @Test
@@ -631,10 +631,15 @@ public class CodeGeneratorTest extends Assert
 
     private void assertFail(Class<? extends Exception> e, String expression)
     {
+        assertFail(e, null, expression);
+    }
+    
+    private void assertFail(Class<? extends Exception> e, Row row, String expression)
+    {
         try
         {
             Expression expr = parser.parseExpression(catalogRegistry, expression);
-            codeGenerator.generateFunction(null, expr).apply(null);
+            codeGenerator.generateFunction(null, expr).apply(row);
             fail(expression + " should fail.");
         }
         catch (Exception ee)

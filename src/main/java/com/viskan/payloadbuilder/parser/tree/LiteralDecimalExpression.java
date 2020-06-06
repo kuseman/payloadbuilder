@@ -12,7 +12,7 @@ public class LiteralDecimalExpression extends LiteralExpression
         this(Double.parseDouble(value));
     }
     
-    private LiteralDecimalExpression(double value)
+    LiteralDecimalExpression(double value)
     {
         super(value);
         this.value = value;

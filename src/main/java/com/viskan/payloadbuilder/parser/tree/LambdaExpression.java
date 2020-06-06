@@ -43,7 +43,13 @@ public class LambdaExpression extends Expression
     {
         return lambdaIds;
     }
-
+    
+    @Override
+    public boolean isConstant()
+    {
+        return expression.isConstant();
+    }
+    
     @Override
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {

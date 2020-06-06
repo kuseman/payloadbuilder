@@ -12,7 +12,7 @@ public class LiteralNumericExpression extends LiteralExpression
         this(Long.parseLong(value));
     }
     
-    private LiteralNumericExpression(long value)
+    LiteralNumericExpression(long value)
     {
         super(value);
         this.value = value;
