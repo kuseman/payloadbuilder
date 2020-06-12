@@ -20,4 +20,5 @@ public interface ExpressionVisitor<TR, TC>
     TR visit(QualifiedFunctionCallExpression expression, TC context);
     TR visit(DereferenceExpression expression, TC context);
     TR visit(LambdaExpression expression, TC context);
+    TR visit(NamedParameterExpression expression, TC context);
 }

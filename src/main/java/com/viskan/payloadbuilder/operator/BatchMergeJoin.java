@@ -162,8 +162,13 @@ public class BatchMergeJoin implements Operator
                         emitOuterRows();
                         continue;
                     }
+                    
+//                    if (outerRows != null && outerRows.size() == 0)
+//                    {
+//                        System.out.println();
+//                    }
 
-                    if (outerRows == null)
+                    if (outerRows == null || outerRows.isEmpty())
                     {
                         batchOuterRows();
                         if (outerRows.isEmpty())
@@ -189,10 +194,17 @@ public class BatchMergeJoin implements Operator
                             continue;
                         }
                     }
-
+                    
                     outerIndex = Math.min(outerIndex, outerRows.size() - 1);
+                    try
+                    {
                     outerRow = outerRows.get(outerIndex);
-
+                    }
+                    catch (IndexOutOfBoundsException e)
+                    {
+                        System.out.println();
+                    }
+                    
                     if (innerRow == null)
                     {
                         innerRow = innerIt.hasNext() ? innerIt.next() : null;

@@ -810,6 +810,19 @@ public final class ExpressionMath
             {
                 return true;
             }
+            
+        }
+        else if (value instanceof Collection)
+        {
+            if (((Collection<Object>) value).contains(arg))
+            {
+                return true;
+            }
+            
+            if (arg instanceof Long && ((Collection<Object>) value).contains(((Long) arg).intValue()))
+            {
+                return true;
+            }
         }
         else if (eq(value, arg, false))
         {

@@ -111,7 +111,7 @@ public class Row
         List<Row> rows = childRows[index];
         if (rows == null)
         {
-            rows = new ArrayList<>(50);
+            rows = new ArrayList<>();
             childRows[index] = rows;
         }
         

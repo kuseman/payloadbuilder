@@ -118,7 +118,9 @@ public class QualifiedReferenceExpression extends Expression
         
         return result;
     }
-
+    
+    private int columnIndex = -2;
+    
     @Override
     public Object eval(EvaluationContext evaluationContext, Row row)
     {
@@ -148,6 +150,29 @@ public class QualifiedReferenceExpression extends Expression
             return value;
         }
 
+        if (qname.getParts().size() == 2)
+        {
+            TableAlias tableAlias = row.getTableAlias();
+            TableAlias parentTableAlias = tableAlias.getParent();
+            String alias = qname.getAlias();
+            if (alias.equals(tableAlias.getAlias()))
+            {
+                if (columnIndex == -2)
+                {
+                    columnIndex = ArrayUtils.indexOf(row.getTableAlias().getColumns(), qname.getLast());
+                }
+                return row.getObject(columnIndex);
+            }
+            else if (parentTableAlias != null && alias.equals(parentTableAlias.getAlias()))
+            {
+                if (columnIndex == -2)
+                {
+                    columnIndex = ArrayUtils.indexOf(parentTableAlias.getColumns(), qname.getLast());
+                }
+                return row.getParent().getObject(columnIndex);
+            }
+        }
+        
         return getValue(row, qname.getParts());
         //        QualifiedReferenceContainer container = evaluationContext.getContainer(qname, uniqueId);
         //        return container.getValue(row);

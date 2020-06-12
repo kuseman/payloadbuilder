@@ -135,6 +135,7 @@ public class BatchHashJoin implements Operator
 
                     if (outerRows == null)
                     {
+                        table.clear();
                         batchOuterRows();
                         if (outerRows.isEmpty())
                         {
@@ -180,6 +181,9 @@ public class BatchHashJoin implements Operator
                             outerRowIndex++;
                             continue;
                         }
+                        
+//                        System.out.println(innerRows.size());
+                        
                     }
                     else if (innerRowIndex >= innerRows.size())
                     {

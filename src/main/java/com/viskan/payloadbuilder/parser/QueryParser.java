@@ -20,6 +20,7 @@ import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.LambdaExpressi
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.LiteralContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.LogicalBinaryContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.LogicalNotContext;
+import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.NamedParameterContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.NestedExpressionContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.NullPredicateContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.PopulateQueryContext;
@@ -52,6 +53,7 @@ import com.viskan.payloadbuilder.parser.tree.LiteralNumericExpression;
 import com.viskan.payloadbuilder.parser.tree.LiteralStringExpression;
 import com.viskan.payloadbuilder.parser.tree.LogicalBinaryExpression;
 import com.viskan.payloadbuilder.parser.tree.LogicalNotExpression;
+import com.viskan.payloadbuilder.parser.tree.NamedParameterExpression;
 import com.viskan.payloadbuilder.parser.tree.NestedExpression;
 import com.viskan.payloadbuilder.parser.tree.NestedSelectItem;
 import com.viskan.payloadbuilder.parser.tree.NullPredicateExpression;
@@ -313,6 +315,12 @@ public class QueryParser
             Integer lambdaId = lambdaParameters.get(qname.getFirst());
             return new QualifiedReferenceExpression(qname, lambdaId != null ? lambdaId.intValue() : -1);
         }
+        
+        @Override
+        public Object visitNamedParameter(NamedParameterContext ctx)
+        {
+            return new NamedParameterExpression(getIdentifier(ctx.identifier()));
+        }
 
         @Override
         public Object visitFunctionCallExpression(FunctionCallExpressionContext ctx)
@@ -512,7 +520,7 @@ public class QueryParser
         @Override
         public Object visitInExpression(InExpressionContext ctx)
         {
-            return new InExpression(getExpression(ctx.expression(0)), ctx.expression().stream().skip(1).map(e -> getExpression(e)).collect(toList()));
+            return new InExpression(getExpression(ctx.expression(0)), ctx.expression().stream().skip(1).map(e -> getExpression(e)).collect(toList()), ctx.NOT() != null);
         }
 
         @Override

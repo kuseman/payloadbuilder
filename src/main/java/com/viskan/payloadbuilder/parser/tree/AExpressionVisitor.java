@@ -49,6 +49,12 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
     {
         return defaultResult(context);
     }
+    
+    @Override
+    public TR visit(NamedParameterExpression expression, TC context)
+    {
+        return defaultResult(context);
+    }
 
     @Override
     public TR visit(ComparisonExpression expression, TC context)

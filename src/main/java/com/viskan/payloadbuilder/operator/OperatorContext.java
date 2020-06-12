@@ -4,11 +4,23 @@ import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.catalog.Index;
 import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 
 /** Context used during selection of operator tree */
 public class OperatorContext
 {
+    public Map<String, Object> data = new HashMap<>();
+    
+    public OperatorContext()
+    {}
+    
+    public OperatorContext(Map<String, Object> params)
+    {
+        evaluationContext.setParameters(params);
+    }
+    
     /** Context used when evaluating expressions */
     private final EvaluationContext evaluationContext = new EvaluationContext();
     

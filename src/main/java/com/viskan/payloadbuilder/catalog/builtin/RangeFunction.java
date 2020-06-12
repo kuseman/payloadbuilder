@@ -6,6 +6,8 @@ import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.TableFunctionInfo;
 import com.viskan.payloadbuilder.operator.OperatorContext;
 
+import static java.util.Objects.requireNonNull;
+
 import java.util.Iterator;
 import java.util.List;
 import java.util.stream.IntStream;
@@ -34,13 +36,13 @@ class Range extends TableFunctionInfo
         // to
         if (arguments.size() <= 1)
         {
-            to = ((Number) arguments.get(0)).intValue();
+            to = ((Number) requireNonNull(arguments.get(0), "From argument to range cannot be null.")).intValue();
         }
         // from, to
         else if (arguments.size() <= 2)
         {
-            from = ((Number) arguments.get(0)).intValue();
-            to = ((Number) arguments.get(1)).intValue();
+            from = ((Number) requireNonNull(arguments.get(0), "From argument to range cannot be null.")).intValue();
+            to = ((Number) requireNonNull(arguments.get(1), "To argument to range cannot be null.")).intValue();
         }
         return IntStream.range(from, to).mapToObj(i -> Row.of(tableAlias, i, new Object[] {i})).iterator();
     }

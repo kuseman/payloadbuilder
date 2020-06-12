@@ -60,6 +60,12 @@
             <artifactId>janino</artifactId>
             <version>3.1.2</version>
         </dependency>
+        
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>4.5.12</version>
+        </dependency>
 
          <!-- TEST -->
          <dependency>
@@ -78,6 +84,30 @@
             <artifactId>rsyntaxtextarea</artifactId>
             <version>3.0.8</version>
         </dependency>
+         <dependency>
+            <groupId>com.fifesoft</groupId>
+            <artifactId>rsyntaxtextarea</artifactId>
+            <version>3.0.8</version>
+        </dependency>
+        
+         <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+            <version>1.7.30</version>
+            <scope>test</scope>
+        </dependency>
+    <dependency>
+        <groupId>de.ruedigermoeller</groupId>
+        <artifactId>fst</artifactId>
+        <version>2.57</version>
+    </dependency>
+
+<dependency>
+    <groupId>com.hazelcast</groupId>
+    <artifactId>hazelcast-client</artifactId>
+    <version>3.12.7</version>
+</dependency>
+        
     </dependencies>
 
     <build>

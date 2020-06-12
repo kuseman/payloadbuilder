@@ -92,6 +92,7 @@ primary
  | '(' identifier (',' identifier)+ ')' '->' expression  	#lambdaExpression
  | value=primary '[' index=expression ']'    				#subscript	
  | qname													#columnReference
+ | namedParameter											#namedParameterExpression
  | left=primary '.' (functionCall | qname)					#dereference	
  | '(' expression ')' 										#nestedExpression			
  ;
@@ -106,6 +107,10 @@ literal
  | numericLiteral											
  | decimalLiteral											
  | stringLiteral											
+ ;
+ 
+namedParameter
+ : COLON identifier
  ;
  
 compareOperator
@@ -124,6 +129,7 @@ qname
 identifier
  : IDENTIFIER
  | QUOTED_IDENTIFIER
+ | nonReserved
  ;
  
 numericLiteral
@@ -142,7 +148,12 @@ booleanLiteral
  : TRUE | FALSE 
  ;
  
+nonReserved
+ : FROM
+ ;
+ 
 // Tokens
+
 AND		: A N D;
 ARRAY	: A R R A Y;
 AS		: A S;
@@ -175,6 +186,7 @@ TRUE	: T R U E;
 WHERE	: W H E R E;
 
 ASTERISK			: '*';
+COLON				: ':';
 EQUALS				: '=';
 EXCLAMATION			: '!';
 GREATERTHAN			: '>';
@@ -200,12 +212,12 @@ STRING
  : '\'' ( ~'\'' | '\'\'' )* '\''
  ;
 
-QUOTED_IDENTIFIER
- : '"' ( ~'"' | '""' )* '"'
- ;
-
 IDENTIFIER
  : (LETTER | '_') (LETTER | DIGIT | '_' | '@')*
+ ;
+
+QUOTED_IDENTIFIER
+ : '"' ( ~'"' | '""' )* '"'
  ;
 
 LINE_COMMENT

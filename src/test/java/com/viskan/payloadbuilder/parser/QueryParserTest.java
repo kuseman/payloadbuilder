@@ -49,6 +49,7 @@ public class QueryParserTest extends Assert
         assertQuery("select art_id from article a cross apply articleAttribute aa");
         assertQuery("select art_id from article a outer apply articleAttribute aa");
         assertQuery("select art_id from article a outer apply range(10) r");
+        assertQuery("select art_id from article a outer apply range(:from) r");
         
         // Populate joins
         assertQuery("select art_id from article a inner join [articleAttribute] aa on aa.art_id = a.art_id ");
@@ -86,6 +87,8 @@ public class QueryParserTest extends Assert
         assertExpression("a != 1");
         assertExpression("not a != 1");
         assertExpression("not a in (1,1,true,2,3.,3,null,false)");
+        assertExpression(":value > 10 AND :value_two < 20");
+        
     }
 
     @Test

@@ -628,7 +628,7 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
                 populating,
                 emitEmptyOuterRows,
                 index,
-                100);
+                3500);
 
         // If outer is sorted on index keys (fully or partly)
         //

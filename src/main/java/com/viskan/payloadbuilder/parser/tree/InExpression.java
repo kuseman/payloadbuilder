@@ -18,9 +18,11 @@ public class InExpression extends Expression
 {
     private final Expression expression;
     private final List<Expression> arguments;
+    private final boolean not;
 
-    public InExpression(Expression expression, List<Expression> arguments)
+    public InExpression(Expression expression, List<Expression> arguments, boolean not)
     {
+        this.not = not;
         this.expression = requireNonNull(expression, "expression");
         this.arguments = requireNonNull(arguments, "arguments");
     }

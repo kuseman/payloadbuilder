@@ -5,7 +5,9 @@ import com.viskan.payloadbuilder.parser.tree.QualifiedReferenceExpression.Qualif
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -15,6 +17,7 @@ public class EvaluationContext
     private final long now = System.currentTimeMillis();
     private List<Object> lambdaValues;
     private List<QualifiedReferenceContainer> qualifiedContainers;
+    private Map<String, Object> parameters = new HashMap<>();
 
     public long getNow()
     {
@@ -89,5 +92,17 @@ public class EvaluationContext
             list.set(itemIndex, item);
         }
         return item;
+    }
+
+    /** Return value for named parameter */
+    public Object getParameterValue(String name)
+    {
+        return parameters.get(name);
+    }
+
+    /** Set parameters */
+    public void setParameters(Map<String, Object> params)
+    {
+        parameters = params;
     }
 }
