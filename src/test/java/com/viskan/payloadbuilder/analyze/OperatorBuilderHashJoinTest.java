@@ -33,6 +33,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorBuilderTest
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
         Operator expected = new HashJoin(
+                2,
                 "",
                 result.tableOperators.get(0),
                 result.tableOperators.get(1),
@@ -68,6 +69,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorBuilderTest
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
         Operator expected = new HashJoin(
+                2,
                 "",
                 result.tableOperators.get(0),
                 result.tableOperators.get(1),
@@ -103,6 +105,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorBuilderTest
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
         Operator expected = new HashJoin(
+                2,
                 "",
                 result.tableOperators.get(0),
                 result.tableOperators.get(1),
@@ -138,6 +141,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorBuilderTest
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
         Operator expected = new HashJoin(
+                2,
                 "",
                 result.tableOperators.get(0),
                 result.tableOperators.get(1),
@@ -170,10 +174,12 @@ public class OperatorBuilderHashJoinTest extends AOperatorBuilderTest
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
         Operator expected = new FilterOperator(
+                5,
                 new HashJoin(
+                        4,
                         "",
-                        new FilterOperator(result.tableOperators.get(0), new ExpressionPredicate(e("s.id3 > 0"))),
-                        new FilterOperator(result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg AND note_id > 0"))),
+                        new FilterOperator(1, result.tableOperators.get(0), new ExpressionPredicate(e("s.id3 > 0"))),
+                        new FilterOperator(3, result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg AND note_id > 0"))),
                         new ExpressionHashFunction(asList(e("s.art_id"))),
                         new ExpressionHashFunction(asList(e("a.art_id"))),
                         new ExpressionPredicate(e("a.art_id = s.art_id")),

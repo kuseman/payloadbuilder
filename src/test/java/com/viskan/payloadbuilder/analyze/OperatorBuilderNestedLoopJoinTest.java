@@ -30,9 +30,10 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorBuilderTest
         assertTrue(source.isEqual(result.alias));
 
         Operator expected = new NestedLoopJoin(
+                4,
                 "",
                 result.tableOperators.get(0),
-                new CachingOperator(new FilterOperator(result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg")))),
+                new CachingOperator(3, new FilterOperator(2, result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg")))),
                 new ExpressionPredicate(e("a.art_id = s.art_id or s.id1 > 0")),
                 DefaultRowMerger.DEFAULT,
                 false,
@@ -60,9 +61,10 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorBuilderTest
         assertTrue(source.isEqual(result.alias));
 
         Operator expected = new NestedLoopJoin(
+                4,
                 "",
                 result.tableOperators.get(0),
-                new CachingOperator(new FilterOperator(result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg AND a.internet_flg")))),
+                new CachingOperator(3, new FilterOperator(2, result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg AND a.internet_flg")))),
                 new ExpressionPredicate(e("a.art_id = s.art_id or s.id1 > 0")),
                 DefaultRowMerger.DEFAULT,
                 true,

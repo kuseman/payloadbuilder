@@ -30,9 +30,10 @@ public class OperatorBuilderApplyTest extends AOperatorBuilderTest
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
         Operator expected = new NestedLoopJoin(
+                3,
                 "",
                 result.tableOperators.get(0),
-                new CachingOperator(result.tableOperators.get(1)),
+                new CachingOperator(2, result.tableOperators.get(1)),
                 null,
                 DefaultRowMerger.DEFAULT,
                 false,
@@ -60,9 +61,10 @@ public class OperatorBuilderApplyTest extends AOperatorBuilderTest
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
         Operator expected = new NestedLoopJoin(
+                3,
                 "",
                 result.tableOperators.get(0),
-                new CachingOperator(result.tableOperators.get(1)),
+                new CachingOperator(2, result.tableOperators.get(1)),
                 null,
                 DefaultRowMerger.DEFAULT,
                 true,
@@ -93,9 +95,10 @@ public class OperatorBuilderApplyTest extends AOperatorBuilderTest
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
         Operator expected = new NestedLoopJoin(
+                3,
                 "",
                 result.tableOperators.get(0),
-                new CachingOperator(result.tableOperators.get(1)),
+                new CachingOperator(2, result.tableOperators.get(1)),
                 null,
                 DefaultRowMerger.DEFAULT,
                 false,
@@ -123,9 +126,10 @@ public class OperatorBuilderApplyTest extends AOperatorBuilderTest
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
         Operator expected = new NestedLoopJoin(
+                3,
                 "",
                 result.tableOperators.get(0),
-                new CachingOperator(result.tableOperators.get(1)),
+                new CachingOperator(2, result.tableOperators.get(1)),
                 null,
                 DefaultRowMerger.DEFAULT,
                 true,

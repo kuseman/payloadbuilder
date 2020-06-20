@@ -1,18 +1,18 @@
 package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.catalog.Index;
 import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.function.Supplier;
+
+import gnu.trove.map.TIntObjectMap;
+import gnu.trove.map.hash.TIntObjectHashMap;
 
 /** Context used during selection of operator tree */
 public class OperatorContext
 {
-    public Map<String, Object> data = new HashMap<>();
-    
     public OperatorContext()
     {}
     
@@ -24,12 +24,12 @@ public class OperatorContext
     /** Context used when evaluating expressions */
     private final EvaluationContext evaluationContext = new EvaluationContext();
     
+    /** Stores node unique data by node's unique id */
+    private final TIntObjectMap<Object> nodeDataById = new TIntObjectHashMap<>();
+    
     /** Reference to parent row. Used in projections, correlated sub queries */
     private Row parentRow;
     
-    /** Hint for table operator to use index. Used in conjunction with {@link #outerIndexValues} */
-    private Index index;
- 
     /** Iterator of outer row values used when having an indexed inner operator in Batched operators */
     private Iterator<Object[]> outerIndexValues;
     
@@ -48,19 +48,34 @@ public class OperatorContext
         return evaluationContext;
     }
     
-    public Index getIndex()
-    {
-        return index;
-    }
-    
     public Iterator<Object[]> getOuterIndexValues()
     {
         return outerIndexValues;
     }
     
-    public void setIndex(Index index, Iterator<Object[]> outerIndexValues)
+    public void setOuterIndexValues(Iterator<Object[]> outerIndexValues)
     {
-        this.index = index;
         this.outerIndexValues = outerIndexValues;
+    }
+    
+    @SuppressWarnings("unchecked")
+    public <T extends NodeData> T getNodeData(int nodeId, Supplier<T> creator)
+    {
+        Object data = nodeDataById.get(nodeId);
+        if (data == null)
+        {
+            data = creator.get();
+            nodeDataById.put(nodeId, data);
+        }
+        
+        T result = (T) data;
+        result.executionCount++;
+        return result;
+    }
+    
+    /** Base class for node data. */
+    public static class NodeData
+    {
+        int executionCount;
     }
 }

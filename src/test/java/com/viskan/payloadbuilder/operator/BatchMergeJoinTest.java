@@ -24,7 +24,7 @@ import org.junit.Test;
 /** Test {@link BatchMergeJoin} */
 public class BatchMergeJoinTest extends Assert
 {
-    private final Index index = new Index(QualifiedName.of("table"), asList("col"));
+    private final Index index = new Index(QualifiedName.of("table"), asList("col"), 10);
 
     @Test
     public void test_inner_join_empty_outer()
@@ -33,7 +33,7 @@ public class BatchMergeJoinTest extends Assert
         Operator right = context -> emptyIterator();
 
         BatchMergeJoin op = new BatchMergeJoin(
-                "",
+                0, "",
                 left,
                 right,
                 (ctx, row, values) -> values[0] = row.getObject(0),
@@ -63,7 +63,7 @@ public class BatchMergeJoinTest extends Assert
         };
 
         BatchMergeJoin op = new BatchMergeJoin(
-                "",
+                0, "",
                 left,
                 right,
                 (ctx, row, values) -> values[0] = row.getObject(0),
@@ -86,7 +86,7 @@ public class BatchMergeJoinTest extends Assert
         Operator right = context -> emptyIterator();
 
         BatchMergeJoin op = new BatchMergeJoin(
-                "",
+                0, "",
                 left,
                 right,
                 (ctx, row, values) -> values[0] = row.getObject(0),
@@ -117,7 +117,7 @@ public class BatchMergeJoinTest extends Assert
         };
 
         BatchMergeJoin op = new BatchMergeJoin(
-                "",
+                0, "",
                 left,
                 right,
                 (ctx, row, values) -> values[0] = row.getObject(0),
@@ -155,7 +155,7 @@ public class BatchMergeJoinTest extends Assert
         };
 
         BatchMergeJoin op = new BatchMergeJoin(
-                "",
+                0, "",
                 left,
                 right,
                 (ctx, row, values) -> values[0] = row.getObject(0),
@@ -219,7 +219,7 @@ public class BatchMergeJoinTest extends Assert
         };
 
         BatchMergeJoin op = new BatchMergeJoin(
-                "",
+                0, "",
                 left,
                 right,
                 (ctx, row, values) -> values[0] = row.getObject(0),
@@ -289,7 +289,7 @@ public class BatchMergeJoinTest extends Assert
         };
 
         BatchMergeJoin op = new BatchMergeJoin(
-                "",
+                0, "",
                 left,
                 right,
                 (ctx, row, values) -> values[0] = row.getObject(0),
@@ -350,7 +350,7 @@ public class BatchMergeJoinTest extends Assert
         };
 
         BatchMergeJoin op = new BatchMergeJoin(
-                "",
+                0, "",
                 left,
                 right,
                 (ctx, row, values) -> values[0] = row.getObject(0),
@@ -425,7 +425,7 @@ public class BatchMergeJoinTest extends Assert
         };
 
         BatchMergeJoin op = new BatchMergeJoin(
-                "",
+                0, "",
                 left,
                 right,
                 (ctx, row, values) -> values[0] = row.getObject(0),
@@ -491,7 +491,7 @@ public class BatchMergeJoinTest extends Assert
         };
 
         BatchMergeJoin op = new BatchMergeJoin(
-                "",
+                0, "",
                 left,
                 right,
                 (ctx, row, values) -> values[0] = row.getObject(0),
@@ -570,7 +570,7 @@ public class BatchMergeJoinTest extends Assert
         };
 
         BatchMergeJoin op = new BatchMergeJoin(
-                "",
+                0, "",
                 left,
                 right,
                 (ctx, row, values) -> values[0] = row.getObject(0),
@@ -639,7 +639,7 @@ public class BatchMergeJoinTest extends Assert
         };
 
         BatchMergeJoin op = new BatchMergeJoin(
-                "",
+                0, "",
                 left,
                 right,
                 (ctx, row, values) -> values[0] = row.getObject(0),
@@ -715,7 +715,7 @@ public class BatchMergeJoinTest extends Assert
         };
 
         BatchMergeJoin op = new BatchMergeJoin(
-                "",
+                0, "",
                 left,
                 right,
                 (ctx, row, values) -> values[0] = row.getObject(0),
@@ -777,7 +777,7 @@ public class BatchMergeJoinTest extends Assert
         };
 
         BatchMergeJoin op = new BatchMergeJoin(
-                "",
+                0, "",
                 left,
                 right,
                 (ctx, row, values) -> values[0] = row.getObject(0),
@@ -847,7 +847,7 @@ public class BatchMergeJoinTest extends Assert
         };
 
         BatchMergeJoin op = new BatchMergeJoin(
-                "",
+                0, "",
                 left,
                 right,
                 (ctx, row, values) -> values[0] = row.getObject(0),
@@ -909,7 +909,7 @@ public class BatchMergeJoinTest extends Assert
         };
 
         BatchMergeJoin op = new BatchMergeJoin(
-                "",
+                0, "",
                 left,
                 right,
                 (ctx, row, values) -> values[0] = row.getObject(0),
@@ -988,7 +988,7 @@ public class BatchMergeJoinTest extends Assert
         };
 
         BatchMergeJoin op = new BatchMergeJoin(
-                "",
+                0, "",
                 left,
                 right,
                 (ctx, row, values) -> values[0] = row.getObject(0),
@@ -1056,7 +1056,7 @@ public class BatchMergeJoinTest extends Assert
         };
 
         BatchMergeJoin op = new BatchMergeJoin(
-                "",
+                0, "",
                 left,
                 right,
                 (ctx, row, values) -> values[0] = row.getObject(0),
@@ -1158,10 +1158,10 @@ public class BatchMergeJoinTest extends Assert
          */
 
         BatchMergeJoin op = new BatchMergeJoin(
-                "",
+                0, "",
                 tableA,
                 new BatchMergeJoin(
-                        "",
+                        0, "",
                         tableB,
                         tableC,
                         (ctx, row, values) -> values[0] = row.getObject(0),

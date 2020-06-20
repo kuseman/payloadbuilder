@@ -27,7 +27,8 @@ nestedSelectItem
    selectItem (',' selectItem)*
    (FROM from=expression)?
    (WHERE where=expression)?
-   (ORDERBY sortItem (',' sortItem)*)?
+   (GROUPBY groupBy+=expression (',' groupBy+=expression)*)?
+   (ORDERBY orderBy+=sortItem (',' orderBy+=sortItem)*)?
    ')'
  ;
  
@@ -36,9 +37,13 @@ tableSourceJoined
  ;
 
 tableSource
- : qname			identifier?
- | functionCall		identifier?
- | populateQuery	identifier?
+ : qname				identifier? (WITH '(' tableOptions+=table_with_option (',' tableOptions+=table_with_option)* ')' )?
+ | catalogFunctionCall	identifier?
+ | populateQuery		identifier?
+ ;
+
+table_with_option
+ : BATCH_SIZE EQUALS size=NUMBER					#batchSize
  ;
 
 joinPart
@@ -87,17 +92,17 @@ expression
  
 primary
  : literal													#literalExpression
- | functionCall 											#functionCallExpression	
+ | catalogFunctionCall 										#functionCallExpression	
  | identifier '->' expression                               #lambdaExpression
  | '(' identifier (',' identifier)+ ')' '->' expression  	#lambdaExpression
  | value=primary '[' index=expression ']'    				#subscript	
  | qname													#columnReference
  | namedParameter											#namedParameterExpression
- | left=primary '.' (functionCall | qname)					#dereference	
+ | left=primary '.' (catalogFunctionCall | qname)			#dereference	
  | '(' expression ')' 										#nestedExpression			
  ;
 
-functionCall
+catalogFunctionCall
  : qname '(' ( expression (',' expression)*)? ')'
  ;
  
@@ -149,41 +154,43 @@ booleanLiteral
  ;
  
 nonReserved
- : FROM
+ : FROM | FIRST
  ;
  
 // Tokens
 
-AND		: A N D;
-ARRAY	: A R R A Y;
-AS		: A S;
-ASC		: A S C;
-APPLY	: A P P L Y;
-CROSS   : C R O S S;
-DESC	: D E S C;
-FALSE	: F A L S E;
-FIRST	: F I R S T;
-FROM	: F R O M;
-GROUPBY : G R O U P ' ' B Y;
-HAVING  : H A V I N G;
-IN		: I N;
-INNER	: I N N E R;
-IS      : I S;
-JOIN	: J O I N;
-LAST	: L A S T;
-LEFT	: L E F T;
-NOT		: N O T;
-NULL	: N U L L;
-NULLS	: N U L L S;
-OBJECT	: O B J E C T;
-ON		: O N;
-OR		: O R;
-ORDERBY	: O R D E R ' ' B Y;
-OUTER   : O U T E R;
-POPULATE: P O P U L A T E;
-SELECT	: S E L E C T;
-TRUE	: T R U E;
-WHERE	: W H E R E;
+AND		     : A N D;
+ARRAY	     : A R R A Y;
+AS		     : A S;
+ASC		     : A S C;
+APPLY	     : A P P L Y;
+BATCH_SIZE   : B A T C H '_' S I Z E;
+CROSS        : C R O S S;
+DESC	     : D E S C;
+FALSE	     : F A L S E;
+FIRST	     : F I R S T;
+FROM	     : F R O M;
+GROUPBY      : G R O U P ' ' B Y;
+HAVING       : H A V I N G;
+IN		     : I N;
+INNER	     : I N N E R;
+IS           : I S;
+JOIN	     : J O I N;
+LAST	     : L A S T;
+LEFT	     : L E F T;
+NOT		     : N O T;
+NULL	     : N U L L;
+NULLS	     : N U L L S;
+OBJECT	     : O B J E C T;
+ON		     : O N;
+OR		     : O R;
+ORDERBY	     : O R D E R ' ' B Y;
+OUTER        : O U T E R;
+POPULATE     : P O P U L A T E;
+SELECT	     : S E L E C T;
+TRUE	     : T R U E;
+WITH         : W I T H;
+WHERE	     : W H E R E;
 
 ASTERISK			: '*';
 COLON				: ':';

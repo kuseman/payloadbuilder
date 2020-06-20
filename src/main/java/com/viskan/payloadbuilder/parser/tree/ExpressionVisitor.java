@@ -5,8 +5,10 @@ public interface ExpressionVisitor<TR, TC>
 {
     TR visit(LiteralNullExpression expression, TC context);
     TR visit(LiteralBooleanExpression expression, TC context);
-    TR visit(LiteralNumericExpression expression, TC context);
-    TR visit(LiteralDecimalExpression expression, TC context);
+    TR visit(LiteralIntegerExpression expression, TC context);
+    TR visit(LiteralLongExpression expression, TC context);
+    TR visit(LiteralFloatExpression expression, TC context);
+    TR visit(LiteralDoubleExpression expression, TC context);
     TR visit(LiteralStringExpression expression, TC context);
     TR visit(ComparisonExpression expression, TC context);
     TR visit(ArithmeticUnaryExpression expression, TC context);

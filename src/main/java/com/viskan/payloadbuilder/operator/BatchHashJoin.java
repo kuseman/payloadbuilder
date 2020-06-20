@@ -7,6 +7,7 @@ import com.viskan.payloadbuilder.evaluation.EvaluationContext;
 import static com.viskan.payloadbuilder.operator.BatchMergeJoin.clearJoinData;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.ArrayUtils.contains;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,7 +36,7 @@ import gnu.trove.map.hash.TIntObjectHashMap;
  * probe a.art_id
  * </pre>
  **/
-public class BatchHashJoin implements Operator
+public class BatchHashJoin extends AOperator
 {
     private final String logicalOperator;
     private final Operator outer;
@@ -46,14 +47,15 @@ public class BatchHashJoin implements Operator
     private final RowMerger rowMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
-    private final int batchSize;
     private final Index innerIndex;
     private final int valuesSize;
-
+    private final int batchSize;
+    
     /* Statistics */
     private int executionCount;
 
     public BatchHashJoin(
+            int nodeId,
             String logicalOperator,
             Operator outer,
             Operator inner,
@@ -63,9 +65,9 @@ public class BatchHashJoin implements Operator
             RowMerger rowMerger,
             boolean populating,
             boolean emitEmptyOuterRows,
-            Index innerIndex,
-            int batchSize)
+            Index innerIndex)
     {
+        super(nodeId);
         this.logicalOperator = requireNonNull(logicalOperator, "logicalOperator");
         this.outer = requireNonNull(outer, "outer");
         this.inner = requireNonNull(inner, "inner");
@@ -77,7 +79,7 @@ public class BatchHashJoin implements Operator
         this.emitEmptyOuterRows = emitEmptyOuterRows;
         this.innerIndex = requireNonNull(innerIndex, "innerIndex");
         this.valuesSize = innerIndex.getColumns().size();
-        this.batchSize = batchSize;
+        this.batchSize = innerIndex.getBatchSize();
     }
 
     @Override
@@ -135,7 +137,6 @@ public class BatchHashJoin implements Operator
 
                     if (outerRows == null)
                     {
-                        table.clear();
                         batchOuterRows();
                         if (outerRows.isEmpty())
                         {
@@ -169,6 +170,12 @@ public class BatchHashJoin implements Operator
                         outerRow = outerRows.get(outerRowIndex);
 
                         TableValue tableValue = table.get(outerRow.hash);
+                        if (tableValue == null)
+                        {
+                            outerRowIndex++;
+                            continue;
+                        }
+                        
                         innerRows = tableValue.getRows();
                         if (innerRows.isEmpty())
                         {
@@ -239,7 +246,7 @@ public class BatchHashJoin implements Operator
             private void hashInnerBatch()
             {
                 outerValuesIterator = outerValuesIterator(context.getEvaluationContext());
-                context.setIndex(innerIndex, outerValuesIterator);
+                context.setOuterIndexValues(outerValuesIterator);
                 Iterator<Row> it = inner.open(context);
 
                 // Hash batch
@@ -257,7 +264,7 @@ public class BatchHashJoin implements Operator
                 }
                 
                 verifyOuterValuesIterator();
-                context.setIndex(null, null);
+                context.setOuterIndexValues(null);
             }
             
             private void emitOuterRows()
@@ -339,7 +346,13 @@ public class BatchHashJoin implements Operator
                             }
 
                             Row row = outerRows.get(outerRowsIndex++);
-                            row.hash = populateKeyValues(outerValuesExtractor, context, row);
+                            int hash = populateKeyValues(outerValuesExtractor, context, row);
+                            // Cannot be null values in keys
+                            if (contains(keyValues, null))
+                            {
+                                continue;
+                            }
+                            row.hash = hash;
                             TableValue tableValue = table.get(row.hash);
                             if (tableValue == null)
                             {
@@ -390,7 +403,8 @@ public class BatchHashJoin implements Operator
         if (obj instanceof BatchHashJoin)
         {
             BatchHashJoin that = (BatchHashJoin) obj;
-            return logicalOperator.equals(that.logicalOperator)
+            return nodeId == that.nodeId
+                && logicalOperator.equals(that.logicalOperator)
                 && outer.equals(that.outer)
                 && inner.equals(that.inner)
                 && outerValuesExtractor.equals(that.outerValuesExtractor)
@@ -408,8 +422,9 @@ public class BatchHashJoin implements Operator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        String description = String.format("BATCH HASH JOIN (%s) (POPULATING: %s, OUTER: %s, EXECUTION COUNT: %s, BATCH SIZE: %s, INDEX: %s, OUTER VALUES: %s, INNER VALUES: %s, PREDICATE: %s)",
+        String description = String.format("BATCH HASH JOIN (%s) (ID: %d, POPULATING: %s, OUTER: %s, EXECUTION COUNT: %s, BATCH SIZE: %s, INDEX: %s, OUTER VALUES: %s, INNER VALUES: %s, PREDICATE: %s)",
                 logicalOperator,
+                nodeId,
                 populating,
                 emitEmptyOuterRows,
                 executionCount,

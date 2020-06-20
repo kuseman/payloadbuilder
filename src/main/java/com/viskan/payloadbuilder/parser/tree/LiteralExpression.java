@@ -75,15 +75,67 @@ public abstract class LiteralExpression extends Expression
         {
             return (Boolean) value ? LiteralBooleanExpression.TRUE_LITERAL : LiteralBooleanExpression.FALSE_LITERAL;
         }
-        else if (value instanceof Double || value instanceof Float)
+        else if (value instanceof Double)
         {
-            return new LiteralDecimalExpression(((Number) value).doubleValue());
+            return new LiteralDoubleExpression(((Number) value).doubleValue());
         }
-        else if (value instanceof Long || value instanceof Integer)
+        else if (value instanceof Float)
         {
-            return new LiteralNumericExpression(((Number) value).longValue());
+            return new LiteralFloatExpression(((Number) value).floatValue());
+        }
+        else if (value instanceof Long)
+        {
+            return new LiteralLongExpression(((Number) value).longValue());
+        }
+        else if (value instanceof Integer)
+        {
+            return new LiteralIntegerExpression(((Number) value).intValue());
         }
         
         throw new IllegalArgumentException("Cannot create a literal expression from value " + value);
+    }
+    
+    /** Create a literal numeric expression from provided string */
+    public static LiteralExpression createLiteralNumericExpression(String value)
+    {
+        try
+        {
+            int intValue = Integer.parseInt(value);
+            return new LiteralIntegerExpression(intValue);
+        }
+        catch (NumberFormatException e)
+        {
+            try
+            {
+                long longValue = Long.parseLong(value);
+                return new LiteralLongExpression(longValue);
+            }
+            catch (NumberFormatException ee)
+            {
+                throw new RuntimeException("Cannot create a numeric expression out of " + value, ee);
+            }
+        }
+    }
+    
+    /** Create a literal decimal expression from provided string */
+    public static LiteralExpression createLiteralDecimalExpression(String value)
+    {
+        try
+        {
+            float floatValue = Float.parseFloat(value);
+            return new LiteralFloatExpression(floatValue);
+        }
+        catch (NumberFormatException e)
+        {
+            try
+            {
+                double doubleValue = Double.parseDouble(value);
+                return new LiteralDoubleExpression(doubleValue);
+            }
+            catch (NumberFormatException ee)
+            {
+                throw new RuntimeException("Cannot create a decimal expression out of " + value, ee);
+            }
+        }
     }
 }

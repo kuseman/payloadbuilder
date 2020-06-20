@@ -12,24 +12,25 @@ public class Row
     // If this is a tuple row then subPos is the other rows position
     private int subPos;
     protected TableAlias tableAlias;
-    
+
     /** Collection of parents that this row belongs to */
     private List<Row> parents;
-    
+
     /** Temporary parent that is set during predicate evaluations (ie. join conditions) */
     private Row predicateParent;
-    
-    private Object[] values;
-    private List<Row>[] childRows;
-    
+
+    private Values values;
+    protected List<Row>[] childRows;
+
     /** Temporary fields used by physical operators during join */
     public boolean match;
     public int hash;
     public Object[] extractedValues;
 
     Row()
-    {}
-    
+    {
+    }
+
     public Row(Row source, int subPos)
     {
         this.pos = source.pos;
@@ -46,7 +47,7 @@ public class Row
         {
             return null;
         }
-        
+
         @SuppressWarnings("unchecked")
         List<Row>[] copy = new List[source.childRows.length];
         int index = 0;
@@ -54,25 +55,25 @@ public class Row
         {
             copy[index++] = rows != null ? new ArrayList<>(rows) : null;
         }
-        
+
         return copy;
     }
-    
+
     public Object getObject(int ordinal)
     {
-        if (ordinal < 0 || ordinal >= values.length)
+        if (ordinal < 0)
         {
             return null;
         }
-        return values[ordinal];
+        return values.get(ordinal);
     }
-    
+
     public Object getObject(String column)
     {
         int ordinal = ArrayUtils.indexOf(tableAlias.getColumns(), column);
         return getObject(ordinal);
     }
-    
+
     public Number getNumber(String column)
     {
         Object obj = getObject(column);
@@ -80,10 +81,10 @@ public class Row
         {
             return (Number) obj;
         }
-        
+
         return null;
     }
-    
+
     public Boolean getBoolean(String column)
     {
         Object obj = getObject(column);
@@ -91,21 +92,16 @@ public class Row
         {
             return (Boolean) obj;
         }
-        
+
         return null;
     }
-    
+
     @SuppressWarnings("unchecked")
     public List<Row> getChildRows(int index)
     {
         if (childRows == null)
         {
             childRows = new List[tableAlias.getChildAliases().size()];
-        }
-        
-        if (index >= childRows.length)
-        {
-            System.err.println();
         }
 
         List<Row> rows = childRows[index];
@@ -114,7 +110,7 @@ public class Row
             rows = new ArrayList<>();
             childRows[index] = rows;
         }
-        
+
         return rows;
     }
 
@@ -122,17 +118,17 @@ public class Row
     {
         return pos;
     }
-    
+
     public int getSubPos()
     {
         return subPos;
     }
-    
+
     public TableAlias getTableAlias()
     {
         return tableAlias;
     }
-    
+
     /** Get single parent. Either returns temporary predicate parent or first connected parent */
     public Row getParent()
     {
@@ -144,10 +140,10 @@ public class Row
         {
             return parents.get(0);
         }
-        
+
         return null;
     }
-    
+
     public List<Row> getParents()
     {
         if (parents == null)
@@ -156,17 +152,17 @@ public class Row
         }
         return parents;
     }
-    
+
     public void setPredicateParent(Row parent)
     {
         predicateParent = parent;
     }
-    
+
     public Row getPredicateParent()
     {
         return predicateParent;
     }
-    
+
     public void clearPredicateParent()
     {
         predicateParent = null;
@@ -178,10 +174,20 @@ public class Row
         Row t = new Row();
         t.pos = pos;
         t.tableAlias = table;
+        t.values = new ObjectValues(values);
+        return t;
+    }
+
+    /** Construct a row with provided meta values and position */
+    public static Row of(TableAlias table, int pos, Values values)
+    {
+        Row t = new Row();
+        t.pos = pos;
+        t.tableAlias = table;
         t.values = values;
         return t;
     }
-    
+
     @Override
     public int hashCode()
     {
@@ -198,10 +204,43 @@ public class Row
         }
         return false;
     }
-    
+
     @Override
     public String toString()
     {
-        return tableAlias.getTable() + " (" + pos + ") " + Arrays.toString(values);// + " " + (!CollectionUtils.isEmpty(childRows) ? (System.lineSeparator() + childRows.stream().map(r -> r.toString() + System.lineSeparator()).collect(joining(","))) : "");
+        return tableAlias.getTable() + " (" + pos + ") " + values;
+    }
+
+    /** Values definition of a rows values */
+    public interface Values
+    {
+        Object get(int ordinal);
+    }
+
+    private static class ObjectValues implements Values
+    {
+        private final Object[] values;
+
+        ObjectValues(Object[] values)
+        {
+            this.values = values;
+        }
+
+        @Override
+        public Object get(int ordinal)
+        {
+            if (ordinal < 0 || ordinal >= values.length)
+            {
+                return null;
+            }
+
+            return values[ordinal];
+        }
+        
+        @Override
+        public String toString()
+        {
+            return Arrays.toString(values);
+        }
     }
 }

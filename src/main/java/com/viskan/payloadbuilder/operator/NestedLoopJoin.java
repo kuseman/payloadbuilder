@@ -12,7 +12,7 @@ import java.util.function.BiPredicate;
 import org.apache.commons.lang3.StringUtils;
 
 /** Operator the join two other operators using nested loop */
-public class NestedLoopJoin implements Operator
+public class NestedLoopJoin extends AOperator
 {
     private final String logicalOperator;
     private final Operator outer;
@@ -21,12 +21,13 @@ public class NestedLoopJoin implements Operator
     private final RowMerger rowMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
-    
+
     /* TODO: need to put this into context, state here wont work when the query plan will be cached */
     /* Statistics */
     private int executionCount;
-    
+
     public NestedLoopJoin(
+            int nodeId,
             String logicalOperator,
             Operator outer,
             Operator inner,
@@ -35,6 +36,7 @@ public class NestedLoopJoin implements Operator
             boolean populating,
             boolean emitEmptyOuterRows)
     {
+        super(nodeId);
         this.logicalOperator = requireNonNull(logicalOperator, "logicalOperator");
         this.outer = requireNonNull(outer, "outer");
         this.inner = requireNonNull(inner, "inner");
@@ -103,7 +105,7 @@ public class NestedLoopJoin implements Operator
                         }
 
                         ii = null;
-                        
+
                         currentOuter = null;
                         continue;
                     }
@@ -111,7 +113,7 @@ public class NestedLoopJoin implements Operator
                     currentOuter.setPredicateParent(contextParent);
                     Row currentInner = ii.next();
                     currentInner.setPredicateParent(currentOuter);
-                    
+
                     if (predicate == null || predicate.test(context.getEvaluationContext(), currentInner))
                     {
                         next = rowMerger.merge(currentOuter, currentInner, populating);
@@ -121,7 +123,7 @@ public class NestedLoopJoin implements Operator
                         }
                         hit = true;
                     }
-                    
+
                     currentInner.clearPredicateParent();
                     currentOuter.clearPredicateParent();
                 }
@@ -143,17 +145,13 @@ public class NestedLoopJoin implements Operator
         if (obj instanceof NestedLoopJoin)
         {
             NestedLoopJoin that = (NestedLoopJoin) obj;
-            return outer.equals(that.outer)
-                &&
-                inner.equals(that.inner)
-                &&
-                Objects.equals(predicate, that.predicate)
-                &&
-                rowMerger.equals(that.rowMerger)
-                &&
-                populating == that.populating
-                &&
-                emitEmptyOuterRows == that.emitEmptyOuterRows;
+            return nodeId == that.nodeId
+                && outer.equals(that.outer)
+                && inner.equals(that.inner)
+                && Objects.equals(predicate, that.predicate)
+                && rowMerger.equals(that.rowMerger)
+                && populating == that.populating
+                && emitEmptyOuterRows == that.emitEmptyOuterRows;
         }
         return false;
     }
@@ -162,8 +160,9 @@ public class NestedLoopJoin implements Operator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        String description = String.format("NESTED LOOP (%s) (POPULATING: %s, OUTER: %s, EXECUTION COUNT: %s, PREDICATE: %s)",
+        String description = String.format("NESTED LOOP (%s) (ID: %d, POPULATING: %s, OUTER: %s, EXECUTION COUNT: %s, PREDICATE: %s)",
                 logicalOperator,
+                nodeId,
                 populating,
                 emitEmptyOuterRows,
                 executionCount,

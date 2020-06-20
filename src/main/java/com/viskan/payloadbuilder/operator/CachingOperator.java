@@ -1,6 +1,7 @@
 package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.operator.OperatorContext.NodeData;
 
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.repeat;
@@ -10,16 +11,16 @@ import java.util.Iterator;
 import java.util.List;
 
 /** Caches provided operator to allow rewinds (Used in inner operator for nested loop) */
-public class CachingOperator implements Operator
+public class CachingOperator extends AOperator
 {
     private final Operator operator;
-    private List<Row> rows = null;
 
     /* Statistics */
     private int executionCount;
 
-    public CachingOperator(Operator target)
+    public CachingOperator(int nodeId, Operator target)
     {
+        super(nodeId);
         this.operator = requireNonNull(target, "operator");
     }
 
@@ -27,16 +28,19 @@ public class CachingOperator implements Operator
     public Iterator<Row> open(OperatorContext context)
     {
         executionCount++;
-        if (rows == null)
+
+        Data data = context.getNodeData(nodeId, Data::new);
+
+        if (data.cache == null)
         {
-            rows = new ArrayList<>();
+            data.cache = new ArrayList<>();
             Iterator<Row> it = operator.open(context);
             while (it.hasNext())
             {
-                rows.add(it.next());
+                data.cache.add(it.next());
             }
         }
-        return rows.iterator();
+        return data.cache.iterator();
     }
 
     @Override
@@ -50,7 +54,9 @@ public class CachingOperator implements Operator
     {
         if (obj instanceof CachingOperator)
         {
-            return operator.equals(((CachingOperator) obj).operator);
+            CachingOperator that = (CachingOperator) obj;
+            return nodeId == that.nodeId
+                && operator.equals(that.operator);
         }
         return super.equals(obj);
     }
@@ -59,8 +65,14 @@ public class CachingOperator implements Operator
     public String toString(int indent)
     {
         String indentString = repeat("  ", indent);
-        return "CACHING (EXECUTION COUNT: " + executionCount + ")" + System.lineSeparator()
+        return String.format("CACHING (ID: %d, EXECUTION COUNT: %d", nodeId, executionCount) + System.lineSeparator()
             +
             indentString + operator.toString(indent + 1);
+    }
+
+    /** Context data for this operator */
+    static class Data extends NodeData
+    {
+        List<Row> cache;
     }
 }

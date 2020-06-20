@@ -33,13 +33,25 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
     }
 
     @Override
-    public TR visit(LiteralNumericExpression expression, TC context)
+    public TR visit(LiteralIntegerExpression expression, TC context)
+    {
+        return defaultResult(context);
+    }
+    
+    @Override
+    public TR visit(LiteralLongExpression expression, TC context)
     {
         return defaultResult(context);
     }
 
     @Override
-    public TR visit(LiteralDecimalExpression expression, TC context)
+    public TR visit(LiteralFloatExpression expression, TC context)
+    {
+        return defaultResult(context);
+    }
+    
+    @Override
+    public TR visit(LiteralDoubleExpression expression, TC context)
     {
         return defaultResult(context);
     }
@@ -55,7 +67,7 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
     {
         return defaultResult(context);
     }
-
+    
     @Override
     public TR visit(ComparisonExpression expression, TC context)
     {

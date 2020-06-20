@@ -56,6 +56,11 @@ public abstract class ScalarFunctionInfo extends FunctionInfo
      **/
     public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode, List<Expression> arguments)
     {
-        throw new NotImplementedException("generate code: " + getClass().getSimpleName());
+        Class<?> clazz = getClass();
+        if (clazz.isAnonymousClass())
+        {
+            clazz = clazz.getSuperclass();
+        }
+        throw new NotImplementedException("generate code: " + clazz.getSimpleName());
     }
 }

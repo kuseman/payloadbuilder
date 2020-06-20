@@ -50,7 +50,7 @@ public class ManualOperatorTest extends Assert
             }
             
             @Override
-            public Operator getOperator(TableAlias tableAlias)
+            public Operator getScanOperator(int nodeId, TableAlias tableAlias)
             {
                 return new Operator()
                 {

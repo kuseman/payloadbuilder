@@ -4,8 +4,6 @@ import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.parser.tree.QualifiedName;
 
-import static java.util.Collections.emptyList;
-
 import java.util.Iterator;
 import java.util.Random;
 import java.util.stream.IntStream;
@@ -25,10 +23,7 @@ public class SortOperatorTest extends Assert
 
         SortOperator operator = new SortOperator(
                 target,
-                (c, rowA, rowB) -> (int) rowA.getObject(0) - (int) rowB.getObject(0),
-                emptyList());
-        
-        assertEquals(emptyList(), operator.getSortItems());
+                (c, rowA, rowB) -> (int) rowA.getObject(0) - (int) rowB.getObject(0));
         
         Iterator<Row> it = operator.open(new OperatorContext());
         int prev = -1;

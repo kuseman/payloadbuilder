@@ -27,15 +27,16 @@ import org.junit.Test;
 /** Test {@link BatchHashJoin} */
 public class BatchHashJoinTest extends Assert
 {
-    private final Index index = new Index(QualifiedName.of("table"), asList("col"));
 
     @Test
     public void test_inner_join_empty_outer()
     {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 1);
         Operator left = context -> emptyIterator();
         Operator right = context -> emptyIterator();
 
         BatchHashJoin op = new BatchHashJoin(
+                0,
                 "",
                 left,
                 right,
@@ -45,8 +46,7 @@ public class BatchHashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                index,
-                1);
+                index);
 
         assertFalse(op.open(new OperatorContext()).hasNext());
     }
@@ -54,6 +54,7 @@ public class BatchHashJoinTest extends Assert
     @Test
     public void test_inner_join_empty_inner()
     {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 1);
         TableAlias a = TableAlias.of(null, "table", "a");
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
         Operator right = context ->
@@ -64,7 +65,7 @@ public class BatchHashJoinTest extends Assert
             }
             return emptyIterator();
         };
-        BatchHashJoin op = new BatchHashJoin(
+        BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
                 right,
@@ -74,8 +75,7 @@ public class BatchHashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                index,
-                1);
+                index);
 
         assertFalse(op.open(new OperatorContext()).hasNext());
     }
@@ -83,11 +83,12 @@ public class BatchHashJoinTest extends Assert
     @Test(expected = IllegalArgumentException.class)
     public void test_bad_implementation_of_inner_operator()
     {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
         TableAlias a = TableAlias.of(null, "table", "a");
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
         Operator right = context -> emptyIterator();
 
-        BatchHashJoin op = new BatchHashJoin(
+        BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
                 right,
@@ -97,8 +98,7 @@ public class BatchHashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                index,
-                2);
+                index);
 
         op.open(new OperatorContext()).hasNext();
     }
@@ -106,6 +106,7 @@ public class BatchHashJoinTest extends Assert
     @Test(expected = IllegalArgumentException.class)
     public void test_bad_implementation_of_inner_operator_2()
     {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
         TableAlias a = TableAlias.of(null, "table", "a");
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
         Operator right = context ->
@@ -115,7 +116,7 @@ public class BatchHashJoinTest extends Assert
             return asList(Row.of(a, 0, ar)).iterator();
         };
 
-        BatchHashJoin op = new BatchHashJoin(
+        BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
                 right,
@@ -125,15 +126,15 @@ public class BatchHashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                index,
-                2);
+                index);
 
         op.open(new OperatorContext()).hasNext();
     }
-    
+
     @Test(expected = NoSuchElementException.class)
     public void test_bad_implementation_of_inner_operator_3()
     {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
         TableAlias a = TableAlias.of(null, "table", "a");
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
         Operator right = context ->
@@ -146,7 +147,7 @@ public class BatchHashJoinTest extends Assert
             return emptyIterator();
         };
 
-        BatchHashJoin op = new BatchHashJoin(
+        BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
                 right,
@@ -156,8 +157,7 @@ public class BatchHashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                index,
-                2);
+                index);
 
         op.open(new OperatorContext()).hasNext();
     }
@@ -165,6 +165,7 @@ public class BatchHashJoinTest extends Assert
     @Test
     public void test_inner_join_one_to_one()
     {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
         TableAlias a = TableAlias.of(null, "table", "a");
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
@@ -186,7 +187,7 @@ public class BatchHashJoinTest extends Assert
             return inner.iterator();
         };
 
-        BatchHashJoin op = new BatchHashJoin(
+        BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
                 right,
@@ -196,8 +197,7 @@ public class BatchHashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                index,
-                3);
+                index);
 
         Iterator<Row> it = op.open(new OperatorContext());
         int count = 0;
@@ -231,6 +231,7 @@ public class BatchHashJoinTest extends Assert
     @Test
     public void test_outer_join_one_to_one()
     {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
         TableAlias a = TableAlias.of(null, "table", "a");
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
@@ -252,7 +253,7 @@ public class BatchHashJoinTest extends Assert
             return inner.iterator();
         };
 
-        BatchHashJoin op = new BatchHashJoin(
+        BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
                 right,
@@ -262,8 +263,7 @@ public class BatchHashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 false,
                 true,
-                index,
-                3);
+                index);
 
         Iterator<Row> it = op.open(new OperatorContext());
         int count = 0;
@@ -305,6 +305,7 @@ public class BatchHashJoinTest extends Assert
     @Test
     public void test_inner_join_one_to_many()
     {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
         TableAlias a = TableAlias.of(null, "table", "a");
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
@@ -322,7 +323,7 @@ public class BatchHashJoinTest extends Assert
                     .iterator();
         };
 
-        BatchHashJoin op = new BatchHashJoin(
+        BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
                 right,
@@ -332,8 +333,7 @@ public class BatchHashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                index,
-                2);
+                index);
 
         Iterator<Row> it = op.open(new OperatorContext());
         int count = 0;
@@ -366,6 +366,7 @@ public class BatchHashJoinTest extends Assert
     @Test
     public void test_outer_join_one_to_many()
     {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
         TableAlias a = TableAlias.of(null, "table", "a");
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
@@ -383,7 +384,7 @@ public class BatchHashJoinTest extends Assert
                     .iterator();
         };
 
-        BatchHashJoin op = new BatchHashJoin(
+        BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
                 right,
@@ -393,8 +394,7 @@ public class BatchHashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 false,
                 true,
-                index,
-                3);
+                index);
 
         Iterator<Row> it = op.open(new OperatorContext());
         int count = 0;
@@ -436,6 +436,7 @@ public class BatchHashJoinTest extends Assert
     @Test
     public void test_inner_join_many_to_one()
     {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 5);
         TableAlias a = TableAlias.of(null, "table", "a");
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
@@ -457,7 +458,7 @@ public class BatchHashJoinTest extends Assert
             return rows.iterator();
         };
 
-        BatchHashJoin op = new BatchHashJoin(
+        BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
                 right,
@@ -467,8 +468,7 @@ public class BatchHashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                index,
-                5);
+                index);
 
         Iterator<Row> it = op.open(new OperatorContext());
         int count = 0;
@@ -502,6 +502,7 @@ public class BatchHashJoinTest extends Assert
     @Test
     public void test_outer_join_many_to_one()
     {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
         TableAlias a = TableAlias.of(null, "table", "a");
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
@@ -523,7 +524,7 @@ public class BatchHashJoinTest extends Assert
             return inner.iterator();
         };
 
-        BatchHashJoin op = new BatchHashJoin(
+        BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
                 right,
@@ -533,8 +534,7 @@ public class BatchHashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 false,
                 true,
-                index,
-                3);
+                index);
 
         Iterator<Row> it = op.open(new OperatorContext());
         int count = 0;
@@ -580,6 +580,7 @@ public class BatchHashJoinTest extends Assert
     @Test
     public void test_inner_join_many_to_many()
     {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
         TableAlias a = TableAlias.of(null, "table", "a");
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
@@ -603,7 +604,7 @@ public class BatchHashJoinTest extends Assert
             return inner.iterator();
         };
 
-        BatchHashJoin op = new BatchHashJoin(
+        BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
                 right,
@@ -613,8 +614,7 @@ public class BatchHashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                index,
-                3);
+                index);
 
         Iterator<Row> it = op.open(new OperatorContext());
         int count = 0;
@@ -649,6 +649,7 @@ public class BatchHashJoinTest extends Assert
     @Test
     public void test_outer_join_many_to_many()
     {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
         TableAlias a = TableAlias.of(null, "table", "a");
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
@@ -672,7 +673,7 @@ public class BatchHashJoinTest extends Assert
             return inner.iterator();
         };
 
-        BatchHashJoin op = new BatchHashJoin(
+        BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
                 right,
@@ -684,8 +685,7 @@ public class BatchHashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 false,
                 true,
-                index,
-                3);
+                index);
 
         int[] expectedOuterPositions = new int[] {
                 0, 1, 2,
@@ -731,6 +731,7 @@ public class BatchHashJoinTest extends Assert
     @Test
     public void test_inner_join_one_to_one_populating()
     {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
         TableAlias a = TableAlias.of(null, "table", "a");
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
@@ -752,7 +753,7 @@ public class BatchHashJoinTest extends Assert
             return inner.iterator();
         };
 
-        BatchHashJoin op = new BatchHashJoin(
+        BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
                 right,
@@ -762,8 +763,7 @@ public class BatchHashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 true,
                 false,
-                index,
-                3);
+                index);
 
         Iterator<Row> it = op.open(new OperatorContext());
         int count = 0;
@@ -795,6 +795,7 @@ public class BatchHashJoinTest extends Assert
     @Test
     public void test_outer_join_one_to_one_populating()
     {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
         TableAlias a = TableAlias.of(null, "table", "a");
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
@@ -816,7 +817,7 @@ public class BatchHashJoinTest extends Assert
             return inner.iterator();
         };
 
-        BatchHashJoin op = new BatchHashJoin(
+        BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
                 right,
@@ -826,8 +827,7 @@ public class BatchHashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 true,
                 true,
-                index,
-                3);
+                index);
 
         Iterator<Row> it = op.open(new OperatorContext());
         int count = 0;
@@ -869,6 +869,7 @@ public class BatchHashJoinTest extends Assert
     @Test
     public void test_inner_join_one_to_many_populating()
     {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
         TableAlias a = TableAlias.of(null, "table", "a");
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
@@ -886,7 +887,7 @@ public class BatchHashJoinTest extends Assert
                     .iterator();
         };
 
-        BatchHashJoin op = new BatchHashJoin(
+        BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
                 right,
@@ -896,8 +897,7 @@ public class BatchHashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 true,
                 false,
-                index,
-                2);
+                index);
 
         Iterator<Row> it = op.open(new OperatorContext());
 
@@ -931,6 +931,7 @@ public class BatchHashJoinTest extends Assert
     @Test
     public void test_outer_join_one_to_many_populating()
     {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
         TableAlias a = TableAlias.of(null, "table", "a");
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
@@ -948,7 +949,7 @@ public class BatchHashJoinTest extends Assert
                     .iterator();
         };
 
-        BatchHashJoin op = new BatchHashJoin(
+        BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
                 right,
@@ -958,8 +959,7 @@ public class BatchHashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 true,
                 true,
-                index,
-                2);
+                index);
 
         Iterator<Row> it = op.open(new OperatorContext());
 
@@ -1004,6 +1004,7 @@ public class BatchHashJoinTest extends Assert
     @Test
     public void test_inner_join_many_to_many_populating()
     {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
         TableAlias a = TableAlias.of(null, "table", "a");
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
@@ -1025,7 +1026,7 @@ public class BatchHashJoinTest extends Assert
                     .iterator();
         };
 
-        BatchHashJoin op = new BatchHashJoin(
+        BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
                 right,
@@ -1035,8 +1036,7 @@ public class BatchHashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 true,
                 false,
-                index,
-                3);
+                index);
 
         Iterator<Row> it = op.open(new OperatorContext());
         int count = 0;
@@ -1059,7 +1059,7 @@ public class BatchHashJoinTest extends Assert
         {
             Row row = it.next();
             assertRowJoinValues(row);
-            //                                    System.out.println(row + " " + row.getChildRows(0));
+            //                                                System.out.println(row + " " + row.getChildRows(0));
             assertEquals(expectedOuterPositions[count], row.getPos());
             assertEquals(expectedInnerPositions[count * 2], row.getChildRows(0).get(0).getPos());
             assertEquals(expectedInnerPositions[(count * 2) + 1], row.getChildRows(0).get(1).getPos());
@@ -1072,6 +1072,7 @@ public class BatchHashJoinTest extends Assert
     @Test
     public void test_outer_join_many_to_many_populating()
     {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
         TableAlias a = TableAlias.of(null, "table", "a");
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
@@ -1093,7 +1094,7 @@ public class BatchHashJoinTest extends Assert
                     .iterator();
         };
 
-        BatchHashJoin op = new BatchHashJoin(
+        BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
                 right,
@@ -1103,8 +1104,7 @@ public class BatchHashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 true,
                 true,
-                index,
-                3);
+                index);
 
         Iterator<Row> it = op.open(new OperatorContext());
         int count = 0;
@@ -1152,6 +1152,7 @@ public class BatchHashJoinTest extends Assert
     @Test
     public void test_inner_join_large()
     {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 250);
         Random rnd = new Random();
         TableAlias a = TableAlias.of(null, "tableA", "a");
         TableAlias b = TableAlias.of(a, "tableB", "b");
@@ -1189,10 +1190,10 @@ public class BatchHashJoinTest extends Assert
          * from tableA a inner join [ tableB b inner join [tableC] c on c.id = b.id ] b on b.id = a.id
          */
 
-        BatchHashJoin op = new BatchHashJoin(
+        BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 tableA,
-                new BatchHashJoin(
+                new BatchHashJoin(0,
                         "",
                         tableB,
                         tableC,
@@ -1205,8 +1206,7 @@ public class BatchHashJoinTest extends Assert
                         DefaultRowMerger.DEFAULT,
                         false,
                         false,
-                        index,
-                        250),
+                        index),
                 (ctx, row, values) -> values[0] = row.getObject(0),
                 (ctx, row, values) -> values[0] = row.getObject(0),
                 (ctx, row) ->
@@ -1218,8 +1218,7 @@ public class BatchHashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                index,
-                250);
+                index);
 
         for (int i = 0; i < 150; i++)
         {

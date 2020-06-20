@@ -15,14 +15,15 @@ import java.util.Iterator;
 import java.util.List;
 
 /** Operator handling TVF's */
-public class TableFunctionOperator implements Operator
+public class TableFunctionOperator extends AOperator
 {
     private final TableAlias tableAlias;
     private final TableFunctionInfo functionInfo;
     private final List<Expression> arguments;
 
-    public TableFunctionOperator(TableAlias tableAlias, TableFunctionInfo functionInfo, List<Expression> arguments)
+    public TableFunctionOperator(int nodeId, TableAlias tableAlias, TableFunctionInfo functionInfo, List<Expression> arguments)
     {
+        super(nodeId);
         this.tableAlias = requireNonNull(tableAlias, "tableAlias");
         this.functionInfo = requireNonNull(functionInfo, "tableFunction");
         this.arguments = requireNonNull(arguments, "arguments");
@@ -31,16 +32,6 @@ public class TableFunctionOperator implements Operator
     @Override
     public Iterator<Row> open(OperatorContext context)
     {
-//        List<Object> args = emptyList();
-//
-//        if (arguments.size() > 0)
-//        {
-//            args = new ArrayList<>(arguments.size());
-//            for (Expression arg : arguments)
-//            {
-//                args.add(arg.eval(context.getEvaluationContext(), context.getParentRow()));
-//            }
-//        }
         return functionInfo.open(context, tableAlias, new Arguments(arguments, context));
     }
 
@@ -67,16 +58,16 @@ public class TableFunctionOperator implements Operator
             }
             if (evalArgs.size() <= index)
             {
-               evalArgs.addAll(Collections.nCopies(index - evalArgs.size() + 1, EMPTY));
+                evalArgs.addAll(Collections.nCopies(index - evalArgs.size() + 1, EMPTY));
             }
-            
+
             Object result = evalArgs.get(index);
             if (result == EMPTY)
             {
                 result = arguments.get(index).eval(context.getEvaluationContext(), context.getParentRow());
                 evalArgs.set(index, result);
             }
-            
+
             return result;
         }
 
@@ -85,9 +76,9 @@ public class TableFunctionOperator implements Operator
         {
             return arguments.size();
         }
-        
+
     }
-    
+
     @Override
     public int hashCode()
     {
@@ -101,19 +92,18 @@ public class TableFunctionOperator implements Operator
     {
         if (obj instanceof TableFunctionOperator)
         {
-            TableFunctionOperator tfo = (TableFunctionOperator) obj;
-            return tableAlias.isEqual(tfo.tableAlias)
-                &&
-                functionInfo.equals(tfo.functionInfo)
-                &&
-                arguments.equals(tfo.arguments);
+            TableFunctionOperator that = (TableFunctionOperator) obj;
+            return nodeId == that.nodeId
+                && tableAlias.isEqual(that.tableAlias)
+                && functionInfo.equals(that.functionInfo)
+                && arguments.equals(that.arguments);
         }
-        return super.equals(obj);
+        return false;
     }
 
     @Override
     public String toString()
     {
-        return String.format("%s (%s)", functionInfo.getName(), arguments.stream().map(Object::toString).collect(joining(", ")));
+        return String.format("%s (ID: %d, %s)", functionInfo.getName(), nodeId, arguments.stream().map(Object::toString).collect(joining(", ")));
     }
 }

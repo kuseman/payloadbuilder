@@ -11,7 +11,9 @@ import com.viskan.payloadbuilder.operator.ExpressionHashFunction;
 import com.viskan.payloadbuilder.operator.ExpressionOperator;
 import com.viskan.payloadbuilder.operator.ExpressionPredicate;
 import com.viskan.payloadbuilder.operator.ExpressionProjection;
+import com.viskan.payloadbuilder.operator.ExpressionValuesExtractor;
 import com.viskan.payloadbuilder.operator.FilterOperator;
+import com.viskan.payloadbuilder.operator.GroupByOperator;
 import com.viskan.payloadbuilder.operator.HashJoin;
 import com.viskan.payloadbuilder.operator.JsonStringWriter;
 import com.viskan.payloadbuilder.operator.NestedLoopJoin;
@@ -64,6 +66,25 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
             assertTrue(e.getMessage(), e.getMessage().contains("defined multiple times for parent"));
         }
     }
+    
+    @Test
+    public void test_groupBy()
+    {
+        String query = "select a.art_id from article a group by a.art_id";
+        QueryResult queryResult = getQueryResult(query);
+        
+        Operator expected = new GroupByOperator(
+                1,
+                queryResult.tableOperators.get(0),
+                asList("art_id"),
+                new ExpressionValuesExtractor(asList(e("a.art_id"))),
+                1);
+        
+//        System.out.println(queryResult.operator.toString(1));
+//        System.err.println(expected.toString(1));
+        
+        assertEquals(expected, queryResult.operator);
+    }
 
     @Test
     public void test_table_function()
@@ -82,19 +103,21 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
         r2.setColumns(new String[] {"Value"});
 
         Operator expected = new HashJoin(
+                5,
                 "",
                 new NestedLoopJoin(
+                        3,
                         "",
-                        new TableFunctionOperator(r, range, asList(
+                        new TableFunctionOperator(0, r, range, asList(
                                 e("randomInt(100)"),
                                 e("randomInt(100) + 100"))),
-                        new CachingOperator(new TableFunctionOperator(r1, range, asList(
+                        new CachingOperator(2, new TableFunctionOperator(1, r1, range, asList(
                                 e("randomInt(100)")))),
                         new ExpressionPredicate(e("r1.Value <= r.Value")),
                         DefaultRowMerger.DEFAULT,
                         true,
                         false),
-                new TableFunctionOperator(r2, range, asList(
+                new TableFunctionOperator(4, r2, range, asList(
                         e("randomInt(100)"),
                         e("randomInt(100) + 100"))),
                 new ExpressionHashFunction(asList(e("r.Value"))),
@@ -104,8 +127,8 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
                 false,
                 false);
 
-        //                        System.err.println(expected.toString(1));
-        //                        System.out.println(queryResult.operator.toString(1));
+//                                System.err.println(expected.toString(1));
+//                                System.out.println(queryResult.operator.toString(1));
 
         assertEquals(expected, queryResult.operator);
 
@@ -115,7 +138,10 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
                 entry("r1", new ExpressionProjection(e("r1.filter(x -> x.Value > 10).map(x -> x.Value)"))),
                 entry("r2", new ExpressionProjection(e("r2.Value"))),
                 entry("r1A", new ArrayProjection(asList(
-                        new ExpressionProjection(e("Value"))), new ExpressionOperator(e("r1"))))));
+                        new ExpressionProjection(e("Value"))), new ExpressionOperator(6, e("r1"))))));
+
+        //                        System.err.println(expected.toString(1));
+        //                        System.out.println(queryResult.operator.toString(1));
 
         assertEquals(expectedProjection, queryResult.projection);
     }
@@ -161,8 +187,10 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
         assertTrue("Alias hierarchy should be equal", source.isEqual(queryResult.alias));
 
         Operator expected = new HashJoin(
+                10,
                 "",
                 new HashJoin(
+                        2,
                         "",
                         queryResult.tableOperators.get(0),
                         queryResult.tableOperators.get(1),
@@ -173,11 +201,14 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
                         true,
                         false),
                 new FilterOperator(
+                        9,
                         new HashJoin(
+                                8,
                                 "",
                                 new HashJoin(
+                                        6,
                                         "",
-                                        new FilterOperator(queryResult.tableOperators.get(2), new ExpressionPredicate(e("active_flg"))),
+                                        new FilterOperator(4, queryResult.tableOperators.get(2), new ExpressionPredicate(e("active_flg"))),
                                         queryResult.tableOperators.get(3),
                                         new ExpressionHashFunction(asList(e("aa.sku_id"))),
                                         new ExpressionHashFunction(asList(e("ap.sku_id"))),
@@ -199,7 +230,7 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
                 DefaultRowMerger.DEFAULT,
                 true,
                 false);
-//
+
 //                System.err.println(expected.toString(1));
 //                System.out.println(queryResult.operator.toString(1));
 
@@ -275,7 +306,7 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
             Random rand = new Random();
 
             @Override
-            public Operator getOperator(TableAlias alias)
+            public Operator getScanOperator(int nodeId, TableAlias alias)
             {
                 boolean ap = alias.getAlias().equals("ap");
                 boolean ab = alias.getAlias().equals("ab");
@@ -493,9 +524,10 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
         Operator expected = new HashJoin(
+                4,
                 "",
-                new FilterOperator(result.tableOperators.get(0), new ExpressionPredicate(e("s.id3 > 0"))),
-                new FilterOperator(result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg and note_id > 0"))),
+                new FilterOperator(1, result.tableOperators.get(0), new ExpressionPredicate(e("s.id3 > 0"))),
+                new FilterOperator(3, result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg and note_id > 0"))),
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
@@ -514,7 +546,8 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
                                 entry("id1", new ExpressionProjection(e("s.id1"))),
                                 entry("id2", new ExpressionProjection(e("a.id2")))),
                                 new FilterOperator(
-                                        new ExpressionOperator(e("s")),
+                                        6,
+                                        new ExpressionOperator(5, e("s")),
                                         new ExpressionPredicate(e("s.id4 > 0"))))))),
                 result.projection);
     }
@@ -549,9 +582,11 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
         Operator expected =
                 // Correlated => nested loop
                 new NestedLoopJoin(
+                        0,
                         "",
                         result.tableOperators.get(0),
                         new HashJoin(
+                                0,
                                 "",
                                 result.tableOperators.get(1),
                                 result.tableOperators.get(2),
@@ -597,19 +632,19 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
             Random rnd = new Random();
 
             @Override
-            public Operator getOperator(TableAlias alias)
+            public Operator getScanOperator(int nodeId, TableAlias alias)
             {
                 QualifiedName qname = alias.getTable();
                 if (qname.toString().equals("source"))
                 {
-                    return new CachingOperator(c -> IntStream.range(0, 1000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextBoolean(), rnd.nextInt(100)})).iterator());
+                    return new CachingOperator(0, c -> IntStream.range(0, 1000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextBoolean(), rnd.nextInt(100)})).iterator());
                 }
                 else if (qname.toString().equals("article"))
                 {
-                    return new CachingOperator(c -> IntStream.range(0, 1000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextInt(1000)})).iterator());
+                    return new CachingOperator(0, c -> IntStream.range(0, 1000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextInt(1000)})).iterator());
                 }
 
-                return new CachingOperator(c -> IntStream.range(0, 10000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextInt(1000)})).iterator());
+                return new CachingOperator(0, c -> IntStream.range(0, 10000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextInt(1000)})).iterator());
             }
         };
 

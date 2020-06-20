@@ -13,16 +13,28 @@ public class Index
 {
     private final QualifiedName table;
     private final List<String> columns;
+    private final int batchSize;
 
-    public Index(QualifiedName table, List<String> columns)
+    public Index(QualifiedName table, List<String> columns, int batchSize)
     {
         this.table = requireNonNull(table, "table");
         this.columns = requireNonNull(columns, "columns");
+        this.batchSize = batchSize;
     }
 
+    public QualifiedName getTable()
+    {
+        return table;
+    }
+    
     public List<String> getColumns()
     {
         return columns;
+    }
+
+    public int getBatchSize()
+    {
+        return batchSize;
     }
 
     @Override
@@ -36,8 +48,9 @@ public class Index
     {
         if (obj instanceof Index)
         {
-            Index i = (Index) obj;
-            return columns.equals(i.columns);
+            Index that = (Index) obj;
+            return columns.equals(that.columns)
+                && batchSize == that.batchSize;
         }
         return false;
     }

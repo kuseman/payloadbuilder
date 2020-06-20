@@ -18,7 +18,7 @@ public class HashJoinTest extends Assert
     @Test
     public void test_inner_join_no_populate_empty()
     {
-        HashJoin op = new HashJoin(
+        HashJoin op = new HashJoin(0,
                 "",
                 c -> emptyIterator(),
                 c -> emptyIterator(),
@@ -38,10 +38,10 @@ public class HashJoinTest extends Assert
         TableAlias a = TableAlias.of(null, "table", "t");
         TableAlias r = TableAlias.of(a, "range", "r");
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
-        HashJoin op = new HashJoin(
+        HashJoin op = new HashJoin(0,
                 "",
                 left,
-                new TableFunctionOperator(r, new NestedLoopJoinTest.Range(5), emptyList()),
+                new TableFunctionOperator(0, r, new NestedLoopJoinTest.Range(5), emptyList()),
                 (c, row) -> (Integer) row.getObject(0),
                 (c, row) -> (Integer) row.getObject(0),
                 (ctx, row) -> (int) row.getObject(0) == (int) row.getParent().getObject(0),
@@ -68,7 +68,7 @@ public class HashJoinTest extends Assert
         TableAlias t2 = TableAlias.of(t, "table2", "t2");
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(t, i - 1, new Object[] {i})).iterator();
         Operator right = context -> IntStream.range(1, 20).mapToObj(i -> Row.of(t2, i - 1, new Object[] {i % 10})).iterator();
-        HashJoin op = new HashJoin(
+        HashJoin op = new HashJoin(0,
                 "",
                 left,
                 right,
@@ -98,36 +98,6 @@ public class HashJoinTest extends Assert
     }
     
     @Test
-    public void test_inner_join_populate_2()
-    {
-        TableAlias t = TableAlias.of(null, "table", "t");
-        TableAlias t2 = TableAlias.of(t, "table2", "t2");
-        Operator left = context -> IntStream.range(1, 20).mapToObj(i -> Row.of(t2, i - 1, new Object[] {i % 10})).iterator();
-        Operator right = context -> IntStream.range(1, 7).mapToObj(i -> Row.of(t, i - 1, new Object[] {i})).iterator();
-        HashJoin op = new HashJoin(
-                "",
-                right,
-                left,
-                (c, row) -> (Integer) row.getObject(0),
-                (c, row) -> (Integer) row.getObject(0),
-                (ctx, row) -> (int) row.getObject(0) == (int) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
-                true,
-                false);
-
-        Iterator<Row> it = op.open(new OperatorContext());
-        int count = 0;
-        while (it.hasNext())
-        {
-            Row row = it.next();
-            assertEquals(row.getObject(0), row.getChildRows(0).get(0).getObject(0));
-            count++;
-        }
-        assertFalse(it.hasNext());
-        assertEquals(12, count);
-    }
-
-    @Test
     public void test_outer_join_no_populate()
     {
         TableAlias a = TableAlias.of(null, "table", "a");
@@ -135,7 +105,7 @@ public class HashJoinTest extends Assert
         Operator left = context -> IntStream.range(0, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
         Operator right = context -> IntStream.range(5, 15).mapToObj(i -> Row.of(b, i - 1, new Object[] {i})).iterator();
         
-        HashJoin op = new HashJoin(
+        HashJoin op = new HashJoin(0,
                 "",
                 left,
                 right,
@@ -173,7 +143,7 @@ public class HashJoinTest extends Assert
         Operator left = context -> IntStream.range(0, 5).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
         Operator right = context -> IntStream.range(5, 15).mapToObj(i -> Row.of(b, i - 1, new Object[] {i % 5 + 2})).iterator();
         
-        HashJoin op = new HashJoin(
+        HashJoin op = new HashJoin(0,
                 "",
                 left,
                 right,

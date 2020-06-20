@@ -1,5 +1,7 @@
 package com.viskan.payloadbuilder.operator;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Iterator;
 
 /** Writer that writes output as JSON string */
@@ -25,8 +27,9 @@ public class JsonStringWriter implements OutputWriter
     }
 
     @Override
-    public void writeValue(Object value)
+    public void writeValue(Object input)
     {
+        Object value = input;
         if (value instanceof Iterator)
         {
             @SuppressWarnings("unchecked")
@@ -44,12 +47,20 @@ public class JsonStringWriter implements OutputWriter
         {
             sb.append("\"");
         }
+        if (value instanceof Float)
+        {
+            value = new BigDecimal((Float) value).setScale(2, RoundingMode.HALF_UP);
+        }
+        else if (value instanceof Double)
+        {
+            value = new BigDecimal((Double) value).setScale(2, RoundingMode.HALF_UP);
+        }
         sb.append(value);
         if (value instanceof String)
         {
             sb.append("\"");
         }
-
+        
         sb.append(",");
     }
 

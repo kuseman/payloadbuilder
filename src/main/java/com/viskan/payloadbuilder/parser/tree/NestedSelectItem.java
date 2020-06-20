@@ -10,6 +10,7 @@ public class NestedSelectItem extends SelectItem
     private final List<SelectItem> selectItems;
     private final Expression from;
     private final Expression where;
+    private final List<Expression> groupBy;
     private final List<SortItem> orderBy;
     private final Type type;
 
@@ -19,6 +20,7 @@ public class NestedSelectItem extends SelectItem
             Expression from,
             Expression where,
             String identifier,
+            List<Expression> groupBy,
             List<SortItem> orderBy)
     {
         super(identifier, identifier != null);
@@ -26,7 +28,8 @@ public class NestedSelectItem extends SelectItem
         this.selectItems = requireNonNull(selectItems, "selectItems");
         this.from = from;
         this.where = where;
-        this.orderBy = orderBy;
+        this.groupBy = requireNonNull(groupBy, "groupBy");
+        this.orderBy = requireNonNull(orderBy, "orderBy");
     }
     
     public Expression getFrom()
@@ -42,6 +45,11 @@ public class NestedSelectItem extends SelectItem
     public Expression getWhere()
     {
         return where;
+    }
+    
+    public List<Expression> getGroupBy()
+    {
+        return groupBy;
     }
     
     public List<SortItem> getOrderBy()

@@ -70,11 +70,11 @@ public class InExpression extends Expression
                 }
                 if (ExpressionMath.inValue(value, argValue))
                 {
-                    return TRUE_LITERAL;
+                    return not ? FALSE_LITERAL : TRUE_LITERAL;
                 }
             }
 
-            return FALSE_LITERAL;
+            return not ? TRUE_LITERAL : FALSE_LITERAL;
         }
 
         return this;
@@ -98,10 +98,10 @@ public class InExpression extends Expression
             }
             if (ExpressionMath.inValue(value, argValue))
             {
-                return true;
+                return not ? false : true;
             }
         }
-        return false;
+        return not ? true : false;
     }
 
     @Override

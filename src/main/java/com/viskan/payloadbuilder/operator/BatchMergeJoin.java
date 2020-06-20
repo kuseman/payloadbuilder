@@ -52,7 +52,7 @@ import org.apache.commons.lang3.StringUtils;
  * - many to many
  * </pre>
  **/
-public class BatchMergeJoin implements Operator
+public class BatchMergeJoin extends AOperator
 {
     private final String logicalOperator;
     private final Operator outer;
@@ -70,10 +70,8 @@ public class BatchMergeJoin implements Operator
     // TODO: min and max batch size (merge and hash)
     //       to guard against to large batches even if all values are the same
 
-    /* Statistics */
-    private int executionCount;
-
     public BatchMergeJoin(
+            int nodeId,
             String logicalOperator,
             Operator outer,
             Operator inner,
@@ -86,6 +84,7 @@ public class BatchMergeJoin implements Operator
             Index innerIndex,
             int batchSize)
     {
+        super(nodeId);
         this.logicalOperator = logicalOperator;
         this.outer = requireNonNull(outer, "outer");
         this.inner = requireNonNull(inner, "inner");
@@ -103,7 +102,6 @@ public class BatchMergeJoin implements Operator
     @Override
     public Iterator<Row> open(OperatorContext context)
     {
-        executionCount++;
         final Iterator<Row> outerIt = outer.open(context);
         return new Iterator<Row>()
         {
@@ -162,11 +160,11 @@ public class BatchMergeJoin implements Operator
                         emitOuterRows();
                         continue;
                     }
-                    
-//                    if (outerRows != null && outerRows.size() == 0)
-//                    {
-//                        System.out.println();
-//                    }
+
+                    //                    if (outerRows != null && outerRows.size() == 0)
+                    //                    {
+                    //                        System.out.println();
+                    //                    }
 
                     if (outerRows == null || outerRows.isEmpty())
                     {
@@ -174,12 +172,12 @@ public class BatchMergeJoin implements Operator
                         if (outerRows.isEmpty())
                         {
                             verifyOuterValuesIterator();
-                            context.setIndex(null, null);
+                            context.setOuterIndexValues(null);
                             return false;
                         }
 
                         outerValuesIterator = outerValuesIterator();
-                        context.setIndex(innerIndex, outerValuesIterator);
+                        context.setOuterIndexValues(outerValuesIterator);
                         innerIt = inner.open(context);
                         if (!innerIt.hasNext())
                         {
@@ -194,17 +192,17 @@ public class BatchMergeJoin implements Operator
                             continue;
                         }
                     }
-                    
+
                     outerIndex = Math.min(outerIndex, outerRows.size() - 1);
                     try
                     {
-                    outerRow = outerRows.get(outerIndex);
+                        outerRow = outerRows.get(outerIndex);
                     }
                     catch (IndexOutOfBoundsException e)
                     {
                         System.out.println();
                     }
-                    
+
                     if (innerRow == null)
                     {
                         innerRow = innerIt.hasNext() ? innerIt.next() : null;
@@ -502,14 +500,15 @@ public class BatchMergeJoin implements Operator
     {
         if (obj instanceof BatchMergeJoin)
         {
-            BatchMergeJoin mj = (BatchMergeJoin) obj;
-            return outer.equals(mj.outer)
-                && inner.equals(mj.inner)
-                && outerValuesExtractor.equals(mj.outerValuesExtractor)
-                && innerValuesExtractor.equals(mj.innerValuesExtractor)
-                && predicate.equals(mj.predicate)
-                && populating == mj.populating
-                && emitEmptyOuterRows == mj.emitEmptyOuterRows;
+            BatchMergeJoin that = (BatchMergeJoin) obj;
+            return nodeId == that.nodeId
+                && outer.equals(that.outer)
+                && inner.equals(that.inner)
+                && outerValuesExtractor.equals(that.outerValuesExtractor)
+                && innerValuesExtractor.equals(that.innerValuesExtractor)
+                && predicate.equals(that.predicate)
+                && populating == that.populating
+                && emitEmptyOuterRows == that.emitEmptyOuterRows;
         }
         return false;
     }
@@ -518,11 +517,11 @@ public class BatchMergeJoin implements Operator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        String description = String.format("BATCH MERGE JOIN (%s) (POPULATING: %s, OUTER: %s, EXECUTION COUNT: %s, BATCH SIZE: %s, PREDICATE: %s)",
+        String description = String.format("BATCH MERGE JOIN (%s) (ID: %d, POPULATING: %s, OUTER: %s, BATCH SIZE: %s, PREDICATE: %s)",
                 logicalOperator,
+                nodeId,
                 populating,
                 emitEmptyOuterRows,
-                executionCount,
                 batchSize,
                 predicate);
         return description + System.lineSeparator()

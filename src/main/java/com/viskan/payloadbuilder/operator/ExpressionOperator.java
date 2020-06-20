@@ -10,12 +10,13 @@ import static java.util.Objects.requireNonNull;
 import java.util.Iterator;
 
 /** Operator that operates over an expression (that returns rows) */
-public class ExpressionOperator implements Operator
+public class ExpressionOperator extends AOperator
 {
     private final Expression expression;
 
-    public ExpressionOperator(Expression expression)
+    public ExpressionOperator(int nodeId, Expression expression)
     {
+        super(nodeId);
         this.expression = requireNonNull(expression, "expression");
     }
 
@@ -38,7 +39,9 @@ public class ExpressionOperator implements Operator
     {
         if (obj instanceof ExpressionOperator)
         {
-            return expression.equals(((ExpressionOperator) obj).expression);
+            ExpressionOperator that = (ExpressionOperator) obj;
+            return nodeId == that.nodeId
+                && expression.equals(that.expression);
         }
         return false;
     }

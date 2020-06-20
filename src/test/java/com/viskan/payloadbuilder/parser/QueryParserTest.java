@@ -37,6 +37,14 @@ public class QueryParserTest extends Assert
     }
 
     @Test
+    public void test_functions()
+    {
+        assertExpression("isnull(null, 1+1.1)");
+        assertExpression("coalesce(null, 1+1.1)");
+        assertExpressionFail(RuntimeException.class, "isnull expected 2 parameters", "isnull(a,b,c)");
+    }
+    
+    @Test
     public void test_joins()
     {
         assertQuery("select art_id from article a");

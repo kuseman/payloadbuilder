@@ -26,7 +26,7 @@ public class EsCatalog extends Catalog
     }
     
     @Override
-    public Operator getOperator(TableAlias alias)
+    public Operator getScanOperator(int nodeId, TableAlias alias)
     {
         if ("source".equals(alias.getTable().toString()))
         {
@@ -59,7 +59,7 @@ public class EsCatalog extends Catalog
     {
         if (ART_ID_INDEX_TABLES.contains(table.toString()))
         {
-            return asList(new Index(table, asList("art_id")));
+            return asList(new Index(table, asList("art_id"), 100));
         }
         return super.getIndices(table);
     }

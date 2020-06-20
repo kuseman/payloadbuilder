@@ -9,10 +9,11 @@ import com.viskan.payloadbuilder.catalog.TableFunctionInfo;
 import com.viskan.payloadbuilder.catalog.builtin.BuiltinCatalog;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.ArithmeticBinaryContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.ArithmeticUnaryContext;
+import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.BatchSizeContext;
+import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.CatalogFunctionCallContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.ColumnReferenceContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.ComparisonExpressionContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.DereferenceContext;
-import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.FunctionCallContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.FunctionCallExpressionContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.InExpressionContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.JoinPartContext;
@@ -47,9 +48,7 @@ import com.viskan.payloadbuilder.parser.tree.Join;
 import com.viskan.payloadbuilder.parser.tree.Join.JoinType;
 import com.viskan.payloadbuilder.parser.tree.LambdaExpression;
 import com.viskan.payloadbuilder.parser.tree.LiteralBooleanExpression;
-import com.viskan.payloadbuilder.parser.tree.LiteralDecimalExpression;
 import com.viskan.payloadbuilder.parser.tree.LiteralNullExpression;
-import com.viskan.payloadbuilder.parser.tree.LiteralNumericExpression;
 import com.viskan.payloadbuilder.parser.tree.LiteralStringExpression;
 import com.viskan.payloadbuilder.parser.tree.LogicalBinaryExpression;
 import com.viskan.payloadbuilder.parser.tree.LogicalNotExpression;
@@ -68,9 +67,12 @@ import com.viskan.payloadbuilder.parser.tree.SortItem.NullOrder;
 import com.viskan.payloadbuilder.parser.tree.SortItem.Order;
 import com.viskan.payloadbuilder.parser.tree.Table;
 import com.viskan.payloadbuilder.parser.tree.TableFunction;
+import com.viskan.payloadbuilder.parser.tree.TableOption;
 import com.viskan.payloadbuilder.parser.tree.TableSource;
 import com.viskan.payloadbuilder.parser.tree.TableSourceJoined;
 
+import static com.viskan.payloadbuilder.parser.tree.LiteralExpression.createLiteralDecimalExpression;
+import static com.viskan.payloadbuilder.parser.tree.LiteralExpression.createLiteralNumericExpression;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
@@ -178,12 +180,19 @@ public class QueryParser
             {
                 throw new IllegalArgumentException("Top table source cannot be a populating table source.");
             }
+            
             Expression where = getExpression(ctx.where);
             List<Expression> groupBy = ctx.groupBy != null ? ctx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
             List<SortItem> orderBy = ctx.sortItem() != null ? ctx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
             return new Query(selectItems, joinedTableSource, where, groupBy, orderBy);
         }
 
+        @Override
+        public Object visitBatchSize(BatchSizeContext ctx)
+        {
+            return new TableOption.BatchSizeOption(Integer.parseInt(ctx.size.getText()));
+        }
+        
         @Override
         public Object visitTopExpression(TopExpressionContext ctx)
         {
@@ -205,7 +214,17 @@ public class QueryParser
                 List<SelectItem> selectItems = ctx.nestedSelectItem().selectItem().stream().map(s -> (SelectItem) visit(s)).collect(toList());
                 Expression from = getExpression(ctx.nestedSelectItem().from);
                 Expression where = getExpression(ctx.nestedSelectItem().where);
-                List<SortItem> orderBy = ctx.nestedSelectItem().sortItem() != null ? ctx.nestedSelectItem().sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : null;
+                List<Expression> groupBy = ctx.nestedSelectItem().groupBy != null 
+                        ? ctx.nestedSelectItem().groupBy
+                            .stream()
+                            .map(gb -> getExpression(gb))
+                            .collect(toList()) 
+                            : emptyList();
+                List<SortItem> orderBy = ctx.nestedSelectItem().orderBy != null 
+                        ? ctx.nestedSelectItem().orderBy
+                            .stream()
+                            .map(si -> getSortItem(si))
+                            .collect(toList()) : emptyList();
 
                 if (type == NestedSelectItem.Type.ARRAY)
                 {
@@ -239,8 +258,12 @@ public class QueryParser
                 {
                     throw new IllegalArgumentException("Cannot have an ORDER BY clause without a FROM clause: " + selectItems);
                 }
+                else if (from == null && !groupBy.isEmpty())
+                {
+                    throw new IllegalArgumentException("Cannot have an GROUP BY clause without a FROM clause: " + selectItems);
+                }
 
-                return new NestedSelectItem(type, selectItems, from, where, identifier, orderBy);
+                return new NestedSelectItem(type, selectItems, from, where, identifier, groupBy, orderBy);
             }
 
             throw new IllegalStateException("Caould no create a select item.");
@@ -274,9 +297,9 @@ public class QueryParser
         public Object visitTableSource(TableSourceContext ctx)
         {
             String alias = getIdentifier(ctx.identifier());
-            if (ctx.functionCall() != null)
+            if (ctx.catalogFunctionCall() != null)
             {
-                FunctionCall functionCall = (FunctionCall) visit(ctx.functionCall());
+                FunctionCall functionCall = (FunctionCall) visit(ctx.catalogFunctionCall());
                 if (functionCall.getFunctionInfo().getType() != FunctionInfo.Type.TABLE)
                 {
                     throw new IllegalArgumentException("Expected a table function but got: " + functionCall.getFunctionInfo());
@@ -305,7 +328,8 @@ public class QueryParser
                 return new PopulateTableSource(alias, tableSourceJoined, where, groupBy, orderBy);
             }
 
-            return new Table(getQualifiedName(ctx.qname()), defaultIfNull(alias, ""));
+            List<TableOption> tableOptions = ctx.tableOptions != null ? ctx.tableOptions.stream().map(to -> (TableOption) visit(to)).collect(toList()) : emptyList();
+            return new Table(getQualifiedName(ctx.qname()), defaultIfNull(alias, ""), tableOptions);
         }
 
         @Override
@@ -325,7 +349,13 @@ public class QueryParser
         @Override
         public Object visitFunctionCallExpression(FunctionCallExpressionContext ctx)
         {
-            FunctionCall functionCall = (FunctionCall) visit(ctx.functionCall());
+            Object child = visit(ctx.catalogFunctionCall());
+            if (child instanceof Expression)
+            {
+                return child;
+            }
+            
+            FunctionCall functionCall = (FunctionCall) child;
             if (functionCall.getFunctionInfo().getType() != FunctionInfo.Type.SCALAR)
             {
                 throw new IllegalArgumentException("Expected a scalar function but got: " + functionCall.getFunctionInfo());
@@ -340,9 +370,9 @@ public class QueryParser
 
             return new QualifiedFunctionCallExpression((ScalarFunctionInfo) functionCall.getFunctionInfo(), functionCall.getArguments());
         }
-
+        
         @Override
-        public Object visitFunctionCall(FunctionCallContext ctx)
+        public Object visitCatalogFunctionCall(CatalogFunctionCallContext ctx)
         {
             /*
              * Function call.
@@ -556,7 +586,7 @@ public class QueryParser
             // Dereferenced function call
             else
             {
-                FunctionCall functionCall = (FunctionCall) visit(ctx.functionCall());
+                FunctionCall functionCall = (FunctionCall) visit(ctx.catalogFunctionCall());
                 result = new QualifiedFunctionCallExpression((ScalarFunctionInfo) functionCall.getFunctionInfo(), functionCall.getArguments());
             }
 
@@ -652,11 +682,11 @@ public class QueryParser
             }
             else if (ctx.numericLiteral() != null)
             {
-                return new LiteralNumericExpression(ctx.numericLiteral().getText());
+                return createLiteralNumericExpression(ctx.numericLiteral().getText());
             }
             else if (ctx.decimalLiteral() != null)
             {
-                return new LiteralDecimalExpression(ctx.decimalLiteral().getText());
+                return createLiteralDecimalExpression(ctx.decimalLiteral().getText());
             }
 
             String text = ctx.stringLiteral().getText();

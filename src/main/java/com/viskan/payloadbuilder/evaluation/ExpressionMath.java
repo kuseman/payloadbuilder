@@ -335,9 +335,17 @@ public final class ExpressionMath
         {
             return left;
         }
-        else if (isDecimal(left))
+        else if (left instanceof Double)
         {
             return left.doubleValue() + right;
+        }
+        else if (left instanceof Float)
+        {
+            return left.floatValue() + right;
+        }
+        else if (left instanceof Long)
+        {
+            return left.longValue() + right;
         }
         return left.intValue() + right;
     }
@@ -348,11 +356,19 @@ public final class ExpressionMath
         {
             return right;
         }
-        else if (isDecimal(right))
+        else if (right instanceof Double)
         {
             return left + right.doubleValue();
         }
-        return left + right.longValue();
+        else if (right instanceof Float)
+        {
+            return left + right.floatValue();
+        }
+        else if (right instanceof Long)
+        {
+            return left + right.longValue();
+        }
+        return left + right.intValue();
     }
 
     public static Number add(Number left, Number right)
@@ -362,12 +378,20 @@ public final class ExpressionMath
             return null;
         }
 
-        if (isDecimal(left) || isDecimal(right))
+        if (left instanceof Double || right instanceof Double)
         {
             return left.doubleValue() + right.doubleValue();
         }
+        else if (left instanceof Float || right instanceof Float) 
+        {
+            return left.floatValue() + right.floatValue();
+        }
+        else if (left instanceof Long || right instanceof Long)
+        {
+            return left.longValue() + right.longValue();
+        }
 
-        return left.longValue() + right.longValue();
+        return left.intValue() + right.intValue();
     }
 
     public static long subtract(long left, long right)
@@ -406,9 +430,17 @@ public final class ExpressionMath
         {
             return left;
         }
-        else if (isDecimal(left))
+        else if (left instanceof Double)
         {
             return left.doubleValue() - right;
+        }
+        else if (left instanceof Float)
+        {
+            return left.floatValue() - right;
+        }
+        else if (left instanceof Long)
+        {
+            return left.longValue() - right;
         }
         return left.intValue() - right;
     }
@@ -419,11 +451,19 @@ public final class ExpressionMath
         {
             return right;
         }
-        else if (isDecimal(right))
+        else if (right instanceof Double)
         {
             return left - right.doubleValue();
         }
-        return left - right.longValue();
+        else if (right instanceof Float)
+        {
+            return left - right.floatValue();
+        }
+        else if (right instanceof Long)
+        {
+            return left - right.longValue();
+        }
+        return left - right.intValue();
     }
 
     public static Number subtract(Number left, Number right)
@@ -433,12 +473,20 @@ public final class ExpressionMath
             return null;
         }
 
-        if (isDecimal(left) || isDecimal(right))
+        if (left instanceof Double || right instanceof Double)
         {
             return left.doubleValue() - right.doubleValue();
         }
-
-        return left.longValue() - right.longValue();
+        else if (left instanceof Float || right instanceof Float) 
+        {
+            return left.floatValue() - right.floatValue();
+        }
+        else if (left instanceof Long || right instanceof Long)
+        {
+            return left.longValue() - right.longValue();
+        }
+        
+        return left.intValue() - right.intValue();
     }
 
     public static long multiply(long left, long right)
@@ -477,9 +525,17 @@ public final class ExpressionMath
         {
             return left;
         }
-        else if (isDecimal(left))
+        else if (left instanceof Double)
         {
             return left.doubleValue() * right;
+        }
+        else if (left instanceof Float)
+        {
+            return left.floatValue() * right;
+        }
+        else if (left instanceof Long)
+        {
+            return left.longValue() * right;
         }
         return left.intValue() * right;
     }
@@ -490,11 +546,19 @@ public final class ExpressionMath
         {
             return right;
         }
-        else if (isDecimal(right))
+        else if (right instanceof Double)
         {
             return left * right.doubleValue();
         }
-        return left * right.longValue();
+        else if (right instanceof Float)
+        {
+            return left * right.floatValue();
+        }
+        else if (right instanceof Long)
+        {
+            return left * right.longValue();
+        }
+        return left * right.intValue();
     }
 
     public static Number multiply(Number left, Number right)
@@ -504,12 +568,20 @@ public final class ExpressionMath
             return null;
         }
 
-        if (isDecimal(left) || isDecimal(right))
+        if (left instanceof Double || right instanceof Double)
         {
             return left.doubleValue() * right.doubleValue();
         }
+        else if (left instanceof Float || right instanceof Float) 
+        {
+            return left.floatValue() * right.floatValue();
+        }
+        else if (left instanceof Long || right instanceof Long)
+        {
+            return left.longValue() * right.longValue();
+        }
 
-        return left.longValue() * right.longValue();
+        return left.intValue() * right.intValue();
     }
 
     public static long divide(long left, long right)
@@ -548,9 +620,17 @@ public final class ExpressionMath
         {
             return left;
         }
-        else if (isDecimal(left))
+        else if (left instanceof Double)
         {
             return left.doubleValue() / right;
+        }
+        else if (left instanceof Float)
+        {
+            return left.floatValue() / right;
+        }
+        else if (left instanceof Long)
+        {
+            return left.longValue() / right;
         }
         return left.intValue() / right;
     }
@@ -561,11 +641,19 @@ public final class ExpressionMath
         {
             return right;
         }
-        else if (isDecimal(right))
+        else if (right instanceof Double)
         {
             return left / right.doubleValue();
         }
-        return left / right.longValue();
+        else if (right instanceof Float)
+        {
+            return left / right.floatValue();
+        }
+        else if (right instanceof Long)
+        {
+            return left / right.longValue();
+        }
+        return left / right.intValue();
     }
 
     public static Number divide(Number left, Number right)
@@ -575,12 +663,20 @@ public final class ExpressionMath
             return null;
         }
 
-        if (isDecimal(left) || isDecimal(right))
+        if (left instanceof Double || right instanceof Double)
         {
             return left.doubleValue() / right.doubleValue();
         }
+        else if (left instanceof Float || right instanceof Float) 
+        {
+            return left.floatValue() / right.floatValue();
+        }
+        else if (left instanceof Long || right instanceof Long)
+        {
+            return left.longValue() / right.longValue();
+        }
 
-        return left.longValue() / right.longValue();
+        return left.intValue() / right.intValue();
     }
 
     public static long modulo(long left, long right)
@@ -619,9 +715,17 @@ public final class ExpressionMath
         {
             return left;
         }
-        else if (isDecimal(left))
+        else if (left instanceof Double)
         {
             return left.doubleValue() % right;
+        }
+        else if (left instanceof Float)
+        {
+            return left.floatValue() % right;
+        }
+        else if (left instanceof Long)
+        {
+            return left.longValue() % right;
         }
         return left.intValue() % right;
     }
@@ -632,11 +736,19 @@ public final class ExpressionMath
         {
             return right;
         }
-        else if (isDecimal(right))
+        else if (right instanceof Double)
         {
             return left % right.doubleValue();
         }
-        return left % right.longValue();
+        else if (right instanceof Float)
+        {
+            return left % right.floatValue();
+        }
+        else if (right instanceof Long)
+        {
+            return left % right.longValue();
+        }
+        return left % right.intValue();
     }
 
     public static Number modulo(Number left, Number right)
@@ -646,12 +758,20 @@ public final class ExpressionMath
             return null;
         }
 
-        if (isDecimal(left) || isDecimal(right))
+        if (left instanceof Double || right instanceof Double)
         {
             return left.doubleValue() % right.doubleValue();
         }
+        else if (left instanceof Float || right instanceof Float) 
+        {
+            return left.floatValue() % right.floatValue();
+        }
+        else if (left instanceof Long || right instanceof Long)
+        {
+            return left.longValue() % right.longValue();
+        }
 
-        return left.longValue() % right.longValue();
+        return left.intValue() % right.intValue();
     }
 
     public static Object add(Object left, Object right)
@@ -752,11 +872,6 @@ public final class ExpressionMath
 
     /* MISC METHODS */
 
-    private static boolean isDecimal(Number number)
-    {
-        return number instanceof Double || number instanceof Float;
-    }
-
     /** Converts an object to a number (if applicable) taking the number type into consideration */
     private static Number convert(Number number, Object other, boolean throwIfNotConvertible)
     {
@@ -815,11 +930,6 @@ public final class ExpressionMath
         else if (value instanceof Collection)
         {
             if (((Collection<Object>) value).contains(arg))
-            {
-                return true;
-            }
-            
-            if (arg instanceof Long && ((Collection<Object>) value).contains(((Long) arg).intValue()))
             {
                 return true;
             }

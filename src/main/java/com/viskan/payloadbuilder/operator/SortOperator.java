@@ -1,7 +1,6 @@
 package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableObject;
 
 import static java.util.Objects.requireNonNull;
 
@@ -15,13 +14,11 @@ public class SortOperator implements Operator
 {
     private final Operator target;
     private final RowComparator comparator;
-    private final List<TableObject> sortItems;
 
-    public SortOperator(Operator target, RowComparator comparator, List<TableObject> sortItems)
+    public SortOperator(Operator target, RowComparator comparator)
     {
         this.target = requireNonNull(target, "target");
         this.comparator = requireNonNull(comparator, "comparator");
-        this.sortItems = requireNonNull(sortItems, "sortItems");
     }
 
     @Override
@@ -35,11 +32,5 @@ public class SortOperator implements Operator
         }
         Collections.sort(rows, (rowA, rowB) -> comparator.compare(context.getEvaluationContext(), rowA, rowB));
         return rows.iterator();
-    }
-    
-    @Override
-    public List<TableObject> getSortItems()
-    {
-        return sortItems;
     }
 }

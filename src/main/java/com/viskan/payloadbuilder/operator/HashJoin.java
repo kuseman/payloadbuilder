@@ -21,7 +21,7 @@ import org.apache.commons.lang3.StringUtils;
 /**
  * Hash match operator. Hashes outer operator and probes the inner operator
  */
-public class HashJoin implements Operator
+public class HashJoin extends AOperator
 {
     private final String logicalOperator;
     private final Operator outer;
@@ -33,10 +33,8 @@ public class HashJoin implements Operator
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
 
-    /* Statistics */
-    private int executionCount;
-
     public HashJoin(
+            int nodeId,
             String logicalOperator,
             Operator outer,
             Operator inner,
@@ -47,6 +45,7 @@ public class HashJoin implements Operator
             boolean populating,
             boolean emitEmptyOuterRows)
     {
+        super(nodeId);
         this.logicalOperator = requireNonNull(logicalOperator, "logicalOperator");
         this.outer = requireNonNull(outer, "outer");
         this.inner = requireNonNull(inner, "inner");
@@ -62,7 +61,6 @@ public class HashJoin implements Operator
     @Override
     public Iterator<Row> open(OperatorContext context)
     {
-        executionCount++;
         Map<IntKey, List<Row>> table = hash(context);
         if (table.isEmpty())
         {
@@ -313,21 +311,15 @@ public class HashJoin implements Operator
         if (obj instanceof HashJoin)
         {
             HashJoin that = (HashJoin) obj;
-            return outer.equals(that.outer)
-                &&
-                inner.equals(that.inner)
-                &&
-                outerHashFunction.equals(that.outerHashFunction)
-                &&
-                innerHashFunction.equals(that.innerHashFunction)
-                &&
-                predicate.equals(that.predicate)
-                &&
-                rowMerger.equals(that.rowMerger)
-                &&
-                populating == that.populating
-                &&
-                emitEmptyOuterRows == that.emitEmptyOuterRows;
+            return nodeId == that.nodeId
+                && outer.equals(that.outer)
+                && inner.equals(that.inner)
+                && outerHashFunction.equals(that.outerHashFunction)
+                && innerHashFunction.equals(that.innerHashFunction)
+                && predicate.equals(that.predicate)
+                && rowMerger.equals(that.rowMerger)
+                && populating == that.populating
+                && emitEmptyOuterRows == that.emitEmptyOuterRows;
         }
         return false;
     }
@@ -336,11 +328,12 @@ public class HashJoin implements Operator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        String desc = String.format("HASH JOIN (%s) (POPULATING: %s, OUTER: %s, EXECUTION COUNT: %s, OUTER KEYS: %s, INNER KEYS: %s, PREDICATE: %s)",
+        String desc = String.format("HASH JOIN (%s) (ID: %d, POPULATING: %s, OUTER: %s, EXECUTION COUNT: %s, OUTER KEYS: %s, INNER KEYS: %s, PREDICATE: %s)",
                 logicalOperator,
+                nodeId,
                 populating,
                 emitEmptyOuterRows,
-                executionCount,
+                null,
                 outerHashFunction.toString(),
                 innerHashFunction.toString(),
                 predicate.toString());

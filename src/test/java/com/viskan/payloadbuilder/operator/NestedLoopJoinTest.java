@@ -24,9 +24,10 @@ public class NestedLoopJoinTest extends Assert
         TableAlias r = TableAlias.of(a, "range", "r");
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
         NestedLoopJoin op = new NestedLoopJoin(
+                0,
                 "",
                 left,
-                new TableFunctionOperator(r, new Range(2), emptyList()),
+                new TableFunctionOperator(0, r, new Range(2), emptyList()),
                 null,   // Null predicate => cross
                 DefaultRowMerger.DEFAULT,
                 false,
@@ -53,9 +54,10 @@ public class NestedLoopJoinTest extends Assert
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
         
         NestedLoopJoin op = new NestedLoopJoin(
+                0,
                 "",
                 left,
-                new TableFunctionOperator(r, new Range(2), emptyList()),
+                new TableFunctionOperator(0, r, new Range(2), emptyList()),
                 null,   // Null predicate => cross
                 DefaultRowMerger.DEFAULT,
                 true,
@@ -82,9 +84,10 @@ public class NestedLoopJoinTest extends Assert
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
         
         NestedLoopJoin op = new NestedLoopJoin(
+                0,
                 "",
                 left,
-                new TableFunctionOperator(r, new Range(0), emptyList()),
+                new TableFunctionOperator(0, r, new Range(0), emptyList()),
                 null,   // Null predicate => cross
                 DefaultRowMerger.DEFAULT,
                 false,
@@ -111,9 +114,10 @@ public class NestedLoopJoinTest extends Assert
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
         
         NestedLoopJoin op = new NestedLoopJoin(
+                0,
                 "",
                 left,
-                new TableFunctionOperator(r, new Range(2), emptyList()),
+                new TableFunctionOperator(0, r, new Range(2), emptyList()),
                 // Even parent rows are joined
                 (ctx, row) -> row.getParent().getPos() % 2 == 0,
                 DefaultRowMerger.DEFAULT,
@@ -154,9 +158,10 @@ public class NestedLoopJoinTest extends Assert
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
         
         NestedLoopJoin op = new NestedLoopJoin(
+                0,
                 "",
                 left,
-                new TableFunctionOperator(r, new Range(2), emptyList()),
+                new TableFunctionOperator(0, r, new Range(2), emptyList()),
                 // Even parent rows are joined
                 (ctx, row) -> row.getParent().getPos() % 2 == 0,
                 DefaultRowMerger.DEFAULT,

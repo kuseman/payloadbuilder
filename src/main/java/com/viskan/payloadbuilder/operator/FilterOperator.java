@@ -12,7 +12,7 @@ import org.apache.commons.collections.iterators.FilterIterator;
 import org.apache.commons.lang3.StringUtils;
 
 /** Filtering operator */
-public class FilterOperator implements Operator
+public class FilterOperator extends AOperator
 {
     private final Operator operator;
     private final BiPredicate<EvaluationContext, Row> predicate;
@@ -20,8 +20,9 @@ public class FilterOperator implements Operator
     /* Statistics */
     private int executionCount;
 
-    public FilterOperator(Operator operator, BiPredicate<EvaluationContext, Row> predicate)
+    public FilterOperator(int nodeId, Operator operator, BiPredicate<EvaluationContext, Row> predicate)
     {
+        super(nodeId);
         this.operator = requireNonNull(operator);
         this.predicate = requireNonNull(predicate);
     }
@@ -47,10 +48,10 @@ public class FilterOperator implements Operator
     {
         if (obj instanceof FilterOperator)
         {
-            FilterOperator f = (FilterOperator) obj;
-            return operator.equals(f.operator)
-                &&
-                predicate.equals(f.predicate);
+            FilterOperator that = (FilterOperator) obj;
+            return nodeId == that.nodeId
+                && operator.equals(that.operator)
+                && predicate.equals(that.predicate);
         }
         return false;
     }
@@ -59,7 +60,7 @@ public class FilterOperator implements Operator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        String desc = String.format("FILTER (EXECUTION COUNT: %s, PREDICATE: %s", executionCount, predicate);
+        String desc = String.format("FILTER (ID: %d, EXECUTION COUNT: %s, PREDICATE: %s", nodeId, executionCount, predicate);
         return desc + System.lineSeparator()
             +
             indentString + operator.toString(indent + 1);

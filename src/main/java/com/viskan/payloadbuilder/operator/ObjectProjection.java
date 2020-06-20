@@ -77,12 +77,10 @@ public class ObjectProjection implements Projection
     {
         if (obj instanceof ObjectProjection)
         {
-            ObjectProjection p = (ObjectProjection) obj;
-            return Objects.equals(selection, p.selection)
-                &&
-                Arrays.equals(projections, p.projections)
-                &&
-                Arrays.equals(columns, p.columns);
+            ObjectProjection that = (ObjectProjection) obj;
+            return Objects.equals(selection, that.selection)
+                && Arrays.equals(projections, that.projections)
+                && Arrays.equals(columns, that.columns);
         }
         return false;
     }

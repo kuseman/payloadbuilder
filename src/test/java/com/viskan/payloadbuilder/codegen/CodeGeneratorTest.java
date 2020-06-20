@@ -16,6 +16,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.commons.lang3.NotImplementedException;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -44,8 +45,8 @@ public class CodeGeneratorTest extends Assert
     @Test
     public void test_auto_cast_strings() throws Exception
     {
-        assertFail(IllegalArgumentException.class, "true = '1.0'");
-        assertFail(IllegalArgumentException.class, "1 = '1.0'");
+        assertFail(IllegalArgumentException.class, "Cannot compare true and", "true = '1.0'");
+        assertFail(IllegalArgumentException.class, "Cannot convert value 1.0 to", "1 = '1.0'");
         
         assertExpression(true, null, "1 = '1'");
         assertExpression(true, null, "'1' = 1");
@@ -102,7 +103,10 @@ public class CodeGeneratorTest extends Assert
         assertExpression(994, row, "hash(1,2)");
         assertExpression(null, row, "hash(1,null)");
         
-        assertExpression(-2L, row, "-2");
+        assertExpression(-2, row, "-2");
+        long v = Integer.MIN_VALUE;
+        v--;
+        assertExpression(v, row, Long.toString(v));
     }
     
     @Test
@@ -155,9 +159,10 @@ public class CodeGeneratorTest extends Assert
         alias.setColumns(new String[] {"a", "b", "c", "d" , "e"});
         Row row = Row.of(alias, 0, new Object[] {true, false, false, false, false });
 
-        assertExpression(1L, row, "1");
-        assertExpression(1.1, row, "1.1");
-        assertExpression(10L, row, "10");
+        assertExpression(1, row, "1");
+        assertExpression(Long.MAX_VALUE, row, Long.toString(Long.MAX_VALUE));
+        assertExpression(1.1f, row, "1.1");
+        assertExpression(10, row, "10");
         assertExpression("hello world", row, "'hello world'");
         assertExpression(null, row, "null");
         assertExpression(false, row, "false");
@@ -178,86 +183,46 @@ public class CodeGeneratorTest extends Assert
         assertExpression(true, row, "1 in(c, 1,2,3,'str', c)");
         assertExpression(false, row, "10.1 in(c, 1,2,3,'str', c)");
     }
+    
+    @Test
+    public void test_functions() throws Exception
+    {
+        TableAlias alias = TableAlias.of(null, "article", "a");
+        alias.setColumns(new String[] {"a", "b", "c"});
+        Row row = Row.of(alias, 0, new Object[] {asList(), null, asList(1, 2)});
+
+        assertExpression(10, null, "isnull(null, 10)");
+        assertExpression(10, null, "isnull(10, var)");
+        assertExpression(6, null, "coalesce(null, null, 1+2+3)");
+        assertFail(IllegalArgumentException.class, "expected 2 parameters", "isnull(10, var, 1)");
+        
+        // Empty 
+        assertExpression(false, row, "a.any(x -> x > 0)");
+        assertExpression(true, row, "a.all(x -> x > 0)");
+        assertExpression(true, row, "a.none(x -> x > 0)");
+
+        // Null 
+        assertExpression(null, row, "b.any(x -> x > 0)");
+        assertExpression(null, row, "b.all(x -> x > 0)");
+        assertExpression(null, row, "b.none(x -> x > 0)");
+        
+        // Values
+        assertExpression(true, row, "c.any(x -> x > 0)");
+        assertExpression(true, row, "c.all(x -> x > 0)");
+        assertExpression(false, row, "c.none(x -> x > 0)");
+
+        assertExpression(false, row, "c.any(x -> x < 0)");
+        assertExpression(false, row, "c.all(x -> x < 0)");
+        assertExpression(true, row, "c.none(x -> x < 0)");
+        
+        assertFail(IllegalArgumentException.class, "Expected boolean result but got: 2", row, "c.any(x -> x+1)");
+    }
 
     @SuppressWarnings("unchecked")
     public <T> Set<T> asSet(T... items)
     {
         return new HashSet<>(asList(items));
     }
-
-//    @Ignore
-//    @Test
-//    public void test_performance() throws Exception
-//    {
-//        TableAlias sourceMeta = TableAlias.of(null, "source", "s");
-//        sourceMeta.setColumns(new String[] {"art_id", "sku_id"});
-//        TableAlias campaignMeta = TableAlias.of(sourceMeta, "campaign", "c");
-//        campaignMeta.setColumns(new String[] {"apply_to_articles", "includeArtIds", "includeSkuIds", "excludeArtIds", "excludeSkuIds"});
-//
-//        Random rnd = new Random();
-//        // _source (art_id, sku_id)
-//        Operator sourceScan = new ListScan(
-//                sourceMeta,
-//                new CachedSupplier<>(() -> IntStream.range(1, 300000).mapToObj(i -> new Object[] {i, i / 5 + i}).collect(Collectors.toList())));
-//
-//        // articleAttribute ("apply_to_articles", "includeArtIds", "includeSkuIds", "excludeArtIds", "excludeSkuIds")
-//        Operator campaignScan = new ListScan(
-//                campaignMeta,
-//                new CachedSupplier<>(() -> IntStream.range(1, 200)
-//                        .mapToObj(i -> new Object[] {0, asList(rnd.nextInt(300000), rnd.nextInt(300000), rnd.nextInt(300000), rnd.nextInt(300000)), asList(rnd.nextInt(1000)),
-//                                asList(rnd.nextInt(1000)), asList(rnd.nextInt(1000))})
-//                        .collect(Collectors.toList())));
-//
-//        //        "(c.apply_to_articles = 1 or ( s.art_id in (c.includeArtIds) or s.sku_id in (c.includeSkuIds) ))"
-//
-//        String expression = "(c.apply_to_articles = 1 or (s.art_id in (c.includeArtIds) or s.sku_id in (c.includeSkuIds)))  and not (s.art_id in (c.excludeArtIds) or s.sku_id in (c.excludeSkuIds) )";
-//
-//        /*
-//         *  Input r_in_apply_to_articles = new Input("apply_to_articles");
-//            Input r_out_art_id = new Input("art_id");
-//            Input r_in_includeArtIds = new Input("includeArtIds");
-//            Input r_out_sku_id = new Input("sku_id");
-//            Input r_in_includeSkuIds = new Input("includeSkuIds");
-//            Input r_in_excludeArtIds = new Input("excludeArtIds");
-//            Input r_in_excludeSkuIds = new Input("excludeSkuIds");
-//         *
-//         */
-//        
-//        Expression e = parser.parseExpression(catalogRegistry, expression);
-//
-//
-//        CodeGenerator gen = new CodeGenerator();
-//        Predicate<Row> predicate = gen.generatePredicate(campaignMeta, e);
-//        
-////        BiPredicate<Row, Row> predicate = getBiPredicate(expression, campaignMeta);
-//        //                ExpressionCodeGenVisitorTest::test;// getBiPredicate(expression, campaignMeta);
-//
-//        Operator op = new NestedLoop(
-//                sourceScan,
-//                campaignScan,
-//                predicate,
-//                DefaultRowMerger.DEFAULT);
-//
-//        for (int i = 0; i < 100; i++)
-//        {
-//            StopWatch sw = new StopWatch();
-//            sw.start();
-//            int rowCount = 0;
-//            int innerCount = 0;
-//            Iterator<Row> it = op.open(new OperatorContext());
-//            while (it.hasNext())
-//            {
-//                Row row = it.next();
-//                innerCount += row.getChildRows(0).size();
-//                rowCount++;
-//            }
-//            sw.stop();
-//            System.out.println("Row count: " + rowCount + " Inner count: " + innerCount + ", Memory: "
-//                + FileUtils.byteCountToDisplaySize(Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) + " Time: "
-//                + sw.toString());
-//        }
-//
-//    }
 
     @Test
     public void test_qualifiednames() throws Exception
@@ -387,8 +352,8 @@ public class CodeGeneratorTest extends Assert
         assertExpression(false, row, "not (1 > 0)");
 
         // Test different types
-        assertFail(ClassCastException.class, row, "a and d");
-        assertFail(ClassCastException.class, row, "b or d");
+        assertFail(ClassCastException.class, "java.lang.Integer cannot be cast to java.lang.Boolean", row, "a and d");
+        assertFail(ClassCastException.class, "java.lang.Integer cannot be cast to java.lang.Boolean", row, "b or d");
     }
 
     @Test
@@ -399,28 +364,28 @@ public class CodeGeneratorTest extends Assert
 
         Object[] results = new Object[] {
                 // 1  1
-                2L, 0L, 1L, 1L, 0L,
+                2, 0, 1, 1, 0,
                 // 1  1.0
-                2.0, 0.0, 1.0, 1.0, 0.0,
+                2.0f, 0.0f, 1.0f, 1.0f, 0.0f,
                 // 1  null
                 null, null, null, null, null,
                 // 1  a
-                2L, 0L, 1L, 1L, 0L,
+                2, 0, 1, 1, 0,
                 // 1  b
-                2.0, 0.0, 1.0, 1.0, 0.0,
+                2.0f, 0.0f, 1.0f, 1.0f, 0.0f,
                 // 1  c
                 null, null, null, null, null,
 
                 // 1.0  1
-                2.0, 0.0, 1.0, 1.0, 0.0,
+                2.0f, 0.0f, 1.0f, 1.0f, 0.0f,
                 // 1.0  1.0
-                2.0, 0.0, 1.0, 1.0, 0.0,
+                2.0f, 0.0f, 1.0f, 1.0f, 0.0f,
                 // 1.0  null
                 null, null, null, null, null,
                 // 1.0  a
-                2.0, 0.0, 1.0, 1.0, 0.0,
+                2.0f, 0.0f, 1.0f, 1.0f, 0.0f,
                 // 1.0  b
-                2.0, 0.0, 1.0, 1.0, 0.0,
+                2.0f, 0.0f, 1.0f, 1.0f, 0.0f,
                 // 1.0  c
                 null, null, null, null, null,
 
@@ -438,28 +403,28 @@ public class CodeGeneratorTest extends Assert
                 null, null, null, null, null,
 
                 // a  1
-                2L, 0L, 1L, 1L, 0L,
+                2, 0, 1, 1, 0,
                 // a  1.0
-                2.0, 0.0, 1.0, 1.0, 0.0,
+                2.0f, 0.0f, 1.0f, 1.0f, 0.0f,
                 // a  null
                 null, null, null, null, null,
                 // a  a
-                2L, 0L, 1L, 1L, 0L,
+                2, 0, 1, 1, 0,
                 // a  b
-                2.0, 0.0, 1.0, 1.0, 0.0,
+                2.0f, 0.0f, 1.0f, 1.0f, 0.0f,
                 // a  c
                 null, null, null, null, null,
 
                 // b  1
-                2.0, 0.0, 1.0, 1.0, 0.0,
+                2.0f, 0.0f, 1.0f, 1.0f, 0.0f,
                 // b  1.0
-                2.0, 0.0, 1.0, 1.0, 0.0,
+                2.0f, 0.0f, 1.0f, 1.0f, 0.0f,
                 // b  null
                 null, null, null, null, null,
                 // b  a
-                2.0, 0.0, 1.0, 1.0, 0.0,
+                2.0f, 0.0f, 1.0f, 1.0f, 0.0f,
                 // b  b
-                2.0, 0.0, 1.0, 1.0, 0.0,
+                2.0f, 0.0f, 1.0f, 1.0f, 0.0f,
                 // b  c
                 null, null, null, null, null,
 
@@ -479,7 +444,7 @@ public class CodeGeneratorTest extends Assert
 
         TableAlias alias = TableAlias.of(null, "article", "a");
         alias.setColumns(new String[] {"a", "b", "c"});
-        Row row = Row.of(alias, 0, new Object[] {1, 1.0, null});
+        Row row = Row.of(alias, 0, new Object[] {1, 1.0f, null});
 
         int index = 0;
         for (String l : expression)
@@ -496,12 +461,12 @@ public class CodeGeneratorTest extends Assert
         assertExpression("hello world", row, "'hello' + ' world'");
 
         // Test different types
-        assertFail(ArithmeticException.class, "true + 10");
-        assertFail(ArithmeticException.class, "true - 10");
-        assertFail(ArithmeticException.class, "true * 10");
-        assertFail(ArithmeticException.class, "true / 10");
-        assertFail(ArithmeticException.class, "true % 10");
-        assertFail(ArithmeticException.class, "1 / 0");
+        assertFail(ArithmeticException.class, "Cannot subtract true", "true - 10");
+        assertFail(ArithmeticException.class, "Cannot multiply true", "true * 10");
+        assertFail(ArithmeticException.class, "Cannot divide true", "true / 10");
+        assertFail(ArithmeticException.class, "Cannot add true", "true + 10");
+        assertFail(ArithmeticException.class, "Cannot modulo true", "true % 10");
+        assertFail(ArithmeticException.class, "/ by zero", "1 / 0");
     }
 
     @Test
@@ -621,30 +586,52 @@ public class CodeGeneratorTest extends Assert
         assertExpression(true, row, "false <= false");
 
         // Test different types
-        assertFail(IllegalArgumentException.class, "true = 10");
-        assertFail(IllegalArgumentException.class, "true != 10");
-        assertFail(IllegalArgumentException.class, "true > 10");
-        assertFail(IllegalArgumentException.class, "true >= 10");
-        assertFail(IllegalArgumentException.class, "true < 10");
-        assertFail(IllegalArgumentException.class, "true <= 10");
+        assertFail(IllegalArgumentException.class, "Cannot compare true", "true = 10");
+        assertFail(IllegalArgumentException.class, "Cannot compare true", "true != 10");
+        assertFail(IllegalArgumentException.class, "Cannot compare true", "true > 10");
+        assertFail(IllegalArgumentException.class, "Cannot compare true", "true >= 10");
+        assertFail(IllegalArgumentException.class, "Cannot compare true", "true < 10");
+        assertFail(IllegalArgumentException.class, "Cannot compare true", "true <= 10");
     }
 
-    private void assertFail(Class<? extends Exception> e, String expression)
+    private void assertFail(Class<? extends Exception> e, String messageContains, String expression)
     {
-        assertFail(e, null, expression);
+        assertFail(e, messageContains, null, expression);
     }
     
-    private void assertFail(Class<? extends Exception> e, Row row, String expression)
+    private void assertFail(Class<? extends Exception> e, String messageContains, Row row, String expression)
     {
+        Expression expr = null;
         try
         {
-            Expression expr = parser.parseExpression(catalogRegistry, expression);
+            expr = parser.parseExpression(catalogRegistry, expression);
             codeGenerator.generateFunction(null, expr).apply(row);
+            fail(expression + " should fail.");
+        }
+        catch (NotImplementedException ee)
+        {
+            System.out.println("Implement. " + ee.getMessage());
+        }
+        catch (Exception ee)
+        {
+            assertEquals(e, ee.getClass());
+            assertTrue("Expected expcetion message to contain " + messageContains + " but was: " + ee.getMessage(), ee.getMessage().contains(messageContains));
+        }
+        
+        if (expr == null)
+        {
+            return;
+        }
+        
+        try
+        {
+            expr.eval(new EvaluationContext(), row);
             fail(expression + " should fail.");
         }
         catch (Exception ee)
         {
             assertEquals(e, ee.getClass());
+            assertTrue("Expected expcetion message to contain " + messageContains + " but was: " + ee.getMessage(), ee.getMessage().contains(messageContains));
         }
     }
 
@@ -655,8 +642,16 @@ public class CodeGeneratorTest extends Assert
         try
         {
             Expression expr = parser.parseExpression(catalogRegistry, expression);
-            BaseFunction function = codeGenerator.generateFunction(alias, expr);
-            assertEquals(expression, value, function.apply(row));
+            try
+            {
+                BaseFunction function = codeGenerator.generateFunction(alias, expr);
+                assertEquals(expression, value, function.apply(row));
+            }
+            catch (NotImplementedException e)
+            {
+                System.out.println("Implement. " + e.getMessage());
+            }
+            
             assertEquals("Eval: " + expression, value, expr.eval(new EvaluationContext(), row));
         }
         catch (Exception e)
