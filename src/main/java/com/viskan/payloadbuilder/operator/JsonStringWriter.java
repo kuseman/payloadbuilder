@@ -9,6 +9,11 @@ public class JsonStringWriter implements OutputWriter
 {
     private StringBuilder sb = new StringBuilder();
 
+    public void append(String string)
+    {
+        sb.append(string);
+    }
+    
     public String getAndReset()
     {
         if (sb.charAt(sb.length() - 1) == ',')

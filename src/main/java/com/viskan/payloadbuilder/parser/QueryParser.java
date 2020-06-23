@@ -108,7 +108,7 @@ public class QueryParser
     {
         return getTree(catalogRegistry, expression, p -> p.topExpression());
     }
-
+    
     @SuppressWarnings("unchecked")
     private <T> T getTree(CatalogRegistry catalogRegistry, String body, Function<PayloadBuilderQueryParser, ParserRuleContext> function)
     {
@@ -117,7 +117,7 @@ public class QueryParser
             @Override
             public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol, int line, int charPositionInLine, String msg, RecognitionException e)
             {
-                throw new RuntimeException("Error parsing query " + body + ". Position: " + charPositionInLine + " " + msg);
+                throw new ParseException(msg, line, charPositionInLine + 1);
             }
         };
 
@@ -179,6 +179,21 @@ public class QueryParser
             if (joinedTableSource != null && joinedTableSource.getTableSource() instanceof PopulateTableSource)
             {
                 throw new IllegalArgumentException("Top table source cannot be a populating table source.");
+            }
+            else if (joinedTableSource == null)
+            {
+                if (ctx.where != null)
+                {
+                    throw new IllegalArgumentException("Cannot have a WHERE clause without a FROM.");
+                }
+                else if (!ctx.groupBy.isEmpty())
+                {
+                    throw new IllegalArgumentException("Cannot have a GROUP BY clause without a FROM.");
+                }
+                else if (!ctx.sortItem().isEmpty())
+                {
+                    throw new IllegalArgumentException("Cannot have a ORDER BY clause without a FROM.");
+                }
             }
             
             Expression where = getExpression(ctx.where);

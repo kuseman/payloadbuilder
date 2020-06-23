@@ -3,34 +3,55 @@ package com.viskan.payloadbuilder.editor;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
+import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
+import javax.swing.JTabbedPane;
+import javax.swing.JTextArea;
+import javax.swing.SwingConstants;
+import javax.swing.border.BevelBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.BadLocationException;
 
 import org.apache.commons.lang3.mutable.MutableInt;
+import org.apache.commons.lang3.time.DurationFormatUtils;
+import org.fife.ui.rsyntaxtextarea.SquiggleUnderlineHighlightPainter;
 import org.fife.ui.rsyntaxtextarea.SyntaxConstants;
 import org.fife.ui.rsyntaxtextarea.TextEditorPane;
 import org.fife.ui.rtextarea.RTextScrollPane;
+import org.kordamp.ikonli.fontawesome.FontAwesome;
+import org.kordamp.ikonli.swing.FontIcon;
 
 /** Content of a query editor. Text editor and a result panel separated with a split panel */
-class QueryEditorContent extends JPanel
+class QueryEditorContentView extends JPanel
 {
     private final JSplitPane splitPane;
-    private final JPanel result;
+    //    private final JPanel result;
+    private final JTextArea messages;
     private final TextEditorPane textEditor;
     private final Consumer<String> textChangeAction;
     private final QueryFile file;
+    private final JLabel labelRunTime;
+    private final JLabel labelRowCount;
 
     private boolean resultCollapsed = false;
     private int prevDividerLocation;
+    private final JLabel labelExecutionStatus;
+    private final AnimatedIcon executionStatusIcon;
 
-    QueryEditorContent(QueryFile file, Consumer<String> textChangeAction)
+    QueryEditorContentView(
+            QueryFile file,
+            Consumer<String> textChangeAction,
+            Consumer<QueryEditorContentView> caretChangeListener)
     {
         this.file = file;
         this.textChangeAction = textChangeAction;
@@ -44,16 +65,85 @@ class QueryEditorContent extends JPanel
         textEditor.setText(file.getQuery());
         RTextScrollPane sp = new RTextScrollPane(textEditor);
         textEditor.getDocument().addDocumentListener(new TextAreaDocumentListener());
+        textEditor.addCaretListener(evt -> caretChangeListener.accept(this));
 
-        result = new JPanel();
+        messages = new JTextArea();
+
+        JTabbedPane result = new JTabbedPane();
+        result.add("Messages", new JScrollPane(messages));
+
         splitPane = new JSplitPane();
         splitPane.setOrientation(JSplitPane.VERTICAL_SPLIT);
         splitPane.setDividerLocation(400);
         splitPane.setLeftComponent(sp);
         splitPane.setRightComponent(result);
         add(splitPane, BorderLayout.CENTER);
+
+        JPanel panelStatus = new JPanel();
+        panelStatus.setPreferredSize(new Dimension(10, 20));
+        add(panelStatus, BorderLayout.SOUTH);
+        panelStatus.setLayout(new FlowLayout(FlowLayout.LEFT, 5, 0));
+
+        labelExecutionStatus = new JLabel();
+        
+        executionStatusIcon = new AnimatedIcon(labelExecutionStatus, 
+                250,
+                FontIcon.of(FontAwesome.HOURGLASS_1),
+                FontIcon.of(FontAwesome.HOURGLASS_2),
+                FontIcon.of(FontAwesome.HOURGLASS_3));
+        
+        labelExecutionStatus.setIcon(executionStatusIcon);
+        
+        labelRunTime = new JLabel("", SwingConstants.CENTER);
+        labelRunTime.setPreferredSize(new Dimension(100, 20));
+        labelRunTime.setBorder(new BevelBorder(BevelBorder.LOWERED));
+        labelRunTime.setToolTipText("Last query run time");
+
+        labelRowCount = new JLabel("", SwingConstants.CENTER);
+        labelRowCount.setPreferredSize(new Dimension(100, 20));
+        labelRowCount.setBorder(new BevelBorder(BevelBorder.LOWERED));
+        labelRowCount.setToolTipText("Last query row count");
+
+        panelStatus.add(labelExecutionStatus);
+        panelStatus.add(labelRunTime);
+        panelStatus.add(labelRowCount);
     }
 
+    int getCaretLineNumber()
+    {
+        return textEditor.getCaretLineNumber() + 1;
+    }
+
+    int getCaretOffsetFromLineStart()
+    {
+        return textEditor.getCaretOffsetFromLineStart() + 1;
+    }
+
+    int getCaretPosition()
+    {
+        return textEditor.getCaretPosition();
+    }
+    
+    void startQuery()
+    {
+        executionStatusIcon.start();
+    }
+
+    void stopQuery()
+    {
+        executionStatusIcon.stop();
+    }
+    
+    void setRunTime(long millis)
+    {
+        labelRunTime.setText(DurationFormatUtils.formatDurationHMS(millis));
+    }
+
+    void setRowCount(int rowCount)
+    {
+        labelRowCount.setText(String.valueOf(rowCount));
+    }
+    
     void toggleResultPane()
     {
         // Expanded
@@ -69,11 +159,11 @@ class QueryEditorContent extends JPanel
             resultCollapsed = false;
         }
     }
-    
+
     /**
      * <pre>
      * Toggle comments on selected lines
-     *  </pre>
+     * </pre>
      **/
     void toggleComments()
     {
@@ -83,29 +173,29 @@ class QueryEditorContent extends JPanel
         int selEnd = textEditor.getSelectionEnd();
         boolean caretSelection = selEnd - selStart == 0;
         Boolean addComments = null;
-        
+
         try
         {
             List<MutableInt> startOffsets = new ArrayList<>();
-            
+
             for (int i = 0; i < lines; i++)
             {
                 int startOffset = textEditor.getLineStartOffset(i);
                 int endOffset = textEditor.getLineEndOffset(i) - 1;
 
                 if (between(startOffset, endOffset, selStart)
-                        || (startOffset > selStart && endOffset <= selEnd)
-                        || between(startOffset, endOffset, selEnd))
+                    || (startOffset > selStart && endOffset <= selEnd)
+                    || between(startOffset, endOffset, selEnd))
                 {
                     if (addComments == null)
                     {
                         addComments = !"--".equals(textEditor.getText(startOffset, 2));
                     }
-                    
+
                     startOffsets.add(new MutableInt(startOffset));
                 }
             }
-            
+
             if (!startOffsets.isEmpty())
             {
                 int modifier = 0;
@@ -122,7 +212,7 @@ class QueryEditorContent extends JPanel
                     startOffset.setValue(Math.max(startOffset.getValue() + modifier, 0));
                     modifier += addComments ? 2 : -2;
                 }
-                
+
                 selStart = startOffsets.get(0).getValue();
                 if (!caretSelection)
                 {
@@ -133,12 +223,12 @@ class QueryEditorContent extends JPanel
                     selEnd = selStart;
                 }
             }
-            
+
         }
         catch (BadLocationException e)
         {
         }
-        
+
         textEditor.setSelectionStart(selStart);
         textEditor.setSelectionEnd(selEnd);
     }
@@ -162,10 +252,34 @@ class QueryEditorContent extends JPanel
     {
         textEditor.discardAllEdits();
     }
-    
-    private boolean between(int start, int end, int value)
+
+    void highLight(int line, int column)
     {
-        return value >= start && value <= end;
+        try
+        {
+            int pos = textEditor.getLineStartOffset(line - 1) + column - 1;
+            textEditor.getHighlighter().addHighlight(pos, pos + 3, new SquiggleUnderlineHighlightPainter(Color.RED));
+        }
+        catch (BadLocationException e)
+        {
+        }
+    }
+
+    void clearHighLights()
+    {
+        int selStart = textEditor.getSelectionStart();
+        int selEnd = textEditor.getSelectionEnd();
+        
+        textEditor.getHighlighter().removeAllHighlights();
+        
+        textEditor.setSelectionStart(selStart);
+        textEditor.setSelectionEnd(selEnd);
+    }
+
+    void setMessage(String message)
+    {
+
+        messages.setText(message);
     }
 
     @Override
@@ -173,6 +287,11 @@ class QueryEditorContent extends JPanel
     {
         textEditor.requestFocusInWindow();
         return true;
+    }
+
+    private boolean between(int start, int end, int value)
+    {
+        return value >= start && value <= end;
     }
 
     private class TextAreaDocumentListener implements DocumentListener

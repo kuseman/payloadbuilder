@@ -20,9 +20,10 @@ import javax.swing.plaf.basic.BasicButtonUI;
 
 import org.apache.commons.io.FilenameUtils;
 
-class TabComponent extends JPanel
+/** View for tab header component */
+class TabComponentView extends JPanel
 {
-    TabComponent(final QueryFile file, final Runnable closeAction)
+    TabComponentView(final QueryFile file, final Runnable closeAction)
     {
         super(new FlowLayout(FlowLayout.LEFT, 0, 0));
         setOpaque(false);
@@ -38,30 +39,29 @@ class TabComponent extends JPanel
 
         file.addPropertyChangeListener(evt ->
         {
-            String filename = FilenameUtils.getName(file.getFilename());
-            if (QueryFile.DIRTY.equals(evt.getPropertyName()))
-            {
-
-                if (file.isDirty())
-                {
-                    name.setText("*" + filename);
-                }
-                else
-                {
-                    name.setText(filename);
-                }
-            }
-            else if (QueryFile.FILENAME.equals(evt.getPropertyName()))
-            {
-                name.setText(filename);
-                //                    this.setToolTipText(file.getFilename());
-            }
+            name.setText(getTabTitle(file));
         });
 
         add(name);
         add(button);
     }
 
+    private String getTabTitle(QueryFile file)
+    {
+        String filename = FilenameUtils.getName(file.getFilename());
+        StringBuilder sb = new StringBuilder();
+        if (file.isDirty())
+        {
+            sb.append("*");
+        }
+        sb.append(filename);
+        if (file.isExecuting())
+        {
+            sb.append(" Executing ...");
+        }
+        return sb.toString();
+    }
+    
     class TabButton extends JButton// implements ActionListener
     {
         public TabButton()

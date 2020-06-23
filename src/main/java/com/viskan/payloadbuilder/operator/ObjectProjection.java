@@ -44,12 +44,12 @@ public class ObjectProjection implements Projection
             context.setParentRow(row);
             Iterator<Row> it = selection.open(context);
             rowToUse = it.hasNext() ? it.next() : null;
-        }
-
-        if (rowToUse == null)
-        {
-            writer.writeValue(null);
-            return;
+            
+            if (rowToUse == null)
+            {
+                writer.writeValue(null);
+                return;
+            }
         }
 
         writer.startObject();

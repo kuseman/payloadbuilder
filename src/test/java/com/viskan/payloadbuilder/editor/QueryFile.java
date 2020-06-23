@@ -15,14 +15,17 @@ public class QueryFile
     static final String DIRTY = "dirty";
     static final String FILENAME = "filename";
     static final String QUERY = "query";
+    static final String EXECUTING = "executing";
     
     private boolean dirty;
     private boolean newFile = true;
     private String filename = "";
+    private boolean executing;
     /** Query from disk */
     private String savedQuery = "";
     private String query = "";
-   
+    private Output output = Output.JSON_RAW;
+    
     QueryFile()
     {}
     
@@ -58,7 +61,23 @@ public class QueryFile
             pcs.firePropertyChange(DIRTY, oldValue, newValue);
         }
     }
+    
+    boolean isExecuting()
+    {
+        return executing;
+    }
 
+    public void setExecuting(boolean executing)
+    {
+        boolean oldValue = this.executing;
+        boolean newValue = executing;
+        if (newValue != oldValue)
+        {
+            this.executing = executing;
+            pcs.firePropertyChange(EXECUTING, oldValue, newValue);
+        }
+    }
+    
     boolean isNew()
     {
         return newFile;
@@ -122,5 +141,25 @@ public class QueryFile
     void addPropertyChangeListener(PropertyChangeListener listener)
     {
         pcs.addPropertyChangeListener(listener);
+    }
+    
+    Output getOutput()
+    {
+        return output;
+    }
+    
+    void setOutput(Output output)
+    {
+        this.output = output;
+    }
+    
+    enum Output
+    {
+        JSON_RAW,
+        JSON_PRETTY,
+        NONE,
+        TABLE,
+        TABLE_JSON,
+        FILE,
     }
 }

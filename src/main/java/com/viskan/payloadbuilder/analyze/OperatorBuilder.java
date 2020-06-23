@@ -178,7 +178,7 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
         query.accept(VISITOR, context);
         context.columnsByAlias.entrySet().forEach(e ->
         {
-            if (e.getKey().getColumns() == null)
+            if (e.getKey() != null && e.getKey().getColumns() == null)
             {
                 e.getKey().setColumns(e.getValue().toArray(EMPTY_STRING_ARRAY));
             }
@@ -190,10 +190,12 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
     public Void visit(Query query, Context context)
     {
         TableSourceJoined tsj = query.getFrom();
-
+        List<AJoin> joins = tsj != null? tsj.getJoins() : emptyList();
+        int joinSize = joins.size();
+        
         Expression where = query.getWhere();
         Expression pushDownPredicate = null;
-        if (where != null && tsj.getJoins().size() > 0)
+        if (where != null && joinSize > 0)
         {
             /* TODO:
               Push down can applied to non populating joins ie:
@@ -217,19 +219,21 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
             }
         }
 
-        List<AJoin> joins = tsj.getJoins();
-        int size = joins.size();
+        
         int batchSize = -1;
         int batchLimitId = -1;
         // No need to batch when there is no joins
-        if (size > 0)
+        if (joinSize > 0)
         {
             batchSize = getBatchSize(tsj.getTableSource());
         }
         // TODO: Utilize index of "from" clause if applicable
         //       ie. s.id = 10, s.id in (1,2,3,4,5)
-        tsj.getTableSource().accept(this, context);
-
+        if (tsj != null)
+        {
+            tsj.getTableSource().accept(this, context);
+        }
+        
         // Collect columns from pushed down predicate
         if (pushDownPredicate != null)
         {
@@ -243,7 +247,7 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
             context.operator = new BatchLimitOperator(batchLimitId, context.operator, batchSize);
         }
 
-        for (int i = 0; i < size; i++)
+        for (int i = 0; i < joinSize; i++)
         {
             joins.get(i).accept(this, context);
         }

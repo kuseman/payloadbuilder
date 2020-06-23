@@ -14,7 +14,6 @@ class PayloadbuilderEditorModel extends Observable
     public static final String SELECTED_FILE = "selectedFile";
 
     private final List<QueryFile> files = new ArrayList<>();
-    private QueryFile selectedFile;
 
     void addPropertyChangeListener(PropertyChangeListener listener)
     {
@@ -47,7 +46,6 @@ class PayloadbuilderEditorModel extends Observable
         {
             files.add(file);
         }
-        this.selectedFile = file;
         pcs.fireIndexedPropertyChange(SELECTED_FILE, index, existing, file);
     }
 

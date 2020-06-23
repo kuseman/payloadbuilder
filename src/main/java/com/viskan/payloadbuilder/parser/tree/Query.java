@@ -20,7 +20,7 @@ public class Query extends ANode
             List<SortItem> orderBy)
     {
         this.selectItems = requireNonNull(selectItems, "selectItems");
-        this.from = requireNonNull(from, "from");
+        this.from = from;
         this.where = where;
         this.groupBy = requireNonNull(groupBy, "groupBy");
         this.orderBy = requireNonNull(orderBy, "orderBy");
