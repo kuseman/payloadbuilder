@@ -187,35 +187,10 @@ public class CodeGeneratorTest extends Assert
     @Test
     public void test_functions() throws Exception
     {
-        TableAlias alias = TableAlias.of(null, "article", "a");
-        alias.setColumns(new String[] {"a", "b", "c"});
-        Row row = Row.of(alias, 0, new Object[] {asList(), null, asList(1, 2)});
-
         assertExpression(10, null, "isnull(null, 10)");
         assertExpression(10, null, "isnull(10, var)");
         assertExpression(6, null, "coalesce(null, null, 1+2+3)");
         assertFail(IllegalArgumentException.class, "expected 2 parameters", "isnull(10, var, 1)");
-        
-        // Empty 
-        assertExpression(false, row, "a.any(x -> x > 0)");
-        assertExpression(true, row, "a.all(x -> x > 0)");
-        assertExpression(true, row, "a.none(x -> x > 0)");
-
-        // Null 
-        assertExpression(null, row, "b.any(x -> x > 0)");
-        assertExpression(null, row, "b.all(x -> x > 0)");
-        assertExpression(null, row, "b.none(x -> x > 0)");
-        
-        // Values
-        assertExpression(true, row, "c.any(x -> x > 0)");
-        assertExpression(true, row, "c.all(x -> x > 0)");
-        assertExpression(false, row, "c.none(x -> x > 0)");
-
-        assertExpression(false, row, "c.any(x -> x < 0)");
-        assertExpression(false, row, "c.all(x -> x < 0)");
-        assertExpression(true, row, "c.none(x -> x < 0)");
-        
-        assertFail(IllegalArgumentException.class, "Expected boolean result but got: 2", row, "c.any(x -> x+1)");
     }
 
     @SuppressWarnings("unchecked")

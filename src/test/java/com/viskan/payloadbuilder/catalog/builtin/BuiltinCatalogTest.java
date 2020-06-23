@@ -82,15 +82,32 @@ public class BuiltinCatalogTest extends Assert
     }
 
     @Test
-    public void test_function_any()
+    public void test_function_match()
     {
-        TableAlias alias = TableAlias.of(null, "table", "t");
-        alias.setColumns(new String[] {"a", "b"});
-        Row row = Row.of(alias, 0, new Object[] {asList(-1, -2, -3, 0, 1, 2, 3), null});
-        assertFunction(false, row, "b.any(a -> a > 2)");
-        assertFunction(true, row, "a.any(a -> a > 2)");
-        assertFunction(false, row, "a.any(a -> a < -10)");
-//        assertFunction(asList(-1, -2, -3, 0, 1, 2, 3), row, "map(a.map(a -> a * 2), a -> a / 2)");
+        TableAlias alias = TableAlias.of(null, "article", "a");
+        alias.setColumns(new String[] {"a", "b", "c"});
+        Row row = Row.of(alias, 0, new Object[] {asList(), null, asList(1, 2)});
+        
+        // Empty 
+        assertFunction(false, row, "a.any(x -> x > 0)");
+        assertFunction(true, row, "a.all(x -> x > 0)");
+        assertFunction(true, row, "a.none(x -> x > 0)");
+
+        // Null 
+        assertFunction(null, row, "b.any(x -> x > 0)");
+        assertFunction(null, row, "b.all(x -> x > 0)");
+        assertFunction(null, row, "b.none(x -> x > 0)");
+        
+        // Values
+        assertFunction(true, row, "c.any(x -> x > 0)");
+        assertFunction(true, row, "c.all(x -> x > 0)");
+        assertFunction(false, row, "c.none(x -> x > 0)");
+
+        assertFunction(false, row, "c.any(x -> x < 0)");
+        assertFunction(false, row, "c.all(x -> x < 0)");
+        assertFunction(true, row, "c.none(x -> x < 0)");
+        
+        assertFail(IllegalArgumentException.class, "Expected boolean result but got: 2", row, "c.any(x -> x+1)");
     }
 
     @Test
@@ -136,5 +153,41 @@ public class BuiltinCatalogTest extends Assert
         }
 
         assertEquals("Eval", expected, actual);
+    }
+    
+    private void assertFail(Class<? extends Exception> e, String messageContains, Row row, String expression)
+    {
+        Expression expr = null;
+        try
+        {
+            expr = parser.parseExpression(catalogRegistry, expression);
+            codeGenerator.generateFunction(null, expr).apply(row);
+            fail(expression + " should fail.");
+        }
+        catch (NotImplementedException ee)
+        {
+            System.out.println("Implement. " + ee.getMessage());
+        }
+        catch (Exception ee)
+        {
+            assertEquals(e, ee.getClass());
+            assertTrue("Expected expcetion message to contain " + messageContains + " but was: " + ee.getMessage(), ee.getMessage().contains(messageContains));
+        }
+        
+        if (expr == null)
+        {
+            return;
+        }
+        
+        try
+        {
+            expr.eval(new EvaluationContext(), row);
+            fail(expression + " should fail.");
+        }
+        catch (Exception ee)
+        {
+            assertEquals(e, ee.getClass());
+            assertTrue("Expected expcetion message to contain " + messageContains + " but was: " + ee.getMessage(), ee.getMessage().contains(messageContains));
+        }
     }
 }
