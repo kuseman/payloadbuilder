@@ -1,26 +1,35 @@
 package com.viskan.payloadbuilder.editor;
 
+import com.viskan.payloadbuilder.editor.catalog.EtmArticleCategoryESCatalogExtension;
+import com.viskan.payloadbuilder.editor.catalog.ICatalogExtension;
+
 import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Observable;
 
 import javax.swing.event.SwingPropertyChangeSupport;
 
-class PayloadbuilderEditorModel extends Observable
+class PayloadbuilderEditorModel
 {
     private final SwingPropertyChangeSupport pcs = new SwingPropertyChangeSupport(this);
     public static final String FILES = "files";
     public static final String SELECTED_FILE = "selectedFile";
 
-    private final List<QueryFile> files = new ArrayList<>();
+    private final List<QueryFileModel> files = new ArrayList<>();
+    private final List<ICatalogExtension> extensions = new ArrayList<>();
 
+    PayloadbuilderEditorModel()
+    {
+        extensions.add(new EtmArticleCategoryESCatalogExtension());
+        extensions.add(new EtmArticleCategoryESCatalogExtension());
+    }
+    
     void addPropertyChangeListener(PropertyChangeListener listener)
     {
         pcs.addPropertyChangeListener(listener);
     }
 
-    void addFile(QueryFile file)
+    void addFile(QueryFileModel file)
     {
         setSelectedFile(files.size(), file);
     }
@@ -30,9 +39,9 @@ class PayloadbuilderEditorModel extends Observable
         setSelectedFile(index, files.get(index));
     }
 
-    void setSelectedFile(int index, QueryFile file)
+    void setSelectedFile(int index, QueryFileModel file)
     {
-        QueryFile existing = index == files.size() ? null : files.get(index);
+        QueryFileModel existing = index == files.size() ? null : files.get(index);
         if (existing != null)
         {
             if (existing.equals(file))
@@ -48,13 +57,18 @@ class PayloadbuilderEditorModel extends Observable
         }
         pcs.fireIndexedPropertyChange(SELECTED_FILE, index, existing, file);
     }
+    
+    List<ICatalogExtension> getExtensions()
+    {
+        return extensions;
+    }
 
-    List<QueryFile> getFiles()
+    List<QueryFileModel> getFiles()
     {
         return files;
     }
 
-    void removeFile(QueryFile file)
+    void removeFile(QueryFileModel file)
     {
         files.remove(file);
     }

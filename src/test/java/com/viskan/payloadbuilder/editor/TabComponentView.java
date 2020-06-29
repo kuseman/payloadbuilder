@@ -1,5 +1,7 @@
 package com.viskan.payloadbuilder.editor;
 
+import com.viskan.payloadbuilder.editor.QueryFileModel.State;
+
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Component;
@@ -23,7 +25,7 @@ import org.apache.commons.io.FilenameUtils;
 /** View for tab header component */
 class TabComponentView extends JPanel
 {
-    TabComponentView(final QueryFile file, final Runnable closeAction)
+    TabComponentView(final QueryFileModel file, final Runnable closeAction)
     {
         super(new FlowLayout(FlowLayout.LEFT, 0, 0));
         setOpaque(false);
@@ -46,7 +48,7 @@ class TabComponentView extends JPanel
         add(button);
     }
 
-    private String getTabTitle(QueryFile file)
+    private String getTabTitle(QueryFileModel file)
     {
         String filename = FilenameUtils.getName(file.getFilename());
         StringBuilder sb = new StringBuilder();
@@ -55,7 +57,7 @@ class TabComponentView extends JPanel
             sb.append("*");
         }
         sb.append(filename);
-        if (file.isExecuting())
+        if (file.getState() == State.EXECUTING)
         {
             sb.append(" Executing ...");
         }

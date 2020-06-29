@@ -16,7 +16,7 @@ public class ArrayProjection implements Projection
     public ArrayProjection(List<Projection> projections, Operator selection)
     {
         this.projections = requireNonNull(projections);
-        this.selection = requireNonNull(selection);
+        this.selection = selection;
     }
 
     @Override
@@ -27,13 +27,23 @@ public class ArrayProjection implements Projection
         int size = projections.size();
 
         writer.startArray();
-        Iterator<Row> it = selection.open(context);
-        while (it.hasNext())
+        if (selection != null)
         {
-            Row selectionRow = it.next();
+            Iterator<Row> it = selection.open(context);
+            while (it.hasNext())
+            {
+                Row selectionRow = it.next();
+                for (int i = 0; i < size; i++)
+                {
+                    projections.get(i).writeValue(writer, context, selectionRow);
+                }
+            }
+        }
+        else
+        {
             for (int i = 0; i < size; i++)
             {
-                projections.get(i).writeValue(writer, context, selectionRow);
+                projections.get(i).writeValue(writer, context, row);
             }
         }
         writer.endArray();
@@ -55,8 +65,7 @@ public class ArrayProjection implements Projection
         {
             ArrayProjection p = (ArrayProjection) obj;
             return selection.equals(p.selection)
-                &&
-                projections.equals(p.projections);
+                && projections.equals(p.projections);
         }
         return false;
     }

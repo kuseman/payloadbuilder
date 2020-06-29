@@ -1,6 +1,6 @@
 package com.viskan.payloadbuilder.editor;
 
-import com.viskan.payloadbuilder.editor.QueryFile.Output;
+import com.viskan.payloadbuilder.editor.QueryFileModel.Output;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
@@ -12,6 +12,7 @@ import java.awt.event.KeyEvent;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
+import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
@@ -21,25 +22,27 @@ import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JSplitPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JToolBar;
 import javax.swing.KeyStroke;
 import javax.swing.SwingConstants;
-import javax.swing.border.BevelBorder;
+import javax.swing.border.EtchedBorder;
 
 import org.kordamp.ikonli.fontawesome.FontAwesome;
 import org.kordamp.ikonli.swing.FontIcon;
 
 /** Main view */
-public class PayloadbuilderEditorView extends JFrame
+class PayloadbuilderEditorView extends JFrame
 {
     private static final String TOGGLE_COMMENT = "toggleComment";
     private static final String TOGGLE_RESULT = "toggleResult";
     //    private static final String FORMAT = "Format";
     private static final String NEW_QUERY = "NewQuery";
     private static final String EXECUTE = "Execute";
+    private final JSplitPane splitPane;
     private final JTabbedPane tabEditor;
     private final JPanel panelCatalogs;
     private final JPanel panelStatus;
@@ -50,7 +53,7 @@ public class PayloadbuilderEditorView extends JFrame
     private final JMenuItem saveItem;
     private final JMenuItem saveAsItem;
     private final JMenuItem exitItem;
-    private final JComboBox<QueryFile.Output> comboOutput;
+    private final JComboBox<QueryFileModel.Output> comboOutput;
     private Runnable executeRunnable;
     private Runnable cancelRunnable;
     private Runnable newQueryRunnable;
@@ -63,9 +66,12 @@ public class PayloadbuilderEditorView extends JFrame
     private Runnable toggleCommentRunnable;
     private Runnable outputChangedRunnable;
     
+    private boolean catalogsCollapsed = false;
+    private int prevCatalogsDividerLocation;
+    
     //    private Runnable parametersAction;
 
-    public PayloadbuilderEditorView()
+    PayloadbuilderEditorView()
     {
         setTitle("Payloadbuilder Editor");
         setLocationRelativeTo(null);
@@ -78,11 +84,11 @@ public class PayloadbuilderEditorView extends JFrame
 
         labelMemory = new JLabel("", SwingConstants.CENTER);
         labelMemory.setPreferredSize(new Dimension(100, 20));
-        labelMemory.setBorder(new BevelBorder(BevelBorder.LOWERED));
+        labelMemory.setBorder(new EtchedBorder(EtchedBorder.LOWERED));
         labelMemory.setToolTipText("Memory");
 
         labelCaret = new JLabel("", SwingConstants.CENTER);
-        labelCaret.setBorder(new BevelBorder(BevelBorder.LOWERED));
+        labelCaret.setBorder(new EtchedBorder(EtchedBorder.LOWERED));
         labelCaret.setPreferredSize(new Dimension(100, 20));
         labelCaret.setToolTipText("Caret position (Line, column, position)");
 
@@ -138,7 +144,7 @@ public class PayloadbuilderEditorView extends JFrame
 
         JButton executeButton = new JButton(executeAction);
         executeButton.setText("Execute");
-        executeButton.setToolTipText("Execute current query");
+        executeButton.setToolTipText("Execute query");
 
         toolBar.add(openAction).setToolTipText("Open file");
         toolBar.add(saveAction).setToolTipText("Save current file");
@@ -147,19 +153,20 @@ public class PayloadbuilderEditorView extends JFrame
         toolBar.add(executeButton);
         toolBar.add(stopAction).setToolTipText("Cancel query");
         toolBar.addSeparator();
+        toolBar.add(toggleCatalogsAction).setToolTipText("Toggle catalogs pane");
         toolBar.add(toggleResultAction).setToolTipText("Toggle result pane");
         //        toolBar.add(formatAction).setToolTipText("Format query");
         toolBar.add(toggleCommentAction).setToolTipText("Toggle comment on selected lines");
 
         comboOutput = new JComboBox<>(Output.values());
-        comboOutput.setSelectedItem(Output.JSON_RAW);
+        comboOutput.setSelectedItem(Output.TABLE);
         comboOutput.setMaximumSize(new Dimension(150, 20));
         comboOutput.addItemListener(l -> run(outputChangedRunnable));
         toolBar.addSeparator();
         toolBar.add(new JLabel("Output "));
         toolBar.add(comboOutput);
 
-        JSplitPane splitPane = new JSplitPane();
+        splitPane = new JSplitPane();
         splitPane.setDividerSize(3);
         getContentPane().add(splitPane, BorderLayout.CENTER);
 
@@ -168,8 +175,9 @@ public class PayloadbuilderEditorView extends JFrame
         splitPane.setRightComponent(tabEditor);
 
         panelCatalogs = new JPanel();
-        panelCatalogs.setPreferredSize(new Dimension(150, 10));
-        splitPane.setLeftComponent(panelCatalogs);
+        panelCatalogs.setLayout(new BoxLayout(panelCatalogs, BoxLayout.Y_AXIS));
+        panelCatalogs.setPreferredSize(new Dimension(250, 0));
+        splitPane.setLeftComponent(new JScrollPane(panelCatalogs));
 
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setPreferredSize(new Dimension(1200, 800));
@@ -274,6 +282,26 @@ public class PayloadbuilderEditorView extends JFrame
         }
     };
 
+    private final Action toggleCatalogsAction = new AbstractAction(TOGGLE_RESULT, FontIcon.of(FontAwesome.ARROWS_H))
+    {
+        @Override
+        public void actionPerformed(ActionEvent e)
+        {
+         // Expanded
+            if (!catalogsCollapsed)
+            {
+                prevCatalogsDividerLocation = splitPane.getDividerLocation();
+                splitPane.setDividerLocation(0.0d);
+                catalogsCollapsed = true;
+            }
+            else
+            {
+                splitPane.setDividerLocation(prevCatalogsDividerLocation);
+                catalogsCollapsed = false;
+            }
+        }
+    };
+
     private final Action toggleCommentAction = new AbstractAction(TOGGLE_COMMENT, FontIcon.of(FontAwesome.INDENT))
     {
         @Override
@@ -289,6 +317,11 @@ public class PayloadbuilderEditorView extends JFrame
         {
             runnable.run();
         }
+    }
+    
+    JPanel getPanelCatalogs()
+    {
+        return panelCatalogs;
     }
 
     JLabel getCaretLabel()

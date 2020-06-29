@@ -26,8 +26,6 @@ import com.viskan.payloadbuilder.parser.tree.QualifiedName;
 import com.viskan.payloadbuilder.parser.tree.Query;
 
 import static com.viskan.payloadbuilder.parser.tree.QualifiedName.of;
-import static com.viskan.payloadbuilder.utils.MapUtils.entry;
-import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
 import static java.util.Arrays.asList;
 
 import java.util.Iterator;
@@ -66,23 +64,23 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
             assertTrue(e.getMessage(), e.getMessage().contains("defined multiple times for parent"));
         }
     }
-    
+
     @Test
     public void test_groupBy()
     {
         String query = "select a.art_id from article a group by a.art_id";
         QueryResult queryResult = getQueryResult(query);
-        
+
         Operator expected = new GroupByOperator(
                 1,
                 queryResult.tableOperators.get(0),
                 asList("art_id"),
                 new ExpressionValuesExtractor(asList(e("a.art_id"))),
                 1);
-        
-//        System.out.println(queryResult.operator.toString(1));
-//        System.err.println(expected.toString(1));
-        
+
+        //        System.out.println(queryResult.operator.toString(1));
+        //        System.err.println(expected.toString(1));
+
         assertEquals(expected, queryResult.operator);
     }
 
@@ -127,21 +125,21 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
                 false,
                 false);
 
-//                                System.err.println(expected.toString(1));
-//                                System.out.println(queryResult.operator.toString(1));
+        //                                System.err.println(expected.toString(1));
+        //                                System.out.println(queryResult.operator.toString(1));
 
         assertEquals(expected, queryResult.operator);
 
-        Projection expectedProjection = new ObjectProjection(ofEntries(true,
-                entry("mul", new ExpressionProjection(e("r.Value * r1.Value * r2.Value"))),
-                entry("r", new ExpressionProjection(e("r.Value"))),
-                entry("r1", new ExpressionProjection(e("r1.filter(x -> x.Value > 10).map(x -> x.Value)"))),
-                entry("r2", new ExpressionProjection(e("r2.Value"))),
-                entry("r1A", new ArrayProjection(asList(
-                        new ExpressionProjection(e("Value"))), new ExpressionOperator(6, e("r1"))))));
+        Projection expectedProjection = new ObjectProjection(asList("mul", "r", "r1", "r2", "r1A"), asList(
+                new ExpressionProjection(e("r.Value * r1.Value * r2.Value")),
+                new ExpressionProjection(e("r.Value")),
+                new ExpressionProjection(e("r1.filter(x -> x.Value > 10).map(x -> x.Value)")),
+                new ExpressionProjection(e("r2.Value")),
+                new ArrayProjection(asList(
+                        new ExpressionProjection(e("Value"))), new ExpressionOperator(6, e("r1")))));
 
-        //                        System.err.println(expected.toString(1));
-        //                        System.out.println(queryResult.operator.toString(1));
+        //                                System.err.println(expected.toString(1));
+        //                                System.out.println(queryResult.operator.toString(1));
 
         assertEquals(expectedProjection, queryResult.projection);
     }
@@ -231,13 +229,13 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
                 true,
                 false);
 
-//                System.err.println(expected.toString(1));
-//                System.out.println(queryResult.operator.toString(1));
+        //                System.err.println(expected.toString(1));
+        //                System.out.println(queryResult.operator.toString(1));
 
         assertEquals(expected, queryResult.operator);
 
-        Projection expectedProjection = new ObjectProjection(
-                ofEntries(true, entry("sku_id", new ExpressionProjection(e("aa.sku_id")))));
+        Projection expectedProjection = new ObjectProjection(asList("sku_id"),
+                asList(new ExpressionProjection(e("aa.sku_id"))));
 
         assertEquals(expectedProjection, queryResult.projection);
     }
@@ -505,12 +503,13 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
         assertTrue(source.isEqual(result.alias));
 
         assertEquals(result.tableOperators.get(0), result.operator);
-        assertEquals(new ObjectProjection(ofEntries(true,
-                entry("id1", new ExpressionProjection(parser.parseExpression(catalogRegistry, "s.id1"))),
-                entry("id2", new ExpressionProjection(parser.parseExpression(catalogRegistry, "a.id2"))))),
+        assertEquals(new ObjectProjection(asList("id1", "id2"),
+                asList(
+                        new ExpressionProjection(parser.parseExpression(catalogRegistry, "s.id1")),
+                        new ExpressionProjection(parser.parseExpression(catalogRegistry, "a.id2")))),
                 result.projection);
     }
-  
+
     @Test
     public void test_select_item_with_filter()
     {
@@ -534,21 +533,22 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
                 DefaultRowMerger.DEFAULT,
                 true,
                 false);
-//
-//                        System.out.println(expected.toString(1));
-//                        System.err.println(result.operator.toString(1));
+        //
+        //                        System.out.println(expected.toString(1));
+        //                        System.err.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
 
         assertEquals(
-                new ObjectProjection(ofEntries(true,
-                        entry("arr", new ObjectProjection(ofEntries(true,
-                                entry("id1", new ExpressionProjection(e("s.id1"))),
-                                entry("id2", new ExpressionProjection(e("a.id2")))),
+                new ObjectProjection(asList("arr"),
+                        asList(new ObjectProjection(asList("id1", "id2"),
+                                asList(
+                                        new ExpressionProjection(e("s.id1")),
+                                        new ExpressionProjection(e("a.id2"))),
                                 new FilterOperator(
                                         6,
                                         new ExpressionOperator(5, e("s")),
-                                        new ExpressionPredicate(e("s.id4 > 0"))))))),
+                                        new ExpressionPredicate(e("s.id4 > 0")))))),
                 result.projection);
     }
 
@@ -607,8 +607,8 @@ public class OperatorBuilderTest extends AOperatorBuilderTest
         assertEquals(expected, result.operator);
 
         assertEquals(
-                new ObjectProjection(ofEntries(true,
-                        entry("art_id", new ExpressionProjection(e("s.art_id"))))),
+                new ObjectProjection(asList("art_id"),
+                        asList(new ExpressionProjection(e("s.art_id")))),
                 result.projection);
     }
 

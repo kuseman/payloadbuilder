@@ -20,4 +20,33 @@ public interface OutputWriter
 
     /** End array */
     void endArray();
+    
+    /*
+     * {
+     *   "int": 1,
+     *   "bool": true,
+     *   "arr": [1,2,3,4,5],
+     *   "objArr": [
+     *     {
+     *       ...
+     *     },
+     *     {
+     *       ...
+     *     }
+     *   ]
+     * }
+     * 
+     * RowSet rs;
+     * Object obj;
+     * obj = rs.getObject(0)
+     * obj = rs.getObject(1)
+     * 
+     * RowSet arRs = rs.getArray(2);
+     * 
+     * 
+     */
+    
+    
+    
+    
 }

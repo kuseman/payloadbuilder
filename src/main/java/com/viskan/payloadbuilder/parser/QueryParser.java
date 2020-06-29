@@ -243,10 +243,10 @@ public class QueryParser
 
                 if (type == NestedSelectItem.Type.ARRAY)
                 {
-                    if (from == null)
-                    {
-                        throw new IllegalArgumentException("ARRAY select requires a from clause: " + selectItems);
-                    }
+//                    if (from == null)
+//                    {
+//                        throw new IllegalArgumentException("ARRAY select requires a from clause: " + selectItems);
+//                    }
 
                     Optional<SelectItem> item = selectItems.stream().filter(si -> !isBlank(si.getIdentifier()) && si.isExplicitIdentifier()).findAny();
 
@@ -706,6 +706,8 @@ public class QueryParser
 
             String text = ctx.stringLiteral().getText();
             text = text.substring(1, text.length() - 1);
+            // Remove escaped single quotes
+            text = text.replaceAll("''", "'");
             return new LiteralStringExpression(text);
         }
 
@@ -755,9 +757,10 @@ public class QueryParser
             if (text.charAt(0) == '"')
             {
                 text = text.substring(1, text.length() - 1);
+                // Remove escaped double quotes
+                text = text.replaceAll("\"\"", "\"");
             }
-            // Remove quoted quotes
-            return text.replaceAll("\"\"", "\"");
+            return text;
         }
 
         private Expression getExpression(ParserRuleContext ctx)

@@ -11,8 +11,6 @@ import com.viskan.payloadbuilder.operator.ObjectProjection;
 import com.viskan.payloadbuilder.operator.Operator;
 import com.viskan.payloadbuilder.parser.tree.QualifiedName;
 
-import static com.viskan.payloadbuilder.utils.MapUtils.entry;
-import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
 import static java.util.Arrays.asList;
 
 import org.junit.Test;
@@ -50,9 +48,10 @@ public class OperatorBuilderHashJoinTest extends AOperatorBuilderTest
         assertEquals(expected, result.operator);
 
         assertEquals(
-                new ObjectProjection(ofEntries(true,
-                        entry("id1", new ExpressionProjection(e("s.id1"))),
-                        entry("id2", new ExpressionProjection(e("a.id2"))))),
+                new ObjectProjection(asList("id1", "id2"),
+                        asList(
+                                new ExpressionProjection(e("s.id1")),
+                                new ExpressionProjection(e("a.id2")))),
                 result.projection);
     }
 
@@ -86,9 +85,10 @@ public class OperatorBuilderHashJoinTest extends AOperatorBuilderTest
         assertEquals(expected, result.operator);
 
         assertEquals(
-                new ObjectProjection(ofEntries(true,
-                        entry("id1", new ExpressionProjection(e("s.id1"))),
-                        entry("id2", new ExpressionProjection(e("a.id2"))))),
+                new ObjectProjection(asList("id1", "id2"),
+                        asList(
+                                new ExpressionProjection(e("s.id1")),
+                                new ExpressionProjection(e("a.id2")))),
                 result.projection);
     }
 
@@ -122,9 +122,10 @@ public class OperatorBuilderHashJoinTest extends AOperatorBuilderTest
         assertEquals(expected, result.operator);
 
         assertEquals(
-                new ObjectProjection(ofEntries(true,
-                        entry("id1", new ExpressionProjection(e("s.id1"))),
-                        entry("id2", new ExpressionProjection(e("a.id2"))))),
+                new ObjectProjection(asList("id1", "id2"),
+                        asList(
+                                new ExpressionProjection(e("s.id1")),
+                                new ExpressionProjection(e("a.id2")))),
                 result.projection);
     }
 
@@ -155,9 +156,10 @@ public class OperatorBuilderHashJoinTest extends AOperatorBuilderTest
         assertEquals(expected, result.operator);
 
         assertEquals(
-                new ObjectProjection(ofEntries(true,
-                        entry("id1", new ExpressionProjection(e("s.id1"))),
-                        entry("id2", new ExpressionProjection(e("a.id2"))))),
+                new ObjectProjection(asList("id1", "id2"),
+                        asList(
+                                new ExpressionProjection(e("s.id1")),
+                                new ExpressionProjection(e("a.id2")))),
                 result.projection);
     }
 
@@ -194,9 +196,10 @@ public class OperatorBuilderHashJoinTest extends AOperatorBuilderTest
         assertEquals(expected, result.operator);
 
         assertEquals(
-                new ObjectProjection(ofEntries(true,
-                        entry("id1", new ExpressionProjection(e("s.id1"))),
-                        entry("id2", new ExpressionProjection(e("a.id2"))))),
+                new ObjectProjection(asList("id1", "id2"),
+                        asList(
+                                new ExpressionProjection(e("s.id1")),
+                                new ExpressionProjection(e("a.id2")))),
                 result.projection);
     }
 }

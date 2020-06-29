@@ -1,18 +1,9 @@
 package com.viskan.payloadbuilder.editor;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
-import com.viskan.payloadbuilder.analyze.OperatorBuilder;
 import com.viskan.payloadbuilder.catalog.CatalogRegistry;
-import com.viskan.payloadbuilder.editor.QueryFile.Output;
-import com.viskan.payloadbuilder.operator.JsonStringWriter;
-import com.viskan.payloadbuilder.operator.Operator;
-import com.viskan.payloadbuilder.operator.OperatorContext;
-import com.viskan.payloadbuilder.operator.Projection;
-import com.viskan.payloadbuilder.parser.ParseException;
-import com.viskan.payloadbuilder.parser.QueryParser;
-import com.viskan.payloadbuilder.parser.tree.QualifiedName;
-import com.viskan.payloadbuilder.parser.tree.Query;
+import com.viskan.payloadbuilder.editor.QueryFileModel.Output;
+import com.viskan.payloadbuilder.editor.QueryFileModel.State;
+import com.viskan.payloadbuilder.editor.catalog.ICatalogExtension;
 
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.io.FileUtils.byteCountToDisplaySize;
@@ -21,32 +12,25 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.File;
-import java.util.Iterator;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
+import javax.swing.ButtonGroup;
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
+import javax.swing.JScrollPane;
 import javax.swing.Timer;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.time.StopWatch;
-import org.apache.commons.lang3.tuple.Pair;
-
 /** Main controller for editor */
-public class PayloadbuilderEditorController implements PropertyChangeListener
+class PayloadbuilderEditorController implements PropertyChangeListener
 {
-    private static final Executor EXECUTOR = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2);
     private final PayloadbuilderEditorView view;
     private final PayloadbuilderEditorModel model;
     private final CaretChangedListener caretChangedListener = new CaretChangedListener();
     private int newFileCounter = 1;
 
-    public PayloadbuilderEditorController(PayloadbuilderEditorView view, PayloadbuilderEditorModel model)
+    PayloadbuilderEditorController(PayloadbuilderEditorView view, PayloadbuilderEditorModel model)
     {
         this.view = requireNonNull(view, "view");
         this.model = requireNonNull(model, "model");
@@ -57,12 +41,12 @@ public class PayloadbuilderEditorController implements PropertyChangeListener
     private void init()
     {
         view.setExecuteAction(new ExecuteListener());
-        view.setCancelAction(() -> 
+        view.setCancelAction(() ->
         {
-            QueryEditorContentView editor = (QueryEditorContentView) view.getEditorsTabbedPane().getSelectedComponent();
-            if (editor != null)
+            QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
+            if (editor != null && editor.getFile().getState() == State.EXECUTING)
             {
-                editor.getFile().setExecuting(false);
+                editor.getFile().setState(State.ABORTED);
             }
         });
         view.setNewQueryAction(new NewQueryListener());
@@ -71,7 +55,7 @@ public class PayloadbuilderEditorController implements PropertyChangeListener
         view.setOpenAction(new OpenListener());
         view.setToogleResultAction(() ->
         {
-            QueryEditorContentView editor = (QueryEditorContentView) view.getEditorsTabbedPane().getSelectedComponent();
+            QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
             if (editor != null)
             {
                 editor.toggleResultPane();
@@ -79,7 +63,7 @@ public class PayloadbuilderEditorController implements PropertyChangeListener
         });
         view.setToggleCommentRunnable(() ->
         {
-            QueryEditorContentView editor = (QueryEditorContentView) view.getEditorsTabbedPane().getSelectedComponent();
+            QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
             if (editor != null)
             {
                 editor.toggleComments();
@@ -87,14 +71,31 @@ public class PayloadbuilderEditorController implements PropertyChangeListener
         });
         view.setOutputChangedAction(() ->
         {
-            QueryEditorContentView editor = (QueryEditorContentView) view.getEditorsTabbedPane().getSelectedComponent();
+            QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
             if (editor != null)
             {
                 editor.getFile().setOutput((Output) view.getOutputCombo().getSelectedItem());
             }
         });
 
-        view.getEditorsTabbedPane().addChangeListener(new SelectFileListener());
+        ButtonGroup defaultGroup = new ButtonGroup();
+        
+        for (ICatalogExtension extension : model.getExtensions())
+        {
+            view.getPanelCatalogs().add(new JScrollPane(new CatalogExtensionView(extension, defaultGroup)));
+//            {
+//                QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
+//                if (editor != null)
+//                {
+//                    QueryFileModel file = editor.getFile();
+//                    file.getCatalogValues()
+//                        .computeIfAbsent(extension, key -> new HashMap<>())
+//                        .put(item, value);
+//                }
+//            }));
+        }
+
+        view.getEditorsTabbedPane().addChangeListener(new SelectedFileListener());
         view.setExitAction(() -> System.exit(0));
 
         view.getMemoryLabel().setText(getMemoryString());
@@ -107,11 +108,41 @@ public class PayloadbuilderEditorController implements PropertyChangeListener
         return String.format("%s / %s", byteCountToDisplaySize(runtime.totalMemory()), byteCountToDisplaySize(runtime.freeMemory()));
     }
 
-    private boolean save(QueryFile file)
+    private boolean save(QueryFileModel file)
     {
+        if (!file.isDirty())
+        {
+            return true;
+        }
+
         if (file.isNew())
         {
-            JFileChooser fileChooser = new JFileChooser();
+            JFileChooser fileChooser = new JFileChooser()
+            {
+                @Override
+                public void approveSelection()
+                {
+                    File f = getSelectedFile();
+                    if (f.exists() && getDialogType() == SAVE_DIALOG)
+                    {
+                        int result = JOptionPane.showConfirmDialog(this, "The file exists, overwrite?", "Existing file", JOptionPane.YES_NO_CANCEL_OPTION);
+                        switch (result)
+                        {
+                            case JOptionPane.YES_OPTION:
+                                super.approveSelection();
+                                return;
+                            case JOptionPane.NO_OPTION:
+                                return;
+                            case JOptionPane.CLOSED_OPTION:
+                                return;
+                            case JOptionPane.CANCEL_OPTION:
+                                cancelSelection();
+                                return;
+                        }
+                    }
+                    super.approveSelection();
+                }
+            };
             fileChooser.setSelectedFile(new File(file.getFilename()));
             int result = fileChooser.showSaveDialog(view);
             if (result == JFileChooser.APPROVE_OPTION)
@@ -133,11 +164,11 @@ public class PayloadbuilderEditorController implements PropertyChangeListener
     {
         if (PayloadbuilderEditorModel.SELECTED_FILE.equals(evt.getPropertyName()))
         {
-            QueryFile file = (QueryFile) evt.getNewValue();
+            QueryFileModel file = (QueryFileModel) evt.getNewValue();
             // New tab
             if (evt.getOldValue() == null)
             {
-                QueryEditorContentView content = new QueryEditorContentView(
+                QueryFileView content = new QueryFileView(
                         file,
                         text -> file.setQuery(text),
                         caretChangedListener);
@@ -182,7 +213,7 @@ public class PayloadbuilderEditorController implements PropertyChangeListener
         }
     };
 
-    private class SelectFileListener implements ChangeListener
+    private class SelectedFileListener implements ChangeListener
     {
         @Override
         public void stateChanged(ChangeEvent e)
@@ -190,7 +221,7 @@ public class PayloadbuilderEditorController implements PropertyChangeListener
             int index = view.getEditorsTabbedPane().getSelectedIndex();
             if (index >= 0)
             {
-                QueryEditorContentView editor = (QueryEditorContentView) view.getEditorsTabbedPane().getSelectedComponent();
+                QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
                 caretChangedListener.accept(editor);
                 model.setSelectedFile(index);
                 view.getOutputCombo().setSelectedItem(editor.getFile().getOutput());
@@ -203,7 +234,7 @@ public class PayloadbuilderEditorController implements PropertyChangeListener
         @Override
         public void run()
         {
-            QueryEditorContentView editor = (QueryEditorContentView) view.getEditorsTabbedPane().getSelectedComponent();
+            QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
             if (editor == null)
             {
                 return;
@@ -213,98 +244,15 @@ public class PayloadbuilderEditorController implements PropertyChangeListener
             {
                 return;
             }
-            EXECUTOR.execute(() ->
-            {
-                // TODO: move this to another class
-                QueryFile file = editor.getFile();
-                editor.startQuery();
-                StopWatch sw = new StopWatch();
-                sw.start();
-                file.setExecuting(true);
-                int rowCount = 0;
-                boolean canceled = false;
-                try
-                {
-                    CatalogRegistry reg = new CatalogRegistry();
-                    QueryParser parser = new QueryParser();
-                    Query query = parser.parseQuery(reg, queryString);
 
-                    Pair<Operator, Projection> pair = OperatorBuilder.create(reg, query);
-                    Operator op = pair.getKey();
-                    Projection pr = pair.getValue();
-                    JsonStringWriter jsw = new JsonStringWriter();
-
-                    StringBuilder sb = new StringBuilder();
-                    OperatorContext context = new OperatorContext();
-                    if (op != null)
-                    {
-                        Iterator<Row> it = op.open(context);
-                        while (it.hasNext())
-                        {
-                            // Check if model says we should break execution
-                            if (!file.isExecuting())
-                            {
-                                canceled = true;
-                                break;
-                            }
-                            
-                            Row row = it.next();
-                            if (file.getOutput() == Output.JSON_RAW)
-                            {
-                                pr.writeValue(jsw, context, row);
-                                sb.append(jsw.getAndReset());
-                                sb.append(System.lineSeparator());
-                            }
-                            rowCount++;
-                            editor.setRowCount(rowCount);
-                            editor.setRunTime(sw.getTime(TimeUnit.MILLISECONDS));
-                        }
-                    }
-                    else
-                    {
-                        TableAlias alias = TableAlias.of(null, QualifiedName.of("table"), "t");
-                        Row row = Row.of(alias, 0, ArrayUtils.EMPTY_OBJECT_ARRAY);
-                        if (file.getOutput() == Output.JSON_RAW)
-                        {
-                            pr.writeValue(jsw, context, row);
-                            sb.append(jsw.getAndReset());
-                        }
-                        rowCount++;
-                    }
-
-                    editor.setMessage(sb.toString());
-                    editor.clearHighLights();
-                }
-                catch (ParseException e)
-                {
-                    editor.highLight(e.getLine(), e.getColumn());
-                    editor.setMessage(String.format("Syntax error. Line: %d, Column: %d. %s", e.getLine(), e.getColumn(), e.getMessage()));
-                }
-                catch (Exception e)
-                {
-                    editor.setMessage("Error. " + e.getMessage());
-                    e.printStackTrace();
-                }
-                finally
-                {
-                    sw.stop();
-                    file.setExecuting(false);
-                    editor.stopQuery();
-                    editor.setRowCount(rowCount);
-                    editor.setRunTime(sw.getTime(TimeUnit.MILLISECONDS));
-                    if (canceled)
-                    {
-                        editor.setMessage("Aborted!");
-                    }
-                }
-            });
+            PayloadbuilderService.executeQuery(editor.getFile(), editor.getResultModel(), queryString, new CatalogRegistry());
         }
     }
 
-    private class CaretChangedListener implements Consumer<QueryEditorContentView>
+    private class CaretChangedListener implements Consumer<QueryFileView>
     {
         @Override
-        public void accept(QueryEditorContentView t)
+        public void accept(QueryFileView t)
         {
             view.getCaretLabel().setText(String.format("%d : %d : %d", t.getCaretLineNumber(), t.getCaretOffsetFromLineStart(), t.getCaretPosition()));
         }
@@ -315,7 +263,7 @@ public class PayloadbuilderEditorController implements PropertyChangeListener
         @Override
         public void run()
         {
-            QueryFile queryFile = new QueryFile();
+            QueryFileModel queryFile = new QueryFileModel();
             queryFile.setFilename("Query" + (newFileCounter++) + ".sql");
             model.addFile(queryFile);
         }
@@ -346,7 +294,7 @@ public class PayloadbuilderEditorController implements PropertyChangeListener
             JFileChooser fileChooser = new JFileChooser();
             if (fileChooser.showOpenDialog(view) == JFileChooser.APPROVE_OPTION)
             {
-                QueryFile file = new QueryFile(fileChooser.getSelectedFile());
+                QueryFileModel file = new QueryFileModel(fileChooser.getSelectedFile());
                 model.addFile(file);
             }
         }
@@ -357,10 +305,10 @@ public class PayloadbuilderEditorController implements PropertyChangeListener
         @Override
         public void run()
         {
-            QueryEditorContentView editor = (QueryEditorContentView) view.getEditorsTabbedPane().getSelectedComponent();
+            QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
             if (editor != null)
             {
-                QueryFile file = editor.getFile();
+                QueryFileModel file = editor.getFile();
                 save(file);
             }
         }

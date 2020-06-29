@@ -11,8 +11,7 @@ import com.viskan.payloadbuilder.operator.ObjectProjection;
 import com.viskan.payloadbuilder.operator.Operator;
 import com.viskan.payloadbuilder.parser.tree.QualifiedName;
 
-import static com.viskan.payloadbuilder.utils.MapUtils.entry;
-import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
+import static java.util.Arrays.asList;
 
 import org.junit.Test;
 
@@ -26,7 +25,7 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorBuilderTest
         QueryResult result = getQueryResult(query);
 
         TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
-        new TableAlias(source, QualifiedName.of("article"), "a", new String[] { "art_id", "active_flg", "id2" });
+        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"art_id", "active_flg", "id2"});
         assertTrue(source.isEqual(result.alias));
 
         Operator expected = new NestedLoopJoin(
@@ -39,17 +38,18 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorBuilderTest
                 false,
                 false);
 
-//        System.out.println(expected.toString(1));
-//        System.err.println( result.operator.toString(1));
-        
+        //        System.out.println(expected.toString(1));
+        //        System.err.println( result.operator.toString(1));
+
         assertEquals(expected, result.operator);
 
-        assertEquals(new ObjectProjection(ofEntries(true,
-                entry("id1", new ExpressionProjection(parser.parseExpression(catalogRegistry, "s.id1"))),
-                entry("id2", new ExpressionProjection(parser.parseExpression(catalogRegistry, "a.id2"))))),
+        assertEquals(new ObjectProjection(asList("id1", "id2"),
+                asList(
+                        new ExpressionProjection(parser.parseExpression(catalogRegistry, "s.id1")),
+                        new ExpressionProjection(parser.parseExpression(catalogRegistry, "a.id2")))),
                 result.projection);
     }
-    
+
     @Test
     public void test_nested_loop_with_populate_and_pushdown()
     {
@@ -57,7 +57,7 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorBuilderTest
         QueryResult result = getQueryResult(query);
 
         TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
-        new TableAlias(source, QualifiedName.of("article"), "a", new String[] { "internet_flg", "art_id", "active_flg", "id2" });
+        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"internet_flg", "art_id", "active_flg", "id2"});
         assertTrue(source.isEqual(result.alias));
 
         Operator expected = new NestedLoopJoin(
@@ -69,15 +69,16 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorBuilderTest
                 DefaultRowMerger.DEFAULT,
                 true,
                 false);
-        
-//        System.out.println(expected.toString(1));
-//        System.err.println( result.operator.toString(1));
-        
+
+        //        System.out.println(expected.toString(1));
+        //        System.err.println( result.operator.toString(1));
+
         assertEquals(expected, result.operator);
 
-        assertEquals(new ObjectProjection(ofEntries(true,
-                entry("id1", new ExpressionProjection(parser.parseExpression(catalogRegistry, "s.id1"))),
-                entry("id2", new ExpressionProjection(parser.parseExpression(catalogRegistry, "a.id2"))))),
+        assertEquals(new ObjectProjection(asList("id1", "id2"),
+                asList(
+                        new ExpressionProjection(parser.parseExpression(catalogRegistry, "s.id1")),
+                        new ExpressionProjection(parser.parseExpression(catalogRegistry, "a.id2")))),
                 result.projection);
     }
 

@@ -55,7 +55,6 @@ import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -278,15 +277,16 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
             sortBys.forEach(si -> si.accept(this, context));
         }
 
-        Map<String, Projection> rootProjections = new LinkedHashMap<>();
-
+        List<String> projectionAliases = new ArrayList<>();
+        List<Projection> projections = new ArrayList<>();
         query.getSelectItems().forEach(s ->
         {
             s.accept(this, context);
-            rootProjections.put(s.getIdentifier(), context.projection);
+            projectionAliases.add(s.getIdentifier());
+            projections.add(context.projection);
         });
 
-        context.projection = new ObjectProjection(rootProjections);
+        context.projection = new ObjectProjection(projectionAliases, projections);
         return null;
     }
 
@@ -302,7 +302,8 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
             aliases = ColumnsVisitor.getColumnsByAlias(context.columnsByAlias, context.parent, from);
         }
 
-        Map<String, Projection> projections = new LinkedHashMap<>();
+        List<String> projectionAliases = new ArrayList<>();
+        List<Projection> projections = new ArrayList<>();
         boolean projectionsAdded = false;
 
         // Use found aliases and traverse select items, order, groupBy and where
@@ -315,7 +316,8 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
                 s.accept(this, context);
                 if (!projectionsAdded)
                 {
-                    projections.put(s.getIdentifier(), context.projection);
+                    projectionAliases.add(s.getIdentifier());
+                    projections.add(context.projection);
                 }
             }
 
@@ -354,11 +356,11 @@ public class OperatorBuilder extends ATreeVisitor<Void, OperatorBuilder.Context>
 
         if (nestedSelectItem.getType() == Type.ARRAY)
         {
-            context.projection = new ArrayProjection(new ArrayList<>(projections.values()), fromOperator);
+            context.projection = new ArrayProjection(projections, fromOperator);
         }
         else
         {
-            context.projection = new ObjectProjection(projections, fromOperator);
+            context.projection = new ObjectProjection(projectionAliases, projections, fromOperator);
         }
         context.parent = parent;
         return null;

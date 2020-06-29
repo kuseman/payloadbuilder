@@ -6,7 +6,7 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.Arrays;
 import java.util.Iterator;
-import java.util.Map;
+import java.util.List;
 import java.util.Objects;
 
 import org.apache.commons.lang3.ArrayUtils;
@@ -16,20 +16,25 @@ public class ObjectProjection implements Projection
 {
     static final Projection[] EMPTY_PROJECTION_ARRAY = new Projection[0];
     private final Operator selection;
-    private final Projection[] projections;
+    private final List<Projection> projections;
     private final String[] columns;
     private final int length;
 
-    public ObjectProjection(Map<String, Projection> projections)
+    public ObjectProjection(List<String> projectionAliases, List<Projection> projections)
     {
-        this(projections, null);
+        this(projectionAliases, projections, null);
     }
 
-    public ObjectProjection(Map<String, Projection> projections, Operator selection)
+    public ObjectProjection(List<String> projectionAliases, List<Projection> projections, Operator selection)
     {
-        this.projections = requireNonNull(projections).values().toArray(EMPTY_PROJECTION_ARRAY);
-        this.columns = projections.keySet().toArray(ArrayUtils.EMPTY_STRING_ARRAY);
-        this.length = this.columns.length;
+        if (requireNonNull(projectionAliases, "projectionAliases").size() != requireNonNull(projections, "projections").size())
+        {
+            throw new IllegalArgumentException("Projection aliases and projections differ in size");
+        }
+        
+        this.projections = requireNonNull(projections, "projections");
+        this.columns = projectionAliases.toArray(ArrayUtils.EMPTY_STRING_ARRAY);
+        this.length = columns.length;
         this.selection = selection;
     }
 
@@ -56,19 +61,25 @@ public class ObjectProjection implements Projection
         for (int i = 0; i < length; i++)
         {
             writer.writeFieldName(columns[i]);
-            projections[i].writeValue(writer, context, rowToUse);
+            projections.get(i).writeValue(writer, context, rowToUse);
         }
         writer.endObject();
         
         context.setParentRow(prevParentRow);
     }
-
+    
+    @Override
+    public String[] getColumns()
+    {
+        return columns;
+    }
+    
     @Override
     public int hashCode()
     {
         return 17 +
             37 * (selection != null ? selection.hashCode() : 0) +
-            37 * Arrays.hashCode(projections) +
+            37 * projections.hashCode() +
             37 * Arrays.hashCode(columns);
     }
 
@@ -79,7 +90,7 @@ public class ObjectProjection implements Projection
         {
             ObjectProjection that = (ObjectProjection) obj;
             return Objects.equals(selection, that.selection)
-                && Arrays.equals(projections, that.projections)
+                && projections.equals(that.projections)
                 && Arrays.equals(columns, that.columns);
         }
         return false;
