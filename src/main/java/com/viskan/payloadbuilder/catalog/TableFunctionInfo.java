@@ -1,8 +1,7 @@
 package com.viskan.payloadbuilder.catalog;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
-import com.viskan.payloadbuilder.operator.OperatorContext;
+import com.viskan.payloadbuilder.operator.Row;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 
 import java.util.Iterator;
 import java.util.List;
@@ -28,5 +27,5 @@ public abstract class TableFunctionInfo extends FunctionInfo
      * @param tableAlias Table alias used for this function
      * @param arguments Arguments to function
      **/
-    public abstract Iterator<Row> open(OperatorContext context, TableAlias tableAlias, List<Object> arguments);
+    public abstract Iterator<Row> open(ExecutionContext context, TableAlias tableAlias, List<Object> arguments);
 }

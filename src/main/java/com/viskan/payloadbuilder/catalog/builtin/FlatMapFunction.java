@@ -1,15 +1,14 @@
 package com.viskan.payloadbuilder.catalog.builtin;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.LambdaFunction;
 import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
+import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.codegen.CodeGeneratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
-import com.viskan.payloadbuilder.parser.tree.Expression;
-import com.viskan.payloadbuilder.parser.tree.LambdaExpression;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.Expression;
+import com.viskan.payloadbuilder.parser.LambdaExpression;
 import com.viskan.payloadbuilder.utils.IteratorUtils;
 
 import static java.util.Arrays.asList;
@@ -58,9 +57,9 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
     }
     
     @Override
-    public Object eval(EvaluationContext context, List<Expression> arguments, Row row)
+    public Object eval(ExecutionContext context, List<Expression> arguments)
     {
-        Object argResult = arguments.get(0).eval(context, row);
+        Object argResult = arguments.get(0).eval(context);
         if (argResult == null)
         {
             return null;
@@ -77,7 +76,7 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
                 if (it == null)
                 {
                     context.setLambdaValue(lambdaId, input);
-                    Object value = le.getExpression().eval(context, row);
+                    Object value = le.getExpression().eval(context);
                     it = IteratorUtils.getIterator(value);
                     return it;
                 }

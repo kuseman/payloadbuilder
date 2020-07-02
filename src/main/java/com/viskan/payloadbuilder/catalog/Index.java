@@ -1,6 +1,6 @@
 package com.viskan.payloadbuilder.catalog;
 
-import com.viskan.payloadbuilder.parser.tree.QualifiedName;
+import com.viskan.payloadbuilder.parser.QualifiedName;
 
 import static java.util.Objects.requireNonNull;
 

@@ -1,7 +1,7 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.operator.OperatorContext.NodeData;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 
 import static java.util.Objects.requireNonNull;
 
@@ -12,12 +12,12 @@ import org.apache.commons.lang3.StringUtils;
 /** Operator that limits number of rows in batches.
  * Is used in conjunction with {@link BatchRepeatOperator} 
  **/
-public class BatchLimitOperator extends AOperator
+class BatchLimitOperator extends AOperator
 {
     private final Operator operator;
     private final int limit;
     
-    public BatchLimitOperator(int nodeId, Operator operator, int limit)
+    BatchLimitOperator(int nodeId, Operator operator, int limit)
     {
         super(nodeId);
         this.operator = requireNonNull(operator, "operator");
@@ -25,9 +25,9 @@ public class BatchLimitOperator extends AOperator
     }
     
     @Override
-    public Iterator<Row> open(OperatorContext context)
+    public Iterator<Row> open(ExecutionContext context)
     {
-        Data data = context.getNodeData(nodeId, Data::new);
+        Data data = context.getOperatorContext().getNodeData(nodeId, Data::new);
         if (data.iterator == null)
         {
             data.iterator = operator.open(context);

@@ -1,8 +1,7 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
-import com.viskan.payloadbuilder.parser.tree.Expression;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.Expression;
 
 import static java.util.Objects.requireNonNull;
 
@@ -11,19 +10,20 @@ import java.util.function.BiPredicate;
 import org.apache.commons.lang3.BooleanUtils;
 
 /** Predicate that operates over an expression */
-public class ExpressionPredicate implements BiPredicate<EvaluationContext, Row>
+class ExpressionPredicate implements BiPredicate<ExecutionContext, Row>
 {
     private final Expression predicate;
     
-    public ExpressionPredicate(Expression predicate)
+    ExpressionPredicate(Expression predicate)
     {
         this.predicate = requireNonNull(predicate, "predicate");
     }
     
     @Override
-    public boolean test(EvaluationContext context, Row row)
+    public boolean test(ExecutionContext context, Row row)
     {
-        return BooleanUtils.isTrue((Boolean) predicate.eval(context, row));
+        context.setRow(row);
+        return BooleanUtils.isTrue((Boolean) predicate.eval(context));
     }
     
     @Override

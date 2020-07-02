@@ -1,7 +1,7 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
+import com.viskan.payloadbuilder.catalog.TableAlias;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 
 import static java.util.Collections.emptyIterator;
 import static java.util.Collections.emptyList;
@@ -9,11 +9,10 @@ import static java.util.Collections.emptyList;
 import java.util.Iterator;
 import java.util.stream.IntStream;
 
-import org.junit.Assert;
 import org.junit.Test;
 
 /** Test {@link HashJoin} */
-public class HashJoinTest extends Assert
+public class HashJoinTest extends AOperatorTest
 {
     @Test
     public void test_inner_join_no_populate_empty()
@@ -28,7 +27,7 @@ public class HashJoinTest extends Assert
                 DefaultRowMerger.DEFAULT,
                 false,
                 false);
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         assertFalse(it.hasNext());
     }
         
@@ -49,7 +48,7 @@ public class HashJoinTest extends Assert
                 false,
                 false);
 
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {
@@ -79,7 +78,7 @@ public class HashJoinTest extends Assert
                 true,
                 false);
 
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {
@@ -116,7 +115,7 @@ public class HashJoinTest extends Assert
                 false,
                 true);
         
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {
@@ -154,7 +153,7 @@ public class HashJoinTest extends Assert
                 true,
                 true);
         
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {

@@ -1,26 +1,22 @@
 package com.viskan.payloadbuilder.parser;
 
-import com.viskan.payloadbuilder.catalog.CatalogRegistry;
-import com.viskan.payloadbuilder.parser.tree.Expression;
+import com.viskan.payloadbuilder.parser.ArithmeticBinaryExpression.Type;
 
-import org.junit.Assert;
+import static java.util.Arrays.asList;
+
 import org.junit.Test;
 
 /** Test query parser */
-public class QueryParserTest extends Assert
+public class QueryParserTest extends AParserTest
 {
-    private final QueryParser parser = new QueryParser();
-    private final CatalogRegistry catalogRegistry = new CatalogRegistry();
-
     @Test
     public void test_selectItems_failures()
     {
-        assertQueryFail(IllegalArgumentException.class, "ARRAY select requires a from clause", "select array(10 col1, 20 col2) col from source s");
-        assertQueryFail(IllegalArgumentException.class, "Select items inside an ARRAY", "select array(10 col1, 20 col2 from s) col from source s");
-        assertQueryFail(IllegalArgumentException.class, "Select items inside an OBJECT", "select object(10) col from source s");
-        assertQueryFail(IllegalArgumentException.class, "Select items on ROOT level", "select 'value' from source s");
-        assertQueryFail(IllegalArgumentException.class, "Cannot have a WHERE clause without a FROM clause", "select object(s.id where false) from source s");
-        assertQueryFail(IllegalArgumentException.class, "Cannot have an ORDER BY clause without a FROM clause", "select object(s.id order by 1) from source s");
+        assertQueryFail(ParseException.class, "Select items inside an ARRAY", "select array(10 col1, 20 col2 from s) col from source s");
+        assertQueryFail(ParseException.class, "Select items inside an OBJECT", "select object(10) col from source s");
+        assertQueryFail(ParseException.class, "Select items on ROOT level", "select 'value' from source s");
+        assertQueryFail(ParseException.class, "Cannot have a WHERE clause without a FROM clause", "select object(s.id where false) from source s");
+        assertQueryFail(ParseException.class, "Cannot have an ORDER BY clause without a FROM clause", "select object(s.id order by 1) from source s");
     }
 
     @Test
@@ -41,32 +37,84 @@ public class QueryParserTest extends Assert
     {
         assertExpression("isnull(null, 1+1.1)");
         assertExpression("coalesce(null, 1+1.1)");
-        assertExpressionFail(RuntimeException.class, "isnull expected 2 parameters", "isnull(a,b,c)");
+
+        assertExpression("a.filter(x -> x.val > 0).sort(x -> x.val).sum(x -> x.val2)");
+        assertExpression("a.filter(x -> x.val > 0)");
+        assertExpression("a.b.c.utils#filter(x -> x.val > 0).utils2#func().sort()");
+
+        assertExpressionFail(ParseException.class, "Function names cannot have more than one", "utils#func.b()");
     }
-    
+
+    @Test
+    public void test_dereference()
+    {
+        assertExpression("a.b.c", new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1));
+        assertExpression(":list.filter(x -> x.value)",
+                new QualifiedFunctionCallExpression(QualifiedName.of("filter"),
+                        asList(
+                                new NamedParameterExpression("list"),
+                                new LambdaExpression(asList("x"),
+                                        new QualifiedReferenceExpression(QualifiedName.of("x", "value"), 0),
+                                        new int[] {0})),
+                        0));
+        assertExpression("a.func()", new QualifiedFunctionCallExpression(QualifiedName.of("func"), asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1)), 0));
+        assertExpression("a.func() + func(a)",
+                new ArithmeticBinaryExpression(
+                        Type.ADD,
+                        new QualifiedFunctionCallExpression(QualifiedName.of("func"), asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1)), 0),
+                        new QualifiedFunctionCallExpression(QualifiedName.of("func"), asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1)), 0)));
+        assertExpression("a.b.c.utils#func()",
+                new QualifiedFunctionCallExpression(
+                        new QualifiedName("utils", asList("func")),
+                        asList(new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1)), 0));
+        assertExpression("a.b.c.func().value",
+                new DereferenceExpression(
+                        new QualifiedFunctionCallExpression(QualifiedName.of("func"), asList(new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1)), 0),
+                        new QualifiedReferenceExpression(QualifiedName.of("value"), -1)));
+        assertExpression("a.b.c.func().utils#func2()",
+                new QualifiedFunctionCallExpression(new QualifiedName("utils", asList("func2")),
+                        asList(new QualifiedFunctionCallExpression(QualifiedName.of("func"), asList(new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1)), 0)), 1));
+
+        assertExpression("a.b.c.func().utils#func2(123)",
+                new QualifiedFunctionCallExpression(new QualifiedName("utils", asList("func2")),
+                        asList(
+                                new QualifiedFunctionCallExpression(QualifiedName.of("func"), asList(
+                                        new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1)),
+                                        0),
+                                new LiteralIntegerExpression(123)),
+                        1));
+    }
+
+    @Test
+    public void test_control_flow()
+    {
+        assertQuery("if true then print 'hello' else print 'world' end if");
+        assertQuery("print utils#func(a,b); print utils#func(10, null); print a.b.c.utils#func1(123, 12.10);");
+    }
+
     @Test
     public void test_joins()
     {
         assertQuery("select art_id from article a");
-        
+
         // Regular joins
         assertQuery("select art_id from article a inner join articleAttribute aa on aa.art_id = a.art_id");
         assertQuery("select art_id from article a left join articleAttribute aa on aa.art_id = a.art_id");
-        
+
         // Apply joins
         assertQuery("select art_id from article a cross apply articleAttribute aa");
         assertQuery("select art_id from article a outer apply articleAttribute aa");
         assertQuery("select art_id from article a outer apply range(10) r");
         assertQuery("select art_id from article a outer apply range(:from) r");
-        
+
         // Populate joins
         assertQuery("select art_id from article a inner join [articleAttribute] aa on aa.art_id = a.art_id ");
         assertQuery("select art_id from article a left join [articleAttribute] aa on art_id = a.art_id ");
-        
+
         // Nested
         assertQuery("select art_id from article a inner join [articleAttribute aa  inner join articlePrice ap on ap.sku_id = aa.sku_id] aa on aa.art_id = a.art_id ");
         assertQuery("select art_id from article a inner join [articleAttribute aa  left join [articlePrice] ap on ap.sku_id = aa.sku_id] aa on aa.art_id = a.art_id ");
-        
+
         // TODO: more parser tests, where, orderby, group by
     }
 
@@ -75,7 +123,7 @@ public class QueryParserTest extends Assert
     {
         assertExpression("a and (b or c)");
     }
-    
+
     @Test
     public void test_expressions()
     {
@@ -96,7 +144,7 @@ public class QueryParserTest extends Assert
         assertExpression("not a != 1");
         assertExpression("not a in (1,1,true,2,3.,3,null,false)");
         assertExpression(":value > 10 AND :value_two < 20");
-        
+
     }
 
     @Test
@@ -114,9 +162,9 @@ public class QueryParserTest extends Assert
         assertExpression("articleAttribute.map(aa -> aa.price.map(a -> a.price_sales) and aa.balance.map(a -> a.balance_disp))");
 
         // Should not dereference non qualified expressions
-        assertExpressionFail(IllegalArgumentException.class, "Can only dereference qualified references or functions", "'rere'.filter(a -> a.sku_id > 0)");
+        //        assertExpressionFail(ParseException.class, "Can only dereference qualified references or functions", "'rere'.filter(a -> a.sku_id > 0)");
         // Lambda parameter already in use
-        assertExpressionFail(IllegalArgumentException.class, "Lambda identifier a is already defined in scope", "articleAttribute.map(a -> p.price.map(a -> a.price_sales))");
+        assertExpressionFail(ParseException.class, "Lambda identifier a is already defined in scope", "articleAttribute.map(a -> p.price.map(a -> a.price_sales))");
     }
 
     @Test
@@ -140,7 +188,7 @@ public class QueryParserTest extends Assert
         //                + "),"
         //                + "left join article_attribute_media aam ("
         //                + ")");
-        //        
+        //
         //        assertQuery(
         //              "inner join article a ("
         //            + "  on a.art_id == _source.art_id"
@@ -152,24 +200,32 @@ public class QueryParserTest extends Assert
 
     private void assertExpression(String expression)
     {
-        Expression e = parser.parseExpression(catalogRegistry, expression);
-        System.out.println(e);
+        assertExpression(expression, null);
     }
 
-    private void assertQuery(String query)
+    private void assertExpression(String expression, Expression expected)
     {
-        parser.parseQuery(catalogRegistry, query);
+        Expression e = e(expression);
+        if (expected != null)
+        {
+            assertEquals(expected, e);
+        }
+    }
+
+    private QueryStatement assertQuery(String query)
+    {
+        return q(query);
     }
 
     private void assertQueryFail(Class<? extends Exception> expected, String messageContains, String query)
     {
         try
         {
-            parser.parseQuery(catalogRegistry, query);
+            q(query);
         }
         catch (Exception e)
         {
-            assertTrue(expected.isAssignableFrom(e.getClass()));
+            assertTrue("Expected exception " + expected + " but got " + e.getClass(), expected.isAssignableFrom(e.getClass()));
             assertTrue(e.getMessage(), e.getMessage().contains(messageContains));
         }
     }
@@ -178,7 +234,7 @@ public class QueryParserTest extends Assert
     {
         try
         {
-            parser.parseExpression(catalogRegistry, expression);
+            e(expression);
             fail();
         }
         catch (Exception e)

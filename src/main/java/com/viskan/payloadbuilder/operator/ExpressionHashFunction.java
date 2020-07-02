@@ -1,8 +1,7 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
-import com.viskan.payloadbuilder.parser.tree.Expression;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.Expression;
 
 import static java.util.Objects.requireNonNull;
 
@@ -11,22 +10,23 @@ import java.util.function.ToIntBiFunction;
 import java.util.stream.Collectors;
 
 /** Function that generates a hash from provided expressions */
-public class ExpressionHashFunction implements ToIntBiFunction<EvaluationContext, Row>
+class ExpressionHashFunction implements ToIntBiFunction<ExecutionContext, Row>
 {
     private final List<Expression> expressions;
     
-    public ExpressionHashFunction(List<Expression> expressions)
+    ExpressionHashFunction(List<Expression> expressions)
     {
         this.expressions = requireNonNull(expressions, "expressions");
     }
     
     @Override
-    public int applyAsInt(EvaluationContext context, Row row)
+    public int applyAsInt(ExecutionContext context, Row row)
     {
         int hash = 37;
         for (Expression expression : expressions)
         {
-            Object result = expression.eval(context, row);
+            context.setRow(row);
+            Object result = expression.eval(context);
             hash += 17 * (result != null ? result.hashCode() : 0);
         }
         return hash;

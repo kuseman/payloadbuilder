@@ -1,18 +1,10 @@
 package com.viskan.payloadbuilder.editor;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
-import com.viskan.payloadbuilder.analyze.OperatorBuilder;
-import com.viskan.payloadbuilder.catalog.CatalogRegistry;
+import com.viskan.payloadbuilder.OutputWriter;
+import com.viskan.payloadbuilder.Payloadbuilder;
+import com.viskan.payloadbuilder.QueryResult;
 import com.viskan.payloadbuilder.editor.QueryFileModel.State;
-import com.viskan.payloadbuilder.operator.Operator;
-import com.viskan.payloadbuilder.operator.OperatorContext;
-import com.viskan.payloadbuilder.operator.OutputWriter;
-import com.viskan.payloadbuilder.operator.Projection;
 import com.viskan.payloadbuilder.parser.ParseException;
-import com.viskan.payloadbuilder.parser.QueryParser;
-import com.viskan.payloadbuilder.parser.tree.QualifiedName;
-import com.viskan.payloadbuilder.parser.tree.Query;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -23,6 +15,7 @@ import java.util.Stack;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.time.StopWatch;
@@ -31,16 +24,21 @@ import org.apache.commons.lang3.tuple.Pair;
 /** Class the executes queries etc. */
 class PayloadbuilderService
 {
-    private static final Executor EXECUTOR = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2);
+    private static final AtomicInteger THREAD_ID = new AtomicInteger(1);
+    private static final Executor EXECUTOR = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2, r -> 
+    {
+        Thread thread = new Thread(r);
+        thread.setDaemon(true);
+        thread.setName("QueryExecutor-#" + THREAD_ID.getAndIncrement());
+        thread.setPriority(Thread.MIN_PRIORITY);
+        return thread;
+    });
 
     /** Execute query for provider query file */
     static void executeQuery(
             QueryFileModel file,
-            ResultModel resultModel,
-            String queryString,
-            CatalogRegistry registry)
+            String queryString)
     {
-
         EXECUTOR.execute(() ->
         {
             file.setState(State.EXECUTING);
@@ -48,43 +46,29 @@ class PayloadbuilderService
             sw.start();
             try
             {
-                QueryParser parser = new QueryParser();
-                Query query = parser.parseQuery(registry, queryString);
+                file.getQuerySession().setAbortSupplier(() -> file.getState() == State.ABORTED);
+                QueryResult queryResult = Payloadbuilder.query(file.getQuerySession(), queryString);
 
-                Pair<Operator, Projection> pair = OperatorBuilder.create(registry, query);
-                Operator op = pair.getKey();
-                Projection pr = pair.getValue();
-
-                setupColumns(resultModel, pr);
-
-                ObjectWriter writer = new ObjectWriter();
-                OperatorContext context = new OperatorContext();
-                if (op != null)
+                while (queryResult.hasMoreResults())
                 {
-                    Iterator<Row> it = op.open(context);
-                    while (it.hasNext())
+                    if (file.getState() == State.ABORTED)
                     {
-                        // Check if query should be aborted
-                        if (file.getState() == State.ABORTED)
-                        {
-                            break;
-                        }
-
-                        Row row = it.next();
-                        pr.writeValue(writer, context, row);
-                        resultModel.addRow(writer.getValue(resultModel.getRowCount() + 1));
-                        file.setExecutionTime(sw.getTime(TimeUnit.MILLISECONDS));
+                        break;
                     }
+                    ResultModel resultModel = new ResultModel(file);
+                    file.addResult(resultModel);
+                    setupColumns(resultModel, queryResult.getResultMetaData());
+    
+                    ObjectWriter writer = new ObjectWriter(
+                            file,
+                            sw,
+                            resultModel);
+    
+                    queryResult.writeResult(writer);
+    
+                    resultModel.done();
+                    file.getQuerySession().getPrintStream().append(String.valueOf(resultModel.getActualRowCount())).append(" row(s) selected").append(System.lineSeparator());
                 }
-                else
-                {
-                    TableAlias alias = TableAlias.of(null, QualifiedName.of("table"), "t");
-                    Row row = Row.of(alias, 0, ArrayUtils.EMPTY_OBJECT_ARRAY);
-                    pr.writeValue(writer, context, row);
-                    resultModel.addRow(writer.getValue(1));
-                }
-
-                resultModel.done();
 
                 if (file.getState() == State.EXECUTING)
                 {
@@ -113,25 +97,35 @@ class PayloadbuilderService
         });
     }
 
-    private static void setupColumns(ResultModel model, Projection pr)
+    private static void setupColumns(ResultModel model, QueryResult.QueryResultMetaData metaData)
     {
         List<String> columns = new ArrayList<>();
         columns.add("");
-        for (String column : pr.getColumns())
+        for (String column : metaData.getColumns())
         {
             columns.add(column);
         }
         model.setColumns(columns.toArray(ArrayUtils.EMPTY_STRING_ARRAY));
     }
-    
+
     /** Writer that writes object structure from a projection */
     private static class ObjectWriter implements OutputWriter
     {
         private final Stack<Object> parent = new Stack<>();
         private final Stack<String> currentField = new Stack<>();
-        
+        private final QueryFileModel file;
+        private final StopWatch stopWatch;
+        private final ResultModel resultModel;
+
+        ObjectWriter(QueryFileModel file, StopWatch stopWatch, ResultModel resultModel)
+        {
+            this.file = file;
+            this.stopWatch = stopWatch;
+            this.resultModel = resultModel;
+        }
+
         /** Returns written value and clears state */
-        public Object[] getValue(int rowNumber)
+        private Object[] getValue(int rowNumber)
         {
             currentField.clear();
             Object v = parent.pop();
@@ -139,9 +133,9 @@ class PayloadbuilderService
             {
                 throw new RuntimeException("Expected a list of string/value pairs but got " + v);
             }
-            
+
             PairList pairList = (PairList) v;
-            
+
             Object[] result = new Object[pairList.size() + 1];
             int index = 0;
             result[index++] = rowNumber;
@@ -149,10 +143,17 @@ class PayloadbuilderService
             {
                 result[index++] = pair.getValue();
             }
-            
+
             return result;
         }
-        
+
+        @Override
+        public void endRow()
+        {
+            resultModel.addRow(getValue(resultModel.getRowCount() + 1));
+            file.setExecutionTime(stopWatch.getTime(TimeUnit.MILLISECONDS));
+        }
+
         @Override
         public void writeFieldName(String name)
         {
@@ -175,7 +176,7 @@ class PayloadbuilderService
                 endArray();
                 return;
             }
-            
+
             putValue(value);
         }
 
@@ -211,7 +212,7 @@ class PayloadbuilderService
         {
             putValue(parent.pop());
         }
-        
+
         @SuppressWarnings("unchecked")
         private void putValue(Object value)
         {
@@ -221,9 +222,9 @@ class PayloadbuilderService
                 parent.push(value);
                 return;
             }
-            
+
             Object p = parent.peek();
-            
+
             if (p instanceof PairList)
             {
                 ((PairList) p).add(Pair.of(currentField.pop(), value));
@@ -239,6 +240,7 @@ class PayloadbuilderService
         }
 
         private static class PairList extends ArrayList<Pair<String, Object>>
-        {}
+        {
+        }
     }
 }

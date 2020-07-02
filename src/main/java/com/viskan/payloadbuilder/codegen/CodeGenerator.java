@@ -1,7 +1,7 @@
 package com.viskan.payloadbuilder.codegen;
 
-import com.viskan.payloadbuilder.TableAlias;
-import com.viskan.payloadbuilder.parser.tree.Expression;
+import com.viskan.payloadbuilder.catalog.TableAlias;
+import com.viskan.payloadbuilder.parser.Expression;
 
 import static java.util.Arrays.asList;
 
@@ -65,8 +65,8 @@ public class CodeGenerator
         
         List<String> usedImports = new ArrayList<>();
         usedImports.addAll(asList(
-                "com.viskan.payloadbuilder.Row",
-                "com.viskan.payloadbuilder.evaluation.ExpressionMath"
+                "com.viskan.payloadbuilder.operator.Row",
+                "com.viskan.payloadbuilder.parser.ExpressionMath"
                 ));
         usedImports.addAll(imports);
         

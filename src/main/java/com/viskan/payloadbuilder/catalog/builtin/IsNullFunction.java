@@ -1,10 +1,9 @@
 package com.viskan.payloadbuilder.catalog.builtin;
 
-import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
-import com.viskan.payloadbuilder.parser.tree.Expression;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.Expression;
 
 import static java.util.Arrays.asList;
 
@@ -25,14 +24,14 @@ class IsNullFunction extends ScalarFunctionInfo
     }
     
     @Override
-    public Object eval(EvaluationContext context, List<Expression> arguments, Row row)
+    public Object eval(ExecutionContext context, List<Expression> arguments)
     {
-        Object obj = arguments.get(0).eval(context, row);
+        Object obj = arguments.get(0).eval(context);
         if (obj != null)
         {
             return obj;
         }
         
-        return arguments.get(1).eval(context, row);
+        return arguments.get(1).eval(context);
     }
 }

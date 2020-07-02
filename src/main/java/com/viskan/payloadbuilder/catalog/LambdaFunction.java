@@ -1,7 +1,7 @@
 package com.viskan.payloadbuilder.catalog;
 
-import com.viskan.payloadbuilder.parser.tree.Expression;
-import com.viskan.payloadbuilder.parser.tree.LambdaExpression;
+import com.viskan.payloadbuilder.parser.Expression;
+import com.viskan.payloadbuilder.parser.LambdaExpression;
 
 import java.util.List;
 

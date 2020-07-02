@@ -1,8 +1,7 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.catalog.Index;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 
 import static com.viskan.payloadbuilder.operator.BatchMergeJoin.clearJoinData;
 import static java.util.Collections.emptyList;
@@ -36,14 +35,14 @@ import gnu.trove.map.hash.TIntObjectHashMap;
  * probe a.art_id
  * </pre>
  **/
-public class BatchHashJoin extends AOperator
+class BatchHashJoin extends AOperator
 {
     private final String logicalOperator;
     private final Operator outer;
     private final Operator inner;
     private final ValuesExtractor outerValuesExtractor;
     private final ValuesExtractor innerValuesExtractor;
-    private final BiPredicate<EvaluationContext, Row> predicate;
+    private final BiPredicate<ExecutionContext, Row> predicate;
     private final RowMerger rowMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
@@ -54,14 +53,14 @@ public class BatchHashJoin extends AOperator
     /* Statistics */
     private int executionCount;
 
-    public BatchHashJoin(
+    BatchHashJoin(
             int nodeId,
             String logicalOperator,
             Operator outer,
             Operator inner,
             ValuesExtractor outerValuesExtractor,
             ValuesExtractor innerValuesExtractor,
-            BiPredicate<EvaluationContext, Row> predicate,
+            BiPredicate<ExecutionContext, Row> predicate,
             RowMerger rowMerger,
             boolean populating,
             boolean emitEmptyOuterRows,
@@ -83,7 +82,7 @@ public class BatchHashJoin extends AOperator
     }
 
     @Override
-    public Iterator<Row> open(OperatorContext context)
+    public Iterator<Row> open(ExecutionContext context)
     {
         executionCount++;
         final Iterator<Row> outerIt = outer.open(context);
@@ -203,7 +202,7 @@ public class BatchHashJoin extends AOperator
                     Row innerRow = innerRows.get(innerRowIndex++);
                     innerRow.setPredicateParent(outerRow);
 
-                    if (predicate.test(context.getEvaluationContext(), innerRow))
+                    if (predicate.test(context, innerRow))
                     {
                         next = rowMerger.merge(outerRow, innerRow, populating);
                         if (populating)
@@ -245,15 +244,15 @@ public class BatchHashJoin extends AOperator
 
             private void hashInnerBatch()
             {
-                outerValuesIterator = outerValuesIterator(context.getEvaluationContext());
-                context.setOuterIndexValues(outerValuesIterator);
+                outerValuesIterator = outerValuesIterator(context);
+                context.getOperatorContext().setOuterIndexValues(outerValuesIterator);
                 Iterator<Row> it = inner.open(context);
 
                 // Hash batch
                 while (it.hasNext())
                 {
                     Row row = it.next();
-                    int hash = populateKeyValues(innerValuesExtractor, context.getEvaluationContext(), row);
+                    int hash = populateKeyValues(innerValuesExtractor, context, row);
                     TableValue tableValue = table.get(hash);
                     if (tableValue == null)
                     {
@@ -264,7 +263,7 @@ public class BatchHashJoin extends AOperator
                 }
                 
                 verifyOuterValuesIterator();
-                context.setOuterIndexValues(null);
+                context.getOperatorContext().setOuterIndexValues(null);
             }
             
             private void emitOuterRows()
@@ -303,14 +302,14 @@ public class BatchHashJoin extends AOperator
 
             private int populateKeyValues(
                     ValuesExtractor valueExtractor,
-                    EvaluationContext context,
+                    ExecutionContext context,
                     Row row)
             {
                 valueExtractor.extract(context, row, keyValues);
                 return hash(keyValues);
             }
 
-            private Iterator<Object[]> outerValuesIterator(EvaluationContext context)
+            private Iterator<Object[]> outerValuesIterator(ExecutionContext context)
             {
                 return new Iterator<Object[]>()
                 {

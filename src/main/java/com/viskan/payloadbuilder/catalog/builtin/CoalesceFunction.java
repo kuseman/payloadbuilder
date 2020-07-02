@@ -1,10 +1,9 @@
 package com.viskan.payloadbuilder.catalog.builtin;
 
-import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
-import com.viskan.payloadbuilder.parser.tree.Expression;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.Expression;
 
 import java.util.List;
 
@@ -17,11 +16,11 @@ class CoalesceFunction extends ScalarFunctionInfo
     }
     
     @Override
-    public Object eval(EvaluationContext context, List<Expression> arguments, Row row)
+    public Object eval(ExecutionContext context, List<Expression> arguments)
     {
         for (Expression arg : arguments)
         {
-            Object obj = arg.eval(context, row);
+            Object obj = arg.eval(context);
             if (obj != null)
             {
                 return obj;

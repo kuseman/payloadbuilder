@@ -1,7 +1,6 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.GroupedRow;
-import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 
 import static java.util.Objects.requireNonNull;
 
@@ -17,14 +16,14 @@ import org.apache.commons.collections.iterators.TransformIterator;
 import org.apache.commons.lang3.StringUtils;
 
 /** Operator that groups by a bucket function */
-public class GroupByOperator extends AOperator
+class GroupByOperator extends AOperator
 {
     private final Operator operator;
     private final ValuesExtractor valuesExtractor;
     private final int size;
     private final List<String> columnReferences;
 
-    public GroupByOperator(
+    GroupByOperator(
             int nodeId,
             Operator operator,
             List<String> columnReferences,
@@ -40,7 +39,7 @@ public class GroupByOperator extends AOperator
 
     @SuppressWarnings("unchecked")
     @Override
-    public Iterator<Row> open(OperatorContext context)
+    public Iterator<Row> open(ExecutionContext context)
     {
         ArrayKey key = new ArrayKey();
         key.key = new Object[size];
@@ -50,7 +49,7 @@ public class GroupByOperator extends AOperator
         while (it.hasNext())
         {
             Row row = it.next();
-            valuesExtractor.extract(context.getEvaluationContext(), row, key.key);
+            valuesExtractor.extract(context, row, key.key);
             table.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
         }
 

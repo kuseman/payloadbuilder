@@ -1,7 +1,6 @@
 package com.viskan.payloadbuilder.catalog.builtin;
 
 import com.viskan.payloadbuilder.catalog.Catalog;
-import com.viskan.payloadbuilder.catalog.CatalogRegistry;
 import com.viskan.payloadbuilder.catalog.builtin.AMatchFunction.MatchType;
 
 /** Built in catalog with functions etc. */
@@ -10,10 +9,9 @@ public class BuiltinCatalog
     public static final String NAME = "BUILTIN";
     
     /** Register built in catalog */
-    public static void register(CatalogRegistry catalogRegistry)
+    public static Catalog get()
     {
         Catalog catalog = new BuiltInCatalog();
-        catalogRegistry.registerCatalog(catalog);
         
         // Scalar functions
         catalog.registerFunction(new ConcatFunction(catalog));
@@ -36,10 +34,13 @@ public class BuiltinCatalog
         catalog.registerFunction(new CountFunction(catalog));
         catalog.registerFunction(new IsNullFunction(catalog));
         catalog.registerFunction(new CoalesceFunction(catalog));
+        catalog.registerFunction(new PropertyFunction(catalog));
         
         // Table functions
         catalog.registerFunction(new Range(catalog));
         catalog.registerFunction(new MapToRowFunction(catalog));
+        
+        return catalog;
     }
     
     private static class BuiltInCatalog extends Catalog

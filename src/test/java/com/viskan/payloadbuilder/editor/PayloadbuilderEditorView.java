@@ -176,7 +176,7 @@ class PayloadbuilderEditorView extends JFrame
 
         panelCatalogs = new JPanel();
         panelCatalogs.setLayout(new BoxLayout(panelCatalogs, BoxLayout.Y_AXIS));
-        panelCatalogs.setPreferredSize(new Dimension(250, 0));
+//        panelCatalogs.setPreferredSize(new Dimension(250, 0));
         splitPane.setLeftComponent(new JScrollPane(panelCatalogs));
 
         setDefaultCloseOperation(EXIT_ON_CLOSE);

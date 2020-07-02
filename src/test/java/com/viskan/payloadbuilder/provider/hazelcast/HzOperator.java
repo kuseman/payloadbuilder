@@ -1,10 +1,10 @@
 package com.viskan.payloadbuilder.provider.hazelcast;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.catalog.Index;
+import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.operator.Operator;
 import com.viskan.payloadbuilder.operator.OperatorContext;
+import com.viskan.payloadbuilder.operator.Row;
 import com.viskan.payloadbuilder.operator.OperatorContext.NodeData;
 
 import static com.viskan.payloadbuilder.utils.MapUtils.entry;

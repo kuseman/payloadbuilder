@@ -1,7 +1,7 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.operator.OperatorContext.NodeData;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.repeat;
@@ -11,25 +11,25 @@ import java.util.Iterator;
 import java.util.List;
 
 /** Caches provided operator to allow rewinds (Used in inner operator for nested loop) */
-public class CachingOperator extends AOperator
+class CachingOperator extends AOperator
 {
     private final Operator operator;
 
     /* Statistics */
     private int executionCount;
 
-    public CachingOperator(int nodeId, Operator target)
+    CachingOperator(int nodeId, Operator target)
     {
         super(nodeId);
         this.operator = requireNonNull(target, "operator");
     }
 
     @Override
-    public Iterator<Row> open(OperatorContext context)
+    public Iterator<Row> open(ExecutionContext context)
     {
         executionCount++;
 
-        Data data = context.getNodeData(nodeId, Data::new);
+        Data data = context.getOperatorContext().getNodeData(nodeId, Data::new);
 
         if (data.cache == null)
         {

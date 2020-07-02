@@ -1,17 +1,16 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
-import com.viskan.payloadbuilder.parser.tree.QualifiedName;
+import com.viskan.payloadbuilder.catalog.TableAlias;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.QualifiedName;
 
 import java.util.Iterator;
 import java.util.stream.IntStream;
 
-import org.junit.Assert;
 import org.junit.Test;
 
 /** Unit test of {@link BatchLimitOperator} */
-public class BatchLimitOperatorTest extends Assert
+public class BatchLimitOperatorTest extends AOperatorTest
 {
     @Test
     public void test()
@@ -20,7 +19,7 @@ public class BatchLimitOperatorTest extends Assert
         Operator op = ctx -> IntStream.range(0, 10).mapToObj(i -> Row.of(alias, i, new Object[] {i} )).iterator();                
         Operator limitOp = new BatchLimitOperator(0, op, 5);
         
-        OperatorContext ctx = new OperatorContext();
+        ExecutionContext ctx = new ExecutionContext(session);
         Iterator<Row> it = limitOp.open(ctx);
         
         int count = 0;

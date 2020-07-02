@@ -2,6 +2,7 @@ package com.viskan.payloadbuilder.editor;
 
 import com.viskan.payloadbuilder.editor.QueryFileModel.Output;
 
+import static com.hazelcast.util.collection.ArrayUtils.getItemAtPositionOrNull;
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
 
@@ -29,6 +30,7 @@ class ResultModel extends AbstractTableModel
     private final QueryFileModel file;
     private List<Object[]> rows = new ArrayList<>(50);
     private String[] columns = EMPTY_STRING_ARRAY;
+    private boolean complete;
     
     private int lastNotifyRowIndex = 0;
     
@@ -40,6 +42,11 @@ class ResultModel extends AbstractTableModel
     /** Add row */
     void addRow(Object[] row)
     {
+        if (complete)
+        {
+            throw new IllegalArgumentException("This result model is completed");
+        }
+        
         rows.add(row);
         if (file.getOutput() == Output.NONE)
         {
@@ -49,6 +56,14 @@ class ResultModel extends AbstractTableModel
         if (rows.size() >= lastNotifyRowIndex + NOTIFY_ROWS_THRESHOLD)
         {
             fireRowsInserted(lastNotifyRowIndex, lastNotifyRowIndex + NOTIFY_ROWS_THRESHOLD - 1);
+            try
+            {
+                // Yield to not hog application
+                Thread.sleep(5);
+            }
+            catch (InterruptedException e)
+            {
+            }
             lastNotifyRowIndex = rows.size();
         }
     }
@@ -56,6 +71,7 @@ class ResultModel extends AbstractTableModel
     /** Called when result is completed. */
     void done()
     {
+        complete = true;
         if (file.getOutput() == Output.NONE)
         {
             return;
@@ -65,6 +81,11 @@ class ResultModel extends AbstractTableModel
         {
             fireRowsInserted(lastNotifyRowIndex, rows.size() - 1);
         }
+    }
+    
+    boolean isComplete()
+    {
+        return complete;
     }
     
     /** Set columns */
@@ -97,7 +118,7 @@ class ResultModel extends AbstractTableModel
     }
     
     /** A non table model method to get row count */
-    int getActualRowCOunt()
+    int getActualRowCount()
     {
         return rows.size();
     }
@@ -128,7 +149,13 @@ class ResultModel extends AbstractTableModel
     @Override
     public Object getValueAt(int rowIndex, int columnIndex)
     {
-        return rows.get(rowIndex)[columnIndex];
+        Object[] row = rows.get(rowIndex);
+        if (row == null)
+        {
+            System.out.println("ROW IS NULL");
+            return null;
+        }
+        return getItemAtPositionOrNull(row, columnIndex);
     }
     
     @Override
@@ -139,10 +166,7 @@ class ResultModel extends AbstractTableModel
     
     private void fireRowsInserted(int rowStart, int rowEnd)
     {
-        SwingUtilities.invokeLater(() -> 
-        {
-            super.fireTableRowsInserted(rowStart, rowEnd);
-        });
+            SwingUtilities.invokeLater(() -> super.fireTableRowsInserted(rowStart, rowEnd));
     }
     
     /** Get cell label for provided object.

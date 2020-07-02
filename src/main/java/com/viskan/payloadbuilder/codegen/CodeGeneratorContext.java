@@ -1,6 +1,6 @@
 package com.viskan.payloadbuilder.codegen;
 
-import com.viskan.payloadbuilder.TableAlias;
+import com.viskan.payloadbuilder.catalog.TableAlias;
 
 import java.util.HashMap;
 import java.util.HashSet;

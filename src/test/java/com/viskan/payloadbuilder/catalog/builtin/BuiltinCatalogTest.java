@@ -1,12 +1,13 @@
 package com.viskan.payloadbuilder.catalog.builtin;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
+import com.viskan.payloadbuilder.QuerySession;
 import com.viskan.payloadbuilder.catalog.CatalogRegistry;
+import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.codegen.CodeGenerator;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
+import com.viskan.payloadbuilder.operator.Row;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.Expression;
 import com.viskan.payloadbuilder.parser.QueryParser;
-import com.viskan.payloadbuilder.parser.tree.Expression;
 
 import static java.util.Arrays.asList;
 
@@ -22,7 +23,7 @@ public class BuiltinCatalogTest extends Assert
 {
     private final CodeGenerator codeGenerator = new CodeGenerator();
     private final QueryParser parser = new QueryParser();
-    private final CatalogRegistry catalogRegistry = new CatalogRegistry();
+    private final QuerySession session = new QuerySession(new CatalogRegistry());
 
     @Test
     public void test_function_hash()
@@ -37,6 +38,21 @@ public class BuiltinCatalogTest extends Assert
     public void test_function_now()
     {
         assertFunction(true, null, "now() > 0");
+    }
+    
+    @Test
+    public void test_function_coalesce()
+    {
+        assertFunction(10, null, "coalesce(null, null, 10)");
+        assertFunction("str", null, "coalesce('str', null, 10)");
+    }
+    
+    @Test
+    public void test_function_property()
+    {
+        assertFunction(null, null, "property('key')");
+        session.setProperty("key", "value");
+        assertFunction("value", null, "property('key')");
     }
     
     @Test
@@ -128,7 +144,7 @@ public class BuiltinCatalogTest extends Assert
     {
         TableAlias alias = row == null ? TableAlias.of(null, "table", "t") : row.getTableAlias();
         row = row != null ? row : Row.of(alias, 0, new Object[0]);
-        Expression e = parser.parseExpression(catalogRegistry, expression);
+        Expression e = parser.parseExpression(expression);
         Object actual = null;
         
         try
@@ -146,7 +162,9 @@ public class BuiltinCatalogTest extends Assert
         }
         
 
-        actual = e.eval(new EvaluationContext(), row);
+        ExecutionContext context = new ExecutionContext(session);
+        context.setRow(row);
+        actual = e.eval(context);
         if (actual instanceof Iterator)
         {
             actual = IteratorUtils.toList((Iterator<Object>) actual);
@@ -160,7 +178,7 @@ public class BuiltinCatalogTest extends Assert
         Expression expr = null;
         try
         {
-            expr = parser.parseExpression(catalogRegistry, expression);
+            expr = parser.parseExpression(expression);
             codeGenerator.generateFunction(null, expr).apply(row);
             fail(expression + " should fail.");
         }
@@ -181,7 +199,9 @@ public class BuiltinCatalogTest extends Assert
         
         try
         {
-            expr.eval(new EvaluationContext(), row);
+            ExecutionContext context = new ExecutionContext(session);
+            context.setRow(row);
+            expr.eval(context);
             fail(expression + " should fail.");
         }
         catch (Exception ee)

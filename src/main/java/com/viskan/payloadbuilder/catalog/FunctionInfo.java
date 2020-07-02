@@ -1,7 +1,7 @@
 package com.viskan.payloadbuilder.catalog;
 
 import com.viskan.payloadbuilder.catalog.builtin.BuiltinCatalog;
-import com.viskan.payloadbuilder.parser.tree.Expression;
+import com.viskan.payloadbuilder.parser.Expression;
 
 import static java.util.Objects.requireNonNull;
 

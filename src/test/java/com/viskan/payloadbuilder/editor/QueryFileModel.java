@@ -1,21 +1,28 @@
 package com.viskan.payloadbuilder.editor;
 
+import com.viskan.payloadbuilder.QuerySession;
+import com.viskan.payloadbuilder.catalog.CatalogRegistry;
+
 import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 import javax.swing.event.SwingPropertyChangeSupport;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
-/** Model of a query file.
- * Has information about filename, execution state etc. 
+/**
+ * Model of a query file. Has information about filename, execution state etc.
  **/
 class QueryFileModel
 {
     private final SwingPropertyChangeSupport pcs = new SwingPropertyChangeSupport(this);
+    static final String RESULT_MODEL = "resultModel";
     static final String DIRTY = "dirty";
     static final String FILENAME = "filename";
     static final String QUERY = "query";
@@ -29,15 +36,16 @@ class QueryFileModel
     private String savedQuery = "";
     private String query = "";
     private Output output = Output.TABLE;
-    
-    /** Choosen catalog values */
-//    private final Map<ICatalogExtension, Map<IExtensionItem, Object>> catalogValues = new HashMap<>();
+
+    private final QuerySession querySession = new QuerySession(new CatalogRegistry());
+
+    private final List<ResultModel> results = new ArrayList<>();
     
     /** Execution fields */
     private long executionTime;
     private String error;
     private Pair<Integer, Integer> parseErrorLocation;
-    
+
     QueryFileModel()
     {
     }
@@ -87,35 +95,36 @@ class QueryFileModel
         if (oldValue != newValue)
         {
             this.state = state;
-            
+
             // Reset execution fields when starting
             if (state == State.EXECUTING)
             {
                 clearForExecution();
             }
-            
+
             pcs.firePropertyChange(STATE, oldValue, newValue);
         }
     }
-    
+
     /** Get current execution time in millis */
     long getExecutionTime()
     {
         return executionTime;
     }
-    
+
     void setExecutionTime(long executionTime)
     {
         this.executionTime = executionTime;
     }
-    
+
     void clearForExecution()
     {
         executionTime = 0;
         error = "";
         parseErrorLocation = null;
+        results.clear();
     }
-    
+
     boolean isNew()
     {
         return newFile;
@@ -190,12 +199,12 @@ class QueryFileModel
     {
         this.output = output;
     }
-    
+
     String getError()
     {
         return error;
     }
-    
+
     void setError(String error)
     {
         this.error = error;
@@ -205,17 +214,44 @@ class QueryFileModel
     {
         return parseErrorLocation;
     }
-    
+
     void setParseErrorLocation(Pair<Integer, Integer> parseErrorLocation)
     {
         this.parseErrorLocation = parseErrorLocation;
     }
+
+    String getTabTitle()
+    {
+        String filename = FilenameUtils.getName(getFilename());
+        StringBuilder sb = new StringBuilder();
+        if (isDirty())
+        {
+            sb.append("*");
+        }
+        sb.append(filename);
+        if (getState() == State.EXECUTING)
+        {
+            sb.append(" Executing ...");
+        }
+        return sb.toString();
+    }
+
+    QuerySession getQuerySession()
+    {
+        return querySession;
+    }
     
-//    public Map<ICatalogExtension, Map<IExtensionItem, Object>> getCatalogValues()
-//    {
-//        return catalogValues;
-//    }
+    List<ResultModel> getResults()
+    {
+        return results;
+    }
     
+    void addResult(ResultModel model)
+    {
+        results.add(model);
+        pcs.firePropertyChange(RESULT_MODEL, null, model);
+    }
+
     enum State
     {
         COMPLETED("Stopped"),
@@ -238,8 +274,8 @@ class QueryFileModel
 
     enum Output
     {
-//        JSON_RAW,
-//        JSON_PRETTY,
+        //        JSON_RAW,
+        //        JSON_PRETTY,
         TABLE,
         FILE,
         NONE;

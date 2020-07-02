@@ -1,11 +1,9 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
-
 import java.util.List;
 
 /** Merges outer and inner row */
-public class DefaultRowMerger implements RowMerger
+class DefaultRowMerger implements RowMerger
 {
     /** Default merger. Merges inner row into outer */
     public static final DefaultRowMerger DEFAULT = new DefaultRowMerger(-1);
@@ -13,7 +11,7 @@ public class DefaultRowMerger implements RowMerger
     /** Limit number of merged rows */
     private final int limit;
 
-    public DefaultRowMerger(int limit)
+    DefaultRowMerger(int limit)
     {
         this.limit = limit;
     }

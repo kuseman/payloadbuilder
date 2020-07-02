@@ -9,12 +9,58 @@ grammar PayloadBuilderQuery;
 }
 
 query
+ : statements
+   EOF
+ ;
+ 
+statements
+ : (statement ';'?)+
+ ;
+ 
+statement
+ : miscStatement
+ | controlFlowStatement
+ | dmlStatement
+ ;
+ 
+miscStatement
+ : setStatement
+ ;
+
+setStatement
+ : SET qname EQUALS expression
+ ;
+
+controlFlowStatement
+ : ifStatement
+ | printStatement
+ ;
+
+ifStatement
+ : IF condition=expression THEN
+   statements
+   (ELSE elseStatements+=statements)?
+   END IF 
+ ;
+
+printStatement
+ : PRINT expression
+ ;
+
+dmlStatement
+ : selectStatement
+ ;
+
+topSelect
+ : selectStatement EOF
+ ;
+
+selectStatement
  : SELECT selectItem (',' selectItem)*
    (FROM tableSourceJoined)?
    (WHERE where=expression)?
    (GROUPBY groupBy+=expression (',' groupBy+=expression)*)?
    (ORDERBY sortItem (',' sortItem)*)?
-   EOF
  ;
 
 selectItem
@@ -38,7 +84,7 @@ tableSourceJoined
 
 tableSource
  : qname				identifier? (WITH '(' tableOptions+=table_with_option (',' tableOptions+=table_with_option)* ')' )?
- | catalogFunctionCall	identifier?
+ | functionCall			identifier?
  | populateQuery		identifier?
  ;
 
@@ -92,18 +138,18 @@ expression
  
 primary
  : literal													#literalExpression
- | catalogFunctionCall 										#functionCallExpression	
+ | left=primary '.' (identifier | functionCall)				#dereference	
+ | identifier												#columnReference
+ | functionCall 											#functionCallExpression	
  | identifier '->' expression                               #lambdaExpression
  | '(' identifier (',' identifier)+ ')' '->' expression  	#lambdaExpression
  | value=primary '[' index=expression ']'    				#subscript	
- | qname													#columnReference
  | namedParameter											#namedParameterExpression
- | left=primary '.' (catalogFunctionCall | qname)			#dereference	
  | '(' expression ')' 										#nestedExpression			
  ;
 
-catalogFunctionCall
- : qname '(' ( expression (',' expression)*)? ')'
+functionCall
+ : qname '(' ( arguments+=expression (',' arguments+=expression)*)? ')'
  ;
  
 literal
@@ -128,7 +174,7 @@ compareOperator
  ; 
 
 qname
- : identifier ('.' identifier)*
+ : (catalog=identifier '#')? parts+=identifier ('.' parts+=identifier)*
  ;
 
 identifier
@@ -167,11 +213,14 @@ APPLY	     : A P P L Y;
 BATCH_SIZE   : B A T C H '_' S I Z E;
 CROSS        : C R O S S;
 DESC	     : D E S C;
+ELSE		 : E L S E;
+END			 : E N D;
 FALSE	     : F A L S E;
 FIRST	     : F I R S T;
 FROM	     : F R O M;
 GROUPBY      : G R O U P ' ' B Y;
 HAVING       : H A V I N G;
+IF           : I F;
 IN		     : I N;
 INNER	     : I N N E R;
 IS           : I S;
@@ -186,8 +235,10 @@ ON		     : O N;
 OR		     : O R;
 ORDERBY	     : O R D E R ' ' B Y;
 OUTER        : O U T E R;
-POPULATE     : P O P U L A T E;
+PRINT        : P R I N T;
 SELECT	     : S E L E C T;
+SET			 : S E T;
+THEN		 : T H E N;
 TRUE	     : T R U E;
 WITH         : W I T H;
 WHERE	     : W H E R E;

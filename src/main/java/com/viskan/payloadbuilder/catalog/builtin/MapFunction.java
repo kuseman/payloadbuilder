@@ -1,15 +1,14 @@
 package com.viskan.payloadbuilder.catalog.builtin;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.LambdaFunction;
 import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
+import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.codegen.CodeGeneratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
-import com.viskan.payloadbuilder.parser.tree.Expression;
-import com.viskan.payloadbuilder.parser.tree.LambdaExpression;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.Expression;
+import com.viskan.payloadbuilder.parser.LambdaExpression;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
@@ -57,9 +56,9 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
     }
     
     @Override
-    public Object eval(EvaluationContext context, List<Expression> arguments, Row row)
+    public Object eval(ExecutionContext context, List<Expression> arguments)
     {
-        Object argResult = arguments.get(0).eval(context, row);
+        Object argResult = arguments.get(0).eval(context);
         if (argResult == null)
         {
             return null;
@@ -69,7 +68,7 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
         return new TransformIterator(IteratorUtils.getIterator(argResult), input -> 
         {
             context.setLambdaValue(lambdaId, input);
-            return le.getExpression().eval(context, row);   
+            return le.getExpression().eval(context);   
         });
     }
     

@@ -1,7 +1,6 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 
 import static java.util.Collections.emptyIterator;
 import static java.util.Collections.singletonList;
@@ -21,26 +20,26 @@ import org.apache.commons.lang3.StringUtils;
 /**
  * Hash match operator. Hashes outer operator and probes the inner operator
  */
-public class HashJoin extends AOperator
+class HashJoin extends AOperator
 {
     private final String logicalOperator;
     private final Operator outer;
     private final Operator inner;
-    private final ToIntBiFunction<EvaluationContext, Row> outerHashFunction;
-    private final ToIntBiFunction<EvaluationContext, Row> innerHashFunction;
-    private final BiPredicate<EvaluationContext, Row> predicate;
+    private final ToIntBiFunction<ExecutionContext, Row> outerHashFunction;
+    private final ToIntBiFunction<ExecutionContext, Row> innerHashFunction;
+    private final BiPredicate<ExecutionContext, Row> predicate;
     private final RowMerger rowMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
 
-    public HashJoin(
+    HashJoin(
             int nodeId,
             String logicalOperator,
             Operator outer,
             Operator inner,
-            ToIntBiFunction<EvaluationContext, Row> outerHashFunction,
-            ToIntBiFunction<EvaluationContext, Row> innerHashFunction,
-            BiPredicate<EvaluationContext, Row> predicate,
+            ToIntBiFunction<ExecutionContext, Row> outerHashFunction,
+            ToIntBiFunction<ExecutionContext, Row> innerHashFunction,
+            BiPredicate<ExecutionContext, Row> predicate,
             RowMerger rowMerger,
             boolean populating,
             boolean emitEmptyOuterRows)
@@ -59,7 +58,7 @@ public class HashJoin extends AOperator
 
     @SuppressWarnings("unchecked")
     @Override
-    public Iterator<Row> open(OperatorContext context)
+    public Iterator<Row> open(ExecutionContext context)
     {
         Map<IntKey, List<Row>> table = hash(context);
         if (table.isEmpty())
@@ -68,7 +67,7 @@ public class HashJoin extends AOperator
         }
 
         boolean markOuterRows = populating || emitEmptyOuterRows;
-        Iterator<Row> probeIterator = probeIterator(context.getParentRow(), table, context, markOuterRows);
+        Iterator<Row> probeIterator = probeIterator(context.getRow(), table, context, markOuterRows);
 
         if (populating)
         {
@@ -95,7 +94,7 @@ public class HashJoin extends AOperator
                 tableIterator(table, TableIteratorType.NON_MATCHED));
     };
 
-    private Map<IntKey, List<Row>> hash(OperatorContext context)
+    private Map<IntKey, List<Row>> hash(ExecutionContext context)
     {
         IntKey key = new IntKey();
         Map<IntKey, List<Row>> table = new LinkedHashMap<>();
@@ -103,7 +102,7 @@ public class HashJoin extends AOperator
         while (oi.hasNext())
         {
             Row row = oi.next();
-            key.key = outerHashFunction.applyAsInt(context.getEvaluationContext(), row);
+            key.key = outerHashFunction.applyAsInt(context, row);
             List<Row> list = table.get(key);
             if (list == null)
             {
@@ -126,7 +125,7 @@ public class HashJoin extends AOperator
     private Iterator<Row> probeIterator(
             Row contextParent,
             Map<IntKey, List<Row>> table,
-            OperatorContext context,
+            ExecutionContext context,
             boolean markOuterRows)
     {
         final Iterator<Row> ii = inner.open(context);
@@ -165,7 +164,7 @@ public class HashJoin extends AOperator
 
                         currentInner = ii.next();
 
-                        key.key = innerHashFunction.applyAsInt(context.getEvaluationContext(), currentInner);
+                        key.key = innerHashFunction.applyAsInt(context, currentInner);
                         List<Row> list = table.get(key);
                         if (list == null)
                         {
@@ -188,7 +187,7 @@ public class HashJoin extends AOperator
                     currentOuter.setPredicateParent(contextParent);
                     currentInner.setPredicateParent(currentOuter);
 
-                    if (predicate.test(context.getEvaluationContext(), currentInner))
+                    if (predicate.test(context, currentInner))
                     {
                         next = rowMerger.merge(currentOuter, currentInner, populating);
                         if (markOuterRows)

@@ -1,11 +1,11 @@
 package com.viskan.payloadbuilder.codegen;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.catalog.CatalogRegistry;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
+import com.viskan.payloadbuilder.catalog.TableAlias;
+import com.viskan.payloadbuilder.operator.Row;
+import com.viskan.payloadbuilder.parser.EvaluationContext;
+import com.viskan.payloadbuilder.parser.Expression;
 import com.viskan.payloadbuilder.parser.QueryParser;
-import com.viskan.payloadbuilder.parser.tree.Expression;
 
 import static java.util.stream.Collectors.toList;
 

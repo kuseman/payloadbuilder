@@ -1,11 +1,10 @@
 package com.viskan.payloadbuilder.provider.elastic;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.Index;
+import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.operator.Operator;
-import com.viskan.payloadbuilder.parser.tree.QualifiedName;
+import com.viskan.payloadbuilder.parser.QualifiedName;
 
 import static java.util.Arrays.asList;
 
@@ -23,6 +22,11 @@ public class EsCatalog extends Catalog
     EsCatalog()
     {
         super("ES");
+    }
+    
+    public EsIndex getIndex()
+    {
+        
     }
     
     @Override
@@ -43,7 +47,13 @@ public class EsCatalog extends Catalog
             
         }
         
-        return new EsOperator(alias);
+        return new EsOperator(alias, null);
+    }
+    
+    @Override
+    public Operator getIndexOperator(int nodeId, TableAlias alias, Index index)
+    {
+        return new EsOperator(alias, index);
     }
     
     Set<String> ART_ID_INDEX_TABLES = new HashSet<>(asList(
@@ -62,5 +72,34 @@ public class EsCatalog extends Catalog
             return asList(new Index(table, asList("art_id"), 100));
         }
         return super.getIndices(table);
+    }
+    
+    /** Class representing a endpoint/index combo */
+    protected static class EsIndex
+    {
+        private final String endpoint;
+        private final String index;
+
+        EsIndex(String endpoint, String index)
+        {
+            this.endpoint = endpoint;
+            this.index = index;
+        }
+
+        public String getEndpoint()
+        {
+            return endpoint;
+        }
+        
+        public String getIndex()
+        {
+            return index;
+        }
+        
+        @Override
+        public String toString()
+        {
+            return index;
+        }
     }
 }

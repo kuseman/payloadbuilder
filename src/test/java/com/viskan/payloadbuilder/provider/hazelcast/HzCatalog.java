@@ -1,10 +1,10 @@
 package com.viskan.payloadbuilder.provider.hazelcast;
 
-import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.Index;
+import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.operator.Operator;
-import com.viskan.payloadbuilder.parser.tree.QualifiedName;
+import com.viskan.payloadbuilder.parser.QualifiedName;
 
 import static java.util.Arrays.asList;
 

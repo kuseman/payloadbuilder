@@ -1,12 +1,11 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 
 /** Definition of a values extractor.
  * Extracts values from a row into a Object array */
-public interface ValuesExtractor
+interface ValuesExtractor
 {
     /** Extract values */
-    void extract(EvaluationContext context, Row row, Object[] values);
+    void extract(ExecutionContext context, Row row, Object[] values);
 }

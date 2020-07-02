@@ -1,7 +1,6 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 
 import static java.util.Objects.requireNonNull;
 
@@ -12,12 +11,12 @@ import java.util.function.BiPredicate;
 import org.apache.commons.lang3.StringUtils;
 
 /** Operator the join two other operators using nested loop */
-public class NestedLoopJoin extends AOperator
+class NestedLoopJoin extends AOperator
 {
     private final String logicalOperator;
     private final Operator outer;
     private final Operator inner;
-    private final BiPredicate<EvaluationContext, Row> predicate;
+    private final BiPredicate<ExecutionContext, Row> predicate;
     private final RowMerger rowMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
@@ -26,12 +25,12 @@ public class NestedLoopJoin extends AOperator
     /* Statistics */
     private int executionCount;
 
-    public NestedLoopJoin(
+    NestedLoopJoin(
             int nodeId,
             String logicalOperator,
             Operator outer,
             Operator inner,
-            BiPredicate<EvaluationContext, Row> predicate,
+            BiPredicate<ExecutionContext, Row> predicate,
             RowMerger rowMerger,
             boolean populating,
             boolean emitEmptyOuterRows)
@@ -47,9 +46,9 @@ public class NestedLoopJoin extends AOperator
     }
 
     @Override
-    public Iterator<Row> open(OperatorContext context)
+    public Iterator<Row> open(ExecutionContext context)
     {
-        final Row contextParent = context.getParentRow();
+        final Row contextParent = context.getRow();
         final Iterator<Row> it = outer.open(context);
         executionCount++;
         return new Iterator<Row>()
@@ -79,14 +78,14 @@ public class NestedLoopJoin extends AOperator
                 {
                     if (ii == null && !it.hasNext())
                     {
-                        context.setParentRow(contextParent);
+                        context.setRow(contextParent);
                         return false;
                     }
 
                     if (currentOuter == null)
                     {
                         currentOuter = it.next();
-                        context.setParentRow(currentOuter);
+                        context.setRow(currentOuter);
                         hit = false;
                     }
 
@@ -114,7 +113,7 @@ public class NestedLoopJoin extends AOperator
                     Row currentInner = ii.next();
                     currentInner.setPredicateParent(currentOuter);
 
-                    if (predicate == null || predicate.test(context.getEvaluationContext(), currentInner))
+                    if (predicate == null || predicate.test(context, currentInner))
                     {
                         next = rowMerger.merge(currentOuter, currentInner, populating);
                         if (populating)

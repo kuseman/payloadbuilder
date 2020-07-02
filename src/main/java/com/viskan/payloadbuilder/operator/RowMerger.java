@@ -1,7 +1,5 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
-
 /** Definition of a row merger that merges to joined rows. */
 public interface RowMerger
 {

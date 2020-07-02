@@ -12,10 +12,14 @@ import java.awt.FlowLayout;
 import java.awt.Point;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import javax.swing.Icon;
@@ -47,19 +51,18 @@ import org.kordamp.ikonli.swing.FontIcon;
 /** Content of a query editor. Text editor and a result panel separated with a split panel */
 class QueryFileView extends JPanel
 {
+    private static final int COLUMN_ADJUST_ROW_LIMIT = 30;
     private final JSplitPane splitPane;
-    //    private final JPanel result;
     private final TextEditorPane textEditor;
+    private final JTabbedPane resultTabs;
     private final JTextArea messages;
-    private final JTable resultTable;
+    private final JPanel resultsPanel;
     private final QueryFileModel file;
     private final JLabel labelRunTime;
     private final JLabel labelRowCount;
+    private final JLabel labelExecutionStatus;
     private final Timer executionTimer;
 
-    private final ResultModel resultModel;
-
-    private boolean columnsAdjusted;
     private boolean resultCollapsed;
     private int prevDividerLocation;
 
@@ -94,32 +97,19 @@ class QueryFileView extends JPanel
         textEditor.addCaretListener(evt -> caretChangeListener.accept(this));
 
         messages = new JTextArea();
-        resultTable = createResultTable();
-        TableColumnAdjuster columnAdjuster = new TableColumnAdjuster(resultTable, 10);
-        resultModel = new ResultModel(file);
-        // Add listener to adjust columns upon reaching 30 rows or query is complete
-        resultModel.addTableModelListener(l ->
-        {
-            if (l.getType() == TableModelEvent.INSERT
-                && !columnsAdjusted
-                && (resultModel.getRowCount() > 30 || file.getState() != State.EXECUTING))
-            {
-                columnAdjuster.adjustColumns();
-                columnsAdjusted = true;
-            }
-
-        });
-        resultTable.setModel(resultModel);
-
-        JTabbedPane result = new JTabbedPane();
-        result.add("Result", new JScrollPane(resultTable));
-        result.add("Messages", new JScrollPane(messages));
+        resultsPanel = new JPanel();
+        resultsPanel.setLayout(new BorderLayout());
+        resultTabs = new JTabbedPane();
+        resultTabs.add(resultsPanel);
+        resultTabs.add(new JScrollPane(messages));
+        resultTabs.setTabComponentAt(0, new TabComponentView("Results", FontIcon.of(FontAwesome.TABLE)));
+        resultTabs.setTabComponentAt(1, new TabComponentView("Messages", FontIcon.of(FontAwesome.FILE_TEXT_O)));
 
         splitPane = new JSplitPane();
         splitPane.setOrientation(JSplitPane.VERTICAL_SPLIT);
         splitPane.setDividerLocation(400);
         splitPane.setLeftComponent(sp);
-        splitPane.setRightComponent(result);
+        splitPane.setRightComponent(resultTabs);
         add(splitPane, BorderLayout.CENTER);
 
         JPanel panelStatus = new JPanel();
@@ -127,7 +117,7 @@ class QueryFileView extends JPanel
         add(panelStatus, BorderLayout.SOUTH);
         panelStatus.setLayout(new FlowLayout(FlowLayout.LEFT, 5, 0));
 
-        JLabel labelExecutionStatus = new JLabel(getIconFromState(file.getState()));
+        labelExecutionStatus = new JLabel(getIconFromState(file.getState()));
 
         labelRunTime = new JLabel("", SwingConstants.LEFT);
         labelRunTime.setToolTipText("Last query run time");
@@ -145,46 +135,169 @@ class QueryFileView extends JPanel
         {
             if (QueryFileModel.STATE.equals(l.getPropertyName()))
             {
-                labelExecutionStatus.setIcon(getIconFromState(file.getState()));
-                labelExecutionStatus.setToolTipText(file.getState().getToolTip());
-
-                switch (file.getState())
-                {
-                    case EXECUTING:
-                        resultModel.clear();
-                        messages.setText("");
-                        executionTimer.start();
-                        result.setSelectedIndex(0);
-                        columnsAdjusted = false;
-                        clearHighLights();
-                        break;
-                    case COMPLETED:
-                        setExecutionStats();
-                        executionTimer.stop();
-                        break;
-                    case ABORTED:
-                        setExecutionStats();
-                        messages.setText("Query was aborted!");
-                        executionTimer.stop();
-                        break;
-                    case ERROR:
-                        result.setSelectedIndex(1);
-                        messages.setText(file.getError());
-                        if (file.getParseErrorLocation() != null)
-                        {
-                            highLight(file.getParseErrorLocation().getKey(), file.getParseErrorLocation().getValue());
-                        }
-                        break;
-                }
+                handleStateChanged();
+            }
+            else if (QueryFileModel.RESULT_MODEL.equals(l.getPropertyName()))
+            {
+                handleResultModelAdded();
             }
         });
+        
+        // Redirect query sessions output to messages text area
+        PrintStream ps = new PrintStream(new OutputStream()
+        {
+            @Override
+            public void write(int b) throws IOException
+            {
+                messages.append(String.valueOf((char)b));
+                messages.setCaretPosition(messages.getDocument().getLength());
+            }
+        });
+        
+        file.getQuerySession().setPrintStream(ps);
+    }
+
+    private void handleStateChanged()
+    {
+        labelExecutionStatus.setIcon(getIconFromState(file.getState()));
+        labelExecutionStatus.setToolTipText(file.getState().getToolTip());
+
+        switch (file.getState())
+        {
+            case EXECUTING:
+                resultsPanel.removeAll();
+                file.clearForExecution();
+                messages.setText("");
+                executionTimer.start();
+                resultTabs.setSelectedIndex(0);
+                clearHighLights();
+                break;
+            case COMPLETED:
+                setExecutionStats();
+                executionTimer.stop();
+                break;
+            case ABORTED:
+                setExecutionStats();
+                messages.setText("Query was aborted!");
+                executionTimer.stop();
+                break;
+            case ERROR:
+                resultTabs.setSelectedIndex(1);
+                messages.setText(file.getError());
+                if (file.getParseErrorLocation() != null)
+                {
+                    highLight(file.getParseErrorLocation().getKey(), file.getParseErrorLocation().getValue());
+                }
+                break;
+        }
+
+        // No rows, then show messages
+        if (file.getState() != State.EXECUTING && file.getResults().size() == 0)
+        {
+            resultTabs.setSelectedIndex(1);
+        }
+    }
+
+    private void handleResultModelAdded()
+    {
+        JTable resultTable = createResultTable();
+        final TableColumnAdjuster columnAdjuster = new TableColumnAdjuster(resultTable, 10);
+        final ResultModel resultModel = file.getResults().get(file.getResults().size() - 1);
+        // Add listener to adjust columns upon reaching 30 rows or query is complete
+        final AtomicBoolean columnsAdjusted = new AtomicBoolean();
+
+        resultModel.addTableModelListener(e ->
+        {
+            if (e.getType() == TableModelEvent.INSERT
+                && !columnsAdjusted.get()
+                && (
+            // Row limit reached
+            resultModel.getRowCount() > COLUMN_ADJUST_ROW_LIMIT
+                // This result set is complete
+                || resultModel.isComplete()))
+            {
+                columnAdjuster.adjustColumns();
+                columnsAdjusted.set(true);
+            }
+        });
+        resultTable.setModel(resultModel);
+
+        // First component, simply add the table
+        if (resultsPanel.getComponentCount() == 0)
+        {
+            resultsPanel.add(new JScrollPane(resultTable), BorderLayout.CENTER);
+        }
+        else
+        {
+            Component c = resultsPanel.getComponent(0);
+            c = ((JScrollPane) c).getViewport().getView();
+
+            // 8 rows plus header plus spacing
+            int height = resultTable.getRowHeight() * 9 + 10;
+
+            JSplitPane splitPane = new JSplitPane();
+            splitPane.setOrientation(JSplitPane.VERTICAL_SPLIT);
+
+            // Split panel, calculate height of previous table
+            // and set a new split panel in the previous split panels right component
+            if (c instanceof JSplitPane)
+            {
+                JSplitPane prevSplitPane = (JSplitPane) c;
+                Component rc = prevSplitPane.getRightComponent();
+
+                JTable prevTable = (JTable) ((JScrollPane) rc).getViewport().getView();
+                int actualTableHright = (prevTable.getRowCount() + 1) * prevTable.getRowHeight() + 15;
+                rc.setPreferredSize(new Dimension(0, Math.min(actualTableHright, height)));
+
+                splitPane.setLeftComponent(rc);
+
+                splitPane.setRightComponent(new JScrollPane(resultTable));
+                splitPane.getRightComponent().setPreferredSize(new Dimension(0, height));
+
+                prevSplitPane.setRightComponent(splitPane);
+            }
+            // Single table, add a split panel and add both new and old table
+            else
+            {
+                resultsPanel.removeAll();
+                splitPane.setLeftComponent(new JScrollPane(c));
+
+                JTable prevTable = (JTable) c;
+                int actualTableHright = (prevTable.getRowCount() + 1) * prevTable.getRowHeight() + 15;
+                splitPane.getLeftComponent().setPreferredSize(new Dimension(0, Math.min(actualTableHright, height)));
+
+                splitPane.setRightComponent(new JScrollPane(resultTable));
+                splitPane.getRightComponent().setPreferredSize(new Dimension(0, height));
+
+                resultsPanel.add(new JScrollPane(splitPane), BorderLayout.CENTER);
+            }
+        }
     }
 
     private JTable createResultTable()
     {
-        JTable result = new JTable();
-        result.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-        result.setDefaultRenderer(Object.class, new DefaultTableCellRenderer()
+        JTable resultTable = new JTable()
+        {
+            @Override
+            public boolean isCellSelected(int row, int column)
+            {
+                // If cell 0 is selected then select whole row
+                if (super.isCellSelected(row, 0))
+                {
+                    return true;
+                }
+                //                else if (super.isCellSelected(0, column))
+                //                {
+                //                    return true;
+                //                }
+                return super.isCellSelected(row, column);
+            }
+        };
+        resultTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+        //        result.setRowSelectionAllowed(true);
+        resultTable.setCellSelectionEnabled(true);
+        //        result.setColumnSelectionAllowed(true);
+        resultTable.setDefaultRenderer(Object.class, new DefaultTableCellRenderer()
         {
             @Override
             public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column)
@@ -206,7 +319,7 @@ class QueryFileView extends JPanel
                 return this;
             }
         });
-        result.addMouseListener(new MouseAdapter()
+        resultTable.addMouseListener(new MouseAdapter()
         {
             @Override
             public void mouseClicked(MouseEvent e)
@@ -235,15 +348,30 @@ class QueryFileView extends JPanel
                         frame.setVisible(true);
                     }
                 }
+                else if (e.getClickCount() == 1 && e.getButton() == MouseEvent.BUTTON1)
+                {
+                    Point point = e.getPoint();
+                    int row = resultTable.rowAtPoint(point);
+                    int col = resultTable.columnAtPoint(point);
+                    if (col == 0)
+                    {
+                        resultTable.setRowSelectionInterval(row, row);
+                    }
+                }
             }
         });
-        return result;
+        return resultTable;
     }
 
-    ResultModel getResultModel()
+    JTextArea getMessagesTextArea()
     {
-        return resultModel;
+        return messages;
     }
+
+    //    ResultModel getResultModel()
+    //    {
+    //        return resultModel;
+    //    }
 
     private Icon getIconFromState(State state)
     {
@@ -265,7 +393,7 @@ class QueryFileView extends JPanel
     private void setExecutionStats()
     {
         labelRunTime.setText(DurationFormatUtils.formatDurationHMS(file.getExecutionTime()));
-        labelRowCount.setText(String.valueOf(resultModel.getActualRowCOunt()));
+        labelRowCount.setText(String.valueOf(file.getResults().stream().mapToInt(r -> r.getActualRowCount()).sum()));
     }
 
     int getCaretLineNumber()

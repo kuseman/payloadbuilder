@@ -1,6 +1,7 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.OutputWriter;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 
 import static java.util.Objects.requireNonNull;
 
@@ -8,46 +9,46 @@ import java.util.Iterator;
 import java.util.List;
 
 /** Array projection. Projects a list of sub projections over a selection */
-public class ArrayProjection implements Projection
+class ArrayProjection implements Projection
 {
     private final List<Projection> projections;
     private final Operator selection;
 
-    public ArrayProjection(List<Projection> projections, Operator selection)
+    ArrayProjection(List<Projection> projections, Operator selection)
     {
         this.projections = requireNonNull(projections);
         this.selection = selection;
     }
 
     @Override
-    public void writeValue(OutputWriter writer, OperatorContext context, Row row)
+    public void writeValue(OutputWriter writer, ExecutionContext context)
     {
-        Row prevParentRow = context.getParentRow();
-        context.setParentRow(row);
         int size = projections.size();
 
         writer.startArray();
         if (selection != null)
         {
+            Row prevRow = context.getRow();
             Iterator<Row> it = selection.open(context);
             while (it.hasNext())
             {
-                Row selectionRow = it.next();
+                Row row = it.next();
                 for (int i = 0; i < size; i++)
                 {
-                    projections.get(i).writeValue(writer, context, selectionRow);
+                    context.setRow(row);
+                    projections.get(i).writeValue(writer, context);
                 }
             }
+            context.setRow(prevRow);
         }
         else
         {
             for (int i = 0; i < size; i++)
             {
-                projections.get(i).writeValue(writer, context, row);
+                projections.get(i).writeValue(writer, context);
             }
         }
         writer.endArray();
-        context.setParentRow(prevParentRow);
     }
 
     @Override

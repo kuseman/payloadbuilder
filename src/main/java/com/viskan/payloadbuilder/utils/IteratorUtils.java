@@ -1,6 +1,6 @@
 package com.viskan.payloadbuilder.utils;
 
-import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.operator.Row;
 
 import static java.util.Objects.requireNonNull;
 

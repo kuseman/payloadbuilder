@@ -1,12 +1,11 @@
 package com.viskan.payloadbuilder.catalog.builtin;
 
-import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.LambdaFunction;
 import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
-import com.viskan.payloadbuilder.parser.tree.Expression;
-import com.viskan.payloadbuilder.parser.tree.LambdaExpression;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.Expression;
+import com.viskan.payloadbuilder.parser.LambdaExpression;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
@@ -46,9 +45,9 @@ abstract class AMatchFunction extends ScalarFunctionInfo implements LambdaFuncti
     }
     
     @Override
-    public Object eval(EvaluationContext context, List<Expression> arguments, Row row)
+    public Object eval(ExecutionContext context, List<Expression> arguments)
     {
-        Object argResult = arguments.get(0).eval(context, row);
+        Object argResult = arguments.get(0).eval(context);
         if (argResult == null)
         {
             return null;
@@ -60,7 +59,7 @@ abstract class AMatchFunction extends ScalarFunctionInfo implements LambdaFuncti
         while (it.hasNext())
         {
             context.setLambdaValue(lambdaId, it.next());
-            Object obj = le.getExpression().eval(context, row);
+            Object obj = le.getExpression().eval(context);
             
             if (!(obj instanceof Boolean))
             {

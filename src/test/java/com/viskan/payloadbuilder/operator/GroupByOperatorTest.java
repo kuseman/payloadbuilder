@@ -1,8 +1,8 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
-import com.viskan.payloadbuilder.parser.tree.QualifiedName;
+import com.viskan.payloadbuilder.catalog.TableAlias;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.QualifiedName;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
@@ -13,11 +13,10 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 import org.apache.commons.collections.IteratorUtils;
-import org.junit.Assert;
 import org.junit.Test;
 
 /** Unit test of {@link GroupByOperator} */
-public class GroupByOperatorTest extends Assert
+public class GroupByOperatorTest extends AOperatorTest
 {
     @Test
     public void test()
@@ -32,7 +31,7 @@ public class GroupByOperatorTest extends Assert
                 (ctx, row, values) -> values[0] = row.getObject(1),
                 1);
 
-        Iterator<Row> it = gop.open(new OperatorContext());
+        Iterator<Row> it = gop.open(new ExecutionContext(session));
 
         List<Object> expected = asList(
                 asList(0, 2, 4, 6, 8),

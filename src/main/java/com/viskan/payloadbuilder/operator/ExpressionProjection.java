@@ -1,24 +1,25 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.parser.tree.Expression;
+import com.viskan.payloadbuilder.OutputWriter;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.Expression;
 
 import static java.util.Objects.requireNonNull;
 
 /** Projection that operates over an {@link Expression} */
-public class ExpressionProjection implements Projection
+class ExpressionProjection implements Projection
 {
     private final Expression expression;
 
-    public ExpressionProjection(Expression expression)
+    ExpressionProjection(Expression expression)
     {
         this.expression = requireNonNull(expression, "expression");
     }
 
     @Override
-    public void writeValue(OutputWriter writer, OperatorContext context, Row row)
+    public void writeValue(OutputWriter writer, ExecutionContext context)
     {
-        writer.writeValue(expression.eval(context.getEvaluationContext(), row));
+        writer.writeValue(expression.eval(context));
     }
 
     @Override

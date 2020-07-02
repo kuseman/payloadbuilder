@@ -1,31 +1,31 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
-import com.viskan.payloadbuilder.parser.tree.Expression;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.Expression;
 
 import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 
 /** Intepreter based values extractor */
-public class ExpressionValuesExtractor implements ValuesExtractor
+class ExpressionValuesExtractor implements ValuesExtractor
 {
     private final List<Expression> expressions;
     private final int size;
 
-    public ExpressionValuesExtractor(List<Expression> expressions)
+    ExpressionValuesExtractor(List<Expression> expressions)
     {
         this.expressions = requireNonNull(expressions, "expressions");
         this.size = expressions.size();
     }
 
     @Override
-    public void extract(EvaluationContext context, Row row, Object[] values)
+    public void extract(ExecutionContext context, Row row, Object[] values)
     {
+        context.setRow(row);
         for (int i = 0; i < size; i++)
         {
-            values[i] = expressions.get(i).eval(context, row);
+            values[i] = expressions.get(i).eval(context);
         }
     }
 

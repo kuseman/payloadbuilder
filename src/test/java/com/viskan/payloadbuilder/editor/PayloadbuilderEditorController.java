@@ -1,6 +1,5 @@
 package com.viskan.payloadbuilder.editor;
 
-import com.viskan.payloadbuilder.catalog.CatalogRegistry;
 import com.viskan.payloadbuilder.editor.QueryFileModel.Output;
 import com.viskan.payloadbuilder.editor.QueryFileModel.State;
 import com.viskan.payloadbuilder.editor.catalog.ICatalogExtension;
@@ -79,20 +78,20 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         });
 
         ButtonGroup defaultGroup = new ButtonGroup();
-        
+
         for (ICatalogExtension extension : model.getExtensions())
         {
             view.getPanelCatalogs().add(new JScrollPane(new CatalogExtensionView(extension, defaultGroup)));
-//            {
-//                QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
-//                if (editor != null)
-//                {
-//                    QueryFileModel file = editor.getFile();
-//                    file.getCatalogValues()
-//                        .computeIfAbsent(extension, key -> new HashMap<>())
-//                        .put(item, value);
-//                }
-//            }));
+            //            {
+            //                QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
+            //                if (editor != null)
+            //                {
+            //                    QueryFileModel file = editor.getFile();
+            //                    file.getCatalogValues()
+            //                        .computeIfAbsent(extension, key -> new HashMap<>())
+            //                        .put(item, value);
+            //                }
+            //            }));
         }
 
         view.getEditorsTabbedPane().addChangeListener(new SelectedFileListener());
@@ -173,7 +172,8 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                         text -> file.setQuery(text),
                         caretChangedListener);
                 view.getEditorsTabbedPane().add(content);
-                view.getEditorsTabbedPane().setTabComponentAt(model.getFiles().size() - 1, new TabComponentView(file, () ->
+
+                TabComponentView tabComponent = new TabComponentView(file.getTabTitle(), null, () ->
                 {
                     if (file.isDirty())
                     {
@@ -202,7 +202,14 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                             break;
                         }
                     }
-                }));
+                });
+                
+                file.addPropertyChangeListener(l ->
+                {
+                    tabComponent.setTitle(file.getTabTitle());
+                });
+
+                view.getEditorsTabbedPane().setTabComponentAt(model.getFiles().size() - 1, tabComponent);
                 view.getEditorsTabbedPane().setSelectedIndex(model.getFiles().size() - 1);
                 content.requestFocusInWindow();
             }
@@ -244,8 +251,13 @@ class PayloadbuilderEditorController implements PropertyChangeListener
             {
                 return;
             }
+            
+            if (editor.getFile().getState() == State.EXECUTING)
+            {
+                return;
+            }
 
-            PayloadbuilderService.executeQuery(editor.getFile(), editor.getResultModel(), queryString, new CatalogRegistry());
+            PayloadbuilderService.executeQuery(editor.getFile(), queryString);
         }
     }
 

@@ -1,10 +1,9 @@
 package com.viskan.payloadbuilder.catalog.builtin;
 
-import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
-import com.viskan.payloadbuilder.parser.tree.Expression;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.Expression;
 
 import java.util.Collection;
 import java.util.Iterator;
@@ -20,9 +19,9 @@ class CountFunction extends ScalarFunctionInfo
     
     @SuppressWarnings("unchecked")
     @Override
-    public Object eval(EvaluationContext context, List<Expression> arguments, Row row)
+    public Object eval(ExecutionContext context, List<Expression> arguments)
     {
-        Object obj = arguments.get(0).eval(context, row);
+        Object obj = arguments.get(0).eval(context);
         int count = 0;
         if (obj instanceof Iterator)
         {

@@ -1,9 +1,10 @@
 package com.viskan.payloadbuilder.provider.elastic;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
+import com.viskan.payloadbuilder.catalog.Index;
+import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.operator.Operator;
 import com.viskan.payloadbuilder.operator.OperatorContext;
+import com.viskan.payloadbuilder.operator.Row;
 
 import static com.viskan.payloadbuilder.utils.MapUtils.entry;
 import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
@@ -12,8 +13,6 @@ import static java.util.Collections.emptyIterator;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -56,10 +55,12 @@ class EsOperator implements Operator
             .build();
 
     private final TableAlias tableAlias;
+    private final Index index;
 
-    public EsOperator(TableAlias tableAlias)
+    public EsOperator(TableAlias tableAlias, Index index)
     {
         this.tableAlias = tableAlias;
+        this.index = index;
     }
 
     /* SETTINGS FIELDS */
@@ -80,72 +81,38 @@ class EsOperator implements Operator
 //        String database = "RamosLager157TestDev".toLowerCase();
     String database = "RamosVnpTestMain".toLowerCase();
     int comp_id = 0;
-    String index = database + "_c" + comp_id + "_v3";
+    String indexName = database + "_c" + comp_id + "_v3";
     String instance = database + (comp_id > 0 ? "_" + comp_id : "");
 
     /* END SETTINGS FIELD */
 
-    Map<String, List<Row>> cache =  new HashMap<>();
+//    Map<String, List<Row>> cache =  new HashMap<>();
     
     @Override
     public Iterator<Row> open(OperatorContext context)
     {
         String table = tableAlias.getTable().toString();
 
-        if (context.getIndex() != null)
+        if (index != null)
         {
-            //
-            String mgetUrl = String.format("%s/%s/data/_mget?filter_path=docs._source&_source_include=payload.%s.columns,payload.%s.rows", esEndpoint, index, table, table);
+            String mgetUrl = String.format("%s/%s/data/_mget?filter_path=docs._source&_source_include=payload.%s.columns,payload.%s.rows", esEndpoint, indexName, table, table);
             String pattern = DOC_ID_PATTERN_BY_TABLE.get(table);
 
-            Iterator<Row> res = cache.computeIfAbsent(table, k ->
+            // TODO: thread up all ids in executor and join
+            DocIdStreamingEntity entity = new DocIdStreamingEntity(context, instance, pattern);
+            return getIterator(table, scrollId ->
             {
-            
-            DocIdStreamingEntity entity = new DocIdStreamingEntity(context, database, pattern);
-            Iterator<Row> it = getIterator(table, scrollId ->
-            {
-//                List<String> docIds = new ArrayList<>();
-//                while (context.getOuterIndexValues().hasNext())
-//                {
-//                    docIds.add(instance + "_" + String.format(pattern, context.getOuterIndexValues().next()));
-//                }
-//                byte[] body = null;
-//                try
-//                {
-//                    body = MAPPER.writeValueAsBytes(ofEntries(entry("ids", docIds)));
-//                }
-//                catch (JsonProcessingException e)
-//                {
-//                }
-//                ByteArrayEntity entity = new ByteArrayEntity(body);
-                
                 scrollId.setValue("DUMMY");
                 HttpPost post = new HttpPost(mgetUrl);
                 post.setEntity(entity);
                 return post;
             });
-            
-            List<Row> rows = new ArrayList<>();
-            while (it.hasNext())
-            {
-                rows.add(it.next());
-            }
-            return rows;
-            
-            }).iterator();
-            
-            while (context.getOuterIndexValues().hasNext())
-            {
-                context.getOuterIndexValues().next();
-            }
-            
-            return res;
         }
 
         String subType = TABLE_TO_SUBTYPE.get(table);
         final String searchUrl = String.format("%s/%s/data/_search?q=_docType:%s+AND+_subType:%s&size=%d&scroll=%s",
                 esEndpoint,
-                index,
+                indexName,
                 docType,
                 subType,
                 250,

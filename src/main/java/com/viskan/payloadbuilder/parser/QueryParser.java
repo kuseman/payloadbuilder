@@ -1,20 +1,17 @@
 package com.viskan.payloadbuilder.parser;
 
-import com.viskan.payloadbuilder.catalog.Catalog;
-import com.viskan.payloadbuilder.catalog.CatalogRegistry;
-import com.viskan.payloadbuilder.catalog.FunctionInfo;
-import com.viskan.payloadbuilder.catalog.LambdaFunction;
-import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
-import com.viskan.payloadbuilder.catalog.TableFunctionInfo;
-import com.viskan.payloadbuilder.catalog.builtin.BuiltinCatalog;
+import com.viskan.payloadbuilder.parser.Apply.ApplyType;
+import com.viskan.payloadbuilder.parser.ComparisonExpression.Type;
+import com.viskan.payloadbuilder.parser.Join.JoinType;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.ArithmeticBinaryContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.ArithmeticUnaryContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.BatchSizeContext;
-import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.CatalogFunctionCallContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.ColumnReferenceContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.ComparisonExpressionContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.DereferenceContext;
+import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.FunctionCallContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.FunctionCallExpressionContext;
+import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.IfStatementContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.InExpressionContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.JoinPartContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.LambdaExpressionContext;
@@ -25,59 +22,28 @@ import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.NamedParameter
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.NestedExpressionContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.NullPredicateContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.PopulateQueryContext;
+import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.PrintStatementContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.QnameContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.QueryContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.SelectItemContext;
+import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.SelectStatementContext;
+import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.SetStatementContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.SortItemContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.TableSourceContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.TableSourceJoinedContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.TopExpressionContext;
-import com.viskan.payloadbuilder.parser.tree.AJoin;
-import com.viskan.payloadbuilder.parser.tree.Apply;
-import com.viskan.payloadbuilder.parser.tree.Apply.ApplyType;
-import com.viskan.payloadbuilder.parser.tree.ArithmeticBinaryExpression;
-import com.viskan.payloadbuilder.parser.tree.ArithmeticUnaryExpression;
-import com.viskan.payloadbuilder.parser.tree.ComparisonExpression;
-import com.viskan.payloadbuilder.parser.tree.ComparisonExpression.Type;
-import com.viskan.payloadbuilder.parser.tree.DereferenceExpression;
-import com.viskan.payloadbuilder.parser.tree.Expression;
-import com.viskan.payloadbuilder.parser.tree.ExpressionSelectItem;
-import com.viskan.payloadbuilder.parser.tree.FunctionCall;
-import com.viskan.payloadbuilder.parser.tree.InExpression;
-import com.viskan.payloadbuilder.parser.tree.Join;
-import com.viskan.payloadbuilder.parser.tree.Join.JoinType;
-import com.viskan.payloadbuilder.parser.tree.LambdaExpression;
-import com.viskan.payloadbuilder.parser.tree.LiteralBooleanExpression;
-import com.viskan.payloadbuilder.parser.tree.LiteralNullExpression;
-import com.viskan.payloadbuilder.parser.tree.LiteralStringExpression;
-import com.viskan.payloadbuilder.parser.tree.LogicalBinaryExpression;
-import com.viskan.payloadbuilder.parser.tree.LogicalNotExpression;
-import com.viskan.payloadbuilder.parser.tree.NamedParameterExpression;
-import com.viskan.payloadbuilder.parser.tree.NestedExpression;
-import com.viskan.payloadbuilder.parser.tree.NestedSelectItem;
-import com.viskan.payloadbuilder.parser.tree.NullPredicateExpression;
-import com.viskan.payloadbuilder.parser.tree.PopulateTableSource;
-import com.viskan.payloadbuilder.parser.tree.QualifiedFunctionCallExpression;
-import com.viskan.payloadbuilder.parser.tree.QualifiedName;
-import com.viskan.payloadbuilder.parser.tree.QualifiedReferenceExpression;
-import com.viskan.payloadbuilder.parser.tree.Query;
-import com.viskan.payloadbuilder.parser.tree.SelectItem;
-import com.viskan.payloadbuilder.parser.tree.SortItem;
-import com.viskan.payloadbuilder.parser.tree.SortItem.NullOrder;
-import com.viskan.payloadbuilder.parser.tree.SortItem.Order;
-import com.viskan.payloadbuilder.parser.tree.Table;
-import com.viskan.payloadbuilder.parser.tree.TableFunction;
-import com.viskan.payloadbuilder.parser.tree.TableOption;
-import com.viskan.payloadbuilder.parser.tree.TableSource;
-import com.viskan.payloadbuilder.parser.tree.TableSourceJoined;
+import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.TopSelectContext;
+import com.viskan.payloadbuilder.parser.SortItem.NullOrder;
+import com.viskan.payloadbuilder.parser.SortItem.Order;
 
-import static com.viskan.payloadbuilder.parser.tree.LiteralExpression.createLiteralDecimalExpression;
-import static com.viskan.payloadbuilder.parser.tree.LiteralExpression.createLiteralNumericExpression;
+import static com.viskan.payloadbuilder.parser.LiteralExpression.createLiteralDecimalExpression;
+import static com.viskan.payloadbuilder.parser.LiteralExpression.createLiteralNumericExpression;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,20 +63,26 @@ import org.antlr.v4.runtime.misc.ParseCancellationException;
 
 public class QueryParser
 {
-    /** Parser query */
-    public Query parseQuery(CatalogRegistry catalogRegistry, String query)
+    /** Parse query */
+    public QueryStatement parseQuery(String query)
     {
-        return getTree(catalogRegistry, query, p -> p.query());
+        return getTree(query, p -> p.query());
+    }
+
+    /** Parse select */
+    public Select parseSelect(String query)
+    {
+        return getTree(query, p -> p.topSelect());
     }
 
     /** Parse expression */
-    public Expression parseExpression(CatalogRegistry catalogRegistry, String expression)
+    public Expression parseExpression(String expression)
     {
-        return getTree(catalogRegistry, expression, p -> p.topExpression());
+        return getTree(expression, p -> p.topExpression());
     }
-    
+
     @SuppressWarnings("unchecked")
-    private <T> T getTree(CatalogRegistry catalogRegistry, String body, Function<PayloadBuilderQueryParser, ParserRuleContext> function)
+    private <T> T getTree(String body, Function<PayloadBuilderQueryParser, ParserRuleContext> function)
     {
         BaseErrorListener errorListener = new BaseErrorListener()
         {
@@ -146,25 +118,55 @@ public class QueryParser
             tree = function.apply(parser);
         }
 
-        return (T) new AstBuilder(catalogRegistry).visit(tree);
+        return (T) new AstBuilder().visit(tree);
     }
 
     /** Builds tree */
     private static class AstBuilder extends PayloadBuilderQueryBaseVisitor<Object>
     {
-        private final CatalogRegistry catalogRegistry;
+        private int functionIdentifier;
+        /** Id for function by qualified name */
+        private final Map<QualifiedName, Integer> functionIdentifierByName = new HashMap<>();
         /** Lambda parameters and slot id in current scope */
         private final Map<String, Integer> lambdaParameters = new HashMap<>();
         private Expression leftDereference;
-        private Expression prevLeftDereference;
 
-        public AstBuilder(CatalogRegistry catalogRegistry)
+        @Override
+        public Object visitIfStatement(IfStatementContext ctx)
         {
-            this.catalogRegistry = catalogRegistry;
+            Expression condition = getExpression(ctx.condition);
+            List<Statement> statements = ctx.statements().stream().map(s -> (Statement) visit(s)).collect(toList());
+            List<Statement> elseStatements = ctx.elseStatements != null ? ctx.elseStatements.stream().map(s -> (Statement) visit(s)).collect(toList()) : emptyList();
+            return new IfStatement(condition, statements, elseStatements);
         }
 
         @Override
         public Object visitQuery(QueryContext ctx)
+        {
+            List<Statement> statements = ctx.statements().children.stream().map(c -> (Statement) visit(c)).collect(toList());
+            return new QueryStatement(statements);
+        }
+
+        @Override
+        public Object visitPrintStatement(PrintStatementContext ctx)
+        {
+            return new PrintStatement(getExpression(ctx.expression()));
+        }
+
+        @Override
+        public Object visitSetStatement(SetStatementContext ctx)
+        {
+            return new SetStatement(getQualifiedName(ctx.qname()), getExpression(ctx.expression()));
+        }
+
+        @Override
+        public Object visitTopSelect(TopSelectContext ctx)
+        {
+            return ((SelectStatement) visit(ctx.selectStatement())).getSelect();
+        }
+
+        @Override
+        public Object visitSelectStatement(SelectStatementContext ctx)
         {
             List<SelectItem> selectItems = ctx.selectItem().stream().map(s -> (SelectItem) visit(s)).collect(toList());
 
@@ -172,34 +174,37 @@ public class QueryParser
 
             if (item.isPresent())
             {
-                throw new IllegalArgumentException("Select items on ROOT level must have aliaes. Item: " + item.get());
+                int index = selectItems.indexOf(item.get());
+                SelectItemContext itemCtx = ctx.selectItem(index);
+                throw new ParseException("Select items on ROOT level must have aliaes. Item: " + item.get(), itemCtx.start);
             }
 
             TableSourceJoined joinedTableSource = ctx.tableSourceJoined() != null ? (TableSourceJoined) visit(ctx.tableSourceJoined()) : null;
             if (joinedTableSource != null && joinedTableSource.getTableSource() instanceof PopulateTableSource)
             {
-                throw new IllegalArgumentException("Top table source cannot be a populating table source.");
+                throw new ParseException("Top table source cannot be a populating table source.", ctx.tableSourceJoined().start);
             }
             else if (joinedTableSource == null)
             {
                 if (ctx.where != null)
                 {
-                    throw new IllegalArgumentException("Cannot have a WHERE clause without a FROM.");
+                    throw new ParseException("Cannot have a WHERE clause without a FROM.", ctx.where.start);
                 }
                 else if (!ctx.groupBy.isEmpty())
                 {
-                    throw new IllegalArgumentException("Cannot have a GROUP BY clause without a FROM.");
+                    throw new ParseException("Cannot have a GROUP BY clause without a FROM.", ctx.groupBy.get(0).start);
                 }
                 else if (!ctx.sortItem().isEmpty())
                 {
-                    throw new IllegalArgumentException("Cannot have a ORDER BY clause without a FROM.");
+                    throw new ParseException("Cannot have a ORDER BY clause without a FROM.", ctx.sortItem().get(0).start);
                 }
             }
-            
+
             Expression where = getExpression(ctx.where);
             List<Expression> groupBy = ctx.groupBy != null ? ctx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
             List<SortItem> orderBy = ctx.sortItem() != null ? ctx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
-            return new Query(selectItems, joinedTableSource, where, groupBy, orderBy);
+            Select select = new Select(selectItems, joinedTableSource, where, groupBy, orderBy);
+            return new SelectStatement(select);
         }
 
         @Override
@@ -207,7 +212,7 @@ public class QueryParser
         {
             return new TableOption.BatchSizeOption(Integer.parseInt(ctx.size.getText()));
         }
-        
+
         @Override
         public Object visitTopExpression(TopExpressionContext ctx)
         {
@@ -229,30 +234,28 @@ public class QueryParser
                 List<SelectItem> selectItems = ctx.nestedSelectItem().selectItem().stream().map(s -> (SelectItem) visit(s)).collect(toList());
                 Expression from = getExpression(ctx.nestedSelectItem().from);
                 Expression where = getExpression(ctx.nestedSelectItem().where);
-                List<Expression> groupBy = ctx.nestedSelectItem().groupBy != null 
-                        ? ctx.nestedSelectItem().groupBy
+                List<Expression> groupBy = ctx.nestedSelectItem().groupBy != null
+                    ? ctx.nestedSelectItem().groupBy
                             .stream()
                             .map(gb -> getExpression(gb))
-                            .collect(toList()) 
-                            : emptyList();
-                List<SortItem> orderBy = ctx.nestedSelectItem().orderBy != null 
-                        ? ctx.nestedSelectItem().orderBy
+                            .collect(toList())
+                    : emptyList();
+                List<SortItem> orderBy = ctx.nestedSelectItem().orderBy != null
+                    ? ctx.nestedSelectItem().orderBy
                             .stream()
                             .map(si -> getSortItem(si))
-                            .collect(toList()) : emptyList();
+                            .collect(toList())
+                    : emptyList();
 
                 if (type == NestedSelectItem.Type.ARRAY)
                 {
-//                    if (from == null)
-//                    {
-//                        throw new IllegalArgumentException("ARRAY select requires a from clause: " + selectItems);
-//                    }
-
                     Optional<SelectItem> item = selectItems.stream().filter(si -> !isBlank(si.getIdentifier()) && si.isExplicitIdentifier()).findAny();
 
                     if (item.isPresent())
                     {
-                        throw new IllegalArgumentException("Select items inside an ARRAY select cannot have aliaes. Item: " + item.get());
+                        int index = selectItems.indexOf(item.get());
+                        SelectItemContext itemCtx = ctx.nestedSelectItem().selectItem(index);
+                        throw new ParseException("Select items inside an ARRAY select cannot have aliaes. Item: " + item.get(), itemCtx.start);
                     }
                 }
                 else
@@ -261,27 +264,32 @@ public class QueryParser
 
                     if (item.isPresent())
                     {
-                        throw new IllegalArgumentException("Select items inside an OBJECT select must have aliaes. Item: " + item.get());
+                        int index = selectItems.indexOf(item.get());
+                        SelectItemContext itemCtx = ctx.nestedSelectItem().selectItem(index);
+                        throw new ParseException("Select items inside an OBJECT select must have aliaes. Item: " + item.get(), itemCtx.start);
                     }
                 }
 
-                if (from == null && where != null)
+                if (from == null)
                 {
-                    throw new IllegalArgumentException("Cannot have a WHERE clause without a FROM clause: " + selectItems);
-                }
-                else if (from == null && !orderBy.isEmpty())
-                {
-                    throw new IllegalArgumentException("Cannot have an ORDER BY clause without a FROM clause: " + selectItems);
-                }
-                else if (from == null && !groupBy.isEmpty())
-                {
-                    throw new IllegalArgumentException("Cannot have an GROUP BY clause without a FROM clause: " + selectItems);
+                    if (where != null)
+                    {
+                        throw new ParseException("Cannot have a WHERE clause without a FROM clause: " + selectItems, ctx.nestedSelectItem().where.start);
+                    }
+                    else if (!orderBy.isEmpty())
+                    {
+                        throw new ParseException("Cannot have an ORDER BY clause without a FROM clause: " + selectItems, ctx.nestedSelectItem().orderBy.get(0).start);
+                    }
+                    else if (!groupBy.isEmpty())
+                    {
+                        throw new ParseException("Cannot have an GROUP BY clause without a FROM clause: " + selectItems, ctx.nestedSelectItem().sortItem().get(0).start);
+                    }
                 }
 
                 return new NestedSelectItem(type, selectItems, from, where, identifier, groupBy, orderBy);
             }
 
-            throw new IllegalStateException("Caould no create a select item.");
+            throw new ParseException("Caould no create a select item.", ctx.start);
         }
 
         @Override
@@ -312,20 +320,20 @@ public class QueryParser
         public Object visitTableSource(TableSourceContext ctx)
         {
             String alias = getIdentifier(ctx.identifier());
-            if (ctx.catalogFunctionCall() != null)
+            if (ctx.functionCall() != null)
             {
-                FunctionCall functionCall = (FunctionCall) visit(ctx.catalogFunctionCall());
-                if (functionCall.getFunctionInfo().getType() != FunctionInfo.Type.TABLE)
-                {
-                    throw new IllegalArgumentException("Expected a table function but got: " + functionCall.getFunctionInfo());
-                }
-                return new TableFunction((TableFunctionInfo) functionCall.getFunctionInfo(), functionCall.getArguments(), defaultIfNull(alias, ""));
+                FunctionCallInfo functionCallInfo = (FunctionCallInfo) visit(ctx.functionCall());
+                //                if (functionCall.getFunctionInfo().getType() != FunctionInfo.Type.TABLE)
+                //                {
+                //                    throw new ParseException("Expected a table function but got: " + functionCall.getFunctionInfo(), ctx.catalogFunctionCall().start);
+                //                }
+                return new TableFunction(functionCallInfo.qname, functionCallInfo.arguments, defaultIfNull(alias, ""), functionCallInfo.functionId, ctx.functionCall().start);
             }
             else if (ctx.populateQuery() != null)
             {
                 if (isBlank(alias))
                 {
-                    throw new IllegalArgumentException("Populate query must have an alias");
+                    throw new ParseException("Populate query must have an alias", ctx.populateQuery().start);
                 }
 
                 PopulateQueryContext populateQueryCtx = ctx.populateQuery();
@@ -333,7 +341,7 @@ public class QueryParser
 
                 if (tableSourceJoined.getTableSource() instanceof PopulateTableSource)
                 {
-                    throw new IllegalArgumentException("Table source in populate query cannot be a populate table source");
+                    throw new ParseException("Table source in populate query cannot be a populate table source", populateQueryCtx.start);
                 }
 
                 Expression where = populateQueryCtx.where != null ? getExpression(populateQueryCtx.where) : null;
@@ -350,11 +358,11 @@ public class QueryParser
         @Override
         public Object visitColumnReference(ColumnReferenceContext ctx)
         {
-            QualifiedName qname = getQualifiedName(ctx.qname());
-            Integer lambdaId = lambdaParameters.get(qname.getFirst());
-            return new QualifiedReferenceExpression(qname, lambdaId != null ? lambdaId.intValue() : -1);
+            String identifier = getIdentifier(ctx.identifier());
+            Integer lambdaId = lambdaParameters.get(identifier);
+            return new QualifiedReferenceExpression(QualifiedName.of(identifier), lambdaId != null ? lambdaId.intValue() : -1);
         }
-        
+
         @Override
         public Object visitNamedParameter(NamedParameterContext ctx)
         {
@@ -364,152 +372,162 @@ public class QueryParser
         @Override
         public Object visitFunctionCallExpression(FunctionCallExpressionContext ctx)
         {
-            Object child = visit(ctx.catalogFunctionCall());
-            if (child instanceof Expression)
+            FunctionCallInfo functionCallInfo = (FunctionCallInfo) visit(ctx.functionCall());
+            return new QualifiedFunctionCallExpression(functionCallInfo.qname, functionCallInfo.arguments, functionCallInfo.functionId, ctx.functionCall().start);
+        }
+
+        @Override
+        public Object visitFunctionCall(FunctionCallContext ctx)
+        {
+            Expression prevLeftDereference = leftDereference;
+            QualifiedName qname = getQualifiedName(ctx.qname());
+            
+            if (qname.getParts().size() != 1)
             {
-                return child;
+                throw new ParseException("Function names cannot have more than one part", ctx.start);
             }
             
-            FunctionCall functionCall = (FunctionCall) child;
-            if (functionCall.getFunctionInfo().getType() != FunctionInfo.Type.SCALAR)
-            {
-                throw new IllegalArgumentException("Expected a scalar function but got: " + functionCall.getFunctionInfo());
-            }
-
-            if (functionCall.getArguments().stream().anyMatch(a -> a instanceof LambdaExpression)
-                &&
-                !(functionCall.getFunctionInfo() instanceof LambdaFunction))
-            {
-                throw new IllegalArgumentException("Function: " + functionCall.getFunctionInfo() + " has lambda arguments but does not implement " + LambdaFunction.class.getSimpleName());
-            }
-
-            return new QualifiedFunctionCallExpression((ScalarFunctionInfo) functionCall.getFunctionInfo(), functionCall.getArguments());
-        }
-        
-        @Override
-        public Object visitCatalogFunctionCall(CatalogFunctionCallContext ctx)
-        {
-            /*
-             * Function call.
-             * Depending on the size of the parts in the qualified name
-             * a correct lookup needs to be made.
-             * Ie.
-             *
-             * field.func()
-             *   Can either be a column reference with a dereferenced function
-             *   or a catalog function with catalog name "func".
-             *
-             * field.field.CATALOG.func()
-             *   Dereference with a catalog function. Because dereferenced functions is
-             *   noting other that syntactic sugar this is equivalent with
-             *   CATALOG.func(field.field) and hence the part before the catalog
-             *   will be extracted and used as argument to function
-             *
-             * If we are inside a dereference (dot)
-             *   Left: field1.func()
-             *   This: field.func()
-             *
-             *   Should be transformed into:
-             *   func(field1.func().field);
-             *
-             *   Or if there is a catalog match like:
-             *   Left: field1.func()
-             *   This: UTILS.func()
-             *
-             *   Should be transformed into:
-             *   UTILS.func(field1.func());
-             *
-             * partN..partX.func()
-             *
-             * Last part before function name is either a catalog reference
-             * or column referemce
-             * qname.getParts().get(size - 2)
-             *
-             */
-
-            QualifiedName qname = getQualifiedName(ctx.qname());
-            int size = qname.getParts().size();
-
-            /*
-             * func()                       <- default
-             * Utils.func()                 <- catalog
-             * field.func()                 <- dereference
-             * field.field.Utils.func()     <- dereference with catalog
-             */
-
-            String functionName = qname.getLast();
-            String potentialCatalog = size == 1 ? BuiltinCatalog.NAME : qname.getParts().get(size - 2);
-
-            Catalog catalog = catalogRegistry.getCatalog(potentialCatalog);
-            boolean catalogHit = catalog != null;
-            if (catalog == null)
-            {
-                // Assume built in catalog if none potential found
-                catalog = catalogRegistry.getBuiltin();
-            }
-
-            FunctionInfo functionInfo = catalog.getFunction(functionName);
-            if (functionInfo == null)
-            {
-                throw new IllegalArgumentException("Could not find a function named: " + (qname.getLast() + " in catalog: " + catalog.getName()));
-            }
-
-            int extractTo = size - 1 - (catalogHit ? 1 : 0);
-            List<Expression> arguments = ctx.expression().stream().map(a -> getExpression(a)).collect(toList());
-
-            Expression arg = null;
-            // Extract qualified name without function name (last part)
-            // And if there was a catalog hit, remove that also
-            if (extractTo > 0)
-            {
-                QualifiedName leftPart = qname.extract(0, extractTo);
-
-                Integer lambdaId = lambdaParameters.get(leftPart.getFirst());
-                arg = new QualifiedReferenceExpression(leftPart, lambdaId != null ? lambdaId.intValue() : -1);
-            }
-
+            List<Expression> arguments = ctx.arguments.stream().map(a -> getExpression(a)).collect(toList());
+            int functionId = functionIdentifierByName.computeIfAbsent(qname, key -> functionIdentifier++);
             /* Wrap argument in a dereference expression if we are inside a dereference
-             * Ie.
-             * Left dereference:
-             *  func(field)
-             *
-             * Right:
-             *   field.func2()
-             *
-             * Rewrite to:
-             *
-             *  func2(func(field).field)
-             */
-            if (leftDereference != null)
+            * Ie.
+            * Left dereference:
+            *  func(field)
+            *
+            * Right:
+            *   field.func2()
+            *
+            * Rewrite to:
+            *
+            *  func2(func(field).field)
+            */
+            if (prevLeftDereference != null)
             {
-                arg = arg != null ? new DereferenceExpression(leftDereference, (QualifiedReferenceExpression) arg) : leftDereference;
+                arguments.add(0, prevLeftDereference);
             }
-            if (arg != null)
-            {
-                arguments.add(0, arg);
-            }
-
-            if (functionInfo.getInputTypes() != null)
-            {
-                List<Class<? extends Expression>> inputTypes = functionInfo.getInputTypes();
-                size = inputTypes.size();
-                if (arguments.size() != size)
-                {
-                    throw new IllegalArgumentException("Function " + functionInfo.getName() + " expected " + inputTypes.size() + " parameters, found " + arguments.size());
-                }
-                for (int i = 0; i < size; i++)
-                {
-                    Class<? extends Expression> inputType = inputTypes.get(i);
-                    if (!inputType.isAssignableFrom(arguments.get(i).getClass()))
-                    {
-                        throw new IllegalArgumentException(
-                                "Function " + functionInfo.getName() + " expects " + inputType.getSimpleName() + " as parameter at index " + i + " but got "
-                                    + arguments.get(i).getClass().getSimpleName());
-                    }
-                }
-            }
-
-            return new FunctionCall(functionInfo, arguments);
+            
+            return new FunctionCallInfo(functionId, qname, arguments);
+            //            /*
+            //             * Function call.
+            //             * Depending on the size of the parts in the qualified name
+            //             * a correct lookup needs to be made.
+            //             * Ie.
+            //             *
+            //             * field.func()
+            //             *   Can either be a column reference with a dereferenced function
+            //             *   or a catalog function with catalog name "func".
+            //             *
+            //             * field.field.CATALOG.func()
+            //             *   Dereference with a catalog function. Because dereferenced functions is
+            //             *   noting other that syntactic sugar this is equivalent to
+            //             *   CATALOG.func(field.field) and hence the part before the catalog
+            //             *   will be extracted and used as argument to function
+            //             *
+            //             * If we are inside a dereference (dot)
+            //             *   Left: field1.func()
+            //             *   This: field.func()
+            //             *
+            //             *   Should be transformed into:
+            //             *   func(field1.func().field);
+            //             *
+            //             *   Or if there is a catalog match like:
+            //             *   Left: field1.func()
+            //             *   This: UTILS.func()
+            //             *
+            //             *   Should be transformed into:
+            //             *   UTILS.func(field1.func());
+            //             *
+            //             * partN..partX.func()
+            //             *
+            //             * Last part before function name is either a catalog reference
+            //             * or column referemce
+            //             * qname.getParts().get(size - 2)
+            //             *
+            //             */
+            //
+            //            QualifiedName qname = getQualifiedName(ctx.qname());
+            //            int size = qname.getParts().size();
+            //
+            //            /*
+            //             * func()                       <- default
+            //             * Utils.func()                 <- catalog
+            //             * field.func()                 <- dereference
+            //             * field.field.Utils.func()     <- dereference with catalog
+            //             */
+            //
+            //            String functionName = qname.getLast();
+            //            String potentialCatalog = size == 1 ? BuiltinCatalog.NAME : qname.getParts().get(size - 2);
+            //
+            //            Catalog catalog = catalogRegistry.getCatalog(potentialCatalog);
+            //            boolean catalogHit = catalog != null;
+            //            if (catalog == null)
+            //            {
+            //                // Assume built in catalog if none potential found
+            //                catalog = catalogRegistry.getBuiltin();
+            //            }
+            //
+            //            FunctionInfo functionInfo = catalog.getFunction(functionName);
+            //            if (functionInfo == null)
+            //            {
+            //                throw new ParseException("Could not find a function named: " + (qname.getLast() + " in catalog: " + catalog.getName()), ctx.start);
+            //            }
+            //
+            //            int extractTo = size - 1 - (catalogHit ? 1 : 0);
+            //            List<Expression> arguments = ctx.expression().stream().map(a -> getExpression(a)).collect(toList());
+            //
+            //            Expression arg = null;
+            //            // Extract qualified name without function name (last part)
+            //            // And if there was a catalog hit, remove that also
+            //            if (extractTo > 0)
+            //            {
+            //                QualifiedName leftPart = qname.extract(0, extractTo);
+            //
+            //                Integer lambdaId = lambdaParameters.get(leftPart.getFirst());
+            //                arg = new QualifiedReferenceExpression(leftPart, lambdaId != null ? lambdaId.intValue() : -1);
+            //            }
+            //
+            //            /* Wrap argument in a dereference expression if we are inside a dereference
+            //             * Ie.
+            //             * Left dereference:
+            //             *  func(field)
+            //             *
+            //             * Right:
+            //             *   field.func2()
+            //             *
+            //             * Rewrite to:
+            //             *
+            //             *  func2(func(field).field)
+            //             */
+            //            if (leftDereference != null)
+            //            {
+            //                arg = arg != null ? new DereferenceExpression(leftDereference, (QualifiedReferenceExpression) arg) : leftDereference;
+            //            }
+            //            if (arg != null)
+            //            {
+            //                arguments.add(0, arg);
+            //            }
+            //
+            //            if (functionInfo.getInputTypes() != null)
+            //            {
+            //                List<Class<? extends Expression>> inputTypes = functionInfo.getInputTypes();
+            //                size = inputTypes.size();
+            //                if (arguments.size() != size)
+            //                {
+            //                    throw new ParseException("Function " + functionInfo.getName() + " expected " + inputTypes.size() + " parameters, found " + arguments.size(), ctx.start);
+            //                }
+            //                for (int i = 0; i < size; i++)
+            //                {
+            //                    Class<? extends Expression> inputType = inputTypes.get(i);
+            //                    if (!inputType.isAssignableFrom(arguments.get(i).getClass()))
+            //                    {
+            //                        throw new ParseException(
+            //                                "Function " + functionInfo.getName() + " expects " + inputType.getSimpleName() + " as parameter at index " + i + " but got "
+            //                                    + arguments.get(i).getClass().getSimpleName(), ctx.start);
+            //                    }
+            //                }
+            //            }
+            //
+            //            return new FunctionCall(functionInfo, arguments);
         }
 
         @Override
@@ -583,26 +601,32 @@ public class QueryParser
         @Override
         public Object visitDereference(DereferenceContext ctx)
         {
-            prevLeftDereference = leftDereference;
+            Expression prevLeftDereference = leftDereference;
             Expression left = getExpression(ctx.left);
             leftDereference = left;
 
-            if (!(left instanceof QualifiedReferenceExpression || left instanceof QualifiedFunctionCallExpression || left instanceof DereferenceExpression))
-            {
-                throw new IllegalArgumentException("Can only dereference qualified references or functions.");
-            }
-
             Expression result;
-            // Dereferenced column
-            if (ctx.qname() != null)
+            // Dereferenced field
+            if (ctx.identifier() != null)
             {
-                result = new DereferenceExpression(left, new QualifiedReferenceExpression(getQualifiedName(ctx.qname()), -1));
+                List<String> parts = new ArrayList<>();
+                parts.add(getIdentifier(ctx.identifier()));
+                if (left instanceof QualifiedReferenceExpression)
+                {
+                    QualifiedReferenceExpression qfe = ((QualifiedReferenceExpression) left);
+                    parts.addAll(0, qfe.getQname().getParts());
+                    result = new QualifiedReferenceExpression(new QualifiedName(null, parts), qfe.getLambdaId());
+                }
+                else
+                {
+                    result = new DereferenceExpression(left, new QualifiedReferenceExpression(new QualifiedName(null, parts), -1));
+                }
             }
             // Dereferenced function call
             else
             {
-                FunctionCall functionCall = (FunctionCall) visit(ctx.catalogFunctionCall());
-                result = new QualifiedFunctionCallExpression((ScalarFunctionInfo) functionCall.getFunctionInfo(), functionCall.getArguments());
+                FunctionCallInfo functionCallInfo = (FunctionCallInfo) visit(ctx.functionCall());
+                result = new QualifiedFunctionCallExpression(functionCallInfo.qname, functionCallInfo.arguments, functionCallInfo.functionId, ctx.functionCall().start);
             }
 
             leftDereference = prevLeftDereference;
@@ -617,7 +641,7 @@ public class QueryParser
             {
                 if (lambdaParameters.containsKey(i))
                 {
-                    throw new IllegalArgumentException("Lambda identifier " + i + " is already defined in scope.");
+                    throw new ParseException("Lambda identifier " + i + " is already defined in scope.", ctx.start);
                 }
 
                 lambdaParameters.put(i, lambdaParameters.size());
@@ -780,7 +804,28 @@ public class QueryParser
             {
                 return null;
             }
-            return new QualifiedName(ctx.identifier().stream().map(i -> getIdentifierString(i.getText())).collect(toList()));
+            String catalog = getIdentifier(ctx.catalog);
+            List<String> parts = ctx.identifier()
+                    .stream()
+                    .skip(catalog == null ? 0 : 1)
+                    .map(i -> getIdentifierString(i.getText()))
+                    .collect(toList());
+
+            return new QualifiedName(catalog, parts);
+        }
+
+        private static class FunctionCallInfo
+        {
+            QualifiedName qname;
+            List<Expression> arguments;
+            int functionId;
+
+            FunctionCallInfo(int functionId, QualifiedName qname, List<Expression> arguments)
+            {
+                this.functionId = functionId;
+                this.qname = qname;
+                this.arguments = arguments;
+            }
         }
     }
 }

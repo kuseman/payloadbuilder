@@ -1,6 +1,7 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.OutputWriter;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 
 import org.apache.commons.lang3.ArrayUtils;
 
@@ -10,7 +11,7 @@ public interface Projection
     static final Type[] EMPTY_TYPES = new Type[0];
     
     /** Return value for provided row */
-    void writeValue(OutputWriter writer, OperatorContext context, Row row);
+    void writeValue(OutputWriter writer, ExecutionContext context);
     
     /** Get columns for this projection */
     default String[] getColumns()

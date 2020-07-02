@@ -1,8 +1,7 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.catalog.Index;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
@@ -52,14 +51,14 @@ import org.apache.commons.lang3.StringUtils;
  * - many to many
  * </pre>
  **/
-public class BatchMergeJoin extends AOperator
+class BatchMergeJoin extends AOperator
 {
     private final String logicalOperator;
     private final Operator outer;
     private final Operator inner;
     private final ValuesExtractor outerValuesExtractor;
     private final ValuesExtractor innerValuesExtractor;
-    private final BiPredicate<EvaluationContext, Row> predicate;
+    private final BiPredicate<ExecutionContext, Row> predicate;
     private final RowMerger rowMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
@@ -70,14 +69,14 @@ public class BatchMergeJoin extends AOperator
     // TODO: min and max batch size (merge and hash)
     //       to guard against to large batches even if all values are the same
 
-    public BatchMergeJoin(
+    BatchMergeJoin(
             int nodeId,
             String logicalOperator,
             Operator outer,
             Operator inner,
             ValuesExtractor outerValuesExtractor,
             ValuesExtractor innerValuesExtractor,
-            BiPredicate<EvaluationContext, Row> predicate,
+            BiPredicate<ExecutionContext, Row> predicate,
             RowMerger rowMerger,
             boolean populating,
             boolean emitEmptyOuterRows,
@@ -100,7 +99,7 @@ public class BatchMergeJoin extends AOperator
     }
 
     @Override
-    public Iterator<Row> open(OperatorContext context)
+    public Iterator<Row> open(ExecutionContext context)
     {
         final Iterator<Row> outerIt = outer.open(context);
         return new Iterator<Row>()
@@ -172,12 +171,12 @@ public class BatchMergeJoin extends AOperator
                         if (outerRows.isEmpty())
                         {
                             verifyOuterValuesIterator();
-                            context.setOuterIndexValues(null);
+                            context.getOperatorContext().setOuterIndexValues(null);
                             return false;
                         }
 
                         outerValuesIterator = outerValuesIterator();
-                        context.setOuterIndexValues(outerValuesIterator);
+                        context.getOperatorContext().setOuterIndexValues(outerValuesIterator);
                         innerIt = inner.open(context);
                         if (!innerIt.hasNext())
                         {
@@ -231,7 +230,7 @@ public class BatchMergeJoin extends AOperator
                         }
                     }
 
-                    int cResult = compare(context.getEvaluationContext(), outerRow, innerRow);
+                    int cResult = compare(context, outerRow, innerRow);
 
                     // outerRow > innerRow
                     if (cResult > 0)
@@ -270,7 +269,7 @@ public class BatchMergeJoin extends AOperator
                     }
 
                     innerRow.setPredicateParent(outerRow);
-                    if (predicate.test(context.getEvaluationContext(), innerRow))
+                    if (predicate.test(context, innerRow))
                     {
                         next = rowMerger.merge(outerRow, innerRow, populating);
                         outerRow.match = true;
@@ -310,7 +309,7 @@ public class BatchMergeJoin extends AOperator
                 return true;
             }
 
-            private int compare(EvaluationContext context, Row outerRow, Row innerRow)
+            private int compare(ExecutionContext context, Row outerRow, Row innerRow)
             {
                 Object[] outerValues = outerRow.extractedValues;
                 populateKeyValues(innerValuesExtractor, context, innerRow);
@@ -373,7 +372,7 @@ public class BatchMergeJoin extends AOperator
 
             private void populateKeyValues(
                     ValuesExtractor valueExtractor,
-                    EvaluationContext context,
+                    ExecutionContext context,
                     Row row)
             {
                 valueExtractor.extract(context, row, keyValues);
@@ -404,7 +403,7 @@ public class BatchMergeJoin extends AOperator
                 while (outerIt.hasNext())
                 {
                     Row row = outerIt.next();
-                    populateKeyValues(outerValuesExtractor, context.getEvaluationContext(), row);
+                    populateKeyValues(outerValuesExtractor, context, row);
                     row.extractedValues = Arrays.copyOf(keyValues, keyValues.length);
 
                     if (batchSize > 0 && count >= batchSize)

@@ -1,10 +1,10 @@
 package com.viskan.payloadbuilder.catalog.builtin;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.catalog.Catalog;
+import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.catalog.TableFunctionInfo;
-import com.viskan.payloadbuilder.operator.OperatorContext;
+import com.viskan.payloadbuilder.operator.Row;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 
 import static java.util.Objects.requireNonNull;
 
@@ -29,7 +29,7 @@ class Range extends TableFunctionInfo
     }
 
     @Override
-    public Iterator<Row> open(OperatorContext context, TableAlias tableAlias, List<Object> arguments)
+    public Iterator<Row> open(ExecutionContext context, TableAlias tableAlias, List<Object> arguments)
     {
         int from = 0;
         int to = -1;

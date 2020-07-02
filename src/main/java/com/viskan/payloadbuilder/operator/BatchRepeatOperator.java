@@ -1,6 +1,6 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 
 import static java.util.Objects.requireNonNull;
 
@@ -12,12 +12,12 @@ import org.apache.commons.lang3.StringUtils;
  * Continues to open down stream multiple times until end is reached after opening
  * Is used in conjunction with {@link BatchLimitOperator} 
  **/
-public class BatchRepeatOperator extends AOperator
+class BatchRepeatOperator extends AOperator
 {
     private final Operator operator;
     private final int targetNodeId;
     
-    public BatchRepeatOperator(int nodeId, int targetNodeId, Operator operator)
+    BatchRepeatOperator(int nodeId, int targetNodeId, Operator operator)
     {
         super(nodeId);
         this.targetNodeId = targetNodeId;
@@ -25,7 +25,7 @@ public class BatchRepeatOperator extends AOperator
     }
     
     @Override
-    public Iterator<Row> open(OperatorContext context)
+    public Iterator<Row> open(ExecutionContext context)
     {
         return new Iterator<Row>()
         {

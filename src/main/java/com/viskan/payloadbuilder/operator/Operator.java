@@ -1,6 +1,6 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 
 import java.util.Iterator;
 
@@ -8,7 +8,7 @@ import java.util.Iterator;
 public interface Operator
 {
     /** Open iterator */
-    Iterator<Row> open(OperatorContext context);
+    Iterator<Row> open(ExecutionContext context);
 
     /**
      * To string with indent. Used when printing operator tree

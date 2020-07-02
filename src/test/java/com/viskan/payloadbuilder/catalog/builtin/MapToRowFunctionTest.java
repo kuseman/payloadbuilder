@@ -1,11 +1,13 @@
 package com.viskan.payloadbuilder.catalog.builtin;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
+import com.viskan.payloadbuilder.QuerySession;
 import com.viskan.payloadbuilder.catalog.Catalog;
-import com.viskan.payloadbuilder.operator.OperatorContext;
-import com.viskan.payloadbuilder.parser.tree.QualifiedName;
-import com.viskan.payloadbuilder.parser.tree.QualifiedReferenceExpression;
+import com.viskan.payloadbuilder.catalog.CatalogRegistry;
+import com.viskan.payloadbuilder.catalog.TableAlias;
+import com.viskan.payloadbuilder.operator.Row;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.QualifiedName;
+import com.viskan.payloadbuilder.parser.QualifiedReferenceExpression;
 
 import static com.viskan.payloadbuilder.utils.MapUtils.entry;
 import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
@@ -34,9 +36,11 @@ public class MapToRowFunctionTest extends Assert
         });
         TableAlias func = TableAlias.of(a, "a", "a");
         func.setColumns(new String[] { "key", "count" });
-        Object value = new QualifiedReferenceExpression(new QualifiedName(asList("a", "article_attribute", "attribute1", "buckets")), -1).eval(null, row);
         
-        Iterator<Row> it = f.open(new OperatorContext(), func, asList(value));
+        ExecutionContext context = new ExecutionContext(new QuerySession(new CatalogRegistry()));
+        context.setRow(row);
+        Object value = new QualifiedReferenceExpression(new QualifiedName(null, asList("a", "article_attribute", "attribute1", "buckets")), -1).eval(context);
+        Iterator<Row> it = f.open(context, func, asList(value));
         while (it.hasNext())
         {
             Row r = it.next();

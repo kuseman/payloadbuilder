@@ -1,7 +1,6 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 
 import static java.util.Objects.requireNonNull;
 
@@ -12,15 +11,15 @@ import org.apache.commons.collections.iterators.FilterIterator;
 import org.apache.commons.lang3.StringUtils;
 
 /** Filtering operator */
-public class FilterOperator extends AOperator
+class FilterOperator extends AOperator
 {
     private final Operator operator;
-    private final BiPredicate<EvaluationContext, Row> predicate;
+    private final BiPredicate<ExecutionContext, Row> predicate;
 
     /* Statistics */
     private int executionCount;
 
-    public FilterOperator(int nodeId, Operator operator, BiPredicate<EvaluationContext, Row> predicate)
+    FilterOperator(int nodeId, Operator operator, BiPredicate<ExecutionContext, Row> predicate)
     {
         super(nodeId);
         this.operator = requireNonNull(operator);
@@ -29,10 +28,10 @@ public class FilterOperator extends AOperator
     
     @SuppressWarnings("unchecked")
     @Override
-    public Iterator<Row> open(OperatorContext context)
+    public Iterator<Row> open(ExecutionContext context)
     {
         executionCount++;
-        return new FilterIterator(operator.open(context), i -> predicate.test(context.getEvaluationContext(), (Row) i));
+        return new FilterIterator(operator.open(context), i ->  predicate.test(context, (Row) i));
     }
 
     @Override

@@ -1,18 +1,17 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
-import com.viskan.payloadbuilder.parser.tree.QualifiedName;
+import com.viskan.payloadbuilder.catalog.TableAlias;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.QualifiedName;
 
 import java.util.Iterator;
 import java.util.Random;
 import java.util.stream.IntStream;
 
-import org.junit.Assert;
 import org.junit.Test;
 
 /** Test of {@link SortOperator} */
-public class SortOperatorTest extends Assert
+public class SortOperatorTest extends AOperatorTest
 {
     @Test
     public void test()
@@ -25,7 +24,7 @@ public class SortOperatorTest extends Assert
                 target,
                 (c, rowA, rowB) -> (int) rowA.getObject(0) - (int) rowB.getObject(0));
         
-        Iterator<Row> it = operator.open(new OperatorContext());
+        Iterator<Row> it = operator.open(new ExecutionContext(session));
         int prev = -1;
         while (it.hasNext())
         {

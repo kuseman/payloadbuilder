@@ -1,10 +1,10 @@
 package com.viskan.payloadbuilder.catalog.builtin;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.catalog.Catalog;
+import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.catalog.TableFunctionInfo;
-import com.viskan.payloadbuilder.operator.OperatorContext;
+import com.viskan.payloadbuilder.operator.Row;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 
 import java.util.Iterator;
 import java.util.List;
@@ -38,7 +38,7 @@ class MapToRowFunction extends TableFunctionInfo
     }
     
     @Override
-    public Iterator<Row> open(OperatorContext context, TableAlias tableAlias, List<Object> arguments)
+    public Iterator<Row> open(ExecutionContext context, TableAlias tableAlias, List<Object> arguments)
     {
         final Object value = arguments.get(0);
         final Iterator<Object> it = IteratorUtils.getIterator(value);

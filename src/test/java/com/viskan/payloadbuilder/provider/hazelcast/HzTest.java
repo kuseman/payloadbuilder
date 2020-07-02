@@ -1,14 +1,14 @@
 package com.viskan.payloadbuilder.provider.hazelcast;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.analyze.OperatorBuilder;
 import com.viskan.payloadbuilder.catalog.CatalogRegistry;
 import com.viskan.payloadbuilder.operator.JsonStringWriter;
 import com.viskan.payloadbuilder.operator.Operator;
+import com.viskan.payloadbuilder.operator.OperatorBuilder;
 import com.viskan.payloadbuilder.operator.OperatorContext;
 import com.viskan.payloadbuilder.operator.Projection;
+import com.viskan.payloadbuilder.operator.Row;
 import com.viskan.payloadbuilder.parser.QueryParser;
-import com.viskan.payloadbuilder.parser.tree.Query;
+import com.viskan.payloadbuilder.parser.SelectStatement;
 
 import static java.util.Arrays.asList;
 
@@ -33,7 +33,7 @@ public class HzTest extends Assert
     @Before
     public void setUp()
     {
-        reg.registerCatalog(c);
+        reg.registerCatalog("hz", c);
         reg.setDefaultCatalog(c);
     }
     
@@ -261,7 +261,7 @@ public class HzTest extends Assert
             boolean print,
             int loopCount)
     {
-        Query query = parser.parseQuery(reg, queryString);
+        SelectStatement query = parser.parseQuery(reg, queryString);
         Pair<Operator, Projection> pair = OperatorBuilder.create(reg, query);
         Operator op = pair.getKey();
         Projection pj = pair.getValue();

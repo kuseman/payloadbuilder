@@ -1,11 +1,10 @@
 package com.viskan.payloadbuilder.catalog.builtin;
 
-import com.viskan.payloadbuilder.Row;
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
-import com.viskan.payloadbuilder.evaluation.ExpressionMath;
-import com.viskan.payloadbuilder.parser.tree.Expression;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.Expression;
+import com.viskan.payloadbuilder.parser.ExpressionMath;
 
 import java.util.Iterator;
 import java.util.List;
@@ -19,9 +18,9 @@ class SumFunction extends ScalarFunctionInfo
     }
     
     @Override
-    public Object eval(EvaluationContext context, List<Expression> arguments, Row row)
+    public Object eval(ExecutionContext context, List<Expression> arguments)
     {
-        Object obj = arguments.get(0).eval(context, row);
+        Object obj = arguments.get(0).eval(context);
         Object sum = null;
         if (obj instanceof Iterator)
         {

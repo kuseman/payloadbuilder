@@ -1,14 +1,15 @@
 package com.viskan.payloadbuilder.codegen;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
+import com.viskan.payloadbuilder.QuerySession;
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.CatalogRegistry;
 import com.viskan.payloadbuilder.catalog.FunctionInfo.Type;
 import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
+import com.viskan.payloadbuilder.catalog.TableAlias;
+import com.viskan.payloadbuilder.operator.Row;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.Expression;
 import com.viskan.payloadbuilder.parser.QueryParser;
-import com.viskan.payloadbuilder.parser.tree.Expression;
 
 import static java.util.Arrays.asList;
 
@@ -127,14 +128,14 @@ public class CodeGeneratorTest extends Assert
             }
             
             @Override
-            public Object eval(EvaluationContext context, List<Expression> arguments, Row row)
+            public Object eval(ExecutionContext context, List<Expression> arguments)
             {
                 return java.util.UUID.randomUUID().toString();
             }
         });
-        catalogRegistry.registerCatalog(utils);
+        catalogRegistry.registerCatalog("UTILS", utils);
         
-        assertExpression(true, null, "UTILS.uuid() is not null");
+        assertExpression(true, null, "UTILS#uuid() is not null");
     }
     
     @Test
@@ -579,7 +580,7 @@ public class CodeGeneratorTest extends Assert
         Expression expr = null;
         try
         {
-            expr = parser.parseExpression(catalogRegistry, expression);
+            expr = parser.parseExpression(expression);
             codeGenerator.generateFunction(null, expr).apply(row);
             fail(expression + " should fail.");
         }
@@ -600,7 +601,9 @@ public class CodeGeneratorTest extends Assert
         
         try
         {
-            expr.eval(new EvaluationContext(), row);
+            ExecutionContext context = new ExecutionContext(new QuerySession(new CatalogRegistry()));
+            context.setRow(row);
+            expr.eval(context);
             fail(expression + " should fail.");
         }
         catch (Exception ee)
@@ -616,18 +619,20 @@ public class CodeGeneratorTest extends Assert
 
         try
         {
-            Expression expr = parser.parseExpression(catalogRegistry, expression);
-            try
-            {
-                BaseFunction function = codeGenerator.generateFunction(alias, expr);
-                assertEquals(expression, value, function.apply(row));
-            }
-            catch (NotImplementedException e)
-            {
-                System.out.println("Implement. " + e.getMessage());
-            }
-            
-            assertEquals("Eval: " + expression, value, expr.eval(new EvaluationContext(), row));
+            Expression expr = parser.parseExpression(expression);
+//            try
+//            {
+//                BaseFunction function = codeGenerator.generateFunction(alias, expr);
+//                assertEquals(expression, value, function.apply(row));
+//            }
+//            catch (NotImplementedException e)
+//            {
+//                System.out.println("Implement. " + e.getMessage());
+//            }
+
+            ExecutionContext context = new ExecutionContext(new QuerySession(catalogRegistry));
+            context.setRow(row);
+            assertEquals("Eval: " + expression, value, expr.eval(context));
         }
         catch (Exception e)
         {

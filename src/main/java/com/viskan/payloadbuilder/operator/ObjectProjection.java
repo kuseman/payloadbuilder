@@ -1,6 +1,7 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
+import com.viskan.payloadbuilder.OutputWriter;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 
 import static java.util.Objects.requireNonNull;
 
@@ -12,7 +13,7 @@ import java.util.Objects;
 import org.apache.commons.lang3.ArrayUtils;
 
 /** Projection that projects an object output */
-public class ObjectProjection implements Projection
+class ObjectProjection implements Projection
 {
     static final Projection[] EMPTY_PROJECTION_ARRAY = new Projection[0];
     private final Operator selection;
@@ -20,12 +21,12 @@ public class ObjectProjection implements Projection
     private final String[] columns;
     private final int length;
 
-    public ObjectProjection(List<String> projectionAliases, List<Projection> projections)
+    ObjectProjection(List<String> projectionAliases, List<Projection> projections)
     {
         this(projectionAliases, projections, null);
     }
 
-    public ObjectProjection(List<String> projectionAliases, List<Projection> projections, Operator selection)
+    ObjectProjection(List<String> projectionAliases, List<Projection> projections, Operator selection)
     {
         if (requireNonNull(projectionAliases, "projectionAliases").size() != requireNonNull(projections, "projections").size())
         {
@@ -39,14 +40,13 @@ public class ObjectProjection implements Projection
     }
 
     @Override
-    public void writeValue(OutputWriter writer, OperatorContext context, Row row)
+    public void writeValue(OutputWriter writer, ExecutionContext context)
     {
-        Row rowToUse = row;
-
-        Row prevParentRow = context.getParentRow();
+        Row rowToUse = context.getRow();
+        Row prevParentRow = rowToUse;
         if (selection != null)
         {
-            context.setParentRow(row);
+//            context.setParentRow(row);
             Iterator<Row> it = selection.open(context);
             rowToUse = it.hasNext() ? it.next() : null;
             
@@ -57,15 +57,16 @@ public class ObjectProjection implements Projection
             }
         }
 
+        context.setRow(rowToUse);
         writer.startObject();
         for (int i = 0; i < length; i++)
         {
             writer.writeFieldName(columns[i]);
-            projections.get(i).writeValue(writer, context, rowToUse);
+            projections.get(i).writeValue(writer, context);
         }
         writer.endObject();
         
-        context.setParentRow(prevParentRow);
+        context.setRow(prevParentRow);
     }
     
     @Override

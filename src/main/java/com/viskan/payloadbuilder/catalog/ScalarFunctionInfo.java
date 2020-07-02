@@ -1,11 +1,9 @@
 package com.viskan.payloadbuilder.catalog;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.codegen.CodeGeneratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
-import com.viskan.payloadbuilder.parser.tree.Expression;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.Expression;
 
 import java.util.List;
 import java.util.Set;
@@ -44,7 +42,7 @@ public abstract class ScalarFunctionInfo extends FunctionInfo
     
     /** Evaluate this function */
     @SuppressWarnings("unused")
-    public Object eval(EvaluationContext context, List<Expression> arguments, Row row)
+    public Object eval(ExecutionContext context, List<Expression> arguments)
     {
         throw new NotImplementedException("eval: " + getClass().getSimpleName());
     }

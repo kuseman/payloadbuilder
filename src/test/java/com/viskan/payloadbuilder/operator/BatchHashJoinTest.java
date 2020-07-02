@@ -1,9 +1,9 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.catalog.Index;
-import com.viskan.payloadbuilder.parser.tree.QualifiedName;
+import com.viskan.payloadbuilder.catalog.TableAlias;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.QualifiedName;
 
 import static com.viskan.payloadbuilder.operator.BatchMergeJoinTest.assertRowJoinValues;
 import static java.util.Arrays.asList;
@@ -20,12 +20,11 @@ import java.util.stream.StreamSupport;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.time.StopWatch;
-import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
 
 /** Test {@link BatchHashJoin} */
-public class BatchHashJoinTest extends Assert
+public class BatchHashJoinTest extends AOperatorTest
 {
 
     @Test
@@ -48,7 +47,7 @@ public class BatchHashJoinTest extends Assert
                 false,
                 index);
 
-        assertFalse(op.open(new OperatorContext()).hasNext());
+        assertFalse(op.open(new ExecutionContext(session)).hasNext());
     }
 
     @Test
@@ -59,9 +58,9 @@ public class BatchHashJoinTest extends Assert
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
         Operator right = context ->
         {
-            while (context.getOuterIndexValues().hasNext())
+            while (context.getOperatorContext().getOuterIndexValues().hasNext())
             {
-                context.getOuterIndexValues().next();
+                context.getOperatorContext().getOuterIndexValues().next();
             }
             return emptyIterator();
         };
@@ -77,7 +76,7 @@ public class BatchHashJoinTest extends Assert
                 false,
                 index);
 
-        assertFalse(op.open(new OperatorContext()).hasNext());
+        assertFalse(op.open(new ExecutionContext(session)).hasNext());
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -100,7 +99,7 @@ public class BatchHashJoinTest extends Assert
                 false,
                 index);
 
-        op.open(new OperatorContext()).hasNext();
+        op.open(new ExecutionContext(session)).hasNext();
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -111,8 +110,8 @@ public class BatchHashJoinTest extends Assert
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
         Operator right = context ->
         {
-            context.getOuterIndexValues().hasNext();
-            Object[] ar = context.getOuterIndexValues().next();
+            context.getOperatorContext().getOuterIndexValues().hasNext();
+            Object[] ar = context.getOperatorContext().getOuterIndexValues().next();
             return asList(Row.of(a, 0, ar)).iterator();
         };
 
@@ -128,7 +127,7 @@ public class BatchHashJoinTest extends Assert
                 false,
                 index);
 
-        op.open(new OperatorContext()).hasNext();
+        op.open(new ExecutionContext(session)).hasNext();
     }
 
     @Test(expected = NoSuchElementException.class)
@@ -139,11 +138,11 @@ public class BatchHashJoinTest extends Assert
         Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
         Operator right = context ->
         {
-            while (context.getOuterIndexValues().hasNext())
+            while (context.getOperatorContext().getOuterIndexValues().hasNext())
             {
-                context.getOuterIndexValues().next();
+                context.getOperatorContext().getOuterIndexValues().next();
             }
-            context.getOuterIndexValues().next();
+            context.getOperatorContext().getOuterIndexValues().next();
             return emptyIterator();
         };
 
@@ -159,7 +158,7 @@ public class BatchHashJoinTest extends Assert
                 false,
                 index);
 
-        op.open(new OperatorContext()).hasNext();
+        op.open(new ExecutionContext(session)).hasNext();
     }
 
     @Test
@@ -176,7 +175,7 @@ public class BatchHashJoinTest extends Assert
                 .iterator();
         Operator right = context ->
         {
-            Iterable<Object[]> it = () -> context.getOuterIndexValues();
+            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Row> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
@@ -199,7 +198,7 @@ public class BatchHashJoinTest extends Assert
                 false,
                 index);
 
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -242,7 +241,7 @@ public class BatchHashJoinTest extends Assert
                 .iterator();
         Operator right = context ->
         {
-            Iterable<Object[]> it = () -> context.getOuterIndexValues();
+            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Row> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
@@ -265,7 +264,7 @@ public class BatchHashJoinTest extends Assert
                 true,
                 index);
 
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -313,7 +312,7 @@ public class BatchHashJoinTest extends Assert
         Operator left = context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator();
         Operator right = context ->
         {
-            Iterable<Object[]> it = () -> context.getOuterIndexValues();
+            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
@@ -335,7 +334,7 @@ public class BatchHashJoinTest extends Assert
                 false,
                 index);
 
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -374,7 +373,7 @@ public class BatchHashJoinTest extends Assert
         Operator left = context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator();
         Operator right = context ->
         {
-            Iterable<Object[]> it = () -> context.getOuterIndexValues();
+            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
@@ -396,7 +395,7 @@ public class BatchHashJoinTest extends Assert
                 true,
                 index);
 
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -447,7 +446,7 @@ public class BatchHashJoinTest extends Assert
                 .iterator();
         Operator right = context ->
         {
-            Iterable<Object[]> it = () -> context.getOuterIndexValues();
+            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Row> rows = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
@@ -470,7 +469,7 @@ public class BatchHashJoinTest extends Assert
                 false,
                 index);
 
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -513,7 +512,7 @@ public class BatchHashJoinTest extends Assert
                 .iterator();
         Operator right = context ->
         {
-            Iterable<Object[]> it = () -> context.getOuterIndexValues();
+            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Row> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
@@ -536,7 +535,7 @@ public class BatchHashJoinTest extends Assert
                 true,
                 index);
 
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -592,7 +591,7 @@ public class BatchHashJoinTest extends Assert
         Operator right = context ->
         {
             // Create 2 rows for each input row
-            Iterable<Object[]> it = () -> context.getOuterIndexValues();
+            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Row> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
@@ -616,7 +615,7 @@ public class BatchHashJoinTest extends Assert
                 false,
                 index);
 
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -661,7 +660,7 @@ public class BatchHashJoinTest extends Assert
         Operator right = context ->
         {
             // Create 2 rows for each input row
-            Iterable<Object[]> it = () -> context.getOuterIndexValues();
+            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Row> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
@@ -705,7 +704,7 @@ public class BatchHashJoinTest extends Assert
                 12, 13
         };
 
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {
@@ -742,7 +741,7 @@ public class BatchHashJoinTest extends Assert
                 .iterator();
         Operator right = context ->
         {
-            Iterable<Object[]> it = () -> context.getOuterIndexValues();
+            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Row> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
@@ -765,7 +764,7 @@ public class BatchHashJoinTest extends Assert
                 false,
                 index);
 
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -806,7 +805,7 @@ public class BatchHashJoinTest extends Assert
                 .iterator();
         Operator right = context ->
         {
-            Iterable<Object[]> it = () -> context.getOuterIndexValues();
+            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Row> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
@@ -829,7 +828,7 @@ public class BatchHashJoinTest extends Assert
                 true,
                 index);
 
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -877,7 +876,7 @@ public class BatchHashJoinTest extends Assert
         Operator left = context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator();
         Operator right = context ->
         {
-            Iterable<Object[]> it = () -> context.getOuterIndexValues();
+            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
@@ -899,7 +898,7 @@ public class BatchHashJoinTest extends Assert
                 false,
                 index);
 
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
 
         int[] expectedOuterPositions = new int[] {
                 7,
@@ -939,7 +938,7 @@ public class BatchHashJoinTest extends Assert
         Operator left = context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator();
         Operator right = context ->
         {
-            Iterable<Object[]> it = () -> context.getOuterIndexValues();
+            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
@@ -961,7 +960,7 @@ public class BatchHashJoinTest extends Assert
                 true,
                 index);
 
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
 
         int[] expectedOuterPositions = new int[] {
                 0, 1,
@@ -1016,7 +1015,7 @@ public class BatchHashJoinTest extends Assert
         Operator right = context ->
         {
             // Create 2 rows for each input row
-            Iterable<Object[]> it = () -> context.getOuterIndexValues();
+            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
@@ -1038,7 +1037,7 @@ public class BatchHashJoinTest extends Assert
                 false,
                 index);
 
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -1084,7 +1083,7 @@ public class BatchHashJoinTest extends Assert
         Operator right = context ->
         {
             // Create 2 rows for each input row
-            Iterable<Object[]> it = () -> context.getOuterIndexValues();
+            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
@@ -1106,7 +1105,7 @@ public class BatchHashJoinTest extends Assert
                 true,
                 index);
 
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -1163,7 +1162,7 @@ public class BatchHashJoinTest extends Assert
         Operator tableA = context -> IntStream.range(1, 1000000).mapToObj(i -> Row.of(a, i, new Object[] {rnd.nextInt(10000), rnd.nextBoolean()})).iterator();
         Operator tableB = context ->
         {
-            Iterable<Object[]> it = () -> context.getOuterIndexValues();
+            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .flatMap(val -> asList(
@@ -1176,7 +1175,7 @@ public class BatchHashJoinTest extends Assert
         };
         Operator tableC = context ->
         {
-            Iterable<Object[]> it = () -> context.getOuterIndexValues();
+            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .flatMap(val -> asList(
@@ -1224,7 +1223,7 @@ public class BatchHashJoinTest extends Assert
         {
             StopWatch sw = new StopWatch();
             sw.start();
-            Iterator<Row> it = op.open(new OperatorContext());
+            Iterator<Row> it = op.open(new ExecutionContext(session));
             int count = 0;
             while (it.hasNext())
             {

@@ -1,5 +1,7 @@
 package com.viskan.payloadbuilder.operator;
 
+import com.viskan.payloadbuilder.OutputWriter;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Iterator;

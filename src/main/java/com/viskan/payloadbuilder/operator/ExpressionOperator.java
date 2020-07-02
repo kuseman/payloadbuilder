@@ -1,7 +1,7 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.parser.tree.Expression;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.Expression;
 import com.viskan.payloadbuilder.utils.IteratorUtils;
 
 import static java.util.Collections.emptyIterator;
@@ -10,20 +10,20 @@ import static java.util.Objects.requireNonNull;
 import java.util.Iterator;
 
 /** Operator that operates over an expression (that returns rows) */
-public class ExpressionOperator extends AOperator
+class ExpressionOperator extends AOperator
 {
     private final Expression expression;
 
-    public ExpressionOperator(int nodeId, Expression expression)
+    ExpressionOperator(int nodeId, Expression expression)
     {
         super(nodeId);
         this.expression = requireNonNull(expression, "expression");
     }
 
     @Override
-    public Iterator<Row> open(OperatorContext context)
+    public Iterator<Row> open(ExecutionContext context)
     {
-        Object result = expression.eval(context.getEvaluationContext(), context.getParentRow());
+        Object result = expression.eval(context);
         return result == null ? emptyIterator() : IteratorUtils.getIterator(result);
     }
 

@@ -51,8 +51,14 @@ class CatalogExtensionView extends JPanel
     {
         this.extension = extension;
 
+        /*
+         * QueryFile
+         *      CatalogRegistry
+         *          default PropertyChangeListener ?
+         *          Catalogs with inherited class implementing ICatalogExtension
+         */
+        
         setBorder(BorderFactory.createTitledBorder(extension.getTitle()));
-
         setLayout(new BorderLayout());
 
         JPanel topPanel = new JPanel();
@@ -157,9 +163,8 @@ class CatalogExtensionView extends JPanel
                             throw new IllegalArgumentException("Could not find set method for property " + property.title());
                         }
 
-                        // Flag to avoid propagation of value during list population
+                        // Flag to avoid propagation of events when having 2 way binding
                         final AtomicBoolean setValue = new AtomicBoolean(true);
-
                         propertySetter = () ->
                         {
                             if (setValue.get())
@@ -185,7 +190,15 @@ class CatalogExtensionView extends JPanel
                         {
                             throw new IllegalArgumentException("Could not find set method for property " + property.title());
                         }
-                        propertySetter = () -> pf.setText(String.valueOf(invoke(getMethod)));
+                        // Flag to avoid propagation of events when having 2 way binding
+                        final AtomicBoolean setValue1 = new AtomicBoolean(true);
+                        propertySetter = () -> 
+                        {
+                            if (setValue1.get())
+                            {
+                                pf.setText(String.valueOf(invoke(getMethod)));
+                            }
+                        };
                         pf.getDocument().addDocumentListener(new ADocumentListenerAdapter()
                         {
                             @Override
@@ -206,22 +219,23 @@ class CatalogExtensionView extends JPanel
                             throw new IllegalArgumentException("Missing itemsPropertyName for property " + property.title());
                         }
                         final JComboBox<Object> cbItems = new JComboBox<>();
+                        AutoCompletionComboBox.enable(cbItems);
                         cbItems.setMaximumRowCount(property.itemsListSize());
                         DefaultComboBoxModel<Object> model = new DefaultComboBoxModel<>();
                         cbItems.setModel(model);
 
-                        // Flag to avoid propagation of value during list population
-                        final AtomicBoolean setValue1 = new AtomicBoolean(true);
+                        // Flag to avoid propagation of events when having 2 way binding
+                        final AtomicBoolean setValue2 = new AtomicBoolean(true);
                         propertySetter = () ->
                         {
-                            if (setValue1.get())
+                            if (setValue2.get())
                             {
                                 model.setSelectedItem(invoke(getMethod));
                             }
                         };
                         propertyListSetter = items ->
                         {
-                            setValue1.set(false);
+                            setValue2.set(false);
                             Object prevItem = model.getSelectedItem();
                             model.removeAllElements();
                             @SuppressWarnings("unchecked")
@@ -234,12 +248,11 @@ class CatalogExtensionView extends JPanel
                             {
                                 model.setSelectedItem(prevItem);
                             }
-                            setValue1.set(true);
+                            setValue2.set(true);
                         };
-
                         cbItems.addActionListener(e ->
                         {
-                            if (setValue1.get())
+                            if (setValue2.get())
                             {
                                 invoke(setMethod, model.getSelectedItem());
                             }
@@ -287,7 +300,7 @@ class CatalogExtensionView extends JPanel
             }
         });
     }
-
+    
     void setPanelEnabled(Container container, boolean isEnabled)
     {
         container.setEnabled(isEnabled);
@@ -321,6 +334,12 @@ class CatalogExtensionView extends JPanel
     {
         try
         {
+            if (args != null && args.length > 0 && !method.getParameterTypes()[0].isAssignableFrom(args[0].getClass()))
+            {
+                System.err.println("Wrong arg");
+                return null;
+            }
+            
             return method.invoke(extension, args);
         }
         catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e)

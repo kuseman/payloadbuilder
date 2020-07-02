@@ -1,9 +1,9 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.catalog.Catalog;
+import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.catalog.TableFunctionInfo;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 
 import static java.util.Collections.emptyList;
 
@@ -11,11 +11,10 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.stream.IntStream;
 
-import org.junit.Assert;
 import org.junit.Test;
 
 /** Test {@link NestedLoopJoin} */
-public class NestedLoopJoinTest extends Assert
+public class NestedLoopJoinTest extends AOperatorTest
 {
     @Test
     public void test_cross_join_no_populate()
@@ -33,7 +32,7 @@ public class NestedLoopJoinTest extends Assert
                 false,
                 false);
 
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {
@@ -63,7 +62,7 @@ public class NestedLoopJoinTest extends Assert
                 true,
                 false);
         
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {
@@ -93,7 +92,7 @@ public class NestedLoopJoinTest extends Assert
                 false,
                 true);
 
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {
@@ -124,7 +123,7 @@ public class NestedLoopJoinTest extends Assert
                 false,
                 true);
 
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
         int subCount = 1;
         while (it.hasNext())
@@ -168,7 +167,7 @@ public class NestedLoopJoinTest extends Assert
                 true,
                 true);
 
-        Iterator<Row> it = op.open(new OperatorContext());
+        Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {
@@ -200,7 +199,7 @@ public class NestedLoopJoinTest extends Assert
         }
 
         @Override
-        public Iterator<Row> open(OperatorContext context, TableAlias tableAlias, List<Object> arguments)
+        public Iterator<Row> open(ExecutionContext context, TableAlias tableAlias, List<Object> arguments)
         {
             if (tableAlias.getColumns() == null)
             {

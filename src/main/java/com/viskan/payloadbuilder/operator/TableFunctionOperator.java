@@ -1,9 +1,9 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
+import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.catalog.TableFunctionInfo;
-import com.viskan.payloadbuilder.parser.tree.Expression;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.Expression;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
@@ -15,13 +15,13 @@ import java.util.Iterator;
 import java.util.List;
 
 /** Operator handling TVF's */
-public class TableFunctionOperator extends AOperator
+class TableFunctionOperator extends AOperator
 {
     private final TableAlias tableAlias;
     private final TableFunctionInfo functionInfo;
     private final List<Expression> arguments;
 
-    public TableFunctionOperator(int nodeId, TableAlias tableAlias, TableFunctionInfo functionInfo, List<Expression> arguments)
+    TableFunctionOperator(int nodeId, TableAlias tableAlias, TableFunctionInfo functionInfo, List<Expression> arguments)
     {
         super(nodeId);
         this.tableAlias = requireNonNull(tableAlias, "tableAlias");
@@ -30,7 +30,7 @@ public class TableFunctionOperator extends AOperator
     }
 
     @Override
-    public Iterator<Row> open(OperatorContext context)
+    public Iterator<Row> open(ExecutionContext context)
     {
         return functionInfo.open(context, tableAlias, new Arguments(arguments, context));
     }
@@ -40,10 +40,10 @@ public class TableFunctionOperator extends AOperator
     {
         private final Object EMPTY = new Object();
         private final List<Expression> arguments;
-        private final OperatorContext context;
+        private final ExecutionContext context;
         private List<Object> evalArgs;
 
-        private Arguments(List<Expression> arguments, OperatorContext context)
+        private Arguments(List<Expression> arguments, ExecutionContext context)
         {
             this.arguments = arguments;
             this.context = context;
@@ -64,7 +64,7 @@ public class TableFunctionOperator extends AOperator
             Object result = evalArgs.get(index);
             if (result == EMPTY)
             {
-                result = arguments.get(index).eval(context.getEvaluationContext(), context.getParentRow());
+                result = arguments.get(index).eval(context);
                 evalArgs.set(index, result);
             }
 

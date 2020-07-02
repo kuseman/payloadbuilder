@@ -1,7 +1,5 @@
 package com.viskan.payloadbuilder.editor;
 
-import com.viskan.payloadbuilder.editor.QueryFileModel.State;
-
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Component;
@@ -15,55 +13,47 @@ import java.awt.event.MouseListener;
 
 import javax.swing.AbstractButton;
 import javax.swing.BorderFactory;
+import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.SwingConstants;
 import javax.swing.plaf.basic.BasicButtonUI;
-
-import org.apache.commons.io.FilenameUtils;
 
 /** View for tab header component */
 class TabComponentView extends JPanel
 {
-    TabComponentView(final QueryFileModel file, final Runnable closeAction)
+    private final JLabel lblTitle;
+    
+    TabComponentView(String title, Icon icon)
+    {
+        this(title, icon, null);
+    }
+    
+    TabComponentView(String title, Icon icon, final Runnable closeAction)
     {
         super(new FlowLayout(FlowLayout.LEFT, 0, 0));
         setOpaque(false);
-
-        JLabel name = new JLabel(FilenameUtils.getName(file.getFilename()));
-        //            this.setToolTipText(file.getFilename());
-        name.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 5));
-        JButton button = new TabButton();
-        button.addActionListener(evt -> closeAction.run());
-
-        //add more space to the top of the component
         setBorder(BorderFactory.createEmptyBorder(2, 0, 0, 0));
 
-        file.addPropertyChangeListener(evt ->
-        {
-            name.setText(getTabTitle(file));
-        });
+        lblTitle = new JLabel(title, icon, SwingConstants.CENTER);
+        lblTitle.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 5));
+        add(lblTitle);
 
-        add(name);
-        add(button);
-    }
+        if (closeAction != null)
+        {
+            JButton button = new TabButton();
+            button.addActionListener(evt -> closeAction.run());
+            add(button);
+        }
 
-    private String getTabTitle(QueryFileModel file)
-    {
-        String filename = FilenameUtils.getName(file.getFilename());
-        StringBuilder sb = new StringBuilder();
-        if (file.isDirty())
-        {
-            sb.append("*");
-        }
-        sb.append(filename);
-        if (file.getState() == State.EXECUTING)
-        {
-            sb.append(" Executing ...");
-        }
-        return sb.toString();
     }
     
+    public void setTitle(String titleString)
+    {
+        lblTitle.setText(titleString);
+    }
+
     class TabButton extends JButton// implements ActionListener
     {
         public TabButton()

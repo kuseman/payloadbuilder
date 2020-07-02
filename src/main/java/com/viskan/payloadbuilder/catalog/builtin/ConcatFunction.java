@@ -1,13 +1,12 @@
 package com.viskan.payloadbuilder.catalog.builtin;
 
-import com.viskan.payloadbuilder.Row;
-import com.viskan.payloadbuilder.TableAlias;
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
+import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.codegen.CodeGeneratorContext;
 import com.viskan.payloadbuilder.codegen.ExpressionCode;
-import com.viskan.payloadbuilder.evaluation.EvaluationContext;
-import com.viskan.payloadbuilder.parser.tree.Expression;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.Expression;
 import com.viskan.payloadbuilder.utils.ObjectUtils;
 
 import static java.util.stream.Collectors.joining;
@@ -34,7 +33,7 @@ class ConcatFunction extends ScalarFunctionInfo
     }
     
     @Override
-    public Object eval(EvaluationContext context, List<Expression> arguments, Row row)
+    public Object eval(ExecutionContext context, List<Expression> arguments)
     {
         int size = arguments.size();
         if (size <= 0)
@@ -45,7 +44,7 @@ class ConcatFunction extends ScalarFunctionInfo
         Object[] args = new Object[size];
         for (int i=0;i<size;i++)
         {
-            args[i] = arguments.get(i).eval(context, row);
+            args[i] = arguments.get(i).eval(context);
         }
         
         return ObjectUtils.concat(args);
