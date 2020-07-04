@@ -4,6 +4,8 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 
+import org.antlr.v4.runtime.Token;
+
 /** Populating join type. Does not produce
  * tuples but instead populates outer rows with join rows */
 public class PopulateTableSource extends TableSource
@@ -18,9 +20,10 @@ public class PopulateTableSource extends TableSource
             TableSourceJoined tableSourceJoined,
             Expression where,
             List<Expression> groupBy,
-            List<SortItem> orderBy)
+            List<SortItem> orderBy,
+            Token token)
     {
-        super(alias);
+        super(alias, token);
         this.tableSourceJoined = requireNonNull(tableSourceJoined, "tableSourceJoined");
         this.orderBy = requireNonNull(orderBy, "orderBy");
         this.groupBy = requireNonNull(groupBy, "groupBy");
@@ -30,6 +33,12 @@ public class PopulateTableSource extends TableSource
     public TableSourceJoined getTableSourceJoined()
     {
         return tableSourceJoined;
+    }
+    
+    @Override
+    public String getCatalog()
+    {
+        return tableSourceJoined.getTableSource().getCatalog();
     }
     
     @Override

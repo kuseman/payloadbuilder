@@ -187,9 +187,6 @@ class BatchHashJoin extends AOperator
                             outerRowIndex++;
                             continue;
                         }
-                        
-//                        System.out.println(innerRows.size());
-                        
                     }
                     else if (innerRowIndex >= innerRows.size())
                     {
@@ -433,10 +430,8 @@ class BatchHashJoin extends AOperator
                 innerValuesExtractor,
                 predicate);
         return description + System.lineSeparator()
-            +
-            indentString + outer.toString(indent + 1) + System.lineSeparator()
-            +
-            indentString + inner.toString(indent + 1);
+            + indentString + outer.toString(indent + 1) + System.lineSeparator()
+            + indentString + inner.toString(indent + 1);
     }
     
     /** Value used in table */

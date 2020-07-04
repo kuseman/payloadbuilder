@@ -2,6 +2,7 @@ package com.viskan.payloadbuilder.catalog;
 
 import com.viskan.payloadbuilder.operator.Operator;
 import com.viskan.payloadbuilder.parser.QualifiedName;
+import com.viskan.payloadbuilder.parser.TableOption;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
@@ -32,7 +33,7 @@ public abstract class Catalog
 
     /**
      * Get indices for provided table
-     * 
+     *
      * @param table Table to retrieve index for
      **/
     public List<Index> getIndices(QualifiedName table)
@@ -42,25 +43,38 @@ public abstract class Catalog
 
     /**
      * Get operator for provided alias
-     * 
+     *
      * @param nodeId Unique id for operator node
-     * @param alias Alias to retrieve operator for
+     * @param catalogAlias Alias used for this catalog in the query
+     * @param tableAlias Table alias to retrieve operator for
+     * @param tableOptions Provided options for this table.
      */
-    public Operator getScanOperator(int nodeId, TableAlias alias)
+    public Operator getScanOperator(
+            int nodeId,
+            String catalogAlias,
+            TableAlias tableAlias,
+            List<TableOption> tableOptions)
     {
-        throw new IllegalArgumentException("Catalog " + name + " doesn't support scan operators.");
+        throw new IllegalArgumentException("Catalog " + catalogAlias + " (" + name + ") doesn't support scan operators.");
     }
 
     /**
      * Get operator for provided alias
-     * 
+     *
      * @param nodeId Unique id for operator node
-     * @param alias Alias to retrieve operator for
+     * @param catalogAlias Alias used for this catalog in the query
+     * @param tableAlias Table alias to retrieve operator for
      * @param index Index to use
+     * @param tableOptions Provided options for this table.
      */
-    public Operator getIndexOperator(int nodeId, TableAlias alias, Index index)
+    public Operator getIndexOperator(
+            int nodeId,
+            String catalogAlias,
+            TableAlias tableAlias,
+            Index index,
+            List<TableOption> tableOptions)
     {
-        throw new IllegalArgumentException("Catalog " + name + "  doesn't support index operators.");
+        throw new IllegalArgumentException("Catalog " + catalogAlias + " (" + name + ") doesn't support index operators.");
     }
 
     /** Register function */

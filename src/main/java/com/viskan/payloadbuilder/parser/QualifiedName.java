@@ -6,22 +6,14 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.join;
 
 import java.util.List;
-import java.util.Objects;
 
 public class QualifiedName
 {
     private final List<String> parts;
-    private final String catalog;
 
-    public QualifiedName(String catalog, List<String> parts)
+    public QualifiedName(List<String> parts)
     {
-        this.catalog = catalog;
         this.parts = unmodifiableList(requireNonNull(parts));
-    }
-
-    public String getCatalog()
-    {
-        return catalog;
     }
 
     public List<String> getParts()
@@ -57,7 +49,7 @@ public class QualifiedName
     /** Extracts a new qualified name from this instance with parts defined in from to */
     public QualifiedName extract(int from, int to)
     {
-        return new QualifiedName(catalog, parts.subList(from, to));
+        return new QualifiedName(parts.subList(from, to));
     }
 
     @Override
@@ -72,8 +64,7 @@ public class QualifiedName
         if (obj instanceof QualifiedName)
         {
             QualifiedName that = (QualifiedName) obj;
-            return Objects.equals(catalog, that.catalog)
-                && parts.equals(that.parts);
+            return parts.equals(that.parts);
 
         }
         return false;
@@ -82,11 +73,11 @@ public class QualifiedName
     @Override
     public String toString()
     {
-        return (catalog != null ? (catalog + "#") : "") + join(parts, ".");
+        return join(parts, ".");
     }
 
     public static QualifiedName of(String... parts)
     {
-        return new QualifiedName(null, asList(parts));
+        return new QualifiedName(asList(parts));
     }
 }

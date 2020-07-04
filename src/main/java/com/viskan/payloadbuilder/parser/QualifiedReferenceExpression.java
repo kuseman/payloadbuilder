@@ -8,13 +8,15 @@ import com.viskan.payloadbuilder.utils.MapUtils;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.Iterator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * Expression of a qualified name type. Column reference with a nested path. Ie. field.subField.value
@@ -23,30 +25,21 @@ public class QualifiedReferenceExpression extends Expression
 {
     private final QualifiedName qname;
     /**
-     * Unique id for this reference expression. Used to for storing {@link QualifiedReferenceContainer} in evaluation context
-     */
-    private final int uniqueId;
-    /**
      * If this references a lambda parameter, this points to it's unique id in current scope. Used to retrieve the current lambda value from
      * evaluation context
      */
     private final int lambdaId;
 
+    
     public QualifiedReferenceExpression(QualifiedName qname, int lambdaId)
     {
         this.qname = requireNonNull(qname, "qname");
-        this.uniqueId = 0;
         this.lambdaId = lambdaId;
     }
-
+    
     public QualifiedName getQname()
     {
         return qname;
-    }
-
-    public int getUniqueId()
-    {
-        return uniqueId;
     }
 
     public int getLambdaId()
@@ -120,6 +113,8 @@ public class QualifiedReferenceExpression extends Expression
     
     private int columnIndex = -2;
     
+    public static Map<Pair<String, QualifiedName>, AtomicInteger> executionsByName = new HashMap<>();
+    
     @Override
     public Object eval(ExecutionContext context)
     {
@@ -156,6 +151,11 @@ public class QualifiedReferenceExpression extends Expression
             return null;
         }
 
+        Pair<String, QualifiedName> key = Pair.of(row.getTableAlias().getRootPath(), qname);
+        
+        executionsByName.computeIfAbsent(key, k -> new AtomicInteger()).incrementAndGet();
+
+        
         if (qname.getParts().size() == 2)
         {
             TableAlias tableAlias = row.getTableAlias();
@@ -324,111 +324,111 @@ public class QualifiedReferenceExpression extends Expression
         return qname.toString();
     }
 
-    /**
-     * Container used to resolve a qualified reference Can cache traversal paths etc. 1. Traverse Row 2. Traverse Iterator 3. Traverse Map
-     **/
-    public static class QualifiedReferenceContainer
-    {
-        /** Cached information for {@link Row} input */
-        private int parentSteps;
-        private int[] childRowsPath;
-        private int ordinal;
-
-        private final QualifiedName qname;
-
-        public QualifiedReferenceContainer(QualifiedName qname)
-        {
-            this.qname = qname;
-        }
-
-        @SuppressWarnings("unchecked")
-        private Object getValue(Object input, int partStart)
-        {
-            if (input instanceof Row)
-            {
-                return getValue((Row) input);
-            }
-            else if (input instanceof Map)
-            {
-                // Assumes the whole part chain is combined maps
-                return MapUtils.traverse((Map<Object, Object>) input, qname.getParts().subList(partStart, qname.getParts().size()));
-            }
-            else if (input instanceof Iterator)
-            {
-                return getValue((Iterator) input);
-
-            }
-            return null;
-        }
-
-        /**
-         * Get value for arbitrary object input Can be a Map iterator etc.
-         */
-        Object getValue(Object input)
-        {
-            return getValue(input, 0);
-
-        }
-
-        /** Get value for itetator */
-        Object getValue(Iterator<Object> iterator)
-        {
-            /*
-             * Iterator input.
-             * Example:
-             *
-             * filter(articleAttribute, aa -> aa.sku_id > 0).price
-             * |-------------------------------------------| |----|
-             * Dereference left----^
-             * Qualified right --------------------------------^
-             *
-             * Filter returns an iterator
-             * And is given to this qualified expression with parts "price"
-             *
-             */
-            if (iterator.hasNext())
-            {
-                Object o = iterator.next();
-                return getValue(o);
-            }
-
-            return null;
-        }
-
-        /** Get value for for */
-        Object getValue(Row row)
-        {
-            if (row == null)
-            {
-                return null;
-            }
-            // TODO: Cache traversal steps
-            //       Make sure that cached TableAlias belongs to rows table alias        
-
-            // 1. Alias it self
-            if (row.getTableAlias().getAlias().equals(qname.getFirst()))
-            {
-                return getValue(row.getObject(qname.getFirst()), 1);
-            }
-
-            // 2. Child alias
-            TableAlias childAlias = row.getTableAlias().getChildAlias(qname.getFirst());
-            if (childAlias != null)
-            {
-                return "child alias " + qname.getFirst();
-            }
-
-            // 3. Parent
-            // TODO:
-
-            // 4. Column
-            int ordinal = ArrayUtils.indexOf(row.getTableAlias().getColumns(), qname.getFirst());
-            return row.getObject(ordinal);
-        }
-
-        /** Clear state. */
-        public void clear()
-        {
-        }
-    }
+//    /**
+//     * Container used to resolve a qualified reference Can cache traversal paths etc. 1. Traverse Row 2. Traverse Iterator 3. Traverse Map
+//     **/
+//    public static class QualifiedReferenceContainer
+//    {
+//        /** Cached information for {@link Row} input */
+//        private int parentSteps;
+//        private int[] childRowsPath;
+//        private int ordinal;
+//
+//        private final QualifiedName qname;
+//
+//        public QualifiedReferenceContainer(QualifiedName qname)
+//        {
+//            this.qname = qname;
+//        }
+//
+//        @SuppressWarnings("unchecked")
+//        private Object getValue(Object input, int partStart)
+//        {
+//            if (input instanceof Row)
+//            {
+//                return getValue((Row) input);
+//            }
+//            else if (input instanceof Map)
+//            {
+//                // Assumes the whole part chain is combined maps
+//                return MapUtils.traverse((Map<Object, Object>) input, qname.getParts().subList(partStart, qname.getParts().size()));
+//            }
+//            else if (input instanceof Iterator)
+//            {
+//                return getValue((Iterator) input);
+//
+//            }
+//            return null;
+//        }
+//
+//        /**
+//         * Get value for arbitrary object input Can be a Map iterator etc.
+//         */
+//        Object getValue(Object input)
+//        {
+//            return getValue(input, 0);
+//
+//        }
+//
+//        /** Get value for itetator */
+//        Object getValue(Iterator<Object> iterator)
+//        {
+//            /*
+//             * Iterator input.
+//             * Example:
+//             *
+//             * filter(articleAttribute, aa -> aa.sku_id > 0).price
+//             * |-------------------------------------------| |----|
+//             * Dereference left----^
+//             * Qualified right --------------------------------^
+//             *
+//             * Filter returns an iterator
+//             * And is given to this qualified expression with parts "price"
+//             *
+//             */
+//            if (iterator.hasNext())
+//            {
+//                Object o = iterator.next();
+//                return getValue(o);
+//            }
+//
+//            return null;
+//        }
+//
+//        /** Get value for for */
+//        Object getValue(Row row)
+//        {
+//            if (row == null)
+//            {
+//                return null;
+//            }
+//            // TODO: Cache traversal steps
+//            //       Make sure that cached TableAlias belongs to rows table alias        
+//
+//            // 1. Alias it self
+//            if (row.getTableAlias().getAlias().equals(qname.getFirst()))
+//            {
+//                return getValue(row.getObject(qname.getFirst()), 1);
+//            }
+//
+//            // 2. Child alias
+//            TableAlias childAlias = row.getTableAlias().getChildAlias(qname.getFirst());
+//            if (childAlias != null)
+//            {
+//                return "child alias " + qname.getFirst();
+//            }
+//
+//            // 3. Parent
+//            // TODO:
+//
+//            // 4. Column
+//            int ordinal = ArrayUtils.indexOf(row.getTableAlias().getColumns(), qname.getFirst());
+//            return row.getObject(ordinal);
+//        }
+//
+//        /** Clear state. */
+//        public void clear()
+//        {
+//        }
+//    }
 }

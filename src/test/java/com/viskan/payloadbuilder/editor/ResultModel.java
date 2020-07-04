@@ -26,9 +26,9 @@ class ResultModel extends AbstractTableModel
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     /** Notify changes eveth x:th row */
-    private static final int NOTIFY_ROWS_THRESHOLD = 1000;
+    private static final int NOTIFY_ROWS_THRESHOLD = 100;
     private final QueryFileModel file;
-    private List<Object[]> rows = new ArrayList<>(50);
+    private final List<Object[]> rows = new ArrayList<>(50);
     private String[] columns = EMPTY_STRING_ARRAY;
     private boolean complete;
     
@@ -48,39 +48,12 @@ class ResultModel extends AbstractTableModel
         }
         
         rows.add(row);
-        if (file.getOutput() == Output.NONE)
-        {
-            return;
-        }
-
-        if (rows.size() >= lastNotifyRowIndex + NOTIFY_ROWS_THRESHOLD)
-        {
-            fireRowsInserted(lastNotifyRowIndex, lastNotifyRowIndex + NOTIFY_ROWS_THRESHOLD - 1);
-            try
-            {
-                // Yield to not hog application
-                Thread.sleep(5);
-            }
-            catch (InterruptedException e)
-            {
-            }
-            lastNotifyRowIndex = rows.size();
-        }
     }
     
     /** Called when result is completed. */
     void done()
     {
         complete = true;
-        if (file.getOutput() == Output.NONE)
-        {
-            return;
-        }
-
-        if (rows.size() - 1 >= lastNotifyRowIndex)
-        {
-            fireRowsInserted(lastNotifyRowIndex, rows.size() - 1);
-        }
     }
     
     boolean isComplete()
@@ -93,28 +66,6 @@ class ResultModel extends AbstractTableModel
     {
         this.columns = requireNonNull(columns);
         SwingUtilities.invokeLater(() -> fireTableStructureChanged());
-    }
-
-    /** Clear model */
-    void clear()
-    {
-        columns = EMPTY_STRING_ARRAY;
-        rows = new ArrayList<>(50);
-        lastNotifyRowIndex = 0;
-        
-        if (SwingUtilities.isEventDispatchThread())
-        {        
-            fireTableStructureChanged();
-            fireTableDataChanged();
-        }
-        else
-        {
-            SwingUtilities.invokeLater(() -> 
-            {
-                fireTableStructureChanged();
-                fireTableDataChanged();
-            });
-        }
     }
     
     /** A non table model method to get row count */
@@ -152,7 +103,6 @@ class ResultModel extends AbstractTableModel
         Object[] row = rows.get(rowIndex);
         if (row == null)
         {
-            System.out.println("ROW IS NULL");
             return null;
         }
         return getItemAtPositionOrNull(row, columnIndex);
@@ -164,9 +114,15 @@ class ResultModel extends AbstractTableModel
         return false;
     }
     
-    private void fireRowsInserted(int rowStart, int rowEnd)
+    /** Notifies changes since last notify */
+    public void notifyChanges()
     {
-            SwingUtilities.invokeLater(() -> super.fireTableRowsInserted(rowStart, rowEnd));
+        int size = rows.size() - 1;
+        if (size > lastNotifyRowIndex)
+        {
+            super.fireTableRowsInserted(lastNotifyRowIndex, size);
+            lastNotifyRowIndex = size;
+        }
     }
     
     /** Get cell label for provided object.
@@ -188,8 +144,7 @@ class ResultModel extends AbstractTableModel
                     generator.writeObject(obj);
                     if (sw.getBuffer().length() > size)
                     {
-                        sw.append("...");
-                        return sw.toString();
+                        return sw.toString().substring(0, size) + "...";
                     }
                 }
             }
@@ -217,4 +172,5 @@ class ResultModel extends AbstractTableModel
             return StringUtils.EMPTY;
         }
     }
+
 }

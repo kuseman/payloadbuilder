@@ -4,50 +4,62 @@ import com.viskan.payloadbuilder.QuerySession;
 import com.viskan.payloadbuilder.catalog.FunctionInfo;
 import com.viskan.payloadbuilder.catalog.ScalarFunctionInfo;
 
+import static com.viskan.payloadbuilder.catalog.FunctionInfo.validate;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 
 import java.util.List;
+import java.util.Objects;
 
 import org.antlr.v4.runtime.Token;
 
 /** Scalar function call */
 public class QualifiedFunctionCallExpression extends Expression
 {
-    private final QualifiedName qname;
-    
-//    private final ScalarFunctionInfo functionInfo;
+    private final String catalog;
+    private final String function;
+
+    //    private final ScalarFunctionInfo functionInfo;
     private final List<Expression> arguments;
-    
-    /** Unique id for this function call in query.
-     * Used to store function lookup during evaluation to avoid multiple lookups */
+
+    /**
+     * Unique id for this function call in query. Used to store function lookup during evaluation to avoid multiple lookups
+     */
     private final int functionId;
 
     private final Token token;
 
     QualifiedFunctionCallExpression(
-            QualifiedName qname,
+            String catalog,
+            String function,
             List<Expression> arguments,
             int functionId)
     {
-        this(qname, arguments, functionId, null);
+        this(catalog, function, arguments, functionId, null);
     }
-    
+
     QualifiedFunctionCallExpression(
-            QualifiedName qname,
+            String catalog,
+            String function,
             List<Expression> arguments,
             int functionId,
             Token token)
     {
-        this.qname = requireNonNull(qname, "qname");
+        this.catalog = catalog;
+        this.function = requireNonNull(function, "function");
         this.arguments = requireNonNull(arguments, "arguments");
         this.functionId = functionId;
         this.token = token;
     }
 
-    public QualifiedName getQname()
+    public String getCatalog()
     {
-        return qname;
+        return catalog;
+    }
+
+    public String getFunction()
+    {
+        return function;
     }
 
     public List<Expression> getArguments()
@@ -55,41 +67,42 @@ public class QualifiedFunctionCallExpression extends Expression
         return arguments;
     }
     
+    
     /** Resolves function this expression based on provided session */
     public ScalarFunctionInfo getFunctionInfo(QuerySession session)
     {
-        FunctionInfo functionInfo = session.resolveFunctionInfo(qname, functionId);
-        
+        FunctionInfo functionInfo = session.resolveFunctionInfo(catalog, function, functionId);
+
         if (!(functionInfo instanceof ScalarFunctionInfo))
         {
             throw new ParseException("Expected a scalar function but got " + functionInfo, token);
         }
-        
+
+        validate(functionInfo, arguments, token);
+
         return (ScalarFunctionInfo) functionInfo;
-    
-        
+
         /*
          * QuerySession (Static data through whole execution, exception of properties)
          *   Catalogs
          *   Params
-         * 
+         *
          * OperatorContext (Context used during selects)
          *   NodeDat
-         *   
-         * 
+         *
+         *
          * EvaluationContext (Context used during evaluation)
          *   LambdaValues
-         * 
-         * 
+         *
+         *
          * ExecutionContext
          *   QuerySession
          *   EvaluationContext (cleared before each evalution)
-         * 
+         *
          */
-        
-        
-//        throw new IllegalArgumentException("No function named: " + qname.getLast() + " found in " + qname.getCatalog());
-//        return null;
+
+        //        throw new IllegalArgumentException("No function named: " + qname.getLast() + " found in " + qname.getCatalog());
+        //        return null;
     }
 
     @Override
@@ -99,11 +112,11 @@ public class QualifiedFunctionCallExpression extends Expression
         return functionInfo.eval(context, arguments);
     }
 
-//    @Override
-//    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
-//    {
-//        return null;//functionInfo.generateCode(context, parentCode, arguments);
-//    }
+    //    @Override
+    //    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
+    //    {
+    //        return null;//functionInfo.generateCode(context, parentCode, arguments);
+    //    }
 
     @Override
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
@@ -127,7 +140,7 @@ public class QualifiedFunctionCallExpression extends Expression
     public int hashCode()
     {
         return 17 +
-            (37 * qname.hashCode()) +
+            (37 * function.hashCode()) +
             (37 * arguments.hashCode());
     }
 
@@ -137,7 +150,8 @@ public class QualifiedFunctionCallExpression extends Expression
         if (obj instanceof QualifiedFunctionCallExpression)
         {
             QualifiedFunctionCallExpression that = (QualifiedFunctionCallExpression) obj;
-            return qname.equals(that.qname)
+            return Objects.equals(catalog, that.catalog)
+                && function.equals(that.function)
                 && arguments.equals(that.arguments);
         }
         return false;
@@ -146,6 +160,9 @@ public class QualifiedFunctionCallExpression extends Expression
     @Override
     public String toString()
     {
-        return qname + "(" + arguments.stream().map(a -> a.toString()).collect(joining(", ")) + ")";
+        return catalog != null ? (catalog + "#")
+            : ""
+                + function
+                + "(" + arguments.stream().map(a -> a.toString()).collect(joining(", ")) + ")";
     }
 }

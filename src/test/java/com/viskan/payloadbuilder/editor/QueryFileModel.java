@@ -2,6 +2,7 @@ package com.viskan.payloadbuilder.editor;
 
 import com.viskan.payloadbuilder.QuerySession;
 import com.viskan.payloadbuilder.catalog.CatalogRegistry;
+import com.viskan.payloadbuilder.provider.elastic.EtmArticleCategoryESCatalog;
 
 import java.beans.PropertyChangeListener;
 import java.io.File;
@@ -9,11 +10,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 import javax.swing.event.SwingPropertyChangeSupport;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.lang3.time.StopWatch;
 import org.apache.commons.lang3.tuple.Pair;
 
 /**
@@ -38,16 +41,16 @@ class QueryFileModel
     private Output output = Output.TABLE;
 
     private final QuerySession querySession = new QuerySession(new CatalogRegistry());
-
     private final List<ResultModel> results = new ArrayList<>();
     
     /** Execution fields */
-    private long executionTime;
+    private StopWatch sw;
     private String error;
     private Pair<Integer, Integer> parseErrorLocation;
 
     QueryFileModel()
     {
+        init();
     }
 
     /** Initialize a file from filename */
@@ -65,6 +68,13 @@ class QueryFileModel
         dirty = false;
         newFile = false;
         savedQuery = query;
+        
+        init();
+    }
+    
+    private void init()
+    {
+        querySession.getCatalogRegistry().registerCatalog("es", new EtmArticleCategoryESCatalog());
     }
 
     boolean isDirty()
@@ -99,7 +109,13 @@ class QueryFileModel
             // Reset execution fields when starting
             if (state == State.EXECUTING)
             {
+                sw = new StopWatch();
+                sw.start();
                 clearForExecution();
+            }
+            else
+            {
+                sw.stop();
             }
 
             pcs.firePropertyChange(STATE, oldValue, newValue);
@@ -109,17 +125,11 @@ class QueryFileModel
     /** Get current execution time in millis */
     long getExecutionTime()
     {
-        return executionTime;
-    }
-
-    void setExecutionTime(long executionTime)
-    {
-        this.executionTime = executionTime;
+        return sw != null ? sw.getTime(TimeUnit.MILLISECONDS) : 0; 
     }
 
     void clearForExecution()
     {
-        executionTime = 0;
         error = "";
         parseErrorLocation = null;
         results.clear();
@@ -249,7 +259,10 @@ class QueryFileModel
     void addResult(ResultModel model)
     {
         results.add(model);
-        pcs.firePropertyChange(RESULT_MODEL, null, model);
+        if (output != Output.NONE)
+        {
+            pcs.firePropertyChange(RESULT_MODEL, null, model);
+        }
     }
 
     enum State

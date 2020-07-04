@@ -4,7 +4,9 @@ import com.viskan.payloadbuilder.QuerySession;
 import com.viskan.payloadbuilder.catalog.FunctionInfo;
 import com.viskan.payloadbuilder.catalog.TableFunctionInfo;
 
+import static com.viskan.payloadbuilder.catalog.FunctionInfo.validate;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 
 import java.util.List;
 
@@ -13,35 +15,49 @@ import org.antlr.v4.runtime.Token;
 /** Table function */
 public class TableFunction extends TableSource
 {
-    private final QualifiedName qname;
-//    private final TableFunctionInfo functionInfo;
+    private final String catalog;
+    private final String function;
     private final List<Expression> arguments;
     private final int functionId;
-    private final Token token;
+    private final List<TableOption> tableOptions;
 
-    public TableFunction(QualifiedName qname, List<Expression> arguments, String alias, int functionId, Token token)
+    public TableFunction(String catalog, String function, List<Expression> arguments, String alias, List<TableOption> tableOptions, int functionId, Token token)
     {
-        super(alias);
-        this.qname = requireNonNull(qname, "qname");
-//        this.functionInfo = requireNonNull(functionInfo, "functionInfo");
+        super(alias, token);
+        this.catalog = catalog;
+        this.function = requireNonNull(function, "function");
         this.arguments = requireNonNull(arguments, "arguments");
+        this.tableOptions = tableOptions;
         this.functionId = functionId;
-        this.token = token;
     }
     
-    public QualifiedName getQname()
+    @Override
+    public String getCatalog()
     {
-        return qname;
+        return catalog;
+    }
+    
+    public String getFunction()
+    {
+        return function;
+    }
+    
+    @Override
+    public List<TableOption> getTableOptions()
+    {
+        return tableOptions;
     }
     
     public TableFunctionInfo getFunctionInfo(QuerySession session)
     {
-        FunctionInfo functionInfo = session.resolveFunctionInfo(qname, functionId);
+        FunctionInfo functionInfo = session.resolveFunctionInfo(catalog, function, functionId);
         
         if (!(functionInfo instanceof TableFunctionInfo))
         {
             throw new ParseException("Expected a table valued function but got " + functionInfo, token);
         }
+        
+        validate(functionInfo, arguments, token);
         
         return (TableFunctionInfo) functionInfo;
     }
@@ -60,6 +76,9 @@ public class TableFunction extends TableSource
     @Override
     public String toString()
     {
-        return qname + " " + alias;
+        return catalog != null ? (catalog + "#")
+            : ""
+                + function
+                + "(" + arguments.stream().map(a -> a.toString()).collect(joining(", ")) + ") " + alias;
     }
 }

@@ -9,6 +9,7 @@ import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.operator.Row;
 import com.viskan.payloadbuilder.parser.ExecutionContext;
 import com.viskan.payloadbuilder.parser.Expression;
+import com.viskan.payloadbuilder.parser.ParseException;
 import com.viskan.payloadbuilder.parser.QueryParser;
 
 import static java.util.Arrays.asList;
@@ -191,7 +192,7 @@ public class CodeGeneratorTest extends Assert
         assertExpression(10, null, "isnull(null, 10)");
         assertExpression(10, null, "isnull(10, var)");
         assertExpression(6, null, "coalesce(null, null, 1+2+3)");
-        assertFail(IllegalArgumentException.class, "expected 2 parameters", "isnull(10, var, 1)");
+        assertFail(ParseException.class, "expected 2 parameters", "isnull(10, var, 1)");
     }
 
     @SuppressWarnings("unchecked")

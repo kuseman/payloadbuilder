@@ -1,9 +1,8 @@
 package com.viskan.payloadbuilder.codegen;
 
-import com.viskan.payloadbuilder.catalog.CatalogRegistry;
 import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.operator.Row;
-import com.viskan.payloadbuilder.parser.EvaluationContext;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 import com.viskan.payloadbuilder.parser.Expression;
 import com.viskan.payloadbuilder.parser.QueryParser;
 
@@ -32,17 +31,17 @@ public class BenchmarkTest
     TableAlias ta;
     Row r;
     Function<Row, Object> func;
-    EvaluationContext context;
+    ExecutionContext context;
 
     @Setup(Level.Trial)
     public void setup()
     {
-        e = new QueryParser().parseExpression(new CatalogRegistry(), "a.filter(a -> a % 2 = 0)");
+        e = new QueryParser().parseExpression("a.filter(a -> a % 2 = 0)");
         ta = TableAlias.of(null, "t", "a");
         ta.setColumns(new String[] { "a" });
         r = Row.of(ta, 0, new Object[] { IntStream.range(0, 100000).mapToObj(i -> i).collect(toList()) } );
         func = new CodeGenerator().generateFunction(ta, e);
-        context = new EvaluationContext();
+        context = new ExecutionContext();
     }
     
     

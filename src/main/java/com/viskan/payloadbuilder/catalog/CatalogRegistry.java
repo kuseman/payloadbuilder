@@ -4,6 +4,7 @@ import com.viskan.payloadbuilder.catalog.builtin.BuiltinCatalog;
 
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.lowerCase;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -33,7 +34,7 @@ public class CatalogRegistry
         {
             throw new IllegalArgumentException("Alias cannot be blank");
         }
-        catalogByName.put(alias, catalog);
+        catalogByName.put(lowerCase(alias), catalog);
     }
 
     /** Get catalog */

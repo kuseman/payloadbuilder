@@ -7,6 +7,7 @@ import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.parser.ExecutionContext;
 import com.viskan.payloadbuilder.parser.QueryParser;
 import com.viskan.payloadbuilder.parser.Select;
+import com.viskan.payloadbuilder.parser.TableOption;
 
 import static java.util.stream.Collectors.joining;
 
@@ -16,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Iterator;
+import java.util.List;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Assert;
@@ -47,7 +49,7 @@ public class ManualOperatorTest extends Assert
             }
             
             @Override
-            public Operator getScanOperator(int nodeId, TableAlias tableAlias)
+            public Operator getScanOperator(int nodeId, String catalogAlias, TableAlias tableAlias, List<TableOption> tableOptions)
             {
                 return new Operator()
                 {

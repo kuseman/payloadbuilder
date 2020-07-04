@@ -2,10 +2,13 @@ package com.viskan.payloadbuilder.catalog;
 
 import com.viskan.payloadbuilder.catalog.builtin.BuiltinCatalog;
 import com.viskan.payloadbuilder.parser.Expression;
+import com.viskan.payloadbuilder.parser.ParseException;
 
 import static java.util.Objects.requireNonNull;
 
 import java.util.List;
+
+import org.antlr.v4.runtime.Token;
 
 /** Definition of a function */
 public abstract class FunctionInfo
@@ -75,12 +78,35 @@ public abstract class FunctionInfo
         {
             FunctionInfo fi = (FunctionInfo) obj;
             return catalog.getName().equals(fi.getCatalog().getName())
-                &&
-                name.equals(fi.getName())
-                &&
-                type.equals(fi.getType());
+                && name.equals(fi.getName())
+                && type.equals(fi.getType());
         }
-        return super.equals(obj);
+        return false;
+    }
+
+    /** Validate function info against arguments */
+    public static void validate(FunctionInfo functionInfo, List<Expression> arguments, Token token)
+    {
+        if (functionInfo.getInputTypes() != null)
+        {
+            List<Class<? extends Expression>> inputTypes = functionInfo.getInputTypes();
+            int size = inputTypes.size();
+            if (arguments.size() != size)
+            {
+                throw new ParseException("Function " + functionInfo.getName() + " expected " + inputTypes.size() + " parameters, found " + arguments.size(), token);
+            }
+            for (int i = 0; i < size; i++)
+            {
+                Class<? extends Expression> inputType = inputTypes.get(i);
+                if (!inputType.isAssignableFrom(arguments.get(i).getClass()))
+                {
+                    throw new ParseException(
+                            "Function " + functionInfo.getName() + " expects " + inputType.getSimpleName() + " as parameter at index " + i + " but got "
+                                + arguments.get(i).getClass().getSimpleName(),
+                            token);
+                }
+            }
+        }
     }
 
     public enum Type

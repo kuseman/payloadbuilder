@@ -6,11 +6,13 @@ import com.viskan.payloadbuilder.catalog.TableFunctionInfo;
 import com.viskan.payloadbuilder.parser.ExecutionContext;
 import com.viskan.payloadbuilder.parser.QualifiedName;
 import com.viskan.payloadbuilder.parser.Select;
+import com.viskan.payloadbuilder.parser.TableOption;
 
 import static com.viskan.payloadbuilder.parser.QualifiedName.of;
 import static java.util.Arrays.asList;
 
 import java.util.Iterator;
+import java.util.List;
 import java.util.Random;
 import java.util.stream.IntStream;
 
@@ -65,7 +67,7 @@ public class OperatorBuilderTest extends AOperatorTest
 
         assertEquals(expected, queryResult.operator);
     }
-
+    
     @Test
     public void test_table_function()
     {
@@ -286,7 +288,7 @@ public class OperatorBuilderTest extends AOperatorTest
             Random rand = new Random();
 
             @Override
-            public Operator getScanOperator(int nodeId, TableAlias alias)
+            public Operator getScanOperator(int nodeId, String catalogAlias, TableAlias alias, List<TableOption> tableOptions)
             {
                 boolean ap = alias.getAlias().equals("ap");
                 boolean ab = alias.getAlias().equals("ab");
@@ -615,7 +617,7 @@ public class OperatorBuilderTest extends AOperatorTest
             Random rnd = new Random();
 
             @Override
-            public Operator getScanOperator(int nodeId, TableAlias alias)
+            public Operator getScanOperator(int nodeId, String catalogAlias, TableAlias alias, List<TableOption> tableOptions)
             {
                 QualifiedName qname = alias.getTable();
                 if (qname.toString().equals("source"))

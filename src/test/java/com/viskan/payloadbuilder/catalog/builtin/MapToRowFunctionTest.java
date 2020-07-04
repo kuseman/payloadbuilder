@@ -39,7 +39,7 @@ public class MapToRowFunctionTest extends Assert
         
         ExecutionContext context = new ExecutionContext(new QuerySession(new CatalogRegistry()));
         context.setRow(row);
-        Object value = new QualifiedReferenceExpression(new QualifiedName(null, asList("a", "article_attribute", "attribute1", "buckets")), -1).eval(context);
+        Object value = new QualifiedReferenceExpression(new QualifiedName(asList("a", "article_attribute", "attribute1", "buckets")), -1).eval(context);
         Iterator<Row> it = f.open(context, func, asList(value));
         while (it.hasNext())
         {

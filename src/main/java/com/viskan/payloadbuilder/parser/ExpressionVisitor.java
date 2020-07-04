@@ -23,4 +23,5 @@ public interface ExpressionVisitor<TR, TC>
     TR visit(DereferenceExpression expression, TC context);
     TR visit(LambdaExpression expression, TC context);
     TR visit(NamedParameterExpression expression, TC context);
+    TR visit(VariableExpression expression, TC context);
 }

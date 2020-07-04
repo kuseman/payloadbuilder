@@ -41,8 +41,6 @@ public class QueryParserTest extends AParserTest
         assertExpression("a.filter(x -> x.val > 0).sort(x -> x.val).sum(x -> x.val2)");
         assertExpression("a.filter(x -> x.val > 0)");
         assertExpression("a.b.c.utils#filter(x -> x.val > 0).utils2#func().sort()");
-
-        assertExpressionFail(ParseException.class, "Function names cannot have more than one", "utils#func.b()");
     }
 
     @Test
@@ -50,35 +48,35 @@ public class QueryParserTest extends AParserTest
     {
         assertExpression("a.b.c", new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1));
         assertExpression(":list.filter(x -> x.value)",
-                new QualifiedFunctionCallExpression(QualifiedName.of("filter"),
+                new QualifiedFunctionCallExpression(null, "filter",
                         asList(
                                 new NamedParameterExpression("list"),
                                 new LambdaExpression(asList("x"),
                                         new QualifiedReferenceExpression(QualifiedName.of("x", "value"), 0),
                                         new int[] {0})),
                         0));
-        assertExpression("a.func()", new QualifiedFunctionCallExpression(QualifiedName.of("func"), asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1)), 0));
+        assertExpression("a.func()", new QualifiedFunctionCallExpression(null, "func", asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1)), 0));
         assertExpression("a.func() + func(a)",
                 new ArithmeticBinaryExpression(
                         Type.ADD,
-                        new QualifiedFunctionCallExpression(QualifiedName.of("func"), asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1)), 0),
-                        new QualifiedFunctionCallExpression(QualifiedName.of("func"), asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1)), 0)));
+                        new QualifiedFunctionCallExpression(null, "func", asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1)), 0),
+                        new QualifiedFunctionCallExpression(null, "func", asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1)), 0)));
         assertExpression("a.b.c.utils#func()",
                 new QualifiedFunctionCallExpression(
-                        new QualifiedName("utils", asList("func")),
+                        "utils", "func",
                         asList(new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1)), 0));
         assertExpression("a.b.c.func().value",
                 new DereferenceExpression(
-                        new QualifiedFunctionCallExpression(QualifiedName.of("func"), asList(new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1)), 0),
+                        new QualifiedFunctionCallExpression(null, "func", asList(new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1)), 0),
                         new QualifiedReferenceExpression(QualifiedName.of("value"), -1)));
         assertExpression("a.b.c.func().utils#func2()",
-                new QualifiedFunctionCallExpression(new QualifiedName("utils", asList("func2")),
-                        asList(new QualifiedFunctionCallExpression(QualifiedName.of("func"), asList(new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1)), 0)), 1));
+                new QualifiedFunctionCallExpression("utils", "func2",
+                        asList(new QualifiedFunctionCallExpression(null, "func", asList(new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1)), 0)), 1));
 
         assertExpression("a.b.c.func().utils#func2(123)",
-                new QualifiedFunctionCallExpression(new QualifiedName("utils", asList("func2")),
+                new QualifiedFunctionCallExpression("utils", "func2",
                         asList(
-                                new QualifiedFunctionCallExpression(QualifiedName.of("func"), asList(
+                                new QualifiedFunctionCallExpression(null, "func", asList(
                                         new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1)),
                                         0),
                                 new LiteralIntegerExpression(123)),

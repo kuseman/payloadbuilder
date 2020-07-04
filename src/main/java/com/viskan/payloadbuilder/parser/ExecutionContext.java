@@ -8,17 +8,32 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+
+import gnu.trove.map.hash.THashMap;
 
 /** Context used during execution of a query */
 public class ExecutionContext
 {
+    private static final String SESSION_SCOPE = "session";
     private final QuerySession session;
     /** Holder for lambda references during evaluation */
-    private final List<Object> lambdaValues = new ArrayList<>();
+    private List<Object> lambdaValues;
+    private Map<String, Object> variables; 
     private final long now = System.currentTimeMillis();
-//    private final EvaluationContext evaluationContext = new EvaluationContext();
     private final OperatorContext operatorContext = new OperatorContext();
+    
+    /** <pre>
+     * Arbitrary cache that can be utilized per statement.
+     * Is cleared between statements.
+     * 
+     * Ie. caching of {@link QualifiedReferenceExpression} lookup path
+     * which is performed alot of times during a select
+     * </pre> 
+     */
+    private Map<String, Object> statementCache;
     
     /** Reference to row. Used in projections, correlated sub queries */
     private Row row;
@@ -66,6 +81,10 @@ public class ExecutionContext
     /** Get lambda value in scope for provided id */
     public Object getLambdaValue(int lambdaId)
     {
+        if (lambdaValues == null)
+        {
+            return null;
+        }
         ensureSize(lambdaValues, lambdaId);
         return lambdaValues.get(lambdaId);
     }
@@ -73,8 +92,74 @@ public class ExecutionContext
     /** Set lambda value in scope for provided id */
     public void setLambdaValue(int lambdaId, Object value)
     {
+        if (lambdaValues == null)
+        {
+            lambdaValues = new ArrayList<>();
+        }
         ensureSize(lambdaValues, lambdaId);
         lambdaValues.set(lambdaId, value);
+    }
+    
+    /** Set variable to context */
+    public void setVariable(String scope, String name, Object value)
+    {
+        if (SESSION_SCOPE.equals(scope))
+        {
+            session.setVariable(name, value);
+        }
+        else
+        {
+            if (variables == null)
+            {
+                variables = new HashMap<>();
+            }
+            variables.put(name, value);
+        }
+    }
+    
+    /** Get variable from context 
+     * @param name2 */
+    public Object getVariable(String name)
+    {
+        Object value = variables != null ? variables.get(name) : null;
+        if (value == null)
+        {
+            value = session.getVariable(name);
+        }
+        return value;
+    }
+    
+    /** Get value from statement cache */
+    @SuppressWarnings("unchecked")
+    public <T> T getStatementCacheValue(String key)
+    {
+        if (statementCache == null)
+        {
+            return null;
+        }
+        
+        return (T) statementCache.get(key);
+    }
+    
+    /** Set statement cache value */
+    public void setStatementCacheValue(String key, Object value)
+    {
+        if (statementCache == null)
+        {
+            statementCache = new THashMap<>();
+        }
+        
+        statementCache.put(key, value);
+    }
+    
+    /** Clear statement cache */
+    public void clearStatementCache() 
+    {
+        if (statementCache == null)
+        {
+            return;
+        }
+        statementCache.clear();
     }
     
     private void ensureSize(List<?> list, int itemIndex)

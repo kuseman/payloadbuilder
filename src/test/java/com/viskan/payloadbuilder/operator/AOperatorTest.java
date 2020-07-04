@@ -7,6 +7,7 @@ import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.parser.ExecutionContext;
 import com.viskan.payloadbuilder.parser.Expression;
 import com.viskan.payloadbuilder.parser.QueryParser;
+import com.viskan.payloadbuilder.parser.TableOption;
 
 import static java.util.Collections.emptyIterator;
 
@@ -36,7 +37,7 @@ public class AOperatorTest extends Assert
         Catalog c = new Catalog("Test")
         {
             @Override
-            public Operator getScanOperator(int nodeId, TableAlias alias)
+            public Operator getScanOperator(int nodeId, String catalogAlias, TableAlias alias, List<TableOption> tableOptions)
             {
                 if (mAlias.getValue() == null)
                 {

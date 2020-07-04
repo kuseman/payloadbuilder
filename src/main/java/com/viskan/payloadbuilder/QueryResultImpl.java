@@ -9,6 +9,7 @@ import com.viskan.payloadbuilder.operator.Row;
 import com.viskan.payloadbuilder.parser.ExecutionContext;
 import com.viskan.payloadbuilder.parser.IfStatement;
 import com.viskan.payloadbuilder.parser.PrintStatement;
+import com.viskan.payloadbuilder.parser.QualifiedReferenceExpression;
 import com.viskan.payloadbuilder.parser.QueryStatement;
 import com.viskan.payloadbuilder.parser.SelectStatement;
 import com.viskan.payloadbuilder.parser.SetStatement;
@@ -46,14 +47,16 @@ class QueryResultImpl implements QueryResult, QueryResultMetaData, StatementVisi
     @Override
     public Void visit(PrintStatement statement, Void ctx)
     {
+        context.clearStatementCache();
         Object value = statement.getExpression().eval(context);
-        session.getPrintStream().println(value);
+        session.printLine(value);
         return null;
     }
 
     @Override
     public Void visit(IfStatement statement, Void ctx)
     {
+        context.clearStatementCache();
         Object value = statement.getCondition().eval(context);
         if ((Boolean) value)
         {
@@ -69,14 +72,16 @@ class QueryResultImpl implements QueryResult, QueryResultMetaData, StatementVisi
     @Override
     public Void visit(SetStatement statement, Void ctx)
     {
+        context.clearStatementCache();
         Object value = statement.getExpression().eval(context);
-        session.setProperty(statement.getKey(), value);
+        context.setVariable(statement.getScope(), statement.getName(), value);
         return null;
     }
 
     @Override
     public Void visit(SelectStatement statement, Void ctx)
     {
+        context.clearStatementCache();
         currentSelect = OperatorBuilder.create(session, statement.getSelect());
         return null;
     }
@@ -110,12 +115,13 @@ class QueryResultImpl implements QueryResult, QueryResultMetaData, StatementVisi
         {
             throw new IllegalArgumentException("No more results");
         }
-
         Operator operator = currentSelect.getKey();
         Projection projection = currentSelect.getValue();
-
+        
+        context.clear();
         if (operator != null)
         {
+            System.out.println(operator.toString(1));
             Iterator<Row> iterator = operator.open(context);
             while (iterator.hasNext())
             {
@@ -138,8 +144,9 @@ class QueryResultImpl implements QueryResult, QueryResultMetaData, StatementVisi
             writer.endRow();
         }
 
-        context.clear();
         currentSelect = null;
+        System.out.println(QualifiedReferenceExpression.executionsByName);
+        QualifiedReferenceExpression.executionsByName.clear();
     }
 
     @Override

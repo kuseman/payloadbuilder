@@ -82,16 +82,6 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         for (ICatalogExtension extension : model.getExtensions())
         {
             view.getPanelCatalogs().add(new JScrollPane(new CatalogExtensionView(extension, defaultGroup)));
-            //            {
-            //                QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
-            //                if (editor != null)
-            //                {
-            //                    QueryFileModel file = editor.getFile();
-            //                    file.getCatalogValues()
-            //                        .computeIfAbsent(extension, key -> new HashMap<>())
-            //                        .put(item, value);
-            //                }
-            //            }));
         }
 
         view.getEditorsTabbedPane().addChangeListener(new SelectedFileListener());

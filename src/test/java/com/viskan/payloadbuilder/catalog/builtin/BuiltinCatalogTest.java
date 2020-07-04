@@ -48,14 +48,6 @@ public class BuiltinCatalogTest extends Assert
     }
     
     @Test
-    public void test_function_property()
-    {
-        assertFunction(null, null, "property('key')");
-        session.setProperty("key", "value");
-        assertFunction("value", null, "property('key')");
-    }
-    
-    @Test
     public void test_randomInt()
     {
         assertFunction(true, null, "randomInt(10) + 1 > 0");

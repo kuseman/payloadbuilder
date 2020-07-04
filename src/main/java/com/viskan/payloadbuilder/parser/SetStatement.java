@@ -6,27 +6,25 @@ import static org.apache.commons.lang3.StringUtils.join;
 /** Set statement */
 public class SetStatement extends Statement
 {
-    private final String key;
+    private final String scope;
+    private final String name;
     private final Expression expression;
     
-    SetStatement(QualifiedName qname, Expression expression)
+    SetStatement(String scope, QualifiedName qname, Expression expression)
     {
+        this.scope = scope;
+        this.name = join(qname.getParts(), ".");
         this.expression = requireNonNull(expression, "expression");
-        String key;
-        if (qname.getCatalog() != null)
-        {
-            key = qname.getCatalog() + "#" + join(qname.getParts(), ".");
-        }
-        else
-        {
-            key = join(qname.getParts(), ".");
-        }
-        this.key = key;
     }
     
-    public String getKey()
+    public String getScope()
     {
-        return key;
+        return scope;
+    }
+    
+    public String getName()
+    {
+        return name;
     }
     
     public Expression getExpression()

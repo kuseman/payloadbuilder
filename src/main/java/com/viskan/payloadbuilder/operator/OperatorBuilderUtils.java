@@ -33,7 +33,6 @@ class OperatorBuilderUtils
                 .map(e -> e.getQname().getLast())
                 .collect(toList());
 
-//        groupBys.forEach(e -> visit(e, context));
         return new GroupByOperator(
                 nodeId,
                 operator,

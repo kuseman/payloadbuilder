@@ -2,11 +2,11 @@ package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.parser.AExpressionVisitor;
 import com.viskan.payloadbuilder.parser.ComparisonExpression;
+import com.viskan.payloadbuilder.parser.ComparisonExpression.Type;
 import com.viskan.payloadbuilder.parser.Expression;
 import com.viskan.payloadbuilder.parser.LogicalBinaryExpression;
 import com.viskan.payloadbuilder.parser.NestedExpression;
 import com.viskan.payloadbuilder.parser.QualifiedReferenceExpression;
-import com.viskan.payloadbuilder.parser.ComparisonExpression.Type;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
@@ -49,7 +49,7 @@ class PredicateAnalyzer
         {
             return AnalyzeResult.EMPTY;
         }
-        
+
         List<Expression> queue = new ArrayList<>();
         queue.add(predicate);
         List<AnalyzePair> resultItems = new ArrayList<>();
@@ -127,7 +127,7 @@ class PredicateAnalyzer
                 rightColumn = qre.getQname().getLast();
             }
         }
-        
+
         return new AnalyzePair(
                 new AnalyzeItem(left, leftAliases, leftColumn),
                 new AnalyzeItem(right, rightAliases, rightColumn));
@@ -181,7 +181,7 @@ class PredicateAnalyzer
             {
                 return Pair.of(null, this);
             }
-            
+
             Expression result = null;
             int size = pairs.size();
             List<AnalyzePair> leftOvers = new ArrayList<>(size);
@@ -209,7 +209,7 @@ class PredicateAnalyzer
         {
             int size = pairs.size();
             Expression result = null;
-            for (int i=size-1;i>=0;i--)
+            for (int i = size - 1; i >= 0; i--)
             {
                 if (result == null)
                 {
@@ -226,6 +226,12 @@ class PredicateAnalyzer
         /** Return equi items for provided alias */
         public List<AnalyzePair> getEquiPairs(String alias, boolean includeAliasLess)
         {
+            return getEquiPairs(alias, includeAliasLess, false);
+        }
+
+        /** Return equi items for provided alias */
+        public List<AnalyzePair> getEquiPairs(String alias, boolean includeAliasLess, boolean onlySingleAlias)
+        {
             if (pairs.isEmpty())
             {
                 return emptyList();
@@ -233,6 +239,7 @@ class PredicateAnalyzer
             return pairs.stream()
                     .filter(pair -> pair.isEqui(alias)
                         || (includeAliasLess && pair.isEqui("")))
+                    .filter(pair -> !onlySingleAlias || pair.isSingleAlias(alias))
                     .collect(toList());
         }
 
@@ -302,13 +309,15 @@ class PredicateAnalyzer
          */
         public Pair<Expression, Expression> getExpressionPair(String alias, boolean includeAliasLess)
         {
-            if (left.isSingleAlias(alias)
-                || (includeAliasLess && left.isSingleAlias("")))
+            if (left.column != null
+                && (left.isSingleAlias(alias)
+                    || (includeAliasLess && left.isSingleAlias(""))))
             {
                 return Pair.of(left.expression, right.expression);
             }
-            else if (right.isSingleAlias(alias)
-                || (includeAliasLess && right.isSingleAlias("")))
+            else if (right.column != null
+                && (right.isSingleAlias(alias)
+                    || (includeAliasLess && right.isSingleAlias(""))))
             {
                 return Pair.of(right.expression, left.expression);
             }
@@ -322,19 +331,21 @@ class PredicateAnalyzer
          */
         public String getColumn(String alias, boolean includeAliasLess)
         {
-            if (left.isSingleAlias(alias)
-                || (includeAliasLess && left.isSingleAlias("")))
+            if (left.column != null
+                && (left.isSingleAlias(alias)
+                    || (includeAliasLess && left.isSingleAlias(""))))
             {
                 return left.column;
             }
-            else if (right.isSingleAlias(alias)
+            else if (right.column != null
+                && right.isSingleAlias(alias)
                 || (includeAliasLess && right.isSingleAlias("")))
             {
                 return right.column;
             }
             return null;
         }
-        
+
         /** Returns true if this pair is a pushdown for provided alias */
         boolean isPushDown(String alias, boolean includeAliasLess)
         {
@@ -429,7 +440,7 @@ class PredicateAnalyzer
         {
             return aliases != null
                 && (aliases.isEmpty()
-                    || aliases.size() == 1 && aliases.contains(alias));
+                    || (aliases.size() == 1 && aliases.contains(alias)));
         }
 
         @Override

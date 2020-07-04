@@ -33,6 +33,7 @@ import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.SwingConstants;
 import javax.swing.Timer;
+import javax.swing.UIManager;
 import javax.swing.WindowConstants;
 import javax.swing.event.TableModelEvent;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -51,7 +52,16 @@ import org.kordamp.ikonli.swing.FontIcon;
 /** Content of a query editor. Text editor and a result panel separated with a split panel */
 class QueryFileView extends JPanel
 {
+    private static final int VIEW_LENGTH_OF_COMPLEX_VALUES = 50;
     private static final int COLUMN_ADJUST_ROW_LIMIT = 30;
+    private static final Color TABLE_NULL_BACKGROUND = new Color(255, 253, 237);
+    private static final Color TABLE_REGULAR_BACKGROUND = UIManager.getColor("Table.dropCellBackground");
+    private static final Icon CHECK_CIRCLE_ICON = FontIcon.of(FontAwesome.CHECK_CIRCLE);
+    private static final Icon PLAY_ICON = FontIcon.of(FontAwesome.PLAY);
+    private static final Icon CLOSE_ICON = FontIcon.of(FontAwesome.CLOSE);
+    private static final Icon WARNING_ICON = FontIcon.of(FontAwesome.WARNING);
+    private static final Icon EXTERNAL_LINK = FontIcon.of(FontAwesome.EXTERNAL_LINK);
+    
     private final JSplitPane splitPane;
     private final TextEditorPane textEditor;
     private final JTabbedPane resultTabs;
@@ -62,14 +72,11 @@ class QueryFileView extends JPanel
     private final JLabel labelRowCount;
     private final JLabel labelExecutionStatus;
     private final Timer executionTimer;
+    private final PrintStream messagePrintStream;
 
     private boolean resultCollapsed;
     private int prevDividerLocation;
 
-    private final static Icon CHECK_CIRCLE_ICON = FontIcon.of(FontAwesome.CHECK_CIRCLE);
-    private final static Icon PLAY_ICON = FontIcon.of(FontAwesome.PLAY);
-    private final static Icon CLOSE_ICON = FontIcon.of(FontAwesome.CLOSE);
-    private final static Icon WARNING_ICON = FontIcon.of(FontAwesome.WARNING);
 
     QueryFileView(
             QueryFileModel file,
@@ -144,7 +151,7 @@ class QueryFileView extends JPanel
         });
         
         // Redirect query sessions output to messages text area
-        PrintStream ps = new PrintStream(new OutputStream()
+        messagePrintStream = new PrintStream(new OutputStream()
         {
             @Override
             public void write(int b) throws IOException
@@ -154,7 +161,7 @@ class QueryFileView extends JPanel
             }
         });
         
-        file.getQuerySession().setPrintStream(ps);
+        file.getQuerySession().setPrintStream(messagePrintStream);
     }
 
     private void handleStateChanged()
@@ -178,7 +185,7 @@ class QueryFileView extends JPanel
                 break;
             case ABORTED:
                 setExecutionStats();
-                messages.setText("Query was aborted!");
+                messagePrintStream.println("Query was aborted!");
                 executionTimer.stop();
                 break;
             case ERROR:
@@ -196,6 +203,9 @@ class QueryFileView extends JPanel
         {
             resultTabs.setSelectedIndex(1);
         }
+        
+        revalidate();
+        repaint();
     }
 
     private void handleResultModelAdded()
@@ -216,6 +226,7 @@ class QueryFileView extends JPanel
                 // This result set is complete
                 || resultModel.isComplete()))
             {
+//                System.out.println("Adjust");
                 columnAdjuster.adjustColumns();
                 columnsAdjusted.set(true);
             }
@@ -294,9 +305,7 @@ class QueryFileView extends JPanel
             }
         };
         resultTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-        //        result.setRowSelectionAllowed(true);
         resultTable.setCellSelectionEnabled(true);
-        //        result.setColumnSelectionAllowed(true);
         resultTable.setDefaultRenderer(Object.class, new DefaultTableCellRenderer()
         {
             @Override
@@ -307,8 +316,8 @@ class QueryFileView extends JPanel
                 // Add icon to map/list results to indicate click-ability
                 if (value instanceof Collection || value instanceof Map)
                 {
-                    setIcon(FontIcon.of(FontAwesome.EXTERNAL_LINK));
-                    setText(ResultModel.getLabel(value, 10));
+                    setIcon(EXTERNAL_LINK);
+                    setText(ResultModel.getLabel(value, VIEW_LENGTH_OF_COMPLEX_VALUES));
                     setHorizontalTextPosition(SwingConstants.TRAILING);
                     setAlignmentX(SwingConstants.LEFT);
                 }
@@ -316,6 +325,20 @@ class QueryFileView extends JPanel
                 {
                     setIcon(null);
                 }
+                
+                if (value == null)
+                {
+                    setText("NULL");
+                    if (!isSelected)
+                    {
+                        setBackground(TABLE_NULL_BACKGROUND);
+                    }
+                }
+                else if (!isSelected)
+                {
+                    setBackground(TABLE_REGULAR_BACKGROUND);
+                }
+                
                 return this;
             }
         });
@@ -340,6 +363,7 @@ class QueryFileView extends JPanel
                         rta.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JSON);
                         rta.setCodeFoldingEnabled(true);
                         rta.setText(ResultModel.getPrettyJson(value));
+                        rta.setCaretPosition(0);
                         rta.setEditable(false);
                         RTextScrollPane sp = new RTextScrollPane(rta);
                         frame.getContentPane().add(sp);
@@ -363,16 +387,6 @@ class QueryFileView extends JPanel
         return resultTable;
     }
 
-    JTextArea getMessagesTextArea()
-    {
-        return messages;
-    }
-
-    //    ResultModel getResultModel()
-    //    {
-    //        return resultModel;
-    //    }
-
     private Icon getIconFromState(State state)
     {
         switch (state)
@@ -394,6 +408,11 @@ class QueryFileView extends JPanel
     {
         labelRunTime.setText(DurationFormatUtils.formatDurationHMS(file.getExecutionTime()));
         labelRowCount.setText(String.valueOf(file.getResults().stream().mapToInt(r -> r.getActualRowCount()).sum()));
+        if (file.getResults().size() > 0)
+        {
+            ResultModel currentModel = file.getResults().get(file.getResults().size() - 1);
+            currentModel.notifyChanges();
+        }
     }
 
     int getCaretLineNumber()

@@ -14,18 +14,16 @@ import java.util.Map;
 import java.util.Stack;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.time.StopWatch;
 import org.apache.commons.lang3.tuple.Pair;
 
 /** Class the executes queries etc. */
 class PayloadbuilderService
 {
     private static final AtomicInteger THREAD_ID = new AtomicInteger(1);
-    private static final Executor EXECUTOR = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2, r -> 
+    private static final Executor EXECUTOR = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2, r ->
     {
         Thread thread = new Thread(r);
         thread.setDaemon(true);
@@ -42,8 +40,8 @@ class PayloadbuilderService
         EXECUTOR.execute(() ->
         {
             file.setState(State.EXECUTING);
-            StopWatch sw = new StopWatch();
-            sw.start();
+//            StopWatch sw = new StopWatch();
+//            sw.start();
             try
             {
                 file.getQuerySession().setAbortSupplier(() -> file.getState() == State.ABORTED);
@@ -58,16 +56,21 @@ class PayloadbuilderService
                     ResultModel resultModel = new ResultModel(file);
                     file.addResult(resultModel);
                     setupColumns(resultModel, queryResult.getResultMetaData());
-    
+
                     ObjectWriter writer = new ObjectWriter(
-                            file,
-                            sw,
+//                            file,
+//                            sw,
                             resultModel);
-    
+
                     queryResult.writeResult(writer);
-    
+
                     resultModel.done();
-                    file.getQuerySession().getPrintStream().append(String.valueOf(resultModel.getActualRowCount())).append(" row(s) selected").append(System.lineSeparator());
+                    file
+                            .getQuerySession()
+                            .printLine(
+                                    String.valueOf(resultModel.getActualRowCount())
+                                        + " row(s) selected"
+                                        + System.lineSeparator());
                 }
 
                 if (file.getState() == State.EXECUTING)
@@ -113,14 +116,14 @@ class PayloadbuilderService
     {
         private final Stack<Object> parent = new Stack<>();
         private final Stack<String> currentField = new Stack<>();
-        private final QueryFileModel file;
-        private final StopWatch stopWatch;
+//        private final QueryFileModel file;
+//        private final StopWatch stopWatch;
         private final ResultModel resultModel;
 
-        ObjectWriter(QueryFileModel file, StopWatch stopWatch, ResultModel resultModel)
+        ObjectWriter(/*QueryFileModel file,/* StopWatch stopWatch, */ResultModel resultModel)
         {
-            this.file = file;
-            this.stopWatch = stopWatch;
+//            this.file = file;
+//            this.stopWatch = stopWatch;
             this.resultModel = resultModel;
         }
 
@@ -146,12 +149,11 @@ class PayloadbuilderService
 
             return result;
         }
-
+        
         @Override
         public void endRow()
         {
             resultModel.addRow(getValue(resultModel.getRowCount() + 1));
-            file.setExecutionTime(stopWatch.getTime(TimeUnit.MILLISECONDS));
         }
 
         @Override

@@ -28,7 +28,7 @@ miscStatement
  ;
 
 setStatement
- : SET qname EQUALS expression
+ : SET (scope=SESSION)? qname EQUALS expression
  ;
 
 controlFlowStatement
@@ -83,13 +83,21 @@ tableSourceJoined
  ;
 
 tableSource
- : qname				identifier? (WITH '(' tableOptions+=table_with_option (',' tableOptions+=table_with_option)* ')' )?
- | functionCall			identifier?
+ : tableName			identifier? tableSourceOptions?
+ | functionCall			identifier? tableSourceOptions?
  | populateQuery		identifier?
  ;
 
-table_with_option
- : BATCH_SIZE EQUALS size=NUMBER					#batchSize
+tableSourceOptions
+ : WITH '(' options+=tableSourceOption (',' tableOptions+=tableSourceOption)* ')'
+ ;
+
+tableSourceOption
+ : qname EQUALS expression
+ ;
+ 
+tableName
+ : (catalog=identifier '#')? qname
  ;
 
 joinPart
@@ -145,11 +153,12 @@ primary
  | '(' identifier (',' identifier)+ ')' '->' expression  	#lambdaExpression
  | value=primary '[' index=expression ']'    				#subscript	
  | namedParameter											#namedParameterExpression
+ | variable													#variableExpression
  | '(' expression ')' 										#nestedExpression			
  ;
 
 functionCall
- : qname '(' ( arguments+=expression (',' arguments+=expression)*)? ')'
+ : (catalog=identifier '#')? function=identifier '(' ( arguments+=expression (',' arguments+=expression)*)? ')'
  ;
  
 literal
@@ -158,6 +167,10 @@ literal
  | numericLiteral											
  | decimalLiteral											
  | stringLiteral											
+ ;
+ 
+variable
+ : '@' qname
  ;
  
 namedParameter
@@ -174,7 +187,7 @@ compareOperator
  ; 
 
 qname
- : (catalog=identifier '#')? parts+=identifier ('.' parts+=identifier)*
+ : parts+=identifier ('.' parts+=identifier)*
  ;
 
 identifier
@@ -237,6 +250,7 @@ ORDERBY	     : O R D E R ' ' B Y;
 OUTER        : O U T E R;
 PRINT        : P R I N T;
 SELECT	     : S E L E C T;
+SESSION		 : S E S S I O N;
 SET			 : S E T;
 THEN		 : T H E N;
 TRUE	     : T R U E;
@@ -271,7 +285,7 @@ STRING
  ;
 
 IDENTIFIER
- : (LETTER | '_') (LETTER | DIGIT | '_' | '@')*
+ : (LETTER | '_') (LETTER | DIGIT | '_')*
  ;
 
 QUOTED_IDENTIFIER

@@ -3,10 +3,10 @@ package com.viskan.payloadbuilder;
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.CatalogRegistry;
 import com.viskan.payloadbuilder.catalog.FunctionInfo;
-import com.viskan.payloadbuilder.parser.QualifiedName;
 
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.StringUtils.lowerCase;
 
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
@@ -21,13 +21,13 @@ import java.util.function.BooleanSupplier;
  **/
 public class QuerySession
 {
+    private static final String CATALOG = "catalog";
     private static final String DEFAULTCATALOG = "defaultCatalog";
-
     private final CatalogRegistry catalogRegistry;
-    private Map<String, Object> properties;
+    private Map<String, Object> variables;
     private PropertyChangeSupport pcs;
     private Catalog defaultCatalog;
-    private PrintStream printStream = System.out;
+    private PrintStream printStream;
     private BooleanSupplier abortSupplier;
 
     private final Map<String, Object> parameters;
@@ -41,12 +41,6 @@ public class QuerySession
     {
         this.catalogRegistry = requireNonNull(catalogRegistry, "catalogRegistry");
         this.parameters = requireNonNull(parameters, "parameters");
-    }
-    
-    /** Get print stream */
-    public PrintStream getPrintStream()
-    {
-        return printStream;
     }
     
     /** Set print stream */
@@ -100,32 +94,46 @@ public class QuerySession
         }
     }
 
-    /** Set a property to session */
-    public void setProperty(String key, Object value)
+    /** Set a variable to session */
+    public void setVariable(String name, Object value)
     {
-        if (properties == null)
+        if (variables == null)
         {
-            properties = new HashMap<>();
+            variables = new HashMap<>();
         }
 
-        Object oldValue = properties.put(key, value);
+        // Default catalog key
+        if (CATALOG.equals(lowerCase(name)))
+        {
+            String catalogName = String.valueOf(value);
+            Catalog c = catalogRegistry.getCatalog(String.valueOf(catalogName));
+            if (c == null)
+            {
+                throw new IllegalArgumentException("Cannot find a catalog named " + catalogName);
+            }
+            setDefaultCatalog(c);
+            return;
+        }
+        
+        Object oldValue = variables.put(name, value);
         if (!Objects.equals(oldValue, value))
         {
             if (pcs != null)
             {
-                pcs.firePropertyChange(key, oldValue, value);
+                pcs.firePropertyChange(name, oldValue, value);
             }
         }
     }
 
     /** Get property by key */
-    public Object getProperty(String key)
+    public Object getVariable(String name)
     {
-        if (properties == null)
+        if (variables == null)
         {
             return null;
         }
-        return properties.get(key);
+        
+        return variables.get(name);
     }
 
     /** Add property change listener */
@@ -148,19 +156,28 @@ public class QuerySession
         pcs.removePropertyChangeListener(listener);
     }
     
-    /** Resolves function info from provided */
-    public FunctionInfo resolveFunctionInfo(QualifiedName qname, int functionId)
+    /** Print value to print stream if set */
+    public void printLine(Object value)
     {
-        // Todo: store lookup
-        
+        if (printStream != null)
+        {
+            printStream.println(value);
+        }
+    }
+    
+    /** Resolves function info from provided 
+     * @param functionId Unique function id to cache a lookup
+     * */
+    public FunctionInfo resolveFunctionInfo(String catalogName, String function, int functionId)
+    {
         Catalog catalog;
-        if (qname.getCatalog() == null)
+        if (catalogName == null)
         {
             catalog = catalogRegistry.getBuiltin();
         }
         else
         {
-            catalog = catalogRegistry.getCatalog(qname.getCatalog());
+            catalog = catalogRegistry.getCatalog(catalogName);
         }
         
         if (catalog == null)
@@ -168,7 +185,6 @@ public class QuerySession
             return null;
         }
         
-        
-        return catalog.getFunction(qname.getFirst()) ;
+        return catalog.getFunction(function) ;
     }
 }

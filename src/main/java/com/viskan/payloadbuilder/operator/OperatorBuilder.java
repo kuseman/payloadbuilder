@@ -18,6 +18,7 @@ import com.viskan.payloadbuilder.parser.Join.JoinType;
 import com.viskan.payloadbuilder.parser.LogicalBinaryExpression;
 import com.viskan.payloadbuilder.parser.NestedSelectItem;
 import com.viskan.payloadbuilder.parser.NestedSelectItem.Type;
+import com.viskan.payloadbuilder.parser.ParseException;
 import com.viskan.payloadbuilder.parser.PopulateTableSource;
 import com.viskan.payloadbuilder.parser.QualifiedName;
 import com.viskan.payloadbuilder.parser.Select;
@@ -26,16 +27,16 @@ import com.viskan.payloadbuilder.parser.SelectStatement;
 import com.viskan.payloadbuilder.parser.SortItem;
 import com.viskan.payloadbuilder.parser.Table;
 import com.viskan.payloadbuilder.parser.TableFunction;
-import com.viskan.payloadbuilder.parser.TableOption.BatchSizeOption;
+import com.viskan.payloadbuilder.parser.TableOption;
 import com.viskan.payloadbuilder.parser.TableSource;
 import com.viskan.payloadbuilder.parser.TableSourceJoined;
 
 import static com.viskan.payloadbuilder.operator.OperatorBuilderUtils.createGroupBy;
 import static com.viskan.payloadbuilder.utils.CollectionUtils.asSet;
 import static java.util.Collections.emptyList;
-import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
+import static org.apache.commons.lang3.StringUtils.lowerCase;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,6 +45,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiFunction;
 
+import org.antlr.v4.runtime.Token;
 import org.apache.commons.lang3.tuple.Pair;
 
 import gnu.trove.map.hash.THashMap;
@@ -53,6 +55,8 @@ import gnu.trove.map.hash.THashMap;
  */
 public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Context>
 {
+    private static final String BATCH_LIMIT = "batch_limit";
+
     private static final OperatorBuilder VISITOR = new OperatorBuilder();
 
     private static final BiFunction<String, TableAlias, RuntimeException> MULTIPLE_ALIAS_EXCEPTION = (alias,
@@ -84,11 +88,9 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         /** Index if any that should be picked up when creating table operator */
         private Index index;
-        
+
         /** Predicate pushed down from join to table source */
         private final Map<String, Expression> pushDownPredicateByAlias = new THashMap<>();
-
-
 
         /** Acquire next unique node id */
         private int acquireNodeId()
@@ -170,16 +172,82 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         return Pair.of(context.operator, context.projection);
     }
 
+    /** Class containing information needed to build a index operator */
+    private static class IndexOperatorFoundation
+    {
+        final List<Expression> outerValueExpressions;
+        final List<Expression> innerValueExpressions;
+        final List<AnalyzePair> indexPairs;
+        final AnalyzeResult leftOverAnalyzeResult;
+        
+        IndexOperatorFoundation(
+                String alias,
+                Index index,
+                List<AnalyzePair> analyzePairs,
+                List<AnalyzePair> equiPairs)
+        {
+            int size = equiPairs.size();
+            outerValueExpressions = new ArrayList<>(size);
+            innerValueExpressions = new ArrayList<>(size);
+            indexPairs = new ArrayList<>(size);
+            
+            populateValueExtractors(
+                    alias,
+                    equiPairs,
+                    index,
+                    outerValueExpressions,
+                    innerValueExpressions,
+                    indexPairs);
+            List<AnalyzePair> pairs = new ArrayList<>(analyzePairs);
+            pairs.removeAll(indexPairs);
+
+            // Remove all pushdown candidates from index items,
+            // these are contained within index and no need to push down
+            // and is neither needed in join condition
+            indexPairs.removeIf(pair -> pair.isPushDown(alias, true));
+
+            // Create a new analyze result from resulting pairs
+            pairs.addAll(indexPairs);
+            this.leftOverAnalyzeResult = new AnalyzeResult(pairs);
+        }
+    }
+    
     @Override
     public Void visit(Select query, Context context)
     {
         TableSourceJoined tsj = query.getFrom();
-        List<AJoin> joins = tsj != null? tsj.getJoins() : emptyList();
+        List<AJoin> joins = tsj != null ? tsj.getJoins() : emptyList();
         int joinSize = joins.size();
-        
+
         Expression where = query.getWhere();
+        AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(where);
+        
+        Index index = null;
+        List<Expression> outerValuesExpressions = null;
+        
+        // Anaylyze where to see if there is a potential index access
+        if (tsj != null && tsj.getTableSource().getTable() != null)
+        {
+            TableSource ts = tsj.getTableSource();
+            List<AnalyzePair> equiPairs = analyzeResult.getEquiPairs(ts.getAlias(), true, true);
+            if (!equiPairs.isEmpty())
+            {
+                Catalog catalog = getCatalog(context, ts.getCatalog(), ts.getToken());
+                index = getIndex(equiPairs, ts.getAlias(), catalog.getIndices(ts.getTable()));
+            }
+            
+            if (index != null)
+            {
+                IndexOperatorFoundation foundation = new IndexOperatorFoundation(ts.getAlias(), index, analyzeResult.pairs, equiPairs);
+                outerValuesExpressions = foundation.outerValueExpressions;
+                analyzeResult = foundation.leftOverAnalyzeResult;
+                where = analyzeResult.getPredicate();
+            }
+        } 
+        
+        
         Expression pushDownPredicate = null;
-        if (where != null && joinSize > 0)
+        if (joinSize > 0)
         {
             /* TODO:
               Push down can applied to non populating joins ie:
@@ -192,9 +260,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
               where s.id > 0        <--- Pushed down to source (DONE!)
               and a.id2 < 10        <--- Can be pushed to article
               and b.id3 != 10       <--- can be pushed to brand
-
+            
             */
-            AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(where);
             Pair<Expression, AnalyzeResult> pair = analyzeResult.extractPushdownPredicate(tsj.getTableSource().getAlias(), true);
             if (pair.getKey() != null)
             {
@@ -203,21 +270,26 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             }
         }
 
-        
-        int batchSize = -1;
+        TableOption batchLimitOption = null;
         int batchLimitId = -1;
         // No need to batch when there is no joins
         if (joinSize > 0)
         {
-            batchSize = getBatchSize(tsj.getTableSource());
+            batchLimitOption = getBatchLimitoption(tsj.getTableSource());
         }
-        // TODO: Utilize index of "from" clause if applicable
+        // TODO: Utilize index for "from" table source using it's where
         //       ie. s.id = 10, s.id in (1,2,3,4,5)
+        
         if (tsj != null)
         {
+            context.index = index;
             tsj.getTableSource().accept(this, context);
+            if (outerValuesExpressions != null)
+            {
+                context.operator = new OuterValuesOperator(context.acquireNodeId(), context.operator, outerValuesExpressions);
+            }
         }
-        
+
         // Collect columns from pushed down predicate
         if (pushDownPredicate != null)
         {
@@ -225,10 +297,10 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             visit(pushDownPredicate, context);
         }
 
-        if (batchSize > 0)
+        if (batchLimitOption != null)
         {
             batchLimitId = context.acquireNodeId();
-            context.operator = new BatchLimitOperator(batchLimitId, context.operator, batchSize);
+            context.operator = new BatchLimitOperator(batchLimitId, context.operator, batchLimitOption.getValueExpression());
         }
 
         for (int i = 0; i < joinSize; i++)
@@ -249,7 +321,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             context.operator = createGroupBy(context.acquireNodeId(), tsj.getTableSource().getAlias(), groupBys, context.operator);
         }
 
-        if (batchSize > 0)
+        if (batchLimitOption != null)
         {
             context.operator = new BatchRepeatOperator(context.acquireNodeId(), batchLimitId, context.operator);
         }
@@ -452,7 +524,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         {
             sortBys.forEach(si -> si.accept(this, context));
         }
-        
+
         // Restore values before leaving
         context.parent = parent;
         return null;
@@ -461,17 +533,17 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     @Override
     public Void visit(Table table, Context context)
     {
-        Pair<Catalog, QualifiedName> pair = getCatalogAndTable(context, table.getTable());
-        TableAlias alias = context.appendTableAlias(pair.getValue(), table.getAlias(), null);
+        Catalog catalog = getCatalog(context, table.getCatalog(), table.getToken());
+        TableAlias alias = context.appendTableAlias(table.getTable(), table.getAlias(), null);
         int nodeId = context.acquireNodeId();
         if (context.index != null)
         {
-            context.operator = pair.getKey().getIndexOperator(nodeId, alias, context.index);
+            context.operator = catalog.getIndexOperator(nodeId, table.getCatalog(), alias, context.index, table.getTableOptions());
             context.index = null;
         }
         else
         {
-            context.operator = pair.getKey().getScanOperator(nodeId, alias);
+            context.operator = catalog.getScanOperator(nodeId, table.getCatalog(), alias, table.getTableOptions());
         }
         return null;
     }
@@ -517,22 +589,15 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     //        return isCorrelated;
     //    }
 
-    /** Returns a batch size if any on provided table source */
-    private int getBatchSize(TableSource ts)
+    /** Reutrn a batch limit option for provided table source (if any) */
+    private TableOption getBatchLimitoption(TableSource ts)
     {
-        if (ts instanceof Table)
-        {
-            Table table = (Table) ts;
-            return table
-                    .getOptions()
-                    .stream()
-                    .filter(o -> o instanceof BatchSizeOption)
-                    .mapToInt(o -> ((BatchSizeOption) o).getBatchSize())
-                    .findFirst()
-                    .orElse(-1);
-        }
-
-        return -1;
+        return ts
+                .getTableOptions()
+                .stream()
+                .filter(o -> BATCH_LIMIT.equals(lowerCase(o.getOption().toString())))
+                .findFirst()
+                .orElse(null);
     }
 
     private void join(
@@ -607,45 +672,17 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         if (innerTableSource.getTable() != null)
         {
-            Pair<Catalog, QualifiedName> pair = getCatalogAndTable(context, innerTableSource.getTable());
-            Catalog catalog = pair.getKey();
-            QualifiedName table = pair.getValue();
+            Catalog catalog = getCatalog(context, innerTableSource.getCatalog(), innerTableSource.getToken());
+            QualifiedName table = innerTableSource.getTable();
             indices = catalog.getIndices(table);
         }
         // TODO: If outer is ordered and no inner indices
         // then the inner could be created and after check it's order for a potential
         // MergeJoin
 
-        /* Extract all references inner columns from equi items */
-        Set<String> columnItems = equiPairs
-                .stream()
-                .map(pair -> pair.getColumn(innerAlias, true))
-                .filter(Objects::nonNull)
-                .collect(toSet());
-
-        Index index = null;
-
-        if (!columnItems.isEmpty())
-        {
-            /* Find the first matching index from extracted columns above */
-            index = indices
-                    .stream()
-                    .filter(i -> columnItems.containsAll(i.getColumns()))
-                    .findFirst()
-                    .orElse(null);
-        }
-
-        List<Expression> outerValueExpressions = new ArrayList<>(equiPairSize);
-        List<Expression> innerValueExpressions = new ArrayList<>(equiPairSize);
-        List<AnalyzePair> indexPairs = new ArrayList<>(equiPairSize);
-        populateValueExtractors(
-                innerAlias,
-                equiPairs,
-                index,
-                outerValueExpressions,
-                innerValueExpressions,
-                indexPairs);
-
+        Index index = getIndex(equiPairs, innerAlias, indices);
+        IndexOperatorFoundation foundation = new IndexOperatorFoundation(innerAlias, index, analyzeResult.pairs, equiPairs);
+        
         // No indices for inner -> HashJoin
         if (index == null)
         {
@@ -654,34 +691,22 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             Operator inner = wrapWithPushDown(context, context.operator, innerAlias);
 
             return new HashJoin(
-                    context.acquireNodeId(),                    
+                    context.acquireNodeId(),
                     logicalOperator,
                     outer,
                     inner,
                     // Collect outer hash expressions
-                    new ExpressionHashFunction(outerValueExpressions),
+                    new ExpressionHashFunction(foundation.outerValueExpressions),
                     // Collect inner hash expression
-                    new ExpressionHashFunction(innerValueExpressions),
+                    new ExpressionHashFunction(foundation.innerValueExpressions),
                     new ExpressionPredicate(condition),
                     DefaultRowMerger.DEFAULT,
                     populating,
                     emitEmptyOuterRows);
         }
-
-        List<AnalyzePair> pairs = new ArrayList<>(analyzeResult.pairs);
-        pairs.removeAll(indexPairs);
-
-        // Remove all pushdown candidates from index items,
-        // these are contained within index and no need to push down
-        // and is neither needed in join condition
-        indexPairs.removeIf(pair -> pair.isPushDown(innerAlias, true));
-
-        // Create a new analyze result from resulting pairs
-        pairs.addAll(indexPairs);
-        analyzeResult = new AnalyzeResult(pairs);
-
+        
         // Extract pushdown and new join condition
-        condition = extractPushDownPredicate(context, innerAlias, emitEmptyOuterRows, analyzeResult);
+        condition = extractPushDownPredicate(context, innerAlias, emitEmptyOuterRows, foundation.leftOverAnalyzeResult);
         context.index = index;
         innerTableSource.accept(this, context);
         if (context.index != null)
@@ -690,9 +715,9 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         }
         Operator inner = wrapWithPushDown(context, context.operator, innerAlias);
 
-        constantalizeValueExtractors(outerValueExpressions, innerValueExpressions);
-        ExpressionValuesExtractor outerValuesExtractor = new ExpressionValuesExtractor(outerValueExpressions);
-        ExpressionValuesExtractor innerValuesExtractor = new ExpressionValuesExtractor(innerValueExpressions);
+        constantalizeValueExtractors(foundation.outerValueExpressions, foundation.innerValueExpressions);
+        ExpressionValuesExtractor outerValuesExtractor = new ExpressionValuesExtractor(foundation.outerValueExpressions);
+        ExpressionValuesExtractor innerValuesExtractor = new ExpressionValuesExtractor(foundation.innerValueExpressions);
 
         return new BatchHashJoin(
                 context.acquireNodeId(),
@@ -737,6 +762,30 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         //        throw new RuntimeException("No operator could be created for join");
     }
+    
+    private Index getIndex(List<AnalyzePair> equiPairs, String alias, List<Index> indices)
+    {
+        /* Extract all references inner columns from equi items */
+        Set<String> columnItems = equiPairs
+                .stream()
+                .map(pair -> pair.getColumn(alias, true))
+                .filter(Objects::nonNull)
+                .collect(toSet());
+
+        Index index = null;
+
+        if (!columnItems.isEmpty())
+        {
+            /* Find the first matching index from extracted columns above */
+            index = indices
+                    .stream()
+                    .filter(i -> columnItems.containsAll(i.getColumns()))
+                    .findFirst()
+                    .orElse(null);
+        }
+        
+        return index;
+    }
 
     /**
      * <pre>
@@ -760,7 +809,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
      *    [a.club_id,     10]
      * </pre>
      **/
-    private void populateValueExtractors(
+    private static void populateValueExtractors(
             String innerAlias,
             List<AnalyzePair> equiPairs,
             Index index,
@@ -873,25 +922,24 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     }
 
     /** Fetch catalog and resulting qualifed name from provided table */
-    private Pair<Catalog, QualifiedName> getCatalogAndTable(Context context, final QualifiedName table)
+    private Catalog getCatalog(Context context, String catalogName, Token token)
     {
-        requireNonNull(table, "table");
-        QualifiedName tableName = table;
-        Catalog catalog = context.session.getCatalogRegistry().getCatalog(tableName.getFirst());
-        if (catalog == null)
+        if (catalogName == null)
         {
-            catalog = context.session.getDefaultCatalog();
+            Catalog catalog = context.session.getDefaultCatalog();
             if (catalog == null)
             {
-                throw new IllegalArgumentException("No default catalog set");
+                throw new ParseException("No default catalog set", token);
             }
-        }
-        else
-        {
-            // Remove catalog name from table name
-            tableName = tableName.extract(1, tableName.getParts().size());
+            return catalog;
         }
 
-        return Pair.of(catalog, tableName);
+        Catalog catalog = context.session.getCatalogRegistry().getCatalog(catalogName);
+        if (catalog == null)
+        {
+            throw new ParseException("No catalog found with name " + catalogName, token);
+        }
+
+        return catalog;
     }
 }

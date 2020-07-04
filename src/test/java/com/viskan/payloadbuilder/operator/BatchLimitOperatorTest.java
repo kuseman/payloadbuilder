@@ -2,6 +2,7 @@ package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.LiteralExpression;
 import com.viskan.payloadbuilder.parser.QualifiedName;
 
 import java.util.Iterator;
@@ -17,7 +18,7 @@ public class BatchLimitOperatorTest extends AOperatorTest
     {
         TableAlias alias = TableAlias.of(null, QualifiedName.of("a"), "a");
         Operator op = ctx -> IntStream.range(0, 10).mapToObj(i -> Row.of(alias, i, new Object[] {i} )).iterator();                
-        Operator limitOp = new BatchLimitOperator(0, op, 5);
+        Operator limitOp = new BatchLimitOperator(0, op, LiteralExpression.create(5));
         
         ExecutionContext ctx = new ExecutionContext(session);
         Iterator<Row> it = limitOp.open(ctx);

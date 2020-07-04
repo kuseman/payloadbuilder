@@ -53,14 +53,21 @@ class BatchRepeatOperator extends AOperator
                     if (it == null)
                     {
                         it = operator.open(context);
-                        if (!it.hasNext())
-                        {
-                            return false;
-                        }
                         continue;
                     }
                     else if (!it.hasNext())
                     {
+                        BatchLimitData batchLimitData = context.getOperatorContext().getNodeData(targetNodeId);
+                        if (batchLimitData == null)
+                        {
+                            throw new OperatorException("Missing node data for target node id: " + targetNodeId);
+                        }
+                        
+                        if (batchLimitData.isComplete())
+                        {
+                            return false;
+                        }
+                        
                         it = null;
                         continue;
                     }
@@ -81,5 +88,13 @@ class BatchRepeatOperator extends AOperator
         return desc + System.lineSeparator()
             +
             indentString + operator.toString(indent + 1);
-    }    
+    }  
+    
+    /** Definition of batch limit data. Provided by {@link BatchLimitOperator} and read
+     * by {@link BatchRepeatOperator} */
+    interface BatchLimitData
+    {
+        /** Returns true if the the limit operator complete */
+        boolean isComplete();
+    }
 }

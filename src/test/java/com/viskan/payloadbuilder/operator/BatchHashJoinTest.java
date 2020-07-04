@@ -26,7 +26,6 @@ import org.junit.Test;
 /** Test {@link BatchHashJoin} */
 public class BatchHashJoinTest extends AOperatorTest
 {
-
     @Test
     public void test_inner_join_empty_outer()
     {

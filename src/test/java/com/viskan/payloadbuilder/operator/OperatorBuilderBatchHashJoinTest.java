@@ -6,6 +6,7 @@ import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.parser.ExecutionContext;
 import com.viskan.payloadbuilder.parser.QualifiedName;
 import com.viskan.payloadbuilder.parser.Select;
+import com.viskan.payloadbuilder.parser.TableOption;
 
 import static com.viskan.payloadbuilder.utils.MapUtils.entry;
 import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
@@ -24,6 +25,38 @@ import org.junit.Test;
 /** Test of {@link OperatorBuilder} with index on tables */
 public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 {
+    @Test
+    public void test_index_access_on_from()
+    {
+        String queryString = "SELECT a.art_if FROM article a WHERE 10 = a.art_id AND a.active_flg";
+        List<Operator> operators = new ArrayList<>();
+        Catalog c = catalog(ofEntries(
+                entry("article", asList("art_id"))
+                ), operators);
+        session.setDefaultCatalog(c);
+        
+        Select select = parser.parseSelect(queryString);
+        Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
+        
+        Operator expected = new FilterOperator(
+                2,
+                new OuterValuesOperator(1, operators.get(0), asList(e("10"))),
+                new ExpressionPredicate(e("a.active_flg")));
+
+        System.err.println(pair.getKey().toString(1));
+        System.out.println(expected.toString(1));
+        
+        assertEquals(expected, pair.getKey());
+        
+        /*
+         *  OuterValuesOperator
+         *    indexScan ( 
+         * 
+         * 
+         */
+        
+    }
+    
     @Test
     public void test_nested_inner_join_with_pushdown()
     {
@@ -268,7 +301,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             }
 
             @Override
-            public Operator getScanOperator(int nodeId, TableAlias alias)
+            public Operator getScanOperator(int nodeId, String catalogAlias, TableAlias alias, List<TableOption> tableOptions)
             {
                 Operator op = op("scan " + alias.getTable().toString());
                 operators.add(op);
@@ -276,7 +309,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             }
 
             @Override
-            public Operator getIndexOperator(int nodeId, TableAlias alias, Index index)
+            public Operator getIndexOperator(int nodeId, String catalogAlias, TableAlias alias, Index index, List<TableOption> tableOptions)
             {
                 Operator op = op("index " + alias.getTable().toString());
                 operators.add(op);

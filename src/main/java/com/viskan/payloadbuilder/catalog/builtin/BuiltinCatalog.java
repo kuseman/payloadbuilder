@@ -34,7 +34,6 @@ public class BuiltinCatalog
         catalog.registerFunction(new CountFunction(catalog));
         catalog.registerFunction(new IsNullFunction(catalog));
         catalog.registerFunction(new CoalesceFunction(catalog));
-        catalog.registerFunction(new PropertyFunction(catalog));
         
         // Table functions
         catalog.registerFunction(new Range(catalog));

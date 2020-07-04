@@ -20,7 +20,7 @@ public class QualifiedReferenceExpressionTest extends AParserTest
     @Test
     public void test_QualifiedReferenceContainer()
     {
-        QualifiedReferenceExpression.QualifiedReferenceContainer c = new QualifiedReferenceContainer(new QualifiedName(null, asList("a", "b", "c")));
+        QualifiedReferenceExpression.QualifiedReferenceContainer c = new QualifiedReferenceContainer(new QualifiedName(asList("a", "b", "c")));
         
         assertNull(c.getValue((Row) null));
         assertNull(c.getValue(IteratorUtils.emptyIterator()));
@@ -40,7 +40,7 @@ public class QualifiedReferenceExpressionTest extends AParserTest
     @Test
     public void test_evaluation()
     {
-        QualifiedReferenceExpression e = new QualifiedReferenceExpression(new QualifiedName(null, asList("a", "b", "c")), -1);
+        QualifiedReferenceExpression e = new QualifiedReferenceExpression(new QualifiedName(asList("a", "b", "c")), -1);
         ExecutionContext ctx = new ExecutionContext(new QuerySession(new CatalogRegistry()));
         
         TableAlias a = TableAlias.of(null, "art", "a");

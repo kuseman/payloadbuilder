@@ -21,6 +21,7 @@ public class TableAlias
     private final String alias;
     private final List<TableAlias> childAliases = new ArrayList<>();
     private String[] columns;
+    private String rootPath;
     // Index of rows of this type in parent row
     private int parentIndex;
 
@@ -69,6 +70,24 @@ public class TableAlias
     {
         return childAliases;
     }
+    
+    /** Get root path from alias */
+    public String getRootPath()
+    {
+        if (rootPath == null)
+        {
+            StringBuilder sb = new StringBuilder();
+            TableAlias current = this;
+            while (current != null)
+            {
+                sb.insert(0, current.alias + "/");
+                current = current.parent;
+            }
+            rootPath = sb.toString();
+        }
+        return rootPath;
+    }
+
 
     /** Find table alias for provided alias relative to this */
     public TableAlias findAlias(String alias)
@@ -171,7 +190,7 @@ public class TableAlias
 
     public static TableAlias of(TableAlias parent, String table, String alias)
     {
-        return TableAlias.of(parent, new QualifiedName(null, asList(table)), alias);
+        return TableAlias.of(parent, new QualifiedName(asList(table)), alias);
     }
 
     /** Construct a table alias from provided table name */
