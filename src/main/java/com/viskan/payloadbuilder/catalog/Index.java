@@ -7,7 +7,8 @@ import static java.util.Objects.requireNonNull;
 import java.util.List;
 
 /**
- * Index. Used on a table to define index which can be utilized by batching operators
+ * A table index. Defines columns that can be utilized in batching operators
+ * for quicker access to rows.
  **/
 public class Index
 {

@@ -113,8 +113,9 @@ class QueryFileModel
                 sw.start();
                 clearForExecution();
             }
-            else
+            else if (sw.isStarted())
             {
+                
                 sw.stop();
             }
 

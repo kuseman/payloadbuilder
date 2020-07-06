@@ -2,14 +2,18 @@ package com.viskan.payloadbuilder.provider.elastic;
 
 import com.viskan.payloadbuilder.catalog.Index;
 import com.viskan.payloadbuilder.catalog.TableAlias;
-import com.viskan.payloadbuilder.operator.Operator;
+import com.viskan.payloadbuilder.operator.AOperator;
 import com.viskan.payloadbuilder.operator.OperatorContext;
+import com.viskan.payloadbuilder.operator.OperatorContext.NodeData;
 import com.viskan.payloadbuilder.operator.Row;
 import com.viskan.payloadbuilder.parser.ExecutionContext;
 
+import static com.viskan.payloadbuilder.DescribeUtils.CATALOG;
+import static com.viskan.payloadbuilder.DescribeUtils.INDEX;
+import static com.viskan.payloadbuilder.provider.elastic.EtmArticleCategoryESCatalog.ARTICLE_DOC_TYPE;
 import static com.viskan.payloadbuilder.utils.MapUtils.entry;
 import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
-import static java.util.Collections.emptyIterator;
+import static java.util.Collections.emptyList;
 import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
@@ -17,11 +21,16 @@ import static org.apache.commons.lang3.StringUtils.lowerCase;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
+import org.apache.commons.io.input.CountingInputStream;
+import org.apache.commons.io.output.CountingOutputStream;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.http.Header;
@@ -41,11 +50,16 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /** Operator for ETM EtmArticle/CategoryV2 synchronizers */
-class EtmArticleCategoryESOperator implements Operator
+class EtmArticleCategoryESOperator extends AOperator
 {
+    private static final String TIMESTAMP = "__timestamp";
+    private static final String DOCID = "__docid";
+    private static final int TIMESTAMP_COLUMN_INDEX = -2;
+    private static final int DOC_ID_COLUMN_INDEX = -3;
+
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-    
+
     private static final PoolingHttpClientConnectionManager CONNECTION_MANAGER = new PoolingHttpClientConnectionManager();
     private static final CloseableHttpClient CLIENT = HttpClientBuilder
             .create()
@@ -58,8 +72,9 @@ class EtmArticleCategoryESOperator implements Operator
     private final Index index;
     private final String catalogAlias;
 
-    public EtmArticleCategoryESOperator(String catalogAlias, TableAlias tableAlias, Index index)
+    public EtmArticleCategoryESOperator(int nodeId, String catalogAlias, TableAlias tableAlias, Index index)
     {
+        super(nodeId);
         this.catalogAlias = catalogAlias;
         this.tableAlias = tableAlias;
         this.index = index;
@@ -69,10 +84,19 @@ class EtmArticleCategoryESOperator implements Operator
 
     private final Map<String, String> TABLE_TO_SUBTYPE = ofEntries(
             entry("article", "article"),
-            entry("articleAttribute", "article"));
+            entry("articlename", "article"),
+            entry("articleproperty", "article"),
+            entry("articleattribute", "article"),
+            entry("articleattributemedia", "article"),
+            entry("articlecategory", "article"),
+            entry("articleprice", "articlePrice"),
+            entry("attribute1", "attribute1"),
+            entry("attribute2", "attribute2"),
+            entry("attribute3", "attribute3"));
 
     private final Map<String, String> DOC_ID_PATTERN_BY_TABLE = ofEntries(
             entry("article", "EtmArticleV2_%s"),
+            entry("articlename", "EtmArticleV2_%s"),
             entry("articleattribute", "EtmArticleV2_%s"),
             entry("articleprice", "EtmArticleV2_articlePrice_%s_%s"),
             entry("articlecategory", "EtmArticleV2_%s"),
@@ -83,113 +107,138 @@ class EtmArticleCategoryESOperator implements Operator
             entry("attribute3", "EtmArticleV2_attribute3_%s"),
             entry("propertykey", "EtmArticleV2_propertyKey_%s"),
             entry("propertyvalue", "EtmArticleV2_propertyValue_%s")
-            
-            );
 
-    private static final String DOC_TYPE = "EtmArticleV2";
-//    String esEndpoint = "http://192.168.10.78:9200";
-//        String database = "RamosLager157TestDev".toLowerCase();
-//    String database = "RamosVnpTestMain".toLowerCase();
-//    int comp_id = 0;
-//    String indexName = database + "_c" + comp_id + "_v3";
-//    String instance = database + (comp_id > 0 ? "_" + comp_id : "");
+    );
+
+    //    private static final String DOC_TYPE = "EtmArticleV2";
+    //    String esEndpoint = "http://192.168.10.78:9200";
+    //        String database = "RamosLager157TestDev".toLowerCase();
+    //    String database = "RamosVnpTestMain".toLowerCase();
+    //    int comp_id = 0;
+    //    String indexName = database + "_c" + comp_id + "_v3";
+    //    String instance = database + (comp_id > 0 ? "_" + comp_id : "");
 
     /* END SETTINGS FIELD */
 
-//    Map<String, List<Row>> cache =  new HashMap<>();
-    
+    //    Map<String, List<Row>> cache =  new HashMap<>();
+
+    @Override
+    public String getName()
+    {
+        return (index != null ? "index" : "scan") + " (" + tableAlias.getTable() + ")";
+    }
+
+    @Override
+    public Map<String, Object> getDescribeProperties()
+    {
+        Map<String, Object> result = ofEntries(true,
+                entry(CATALOG, EtmArticleCategoryESCatalog.NAME));
+
+        if (index != null)
+        {
+            result.put(INDEX, index);
+        }
+        return result;
+    }
+
     @Override
     public Iterator<Row> open(ExecutionContext context)
     {
         String varEndpoint = (String) context.getVariable(catalogAlias + "." + EtmArticleCategoryESCatalog.ENDPOINT_KEY);
         String varIndex = (String) context.getVariable(catalogAlias + "." + EtmArticleCategoryESCatalog.INDEX_KEY);
-        
+
         if (isBlank(varEndpoint) || isBlank(varIndex))
         {
             throw new IllegalArgumentException("Missing endpoint/index variables in scope");
         }
-        
+
         String table = tableAlias.getTable().toString();
+
+        // TODO: turn on only in analyze mode
+        NodeData nodeData = context.getOperatorContext().getNodeData(nodeId, NodeData::new);
+        AtomicLong sentBytes = (AtomicLong) nodeData.properties.computeIfAbsent("sentCount", k -> new AtomicLong());
+        AtomicLong receivedBytes = (AtomicLong) nodeData.properties.computeIfAbsent("receivedCount", k -> new AtomicLong());
+        AtomicInteger scrollCount = (AtomicInteger) nodeData.properties.computeIfAbsent("scrollCount", k -> new AtomicInteger());
 
         if (index != null)
         {
             String mgetUrl = String.format("%s/%s/data/_mget?filter_path=docs._source,docs._id&_source_include=_timestamp,payload.%s.columns,payload.%s.rows", varEndpoint, varIndex, table, table);
             String pattern = DOC_ID_PATTERN_BY_TABLE.get(lowerCase(table));
 
+            if (pattern == null)
+            {
+                throw new RuntimeException("No doc id pattern registered for " + table);
+            }
+
             // ramosvnptestmain_c0_v3
             // ramosvnptestmain_c0
             String instance = varIndex.substring(0, varIndex.lastIndexOf("_"));
             int comp_id = Integer.parseInt(instance.substring(instance.lastIndexOf("_") + 2));
             instance = instance.substring(0, instance.lastIndexOf("_"));
-            
+
             if (comp_id > 0)
             {
                 instance = instance + "_" + comp_id;
             }
-            
+
             // TODO: thread up all ids in executor and join
-            DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getOperatorContext(), instance, pattern);
-            return getIterator(table, scrollId ->
-            {
-                scrollId.setValue("DUMMY");
-                HttpPost post = new HttpPost(mgetUrl);
-                post.setEntity(entity);
-                return post;
-            });
+            DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getOperatorContext(), instance, pattern, sentBytes);
+            return getIterator(
+                    table,
+                    receivedBytes,
+                    scrollId ->
+                    {
+                        HttpPost post = new HttpPost(mgetUrl);
+                        post.setEntity(entity);
+                        return post;
+                    });
         }
 
-        String subType = TABLE_TO_SUBTYPE.get(table);
-        final String searchUrl = String.format("%s/%s/data/_search?q=_docType:%s+AND+_subType:%s&size=%d&scroll=%s",
+        String subType = TABLE_TO_SUBTYPE.get(lowerCase(table));
+
+        final String searchUrl = String.format(
+                "%s/%s/data/_search?q=_docType:%s+AND+_subType:%s&size=%d&scroll=%s&filter_path=_scroll_id,hits.hits._id,hits.hits._source&_source_include=_timestamp,payload.%s.columns,payload.%s.rows",
                 varEndpoint,
                 varIndex,
-                DOC_TYPE,
+                ARTICLE_DOC_TYPE,
                 subType,
-                250,
-                "2m");
+                1000,
+                "2m",
+                table,
+                table);
         String scrollUrl = String.format("%s/_search/scroll?scroll=%s&scroll_id=", varEndpoint, "2m");
 
-        return getIterator(table, scrollId ->
-        {
-            if (scrollId.getValue() == null)
-            {
-                return new HttpGet(searchUrl);
-            }
-            else
-            {
-                String id = scrollId.getValue();
-                scrollId.setValue(null);
-                return new HttpGet(scrollUrl + id);
-            }
-        });
+        return getIterator(
+                table,
+                receivedBytes,
+                scrollId ->
+                {
+                    scrollCount.incrementAndGet();
+                    if (scrollId.getValue() == null)
+                    {
+                        sentBytes.addAndGet(searchUrl.length());
+                        return new HttpGet(searchUrl);
+                    }
+                    else
+                    {
+                        String id = scrollId.getValue();
+                        scrollId.setValue(null);
+                        return new HttpGet(scrollUrl + id);
+                    }
+                });
     }
-    
-    private static final int TIMESTAMP_COLUMN_INDEX = -2;
-    private static final int DOC_ID_COLUMN_INDEX = -3;
+
 
     private Iterator<Row> getIterator(
             String table,
+            AtomicLong receivedBytes,
             Function<MutableObject<String>, HttpUriRequest> requestSupplier)
     {
         return new Iterator<Row>()
         {
             int rowPos = 0;
-
-            /* DEBUG FIELDS */
-//            int queryCount = 0;
-//            StopWatch sw = new StopWatch();
-//            StopWatch sw2 = new StopWatch();
-//            int docCount = 0;
-//            int rowCount = 0;
-//            long deserTime = 0;
-//            long reqTime = 0;
-            /* DEBUG FIELDS */
-
-            //            JsonParser parser;
             MutableObject<String> scrollId = new MutableObject<>();
-
             Iterator<Doc> docIt;
-
-//            String[] columns;
             int[] tableAliasColumnIndices;
             Doc doc;
             Iterator<Object[]> rowsIterator;
@@ -216,37 +265,36 @@ class EtmArticleCategoryESOperator implements Operator
                 {
                     if (docIt == null)
                     {
-//                        if (queryCount == 0)
-//                        {
-//                            sw.start();
-//                        }
-//
-//                        queryCount++;
                         HttpUriRequest request = requestSupplier.apply(scrollId);
-
-//                        sw2.start();
-                        GetResponse gr;
+                        ESResponse esReponse;
                         try (CloseableHttpResponse response = CLIENT.execute(request);)
                         {
-                            gr = MAPPER.readValue(response.getEntity().getContent(), GetResponse.class);
+                            CountingInputStream cis = new CountingInputStream(response.getEntity().getContent());
+                            esReponse = MAPPER.readValue(cis, ESResponse.class);
+                            receivedBytes.addAndGet(cis.getByteCount());
                         }
                         catch (IOException e)
                         {
                             throw new RuntimeException("Error query", e);
                         }
-                        
-//                        sw2.stop();
-//                        reqTime += sw2.getTime(TimeUnit.MILLISECONDS);
-//                        sw2.reset();
-                        docIt = gr.docs != null ? gr.docs.iterator() : emptyIterator();
+
+                        scrollId.setValue(esReponse.scrollId);
+                        docIt = esReponse.getDocs().iterator();
+
+                        if (!docIt.hasNext())
+                        {
+                            return false;
+                        }
                         continue;
-                    }
-                    else if (rowsIterator == null  && !docIt.hasNext())
-                    {
-                        return false;
                     }
                     else if (rowsIterator == null)
                     {
+                        if (!docIt.hasNext())
+                        {
+                            docIt = null;
+                            continue;
+                        }
+
                         doc = docIt.next();
                         while (!doc.isValid() && docIt.hasNext())
                         {
@@ -255,33 +303,14 @@ class EtmArticleCategoryESOperator implements Operator
 
                         if (!doc.isValid())
                         {
-                            return false;
+                            docIt = null;
+                            continue;
                         }
 
-//                        docCount++;
                         Payload payload = doc.source.payload.get(table);
-                        
                         if (tableAliasColumnIndices == null)
                         {
-                            tableAliasColumnIndices = new int[tableAlias.getColumns().length];
-                            int index = 0;
-                            for (String aliasColumn : tableAlias.getColumns())
-                            {
-                                int columnIndex;
-                                if (equalsIgnoreCase("timestamp", aliasColumn))
-                                {
-                                    columnIndex = TIMESTAMP_COLUMN_INDEX;
-                                }
-                                else if (equalsIgnoreCase("docid", aliasColumn))
-                                {
-                                    columnIndex = DOC_ID_COLUMN_INDEX;
-                                }
-                                else
-                                {
-                                    columnIndex = ArrayUtils.indexOf(payload.columns, aliasColumn);
-                                }
-                                tableAliasColumnIndices[index++] = columnIndex;
-                            }
+                            populateColumnIndices(payload);
                         }
 
                         rowsIterator = payload.rows.iterator();
@@ -292,7 +321,7 @@ class EtmArticleCategoryESOperator implements Operator
                         rowsIterator = null;
                         continue;
                     }
-                    
+
                     Object[] data = rowsIterator.next();
                     Object[] rowData = new Object[tableAliasColumnIndices.length];
 
@@ -317,20 +346,89 @@ class EtmArticleCategoryESOperator implements Operator
                 }
                 return true;
             }
+            
+            private void populateColumnIndices(Payload payload)
+            {
+                // All columns wanted, update alias columns
+                if (tableAlias.getColumns() == null)
+                {
+                    int length = payload.columns.length;
+                    String[] columns = Arrays.copyOf(payload.columns, length + 2);
+                    columns[length] = TIMESTAMP;
+                    columns[length + 1] = DOCID;
+                    
+                    tableAliasColumnIndices = new int[columns.length];
+                    tableAlias.setColumns(columns);
+                }
+                else
+                {
+                    tableAliasColumnIndices = new int[tableAlias.getColumns().length];
+                }
+                
+                int index = 0;
+                for (String aliasColumn : tableAlias.getColumns())
+                {
+                    int columnIndex;
+                    if (equalsIgnoreCase(TIMESTAMP, aliasColumn))
+                    {
+                        columnIndex = TIMESTAMP_COLUMN_INDEX;
+                    }
+                    else if (equalsIgnoreCase(DOCID, aliasColumn))
+                    {
+                        columnIndex = DOC_ID_COLUMN_INDEX;
+                    }
+                    else
+                    {
+                        columnIndex = ArrayUtils.indexOf(payload.columns, aliasColumn);
+                    }
+                    tableAliasColumnIndices[index++] = columnIndex;
+                }
+            }
         };
+        
     }
 
-    private static class GetResponse
+    /** Top response (Used both in get request and search request) */
+    private static class ESResponse
     {
+        @JsonProperty("_scroll_id")
+        String scrollId;
+
+        /** Get response */
         @JsonProperty("docs")
         List<Doc> docs;
+
+        /** Search response */
+        @JsonProperty("hits")
+        OuterHits hits;
+
+        /** Return docs fr */
+        List<Doc> getDocs()
+        {
+            if (docs != null)
+            {
+                return docs;
+            }
+            else if (hits != null)
+            {
+                return hits.hits;
+            }
+
+            return emptyList();
+        }
+    }
+
+    private static class OuterHits
+    {
+        @JsonProperty("hits")
+        List<Doc> hits;
     }
 
     private static class Doc
     {
         @JsonProperty("_source")
         Source source;
-        
+
         @JsonProperty("_id")
         String docId;
 
@@ -344,7 +442,7 @@ class EtmArticleCategoryESOperator implements Operator
     {
         @JsonProperty
         Map<String, Payload> payload;
-        
+
         @JsonProperty("_timestamp")
         String timestamp;
     }
@@ -360,7 +458,7 @@ class EtmArticleCategoryESOperator implements Operator
     @Override
     public String toString()
     {
-        return (index != null ? "index" : "scan") + " (" + tableAlias.toString() + ")";
+        return String.format("ID: %d, %s", nodeId, (index != null ? "index" : "scan") + " (" + tableAlias.toString() + ")");
     }
 
     /** Class the streams doc id's to _mget endpoint in ES */
@@ -375,12 +473,14 @@ class EtmArticleCategoryESOperator implements Operator
         private final OperatorContext context;
         private final String pattern;
         private final byte[] prefixBytes;
+        private final AtomicLong sentBytes;
 
-        private DocIdStreamingEntity(OperatorContext context, String instance, String pattern)
+        private DocIdStreamingEntity(OperatorContext context, String instance, String pattern, AtomicLong sentBytes)
         {
             this.context = context;
             this.prefixBytes = (instance + "_").getBytes();
             this.pattern = pattern;
+            this.sentBytes = sentBytes;
         }
 
         @Override
@@ -422,29 +522,34 @@ class EtmArticleCategoryESOperator implements Operator
         @Override
         public void writeTo(OutputStream outStream) throws IOException
         {
-            OutputStream bos = outStream;
-            bos.write(HEADER_BYTES);
-
             Iterator<Object[]> values = context.getOuterIndexValues();
-
-            boolean first = true;
-            while (values.hasNext())
+            if (values == null || !values.hasNext())
             {
-                if (!first)
-                {
-                    bos.write(COMMA_BYTES);
-                }
-                first = false;
-                bos.write(QUOTE_BYTES);
-                bos.write(prefixBytes);
-                String docId = String.format(pattern, values.next());
-                bos.write(docId.getBytes());
-                bos.write(QUOTE_BYTES);
+                return;
             }
 
-            bos.write(FOOTER_BYTES);
-            bos.flush();
-            bos.close();
+            try (CountingOutputStream bos = new CountingOutputStream(outStream))
+            {
+                bos.write(HEADER_BYTES);
+
+                boolean first = true;
+                while (values.hasNext())
+                {
+                    if (!first)
+                    {
+                        bos.write(COMMA_BYTES);
+                    }
+                    first = false;
+                    bos.write(QUOTE_BYTES);
+                    bos.write(prefixBytes);
+                    String docId = String.format(pattern, values.next());
+                    bos.write(docId.getBytes());
+                    bos.write(QUOTE_BYTES);
+                }
+
+                bos.write(FOOTER_BYTES);
+                sentBytes.addAndGet(bos.getByteCount());
+            }
         }
 
         @Override

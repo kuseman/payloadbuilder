@@ -25,10 +25,20 @@ statement
  
 miscStatement
  : setStatement
+ | describeStatement
  ;
 
 setStatement
  : SET (scope=SESSION)? qname EQUALS expression
+ ;
+ 
+describeStatement
+ : DESCRIBE 
+ (
+ 	 tableName 
+   | functionName '('')'
+   | selectStatement 
+ )
  ;
 
 controlFlowStatement
@@ -158,7 +168,11 @@ primary
  ;
 
 functionCall
- : (catalog=identifier '#')? function=identifier '(' ( arguments+=expression (',' arguments+=expression)*)? ')'
+ : functionName '(' ( arguments+=expression (',' arguments+=expression)*)? ')'
+ ;
+ 
+functionName
+ : (catalog=identifier '#')? function=identifier
  ;
  
 literal
@@ -226,6 +240,7 @@ APPLY	     : A P P L Y;
 BATCH_SIZE   : B A T C H '_' S I Z E;
 CROSS        : C R O S S;
 DESC	     : D E S C;
+DESCRIBE	 : D E S C R I B E;
 ELSE		 : E L S E;
 END			 : E N D;
 FALSE	     : F A L S E;

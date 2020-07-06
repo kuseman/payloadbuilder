@@ -46,6 +46,12 @@ public class AOperatorTest extends Assert
                 Operator op = new Operator()
                 {
                     @Override
+                    public int getNodeId()
+                    {
+                        return 0;
+                    }
+                    
+                    @Override
                     public Iterator<Row> open(ExecutionContext context)
                     {
                         return emptyIterator();

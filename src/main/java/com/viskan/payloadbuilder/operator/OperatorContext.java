@@ -1,6 +1,8 @@
 package com.viskan.payloadbuilder.operator;
 
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.function.Supplier;
 
 import gnu.trove.map.TIntObjectMap;
@@ -10,7 +12,7 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 public class OperatorContext
 {
     /** Stores node unique data by node's unique id */
-    private final TIntObjectMap<Object> nodeDataById = new TIntObjectHashMap<>();
+    private final TIntObjectMap<NodeData> nodeDataById = new TIntObjectHashMap<>();
     
     /** Iterator of outer row values used when having an indexed inner operator in Batched operators */
     private Iterator<Object[]> outerIndexValues;
@@ -31,6 +33,11 @@ public class OperatorContext
         nodeDataById.clear();       
     }
     
+    public TIntObjectMap<? extends NodeData> getNodeData()
+    {
+        return nodeDataById;
+    }
+    
     /** Get node data by id */
     @SuppressWarnings("unchecked")
     public <T extends NodeData> T getNodeData(int nodeId)
@@ -42,21 +49,22 @@ public class OperatorContext
     @SuppressWarnings("unchecked")
     public <T extends NodeData> T getNodeData(int nodeId, Supplier<T> creator)
     {
-        Object data = nodeDataById.get(nodeId);
+        T data = (T) nodeDataById.get(nodeId);
         if (data == null)
         {
             data = creator.get();
             nodeDataById.put(nodeId, data);
         }
         
-        T result = (T) data;
-        result.executionCount++;
-        return result;
+        data.executionCount++;
+        return data;
     }
     
     /** Base class for node data. */
     public static class NodeData
     {
-        int executionCount;
+        public int executionCount;
+        /** Operator specific properties. Bytes fetched etc. */
+        public Map<String, Object> properties = new HashMap<>();
     }
 }

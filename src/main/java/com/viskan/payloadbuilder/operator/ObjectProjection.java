@@ -13,7 +13,7 @@ import java.util.Objects;
 import org.apache.commons.lang3.ArrayUtils;
 
 /** Projection that projects an object output */
-class ObjectProjection implements Projection
+public class ObjectProjection implements Projection
 {
     static final Projection[] EMPTY_PROJECTION_ARRAY = new Projection[0];
     private final Operator selection;
@@ -21,7 +21,7 @@ class ObjectProjection implements Projection
     private final String[] columns;
     private final int length;
 
-    ObjectProjection(List<String> projectionAliases, List<Projection> projections)
+    public ObjectProjection(List<String> projectionAliases, List<Projection> projections)
     {
         this(projectionAliases, projections, null);
     }

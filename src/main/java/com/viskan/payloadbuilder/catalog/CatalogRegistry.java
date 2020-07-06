@@ -13,7 +13,7 @@ import java.util.Map;
 public class CatalogRegistry
 {
     public static final String DEFAULTCATALOG = "defaultCatalog";
-    private final Map<String, Catalog> catalogByName = new HashMap<>();
+    private final Map<String, Catalog> catalogByAlias = new HashMap<>();
     private final Catalog builtinCatalog;
 
     public CatalogRegistry()
@@ -34,12 +34,12 @@ public class CatalogRegistry
         {
             throw new IllegalArgumentException("Alias cannot be blank");
         }
-        catalogByName.put(lowerCase(alias), catalog);
+        catalogByAlias.put(lowerCase(alias), catalog);
     }
 
     /** Get catalog */
-    public Catalog getCatalog(String name)
+    public Catalog getCatalog(String alias)
     {
-        return isBlank(name) ? builtinCatalog : catalogByName.get(name);
-    }
+        return isBlank(alias) ? builtinCatalog : catalogByAlias.get(alias);
+}
 }

@@ -1,10 +1,16 @@
 package com.viskan.payloadbuilder.operator;
 
+import com.viskan.payloadbuilder.DescribeUtils;
 import com.viskan.payloadbuilder.parser.ExecutionContext;
 
+import static com.viskan.payloadbuilder.utils.MapUtils.entry;
+import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
+import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 
 import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.function.BiPredicate;
 
 import org.apache.commons.collections.iterators.FilterIterator;
@@ -16,9 +22,6 @@ class FilterOperator extends AOperator
     private final Operator operator;
     private final BiPredicate<ExecutionContext, Row> predicate;
 
-    /* Statistics */
-    private int executionCount;
-
     FilterOperator(int nodeId, Operator operator, BiPredicate<ExecutionContext, Row> predicate)
     {
         super(nodeId);
@@ -26,11 +29,30 @@ class FilterOperator extends AOperator
         this.predicate = requireNonNull(predicate);
     }
     
+    @Override
+    public List<Operator> getChildOperators()
+    {
+        return asList(operator);
+    }
+    
+    @Override
+    public String getName()
+    {
+        return "Filter";
+    }
+    
+    @Override
+    public Map<String, Object> getDescribeProperties()
+    {
+        return ofEntries(true,
+                entry(DescribeUtils.PREDICATE, predicate)
+                );
+    }
+    
     @SuppressWarnings("unchecked")
     @Override
     public Iterator<Row> open(ExecutionContext context)
     {
-        executionCount++;
         return new FilterIterator(operator.open(context), i ->  predicate.test(context, (Row) i));
     }
 
@@ -59,7 +81,7 @@ class FilterOperator extends AOperator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        String desc = String.format("FILTER (ID: %d, EXECUTION COUNT: %s, PREDICATE: %s", nodeId, executionCount, predicate);
+        String desc = String.format("FILTER (ID: %d, EXECUTION COUNT: %s, PREDICATE: %s", nodeId, 0, predicate);
         return desc + System.lineSeparator()
             +
             indentString + operator.toString(indent + 1);

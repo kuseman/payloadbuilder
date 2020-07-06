@@ -17,26 +17,27 @@ import java.util.Set;
 /** Catalog for ETM EtmArticle/CategoryV2 synchronizers */
 public class EtmArticleCategoryESCatalog extends Catalog
 {
-    private static final int BATCH_SIZE = 1250;
-    private static final String ETMARTICLE_V2 = "EtmArticleV2";
+    private static final int BATCH_SIZE = 500;
+    static final String ARTICLE_DOC_TYPE = "EtmArticleV2";
+    static final String NAME = "EtmArticleCategoryES";
     public static String ENDPOINT_KEY = "endpoint";
     public static String INDEX_KEY = "index";
     
     public EtmArticleCategoryESCatalog()
     {
-        super("EtmArticleCategoryES");
+        super(NAME);
     }
     
     @Override
     public Operator getScanOperator(int nodeId, String catalogAlias, TableAlias tableAlias, List<TableOption> tableOptions)
     {
-        return new EtmArticleCategoryESOperator(catalogAlias, tableAlias, null);
+        return new EtmArticleCategoryESOperator(nodeId, catalogAlias, tableAlias, null);
     }
     
     @Override
     public Operator getIndexOperator(int nodeId, String catalogAlias, TableAlias tableAlias, Index index, List<TableOption> tableOptions)
     {
-        return new EtmArticleCategoryESOperator(catalogAlias, tableAlias, index);
+        return new EtmArticleCategoryESOperator(nodeId, catalogAlias, tableAlias, index);
     }
     
    
@@ -44,6 +45,7 @@ public class EtmArticleCategoryESCatalog extends Catalog
     
     Set<String> ART_ID_INDEX_TABLES = new HashSet<>(asList(
             "article",
+            "articlename",
             "articleattribute",
             "articlecategory",
             "articleattributemedia",
@@ -60,7 +62,7 @@ public class EtmArticleCategoryESCatalog extends Catalog
         }
         else if ("articleprice".equals(tbl))
         {
-            return asList(new Index(table, asList("art_id", "country_id"), BATCH_SIZE));
+            return asList(new Index(table, asList("art_id", "country_id"), 1250));
         }
         else if ("attribute1".equals(tbl))
         {

@@ -25,14 +25,12 @@ class ResultModel extends AbstractTableModel
 {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    /** Notify changes eveth x:th row */
-    private static final int NOTIFY_ROWS_THRESHOLD = 100;
     private final QueryFileModel file;
     private final List<Object[]> rows = new ArrayList<>(50);
     private String[] columns = EMPTY_STRING_ARRAY;
     private boolean complete;
     
-    private int lastNotifyRowIndex = 0;
+    private int lastNotifyRowIndex = -1;
     
     ResultModel(QueryFileModel file)
     {
@@ -54,6 +52,7 @@ class ResultModel extends AbstractTableModel
     void done()
     {
         complete = true;
+        notifyChanges();
     }
     
     boolean isComplete()
@@ -120,14 +119,20 @@ class ResultModel extends AbstractTableModel
         int size = rows.size() - 1;
         if (size > lastNotifyRowIndex)
         {
-            super.fireTableRowsInserted(lastNotifyRowIndex, size);
+            if (SwingUtilities.isEventDispatchThread())
+            {
+                super.fireTableRowsInserted(lastNotifyRowIndex, size);
+            }
+            else
+            {
+                SwingUtilities.invokeLater(() -> super.fireTableRowsInserted(lastNotifyRowIndex, size));
+            }
             lastNotifyRowIndex = size;
         }
     }
     
     /** Get cell label for provided object.
-     * Produces a minimal json for array and map objects
-     */
+     * Produces a minimal json for array and map objects */
     static String getLabel(Object value, int size)
     {
         StringWriter sw = new StringWriter(size);

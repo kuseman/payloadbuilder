@@ -2,9 +2,14 @@ package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.parser.ExecutionContext;
 
+import static com.viskan.payloadbuilder.utils.MapUtils.entry;
+import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
+import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 
 import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -22,6 +27,25 @@ class BatchRepeatOperator extends AOperator
         super(nodeId);
         this.targetNodeId = targetNodeId;
         this.operator = requireNonNull(operator, "operator");
+    }
+    
+    @Override
+    public List<Operator> getChildOperators()
+    {
+        return asList(operator);
+    }
+    
+    @Override
+    public String getName()
+    {
+        return "Batch repeat";
+    }
+
+    @Override
+    public Map<String, Object> getDescribeProperties()
+    {
+        return ofEntries(true,
+                entry("Target nodeId", targetNodeId));
     }
     
     @Override

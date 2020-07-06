@@ -39,6 +39,7 @@ import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -245,7 +246,6 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             }
         } 
         
-        
         Expression pushDownPredicate = null;
         if (joinSize > 0)
         {
@@ -277,13 +277,15 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         {
             batchLimitOption = getBatchLimitoption(tsj.getTableSource());
         }
-        // TODO: Utilize index for "from" table source using it's where
-        //       ie. s.id = 10, s.id in (1,2,3,4,5)
-        
+
         if (tsj != null)
         {
             context.index = index;
             tsj.getTableSource().accept(this, context);
+            if (context.index != null)
+            {
+                throw new RuntimeException("Index " + index + " should have been consumed by " + tsj.getTableSource().getTable());
+            }
             if (outerValuesExpressions != null)
             {
                 context.operator = new OuterValuesOperator(context.acquireNodeId(), context.operator, outerValuesExpressions);
@@ -817,6 +819,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             List<Expression> innerValueExpressions,
             List<AnalyzePair> indexPairs)
     {
+        Set<String> processedColumns = new HashSet<>();
         int size = equiPairs.size();
         for (int i = 0; i < size; i++)
         {
@@ -832,6 +835,14 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 {
                     continue;
                 }
+                
+                if (!processedColumns.add(column))
+                {
+                    // TODO: pick the best avaiable expression
+                    // Ie. Expression#isConstant over any other
+                    continue;
+                }
+                
                 indexPairs.add(pair);
             }
 

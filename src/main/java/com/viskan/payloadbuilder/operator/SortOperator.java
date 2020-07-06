@@ -10,13 +10,14 @@ import java.util.Iterator;
 import java.util.List;
 
 /** Operator sorting target operator */
-class SortOperator implements Operator
+class SortOperator extends AOperator
 {
     private final Operator target;
     private final RowComparator comparator;
 
-    SortOperator(Operator target, RowComparator comparator)
+    SortOperator(int nodeId, Operator target, RowComparator comparator)
     {
+        super(nodeId);
         this.target = requireNonNull(target, "target");
         this.comparator = requireNonNull(comparator, "comparator");
     }

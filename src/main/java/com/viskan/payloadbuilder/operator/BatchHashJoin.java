@@ -3,7 +3,17 @@ package com.viskan.payloadbuilder.operator;
 import com.viskan.payloadbuilder.catalog.Index;
 import com.viskan.payloadbuilder.parser.ExecutionContext;
 
+import static com.viskan.payloadbuilder.DescribeUtils.BATCH_SIZE;
+import static com.viskan.payloadbuilder.DescribeUtils.INDEX;
+import static com.viskan.payloadbuilder.DescribeUtils.INNER_VALUES;
+import static com.viskan.payloadbuilder.DescribeUtils.LOGICAL_OPERATOR;
+import static com.viskan.payloadbuilder.DescribeUtils.OUTER_VALUES;
+import static com.viskan.payloadbuilder.DescribeUtils.POPULATING;
+import static com.viskan.payloadbuilder.DescribeUtils.PREDICATE;
 import static com.viskan.payloadbuilder.operator.BatchMergeJoin.clearJoinData;
+import static com.viskan.payloadbuilder.utils.MapUtils.entry;
+import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
+import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.ArrayUtils.contains;
@@ -12,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.function.BiPredicate;
 
@@ -49,7 +60,7 @@ class BatchHashJoin extends AOperator
     private final Index innerIndex;
     private final int valuesSize;
     private final int batchSize;
-    
+
     /* Statistics */
     private int executionCount;
 
@@ -79,6 +90,31 @@ class BatchHashJoin extends AOperator
         this.innerIndex = requireNonNull(innerIndex, "innerIndex");
         this.valuesSize = innerIndex.getColumns().size();
         this.batchSize = innerIndex.getBatchSize();
+    }
+
+    @Override
+    public List<Operator> getChildOperators()
+    {
+        return asList(outer, inner);
+    }
+
+    @Override
+    public String getName()
+    {
+        return "Batch Hash Join";
+    }
+
+    @Override
+    public Map<String, Object> getDescribeProperties()
+    {
+        return ofEntries(true,
+                entry(LOGICAL_OPERATOR, logicalOperator),
+                entry(POPULATING, populating),
+                entry(BATCH_SIZE, batchSize),
+                entry(PREDICATE, predicate),
+                entry(INDEX, innerIndex),
+                entry(OUTER_VALUES, outerValuesExtractor),
+                entry(INNER_VALUES, innerValuesExtractor));
     }
 
     @Override
@@ -174,7 +210,7 @@ class BatchHashJoin extends AOperator
                             outerRowIndex++;
                             continue;
                         }
-                        
+
                         innerRows = tableValue.getRows();
                         if (innerRows.isEmpty())
                         {
@@ -258,11 +294,11 @@ class BatchHashJoin extends AOperator
                     }
                     tableValue.addRow(row);
                 }
-                
+
                 verifyOuterValuesIterator();
                 context.getOperatorContext().setOuterIndexValues(null);
             }
-            
+
             private void emitOuterRows()
             {
                 // Complete
@@ -280,7 +316,7 @@ class BatchHashJoin extends AOperator
 
                 outerRowIndex++;
             }
-            
+
             private void verifyOuterValuesIterator()
             {
                 if (outerValuesIterator != null && outerValuesIterator.hasNext())
@@ -355,7 +391,7 @@ class BatchHashJoin extends AOperator
                                 tableValue = new TableValue();
                                 table.put(row.hash, tableValue);
                             }
-                            
+
                             if (!tableValue.addInnterValues(keyValues))
                             {
                                 // Value already present, no need to push values to downstream
@@ -371,7 +407,7 @@ class BatchHashJoin extends AOperator
             }
         };
     }
-    
+
     private int hash(Object[] values)
     {
         int result = 1;
@@ -418,7 +454,8 @@ class BatchHashJoin extends AOperator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        String description = String.format("BATCH HASH JOIN (%s) (ID: %d, POPULATING: %s, OUTER: %s, EXECUTION COUNT: %s, BATCH SIZE: %s, INDEX: %s, OUTER VALUES: %s, INNER VALUES: %s, PREDICATE: %s)",
+        String description = String.format(
+                "BATCH HASH JOIN (%s) (ID: %d, POPULATING: %s, OUTER: %s, EXECUTION COUNT: %s, BATCH SIZE: %s, INDEX: %s, OUTER VALUES: %s, INNER VALUES: %s, PREDICATE: %s)",
                 logicalOperator,
                 nodeId,
                 populating,
@@ -433,7 +470,7 @@ class BatchHashJoin extends AOperator
             + indentString + outer.toString(indent + 1) + System.lineSeparator()
             + indentString + inner.toString(indent + 1);
     }
-    
+
     /** Value used in table */
     private static class TableValue
     {
@@ -460,7 +497,7 @@ class BatchHashJoin extends AOperator
             {
                 rows = new ArrayList<>();
             }
-            
+
             rows.add(row);
         }
 
@@ -469,8 +506,11 @@ class BatchHashJoin extends AOperator
             return rows != null ? rows : emptyList();
         }
 
-        /** Add inner values array
-         * @return True if array was added */
+        /**
+         * Add inner values array
+         * 
+         * @return True if array was added
+         */
         boolean addInnterValues(Object[] keyValues)
         {
             if (values == null)
@@ -481,7 +521,7 @@ class BatchHashJoin extends AOperator
             {
                 return false;
             }
-            
+
             values.add(Arrays.copyOf(keyValues, keyValues.length));
             return true;
         }

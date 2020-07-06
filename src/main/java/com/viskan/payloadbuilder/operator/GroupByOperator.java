@@ -2,6 +2,9 @@ package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.parser.ExecutionContext;
 
+import static com.viskan.payloadbuilder.utils.MapUtils.entry;
+import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
+import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 
 import java.util.ArrayList;
@@ -37,6 +40,26 @@ class GroupByOperator extends AOperator
         this.size = size;
     }
 
+    @Override
+    public List<Operator> getChildOperators()
+    {
+        return asList(operator);
+    }
+    
+    @Override
+    public String getName()
+    {
+        return "Group by";
+    }
+    
+    @Override
+    public Map<String, Object> getDescribeProperties()
+    {
+        return ofEntries(true,
+                entry("Values", valuesExtractor.toString())
+                );
+    }
+    
     @SuppressWarnings("unchecked")
     @Override
     public Iterator<Row> open(ExecutionContext context)

@@ -8,6 +8,7 @@ import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.ArithmeticUnar
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.ColumnReferenceContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.ComparisonExpressionContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.DereferenceContext;
+import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.DescribeStatementContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.FunctionCallContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.FunctionCallExpressionContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.IfStatementContext;
@@ -165,6 +166,23 @@ public class QueryParser
             return new SetStatement(scope, getQualifiedName(ctx.qname()), getExpression(ctx.expression()));
         }
 
+        @Override
+        public Object visitDescribeStatement(DescribeStatementContext ctx)
+        {
+            if (ctx.tableName() != null)
+            {
+                String catalog = lowerCase(ctx.tableName().catalog != null ? ctx.tableName().catalog.getText() : null);
+                return new DescribeTableStatement(catalog, getQualifiedName(ctx.tableName().qname()));
+            }
+            else if (ctx.functionName() != null)
+            {
+                String catalog = lowerCase(ctx.functionName().catalog != null ? ctx.functionName().catalog.getText() : null);
+                return new DescribeFunctionStatement(catalog, ctx.functionName().function.getText());
+            }
+            
+            return new DescribeSelectStatement((SelectStatement) visit(ctx.selectStatement()));
+        }
+        
         @Override
         public Object visitTopSelect(TopSelectContext ctx)
         {
@@ -395,8 +413,8 @@ public class QueryParser
         public Object visitFunctionCall(FunctionCallContext ctx)
         {
             Expression prevLeftDereference = leftDereference;
-            String catalog = lowerCase(ctx.catalog != null ? ctx.catalog.getText() : null);
-            String function = getIdentifier(ctx.function);
+            String catalog = lowerCase(ctx.functionName().catalog != null ? ctx.functionName().catalog.getText() : null);
+            String function = getIdentifier(ctx.functionName().function);
             
             List<Expression> arguments = ctx.arguments.stream().map(a -> getExpression(a)).collect(toList());
             int id = functionIdByName.computeIfAbsent(Pair.of(catalog, function), key -> functionId++);

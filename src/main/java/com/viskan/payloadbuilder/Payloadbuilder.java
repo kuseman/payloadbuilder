@@ -18,10 +18,6 @@ public class Payloadbuilder
      *   - DeferenceExpression
      *      Implement
      *   - Correlated queries support
-     *   - Index support on FROM clause
-     *      id = <...>
-     *      id IN (1,2,3,)
-     *      Wrap index operator with a outer values provider  
      *   - Order by
      *      Implement
      *   - Extensibility

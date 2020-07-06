@@ -91,6 +91,8 @@ class QueryFileView extends JPanel
         textEditor.setRows(40);
         textEditor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_SQL);
         textEditor.setCodeFoldingEnabled(true);
+        textEditor.setTabSize(2);
+        textEditor.setTabsEmulated(true);
         textEditor.setText(file.getQuery());
         RTextScrollPane sp = new RTextScrollPane(textEditor);
         textEditor.getDocument().addDocumentListener(new ADocumentListenerAdapter()
@@ -173,6 +175,7 @@ class QueryFileView extends JPanel
         {
             case EXECUTING:
                 resultsPanel.removeAll();
+                tables.clear();
                 file.clearForExecution();
                 messages.setText("");
                 executionTimer.start();
@@ -207,6 +210,8 @@ class QueryFileView extends JPanel
         revalidate();
         repaint();
     }
+    
+    private final List<JTable> tables = new ArrayList<>();
 
     private void handleResultModelAdded()
     {
@@ -226,13 +231,22 @@ class QueryFileView extends JPanel
                 // This result set is complete
                 || resultModel.isComplete()))
             {
-//                System.out.println("Adjust");
                 columnAdjuster.adjustColumns();
                 columnsAdjusted.set(true);
             }
         });
         resultTable.setModel(resultModel);
 
+        /*
+        1. ScrollPane (table1)
+        2. ScrollPane(SplitPane(ScrollPane(table1), ScrollPane(table2))
+        3. RC: ScrollPane(table2)
+           New SplitPane(ScrollPane(table2), ScrollPane(table3))
+           ScrollPane(SplitPane(ScrollPane(table1), SplitPane(ScrollPane(table2), ScrollPane(table3))))
+        4. Rc: SplitPane(ScrollPane(table2), ScrollPane(table3)))
+           New SplitPane(SplitPane(ScrollPane(table2), ScrollPane(table3)), ScrollPane(table4))
+           ScrollPane(SplitPane(ScrollPane(table1), SplitPane(SplitPane(ScrollPane(table2), ScrollPane(table3)), ScrollPane(table4))))
+        */
         // First component, simply add the table
         if (resultsPanel.getComponentCount() == 0)
         {
@@ -256,7 +270,15 @@ class QueryFileView extends JPanel
                 JSplitPane prevSplitPane = (JSplitPane) c;
                 Component rc = prevSplitPane.getRightComponent();
 
-                JTable prevTable = (JTable) ((JScrollPane) rc).getViewport().getView();
+                JTable prevTable = tables.get(tables.size() - 1);
+//                try
+//                {
+//                prevTable = (JTable) ((JScrollPane) rc).getViewport().getView();
+//                }
+//                catch (ClassCastException e)
+//                {
+//                    System.err.println();
+//                }
                 int actualTableHright = (prevTable.getRowCount() + 1) * prevTable.getRowHeight() + 15;
                 rc.setPreferredSize(new Dimension(0, Math.min(actualTableHright, height)));
 
@@ -283,6 +305,7 @@ class QueryFileView extends JPanel
                 resultsPanel.add(new JScrollPane(splitPane), BorderLayout.CENTER);
             }
         }
+        tables.add(resultTable);
     }
 
     private JTable createResultTable()

@@ -5,14 +5,19 @@ import com.viskan.payloadbuilder.catalog.TableFunctionInfo;
 import com.viskan.payloadbuilder.parser.ExecutionContext;
 import com.viskan.payloadbuilder.parser.Expression;
 
+import static com.viskan.payloadbuilder.DescribeUtils.CATALOG;
+import static com.viskan.payloadbuilder.utils.MapUtils.entry;
+import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 
 import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 /** Operator handling TVF's */
 class TableFunctionOperator extends AOperator
@@ -27,6 +32,20 @@ class TableFunctionOperator extends AOperator
         this.tableAlias = requireNonNull(tableAlias, "tableAlias");
         this.functionInfo = requireNonNull(functionInfo, "tableFunction");
         this.arguments = requireNonNull(arguments, "arguments");
+    }
+
+    @Override
+    public String getName()
+    {
+        return "Function: " + functionInfo.getName();
+    }
+
+    @Override
+    public Map<String, Object> getDescribeProperties()
+    {
+        return ofEntries(true,
+                entry(CATALOG, functionInfo.getCatalog().getName()),
+                entry("Arguments", arguments.stream().map(Object::toString).collect(toList())));
     }
 
     @Override

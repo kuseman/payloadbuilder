@@ -33,7 +33,6 @@ public abstract class Catalog
 
     /**
      * Get indices for provided table
-     *
      * @param table Table to retrieve index for
      **/
     public List<Index> getIndices(QualifiedName table)
