@@ -21,7 +21,7 @@ public class NestedLoopJoinTest extends AOperatorTest
     {
         TableAlias a = TableAlias.of(null, "table", "t");
         TableAlias r = TableAlias.of(a, "range", "r");
-        Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
+        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator());
         NestedLoopJoin op = new NestedLoopJoin(
                 0,
                 "",
@@ -50,7 +50,7 @@ public class NestedLoopJoinTest extends AOperatorTest
     {
         TableAlias a = TableAlias.of(null, "table", "t");
         TableAlias r = TableAlias.of(a, "range", "r");
-        Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
+        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator());
         
         NestedLoopJoin op = new NestedLoopJoin(
                 0,
@@ -80,7 +80,7 @@ public class NestedLoopJoinTest extends AOperatorTest
     {
         TableAlias a = TableAlias.of(null, "table", "t");
         TableAlias r = TableAlias.of(a, "range", "r");
-        Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
+        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator());
         
         NestedLoopJoin op = new NestedLoopJoin(
                 0,
@@ -110,7 +110,7 @@ public class NestedLoopJoinTest extends AOperatorTest
     {
         TableAlias a = TableAlias.of(null, "table", "t");
         TableAlias r = TableAlias.of(a, "range", "r");
-        Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
+        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator());
         
         NestedLoopJoin op = new NestedLoopJoin(
                 0,
@@ -154,7 +154,7 @@ public class NestedLoopJoinTest extends AOperatorTest
     {
         TableAlias a = TableAlias.of(null, "table", "t");
         TableAlias r = TableAlias.of(a, "range", "r");
-        Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
+        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator());
         
         NestedLoopJoin op = new NestedLoopJoin(
                 0,

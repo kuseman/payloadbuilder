@@ -4,7 +4,9 @@ import com.viskan.payloadbuilder.QuerySession;
 import com.viskan.payloadbuilder.operator.OperatorContext;
 import com.viskan.payloadbuilder.operator.Row;
 
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -100,6 +102,12 @@ public class ExecutionContext
         lambdaValues.set(lambdaId, value);
     }
     
+    /** Get variables map */
+    public Map<String, Object> getVariables()
+    {
+        return defaultIfNull(variables, emptyMap());
+    }
+    
     /** Set variable to context */
     public void setVariable(String scope, String name, Object value)
     {
@@ -117,8 +125,7 @@ public class ExecutionContext
         }
     }
     
-    /** Get variable from context 
-     * @param name2 */
+    /** Get variable from context */
     public Object getVariable(String name)
     {
         Object value = variables != null ? variables.get(name) : null;

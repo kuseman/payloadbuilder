@@ -61,7 +61,7 @@ class QueryFileView extends JPanel
     private static final Icon CLOSE_ICON = FontIcon.of(FontAwesome.CLOSE);
     private static final Icon WARNING_ICON = FontIcon.of(FontAwesome.WARNING);
     private static final Icon EXTERNAL_LINK = FontIcon.of(FontAwesome.EXTERNAL_LINK);
-    
+
     private final JSplitPane splitPane;
     private final TextEditorPane textEditor;
     private final JTabbedPane resultTabs;
@@ -76,7 +76,6 @@ class QueryFileView extends JPanel
 
     private boolean resultCollapsed;
     private int prevDividerLocation;
-
 
     QueryFileView(
             QueryFileModel file,
@@ -148,21 +147,21 @@ class QueryFileView extends JPanel
             }
             else if (QueryFileModel.RESULT_MODEL.equals(l.getPropertyName()))
             {
-                handleResultModelAdded();
+                handleResultModelAdded((ResultModel) l.getNewValue());
             }
         });
-        
+
         // Redirect query sessions output to messages text area
         messagePrintStream = new PrintStream(new OutputStream()
         {
             @Override
             public void write(int b) throws IOException
             {
-                messages.append(String.valueOf((char)b));
+                messages.append(String.valueOf((char) b));
                 messages.setCaretPosition(messages.getDocument().getLength());
             }
         });
-        
+
         file.getQuerySession().setPrintStream(messagePrintStream);
     }
 
@@ -206,18 +205,14 @@ class QueryFileView extends JPanel
         {
             resultTabs.setSelectedIndex(1);
         }
-        
-        revalidate();
-        repaint();
     }
-    
+
     private final List<JTable> tables = new ArrayList<>();
 
-    private void handleResultModelAdded()
+    private void handleResultModelAdded(final ResultModel resultModel)
     {
         JTable resultTable = createResultTable();
         final TableColumnAdjuster columnAdjuster = new TableColumnAdjuster(resultTable, 10);
-        final ResultModel resultModel = file.getResults().get(file.getResults().size() - 1);
         // Add listener to adjust columns upon reaching 30 rows or query is complete
         final AtomicBoolean columnsAdjusted = new AtomicBoolean();
 
@@ -237,75 +232,75 @@ class QueryFileView extends JPanel
         });
         resultTable.setModel(resultModel);
 
-        /*
-        1. ScrollPane (table1)
-        2. ScrollPane(SplitPane(ScrollPane(table1), ScrollPane(table2))
-        3. RC: ScrollPane(table2)
-           New SplitPane(ScrollPane(table2), ScrollPane(table3))
-           ScrollPane(SplitPane(ScrollPane(table1), SplitPane(ScrollPane(table2), ScrollPane(table3))))
-        4. Rc: SplitPane(ScrollPane(table2), ScrollPane(table3)))
-           New SplitPane(SplitPane(ScrollPane(table2), ScrollPane(table3)), ScrollPane(table4))
-           ScrollPane(SplitPane(ScrollPane(table1), SplitPane(SplitPane(ScrollPane(table2), ScrollPane(table3)), ScrollPane(table4))))
-        */
-        // First component, simply add the table
-        if (resultsPanel.getComponentCount() == 0)
+        tables.add(resultTable);
+        int size = tables.size();
+
+        resultsPanel.removeAll();
+
+        // 8 rows plus header plus spacing
+        int tablHeight = resultTable.getRowHeight() * 9 + 10;
+
+        Component parent = null;
+
+        for (int i = 0; i < size; i++)
         {
-            resultsPanel.add(new JScrollPane(resultTable), BorderLayout.CENTER);
-        }
-        else
-        {
-            Component c = resultsPanel.getComponent(0);
-            c = ((JScrollPane) c).getViewport().getView();
-
-            // 8 rows plus header plus spacing
-            int height = resultTable.getRowHeight() * 9 + 10;
-
-            JSplitPane splitPane = new JSplitPane();
-            splitPane.setOrientation(JSplitPane.VERTICAL_SPLIT);
-
-            // Split panel, calculate height of previous table
-            // and set a new split panel in the previous split panels right component
-            if (c instanceof JSplitPane)
+            JTable table = tables.get(i);
+            JTable prevTable = i > 0 ? tables.get(i-1) : null;
+            int prevTableHeight = -1;
+            if (i > 0)
             {
-                JSplitPane prevSplitPane = (JSplitPane) c;
-                Component rc = prevSplitPane.getRightComponent();
-
-                JTable prevTable = tables.get(tables.size() - 1);
-//                try
-//                {
-//                prevTable = (JTable) ((JScrollPane) rc).getViewport().getView();
-//                }
-//                catch (ClassCastException e)
-//                {
-//                    System.err.println();
-//                }
-                int actualTableHright = (prevTable.getRowCount() + 1) * prevTable.getRowHeight() + 15;
-                rc.setPreferredSize(new Dimension(0, Math.min(actualTableHright, height)));
-
-                splitPane.setLeftComponent(rc);
-
-                splitPane.setRightComponent(new JScrollPane(resultTable));
-                splitPane.getRightComponent().setPreferredSize(new Dimension(0, height));
-
-                prevSplitPane.setRightComponent(splitPane);
+                // The least of 8 rows or actual rows in prev table
+                prevTableHeight = Math.min((prevTable.getRowCount() + 1) * prevTable.getRowHeight() + 15, tablHeight);
             }
-            // Single table, add a split panel and add both new and old table
+            // Single table
+            if (i == 0)
+            {
+                parent = table;
+            }
+            // Split panel
+            else if (i == 1)
+            {
+                JSplitPane sp = new JSplitPane();
+                sp.setOrientation(JSplitPane.VERTICAL_SPLIT);
+                sp.setLeftComponent(new JScrollPane(parent));
+             // Adjust prev tables height
+                sp.getLeftComponent().setPreferredSize(new Dimension(0, prevTableHeight));
+                sp.setRightComponent(new JScrollPane(table));
+                sp.getRightComponent().setPreferredSize(new Dimension(0, tablHeight));
+
+                parent = sp;
+            }
+            // Nested split panel
             else
             {
-                resultsPanel.removeAll();
-                splitPane.setLeftComponent(new JScrollPane(c));
-
-                JTable prevTable = (JTable) c;
-                int actualTableHright = (prevTable.getRowCount() + 1) * prevTable.getRowHeight() + 15;
-                splitPane.getLeftComponent().setPreferredSize(new Dimension(0, Math.min(actualTableHright, height)));
-
-                splitPane.setRightComponent(new JScrollPane(resultTable));
-                splitPane.getRightComponent().setPreferredSize(new Dimension(0, height));
-
-                resultsPanel.add(new JScrollPane(splitPane), BorderLayout.CENTER);
+                JSplitPane prevSp = (JSplitPane) parent;
+                Component rc = prevSp.getRightComponent();
+                
+                JSplitPane sp = new JSplitPane();
+                sp.setOrientation(JSplitPane.VERTICAL_SPLIT);
+                
+                // Adjust prev tables height
+                if (rc instanceof JScrollPane)
+                {
+                    sp.setLeftComponent(new JScrollPane(prevTable));
+                    sp.getLeftComponent().setPreferredSize(new Dimension(0, prevTableHeight));
+                }
+                else if (rc instanceof JSplitPane)
+                {
+                    ((JSplitPane) rc).getRightComponent().setPreferredSize(new Dimension(0, prevTableHeight));
+                    sp.setLeftComponent(rc);
+                }
+                sp.setRightComponent(new JScrollPane(table));
+                sp.getRightComponent().setPreferredSize(new Dimension(0, tablHeight));
+                
+                JSplitPane topSp = new JSplitPane();
+                topSp.setOrientation(JSplitPane.VERTICAL_SPLIT);
+                
+                // Replace the right component with the new split panel
+                prevSp.setRightComponent(sp);
             }
         }
-        tables.add(resultTable);
+        resultsPanel.add(new JScrollPane(parent), BorderLayout.CENTER);
     }
 
     private JTable createResultTable()
@@ -348,7 +343,7 @@ class QueryFileView extends JPanel
                 {
                     setIcon(null);
                 }
-                
+
                 if (value == null)
                 {
                     setText("NULL");
@@ -361,7 +356,7 @@ class QueryFileView extends JPanel
                 {
                     setBackground(TABLE_REGULAR_BACKGROUND);
                 }
-                
+
                 return this;
             }
         });

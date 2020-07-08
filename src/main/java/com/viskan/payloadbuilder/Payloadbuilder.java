@@ -18,12 +18,12 @@ public class Payloadbuilder
      *   - DeferenceExpression
      *      Implement
      *   - Correlated queries support
-     *   - Order by
-     *      Implement
      *   - Extensibility
      *      Override parts of query and/remove/alter
      *   - Sources support (art_id/attr1_id lists)
      *      Built in operator ?  
+     *   - Insert into temptable
+     *      Needed for campaigns etc. Eventual stockhouse
      *   - Add more builtin functions
      *      - lowercase
      *      - ltrim
@@ -32,14 +32,10 @@ public class Payloadbuilder
      *      - dateadd
      *      - Make sure everything from old payloadbuilder is supported
      *   - Describe support
-     *      Table (fetch one row and show available columns)
      *      Function (show metadata, arguments, documentation)
-     *      Select (build query plan and show in result set (indented tree))
-     *        Add support for catalogs to provide info in a object like fashion to show in a column
      *   - Analyze select
      *      Perform select and measure stuff like catalog times, execution count
      *      Let catalogs provide data, like bytes fetched etc.
-     *   - Show parameters/variables
      *   - Add support for project alias.*
      *   - Write SQL server catalog
      *   - BatchMergeJoin

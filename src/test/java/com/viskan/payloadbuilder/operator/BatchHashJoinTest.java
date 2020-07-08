@@ -13,14 +13,10 @@ import static java.util.stream.Collectors.toList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Random;
 import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
-import org.apache.commons.lang3.time.StopWatch;
-import org.junit.Ignore;
 import org.junit.Test;
 
 /** Test {@link BatchHashJoin} */
@@ -30,8 +26,8 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_inner_join_empty_outer()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 1);
-        Operator left = context -> emptyIterator();
-        Operator right = context -> emptyIterator();
+        Operator left = op(ctx -> emptyIterator());
+        Operator right = op(ctx -> emptyIterator());
 
         BatchHashJoin op = new BatchHashJoin(
                 0,
@@ -54,15 +50,15 @@ public class BatchHashJoinTest extends AOperatorTest
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 1);
         TableAlias a = TableAlias.of(null, "table", "a");
-        Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
-        Operator right = context ->
+        Operator left = op(contet -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
+        Operator right = op(context ->
         {
             while (context.getOperatorContext().getOuterIndexValues().hasNext())
             {
                 context.getOperatorContext().getOuterIndexValues().next();
             }
             return emptyIterator();
-        };
+        });
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
@@ -83,8 +79,8 @@ public class BatchHashJoinTest extends AOperatorTest
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
         TableAlias a = TableAlias.of(null, "table", "a");
-        Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
-        Operator right = context -> emptyIterator();
+        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
+        Operator right = op(context -> emptyIterator());
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
@@ -106,13 +102,13 @@ public class BatchHashJoinTest extends AOperatorTest
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
         TableAlias a = TableAlias.of(null, "table", "a");
-        Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
-        Operator right = context ->
+        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
+        Operator right = op(context ->
         {
             context.getOperatorContext().getOuterIndexValues().hasNext();
             Object[] ar = context.getOperatorContext().getOuterIndexValues().next();
             return asList(Row.of(a, 0, ar)).iterator();
-        };
+        });
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
@@ -134,8 +130,8 @@ public class BatchHashJoinTest extends AOperatorTest
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
         TableAlias a = TableAlias.of(null, "table", "a");
-        Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
-        Operator right = context ->
+        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
+        Operator right = op(context ->
         {
             while (context.getOperatorContext().getOuterIndexValues().hasNext())
             {
@@ -143,7 +139,7 @@ public class BatchHashJoinTest extends AOperatorTest
             }
             context.getOperatorContext().getOuterIndexValues().next();
             return emptyIterator();
-        };
+        });
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
@@ -168,11 +164,11 @@ public class BatchHashJoinTest extends AOperatorTest
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = context -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+        Operator left = op(context -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
                 .stream()
                 .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator();
-        Operator right = context ->
+                .iterator());
+        Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Row> inner = StreamSupport.stream(it.spliterator(), false)
@@ -183,7 +179,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .collect(toList());
 
             return inner.iterator();
-        };
+        });
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
@@ -234,11 +230,11 @@ public class BatchHashJoinTest extends AOperatorTest
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = context -> asList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+        Operator left = op(context -> asList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
                 .stream()
                 .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator();
-        Operator right = context ->
+                .iterator());
+        Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Row> inner = StreamSupport.stream(it.spliterator(), false)
@@ -249,7 +245,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .collect(toList());
 
             return inner.iterator();
-        };
+        });
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
@@ -308,8 +304,8 @@ public class BatchHashJoinTest extends AOperatorTest
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator();
-        Operator right = context ->
+        Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
+        Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
@@ -319,7 +315,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}, new Object[] {-666, 3}).stream())
                     .map(ar -> Row.of(b, posRight.getAndIncrement(), ar))
                     .iterator();
-        };
+        });
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
@@ -369,8 +365,8 @@ public class BatchHashJoinTest extends AOperatorTest
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator();
-        Operator right = context ->
+        Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
+        Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
@@ -380,7 +376,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
                     .map(ar -> Row.of(b, posRight.getAndIncrement(), ar))
                     .iterator();
-        };
+        });
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
@@ -439,11 +435,11 @@ public class BatchHashJoinTest extends AOperatorTest
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
+        Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
                 .stream()
                 .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator();
-        Operator right = context ->
+                .iterator());
+        Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Row> rows = StreamSupport.stream(it.spliterator(), false)
@@ -454,7 +450,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .collect(toList());
 
             return rows.iterator();
-        };
+        });
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
@@ -505,11 +501,11 @@ public class BatchHashJoinTest extends AOperatorTest
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
+        Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
                 .stream()
                 .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator();
-        Operator right = context ->
+                .iterator());
+        Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Row> inner = StreamSupport.stream(it.spliterator(), false)
@@ -520,7 +516,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .collect(toList());
 
             return inner.iterator();
-        };
+        });
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
@@ -583,11 +579,11 @@ public class BatchHashJoinTest extends AOperatorTest
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
+        Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
                 .stream()
                 .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator();
-        Operator right = context ->
+                .iterator());
+        Operator right = op(context ->
         {
             // Create 2 rows for each input row
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
@@ -600,7 +596,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .collect(toList());
 
             return inner.iterator();
-        };
+        });
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
@@ -652,11 +648,11 @@ public class BatchHashJoinTest extends AOperatorTest
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
+        Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
                 .stream()
                 .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator();
-        Operator right = context ->
+                .iterator());
+        Operator right = op(context ->
         {
             // Create 2 rows for each input row
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
@@ -669,7 +665,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .collect(toList());
 
             return inner.iterator();
-        };
+        });
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
@@ -734,11 +730,11 @@ public class BatchHashJoinTest extends AOperatorTest
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = context -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+        Operator left = op(context -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
                 .stream()
                 .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator();
-        Operator right = context ->
+                .iterator());
+        Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Row> inner = StreamSupport.stream(it.spliterator(), false)
@@ -749,7 +745,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .collect(toList());
 
             return inner.iterator();
-        };
+        });
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
@@ -798,11 +794,11 @@ public class BatchHashJoinTest extends AOperatorTest
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = context -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+        Operator left = op(context -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
                 .stream()
                 .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator();
-        Operator right = context ->
+                .iterator());
+        Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Row> inner = StreamSupport.stream(it.spliterator(), false)
@@ -813,7 +809,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .collect(toList());
 
             return inner.iterator();
-        };
+        });
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
@@ -872,8 +868,8 @@ public class BatchHashJoinTest extends AOperatorTest
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator();
-        Operator right = context ->
+        Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
+        Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
@@ -883,7 +879,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
                     .map(ar -> Row.of(b, posRight.getAndIncrement(), ar))
                     .iterator();
-        };
+        });
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
@@ -934,8 +930,8 @@ public class BatchHashJoinTest extends AOperatorTest
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator();
-        Operator right = context ->
+        Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
+        Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
@@ -945,7 +941,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
                     .map(ar -> Row.of(b, posRight.getAndIncrement(), ar))
                     .iterator();
-        };
+        });
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
@@ -1007,11 +1003,11 @@ public class BatchHashJoinTest extends AOperatorTest
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
+        Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
                 .stream()
                 .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator();
-        Operator right = context ->
+                .iterator());
+        Operator right = op(context ->
         {
             // Create 2 rows for each input row
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
@@ -1022,7 +1018,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
                     .map(ar -> Row.of(b, posRight.getAndIncrement(), ar))
                     .iterator();
-        };
+        });
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
@@ -1075,11 +1071,11 @@ public class BatchHashJoinTest extends AOperatorTest
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
+        Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
                 .stream()
                 .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator();
-        Operator right = context ->
+                .iterator());
+        Operator right = op(context ->
         {
             // Create 2 rows for each input row
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
@@ -1090,7 +1086,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
                     .map(ar -> Row.of(b, posRight.getAndIncrement(), ar))
                     .iterator();
-        };
+        });
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
@@ -1146,96 +1142,92 @@ public class BatchHashJoinTest extends AOperatorTest
         assertEquals(24, count);
     }
 
-    @Ignore
-    @Test
-    public void test_inner_join_large()
-    {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 250);
-        Random rnd = new Random();
-        TableAlias a = TableAlias.of(null, "tableA", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
-        TableAlias c = TableAlias.of(b, "tableC", "c");
-        MutableInt bPos = new MutableInt();
-        MutableInt cPos = new MutableInt();
-
-        Operator tableA = context -> IntStream.range(1, 1000000).mapToObj(i -> Row.of(a, i, new Object[] {rnd.nextInt(10000), rnd.nextBoolean()})).iterator();
-        Operator tableB = context ->
-        {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
-                    .flatMap(val -> asList(
-                            new Object[] {val, 1, rnd.nextBoolean()},
-                            new Object[] {val, 2, rnd.nextBoolean()},
-                            new Object[] {val, 3, rnd.nextBoolean()},
-                            new Object[] {val, 4, rnd.nextBoolean()}).stream())
-                    .map(ar2 -> Row.of(b, bPos.getAndIncrement(), ar2))
-                    .iterator();
-        };
-        Operator tableC = context ->
-        {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
-                    .flatMap(val -> asList(
-                            new Object[] {val, 1, "Val" + val},
-                            new Object[] {val, 4, rnd.nextBoolean()}).stream())
-                    .map(ar -> Row.of(c, cPos.getAndIncrement(), ar))
-                    .iterator();
-        };
-
-        /**
-         * from tableA a inner join [ tableB b inner join [tableC] c on c.id = b.id ] b on b.id = a.id
-         */
-
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
-                tableA,
-                new BatchHashJoin(0,
-                        "",
-                        tableB,
-                        tableC,
-                        (ctx, row, values) -> values[0] = row.getObject(0),
-                        (ctx, row, values) -> values[0] = row.getObject(0),
-                        (ctx, row) ->
-                        {
-                            return (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0);
-                        },
-                        DefaultRowMerger.DEFAULT,
-                        false,
-                        false,
-                        index),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row) ->
-                {
-                    return (Boolean) row.getObject(2)
-                        && (Boolean) row.getParent().getObject(1)
-                        && (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0);
-                },
-                DefaultRowMerger.DEFAULT,
-                false,
-                false,
-                index);
-
-        for (int i = 0; i < 150; i++)
-        {
-            StopWatch sw = new StopWatch();
-            sw.start();
-            Iterator<Row> it = op.open(new ExecutionContext(session));
-            int count = 0;
-            while (it.hasNext())
-            {
-                Row row = it.next();
-                //                assertEquals(4, row.getChildRows(0).size());
-                //                                                                System.out.println(row + " " + row.getChildRows(0).stream().map(r -> r.toString() + " " + r.getChildRows(0)).collect(joining(", ")) );
-                //            assertEquals("Val" + row.getObject(0), row.getChildRows(0).get(0).getObject(1));
-                count++;
-            }
-            sw.stop();
-            long mem = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-            System.out.println("Time: " + sw.toString() + " rows: " + count + " mem: " + FileUtils.byteCountToDisplaySize(mem));
-        }
-        //        assertEquals(5, count);
-    }
+//    @Ignore
+//    @Test
+//    public void test_inner_join_large()
+//    {
+//        Index index = new Index(QualifiedName.of("table"), asList("col"), 250);
+//        Random rnd = new Random();
+//        TableAlias a = TableAlias.of(null, "tableA", "a");
+//        TableAlias b = TableAlias.of(a, "tableB", "b");
+//        TableAlias c = TableAlias.of(b, "tableC", "c");
+//        MutableInt bPos = new MutableInt();
+//        MutableInt cPos = new MutableInt();
+//
+//        Operator tableA = op(context -> IntStream.range(1, 1000000).mapToObj(i -> Row.of(a, i, new Object[] {rnd.nextInt(10000), rnd.nextBoolean()})).iterator());
+//        Operator tableB = op(context ->
+//        {
+//            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+//            return StreamSupport.stream(it.spliterator(), false)
+//                    .map(ar -> (Integer) ar[0])
+//                    .flatMap(val -> asList(
+//                            new Object[] {val, 1, rnd.nextBoolean()},
+//                            new Object[] {val, 2, rnd.nextBoolean()},
+//                            new Object[] {val, 3, rnd.nextBoolean()},
+//                            new Object[] {val, 4, rnd.nextBoolean()}).stream())
+//                    .map(ar2 -> Row.of(b, bPos.getAndIncrement(), ar2))
+//                    .iterator();
+//        });
+//        Operator tableC = op(context ->
+//        {
+//            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+//            return StreamSupport.stream(it.spliterator(), false)
+//                    .map(ar -> (Integer) ar[0])
+//                    .flatMap(val -> asList(
+//                            new Object[] {val, 1, "Val" + val},
+//                            new Object[] {val, 4, rnd.nextBoolean()}).stream())
+//                    .map(ar -> Row.of(c, cPos.getAndIncrement(), ar))
+//                    .iterator();
+//        });
+//
+//        BatchHashJoin op = new BatchHashJoin(0,
+//                "",
+//                tableA,
+//                new BatchHashJoin(0,
+//                        "",
+//                        tableB,
+//                        tableC,
+//                        (ctx, row, values) -> values[0] = row.getObject(0),
+//                        (ctx, row, values) -> values[0] = row.getObject(0),
+//                        (ctx, row) ->
+//                        {
+//                            return (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0);
+//                        },
+//                        DefaultRowMerger.DEFAULT,
+//                        false,
+//                        false,
+//                        index),
+//                (ctx, row, values) -> values[0] = row.getObject(0),
+//                (ctx, row, values) -> values[0] = row.getObject(0),
+//                (ctx, row) ->
+//                {
+//                    return (Boolean) row.getObject(2)
+//                        && (Boolean) row.getParent().getObject(1)
+//                        && (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0);
+//                },
+//                DefaultRowMerger.DEFAULT,
+//                false,
+//                false,
+//                index);
+//
+//        for (int i = 0; i < 150; i++)
+//        {
+//            StopWatch sw = new StopWatch();
+//            sw.start();
+//            Iterator<Row> it = op.open(new ExecutionContext(session));
+//            int count = 0;
+//            while (it.hasNext())
+//            {
+//                Row row = it.next();
+//                //                assertEquals(4, row.getChildRows(0).size());
+//                //                                                                System.out.println(row + " " + row.getChildRows(0).stream().map(r -> r.toString() + " " + r.getChildRows(0)).collect(joining(", ")) );
+//                //            assertEquals("Val" + row.getObject(0), row.getChildRows(0).get(0).getObject(1));
+//                count++;
+//            }
+//            sw.stop();
+//            long mem = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+//            System.out.println("Time: " + sw.toString() + " rows: " + count + " mem: " + FileUtils.byteCountToDisplaySize(mem));
+//        }
+//        //        assertEquals(5, count);
+//    }
 }

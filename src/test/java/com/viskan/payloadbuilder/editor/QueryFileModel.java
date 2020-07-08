@@ -24,7 +24,7 @@ import org.apache.commons.lang3.tuple.Pair;
  **/
 class QueryFileModel
 {
-    private final SwingPropertyChangeSupport pcs = new SwingPropertyChangeSupport(this);
+    private final SwingPropertyChangeSupport pcs = new SwingPropertyChangeSupport(this, true);
     static final String RESULT_MODEL = "resultModel";
     static final String DIRTY = "dirty";
     static final String FILENAME = "filename";

@@ -328,12 +328,11 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             context.operator = new BatchRepeatOperator(context.acquireNodeId(), batchLimitId, context.operator);
         }
 
-        // TODO: wrap context.operator with order by
-        // NOTE! Must be after batch repeat operator or else the order will be per batch
         List<SortItem> sortBys = query.getOrderBy();
         if (!sortBys.isEmpty())
         {
             sortBys.forEach(si -> si.accept(this, context));
+            context.operator = new SortByOperator(context.acquireNodeId(), context.operator, new ExpressionRowComparator(sortBys));
         }
 
         List<String> projectionAliases = new ArrayList<>();
@@ -410,7 +409,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         if (!nestedSelectItem.getOrderBy().isEmpty())
         {
-            // TODO: wrap from operator with order by
+            fromOperator = new SortByOperator(context.acquireNodeId(), fromOperator, new ExpressionRowComparator(nestedSelectItem.getOrderBy()));
         }
 
         if (nestedSelectItem.getType() == Type.ARRAY)

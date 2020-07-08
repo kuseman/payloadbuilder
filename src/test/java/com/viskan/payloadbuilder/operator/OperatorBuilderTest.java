@@ -1,24 +1,15 @@
 package com.viskan.payloadbuilder.operator;
 
-import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.catalog.TableFunctionInfo;
-import com.viskan.payloadbuilder.parser.ExecutionContext;
 import com.viskan.payloadbuilder.parser.QualifiedName;
-import com.viskan.payloadbuilder.parser.Select;
-import com.viskan.payloadbuilder.parser.TableOption;
+import com.viskan.payloadbuilder.parser.SortItem;
+import com.viskan.payloadbuilder.parser.SortItem.NullOrder;
+import com.viskan.payloadbuilder.parser.SortItem.Order;
 
 import static com.viskan.payloadbuilder.parser.QualifiedName.of;
 import static java.util.Arrays.asList;
 
-import java.util.Iterator;
-import java.util.List;
-import java.util.Random;
-import java.util.stream.IntStream;
-
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.time.StopWatch;
-import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -49,6 +40,23 @@ public class OperatorBuilderTest extends AOperatorTest
         }
     }
 
+    @Test
+    public void test_sortBy()
+    {
+        String query = "select a.art_id from article a order by a.art_id";
+        QueryResult queryResult = getQueryResult(query);
+
+        Operator expected = new SortByOperator(
+                1,
+                queryResult.tableOperators.get(0),
+                new ExpressionRowComparator((asList(new SortItem(e("a.art_id"), Order.ASC, NullOrder.UNDEFINED)))));
+
+//                System.out.println(queryResult.operator.toString(1));
+//                System.err.println(expected.toString(1));
+
+        assertEquals(expected, queryResult.operator);
+    }
+    
     @Test
     public void test_groupBy()
     {
@@ -222,154 +230,6 @@ public class OperatorBuilderTest extends AOperatorTest
                 asList(new ExpressionProjection(e("aa.sku_id"))));
 
         assertEquals(expectedProjection, queryResult.projection);
-    }
-
-    @Ignore
-    @Test
-    public void test()
-    {
-        Select select = parser.parseSelect(
-                "select aa.a1.attr1_code"
-                    + ",    s.art_id + ab.articleBrandId col"
-                    + "/*,    array"
-                    + "     ("
-                    + "       object"
-                    + "       ("
-                    + "         rowId, "
-                    + "         brandName, "
-                    + "         articleBrandId "
-                    + "       )"
-                    + "       from ab "
-                    + "     ) brands*/"
-                    + ",    array"
-                    + "     ("
-                    + "         sku_id,"
-                    + "         array"
-                    + "         ("
-                    + "             ap.sku_id,"
-                    + "             ap.row_id "
-                    + "             from ap"
-                    + "         ) "
-                    + "     from aa"
-                    + "     ) sub "
-                    + "from source s "
-                    + "inner join "
-                    + "["
-                    + "  article "
-                    + "] a "
-                    + "    on a.art_id = s.art_id "
-                    + "inner join "
-                    + "["
-                    + "  articleAttribute aa"
-                    + "  inner join "
-                    + "  ["
-                    + "    attribute1 a1 "
-                    + "    inner join attribute1Group a1g "
-                    + "     on a1g.attr1_id = a1.attr1_id "
-                    + "  ] a1 "
-                    + "      on a1.attr1_id = aa.attr1_id"
-                    + "  inner join articlePrice ap "
-                    + "    on ap.sku_id = aa.sku_id "
-                    + "    and ap.active_flg "
-                    + "    and ap.min_qty = 1"
-                    + "] aa "
-                    + "    on aa.art_id = s.art_id "
-                    + "    and aa.active_flg "
-                    + "    and aa.internet_flg "
-                    + "inner join "
-                    + "["
-                    + "  articleBrand "
-                    + "] ab "
-                    + "    on ab.articleBrandId = a.articleBrandId "
-                    + "");
-
-        Catalog c = new Catalog("TEST")
-        {
-            Random rand = new Random();
-
-            @Override
-            public Operator getScanOperator(int nodeId, String catalogAlias, TableAlias alias, List<TableOption> tableOptions)
-            {
-                boolean ap = alias.getAlias().equals("ap");
-                boolean ab = alias.getAlias().equals("ab");
-
-                int to = 50000;
-                return c -> IntStream.range(0, rand.nextInt(to) + 1)
-                        .mapToObj(i ->
-                        {
-                            int length = alias.getColumns().length;
-                            Object[] values = new Object[length];
-                            for (int ii = 0; ii < length; ii++)
-                            {
-                                if (alias.getColumns()[ii].endsWith("flg"))
-                                {
-                                    values[ii] = Boolean.TRUE;
-                                }
-                                else if (ap && alias.getColumns()[ii].equals("sku_id"))
-                                {
-                                    values[ii] = i % 10;
-                                }
-                                else if (ab && alias.getColumns()[ii].equals("articleBrandId"))
-                                {
-                                    values[ii] = i % 10;
-                                }
-                                else if (alias.getColumns()[ii].equals("min_qty"))
-                                {
-                                    values[ii] = 1;
-                                }
-                                else if (alias.getColumns()[ii].endsWith("Name"))
-                                {
-                                    byte[] b = new byte[10];
-                                    rand.nextBytes(b);
-                                    values[ii] = new String(b);
-                                }
-                                else
-                                {
-                                    values[ii] = i;
-                                }
-                            }
-
-                            return Row.of(alias, i, values);
-                        })
-                        .iterator();
-            }
-        };
-
-        session.setDefaultCatalog(c);
-
-        for (int i = 0; i < 1000; i++)
-        {
-
-            StopWatch sw = new StopWatch();
-            sw.start();
-
-            Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
-            Operator operator = pair.getLeft();
-            Projection projection = pair.getRight();
-            if (i == 0)
-            {
-                System.err.println(operator.toString(1));
-            }
-            JsonStringWriter writer = new JsonStringWriter();
-
-            ExecutionContext context = new ExecutionContext(session);
-            Iterator<Row> it = operator.open(context);
-            int count = 0;
-            while (it.hasNext())
-            {
-                Row row = it.next();
-                context.setRow(row);
-                projection.writeValue(writer, context);
-                writer.getAndReset();
-                //            System.out.println(row);
-                //            System.out.println();
-                count++;
-            }
-
-            sw.stop();
-            System.out.println("TIme: " + sw.toString() + ", rows: " + count + ", mem: " + FileUtils.byteCountToDisplaySize((Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory())));
-
-        }
     }
 
     @Test
@@ -597,65 +457,65 @@ public class OperatorBuilderTest extends AOperatorTest
                 result.projection);
     }
 
-    @Ignore
-    @Test
-    public void test_correlated_manual()
-    {
-        String query = "SELECT s.art_id "
-            + "FROM source s "
-            + "INNER JOIN "
-            + "["
-            + "  article a"
-            + "  INNER JOIN [articleAttribute] aa"
-            + "    ON aa.art_id = a.art_id "
-            + "    AND s.id "
-            + "] a"
-            + "  ON a.art_id = s.art_id";
-
-        Catalog c = new Catalog("TEST")
-        {
-            Random rnd = new Random();
-
-            @Override
-            public Operator getScanOperator(int nodeId, String catalogAlias, TableAlias alias, List<TableOption> tableOptions)
-            {
-                QualifiedName qname = alias.getTable();
-                if (qname.toString().equals("source"))
-                {
-                    return new CachingOperator(0, c -> IntStream.range(0, 1000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextBoolean(), rnd.nextInt(100)})).iterator());
-                }
-                else if (qname.toString().equals("article"))
-                {
-                    return new CachingOperator(0, c -> IntStream.range(0, 1000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextInt(1000)})).iterator());
-                }
-
-                return new CachingOperator(0, c -> IntStream.range(0, 10000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextInt(1000)})).iterator());
-            }
-        };
-
-        session.setDefaultCatalog(c);
-
-        Pair<Operator, Projection> pair = null;
-        for (int i = 0; i < 10; i++)
-        {
-            pair = OperatorBuilder.create(session, parser.parseSelect(query));
-            ExecutionContext context = new ExecutionContext(session);
-            Iterator<Row> it = pair.getKey().open(context);
-            StopWatch sw = new StopWatch();
-            sw.start();
-            int count = 0;
-            while (it.hasNext())
-            {
-                Row row = it.next();
-                //            System.out.println(row);
-                count++;
-            }
-            sw.stop();
-            System.out.println("Time: " + sw.toString() + ", rows: " + count);
-            System.out.println(FileUtils.byteCountToDisplaySize(Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()));
-        }
-
-        System.out.println(pair.getKey().toString(1));
-
-    }
+//    @Ignore
+//    @Test
+//    public void test_correlated_manual()
+//    {
+//        String query = "SELECT s.art_id "
+//            + "FROM source s "
+//            + "INNER JOIN "
+//            + "["
+//            + "  article a"
+//            + "  INNER JOIN [articleAttribute] aa"
+//            + "    ON aa.art_id = a.art_id "
+//            + "    AND s.id "
+//            + "] a"
+//            + "  ON a.art_id = s.art_id";
+//
+//        Catalog c = new Catalog("TEST")
+//        {
+//            Random rnd = new Random();
+//
+//            @Override
+//            public Operator getScanOperator(int nodeId, String catalogAlias, TableAlias alias, List<TableOption> tableOptions)
+//            {
+//                QualifiedName qname = alias.getTable();
+//                if (qname.toString().equals("source"))
+//                {
+//                    return new CachingOperator(0, c -> IntStream.range(0, 1000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextBoolean(), rnd.nextInt(100)})).iterator());
+//                }
+//                else if (qname.toString().equals("article"))
+//                {
+//                    return new CachingOperator(0, c -> IntStream.range(0, 1000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextInt(1000)})).iterator());
+//                }
+//
+//                return new CachingOperator(0, c -> IntStream.range(0, 10000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextInt(1000)})).iterator());
+//            }
+//        };
+//
+//        session.setDefaultCatalog(c);
+//
+//        Pair<Operator, Projection> pair = null;
+//        for (int i = 0; i < 10; i++)
+//        {
+//            pair = OperatorBuilder.create(session, parser.parseSelect(query));
+//            ExecutionContext context = new ExecutionContext(session);
+//            Iterator<Row> it = pair.getKey().open(context);
+//            StopWatch sw = new StopWatch();
+//            sw.start();
+//            int count = 0;
+//            while (it.hasNext())
+//            {
+//                Row row = it.next();
+//                //            System.out.println(row);
+//                count++;
+//            }
+//            sw.stop();
+//            System.out.println("Time: " + sw.toString() + ", rows: " + count);
+//            System.out.println(FileUtils.byteCountToDisplaySize(Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()));
+//        }
+//
+//        System.out.println(pair.getKey().toString(1));
+//
+//    }
 }

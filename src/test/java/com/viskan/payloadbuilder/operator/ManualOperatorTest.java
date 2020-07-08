@@ -54,6 +54,12 @@ public class ManualOperatorTest extends Assert
                 return new Operator()
                 {
                     @Override
+                    public int getNodeId()
+                    {
+                        return 0;
+                    }
+                    
+                    @Override
                     public Iterator<Row> open(ExecutionContext context)
                     {
                         String stringPath = tableAlias.getTable().getParts().stream().collect(joining("/", "C:/", ""));

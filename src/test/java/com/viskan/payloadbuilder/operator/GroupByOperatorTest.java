@@ -22,7 +22,7 @@ public class GroupByOperatorTest extends AOperatorTest
     public void test()
     {
         TableAlias alias = TableAlias.of(null, QualifiedName.of("a"), "a");
-        Operator op = ctx -> IntStream.range(0, 10).mapToObj(i -> Row.of(alias, i, new Object[] {i, i % 2})).iterator();
+        Operator op = op(ctx -> IntStream.range(0, 10).mapToObj(i -> Row.of(alias, i, new Object[] {i, i % 2})).iterator());
 
         GroupByOperator gop = new GroupByOperator(
                 0,

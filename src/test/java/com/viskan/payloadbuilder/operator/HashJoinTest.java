@@ -19,8 +19,8 @@ public class HashJoinTest extends AOperatorTest
     {
         HashJoin op = new HashJoin(0,
                 "",
-                c -> emptyIterator(),
-                c -> emptyIterator(),
+                op(c -> emptyIterator()),
+                op(c -> emptyIterator()),
                 (c, row) -> (Integer) row.getObject(0),
                 (c, row) -> (Integer) row.getObject(0),
                 (ctx, row) -> (int) row.getObject(0) == (int) row.getParent().getObject(0),
@@ -36,7 +36,7 @@ public class HashJoinTest extends AOperatorTest
     {
         TableAlias a = TableAlias.of(null, "table", "t");
         TableAlias r = TableAlias.of(a, "range", "r");
-        Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator();
+        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator());
         HashJoin op = new HashJoin(0,
                 "",
                 left,
@@ -65,8 +65,8 @@ public class HashJoinTest extends AOperatorTest
     {
         TableAlias t = TableAlias.of(null, "table", "t");
         TableAlias t2 = TableAlias.of(t, "table2", "t2");
-        Operator left = context -> IntStream.range(1, 10).mapToObj(i -> Row.of(t, i - 1, new Object[] {i})).iterator();
-        Operator right = context -> IntStream.range(1, 20).mapToObj(i -> Row.of(t2, i - 1, new Object[] {i % 10})).iterator();
+        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(t, i - 1, new Object[] {i})).iterator());
+        Operator right = op(context -> IntStream.range(1, 20).mapToObj(i -> Row.of(t2, i - 1, new Object[] {i % 10})).iterator());
         HashJoin op = new HashJoin(0,
                 "",
                 left,
@@ -101,8 +101,8 @@ public class HashJoinTest extends AOperatorTest
     {
         TableAlias a = TableAlias.of(null, "table", "a");
         TableAlias b = TableAlias.of(a, "table", "b");
-        Operator left = context -> IntStream.range(0, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
-        Operator right = context -> IntStream.range(5, 15).mapToObj(i -> Row.of(b, i - 1, new Object[] {i})).iterator();
+        Operator left = op(context -> IntStream.range(0, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
+        Operator right = op(context -> IntStream.range(5, 15).mapToObj(i -> Row.of(b, i - 1, new Object[] {i})).iterator());
         
         HashJoin op = new HashJoin(0,
                 "",
@@ -139,8 +139,8 @@ public class HashJoinTest extends AOperatorTest
     {
         TableAlias a = TableAlias.of(null, "table", "a");
         TableAlias b = TableAlias.of(a, "table", "b");
-        Operator left = context -> IntStream.range(0, 5).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator();
-        Operator right = context -> IntStream.range(5, 15).mapToObj(i -> Row.of(b, i - 1, new Object[] {i % 5 + 2})).iterator();
+        Operator left = op(context -> IntStream.range(0, 5).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
+        Operator right = op(context -> IntStream.range(5, 15).mapToObj(i -> Row.of(b, i - 1, new Object[] {i % 5 + 2})).iterator());
         
         HashJoin op = new HashJoin(0,
                 "",

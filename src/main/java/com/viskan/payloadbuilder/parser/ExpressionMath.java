@@ -259,6 +259,17 @@ public final class ExpressionMath
     }
 
     @SuppressWarnings("unchecked")
+    public static int cmp(Object left, Object right)
+    {
+        if (left.getClass() != right.getClass() || !(left instanceof Comparable))
+        {
+            throw new IllegalArgumentException("Cannot compare " + left + " and " + right);
+        }
+
+        return ((Comparable<Object>) left).compareTo(right);
+    }
+    
+    @SuppressWarnings("unchecked")
     public static boolean eq(Object left, Object right, boolean throwIfNotComparable)
     {
         if (left instanceof Number)

@@ -1,20 +1,27 @@
 package com.viskan.payloadbuilder;
 
+import com.viskan.payloadbuilder.catalog.Catalog;
+import com.viskan.payloadbuilder.catalog.Index;
 import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.operator.ObjectProjection;
 import com.viskan.payloadbuilder.operator.Operator;
 import com.viskan.payloadbuilder.operator.OperatorBuilder;
 import com.viskan.payloadbuilder.operator.Projection;
 import com.viskan.payloadbuilder.operator.Row;
+import com.viskan.payloadbuilder.parser.DescribeTableStatement;
 import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.ParseException;
 import com.viskan.payloadbuilder.parser.QualifiedName;
 import com.viskan.payloadbuilder.parser.Select;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -39,21 +46,121 @@ public class DescribeUtils
     private DescribeUtils()
     {
     }
+    
+    /** Builds a describe table select */
+    static Pair<Operator, Projection> getDescribeTable(ExecutionContext context, DescribeTableStatement statement)
+    {
+        QuerySession session = context.getSession();
+        String catalogAlias = statement.getCatalog();
+        QualifiedName tableName = statement.getTableName();
+        Catalog catalog = isBlank(catalogAlias) ? session.getDefaultCatalog() : session.getCatalogRegistry().getCatalog(catalogAlias);
 
+        if (catalog == null)
+        {
+            throw new ParseException("Could not find catalog with alias " + catalogAlias, 0, 0);
+        }
+
+        TableAlias tableAlias = TableAlias.of(null, tableName, "");
+        Operator operator = catalog.getScanOperator(0, catalogAlias, tableAlias, emptyList());
+
+        context.clear();
+        // Get first row from scan operator
+        Iterator<Row> iterator = operator.open(context);
+        List<Class<?>> typeByColumn = null;
+
+        // Fetch ten first rows from operator
+        // This to minimize the risk of getting null in one column
+        // and don't be able to get data type, it's type less/reflective system :)
+        int count = 10;
+        int columnCount = -1;
+        while (count > 0 && iterator.hasNext())
+        {
+            if (columnCount == -1)
+            {
+                columnCount = tableAlias.getColumns().length;
+                if (columnCount <= 0)
+                {
+                    break;
+                }
+                typeByColumn = new ArrayList<>(Collections.nCopies(columnCount, null));
+            }
+
+            Row row = iterator.next();
+            count--;
+
+            for (int i = 0; i < columnCount; i++)
+            {
+                if (typeByColumn.get(i) == null)
+                {
+                    Object value = row.getObject(i);
+                    typeByColumn.set(i, value != null ? value.getClass() : null);
+                }
+            }
+
+        }
+
+        if (typeByColumn == null)
+        {
+            return null;
+        }
+
+        List<Index> indices = catalog.getIndices(tableName);
+
+        // Name,    Type,   Description
+        // art_id,  Column, String
+        // index1   Index   [art_id]
+
+        // Create a select over all columns in table
+
+        TableAlias describeAlias = new TableAlias(null, QualifiedName.of("describe"), "d", new String[] {"Name", "Type", "Description"});
+        List<Row> describeRows = new ArrayList<>(columnCount + indices.size());
+        int pos = 0;
+        // Add column rows
+        for (int i = 0; i < columnCount; i++)
+        {
+            Class<?> type = typeByColumn.get(i);
+            describeRows.add(Row.of(describeAlias, pos++, new Object[] {tableAlias.getColumns()[i], "Column", type == null ? "Unknown" : type.getSimpleName()}));
+        }
+        describeRows.add(Row.of(describeAlias, pos++, new Object[] { "", "", "" }));
+        // Add indices
+        int i = 1;
+        for (Index index : indices)
+        {
+            describeRows.add(Row.of(describeAlias, pos++, new Object[] {"Index_" + (i++), "Index", index.getColumns() + " (Batch size: " + index.getBatchSize() + ")"}));
+        }
+
+        Operator describeOperator = new Operator()
+        {
+            @Override
+            public Iterator<Row> open(ExecutionContext context)
+            {
+                return describeRows.iterator();
+            }
+
+            @Override
+            public int getNodeId()
+            {
+                return 0;
+            }
+        };
+
+        return Pair.of(describeOperator, getIndexProjection(asList(describeAlias.getColumns())));
+    }
+    
     /** Build describe select from provided select */
     static Pair<Operator, Projection> getDescribeSelect(QuerySession session, Select select)
     {
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
         Operator root = pair.getKey();
 
-        final List<DescribeRow> describeRows = new ArrayList<>();
+        final List<DescribeOperatorRow> describeRows = new ArrayList<>();
         collectOperatorDescribeRows(describeRows, root, 0, "", false);
 
         List<String> describeColumns = new ArrayList<>();
         Map<String, MutableInt> countByColumn = new HashMap<>();
 
         // Count properties columns
-        for (DescribeRow row : describeRows)
+        for (DescribeOperatorRow row : describeRows)
         {
             for (String col : row.properties.keySet())
             {
@@ -80,7 +187,7 @@ public class DescribeUtils
         List<Row> rows = new ArrayList<>(describeRows.size());
         int pos = 0;
         int size = describeColumns.size();
-        for (DescribeRow dRow : describeRows)
+        for (DescribeOperatorRow dRow : describeRows)
         {
             Object[] values = new Object[size];
             values[0] = dRow.nodeId;
@@ -109,35 +216,30 @@ public class DescribeUtils
             }
         };
 
-        Projection describeProjection = new ObjectProjection(
-                describeColumns,
-                IntStream.range(0, describeColumns.size()).mapToObj(index -> (Projection) (writer, context) ->
+        return Pair.of(describeOperator, getIndexProjection(describeColumns));
+    }
+    
+    /** Get an object projection over column array */
+    static Projection getIndexProjection(List<String> columns)
+    {
+        return new ObjectProjection(
+                columns,
+                IntStream.range(0, columns.size()).mapToObj(index -> (Projection) (writer, ctx) ->
                 {
-                    Row row = context.getRow();
+                    Row row = ctx.getRow();
                     writer.writeValue(row.getObject(index));
                 }).collect(toList()));
-
-        return Pair.of(describeOperator, describeProjection);
     }
 
     private static void collectOperatorDescribeRows(
-            List<DescribeRow> rows,
+            List<DescribeOperatorRow> rows,
             Operator parent,
             int pos,
             String indent,
             boolean last)
     {
-        //        Object[] values = new Object[DESCRIBE_TABLE_ALIAS.getColumns().length];
-        //        values[0] = parent.getNodeId();
-        //        values[1] = indent + "+- " + parent.getName();
-        //        values[2] = parent.getDescribeString();
-        //        values[3] = parent.getDescribeProperties();
-
-        rows.add(new DescribeRow(parent.getNodeId(), indent + "+- " + parent.getName(), parent.getDescribeProperties()));
-
+        rows.add(new DescribeOperatorRow(parent.getNodeId(), indent + "+- " + parent.getName(), parent.getDescribeProperties()));
         indent += last ? "   " : "|  ";
-        //        rows.add(Row.of(DESCRIBE_TABLE_ALIAS, pos++, values));
-
         for (int i = 0; i < parent.getChildOperators().size(); i++)
         {
             Operator child = parent.getChildOperators().get(i);
@@ -145,13 +247,13 @@ public class DescribeUtils
         }
     }
 
-    private static class DescribeRow
+    private static class DescribeOperatorRow
     {
         final int nodeId;
         final String name;
         final Map<String, Object> properties;
 
-        public DescribeRow(int nodeId, String name, Map<String, Object> properties)
+        public DescribeOperatorRow(int nodeId, String name, Map<String, Object> properties)
         {
             this.nodeId = nodeId;
             this.name = name;

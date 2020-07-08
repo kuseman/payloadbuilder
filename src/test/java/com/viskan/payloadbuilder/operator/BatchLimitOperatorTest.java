@@ -17,7 +17,7 @@ public class BatchLimitOperatorTest extends AOperatorTest
     public void test()
     {
         TableAlias alias = TableAlias.of(null, QualifiedName.of("a"), "a");
-        Operator op = ctx -> IntStream.range(0, 10).mapToObj(i -> Row.of(alias, i, new Object[] {i} )).iterator();                
+        Operator op = op(ctx -> IntStream.range(0, 10).mapToObj(i -> Row.of(alias, i, new Object[] {i} )).iterator());                
         Operator limitOp = new BatchLimitOperator(0, op, LiteralExpression.create(5));
         
         ExecutionContext ctx = new ExecutionContext(session);

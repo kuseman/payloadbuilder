@@ -1,75 +1,54 @@
 package com.viskan.payloadbuilder.codegen;
 
-import com.viskan.payloadbuilder.catalog.TableAlias;
-import com.viskan.payloadbuilder.operator.Row;
-import com.viskan.payloadbuilder.parser.ExecutionContext;
-import com.viskan.payloadbuilder.parser.Expression;
-import com.viskan.payloadbuilder.parser.QueryParser;
-
-import static java.util.stream.Collectors.toList;
-
-import java.io.IOException;
-import java.util.Iterator;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
-import java.util.stream.IntStream;
-
-import org.openjdk.jmh.annotations.Benchmark;
-import org.openjdk.jmh.annotations.Fork;
-import org.openjdk.jmh.annotations.Level;
-import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Scope;
-import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
-import org.openjdk.jmh.annotations.Warmup;
-import org.openjdk.jmh.runner.RunnerException;
 
 @State(Scope.Thread)
 public class BenchmarkTest
 {
-    Expression e;
-    TableAlias ta;
-    Row r;
-    Function<Row, Object> func;
-    ExecutionContext context;
-
-    @Setup(Level.Trial)
-    public void setup()
-    {
-        e = new QueryParser().parseExpression("a.filter(a -> a % 2 = 0)");
-        ta = TableAlias.of(null, "t", "a");
-        ta.setColumns(new String[] { "a" });
-        r = Row.of(ta, 0, new Object[] { IntStream.range(0, 100000).mapToObj(i -> i).collect(toList()) } );
-        func = new CodeGenerator().generateFunction(ta, e);
-        context = new ExecutionContext();
-    }
-    
-    
-    @Benchmark
-    @Warmup(iterations = 3, time = 10, timeUnit = TimeUnit.SECONDS)
-    @Measurement(iterations = 3, time = 10, timeUnit = TimeUnit.SECONDS)
-    @Fork(1)
-    public void test_eval()
-    {
-        Iterator it = (Iterator) e.eval(context, r);
-        while (it.hasNext())
-        {
-            it.next();
-        }
-    }
-    
-    @Benchmark
-    @Warmup(iterations = 3, time = 10, timeUnit = TimeUnit.SECONDS)
-    @Measurement(iterations = 3, time = 10, timeUnit = TimeUnit.SECONDS)
-    @Fork(1)
-    public void test_codegen()
-    {
-        Iterator it = (Iterator) func.apply(r);
-        while (it.hasNext())
-        {
-            it.next();
-        }
-    }
+//    Expression e;
+//    TableAlias ta;
+//    Row r;
+//    Function<Row, Object> func;
+//    ExecutionContext context;
+//
+//    @Setup(Level.Trial)
+//    public void setup()
+//    {
+//        e = new QueryParser().parseExpression("a.filter(a -> a % 2 = 0)");
+//        ta = TableAlias.of(null, "t", "a");
+//        ta.setColumns(new String[] { "a" });
+//        r = Row.of(ta, 0, new Object[] { IntStream.range(0, 100000).mapToObj(i -> i).collect(toList()) } );
+//        func = new CodeGenerator().generateFunction(ta, e);
+//        context = new ExecutionContext();
+//    }
+//    
+//    
+//    @Benchmark
+//    @Warmup(iterations = 3, time = 10, timeUnit = TimeUnit.SECONDS)
+//    @Measurement(iterations = 3, time = 10, timeUnit = TimeUnit.SECONDS)
+//    @Fork(1)
+//    public void test_eval()
+//    {
+//        Iterator it = (Iterator) e.eval(context, r);
+//        while (it.hasNext())
+//        {
+//            it.next();
+//        }
+//    }
+//    
+//    @Benchmark
+//    @Warmup(iterations = 3, time = 10, timeUnit = TimeUnit.SECONDS)
+//    @Measurement(iterations = 3, time = 10, timeUnit = TimeUnit.SECONDS)
+//    @Fork(1)
+//    public void test_codegen()
+//    {
+//        Iterator it = (Iterator) func.apply(r);
+//        while (it.hasNext())
+//        {
+//            it.next();
+//        }
+//    }
     
 //    @Benchmark
 //    public void test()
@@ -189,13 +168,13 @@ public class BenchmarkTest
 //        boolean res6 = res2 && res5;
 //    }
     
-    public static void main(String[] args) throws RunnerException, IOException
-    {
-//        BenchmarkTest bt = new BenchmarkTest();
-//        bt.setup();
-//        System.out.println(IteratorUtils.toList((Iterator) bt.test_eval()));
-//        System.out.println(IteratorUtils.toList((Iterator) bt.test_codegen()));
-        
-        org.openjdk.jmh.Main.main(args);
-    }
+//    public static void main(String[] args) throws RunnerException, IOException
+//    {
+////        BenchmarkTest bt = new BenchmarkTest();
+////        bt.setup();
+////        System.out.println(IteratorUtils.toList((Iterator) bt.test_eval()));
+////        System.out.println(IteratorUtils.toList((Iterator) bt.test_codegen()));
+//        
+//        org.openjdk.jmh.Main.main(args);
+//    }
 }

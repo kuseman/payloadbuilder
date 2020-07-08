@@ -26,6 +26,7 @@ statement
 miscStatement
  : setStatement
  | describeStatement
+ | showStatement
  ;
 
 setStatement
@@ -38,6 +39,14 @@ describeStatement
  	 tableName 
    | functionName '('')'
    | selectStatement 
+ )
+ ;
+
+showStatement
+ : SHOW
+ (
+ 	VARIABLES
+ |  PARAMETERS
  )
  ;
 
@@ -237,7 +246,6 @@ ARRAY	     : A R R A Y;
 AS		     : A S;
 ASC		     : A S C;
 APPLY	     : A P P L Y;
-BATCH_SIZE   : B A T C H '_' S I Z E;
 CROSS        : C R O S S;
 DESC	     : D E S C;
 DESCRIBE	 : D E S C R I B E;
@@ -263,12 +271,15 @@ ON		     : O N;
 OR		     : O R;
 ORDERBY	     : O R D E R ' ' B Y;
 OUTER        : O U T E R;
+PARAMETERS   : P A R A M E T E R S;
 PRINT        : P R I N T;
 SELECT	     : S E L E C T;
 SESSION		 : S E S S I O N;
 SET			 : S E T;
+SHOW		 : S H O W;
 THEN		 : T H E N;
 TRUE	     : T R U E;
+VARIABLES	 : V A R I A B L E S;
 WITH         : W I T H;
 WHERE	     : W H E R E;
 

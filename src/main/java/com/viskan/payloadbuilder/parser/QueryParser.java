@@ -28,6 +28,7 @@ import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.QueryContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.SelectItemContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.SelectStatementContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.SetStatementContext;
+import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.ShowStatementContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.SortItemContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.TableSourceContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.TableSourceJoinedContext;
@@ -181,6 +182,13 @@ public class QueryParser
             }
             
             return new DescribeSelectStatement((SelectStatement) visit(ctx.selectStatement()));
+        }
+        
+        @Override
+        public Object visitShowStatement(ShowStatementContext ctx)
+        {
+            ShowStatement.Type type = ctx.PARAMETERS() != null ? ShowStatement.Type.PARAMETERS : ShowStatement.Type.VARIABLES;
+            return new ShowStatement(type);
         }
         
         @Override

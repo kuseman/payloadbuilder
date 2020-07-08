@@ -31,7 +31,7 @@ class QualifiedReferencePath
     
     /** <pre>
      * Parts that's left after lookup. 
-     * Object lookup after destination. Ie a Map-traversal. */
+     * Object lookup after destination. Ie. a Map-traversal. */
     private final List<String> parts;
     
     /** Calculates lookup path.

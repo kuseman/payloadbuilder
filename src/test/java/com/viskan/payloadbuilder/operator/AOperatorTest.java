@@ -14,6 +14,7 @@ import static java.util.Collections.emptyIterator;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.function.Function;
 
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.tuple.Pair;
@@ -28,6 +29,25 @@ public class AOperatorTest extends Assert
     protected Expression e(String expression)
     {
         return parser.parseExpression(expression);
+    }
+    
+    protected Operator op(final Function<ExecutionContext, Iterator<Row>> it)
+    {
+        return new Operator()
+        {
+            
+            @Override
+            public Iterator<Row> open(ExecutionContext context)
+            {
+                return it.apply(context);
+            }
+            
+            @Override
+            public int getNodeId()
+            {
+                return 0;
+            }
+        };
     }
 
     protected QueryResult getQueryResult(String query)

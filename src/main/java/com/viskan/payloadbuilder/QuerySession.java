@@ -16,6 +16,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.BooleanSupplier;
 
+import org.apache.commons.lang3.ObjectUtils;
+
 /** A query session. Holds properties for catalog implementations etc.
  * Can live through mulitple query executions 
  **/
@@ -125,6 +127,18 @@ public class QuerySession
         }
     }
 
+    /** Return variables map */
+    public Map<String, Object> getVariables()
+    {
+        return ObjectUtils.defaultIfNull(variables, emptyMap());
+    }
+    
+    /** Return parameters map */
+    public Map<String, Object> getParameters()
+    {
+        return parameters;
+    }
+    
     /** Get property by key */
     public Object getVariable(String name)
     {

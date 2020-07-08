@@ -3,10 +3,13 @@ package com.viskan.payloadbuilder.operator;
 import com.viskan.payloadbuilder.parser.ExecutionContext;
 import com.viskan.payloadbuilder.parser.Expression;
 
+import static com.viskan.payloadbuilder.utils.MapUtils.entry;
+import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
 import static java.util.Objects.requireNonNull;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.collections.iterators.SingletonIterator;
 import org.apache.commons.lang3.StringUtils;
@@ -24,6 +27,18 @@ class OuterValuesOperator extends AOperator
         super(nodeId);
         this.operator = requireNonNull(operator, "operator");
         this.valueExpressions = requireNonNull(valueExpressions, "valueExpressions");
+    }
+    
+    @Override
+    public String getName()
+    {
+        return "Outer values";
+    }
+    
+    @Override
+    public Map<String, Object> getDescribeProperties()
+    {
+        return ofEntries(entry("Values", valueExpressions.toString()));
     }
 
     @SuppressWarnings("unchecked")

@@ -43,8 +43,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 new OuterValuesOperator(1, operators.get(0), asList(e("10"))),
                 new ExpressionPredicate(e("a.active_flg")));
 
-        System.err.println(pair.getKey().toString(1));
-        System.out.println(expected.toString(1));
+//        System.err.println(pair.getKey().toString(1));
+//        System.out.println(expected.toString(1));
         
         assertEquals(expected, pair.getKey());
         
@@ -320,6 +320,12 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             {
                 return new Operator()
                 {
+                    @Override
+                    public int getNodeId()
+                    {
+                        return 0;
+                    }
+                    
                     @Override
                     public Iterator<Row> open(ExecutionContext context)
                     {
