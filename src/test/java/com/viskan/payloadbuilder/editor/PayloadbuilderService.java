@@ -35,13 +35,12 @@ class PayloadbuilderService
     /** Execute query for provider query file */
     static void executeQuery(
             QueryFileModel file,
-            String queryString)
+            String queryString,
+            Runnable queryFinnishedCallback)
     {
         EXECUTOR.execute(() ->
         {
             file.setState(State.EXECUTING);
-//            StopWatch sw = new StopWatch();
-//            sw.start();
             try
             {
                 file.getQuerySession().setAbortSupplier(() -> file.getState() == State.ABORTED);
@@ -57,11 +56,7 @@ class PayloadbuilderService
                     file.addResult(resultModel);
                     setupColumns(resultModel, queryResult.getResultMetaData());
 
-                    ObjectWriter writer = new ObjectWriter(
-//                            file,
-//                            sw,
-                            resultModel);
-
+                    ObjectWriter writer = new ObjectWriter(resultModel);
                     queryResult.writeResult(writer);
 
                     resultModel.done();
@@ -96,6 +91,7 @@ class PayloadbuilderService
                 {
                     file.setState(State.COMPLETED);
                 }
+                queryFinnishedCallback.run();
             }
         });
     }
@@ -116,14 +112,10 @@ class PayloadbuilderService
     {
         private final Stack<Object> parent = new Stack<>();
         private final Stack<String> currentField = new Stack<>();
-//        private final QueryFileModel file;
-//        private final StopWatch stopWatch;
         private final ResultModel resultModel;
 
-        ObjectWriter(/*QueryFileModel file,/* StopWatch stopWatch, */ResultModel resultModel)
+        ObjectWriter(ResultModel resultModel)
         {
-//            this.file = file;
-//            this.stopWatch = stopWatch;
             this.resultModel = resultModel;
         }
 

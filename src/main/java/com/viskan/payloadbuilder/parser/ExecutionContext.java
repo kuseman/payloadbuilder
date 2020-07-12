@@ -14,8 +14,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import gnu.trove.map.hash.THashMap;
-
 /** Context used during execution of a query */
 public class ExecutionContext
 {
@@ -35,7 +33,7 @@ public class ExecutionContext
      * which is performed alot of times during a select
      * </pre> 
      */
-    private Map<String, Object> statementCache;
+//    private Map<String, Object> statementCache;
     
     /** Reference to row. Used in projections, correlated sub queries */
     private Row row;
@@ -126,48 +124,48 @@ public class ExecutionContext
     }
     
     /** Get variable from context */
-    public Object getVariable(String name)
+    public Object getVariableValue(String name)
     {
         Object value = variables != null ? variables.get(name) : null;
         if (value == null)
         {
-            value = session.getVariable(name);
+            value = session.getVariableValue(name);
         }
         return value;
     }
     
-    /** Get value from statement cache */
-    @SuppressWarnings("unchecked")
-    public <T> T getStatementCacheValue(String key)
-    {
-        if (statementCache == null)
-        {
-            return null;
-        }
-        
-        return (T) statementCache.get(key);
-    }
+//    /** Get value from statement cache */
+//    @SuppressWarnings("unchecked")
+//    public <T> T getStatementCacheValue(String key)
+//    {
+//        if (statementCache == null)
+//        {
+//            return null;
+//        }
+//        
+//        return (T) statementCache.get(key);
+//    }
     
     /** Set statement cache value */
-    public void setStatementCacheValue(String key, Object value)
-    {
-        if (statementCache == null)
-        {
-            statementCache = new THashMap<>();
-        }
-        
-        statementCache.put(key, value);
-    }
-    
-    /** Clear statement cache */
-    public void clearStatementCache() 
-    {
-        if (statementCache == null)
-        {
-            return;
-        }
-        statementCache.clear();
-    }
+//    public void setStatementCacheValue(String key, Object value)
+//    {
+//        if (statementCache == null)
+//        {
+//            statementCache = new THashMap<>();
+//        }
+//        
+//        statementCache.put(key, value);
+//    }
+//    
+//    /** Clear statement cache */
+//    public void clearStatementCache() 
+//    {
+//        if (statementCache == null)
+//        {
+//            return;
+//        }
+//        statementCache.clear();
+//    }
     
     private void ensureSize(List<?> list, int itemIndex)
     {

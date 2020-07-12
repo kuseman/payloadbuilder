@@ -27,7 +27,7 @@ public class VariableExpression extends Expression
     @Override
     public Object eval(ExecutionContext context)
     {
-        return context.getVariable(name);
+        return context.getVariableValue(name);
     }
     
     @Override

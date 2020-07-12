@@ -7,10 +7,10 @@ import com.viskan.payloadbuilder.operator.OperatorContext;
 import com.viskan.payloadbuilder.operator.OperatorContext.NodeData;
 import com.viskan.payloadbuilder.operator.Row;
 import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.provider.elastic.EtmArticleCategoryESCatalog.TypeMapping;
 
 import static com.viskan.payloadbuilder.DescribeUtils.CATALOG;
 import static com.viskan.payloadbuilder.DescribeUtils.INDEX;
-import static com.viskan.payloadbuilder.provider.elastic.EtmArticleCategoryESCatalog.ARTICLE_DOC_TYPE;
 import static com.viskan.payloadbuilder.utils.MapUtils.entry;
 import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
 import static java.util.Collections.emptyList;
@@ -57,7 +57,7 @@ class EtmArticleCategoryESOperator extends AOperator
     private static final int TIMESTAMP_COLUMN_INDEX = -2;
     private static final int DOC_ID_COLUMN_INDEX = -3;
 
-    private static final ObjectMapper MAPPER = new ObjectMapper()
+    static final ObjectMapper MAPPER = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private static final PoolingHttpClientConnectionManager CONNECTION_MANAGER = new PoolingHttpClientConnectionManager();
@@ -68,47 +68,56 @@ class EtmArticleCategoryESOperator extends AOperator
             .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
             .build();
 
+    private final TypeMapping typeMapping;
     private final TableAlias tableAlias;
     private final Index index;
-    private final String catalogAlias;
+    private final String endpointKey;
+    private final String instanceKey;
 
-    public EtmArticleCategoryESOperator(int nodeId, String catalogAlias, TableAlias tableAlias, Index index)
+    public EtmArticleCategoryESOperator(
+            TypeMapping typeMapping,
+            int nodeId,
+            String catalogAlias,
+            TableAlias tableAlias,
+            Index index)
     {
         super(nodeId);
-        this.catalogAlias = catalogAlias;
+        this.typeMapping = typeMapping;
         this.tableAlias = tableAlias;
         this.index = index;
+        this.endpointKey = catalogAlias + "." + EtmArticleCategoryESCatalog.ENDPOINT_KEY;
+        this.instanceKey = catalogAlias + "." + EtmArticleCategoryESCatalog.INSTANCE_KEY;
     }
 
     /* SETTINGS FIELDS */
-
-    private final Map<String, String> TABLE_TO_SUBTYPE = ofEntries(
-            entry("article", "article"),
-            entry("articlename", "article"),
-            entry("articleproperty", "article"),
-            entry("articleattribute", "article"),
-            entry("articleattributemedia", "article"),
-            entry("articlecategory", "article"),
-            entry("articleprice", "articlePrice"),
-            entry("attribute1", "attribute1"),
-            entry("attribute2", "attribute2"),
-            entry("attribute3", "attribute3"));
-
-    private final Map<String, String> DOC_ID_PATTERN_BY_TABLE = ofEntries(
-            entry("article", "EtmArticleV2_%s"),
-            entry("articlename", "EtmArticleV2_%s"),
-            entry("articleattribute", "EtmArticleV2_%s"),
-            entry("articleprice", "EtmArticleV2_articlePrice_%s_%s"),
-            entry("articlecategory", "EtmArticleV2_%s"),
-            entry("articleproperty", "EtmArticleV2_%s"),
-            entry("articleattributemedia", "EtmArticleV2_%s"),
-            entry("attribute1", "EtmArticleV2_attribute1_%s"),
-            entry("attribute2", "EtmArticleV2_attribute2_%s"),
-            entry("attribute3", "EtmArticleV2_attribute3_%s"),
-            entry("propertykey", "EtmArticleV2_propertyKey_%s"),
-            entry("propertyvalue", "EtmArticleV2_propertyValue_%s")
-
-    );
+    //
+    //    private final Map<String, String> TABLE_TO_SUBTYPE = ofEntries(
+    //            entry("article", "article"),
+    //            entry("articlename", "article"),
+    //            entry("articleproperty", "article"),
+    //            entry("articleattribute", "article"),
+    //            entry("articleattributemedia", "article"),
+    //            entry("articlecategory", "article"),
+    //            entry("articleprice", "articlePrice"),
+    //            entry("attribute1", "attribute1"),
+    //            entry("attribute2", "attribute2"),
+    //            entry("attribute3", "attribute3"));
+    //
+    //    private final Map<String, String> DOC_ID_PATTERN_BY_TABLE = ofEntries(
+    //            entry("article", "EtmArticleV2_%s"),
+    //            entry("articlename", "EtmArticleV2_%s"),
+    //            entry("articleattribute", "EtmArticleV2_%s"),
+    //            entry("articleprice", "EtmArticleV2_articlePrice_%s_%s"),
+    //            entry("articlecategory", "EtmArticleV2_%s"),
+    //            entry("articleproperty", "EtmArticleV2_%s"),
+    //            entry("articleattributemedia", "EtmArticleV2_%s"),
+    //            entry("attribute1", "EtmArticleV2_attribute1_%s"),
+    //            entry("attribute2", "EtmArticleV2_attribute2_%s"),
+    //            entry("attribute3", "EtmArticleV2_attribute3_%s"),
+    //            entry("propertykey", "EtmArticleV2_propertyKey_%s"),
+    //            entry("propertyvalue", "EtmArticleV2_propertyValue_%s")
+    //
+    //    );
 
     //    private static final String DOC_TYPE = "EtmArticleV2";
     //    String esEndpoint = "http://192.168.10.78:9200";
@@ -144,15 +153,57 @@ class EtmArticleCategoryESOperator extends AOperator
     @Override
     public Iterator<Row> open(ExecutionContext context)
     {
-        String varEndpoint = (String) context.getVariable(catalogAlias + "." + EtmArticleCategoryESCatalog.ENDPOINT_KEY);
-        String varIndex = (String) context.getVariable(catalogAlias + "." + EtmArticleCategoryESCatalog.INDEX_KEY);
+        String endpoint;
+        String table;
+        String instance;
 
-        if (isBlank(varEndpoint) || isBlank(varIndex))
+        List<String> parts = tableAlias.getTable().getParts();
+
+        // Three part qualified name -> <endpoint>.<instance>.<table>
+        if (parts.size() == 3)
         {
-            throw new IllegalArgumentException("Missing endpoint/index variables in scope");
+            endpoint = parts.get(0);
+            instance = parts.get(1);
+            table = parts.get(2);
+        }
+        // Tow or one part qualified name -> <instance>.<table> or <table>
+        else if (parts.size() <= 2)
+        {
+            endpoint = (String) context.getVariableValue(endpointKey);
+            if (isBlank(endpoint))
+            {
+                throw new IllegalArgumentException("Missing endpoint key ( " + endpointKey + " ) in variables in scope");
+            }
+
+            if (parts.size() == 2)
+            {
+                instance = parts.get(0);
+                table = parts.get(1);
+            }
+            else
+            {
+                instance = (String) context.getVariableValue(instanceKey);
+                if (isBlank(instance))
+                {
+                    throw new IllegalArgumentException("Missing instance key ( " + instanceKey + " ) in variables in scope");
+                }
+                table = parts.get(0);
+            }
+        }
+        else
+        {
+            throw new IllegalArgumentException("Invalid qualified table name " + tableAlias.getTable() + ". Requires 1 to 3 parts. <endpoint>.<instance>.<table>");
         }
 
-        String table = tableAlias.getTable().toString();
+        String database = lowerCase(instance);
+        int comp_id = 0;
+        int cIndex = instance.lastIndexOf("_");
+        if (cIndex != -1)
+        {
+            database = instance.substring(0, cIndex);
+            comp_id = Integer.parseInt(instance.substring(cIndex + 1));
+        }
+        String indexName = database + "_c" + comp_id + "_v3";
 
         // TODO: turn on only in analyze mode
         NodeData nodeData = context.getOperatorContext().getNodeData(nodeId, NodeData::new);
@@ -162,27 +213,13 @@ class EtmArticleCategoryESOperator extends AOperator
 
         if (index != null)
         {
-            String mgetUrl = String.format("%s/%s/data/_mget?filter_path=docs._source,docs._id&_source_include=_timestamp,payload.%s.columns,payload.%s.rows", varEndpoint, varIndex, table, table);
-            String pattern = DOC_ID_PATTERN_BY_TABLE.get(lowerCase(table));
-
-            if (pattern == null)
+            String mgetUrl = String.format("%s/%s/data/_mget?filter_path=docs._source,docs._id&_source_include=_timestamp,payload.%s.columns,payload.%s.rows", endpoint, indexName, table, table);
+            if (isBlank(typeMapping.docIdPattern))
             {
                 throw new RuntimeException("No doc id pattern registered for " + table);
             }
-
-            // ramosvnptestmain_c0_v3
-            // ramosvnptestmain_c0
-            String instance = varIndex.substring(0, varIndex.lastIndexOf("_"));
-            int comp_id = Integer.parseInt(instance.substring(instance.lastIndexOf("_") + 2));
-            instance = instance.substring(0, instance.lastIndexOf("_"));
-
-            if (comp_id > 0)
-            {
-                instance = instance + "_" + comp_id;
-            }
-
             // TODO: thread up all ids in executor and join
-            DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getOperatorContext(), instance, pattern, sentBytes);
+            DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getOperatorContext(), instance, typeMapping.docIdPattern, sentBytes);
             return getIterator(
                     table,
                     receivedBytes,
@@ -194,19 +231,17 @@ class EtmArticleCategoryESOperator extends AOperator
                     });
         }
 
-        String subType = TABLE_TO_SUBTYPE.get(lowerCase(table));
-
         final String searchUrl = String.format(
                 "%s/%s/data/_search?q=_docType:%s+AND+_subType:%s&size=%d&scroll=%s&filter_path=_scroll_id,hits.hits._id,hits.hits._source&_source_include=_timestamp,payload.%s.columns,payload.%s.rows",
-                varEndpoint,
-                varIndex,
-                ARTICLE_DOC_TYPE,
-                subType,
+                endpoint,
+                indexName,
+                typeMapping.doctype,
+                typeMapping.subtype,
                 1000,
                 "2m",
                 table,
                 table);
-        String scrollUrl = String.format("%s/_search/scroll?scroll=%s&scroll_id=", varEndpoint, "2m");
+        String scrollUrl = String.format("%s/_search/scroll?scroll=%s&scroll_id=", endpoint, "2m");
 
         return getIterator(
                 table,
@@ -227,7 +262,6 @@ class EtmArticleCategoryESOperator extends AOperator
                     }
                 });
     }
-
 
     private Iterator<Row> getIterator(
             String table,
@@ -346,7 +380,7 @@ class EtmArticleCategoryESOperator extends AOperator
                 }
                 return true;
             }
-            
+
             private void populateColumnIndices(Payload payload)
             {
                 // All columns wanted, update alias columns
@@ -356,7 +390,7 @@ class EtmArticleCategoryESOperator extends AOperator
                     String[] columns = Arrays.copyOf(payload.columns, length + 2);
                     columns[length] = TIMESTAMP;
                     columns[length + 1] = DOCID;
-                    
+
                     tableAliasColumnIndices = new int[columns.length];
                     tableAlias.setColumns(columns);
                 }
@@ -364,7 +398,7 @@ class EtmArticleCategoryESOperator extends AOperator
                 {
                     tableAliasColumnIndices = new int[tableAlias.getColumns().length];
                 }
-                
+
                 int index = 0;
                 for (String aliasColumn : tableAlias.getColumns())
                 {
@@ -385,7 +419,7 @@ class EtmArticleCategoryESOperator extends AOperator
                 }
             }
         };
-        
+
     }
 
     /** Top response (Used both in get request and search request) */

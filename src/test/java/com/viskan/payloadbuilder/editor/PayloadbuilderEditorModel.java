@@ -1,7 +1,6 @@
 package com.viskan.payloadbuilder.editor;
 
-import com.viskan.payloadbuilder.editor.catalog.EtmArticleCategoryESCatalogExtension;
-import com.viskan.payloadbuilder.editor.catalog.ICatalogExtension;
+import com.viskan.payloadbuilder.provider.elastic.EtmArticleCategoryESCatalogExtension;
 
 import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
@@ -16,12 +15,11 @@ class PayloadbuilderEditorModel
     public static final String SELECTED_FILE = "selectedFile";
 
     private final List<QueryFileModel> files = new ArrayList<>();
-    private final List<ICatalogExtension> extensions = new ArrayList<>();
+    private final List<CatalogExtensionModel> extensions = new ArrayList<>();
 
     PayloadbuilderEditorModel()
     {
-        extensions.add(new EtmArticleCategoryESCatalogExtension());
-        extensions.add(new EtmArticleCategoryESCatalogExtension());
+        extensions.add(new CatalogExtensionModel(new EtmArticleCategoryESCatalogExtension()));
     }
     
     void addPropertyChangeListener(PropertyChangeListener listener)
@@ -58,7 +56,7 @@ class PayloadbuilderEditorModel
         pcs.fireIndexedPropertyChange(SELECTED_FILE, index, existing, file);
     }
     
-    List<ICatalogExtension> getExtensions()
+    List<CatalogExtensionModel> getExtensions()
     {
         return extensions;
     }

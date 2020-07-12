@@ -57,7 +57,7 @@ public class AOperatorTest extends Assert
         Catalog c = new Catalog("Test")
         {
             @Override
-            public Operator getScanOperator(int nodeId, String catalogAlias, TableAlias alias, List<TableOption> tableOptions)
+            public Operator getScanOperator(QuerySession session, int nodeId, String catalogAlias, TableAlias alias, List<TableOption> tableOptions)
             {
                 if (mAlias.getValue() == null)
                 {

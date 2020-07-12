@@ -234,7 +234,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             if (!equiPairs.isEmpty())
             {
                 Catalog catalog = getCatalog(context, ts.getCatalog(), ts.getToken());
-                index = getIndex(equiPairs, ts.getAlias(), catalog.getIndices(ts.getTable()));
+                index = getIndex(equiPairs, ts.getAlias(), catalog.getIndices(context.session, ts.getCatalog(), ts.getTable()));
             }
             
             if (index != null)
@@ -539,12 +539,12 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         int nodeId = context.acquireNodeId();
         if (context.index != null)
         {
-            context.operator = catalog.getIndexOperator(nodeId, table.getCatalog(), alias, context.index, table.getTableOptions());
+            context.operator = catalog.getIndexOperator(context.session, nodeId, table.getCatalog(), alias, context.index, table.getTableOptions());
             context.index = null;
         }
         else
         {
-            context.operator = catalog.getScanOperator(nodeId, table.getCatalog(), alias, table.getTableOptions());
+            context.operator = catalog.getScanOperator(context.session, nodeId, table.getCatalog(), alias, table.getTableOptions());
         }
         return null;
     }
@@ -675,7 +675,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         {
             Catalog catalog = getCatalog(context, innerTableSource.getCatalog(), innerTableSource.getToken());
             QualifiedName table = innerTableSource.getTable();
-            indices = catalog.getIndices(table);
+            indices = catalog.getIndices(context.session, innerTableSource.getCatalog(), table);
         }
         // TODO: If outer is ordered and no inner indices
         // then the inner could be created and after check it's order for a potential

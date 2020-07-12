@@ -193,14 +193,7 @@ class BatchMergeJoin extends AOperator
                     }
 
                     outerIndex = Math.min(outerIndex, outerRows.size() - 1);
-                    try
-                    {
-                        outerRow = outerRows.get(outerIndex);
-                    }
-                    catch (IndexOutOfBoundsException e)
-                    {
-                        System.out.println();
-                    }
+                    outerRow = outerRows.get(outerIndex);
 
                     if (innerRow == null)
                     {

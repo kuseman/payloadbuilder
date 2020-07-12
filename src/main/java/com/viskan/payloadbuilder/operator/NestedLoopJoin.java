@@ -1,10 +1,16 @@
 package com.viskan.payloadbuilder.operator;
 
+import com.viskan.payloadbuilder.DescribeUtils;
 import com.viskan.payloadbuilder.parser.ExecutionContext;
 
+import static com.viskan.payloadbuilder.utils.MapUtils.entry;
+import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
+import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 
 import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.BiPredicate;
 
@@ -45,6 +51,25 @@ class NestedLoopJoin extends AOperator
         this.emitEmptyOuterRows = emitEmptyOuterRows;
     }
 
+    @Override
+    public List<Operator> getChildOperators()
+    {
+        return asList(outer, inner);
+    }
+    
+    @Override
+    public String getName()
+    {
+        return "Nested loop";
+    }
+    
+    @Override
+    public Map<String, Object> getDescribeProperties()
+    {
+        return ofEntries(
+                entry(DescribeUtils.PREDICATE, predicate));
+    }
+    
     @Override
     public Iterator<Row> open(ExecutionContext context)
     {

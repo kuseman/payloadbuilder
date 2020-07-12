@@ -61,7 +61,7 @@ public class DescribeUtils
         }
 
         TableAlias tableAlias = TableAlias.of(null, tableName, "");
-        Operator operator = catalog.getScanOperator(0, catalogAlias, tableAlias, emptyList());
+        Operator operator = catalog.getScanOperator(context.getSession(), 0, catalogAlias, tableAlias, emptyList());
 
         context.clear();
         // Get first row from scan operator
@@ -104,7 +104,7 @@ public class DescribeUtils
             return null;
         }
 
-        List<Index> indices = catalog.getIndices(tableName);
+        List<Index> indices = catalog.getIndices(context.getSession(), tableName);
 
         // Name,    Type,   Description
         // art_id,  Column, String

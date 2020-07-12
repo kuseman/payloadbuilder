@@ -3,6 +3,7 @@ package com.viskan.payloadbuilder.operator;
 import com.viskan.payloadbuilder.operator.OperatorContext.NodeData;
 import com.viskan.payloadbuilder.parser.ExecutionContext;
 
+import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.repeat;
 
@@ -22,6 +23,18 @@ class CachingOperator extends AOperator
     {
         super(nodeId);
         this.operator = requireNonNull(target, "operator");
+    }
+    
+    @Override
+    public List<Operator> getChildOperators()
+    {
+        return asList(operator);
+    }
+    
+    @Override
+    public String getName()
+    {
+        return "Cache";
     }
 
     @Override

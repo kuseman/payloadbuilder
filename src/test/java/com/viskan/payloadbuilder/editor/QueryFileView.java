@@ -73,6 +73,7 @@ class QueryFileView extends JPanel
     private final JLabel labelExecutionStatus;
     private final Timer executionTimer;
     private final PrintStream messagePrintStream;
+    private final List<JTable> tables = new ArrayList<>();
 
     private boolean resultCollapsed;
     private int prevDividerLocation;
@@ -143,7 +144,7 @@ class QueryFileView extends JPanel
         {
             if (QueryFileModel.STATE.equals(l.getPropertyName()))
             {
-                handleStateChanged();
+                handleStateChanged((State) l.getNewValue());
             }
             else if (QueryFileModel.RESULT_MODEL.equals(l.getPropertyName()))
             {
@@ -165,12 +166,12 @@ class QueryFileView extends JPanel
         file.getQuerySession().setPrintStream(messagePrintStream);
     }
 
-    private void handleStateChanged()
+    private void handleStateChanged(State state)
     {
-        labelExecutionStatus.setIcon(getIconFromState(file.getState()));
-        labelExecutionStatus.setToolTipText(file.getState().getToolTip());
+        labelExecutionStatus.setIcon(getIconFromState(state));
+        labelExecutionStatus.setToolTipText(state.getToolTip());
 
-        switch (file.getState())
+        switch (state)
         {
             case EXECUTING:
                 resultsPanel.removeAll();
@@ -201,13 +202,11 @@ class QueryFileView extends JPanel
         }
 
         // No rows, then show messages
-        if (file.getState() != State.EXECUTING && file.getResults().size() == 0)
+        if (state != State.EXECUTING && resultsPanel.getComponentCount() == 0)
         {
             resultTabs.setSelectedIndex(1);
         }
     }
-
-    private final List<JTable> tables = new ArrayList<>();
 
     private void handleResultModelAdded(final ResultModel resultModel)
     {
@@ -263,7 +262,7 @@ class QueryFileView extends JPanel
                 JSplitPane sp = new JSplitPane();
                 sp.setOrientation(JSplitPane.VERTICAL_SPLIT);
                 sp.setLeftComponent(new JScrollPane(parent));
-             // Adjust prev tables height
+                // Adjust prev tables height
                 sp.getLeftComponent().setPreferredSize(new Dimension(0, prevTableHeight));
                 sp.setRightComponent(new JScrollPane(table));
                 sp.getRightComponent().setPreferredSize(new Dimension(0, tablHeight));

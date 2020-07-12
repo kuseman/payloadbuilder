@@ -1,5 +1,6 @@
 package com.viskan.payloadbuilder.operator;
 
+import com.viskan.payloadbuilder.QuerySession;
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.Index;
 import com.viskan.payloadbuilder.catalog.TableAlias;
@@ -47,14 +48,6 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 //        System.out.println(expected.toString(1));
         
         assertEquals(expected, pair.getKey());
-        
-        /*
-         *  OuterValuesOperator
-         *    indexScan ( 
-         * 
-         * 
-         */
-        
     }
     
     @Test
@@ -99,14 +92,14 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                         DefaultRowMerger.DEFAULT,
                         false,
                         false,
-                        c.getIndices(QualifiedName.of("article_attribute")).get(0)),
+                        c.getIndices(session, "", QualifiedName.of("article_attribute")).get(0)),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("s.art_id"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
                 DefaultRowMerger.DEFAULT,
                 true,
                 false,
-                c.getIndices(QualifiedName.of("article")).get(0));
+                c.getIndices(session, "", QualifiedName.of("article")).get(0));
                 
         Operator actual = pair.getKey();
         
@@ -148,7 +141,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                c.getIndices(QualifiedName.of("article")).get(0));
+                c.getIndices(session, "", QualifiedName.of("article")).get(0));
                 
         Operator actual = pair.getKey();
         
@@ -190,7 +183,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 true,
                 false,
-                c.getIndices(QualifiedName.of("article")).get(0));
+                c.getIndices(session, "", QualifiedName.of("article")).get(0));
                 
         Operator actual = pair.getKey();
         
@@ -232,7 +225,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 true,
                 true,
-                c.getIndices(QualifiedName.of("article")).get(0));
+                c.getIndices(session, "", QualifiedName.of("article")).get(0));
                 
         Operator actual = pair.getKey();
         
@@ -274,7 +267,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 false,
                 true,
-                c.getIndices(QualifiedName.of("article")).get(0));
+                c.getIndices(session, "", QualifiedName.of("article")).get(0));
                 
         Operator actual = pair.getKey();
         
@@ -294,14 +287,14 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         return new Catalog("TEST")
         {
             @Override
-            public List<Index> getIndices(QualifiedName table)
+            public List<Index> getIndices(QuerySession session, String catalogAlias, QualifiedName table)
             {
                 List<String> keys = keysByTable.get(table.toString());
                 return keys != null ? asList(new Index(table, keys, 100)) : emptyList();
             }
 
             @Override
-            public Operator getScanOperator(int nodeId, String catalogAlias, TableAlias alias, List<TableOption> tableOptions)
+            public Operator getScanOperator(QuerySession session, int nodeId, String catalogAlias, TableAlias alias, List<TableOption> tableOptions)
             {
                 Operator op = op("scan " + alias.getTable().toString());
                 operators.add(op);
@@ -309,7 +302,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             }
 
             @Override
-            public Operator getIndexOperator(int nodeId, String catalogAlias, TableAlias alias, Index index, List<TableOption> tableOptions)
+            public Operator getIndexOperator(QuerySession session, int nodeId, String catalogAlias, TableAlias alias, Index index, List<TableOption> tableOptions)
             {
                 Operator op = op("index " + alias.getTable().toString());
                 operators.add(op);

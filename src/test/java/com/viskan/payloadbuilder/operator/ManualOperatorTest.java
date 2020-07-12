@@ -49,7 +49,7 @@ public class ManualOperatorTest extends Assert
             }
             
             @Override
-            public Operator getScanOperator(int nodeId, String catalogAlias, TableAlias tableAlias, List<TableOption> tableOptions)
+            public Operator getScanOperator(QuerySession session, int nodeId, String catalogAlias, TableAlias tableAlias, List<TableOption> tableOptions)
             {
                 return new Operator()
                 {

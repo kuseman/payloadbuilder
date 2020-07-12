@@ -1,5 +1,6 @@
 package com.viskan.payloadbuilder.catalog;
 
+import com.viskan.payloadbuilder.QuerySession;
 import com.viskan.payloadbuilder.operator.Operator;
 import com.viskan.payloadbuilder.parser.QualifiedName;
 import com.viskan.payloadbuilder.parser.TableOption;
@@ -33,9 +34,14 @@ public abstract class Catalog
 
     /**
      * Get indices for provided table
+     * @param session Current query session
+     * @param catalogAlias Alias used for this catalog in the query
      * @param table Table to retrieve index for
      **/
-    public List<Index> getIndices(QualifiedName table)
+    public List<Index> getIndices(
+            QuerySession session,
+            String catalogAlias,
+            QualifiedName table)
     {
         return emptyList();
     }
@@ -43,12 +49,14 @@ public abstract class Catalog
     /**
      * Get operator for provided alias
      *
+     * @param session Current query session
      * @param nodeId Unique id for operator node
      * @param catalogAlias Alias used for this catalog in the query
      * @param tableAlias Table alias to retrieve operator for
      * @param tableOptions Provided options for this table.
      */
     public Operator getScanOperator(
+            QuerySession session,
             int nodeId,
             String catalogAlias,
             TableAlias tableAlias,
@@ -60,6 +68,7 @@ public abstract class Catalog
     /**
      * Get operator for provided alias
      *
+     * @param session Current query session
      * @param nodeId Unique id for operator node
      * @param catalogAlias Alias used for this catalog in the query
      * @param tableAlias Table alias to retrieve operator for
@@ -67,6 +76,7 @@ public abstract class Catalog
      * @param tableOptions Provided options for this table.
      */
     public Operator getIndexOperator(
+            QuerySession session,
             int nodeId,
             String catalogAlias,
             TableAlias tableAlias,

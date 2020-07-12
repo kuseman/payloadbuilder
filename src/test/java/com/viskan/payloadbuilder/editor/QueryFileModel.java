@@ -7,11 +7,13 @@ import com.viskan.payloadbuilder.provider.elastic.EtmArticleCategoryESCatalog;
 import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
+import javax.swing.SwingUtilities;
 import javax.swing.event.SwingPropertyChangeSupport;
 
 import org.apache.commons.io.FileUtils;
@@ -119,7 +121,15 @@ class QueryFileModel
                 sw.stop();
             }
 
-            pcs.firePropertyChange(STATE, oldValue, newValue);
+            // Let UI update correctly when chaning state of query model
+            try
+            {
+                SwingUtilities.invokeAndWait(() -> pcs.firePropertyChange(STATE, oldValue, newValue));
+            }
+            catch (InvocationTargetException | InterruptedException e)
+            {
+                throw new RuntimeException("Error updating state of query", e);
+            }
         }
     }
 

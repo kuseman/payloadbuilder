@@ -59,7 +59,7 @@ class QueryResultImpl implements QueryResult, QueryResultMetaData, StatementVisi
     @Override
     public Void visit(PrintStatement statement, Void ctx)
     {
-        context.clearStatementCache();
+//        context.clearStatementCache();
         Object value = statement.getExpression().eval(context);
         session.printLine(value);
         return null;
@@ -68,7 +68,7 @@ class QueryResultImpl implements QueryResult, QueryResultMetaData, StatementVisi
     @Override
     public Void visit(IfStatement statement, Void ctx)
     {
-        context.clearStatementCache();
+//        context.clearStatementCache();
         Object value = statement.getCondition().eval(context);
         if ((Boolean) value)
         {
@@ -84,7 +84,7 @@ class QueryResultImpl implements QueryResult, QueryResultMetaData, StatementVisi
     @Override
     public Void visit(SetStatement statement, Void ctx)
     {
-        context.clearStatementCache();
+//        context.clearStatementCache();
         Object value = statement.getExpression().eval(context);
         context.setVariable(statement.getScope(), statement.getName(), value);
         return null;
@@ -179,7 +179,7 @@ class QueryResultImpl implements QueryResult, QueryResultMetaData, StatementVisi
     @Override
     public Void visit(SelectStatement statement, Void ctx)
     {
-        context.clearStatementCache();
+//        context.clearStatementCache();
         currentSelect = OperatorBuilder.create(session, statement.getSelect());
         return null;
     }
@@ -194,6 +194,7 @@ class QueryResultImpl implements QueryResult, QueryResultMetaData, StatementVisi
             }
 
             Statement stm = queue.remove(0);
+            // context.clearStatementCache();
             stm.accept(this, null);
         }
 
