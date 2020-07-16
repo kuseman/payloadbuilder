@@ -20,16 +20,17 @@ import com.viskan.payloadbuilder.parser.ShowStatement;
 import com.viskan.payloadbuilder.parser.ShowStatement.Type;
 import com.viskan.payloadbuilder.parser.Statement;
 import com.viskan.payloadbuilder.parser.StatementVisitor;
+import com.viskan.payloadbuilder.parser.UseStatement;
 
 import static java.util.Arrays.asList;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_OBJECT_ARRAY;
+import static org.apache.commons.lang3.StringUtils.join;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.collections.IteratorUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -40,7 +41,7 @@ class QueryResultImpl implements QueryResult, QueryResultMetaData, StatementVisi
 {
     private static final Row DUMMY_ROW = Row.of(TableAlias.of(null, "dummy", "d"), 0, EMPTY_OBJECT_ARRAY);
     private static final TableAlias SHOW_PARAMETERS_ALIAS = new TableAlias(null, QualifiedName.of("parameters"), "p", new String[] {"Name", "Value"});
-    private static final TableAlias SHOW_VARIABLES_ALIAS = new TableAlias(null, QualifiedName.of("variables"), "v", new String[] {"Name", "Value", "Scope"});
+    private static final TableAlias SHOW_VARIABLES_ALIAS = new TableAlias(null, QualifiedName.of("variables"), "v", new String[] {"Name", "Value"});
 
     private final QuerySession session;
     private final ExecutionContext context;
@@ -59,7 +60,6 @@ class QueryResultImpl implements QueryResult, QueryResultMetaData, StatementVisi
     @Override
     public Void visit(PrintStatement statement, Void ctx)
     {
-//        context.clearStatementCache();
         Object value = statement.getExpression().eval(context);
         session.printLine(value);
         return null;
@@ -68,7 +68,6 @@ class QueryResultImpl implements QueryResult, QueryResultMetaData, StatementVisi
     @Override
     public Void visit(IfStatement statement, Void ctx)
     {
-//        context.clearStatementCache();
         Object value = statement.getCondition().eval(context);
         if ((Boolean) value)
         {
@@ -84,9 +83,30 @@ class QueryResultImpl implements QueryResult, QueryResultMetaData, StatementVisi
     @Override
     public Void visit(SetStatement statement, Void ctx)
     {
-//        context.clearStatementCache();
         Object value = statement.getExpression().eval(context);
-        context.setVariable(statement.getScope(), statement.getName(), value);
+        context.setVariable(statement.getName(), value);
+        return null;
+    }
+    
+    @Override
+    public Void visit(UseStatement statement, Void ctx)
+    {
+        // Change of default catalog
+        if (statement.getExpression() == null)
+        {
+            context.getSession().setDefaultCatalog(statement.getQname().getFirst());
+        }
+        // Set property
+        else
+        {
+            QualifiedName qname = statement.getQname();
+            String catalogAlias = qname.getFirst();
+            QualifiedName property = qname.extract(1);
+            
+            String key = join(property.getParts(), ".");
+            Object value = statement.getExpression().eval(context);
+            context.getSession().setCatalogProperty(catalogAlias, key, value);
+        }
         return null;
     }
 
@@ -135,25 +155,18 @@ class QueryResultImpl implements QueryResult, QueryResultMetaData, StatementVisi
         }
         else
         {
-            Map<String, Object> executionVariables = context.getVariables();
-            Map<String, Object> sessionVariables = context.getSession().getVariables();
+            Map<String, Object> variables = context.getVariables();
             columns = SHOW_VARIABLES_ALIAS.getColumns();
             operator = new Operator()
             {
                 @Override
                 public Iterator<Row> open(ExecutionContext context)
                 {
-                    return IteratorUtils.chainedIterator(
-                            executionVariables
-                                    .entrySet()
-                                    .stream()
-                                    .map(e -> Row.of(SHOW_VARIABLES_ALIAS, pos.incrementAndGet(), new Object[] {e.getKey(), e.getValue(), "Query"}))
-                                    .iterator(),
-                            sessionVariables
-                                    .entrySet()
-                                    .stream()
-                                    .map(e -> Row.of(SHOW_VARIABLES_ALIAS, pos.incrementAndGet(), new Object[] {e.getKey(), e.getValue(), "Session"}))
-                                    .iterator());
+                    return variables
+                            .entrySet()
+                            .stream()
+                            .map(e -> Row.of(SHOW_VARIABLES_ALIAS, pos.incrementAndGet(), new Object[] {e.getKey(), e.getValue()}))
+                            .iterator();
                 }
 
                 @Override
@@ -179,7 +192,7 @@ class QueryResultImpl implements QueryResult, QueryResultMetaData, StatementVisi
     @Override
     public Void visit(SelectStatement statement, Void ctx)
     {
-//        context.clearStatementCache();
+        //        context.clearStatementCache();
         currentSelect = OperatorBuilder.create(session, statement.getSelect());
         return null;
     }
@@ -242,19 +255,19 @@ class QueryResultImpl implements QueryResult, QueryResultMetaData, StatementVisi
             writer.endRow();
         }
 
-//        ObjectWriter printer = new ObjectMapper().writerWithDefaultPrettyPrinter();
-//        context.getOperatorContext().getNodeData().forEachEntry((i, e) ->
-//        {
-//            try
-//            {
-//                System.out.println("Node: " + i);
-//                System.out.println(printer.writeValueAsString(e));
-//            }
-//            catch (JsonProcessingException ee)
-//            {
-//            }
-//            return true;
-//        });
+        //        ObjectWriter printer = new ObjectMapper().writerWithDefaultPrettyPrinter();
+        //        context.getOperatorContext().getNodeData().forEachEntry((i, e) ->
+        //        {
+        //            try
+        //            {
+        //                System.out.println("Node: " + i);
+        //                System.out.println(printer.writeValueAsString(e));
+        //            }
+        //            catch (JsonProcessingException ee)
+        //            {
+        //            }
+        //            return true;
+        //        });
 
         currentSelect = null;
         //        System.out.println(QualifiedReferenceExpression.executionsByName);

@@ -41,5 +41,11 @@ public class CatalogRegistry
     public Catalog getCatalog(String alias)
     {
         return isBlank(alias) ? builtinCatalog : catalogByAlias.get(alias);
-}
+    }
+    
+    /** Clears registered catalogs */
+    public void clearCatalogs()
+    {
+        catalogByAlias.clear();
+    }
 }

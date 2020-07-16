@@ -2,24 +2,26 @@ package com.viskan.payloadbuilder.editor;
 
 import com.viskan.payloadbuilder.editor.QueryFileModel.Output;
 import com.viskan.payloadbuilder.editor.QueryFileModel.State;
-import com.viskan.payloadbuilder.utils.MapUtils;
 
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.io.FileUtils.byteCountToDisplaySize;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
+import java.awt.GridBagConstraints;
+import java.awt.Insets;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.File;
-import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
 import javax.swing.ButtonGroup;
 import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
-import javax.swing.JScrollPane;
 import javax.swing.Timer;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
@@ -29,15 +31,22 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 /** Main controller for editor */
 class PayloadbuilderEditorController implements PropertyChangeListener
 {
-    private static final String EXTENSIONS = "extensions";
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    static final String CATALOG_CONFIG = "catalogConfig";
+    static final ObjectMapper MAPPER = new ObjectMapper();
     private final PayloadbuilderEditorView view;
     private final PayloadbuilderEditorModel model;
     private final CaretChangedListener caretChangedListener = new CaretChangedListener();
+    private final Map<String, Object> config;
+    private final List<CatalogExtensionView> catalogExtensionViews = new ArrayList<>();
+    private final ButtonGroup defaultGroup = new ButtonGroup();
     private int newFileCounter = 1;
 
-    PayloadbuilderEditorController(PayloadbuilderEditorView view, PayloadbuilderEditorModel model)
+    PayloadbuilderEditorController(
+            Map<String, Object> config,
+            PayloadbuilderEditorView view,
+            PayloadbuilderEditorModel model)
     {
+        this.config = config;
         this.view = requireNonNull(view, "view");
         this.model = requireNonNull(model, "model");
         this.model.addPropertyChangeListener(this);
@@ -75,6 +84,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                 editor.toggleComments();
             }
         });
+        view.setEditParametersRunnable(new EditParametersListener()); 
         view.setOutputChangedAction(() ->
         {
             QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
@@ -84,19 +94,86 @@ class PayloadbuilderEditorController implements PropertyChangeListener
             }
         });
 
-        ButtonGroup defaultGroup = new ButtonGroup();
-
-        loadConfig();
-        for (CatalogExtensionModel extension : model.getExtensions())
+        int y = 0;
+        Insets insets = new Insets(0, 0, 3, 0);
+        @SuppressWarnings("unchecked")
+        Map<String, Map<String, Object>> catalogConfigs = (Map<String, Map<String, Object>>) config.getOrDefault(CATALOG_CONFIG, emptyMap());
+        for (ICatalogExtension extension : model.getCatalogExtensions())
         {
-            view.getPanelCatalogs().add(new JScrollPane(new CatalogExtensionView(extension, defaultGroup, () -> saveConfig())));
+            Map<String, Object> catalogConfig = catalogConfigs.getOrDefault(extension.getClass().getName(), emptyMap());
+            extension.load(catalogConfig);
+            
+            CatalogExtensionView extensionView = new CatalogExtensionView(
+                    extension,
+                    defaultGroup,
+                    () -> configChanged(extension),
+                    () -> propertiesChanged(extension),
+                    a -> aliasChanged(extension, a),
+                    c -> defaultCatalogChanged(c),
+                    e -> enabledChanged(extension, e));
+            catalogExtensionViews.add(extensionView);
+            boolean last = y == model.getCatalogExtensions().size() - 1;
+            view.getPanelCatalogs().add(extensionView, new GridBagConstraints(0, y++, 1, 1, 1, last ? 1 : 0, GridBagConstraints.BASELINE, GridBagConstraints.HORIZONTAL, insets, 0, 0));
         }
+//        if (defaultGroup.getButtonCount() > 0)
+//        {
+//            defaultGroup.getElements().nextElement().setSelected(true);
+//        }
 
         view.getEditorsTabbedPane().addChangeListener(new SelectedFileListener());
+        // TODO: check of unsaved files
         view.setExitAction(() -> System.exit(0));
 
         view.getMemoryLabel().setText(getMemoryString());
         new Timer(250, evt -> view.getMemoryLabel().setText(getMemoryString())).start();
+    }
+    
+    private void configChanged(ICatalogExtension catalogExtension)
+    {
+        getCatalogConfig().put(catalogExtension.getClass().getName(), catalogExtension.getProperties());
+        saveConfig();
+        // Also populate new properties in current session if config changed
+        propertiesChanged(catalogExtension);
+    }
+
+    /** Properties of a catalog extension changed. Setup current query file with it's new properties */
+    private void propertiesChanged(ICatalogExtension catalogExtension)
+    {
+        QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
+        if (editor != null)
+        {
+            CatalogExtensionModel model = editor.getFile().getCatalogExtensions().get(catalogExtension);
+            catalogExtension.setup(model.getAlias(), editor.getFile().getQuerySession());
+        }
+    }
+    
+    private void aliasChanged(ICatalogExtension catalogExtension, String alias)
+    {
+        QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
+        if (editor != null)
+        {
+            CatalogExtensionModel model = editor.getFile().getCatalogExtensions().get(catalogExtension);
+            model.setAlias(alias);
+        }
+    }
+    
+    private void enabledChanged(ICatalogExtension catalogExtension, boolean enabled)
+    {
+        QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
+        if (editor != null)
+        {
+            CatalogExtensionModel model = editor.getFile().getCatalogExtensions().get(catalogExtension);
+            model.setEnabled(enabled);
+        }
+    }
+    
+    private void defaultCatalogChanged(String catalogAlias)
+    {
+        QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
+        if (editor != null)
+        {
+            editor.getFile().getQuerySession().setDefaultCatalog(catalogAlias);
+        }
     }
 
     private String getMemoryString()
@@ -105,67 +182,15 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         return String.format("%s / %s", byteCountToDisplaySize(runtime.totalMemory()), byteCountToDisplaySize(runtime.freeMemory()));
     }
     
-    private void loadConfig()
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> getCatalogConfig()
     {
-        File configFile = new File("config.json");
-        Map<String, Object> config;
-        try
-        {
-            config = MAPPER.readValue(configFile, Map.class);
-        }
-        catch (IOException e)
-        {
-            throw new RuntimeException("Error loading config from " + configFile.getAbsolutePath(), e);
-        }
-        
-        @SuppressWarnings("unchecked")
-        Map<String, Object> extensions = (Map<String, Object>) config.get(EXTENSIONS);
-        
-        for (CatalogExtensionModel model : model.getExtensions())
-        {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> catalogProperties = (Map<String, Object>) extensions.get(model.getExtension().getClass().getName());
-            if (catalogProperties != null)
-            {
-                model.getExtension().load(catalogProperties);
-            }
-        }
-                
+        return (Map<String, Object>) config.computeIfAbsent(CATALOG_CONFIG, k -> new HashMap<String, Object>());
     }
     
     private void saveConfig()
     {
-        /*
-         * Save config
-         * 
-         * {
-         *   "keybindings: [],
-         *   "editor": [],
-         *   "extensions": {
-         *     "<etension class>": {
-         *       "typeMappings": [......],
-         *       "endpoints": [.....]
-         *     }
-         *   }
-         * }
-         * 
-         */
-        
-        System.out.println("Save config");
-        
-        Map<String, Object> extensions = new HashMap<>();
-        model.getExtensions().forEach(e ->  extensions.put(e.getExtension().getClass().getName(), e.getExtension().getProperties()));
-        Map<String, Object> config = MapUtils.ofEntries(MapUtils.entry(EXTENSIONS, extensions));
-
-        File configFile = new File("config.json");
-        try
-        {
-            MAPPER.writeValue(configFile, config);
-        }
-        catch (IOException e)
-        {
-            throw new RuntimeException("Error saving config to " + configFile.getAbsolutePath(), e);
-        }
+        Main.saveConfig(config);
     }
 
     private boolean save(QueryFileModel file)
@@ -293,6 +318,8 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                 caretChangedListener.accept(editor);
                 model.setSelectedFile(index);
                 view.getOutputCombo().setSelectedItem(editor.getFile().getOutput());
+                defaultGroup.clearSelection();
+                catalogExtensionViews.forEach(v -> v.init(editor.getFile()));                
             }
         }
     }
@@ -319,11 +346,49 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                 return;
             }
 
-            model.getExtensions().forEach(e -> e.getExtension().setup(e.getAlias(), fileModel.getQuerySession()));
+            // Setup catalogs
+            fileModel.getQuerySession().getCatalogRegistry().clearCatalogs();
+            fileModel.getCatalogExtensions().entrySet().forEach(e -> 
+            {
+                ICatalogExtension extension = e.getKey();
+                CatalogExtensionModel model = e.getValue();
+                if (model.isEnabled())
+                {
+                    // Register catalog in session
+                    fileModel.getQuerySession().getCatalogRegistry().registerCatalog(model.getAlias(), extension.getCatalog());
+                    // Setup extensions from model data
+                    // Do this here also besides when properties changes,
+                    // since there is a possibility that no changes was made before a query is executed.
+                    extension.setup(model.getAlias(), fileModel.getQuerySession());
+                }
+            });
+                
             PayloadbuilderService.executeQuery(fileModel, queryString, () ->
             {
-                model.getExtensions().forEach(e -> e.getExtension().update(e.getAlias(), fileModel.getQuerySession()));
+                // Update properties in UI after query is finished
+                // Change current index/instance/database etc. that was altered in query
+                catalogExtensionViews.forEach(v -> v.init(fileModel));
             });
+        }
+    }
+    
+    private class EditParametersListener implements Runnable
+    {
+        @Override
+        public void run()
+        {
+            QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
+            if (editor == null)
+            {
+                return;
+            }
+            String queryString = editor.getQuery(true);
+            if (isBlank(queryString))
+            {
+                return;
+            }
+            
+            System.out.println(PayloadbuilderService.getParameters(queryString));
         }
     }
 
@@ -341,7 +406,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         @Override
         public void run()
         {
-            QueryFileModel queryFile = new QueryFileModel();
+            QueryFileModel queryFile = new QueryFileModel(model.getCatalogExtensions());
             queryFile.setFilename("Query" + (newFileCounter++) + ".sql");
             model.addFile(queryFile);
         }
@@ -372,7 +437,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
             JFileChooser fileChooser = new JFileChooser();
             if (fileChooser.showOpenDialog(view) == JFileChooser.APPROVE_OPTION)
             {
-                QueryFileModel file = new QueryFileModel(fileChooser.getSelectedFile());
+                QueryFileModel file = new QueryFileModel(model.getCatalogExtensions(), fileChooser.getSelectedFile());
                 model.addFile(file);
             }
         }

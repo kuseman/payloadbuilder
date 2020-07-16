@@ -1,13 +1,13 @@
-package com.viskan.payloadbuilder.provider.elastic;
+package com.viskan.payloadbuilder.catalog.elastic;
 
 import com.viskan.payloadbuilder.catalog.Index;
 import com.viskan.payloadbuilder.catalog.TableAlias;
+import com.viskan.payloadbuilder.catalog.elastic.EtmArticleCategoryESCatalog.TypeMapping;
 import com.viskan.payloadbuilder.operator.AOperator;
 import com.viskan.payloadbuilder.operator.OperatorContext;
 import com.viskan.payloadbuilder.operator.OperatorContext.NodeData;
 import com.viskan.payloadbuilder.operator.Row;
 import com.viskan.payloadbuilder.parser.ExecutionContext;
-import com.viskan.payloadbuilder.provider.elastic.EtmArticleCategoryESCatalog.TypeMapping;
 
 import static com.viskan.payloadbuilder.DescribeUtils.CATALOG;
 import static com.viskan.payloadbuilder.DescribeUtils.INDEX;
@@ -61,7 +61,7 @@ class EtmArticleCategoryESOperator extends AOperator
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private static final PoolingHttpClientConnectionManager CONNECTION_MANAGER = new PoolingHttpClientConnectionManager();
-    private static final CloseableHttpClient CLIENT = HttpClientBuilder
+    static final CloseableHttpClient CLIENT = HttpClientBuilder
             .create()
             .setConnectionManager(CONNECTION_MANAGER)
             .disableCookieManagement()
@@ -71,8 +71,7 @@ class EtmArticleCategoryESOperator extends AOperator
     private final TypeMapping typeMapping;
     private final TableAlias tableAlias;
     private final Index index;
-    private final String endpointKey;
-    private final String instanceKey;
+    private final String catalogAlias;
 
     public EtmArticleCategoryESOperator(
             TypeMapping typeMapping,
@@ -83,10 +82,9 @@ class EtmArticleCategoryESOperator extends AOperator
     {
         super(nodeId);
         this.typeMapping = typeMapping;
+        this.catalogAlias = catalogAlias;
         this.tableAlias = tableAlias;
         this.index = index;
-        this.endpointKey = catalogAlias + "." + EtmArticleCategoryESCatalog.ENDPOINT_KEY;
-        this.instanceKey = catalogAlias + "." + EtmArticleCategoryESCatalog.INSTANCE_KEY;
     }
 
     /* SETTINGS FIELDS */
@@ -169,10 +167,10 @@ class EtmArticleCategoryESOperator extends AOperator
         // Tow or one part qualified name -> <instance>.<table> or <table>
         else if (parts.size() <= 2)
         {
-            endpoint = (String) context.getVariableValue(endpointKey);
+            endpoint = (String) context.getSession().getCatalogProperty(catalogAlias, EtmArticleCategoryESCatalog.ENDPOINT_KEY);
             if (isBlank(endpoint))
             {
-                throw new IllegalArgumentException("Missing endpoint key ( " + endpointKey + " ) in variables in scope");
+                throw new IllegalArgumentException("Missing endpoint key in catalog properties.");
             }
 
             if (parts.size() == 2)
@@ -182,10 +180,10 @@ class EtmArticleCategoryESOperator extends AOperator
             }
             else
             {
-                instance = (String) context.getVariableValue(instanceKey);
+                instance = (String) context.getSession().getCatalogProperty(catalogAlias, EtmArticleCategoryESCatalog.INSTANCE_KEY);
                 if (isBlank(instance))
                 {
-                    throw new IllegalArgumentException("Missing instance key ( " + instanceKey + " ) in variables in scope");
+                    throw new IllegalArgumentException("Missing instance key in catalog properties.");
                 }
                 table = parts.get(0);
             }
@@ -221,7 +219,6 @@ class EtmArticleCategoryESOperator extends AOperator
             // TODO: thread up all ids in executor and join
             DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getOperatorContext(), instance, typeMapping.docIdPattern, sentBytes);
             return getIterator(
-                    table,
                     receivedBytes,
                     scrollId ->
                     {
@@ -239,12 +236,11 @@ class EtmArticleCategoryESOperator extends AOperator
                 typeMapping.subtype,
                 1000,
                 "2m",
-                table,
-                table);
+                typeMapping.name,
+                typeMapping.name);
         String scrollUrl = String.format("%s/_search/scroll?scroll=%s&scroll_id=", endpoint, "2m");
 
         return getIterator(
-                table,
                 receivedBytes,
                 scrollId ->
                 {
@@ -264,7 +260,6 @@ class EtmArticleCategoryESOperator extends AOperator
     }
 
     private Iterator<Row> getIterator(
-            String table,
             AtomicLong receivedBytes,
             Function<MutableObject<String>, HttpUriRequest> requestSupplier)
     {
@@ -341,7 +336,7 @@ class EtmArticleCategoryESOperator extends AOperator
                             continue;
                         }
 
-                        Payload payload = doc.source.payload.get(table);
+                        Payload payload = doc.source.payload.get(typeMapping.name);
                         if (tableAliasColumnIndices == null)
                         {
                             populateColumnIndices(payload);

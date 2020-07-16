@@ -36,6 +36,7 @@ import static com.viskan.payloadbuilder.utils.CollectionUtils.asSet;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
 
 import java.util.ArrayList;
@@ -233,8 +234,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             List<AnalyzePair> equiPairs = analyzeResult.getEquiPairs(ts.getAlias(), true, true);
             if (!equiPairs.isEmpty())
             {
-                Catalog catalog = getCatalog(context, ts.getCatalog(), ts.getToken());
-                index = getIndex(equiPairs, ts.getAlias(), catalog.getIndices(context.session, ts.getCatalog(), ts.getTable()));
+                Pair<String, Catalog> pair = getCatalog(context, ts.getCatalog(), ts.getToken());
+                index = getIndex(equiPairs, ts.getAlias(), pair.getValue().getIndices(context.session, pair.getKey(), ts.getTable()));
             }
             
             if (index != null)
@@ -534,17 +535,17 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     @Override
     public Void visit(Table table, Context context)
     {
-        Catalog catalog = getCatalog(context, table.getCatalog(), table.getToken());
+        Pair<String, Catalog> pair = getCatalog(context, table.getCatalog(), table.getToken());
         TableAlias alias = context.appendTableAlias(table.getTable(), table.getAlias(), null);
         int nodeId = context.acquireNodeId();
         if (context.index != null)
         {
-            context.operator = catalog.getIndexOperator(context.session, nodeId, table.getCatalog(), alias, context.index, table.getTableOptions());
+            context.operator = pair.getValue().getIndexOperator(context.session, nodeId, pair.getKey(), alias, context.index, table.getTableOptions());
             context.index = null;
         }
         else
         {
-            context.operator = catalog.getScanOperator(context.session, nodeId, table.getCatalog(), alias, table.getTableOptions());
+            context.operator = pair.getValue().getScanOperator(context.session, nodeId, pair.getKey(), alias, table.getTableOptions());
         }
         return null;
     }
@@ -673,9 +674,9 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         if (innerTableSource.getTable() != null)
         {
-            Catalog catalog = getCatalog(context, innerTableSource.getCatalog(), innerTableSource.getToken());
+            Pair<String, Catalog> pair = getCatalog(context, innerTableSource.getCatalog(), innerTableSource.getToken());
             QualifiedName table = innerTableSource.getTable();
-            indices = catalog.getIndices(context.session, innerTableSource.getCatalog(), table);
+            indices = pair.getValue().getIndices(context.session, pair.getKey(), table);
         }
         // TODO: If outer is ordered and no inner indices
         // then the inner could be created and after check it's order for a potential
@@ -932,24 +933,24 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     }
 
     /** Fetch catalog and resulting qualifed name from provided table */
-    private Catalog getCatalog(Context context, String catalogName, Token token)
+    private Pair<String, Catalog> getCatalog(Context context, String catalogAlias, Token token)
     {
-        if (catalogName == null)
+        if (isBlank(catalogAlias))
         {
             Catalog catalog = context.session.getDefaultCatalog();
             if (catalog == null)
             {
                 throw new ParseException("No default catalog set", token);
             }
-            return catalog;
+            return Pair.of(context.session.getDefaultCatalogAlias(), catalog);
         }
 
-        Catalog catalog = context.session.getCatalogRegistry().getCatalog(catalogName);
+        Catalog catalog = context.session.getCatalogRegistry().getCatalog(catalogAlias);
         if (catalog == null)
         {
-            throw new ParseException("No catalog found with name " + catalogName, token);
+            throw new ParseException("No catalog found with name " + catalogAlias, token);
         }
 
-        return catalog;
+        return Pair.of(catalogAlias, catalog);
     }
 }

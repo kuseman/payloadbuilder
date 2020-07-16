@@ -50,6 +50,6 @@ public class VariableExpression extends Expression
     @Override
     public String toString()
     {
-        return ":" + name;
+        return "@" + name;
     }
 }

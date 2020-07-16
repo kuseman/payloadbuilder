@@ -22,6 +22,10 @@ public class Payloadbuilder
      *      Override parts of query and/remove/alter
      *   - Sources support (art_id/attr1_id lists)
      *      Built in operator ?  
+     *   - Catalog supported predicates
+     *      Catalog function for supported predicate fields
+     *      Extract those fields from predicate and send into create operator method
+     *      Add the rest as filter as usual
      *   - Insert into temptable
      *      Needed for campaigns etc. Eventual stockhouse
      *   - Add more builtin functions
@@ -44,12 +48,6 @@ public class Payloadbuilder
      *   - Codegen of expressions
      * 
      * UI
-     *   - Catalog config
-     *      - Model based
-     *      - Reactive components in first view (session index/database etc.)
-     *      - Config dialog
-     *   - Adding/removing catalog extensions
-     *   - Load/save catalog config
      *   - Parameters toolbar button
      *      - Find out parameters by traversing query
      *      - Populate key/value editor (JSON values)

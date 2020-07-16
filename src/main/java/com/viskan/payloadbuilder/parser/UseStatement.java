@@ -1,23 +1,22 @@
 package com.viskan.payloadbuilder.parser;
 
 import static java.util.Objects.requireNonNull;
-import static org.apache.commons.lang3.StringUtils.join;
 
-/** Set statement */
-public class SetStatement extends Statement
+/** Use statement */
+public class UseStatement extends Statement
 {
-    private final String name;
+    private final QualifiedName qname;
     private final Expression expression;
     
-    SetStatement(QualifiedName qname, Expression expression)
+    UseStatement(QualifiedName qname, Expression expression)
     {
-        this.name = join(qname.getParts(), ".");
-        this.expression = requireNonNull(expression, "expression");
+        this.qname = requireNonNull(qname, "qname");
+        this.expression = expression;
     }
     
-    public String getName()
+    public QualifiedName getQname()
     {
-        return name;
+        return qname;
     }
     
     public Expression getExpression()

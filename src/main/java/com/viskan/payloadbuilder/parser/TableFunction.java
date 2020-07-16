@@ -27,7 +27,7 @@ public class TableFunction extends TableSource
         this.catalog = catalog;
         this.function = requireNonNull(function, "function");
         this.arguments = requireNonNull(arguments, "arguments");
-        this.tableOptions = tableOptions;
+        this.tableOptions = requireNonNull(tableOptions, "tableOptions");
         this.functionId = functionId;
     }
     
@@ -52,7 +52,11 @@ public class TableFunction extends TableSource
     {
         FunctionInfo functionInfo = session.resolveFunctionInfo(catalog, function, functionId);
         
-        if (!(functionInfo instanceof TableFunctionInfo))
+        if (functionInfo == null)
+        {
+            throw new ParseException("No function found with name " + function, token);
+        }
+        else if (!(functionInfo instanceof TableFunctionInfo))
         {
             throw new ParseException("Expected a table valued function but got " + functionInfo, token);
         }

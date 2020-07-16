@@ -35,6 +35,7 @@ class TableColumnAdjuster implements PropertyChangeListener, TableModelListener
     private boolean isColumnDataIncluded;
     private boolean isOnlyAdjustLarger;
     private boolean isDynamicAdjustment;
+    private final int maxWidth;
     //    private final Map<TableColumn, Integer> columnSizes = new HashMap<>();
 
     /*
@@ -42,16 +43,17 @@ class TableColumnAdjuster implements PropertyChangeListener, TableModelListener
      */
     TableColumnAdjuster(JTable table)
     {
-        this(table, 6);
+        this(table, 6, -1);
     }
 
     /*
      *  Specify the table and spacing
      */
-    TableColumnAdjuster(JTable table, int spacing)
+    TableColumnAdjuster(JTable table, int spacing, int maxWidth)
     {
         this.table = table;
         this.spacing = spacing;
+        this.maxWidth = maxWidth;
         setColumnHeaderIncluded(true);
         setColumnDataIncluded(true);
         setOnlyAdjustLarger(false);
@@ -178,7 +180,7 @@ class TableColumnAdjuster implements PropertyChangeListener, TableModelListener
         }
 
         table.getTableHeader().setResizingColumn(tableColumn);
-        tableColumn.setWidth(width);
+        tableColumn.setWidth(maxWidth != -1 ? Math.min(width, maxWidth) : width);
     }
 
     /*

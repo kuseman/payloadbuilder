@@ -51,6 +51,12 @@ public class QualifiedName
     {
         return new QualifiedName(parts.subList(from, to));
     }
+    
+    /** Extracts a new qualified name from this instance with parts defined in from to last part */
+    public QualifiedName extract(int from)
+    {
+        return new QualifiedName(parts.subList(from, parts.size()));
+    }
 
     @Override
     public int hashCode()

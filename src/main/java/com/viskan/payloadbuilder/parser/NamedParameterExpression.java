@@ -12,6 +12,11 @@ public class NamedParameterExpression extends Expression
         this.name = requireNonNull(name, "name");
     }
 
+    public String getName()
+    {
+        return name;
+    }
+    
     @Override
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {

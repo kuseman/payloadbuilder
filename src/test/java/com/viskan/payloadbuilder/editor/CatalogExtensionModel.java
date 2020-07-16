@@ -1,26 +1,24 @@
 package com.viskan.payloadbuilder.editor;
 
-import com.viskan.payloadbuilder.editor.catalog.ICatalogExtension;
-
-import static java.util.Objects.requireNonNull;
-
 /** Model for a catalog extension */
 class CatalogExtensionModel
 {
-    private final ICatalogExtension extension;
-    private boolean enabled;
+//    private final ICatalogExtension extension;
+    private boolean enabled = true;
     private String alias;
     
-    CatalogExtensionModel(ICatalogExtension extension)
+    CatalogExtensionModel(String alias)
+//            ICatalogExtension extension
+//            )
     {
-        this.extension = requireNonNull(extension);
-        this.alias = extension.getDefaultAlias();
+//        this.extension = requireNonNull(extension);
+        this.alias = alias;
     }
     
-    public ICatalogExtension getExtension()
-    {
-        return extension;
-    }
+//    public ICatalogExtension getExtension()
+//    {
+//        return extension;
+//    }
     
     public boolean isEnabled()
     {

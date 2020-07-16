@@ -5,6 +5,7 @@ import com.viskan.payloadbuilder.editor.QueryFileModel.Output;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.GridBagLayout;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
@@ -12,7 +13,7 @@ import java.awt.event.KeyEvent;
 
 import javax.swing.AbstractAction;
 import javax.swing.Action;
-import javax.swing.BoxLayout;
+import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
@@ -42,6 +43,18 @@ class PayloadbuilderEditorView extends JFrame
     //    private static final String FORMAT = "Format";
     private static final String NEW_QUERY = "NewQuery";
     private static final String EXECUTE = "Execute";
+    private static final String EDIT_PARAMETERS = "EditParameters";
+    
+    private static final Icon FOLDER_OPEN_O = FontIcon.of(FontAwesome.FOLDER_OPEN_O);
+    private static final Icon SAVE = FontIcon.of(FontAwesome.SAVE);
+    private static final Icon PLAY_CIRCLE = FontIcon.of(FontAwesome.PLAY_CIRCLE);
+    private static final Icon STOP_CIRCLE = FontIcon.of(FontAwesome.STOP_CIRCLE);
+    private static final Icon FILE_TEXT_O = FontIcon.of(FontAwesome.FILE_TEXT_O);
+    private static final Icon ARROWS_V = FontIcon.of(FontAwesome.ARROWS_V);
+    private static final Icon ARROWS_H = FontIcon.of(FontAwesome.ARROWS_H);
+    private static final Icon INDENT = FontIcon.of(FontAwesome.INDENT);
+    private static final Icon EDIT = FontIcon.of(FontAwesome.EDIT);
+    
     private final JSplitPane splitPane;
     private final JTabbedPane tabEditor;
     private final JPanel panelCatalogs;
@@ -65,6 +78,7 @@ class PayloadbuilderEditorView extends JFrame
     private Runnable toggleResultRunnable;
     private Runnable toggleCommentRunnable;
     private Runnable outputChangedRunnable;
+    private Runnable editParametersRunnable;
     
     private boolean catalogsCollapsed = false;
     private int prevCatalogsDividerLocation;
@@ -157,6 +171,7 @@ class PayloadbuilderEditorView extends JFrame
         toolBar.add(toggleResultAction).setToolTipText("Toggle result pane");
         //        toolBar.add(formatAction).setToolTipText("Format query");
         toolBar.add(toggleCommentAction).setToolTipText("Toggle comment on selected lines");
+        toolBar.add(editParametersAction).setToolTipText("Edit parameters");
 
         comboOutput = new JComboBox<>(Output.values());
         comboOutput.setSelectedItem(Output.TABLE);
@@ -175,7 +190,7 @@ class PayloadbuilderEditorView extends JFrame
         splitPane.setRightComponent(tabEditor);
 
         panelCatalogs = new JPanel();
-        panelCatalogs.setLayout(new BoxLayout(panelCatalogs, BoxLayout.Y_AXIS));
+        panelCatalogs.setLayout(new GridBagLayout()); //new BoxLayout(panelCatalogs, BoxLayout.Y_AXIS));
 //        panelCatalogs.setPreferredSize(new Dimension(250, 0));
         splitPane.setLeftComponent(new JScrollPane(panelCatalogs));
 
@@ -200,8 +215,8 @@ class PayloadbuilderEditorView extends JFrame
     //            }
     //        }
     //    }
-
-    private final Action openAction = new AbstractAction("OPEN", (FontIcon.of(FontAwesome.FOLDER_OPEN_O)))
+    
+    private final Action openAction = new AbstractAction("OPEN", FOLDER_OPEN_O)
     {
         @Override
         public void actionPerformed(ActionEvent e)
@@ -210,7 +225,7 @@ class PayloadbuilderEditorView extends JFrame
         }
     };
 
-    private final Action saveAction = new AbstractAction("SAVE", (FontIcon.of(FontAwesome.SAVE)))
+    private final Action saveAction = new AbstractAction("SAVE", SAVE)
     {
         @Override
         public void actionPerformed(ActionEvent e)
@@ -237,7 +252,7 @@ class PayloadbuilderEditorView extends JFrame
         }
     };
 
-    private final Action executeAction = new AbstractAction(EXECUTE, FontIcon.of(FontAwesome.PLAY_CIRCLE))
+    private final Action executeAction = new AbstractAction(EXECUTE, PLAY_CIRCLE)
     {
         @Override
         public void actionPerformed(ActionEvent e)
@@ -246,7 +261,7 @@ class PayloadbuilderEditorView extends JFrame
         }
     };
 
-    private final Action stopAction = new AbstractAction(EXECUTE, FontIcon.of(FontAwesome.STOP_CIRCLE))
+    private final Action stopAction = new AbstractAction(EXECUTE, STOP_CIRCLE)
     {
         @Override
         public void actionPerformed(ActionEvent e)
@@ -255,7 +270,7 @@ class PayloadbuilderEditorView extends JFrame
         }
     };
 
-    private final Action newQueryAction = new AbstractAction(NEW_QUERY, FontIcon.of(FontAwesome.FILE_TEXT_O))
+    private final Action newQueryAction = new AbstractAction(NEW_QUERY, FILE_TEXT_O)
     {
         @Override
         public void actionPerformed(ActionEvent e)
@@ -273,7 +288,7 @@ class PayloadbuilderEditorView extends JFrame
     //        }
     //    };
 
-    private final Action toggleResultAction = new AbstractAction(TOGGLE_RESULT, FontIcon.of(FontAwesome.ARROWS_V))
+    private final Action toggleResultAction = new AbstractAction(TOGGLE_RESULT, ARROWS_V)
     {
         @Override
         public void actionPerformed(ActionEvent e)
@@ -282,7 +297,7 @@ class PayloadbuilderEditorView extends JFrame
         }
     };
 
-    private final Action toggleCatalogsAction = new AbstractAction(TOGGLE_RESULT, FontIcon.of(FontAwesome.ARROWS_H))
+    private final Action toggleCatalogsAction = new AbstractAction(TOGGLE_RESULT, ARROWS_H)
     {
         @Override
         public void actionPerformed(ActionEvent e)
@@ -302,7 +317,7 @@ class PayloadbuilderEditorView extends JFrame
         }
     };
 
-    private final Action toggleCommentAction = new AbstractAction(TOGGLE_COMMENT, FontIcon.of(FontAwesome.INDENT))
+    private final Action toggleCommentAction = new AbstractAction(TOGGLE_COMMENT, INDENT)
     {
         @Override
         public void actionPerformed(ActionEvent e)
@@ -311,6 +326,15 @@ class PayloadbuilderEditorView extends JFrame
         }
     };
 
+    private final Action editParametersAction = new AbstractAction(EDIT_PARAMETERS, EDIT)
+    {
+        @Override
+        public void actionPerformed(ActionEvent e)
+        {
+            run(editParametersRunnable);
+        }
+    };
+    
     private void run(Runnable runnable)
     {
         if (runnable != null)
@@ -389,6 +413,11 @@ class PayloadbuilderEditorView extends JFrame
         this.toggleCommentRunnable = toggleCommentRunnable;
     }
 
+    void setEditParametersRunnable(Runnable editParametersRunnable)
+    {
+        this.editParametersRunnable = editParametersRunnable;
+    }
+    
     void setCancelAction(Runnable cancelRunnable)
     {
         this.cancelRunnable = cancelRunnable;

@@ -211,7 +211,7 @@ class QueryFileView extends JPanel
     private void handleResultModelAdded(final ResultModel resultModel)
     {
         JTable resultTable = createResultTable();
-        final TableColumnAdjuster columnAdjuster = new TableColumnAdjuster(resultTable, 10);
+        final TableColumnAdjuster columnAdjuster = new TableColumnAdjuster(resultTable, 10, 250);
         // Add listener to adjust columns upon reaching 30 rows or query is complete
         final AtomicBoolean columnsAdjusted = new AtomicBoolean();
 

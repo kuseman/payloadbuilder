@@ -25,12 +25,17 @@ statement
  
 miscStatement
  : setStatement
+ | useStatement
  | describeStatement
  | showStatement
  ;
 
 setStatement
- : SET (scope=SESSION)? qname EQUALS expression
+ : SET qname EQUALS expression
+ ;
+ 
+useStatement
+ : USE qname (EQUALS expression)?
  ;
  
 describeStatement
@@ -279,6 +284,7 @@ SET			 : S E T;
 SHOW		 : S H O W;
 THEN		 : T H E N;
 TRUE	     : T R U E;
+USE			 : U S E;
 VARIABLES	 : V A R I A B L E S;
 WITH         : W I T H;
 WHERE	     : W H E R E;

@@ -2,6 +2,8 @@ package com.viskan.payloadbuilder.editor;
 
 import java.awt.AWTEvent;
 import java.awt.EventQueue;
+import java.io.File;
+import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
@@ -15,6 +17,8 @@ import javax.swing.UnsupportedLookAndFeelException;
 /** Main of PayloadbuilderEditor */
 public class Main
 {
+    private static final File CONFIG_FILE = new File("config.json");
+    
     public static void main(String[] args)
     {
         try
@@ -24,19 +28,50 @@ public class Main
         catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException ex)
         {
         }
+        
+        Map<String, Object> config = loadConfig();
 
         // Start all Swing applications on the EDT.
         SwingUtilities.invokeLater(() ->
         {
 //            Toolkit.getDefaultToolkit().getSystemEventQueue().push(new TracingEventQueue());
-
+            
+            
             PayloadbuilderEditorView view = new PayloadbuilderEditorView();
-            PayloadbuilderEditorModel model = new PayloadbuilderEditorModel();
-            new PayloadbuilderEditorController(view, model);
+            PayloadbuilderEditorModel model = new PayloadbuilderEditorModel(config);
+            new PayloadbuilderEditorController(config, view, model);
 
             view.setVisible(true);
             //            new PayloadbuilderEditorView().setVisible(true);
         });
+    }
+    
+    private static Map<String, Object> loadConfig()
+    {
+        if (!CONFIG_FILE.exists())
+        {
+            return new HashMap<>();
+        }
+        try
+        {
+            return PayloadbuilderEditorController.MAPPER.readValue(CONFIG_FILE, Map.class);
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Error loading config from " + CONFIG_FILE.getAbsolutePath(), e);
+        }
+    }
+    
+    static void saveConfig(Map<String, Object> config)
+    {
+        try
+        {
+            PayloadbuilderEditorController.MAPPER.writeValue(CONFIG_FILE, config);
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Error saving config to " + CONFIG_FILE.getAbsolutePath(), e);
+        }
     }
 
     public static final class TracingEventQueue extends EventQueue

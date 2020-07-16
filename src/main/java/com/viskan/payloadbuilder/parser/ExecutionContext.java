@@ -17,7 +17,6 @@ import java.util.Map;
 /** Context used during execution of a query */
 public class ExecutionContext
 {
-    private static final String SESSION_SCOPE = "session";
     private final QuerySession session;
     /** Holder for lambda references during evaluation */
     private List<Object> lambdaValues;
@@ -107,31 +106,19 @@ public class ExecutionContext
     }
     
     /** Set variable to context */
-    public void setVariable(String scope, String name, Object value)
+    public void setVariable(String name, Object value)
     {
-        if (SESSION_SCOPE.equals(scope))
+        if (variables == null)
         {
-            session.setVariable(name, value);
+            variables = new HashMap<>();
         }
-        else
-        {
-            if (variables == null)
-            {
-                variables = new HashMap<>();
-            }
-            variables.put(name, value);
-        }
+        variables.put(name, value);
     }
     
     /** Get variable from context */
     public Object getVariableValue(String name)
     {
-        Object value = variables != null ? variables.get(name) : null;
-        if (value == null)
-        {
-            value = session.getVariableValue(name);
-        }
-        return value;
+        return variables != null ? variables.get(name) : null;
     }
     
 //    /** Get value from statement cache */

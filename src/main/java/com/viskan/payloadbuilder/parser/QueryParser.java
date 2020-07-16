@@ -35,6 +35,7 @@ import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.TableSourceJoi
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.TableSourceOptionContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.TopExpressionContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.TopSelectContext;
+import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.UseStatementContext;
 import com.viskan.payloadbuilder.parser.PayloadBuilderQueryParser.VariableExpressionContext;
 import com.viskan.payloadbuilder.parser.SortItem.NullOrder;
 import com.viskan.payloadbuilder.parser.SortItem.Order;
@@ -163,10 +164,25 @@ public class QueryParser
         @Override
         public Object visitSetStatement(SetStatementContext ctx)
         {
-            String scope = ctx.scope != null ? ctx.scope.getText() : null;
-            return new SetStatement(scope, getQualifiedName(ctx.qname()), getExpression(ctx.expression()));
+            return new SetStatement(getQualifiedName(ctx.qname()), getExpression(ctx.expression()));
         }
 
+        @Override
+        public Object visitUseStatement(UseStatementContext ctx)
+        {
+            QualifiedName qname = getQualifiedName(ctx.qname());
+            Expression expression = ctx.expression() != null ? getExpression(ctx.expression()) : null;
+            if (expression != null && qname.getParts().size() == 1)
+            {
+                throw new ParseException("Cannot assign default catalog a value", ctx.start);
+            }
+            else if (expression == null && qname.getParts().size() > 1)
+            {
+                throw new ParseException("Must provide an assignment value to a catalog property.", ctx.start);
+            }
+            return new UseStatement(qname, expression);
+        }
+        
         @Override
         public Object visitDescribeStatement(DescribeStatementContext ctx)
         {

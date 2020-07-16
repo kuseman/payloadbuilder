@@ -1,5 +1,7 @@
 package com.viskan.payloadbuilder.editor;
 
+import static com.viskan.payloadbuilder.editor.ICatalogExtension.CONFIG;
+
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Container;
@@ -9,6 +11,8 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.util.Objects;
+import java.util.function.Consumer;
 
 import javax.swing.BorderFactory;
 import javax.swing.ButtonGroup;
@@ -29,63 +33,82 @@ import org.kordamp.ikonli.swing.FontIcon;
 class CatalogExtensionView extends JPanel
 {
     private static final Icon COG = FontIcon.of(FontAwesome.COG);
+    private final ICatalogExtension extension;
+    private final JTextField tfAlias;
+    private final JCheckBox cbEnabled;
+    private final JRadioButton rbDefault;
+    private final JButton btnConfig;
+    private final JPanel extensionPanel;
+    private final Runnable propertiesChangedAction;
+    private boolean fireEvents = true;
+    private boolean configChanged;
     
     CatalogExtensionView(
-            CatalogExtensionModel extension,
+            ICatalogExtension extension,
             ButtonGroup defaultGroup,
-            Runnable configChanged)
+            Runnable configChangedAction,
+            Runnable propertiesChangedAction,
+            Consumer<String> aliasChangedAction,
+            Consumer<String> defaultCatalogChangedAction,
+            Consumer<Boolean> enabledChangedAction)
     {
-        /*
-         * QueryFile
-         *      CatalogRegistry
-         *          default PropertyChangeListener ?
-         *          Catalogs with inherited class implementing ICatalogExtension
-         */
-        
-        setBorder(BorderFactory.createTitledBorder(extension.getExtension().getTitle()));
+        this.extension = extension;
+        this.propertiesChangedAction = propertiesChangedAction;
+        setBorder(BorderFactory.createTitledBorder(extension.getTitle()));
         setLayout(new BorderLayout());
 
         JPanel topPanel = new JPanel();
-        JPanel extensionPanel = new JPanel();
+        extensionPanel = new JPanel();
         extensionPanel.setLayout(new BorderLayout());
 
         topPanel.setLayout(new GridBagLayout());
 
-        JTextField tfAlias = new JTextField(extension.getAlias());
+        tfAlias = new JTextField(extension.getDefaultAlias());
         tfAlias.getDocument().addDocumentListener(new ADocumentListenerAdapter()
         {
             @Override
             protected void update()
             {
-                extension.setAlias(tfAlias.getText());
+                if (fireEvents)
+                {
+                    aliasChangedAction.accept(tfAlias.getText());
+                    // If this is default catalog also trigger that
+                    if (rbDefault.isSelected())
+                    {
+                        defaultCatalogChangedAction.accept(tfAlias.getText());
+                    }
+                }
             }
         });
         
-        JRadioButton rbDefault = new JRadioButton();
+        rbDefault = new JRadioButton();
         rbDefault.setToolTipText("Set default catalog");
+        rbDefault.addActionListener(l -> 
+        {
+            if (rbDefault.isSelected() && fireEvents)
+            {
+                defaultCatalogChangedAction.accept(tfAlias.getText());
+            }
+        });
         defaultGroup.add(rbDefault);
 
-        JButton config = new JButton(COG);
-        JCheckBox cbEnabled = new JCheckBox();
+        btnConfig = new JButton(COG);
+        cbEnabled = new JCheckBox();
         cbEnabled.setToolTipText("Enable/disable extension");
         cbEnabled.setSelected(true);
         cbEnabled.addActionListener(l ->
         {
-            if (rbDefault.isSelected())
+            setEnabled();
+            if (fireEvents)
             {
-                defaultGroup.clearSelection();
+                enabledChangedAction.accept(cbEnabled.isSelected());
             }
-            rbDefault.setEnabled(cbEnabled.isSelected());
-            tfAlias.setEnabled(cbEnabled.isSelected());
-            config.setEnabled(cbEnabled.isSelected());
-            setPanelEnabled(extensionPanel, cbEnabled.isSelected());
-            extension.setEnabled(cbEnabled.isSelected());
         });
-        config.addActionListener(l -> 
+        btnConfig.addActionListener(l -> 
         {
-            JFrame dialog = new JFrame("Config " + extension.getExtension().getTitle());
+            JFrame dialog = new JFrame("Config " + extension.getTitle());
             dialog.getContentPane().setLayout(new BorderLayout());
-            dialog.getContentPane().add(extension.getExtension().getConfigComponent(), BorderLayout.CENTER);
+            dialog.getContentPane().add(extension.getConfigComponent(), BorderLayout.CENTER);
             dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
             dialog.setPreferredSize(new Dimension(800, 600));
             dialog.pack();
@@ -97,33 +120,80 @@ class CatalogExtensionView extends JPanel
                 @Override
                 public void windowClosed(WindowEvent e)
                 {
-                    configChanged.run();
+                    if (configChanged)
+                    {
+                        configChanged = false;
+                        configChangedAction.run();
+                    }
                 }
             });
         });
-        config.setEnabled(extension.getExtension().getConfigComponent() != null);
+        btnConfig.setEnabled(extension.getConfigComponent() != null);
         
         topPanel.add(rbDefault, new GridBagConstraints(0, 0, 1, 1, 0, 0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.NONE, new Insets(0, 0, 5, 0), 0, 0));
         topPanel.add(cbEnabled, new GridBagConstraints(1, 0, 1, 1, 0, 0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.NONE, new Insets(0, 0, 5, 0), 0, 0));
         topPanel.add(new JLabel("Alias: "), new GridBagConstraints(2, 0, 1, 0, 0, 0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.NONE, new Insets(0, 0, 0, 0), 0, 0));
         topPanel.add(tfAlias,
                 new GridBagConstraints(3, 0, 1, 0, 1, 0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
-        topPanel.add(config,
+        topPanel.add(btnConfig,
                 new GridBagConstraints(4, 0, 1, 0, 0, 0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 5, 0), 0, -4));
-
 
         add(topPanel, BorderLayout.NORTH);
         add(extensionPanel, BorderLayout.CENTER);
         
-        extensionPanel.add(extension.getExtension().getQuickPropertiesComponent(), BorderLayout.CENTER);
+        Component propertiesComponent = extension.getQuickPropertiesComponent();
+        if (propertiesComponent != null)
+        {
+            extensionPanel.add(propertiesComponent, BorderLayout.CENTER);
+        }
+
+        // Add listener
+        extension.addPropertyChangeListener(l ->  handlePropertyChanged(l.getPropertyName()));
+    }
+    
+    private void handlePropertyChanged(String property)
+    {
+        if (CONFIG.equals(property))
+        {
+            configChanged = true;
+        }
+        else if (ICatalogExtension.PROPERTIES.equals(property))
+        {
+            propertiesChangedAction.run();
+        }
+    }
+    
+    private void setEnabled()
+    {
+        rbDefault.setEnabled(cbEnabled.isSelected());
+        tfAlias.setEnabled(cbEnabled.isSelected());
+        // Config cannot be enabled once disabled
+        btnConfig.setEnabled(btnConfig.isEnabled() && cbEnabled.isSelected());
+        setPanelEnabled(extensionPanel, cbEnabled.isSelected());
+    }
+    
+    /** Init view from QueryFileModel */
+    void init(QueryFileModel model)
+    {
+        fireEvents = false;
+        if (Objects.equals(model.getQuerySession().getDefaultCatalogAlias(), tfAlias.getText()))
+        {
+            rbDefault.setSelected(true);
+        }
+        
+        CatalogExtensionModel extensionModel = model.getCatalogExtensions().get(extension);
+        tfAlias.setText(extensionModel.getAlias());
+        cbEnabled.setSelected(extensionModel.isEnabled());
+        setEnabled();
+        // Update extension UI from query session
+        extension.update(extensionModel.getAlias(), model.getQuerySession());
+        fireEvents = true;
     }
     
     void setPanelEnabled(Container container, boolean isEnabled)
     {
         container.setEnabled(isEnabled);
-
         Component[] components = container.getComponents();
-
         for (Component component : components)
         {
             if (component instanceof Container)

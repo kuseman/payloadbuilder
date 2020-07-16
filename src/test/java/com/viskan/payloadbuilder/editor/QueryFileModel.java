@@ -2,7 +2,8 @@ package com.viskan.payloadbuilder.editor;
 
 import com.viskan.payloadbuilder.QuerySession;
 import com.viskan.payloadbuilder.catalog.CatalogRegistry;
-import com.viskan.payloadbuilder.provider.elastic.EtmArticleCategoryESCatalog;
+
+import static java.util.stream.Collectors.toMap;
 
 import java.beans.PropertyChangeListener;
 import java.io.File;
@@ -10,8 +11,10 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 import javax.swing.SwingUtilities;
 import javax.swing.event.SwingPropertyChangeSupport;
@@ -43,20 +46,21 @@ class QueryFileModel
     private Output output = Output.TABLE;
 
     private final QuerySession querySession = new QuerySession(new CatalogRegistry());
-    private final List<ResultModel> results = new ArrayList<>();
-    
+    private Map<ICatalogExtension, CatalogExtensionModel> catalogExtensions;
+
     /** Execution fields */
+    private final List<ResultModel> results = new ArrayList<>();
     private StopWatch sw;
     private String error;
     private Pair<Integer, Integer> parseErrorLocation;
 
-    QueryFileModel()
+    QueryFileModel(List<ICatalogExtension> extensions)
     {
-        init();
+        init(extensions);
     }
 
     /** Initialize a file from filename */
-    QueryFileModel(File file)
+    QueryFileModel(List<ICatalogExtension> extensions, File file)
     {
         this.filename = file.getAbsolutePath();
         try
@@ -70,13 +74,19 @@ class QueryFileModel
         dirty = false;
         newFile = false;
         savedQuery = query;
-        
-        init();
+
+        init(extensions);
     }
-    
-    private void init()
+
+    private void init(List<ICatalogExtension> extensions)
     {
-        querySession.getCatalogRegistry().registerCatalog("es", new EtmArticleCategoryESCatalog());
+        catalogExtensions = extensions.stream()
+                .collect(toMap(Function.identity(), v -> new CatalogExtensionModel(v.getDefaultAlias())));
+        // Set first extension as default
+        if (extensions.size() > 0)
+        {
+            querySession.setDefaultCatalog(extensions.get(0).getDefaultAlias());
+        }
     }
 
     boolean isDirty()
@@ -117,18 +127,24 @@ class QueryFileModel
             }
             else if (sw.isStarted())
             {
-                
                 sw.stop();
             }
 
             // Let UI update correctly when chaning state of query model
-            try
+            if (SwingUtilities.isEventDispatchThread())
             {
-                SwingUtilities.invokeAndWait(() -> pcs.firePropertyChange(STATE, oldValue, newValue));
+                pcs.firePropertyChange(STATE, oldValue, newValue);
             }
-            catch (InvocationTargetException | InterruptedException e)
+            else
             {
-                throw new RuntimeException("Error updating state of query", e);
+                try
+                {
+                    SwingUtilities.invokeAndWait(() -> pcs.firePropertyChange(STATE, oldValue, newValue));
+                }
+                catch (InvocationTargetException | InterruptedException e)
+                {
+                    throw new RuntimeException("Error updating state of query", e);
+                }
             }
         }
     }
@@ -136,7 +152,7 @@ class QueryFileModel
     /** Get current execution time in millis */
     long getExecutionTime()
     {
-        return sw != null ? sw.getTime(TimeUnit.MILLISECONDS) : 0; 
+        return sw != null ? sw.getTime(TimeUnit.MILLISECONDS) : 0;
     }
 
     void clearForExecution()
@@ -261,12 +277,12 @@ class QueryFileModel
     {
         return querySession;
     }
-    
+
     List<ResultModel> getResults()
     {
         return results;
     }
-    
+
     void addResult(ResultModel model)
     {
         results.add(model);
@@ -276,6 +292,12 @@ class QueryFileModel
         }
     }
 
+    public Map<ICatalogExtension, CatalogExtensionModel> getCatalogExtensions()
+    {
+        return catalogExtensions;
+    }
+
+    /** Execution state of this file */
     enum State
     {
         COMPLETED("Stopped"),
@@ -296,10 +318,9 @@ class QueryFileModel
         }
     }
 
+    /** Current output of this file */
     enum Output
     {
-        //        JSON_RAW,
-        //        JSON_PRETTY,
         TABLE,
         FILE,
         NONE;

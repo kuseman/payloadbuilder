@@ -88,8 +88,8 @@ public class AOperatorTest extends Assert
                 return op;
             }
         };
-
-        session.setDefaultCatalog(c);
+        session.getCatalogRegistry().registerCatalog("c", c);
+        session.setDefaultCatalog("c");
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, parser.parseSelect(query));
 
         QueryResult result = new QueryResult();

@@ -1,10 +1,12 @@
 package com.viskan.payloadbuilder.editor;
 
-import com.viskan.payloadbuilder.provider.elastic.EtmArticleCategoryESCatalogExtension;
+import static java.util.Collections.emptyMap;
+import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 
 import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import javax.swing.event.SwingPropertyChangeSupport;
 
@@ -15,11 +17,28 @@ class PayloadbuilderEditorModel
     public static final String SELECTED_FILE = "selectedFile";
 
     private final List<QueryFileModel> files = new ArrayList<>();
-    private final List<CatalogExtensionModel> extensions = new ArrayList<>();
+    private final List<ICatalogExtension> extensions = new ArrayList<>();
 
-    PayloadbuilderEditorModel()
+    PayloadbuilderEditorModel(Map<String, Object> config)
     {
-        extensions.add(new CatalogExtensionModel(new EtmArticleCategoryESCatalogExtension()));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> catalogConfig = defaultIfNull((Map<String, Object>) config.get(PayloadbuilderEditorController.CATALOG_CONFIG), emptyMap());
+        for (String configClass : catalogConfig.keySet())
+        {
+            try
+            {
+                Class<?> clazz = Class.forName(configClass);
+                if (ICatalogExtension.class.isAssignableFrom(clazz))
+                {
+                    extensions.add((ICatalogExtension) clazz.newInstance());
+                }
+            }
+            catch (Exception e)
+            {
+                // TODO: log bus
+                throw new RuntimeException("Cannot instansiate extension " + configClass, e);
+            }
+        }
     }
     
     void addPropertyChangeListener(PropertyChangeListener listener)
@@ -56,7 +75,7 @@ class PayloadbuilderEditorModel
         pcs.fireIndexedPropertyChange(SELECTED_FILE, index, existing, file);
     }
     
-    List<CatalogExtensionModel> getExtensions()
+    List<ICatalogExtension> getCatalogExtensions()
     {
         return extensions;
     }

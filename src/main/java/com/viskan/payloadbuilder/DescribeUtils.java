@@ -53,7 +53,16 @@ public class DescribeUtils
         QuerySession session = context.getSession();
         String catalogAlias = statement.getCatalog();
         QualifiedName tableName = statement.getTableName();
-        Catalog catalog = isBlank(catalogAlias) ? session.getDefaultCatalog() : session.getCatalogRegistry().getCatalog(catalogAlias);
+        Catalog catalog;
+        if (isBlank(catalogAlias))
+        {
+            catalog = context.getSession().getDefaultCatalog();
+            catalogAlias = context.getSession().getDefaultCatalogAlias();
+        }
+        else
+        {
+            catalog = session.getCatalogRegistry().getCatalog(catalogAlias);
+        }
 
         if (catalog == null)
         {
@@ -104,7 +113,7 @@ public class DescribeUtils
             return null;
         }
 
-        List<Index> indices = catalog.getIndices(context.getSession(), tableName);
+        List<Index> indices = catalog.getIndices(context.getSession(), catalogAlias, tableName);
 
         // Name,    Type,   Description
         // art_id,  Column, String

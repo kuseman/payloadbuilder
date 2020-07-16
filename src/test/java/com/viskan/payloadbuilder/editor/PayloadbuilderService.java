@@ -4,13 +4,23 @@ import com.viskan.payloadbuilder.OutputWriter;
 import com.viskan.payloadbuilder.Payloadbuilder;
 import com.viskan.payloadbuilder.QueryResult;
 import com.viskan.payloadbuilder.editor.QueryFileModel.State;
+import com.viskan.payloadbuilder.parser.AExpressionVisitor;
+import com.viskan.payloadbuilder.parser.AStatementVisitor;
+import com.viskan.payloadbuilder.parser.Expression;
+import com.viskan.payloadbuilder.parser.NamedParameterExpression;
 import com.viskan.payloadbuilder.parser.ParseException;
+import com.viskan.payloadbuilder.parser.QueryParser;
+import com.viskan.payloadbuilder.parser.QueryStatement;
+
+import static java.util.Collections.emptySet;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -22,6 +32,8 @@ import org.apache.commons.lang3.tuple.Pair;
 /** Class the executes queries etc. */
 class PayloadbuilderService
 {
+    private static final NamedParameterVisitor NAMED_PARAMETERS_VISITOR = new NamedParameterVisitor();
+    private static final QueryParser PARSER = new QueryParser();
     private static final AtomicInteger THREAD_ID = new AtomicInteger(1);
     private static final Executor EXECUTOR = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2, r ->
     {
@@ -94,6 +106,46 @@ class PayloadbuilderService
                 queryFinnishedCallback.run();
             }
         });
+    }
+    
+    /** Get named parameters from query */
+    static Set<String> getParameters(String query)
+    {
+        QueryStatement parsedQuery;
+        try
+        {
+            parsedQuery = PARSER.parseQuery(query);
+        }
+        catch (Exception e)
+        {
+            e.printStackTrace();
+            // TODO: notify error parsing
+            return emptySet();
+        }
+        Set<String> parameters = new HashSet<>();
+        parsedQuery.getStatements().forEach(s -> s.accept(NAMED_PARAMETERS_VISITOR, parameters));
+        return parameters;
+    }
+    
+    private static class NamedParameterVisitor extends AStatementVisitor<Void, Set<String>>
+    {
+        private static final ExpressionVisitor EXPRESSION_VISITOR = new ExpressionVisitor();
+        
+        @Override
+        protected void visitExpression(Set<String> context, Expression expression)
+        {
+            expression.accept(EXPRESSION_VISITOR, context);
+        }
+        
+        private static class ExpressionVisitor extends AExpressionVisitor<Void, Set<String>>
+        {
+            @Override
+            public Void visit(NamedParameterExpression expression, Set<String> context)
+            {
+                context.add(expression.getName());
+                return null;
+            }
+        }
     }
 
     private static void setupColumns(ResultModel model, QueryResult.QueryResultMetaData metaData)
