@@ -2,6 +2,7 @@ package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.QuerySession;
 import com.viskan.payloadbuilder.catalog.Catalog;
+import com.viskan.payloadbuilder.catalog.Catalog.TablePredicate;
 import com.viskan.payloadbuilder.catalog.CatalogRegistry;
 import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.parser.ExecutionContext;
@@ -14,6 +15,7 @@ import static java.util.Collections.emptyIterator;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import org.apache.commons.lang3.mutable.MutableObject;
@@ -49,16 +51,31 @@ public class AOperatorTest extends Assert
             }
         };
     }
-
     protected QueryResult getQueryResult(String query)
+    {
+        return getQueryResult(query, null);
+    }
+    
+    protected QueryResult getQueryResult(String query, Consumer<TablePredicate> predicateConsumer)
     {
         List<Operator> tableOperators = new ArrayList<>();
         MutableObject<TableAlias> mAlias = new MutableObject<>();
         Catalog c = new Catalog("Test")
         {
             @Override
-            public Operator getScanOperator(QuerySession session, int nodeId, String catalogAlias, TableAlias alias, List<TableOption> tableOptions)
+            public Operator getScanOperator(
+                    QuerySession session,
+                    int nodeId,
+                    String catalogAlias,
+                    TableAlias alias,
+                    TablePredicate predicate,
+                    List<TableOption> tableOptions)
             {
+                if (predicateConsumer != null)
+                {
+                    predicateConsumer.accept(predicate);
+                }
+                
                 if (mAlias.getValue() == null)
                 {
                     mAlias.setValue(alias);

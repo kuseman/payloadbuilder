@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import javax.swing.ButtonGroup;
@@ -25,6 +26,8 @@ import javax.swing.JOptionPane;
 import javax.swing.Timer;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
+
+import org.apache.commons.io.FilenameUtils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -35,6 +38,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
     static final ObjectMapper MAPPER = new ObjectMapper();
     private final PayloadbuilderEditorView view;
     private final PayloadbuilderEditorModel model;
+    private final ParametersDialog parametersDialog;
     private final CaretChangedListener caretChangedListener = new CaretChangedListener();
     private final Map<String, Object> config;
     private final List<CatalogExtensionView> catalogExtensionViews = new ArrayList<>();
@@ -50,6 +54,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         this.view = requireNonNull(view, "view");
         this.model = requireNonNull(model, "model");
         this.model.addPropertyChangeListener(this);
+        this.parametersDialog = new ParametersDialog(view);
         init();
     }
 
@@ -84,7 +89,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                 editor.toggleComments();
             }
         });
-        view.setEditParametersRunnable(new EditParametersListener()); 
+        view.setEditParametersRunnable(new EditParametersListener());
         view.setOutputChangedAction(() ->
         {
             QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
@@ -102,7 +107,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         {
             Map<String, Object> catalogConfig = catalogConfigs.getOrDefault(extension.getClass().getName(), emptyMap());
             extension.load(catalogConfig);
-            
+
             CatalogExtensionView extensionView = new CatalogExtensionView(
                     extension,
                     defaultGroup,
@@ -115,10 +120,6 @@ class PayloadbuilderEditorController implements PropertyChangeListener
             boolean last = y == model.getCatalogExtensions().size() - 1;
             view.getPanelCatalogs().add(extensionView, new GridBagConstraints(0, y++, 1, 1, 1, last ? 1 : 0, GridBagConstraints.BASELINE, GridBagConstraints.HORIZONTAL, insets, 0, 0));
         }
-//        if (defaultGroup.getButtonCount() > 0)
-//        {
-//            defaultGroup.getElements().nextElement().setSelected(true);
-//        }
 
         view.getEditorsTabbedPane().addChangeListener(new SelectedFileListener());
         // TODO: check of unsaved files
@@ -127,7 +128,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         view.getMemoryLabel().setText(getMemoryString());
         new Timer(250, evt -> view.getMemoryLabel().setText(getMemoryString())).start();
     }
-    
+
     private void configChanged(ICatalogExtension catalogExtension)
     {
         getCatalogConfig().put(catalogExtension.getClass().getName(), catalogExtension.getProperties());
@@ -146,7 +147,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
             catalogExtension.setup(model.getAlias(), editor.getFile().getQuerySession());
         }
     }
-    
+
     private void aliasChanged(ICatalogExtension catalogExtension, String alias)
     {
         QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
@@ -156,7 +157,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
             model.setAlias(alias);
         }
     }
-    
+
     private void enabledChanged(ICatalogExtension catalogExtension, boolean enabled)
     {
         QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
@@ -166,7 +167,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
             model.setEnabled(enabled);
         }
     }
-    
+
     private void defaultCatalogChanged(String catalogAlias)
     {
         QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
@@ -181,13 +182,13 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         Runtime runtime = Runtime.getRuntime();
         return String.format("%s / %s", byteCountToDisplaySize(runtime.totalMemory()), byteCountToDisplaySize(runtime.freeMemory()));
     }
-    
+
     @SuppressWarnings("unchecked")
     private Map<String, Object> getCatalogConfig()
     {
         return (Map<String, Object>) config.computeIfAbsent(CATALOG_CONFIG, k -> new HashMap<String, Object>());
     }
-    
+
     private void saveConfig()
     {
         Main.saveConfig(config);
@@ -289,7 +290,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                         }
                     }
                 });
-                
+
                 file.addPropertyChangeListener(l ->
                 {
                     tabComponent.setTitle(file.getTabTitle());
@@ -319,7 +320,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                 model.setSelectedFile(index);
                 view.getOutputCombo().setSelectedItem(editor.getFile().getOutput());
                 defaultGroup.clearSelection();
-                catalogExtensionViews.forEach(v -> v.init(editor.getFile()));                
+                catalogExtensionViews.forEach(v -> v.init(editor.getFile()));
             }
         }
     }
@@ -339,7 +340,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
             {
                 return;
             }
-            
+
             QueryFileModel fileModel = editor.getFile();
             if (fileModel.getState() == State.EXECUTING)
             {
@@ -348,7 +349,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
 
             // Setup catalogs
             fileModel.getQuerySession().getCatalogRegistry().clearCatalogs();
-            fileModel.getCatalogExtensions().entrySet().forEach(e -> 
+            fileModel.getCatalogExtensions().entrySet().forEach(e ->
             {
                 ICatalogExtension extension = e.getKey();
                 CatalogExtensionModel model = e.getValue();
@@ -362,7 +363,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                     extension.setup(model.getAlias(), fileModel.getQuerySession());
                 }
             });
-                
+
             PayloadbuilderService.executeQuery(fileModel, queryString, () ->
             {
                 // Update properties in UI after query is finished
@@ -371,7 +372,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
             });
         }
     }
-    
+
     private class EditParametersListener implements Runnable
     {
         @Override
@@ -387,8 +388,28 @@ class PayloadbuilderEditorController implements PropertyChangeListener
             {
                 return;
             }
-            
-            System.out.println(PayloadbuilderService.getParameters(queryString));
+
+            QueryFileModel fileModel = editor.getFile();
+
+            Set<String> parameterNames = PayloadbuilderService.getParameters(queryString);
+
+            for (String name : parameterNames)
+            {
+                if (!fileModel.getParameters().containsKey(name))
+                {
+                    fileModel.getParameters().put(name, null);
+                }
+            }
+
+            parametersDialog.init(FilenameUtils.getName(fileModel.getFilename()), fileModel.getParameters());
+            parametersDialog.setVisible(true);
+
+            Map<String, Object> parameters = parametersDialog.getParameters();
+            if (parameters != null)
+            {
+                fileModel.getParameters().clear();
+                fileModel.getParameters().putAll(parameters);
+            }
         }
     }
 
@@ -411,23 +432,6 @@ class PayloadbuilderEditorController implements PropertyChangeListener
             model.addFile(queryFile);
         }
     }
-
-    //    private class FormatListener implements Runnable
-    //    {
-    //        @Override
-    //        public void run()
-    //        {
-    //            QueryEditorContentView editor = (QueryEditorContentView) view.getEditorsTabbedPane().getSelectedComponent();
-    //            if (editor != null)
-    //            {
-    //                String queryString = editor.getQuery(false);
-    //                if (!isBlank(queryString))
-    //                {
-    //                    //                    System.out.println("FORMAT " + query);
-    //                }
-    //            }
-    //        }
-    //    }
 
     private class OpenListener implements Runnable
     {

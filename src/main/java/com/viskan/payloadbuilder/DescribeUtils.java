@@ -1,6 +1,7 @@
 package com.viskan.payloadbuilder;
 
 import com.viskan.payloadbuilder.catalog.Catalog;
+import com.viskan.payloadbuilder.catalog.Catalog.TablePredicate;
 import com.viskan.payloadbuilder.catalog.Index;
 import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.operator.ObjectProjection;
@@ -47,7 +48,11 @@ public class DescribeUtils
     {
     }
     
-    /** Builds a describe table select */
+    /** Builds a describe table select
+     * TODO: this needs to be changed and delegated to catalog.
+     * For example Elastic there are alot of different objects in a type
+     * and since we are fetching the 10 first rows the result will be wrong
+     **/
     static Pair<Operator, Projection> getDescribeTable(ExecutionContext context, DescribeTableStatement statement)
     {
         QuerySession session = context.getSession();
@@ -70,7 +75,7 @@ public class DescribeUtils
         }
 
         TableAlias tableAlias = TableAlias.of(null, tableName, "");
-        Operator operator = catalog.getScanOperator(context.getSession(), 0, catalogAlias, tableAlias, emptyList());
+        Operator operator = catalog.getScanOperator(context.getSession(), 0, catalogAlias, tableAlias, TablePredicate.EMPTY, emptyList());
 
         context.clear();
         // Get first row from scan operator
@@ -84,7 +89,7 @@ public class DescribeUtils
         int columnCount = -1;
         while (count > 0 && iterator.hasNext())
         {
-            if (columnCount == -1)
+            if (columnCount == -1 && tableAlias.getColumns() != null)
             {
                 columnCount = tableAlias.getColumns().length;
                 if (columnCount <= 0)

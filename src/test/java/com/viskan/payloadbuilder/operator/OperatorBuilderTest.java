@@ -2,6 +2,9 @@ package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.catalog.TableFunctionInfo;
+import com.viskan.payloadbuilder.operator.PredicateAnalyzer.AnalyzePair;
+import com.viskan.payloadbuilder.operator.PredicateAnalyzer.AnalyzeResult;
+import com.viskan.payloadbuilder.parser.Expression;
 import com.viskan.payloadbuilder.parser.QualifiedName;
 import com.viskan.payloadbuilder.parser.SortItem;
 import com.viskan.payloadbuilder.parser.SortItem.NullOrder;
@@ -10,6 +13,10 @@ import com.viskan.payloadbuilder.parser.SortItem.Order;
 import static com.viskan.payloadbuilder.parser.QualifiedName.of;
 import static java.util.Arrays.asList;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.lang3.mutable.MutableObject;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -41,6 +48,36 @@ public class OperatorBuilderTest extends AOperatorTest
     }
 
     @Test
+    public void test_batch_limit_operator()
+    {
+        String query = "select a.art_id from source s with (batch_limit=250) inner join article a on a.art_id = s.art_id";
+        QueryResult queryResult = getQueryResult(query);
+
+        Operator expected = new BatchRepeatOperator(
+                4,
+                1,
+                new HashJoin(
+                        3,
+                        "",
+                        new BatchLimitOperator(
+                                1,
+                                queryResult.tableOperators.get(0),
+                                e("250")),
+                        queryResult.tableOperators.get(1),
+                        new ExpressionHashFunction(asList(e("s.art_id"))),
+                        new ExpressionHashFunction(asList(e("a.art_id"))),
+                        new ExpressionPredicate(e("a.art_id = s.art_id")),
+                        DefaultRowMerger.DEFAULT,
+                        false,
+                        false));
+
+        //                System.out.println(queryResult.operator.toString(1));
+        //                System.err.println(expected.toString(1));
+
+        assertEquals(expected, queryResult.operator);
+    }
+
+    @Test
     public void test_sortBy()
     {
         String query = "select a.art_id from article a order by a.art_id";
@@ -51,12 +88,12 @@ public class OperatorBuilderTest extends AOperatorTest
                 queryResult.tableOperators.get(0),
                 new ExpressionRowComparator((asList(new SortItem(e("a.art_id"), Order.ASC, NullOrder.UNDEFINED)))));
 
-//                System.out.println(queryResult.operator.toString(1));
-//                System.err.println(expected.toString(1));
+        //                System.out.println(queryResult.operator.toString(1));
+        //                System.err.println(expected.toString(1));
 
         assertEquals(expected, queryResult.operator);
     }
-    
+
     @Test
     public void test_groupBy()
     {
@@ -75,7 +112,7 @@ public class OperatorBuilderTest extends AOperatorTest
 
         assertEquals(expected, queryResult.operator);
     }
-    
+
     @Test
     public void test_table_function()
     {
@@ -117,8 +154,8 @@ public class OperatorBuilderTest extends AOperatorTest
                 false,
                 false);
 
-//                                        System.err.println(expected.toString(1));
-//                                        System.out.println(queryResult.operator.toString(1));
+        //                                        System.err.println(expected.toString(1));
+        //                                        System.out.println(queryResult.operator.toString(1));
 
         assertEquals(expected, queryResult.operator);
 
@@ -356,6 +393,53 @@ public class OperatorBuilderTest extends AOperatorTest
     }
 
     @Test
+    public void test_catalog_supported_predicates()
+    {
+        String query = "select s.id1, s.flag1 from source s where s.flag1 and s.flag2";
+
+        MutableObject<Expression> catalogPredicate = new MutableObject<>();
+
+        QueryResult result = getQueryResult(query, p ->
+        {
+            // flag1 is supported as filter
+            AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(p.getPredicate());
+            List<AnalyzePair> leftOvers = new ArrayList<>();
+            for (AnalyzePair pair : analyzeResult.getPairs())
+            {
+                if (pair.getColumn("s", true).equals("flag1"))
+                {
+                    catalogPredicate.setValue(pair.getPredicate());
+                }
+                else
+                {
+                    leftOvers.add(pair);
+                }
+            }
+            p.setPredicate(new AnalyzeResult(leftOvers).getPredicate());
+        });
+
+        assertEquals(e("s.flag1"), catalogPredicate.getValue());
+
+        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"flag2", "flag1", "id1"});
+        assertTrue(source.isEqual(result.alias));
+
+        Operator expected = new FilterOperator(
+                1,
+                result.tableOperators.get(0),
+                new ExpressionPredicate(e("s.flag2")));
+
+        //        System.out.println(expected.toString(1));
+        //        System.out.println(result.operator.toString(1));
+
+        assertEquals(expected, result.operator);
+        assertEquals(new ObjectProjection(asList("id1", "flag1"),
+                asList(
+                        new ExpressionProjection(e("s.id1")),
+                        new ExpressionProjection(e("s.flag1")))),
+                result.projection);
+    }
+
+    @Test
     public void test_select_item_with_filter()
     {
         String query = "select object(s.id1, a.id2 from s where s.id4 > 0) arr from source s inner join [article where note_id > 0] a on a.art_id = s.art_id and a.active_flg where s.id3 > 0";
@@ -457,65 +541,65 @@ public class OperatorBuilderTest extends AOperatorTest
                 result.projection);
     }
 
-//    @Ignore
-//    @Test
-//    public void test_correlated_manual()
-//    {
-//        String query = "SELECT s.art_id "
-//            + "FROM source s "
-//            + "INNER JOIN "
-//            + "["
-//            + "  article a"
-//            + "  INNER JOIN [articleAttribute] aa"
-//            + "    ON aa.art_id = a.art_id "
-//            + "    AND s.id "
-//            + "] a"
-//            + "  ON a.art_id = s.art_id";
-//
-//        Catalog c = new Catalog("TEST")
-//        {
-//            Random rnd = new Random();
-//
-//            @Override
-//            public Operator getScanOperator(int nodeId, String catalogAlias, TableAlias alias, List<TableOption> tableOptions)
-//            {
-//                QualifiedName qname = alias.getTable();
-//                if (qname.toString().equals("source"))
-//                {
-//                    return new CachingOperator(0, c -> IntStream.range(0, 1000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextBoolean(), rnd.nextInt(100)})).iterator());
-//                }
-//                else if (qname.toString().equals("article"))
-//                {
-//                    return new CachingOperator(0, c -> IntStream.range(0, 1000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextInt(1000)})).iterator());
-//                }
-//
-//                return new CachingOperator(0, c -> IntStream.range(0, 10000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextInt(1000)})).iterator());
-//            }
-//        };
-//
-//        session.setDefaultCatalog(c);
-//
-//        Pair<Operator, Projection> pair = null;
-//        for (int i = 0; i < 10; i++)
-//        {
-//            pair = OperatorBuilder.create(session, parser.parseSelect(query));
-//            ExecutionContext context = new ExecutionContext(session);
-//            Iterator<Row> it = pair.getKey().open(context);
-//            StopWatch sw = new StopWatch();
-//            sw.start();
-//            int count = 0;
-//            while (it.hasNext())
-//            {
-//                Row row = it.next();
-//                //            System.out.println(row);
-//                count++;
-//            }
-//            sw.stop();
-//            System.out.println("Time: " + sw.toString() + ", rows: " + count);
-//            System.out.println(FileUtils.byteCountToDisplaySize(Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()));
-//        }
-//
-//        System.out.println(pair.getKey().toString(1));
-//
-//    }
+    //    @Ignore
+    //    @Test
+    //    public void test_correlated_manual()
+    //    {
+    //        String query = "SELECT s.art_id "
+    //            + "FROM source s "
+    //            + "INNER JOIN "
+    //            + "["
+    //            + "  article a"
+    //            + "  INNER JOIN [articleAttribute] aa"
+    //            + "    ON aa.art_id = a.art_id "
+    //            + "    AND s.id "
+    //            + "] a"
+    //            + "  ON a.art_id = s.art_id";
+    //
+    //        Catalog c = new Catalog("TEST")
+    //        {
+    //            Random rnd = new Random();
+    //
+    //            @Override
+    //            public Operator getScanOperator(int nodeId, String catalogAlias, TableAlias alias, List<TableOption> tableOptions)
+    //            {
+    //                QualifiedName qname = alias.getTable();
+    //                if (qname.toString().equals("source"))
+    //                {
+    //                    return new CachingOperator(0, c -> IntStream.range(0, 1000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextBoolean(), rnd.nextInt(100)})).iterator());
+    //                }
+    //                else if (qname.toString().equals("article"))
+    //                {
+    //                    return new CachingOperator(0, c -> IntStream.range(0, 1000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextInt(1000)})).iterator());
+    //                }
+    //
+    //                return new CachingOperator(0, c -> IntStream.range(0, 10000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextInt(1000)})).iterator());
+    //            }
+    //        };
+    //
+    //        session.setDefaultCatalog(c);
+    //
+    //        Pair<Operator, Projection> pair = null;
+    //        for (int i = 0; i < 10; i++)
+    //        {
+    //            pair = OperatorBuilder.create(session, parser.parseSelect(query));
+    //            ExecutionContext context = new ExecutionContext(session);
+    //            Iterator<Row> it = pair.getKey().open(context);
+    //            StopWatch sw = new StopWatch();
+    //            sw.start();
+    //            int count = 0;
+    //            while (it.hasNext())
+    //            {
+    //                Row row = it.next();
+    //                //            System.out.println(row);
+    //                count++;
+    //            }
+    //            sw.stop();
+    //            System.out.println("Time: " + sw.toString() + ", rows: " + count);
+    //            System.out.println(FileUtils.byteCountToDisplaySize(Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()));
+    //        }
+    //
+    //        System.out.println(pair.getKey().toString(1));
+    //
+    //    }
 }

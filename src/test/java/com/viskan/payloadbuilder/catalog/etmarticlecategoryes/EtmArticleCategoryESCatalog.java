@@ -1,4 +1,4 @@
-package com.viskan.payloadbuilder.catalog.elastic;
+package com.viskan.payloadbuilder.catalog.etmarticlecategoryes;
 
 import com.viskan.payloadbuilder.QuerySession;
 import com.viskan.payloadbuilder.catalog.Catalog;
@@ -19,7 +19,7 @@ import java.util.Set;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /** Catalog for ETM EtmArticle/CategoryV2 synchronizers */
-public class EtmArticleCategoryESCatalog extends Catalog
+class EtmArticleCategoryESCatalog extends Catalog
 {
     private static final int BATCH_SIZE = 500;
     private static final String DOCTYPE = "EtmArticleV2";
@@ -29,38 +29,51 @@ public class EtmArticleCategoryESCatalog extends Catalog
     static final String INSTANCE_KEY = "instance";
     
     static final List<TypeMapping> TYPE_MAPPINGS = asList(
-            new TypeMapping("article", asSet("article"), "EtmArticle_%d", asList("art_id"), DOCTYPE, "article"),
-            new TypeMapping("articleName", asSet("articlename", "article_name"), "EtmArticle_%d", asList("art_id"), DOCTYPE, "article"),
-            new TypeMapping("articleAttribute", asSet("articleattribute", "article_attribute"), "EtmArticle_%d", asList("art_id"), DOCTYPE, "article"),
-            new TypeMapping("articleProperty", asSet("articleproperty", "article_property"), "EtmArticle_%d", asList("art_id"), DOCTYPE, "article"),
-            new TypeMapping("articleCategory", asSet("articlecategory","article_category"), "EtmArticle_%d", asList("art_id"), DOCTYPE, "article"),
-            new TypeMapping("articleAttributeMedia", asSet("articleattributemedia" ,"article_attribute_media"), "EtmArticle_%d", asList("art_id"), DOCTYPE, "article"),
-            new TypeMapping("articlePrentype", asSet("articleprentype" ,"article_prentype"), "EtmArticle_%d", asList("art_id"), DOCTYPE, "article"),
-
-            new TypeMapping("articlePrice", asSet("articleprice"), "EtmArticle_articlePrice_%d_%d", asList("art_id", "country_id"), DOCTYPE, "articlePrice"),
+            new TypeMapping("article", asSet("article"), "EtmArticleV2_%d", asList("art_id"), DOCTYPE, "article"),
+            new TypeMapping("articleName", asSet("articlename", "article_name"), "EtmArticleV2_%d", asList("art_id"), DOCTYPE, "article"),
+            new TypeMapping("articleAttribute", asSet("articleattribute", "article_attribute"), "EtmArticleV2_%d", asList("art_id"), DOCTYPE, "article"),
+            new TypeMapping("articleProperty", asSet("articleproperty", "article_property"), "EtmArticleV2_%d", asList("art_id"), DOCTYPE, "article"),
+            new TypeMapping("articleCategory", asSet("articlecategory","article_category"), "EtmArticleV2_%d", asList("art_id"), DOCTYPE, "article"),
+            new TypeMapping("articleAttributeMedia", asSet("articleattributemedia" ,"article_attribute_media"), "EtmArticleV2_%d", asList("art_id"), DOCTYPE, "article"),
+            new TypeMapping("articlePrentype", asSet("articleprentype" ,"article_prentype"), "EtmArticleV2_%d", asList("art_id"), DOCTYPE, "article"),
+            new TypeMapping("articlePrice", asSet("articleprice"), "EtmArticleV2_articlePrice_%d_%d", asList("art_id", "country_id"), DOCTYPE, "articlePrice"),
+            new TypeMapping("articleBalance", asSet("articlebalance"), "EtmArticleV2_articleBalance_%d", asList("art_id"), DOCTYPE, "articleBalance"),
             
-            new TypeMapping("attribute1", asSet("attribute1"), "EtmArticle_attribute1_%d", asList("attr1_id"), DOCTYPE, "attribute1"),
-            new TypeMapping("attribute2", asSet("attribute2"), "EtmArticle_attribute2_%d", asList("attr2_id"), DOCTYPE, "attribute2"),
-            new TypeMapping("attribute3", asSet("attribute3"), "EtmArticle_attribute3_%d", asList("attr3_id"), DOCTYPE, "attribute3"),
+            new TypeMapping("attribute1", asSet("attribute1"), "EtmArticleV2_attribute1_%d", asList("attr1_id"), DOCTYPE, "attribute1"),
+            new TypeMapping("attribute2", asSet("attribute2"), "EtmArticleV2_attribute2_%d", asList("attr2_id"), DOCTYPE, "attribute2"),
+            new TypeMapping("attribute3", asSet("attribute3"), "EtmArticleV2_attribute3_%d", asList("attr3_id"), DOCTYPE, "attribute3"),
             
-            new TypeMapping("propertyKey", asSet("propertykey"), "EtmArticle_propertyKey_%d", asList("propertykey_id"), DOCTYPE, "propertyKey"),
-            new TypeMapping("propertyValue", asSet("propertyvalue"), "EtmArticle_propertyValue_%d", asList("propertyvalue_id"), DOCTYPE, "propertyValue")
+            new TypeMapping("propertyKey", asSet("propertykey"), "EtmArticleV2_propertyKey_%d", asList("propertykey_id"), DOCTYPE, "propertyKey"),
+            new TypeMapping("propertyValue", asSet("propertyvalue"), "EtmArticleV2_propertyValue_%d", asList("propertyvalue_id"), DOCTYPE, "propertyValue")
             );
     
-    public EtmArticleCategoryESCatalog()
+    EtmArticleCategoryESCatalog()
     {
         super(NAME);
     }
     
     @Override
-    public Operator getScanOperator(QuerySession session, int nodeId, String catalogAlias, TableAlias tableAlias, List<TableOption> tableOptions)
+    public Operator getScanOperator(
+            QuerySession session,
+            int nodeId,
+            String catalogAlias,
+            TableAlias tableAlias,
+            TablePredicate predicate,
+            List<TableOption> tableOptions)
     {
         TypeMapping mapping = getMapping(tableAlias.getTable().getLast());
         return new EtmArticleCategoryESOperator(mapping, nodeId, catalogAlias, tableAlias, null);
     }
     
     @Override
-    public Operator getIndexOperator(QuerySession session, int nodeId, String catalogAlias, TableAlias tableAlias, Index index, List<TableOption> tableOptions)
+    public Operator getIndexOperator(
+            QuerySession session,
+            int nodeId,
+            String catalogAlias,
+            TableAlias tableAlias,
+            Index index,
+            TablePredicate predicate,
+            List<TableOption> tableOptions)
     {
         TypeMapping mapping = getMapping(tableAlias.getTable().getLast());
         return new EtmArticleCategoryESOperator(mapping, nodeId, catalogAlias, tableAlias, index);

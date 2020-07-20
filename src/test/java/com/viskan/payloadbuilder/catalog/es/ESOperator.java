@@ -1,27 +1,31 @@
-package com.viskan.payloadbuilder.catalog.elastic;
+package com.viskan.payloadbuilder.catalog.es;
 
+import com.viskan.payloadbuilder.QuerySession;
 import com.viskan.payloadbuilder.catalog.Index;
 import com.viskan.payloadbuilder.catalog.TableAlias;
-import com.viskan.payloadbuilder.catalog.elastic.EtmArticleCategoryESCatalog.TypeMapping;
 import com.viskan.payloadbuilder.operator.AOperator;
 import com.viskan.payloadbuilder.operator.OperatorContext;
 import com.viskan.payloadbuilder.operator.OperatorContext.NodeData;
 import com.viskan.payloadbuilder.operator.Row;
 import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.Expression;
+import com.viskan.payloadbuilder.parser.QualifiedName;
 
 import static com.viskan.payloadbuilder.DescribeUtils.CATALOG;
 import static com.viskan.payloadbuilder.DescribeUtils.INDEX;
+import static com.viskan.payloadbuilder.DescribeUtils.PREDICATE;
 import static com.viskan.payloadbuilder.utils.MapUtils.entry;
 import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
 import static java.util.Collections.emptyList;
-import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
+import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
+import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
 import static org.apache.commons.lang3.StringUtils.isBlank;
-import static org.apache.commons.lang3.StringUtils.lowerCase;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +37,7 @@ import org.apache.commons.io.input.CountingInputStream;
 import org.apache.commons.io.output.CountingOutputStream;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.mutable.MutableObject;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -49,14 +54,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-/** Operator for ETM EtmArticle/CategoryV2 synchronizers */
-class EtmArticleCategoryESOperator extends AOperator
+/** Operator for Elastic search */
+class ESOperator extends AOperator
 {
-    private static final String TIMESTAMP = "__timestamp";
-    private static final String DOCID = "__docid";
-    private static final int TIMESTAMP_COLUMN_INDEX = -2;
-    private static final int DOC_ID_COLUMN_INDEX = -3;
-
+    static final String DOCID = "__id";
     static final ObjectMapper MAPPER = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
@@ -68,66 +69,24 @@ class EtmArticleCategoryESOperator extends AOperator
             .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
             .build();
 
-    private final TypeMapping typeMapping;
     private final TableAlias tableAlias;
     private final Index index;
     private final String catalogAlias;
-
-    public EtmArticleCategoryESOperator(
-            TypeMapping typeMapping,
+    private final List<Pair<String, Expression>> fieldPredicates;
+    
+    public ESOperator(
             int nodeId,
             String catalogAlias,
             TableAlias tableAlias,
-            Index index)
+            Index index,
+            List<Pair<String, Expression>> fieldPredicates)
     {
         super(nodeId);
-        this.typeMapping = typeMapping;
         this.catalogAlias = catalogAlias;
         this.tableAlias = tableAlias;
         this.index = index;
+        this.fieldPredicates = requireNonNull(fieldPredicates, "fieldPredicates");
     }
-
-    /* SETTINGS FIELDS */
-    //
-    //    private final Map<String, String> TABLE_TO_SUBTYPE = ofEntries(
-    //            entry("article", "article"),
-    //            entry("articlename", "article"),
-    //            entry("articleproperty", "article"),
-    //            entry("articleattribute", "article"),
-    //            entry("articleattributemedia", "article"),
-    //            entry("articlecategory", "article"),
-    //            entry("articleprice", "articlePrice"),
-    //            entry("attribute1", "attribute1"),
-    //            entry("attribute2", "attribute2"),
-    //            entry("attribute3", "attribute3"));
-    //
-    //    private final Map<String, String> DOC_ID_PATTERN_BY_TABLE = ofEntries(
-    //            entry("article", "EtmArticleV2_%s"),
-    //            entry("articlename", "EtmArticleV2_%s"),
-    //            entry("articleattribute", "EtmArticleV2_%s"),
-    //            entry("articleprice", "EtmArticleV2_articlePrice_%s_%s"),
-    //            entry("articlecategory", "EtmArticleV2_%s"),
-    //            entry("articleproperty", "EtmArticleV2_%s"),
-    //            entry("articleattributemedia", "EtmArticleV2_%s"),
-    //            entry("attribute1", "EtmArticleV2_attribute1_%s"),
-    //            entry("attribute2", "EtmArticleV2_attribute2_%s"),
-    //            entry("attribute3", "EtmArticleV2_attribute3_%s"),
-    //            entry("propertykey", "EtmArticleV2_propertyKey_%s"),
-    //            entry("propertyvalue", "EtmArticleV2_propertyValue_%s")
-    //
-    //    );
-
-    //    private static final String DOC_TYPE = "EtmArticleV2";
-    //    String esEndpoint = "http://192.168.10.78:9200";
-    //        String database = "RamosLager157TestDev".toLowerCase();
-    //    String database = "RamosVnpTestMain".toLowerCase();
-    //    int comp_id = 0;
-    //    String indexName = database + "_c" + comp_id + "_v3";
-    //    String instance = database + (comp_id > 0 ? "_" + comp_id : "");
-
-    /* END SETTINGS FIELD */
-
-    //    Map<String, List<Row>> cache =  new HashMap<>();
 
     @Override
     public String getName()
@@ -139,7 +98,8 @@ class EtmArticleCategoryESOperator extends AOperator
     public Map<String, Object> getDescribeProperties()
     {
         Map<String, Object> result = ofEntries(true,
-                entry(CATALOG, EtmArticleCategoryESCatalog.NAME));
+                entry(CATALOG, ESCatalog.NAME),
+                entry(PREDICATE, fieldPredicates.stream().map(p -> p.getKey() + " = " + p.getValue()).collect(joining(" AND "))));
 
         if (index != null)
         {
@@ -147,61 +107,11 @@ class EtmArticleCategoryESOperator extends AOperator
         }
         return result;
     }
-
+    
     @Override
     public Iterator<Row> open(ExecutionContext context)
     {
-        String endpoint;
-        String table;
-        String instance;
-
-        List<String> parts = tableAlias.getTable().getParts();
-
-        // Three part qualified name -> <endpoint>.<instance>.<table>
-        if (parts.size() == 3)
-        {
-            endpoint = parts.get(0);
-            instance = parts.get(1);
-            table = parts.get(2);
-        }
-        // Tow or one part qualified name -> <instance>.<table> or <table>
-        else if (parts.size() <= 2)
-        {
-            endpoint = (String) context.getSession().getCatalogProperty(catalogAlias, EtmArticleCategoryESCatalog.ENDPOINT_KEY);
-            if (isBlank(endpoint))
-            {
-                throw new IllegalArgumentException("Missing endpoint key in catalog properties.");
-            }
-
-            if (parts.size() == 2)
-            {
-                instance = parts.get(0);
-                table = parts.get(1);
-            }
-            else
-            {
-                instance = (String) context.getSession().getCatalogProperty(catalogAlias, EtmArticleCategoryESCatalog.INSTANCE_KEY);
-                if (isBlank(instance))
-                {
-                    throw new IllegalArgumentException("Missing instance key in catalog properties.");
-                }
-                table = parts.get(0);
-            }
-        }
-        else
-        {
-            throw new IllegalArgumentException("Invalid qualified table name " + tableAlias.getTable() + ". Requires 1 to 3 parts. <endpoint>.<instance>.<table>");
-        }
-
-        String database = lowerCase(instance);
-        int comp_id = 0;
-        int cIndex = instance.lastIndexOf("_");
-        if (cIndex != -1)
-        {
-            database = instance.substring(0, cIndex);
-            comp_id = Integer.parseInt(instance.substring(cIndex + 1));
-        }
-        String indexName = database + "_c" + comp_id + "_v3";
+        EsType esType = EsType.of(context.getSession(), catalogAlias, tableAlias.getTable());
 
         // TODO: turn on only in analyze mode
         NodeData nodeData = context.getOperatorContext().getNodeData(nodeId, NodeData::new);
@@ -211,13 +121,9 @@ class EtmArticleCategoryESOperator extends AOperator
 
         if (index != null)
         {
-            String mgetUrl = String.format("%s/%s/data/_mget?filter_path=docs._source,docs._id&_source_include=_timestamp,payload.%s.columns,payload.%s.rows", endpoint, indexName, table, table);
-            if (isBlank(typeMapping.docIdPattern))
-            {
-                throw new RuntimeException("No doc id pattern registered for " + table);
-            }
+            String mgetUrl = String.format("%s/%s/%s/_mget?filter_path=docs._source,docs._id", esType.endpoint, esType.index, esType.type);
             // TODO: thread up all ids in executor and join
-            DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getOperatorContext(), instance, typeMapping.docIdPattern, sentBytes);
+            DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getOperatorContext(), sentBytes);
             return getIterator(
                     receivedBytes,
                     scrollId ->
@@ -229,16 +135,15 @@ class EtmArticleCategoryESOperator extends AOperator
         }
 
         final String searchUrl = String.format(
-                "%s/%s/data/_search?q=_docType:%s+AND+_subType:%s&size=%d&scroll=%s&filter_path=_scroll_id,hits.hits._id,hits.hits._source&_source_include=_timestamp,payload.%s.columns,payload.%s.rows",
-                endpoint,
-                indexName,
-                typeMapping.doctype,
-                typeMapping.subtype,
+                "%s/%s/%s/_search?%s&size=%d&scroll=%s&filter_path=_scroll_id,hits.hits._id,hits.hits._source",
+                esType.endpoint,
+                esType.index,
+                esType.type,
+                getPredicateParam(context),
+                // TODO: table option for batch size
                 1000,
-                "2m",
-                typeMapping.name,
-                typeMapping.name);
-        String scrollUrl = String.format("%s/_search/scroll?scroll=%s&scroll_id=", endpoint, "2m");
+                "2m");
+        String scrollUrl = String.format("%s/_search/scroll?scroll=%s&scroll_id=", esType.endpoint, "2m");
 
         return getIterator(
                 receivedBytes,
@@ -268,10 +173,6 @@ class EtmArticleCategoryESOperator extends AOperator
             int rowPos = 0;
             MutableObject<String> scrollId = new MutableObject<>();
             Iterator<Doc> docIt;
-            int[] tableAliasColumnIndices;
-            Doc doc;
-            Iterator<Object[]> rowsIterator;
-
             Row next;
 
             @Override
@@ -316,107 +217,79 @@ class EtmArticleCategoryESOperator extends AOperator
                         }
                         continue;
                     }
-                    else if (rowsIterator == null)
+                    else if (!docIt.hasNext())
                     {
-                        if (!docIt.hasNext())
-                        {
-                            docIt = null;
-                            continue;
-                        }
-
-                        doc = docIt.next();
-                        while (!doc.isValid() && docIt.hasNext())
-                        {
-                            doc = docIt.next();
-                        }
-
-                        if (!doc.isValid())
-                        {
-                            docIt = null;
-                            continue;
-                        }
-
-                        Payload payload = doc.source.payload.get(typeMapping.name);
-                        if (tableAliasColumnIndices == null)
-                        {
-                            populateColumnIndices(payload);
-                        }
-
-                        rowsIterator = payload.rows.iterator();
-                        continue;
-                    }
-                    else if (!rowsIterator.hasNext())
-                    {
-                        rowsIterator = null;
+                        docIt = null;
                         continue;
                     }
 
-                    Object[] data = rowsIterator.next();
-                    Object[] rowData = new Object[tableAliasColumnIndices.length];
-
-                    for (int i = 0; i < rowData.length; i++)
+                    Doc doc = docIt.next();
+                    if (!doc.isValid())
                     {
-                        int columnIndex = tableAliasColumnIndices[i];
-                        if (columnIndex == TIMESTAMP_COLUMN_INDEX)
-                        {
-                            rowData[i] = doc.source.timestamp;
-                        }
-                        else if (columnIndex == DOC_ID_COLUMN_INDEX)
-                        {
-                            rowData[i] = doc.docId;
-                        }
-                        else
-                        {
-                            rowData[i] = columnIndex >= 0 && columnIndex < data.length ? data[columnIndex] : null;
-                        }
+                        continue;
                     }
 
-                    next = Row.of(tableAlias, rowPos++, rowData);
-                }
-                return true;
-            }
-
-            private void populateColumnIndices(Payload payload)
-            {
-                // All columns wanted, update alias columns
-                if (tableAlias.getColumns() == null)
-                {
-                    int length = payload.columns.length;
-                    String[] columns = Arrays.copyOf(payload.columns, length + 2);
-                    columns[length] = TIMESTAMP;
-                    columns[length + 1] = DOCID;
-
-                    tableAliasColumnIndices = new int[columns.length];
-                    tableAlias.setColumns(columns);
-                }
-                else
-                {
-                    tableAliasColumnIndices = new int[tableAlias.getColumns().length];
-                }
-
-                int index = 0;
-                for (String aliasColumn : tableAlias.getColumns())
-                {
-                    int columnIndex;
-                    if (equalsIgnoreCase(TIMESTAMP, aliasColumn))
+                    if (tableAlias.getColumns() == null && !doc.source.keySet().isEmpty())
                     {
-                        columnIndex = TIMESTAMP_COLUMN_INDEX;
+                        List<String> columns = new ArrayList<>(doc.source.keySet());
+                        columns.add(DOCID);
+                        tableAlias.setColumns(columns.toArray(EMPTY_STRING_ARRAY));
                     }
-                    else if (equalsIgnoreCase(DOCID, aliasColumn))
+                    
+                    Object[] data;
+                    if (tableAlias.getColumns() != null)
                     {
-                        columnIndex = DOC_ID_COLUMN_INDEX;
+                        data = new Object[tableAlias.getColumns().length];
+                        int index = 0;
+                        for (String column : tableAlias.getColumns())
+                        {
+                            if (DOCID.equals(column))
+                            {
+                                data[index++] = doc.docId;
+                            }
+                            else
+                            {
+                                data[index++] = doc.source.get(column);
+                            }
+                        }
                     }
                     else
                     {
-                        columnIndex = ArrayUtils.indexOf(payload.columns, aliasColumn);
+                        data = ArrayUtils.EMPTY_OBJECT_ARRAY;
                     }
-                    tableAliasColumnIndices[index++] = columnIndex;
+
+                    next = Row.of(tableAlias, rowPos++, data);
                 }
+                return true;
             }
         };
-
     }
 
+    private String getPredicateParam(ExecutionContext context)
+    {
+        if (fieldPredicates.isEmpty())
+        {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (Pair<String, Expression> pair : fieldPredicates)
+        {
+            if (sb.length() == 0)
+            {
+                sb.append("q=");
+            }
+            else if (sb.length() > 0)
+            {
+                sb.append("+AND+");
+            }
+            
+            Object value = pair.getValue().eval(context);
+            sb.append(pair.getKey()).append(":").append(value);
+        }
+        
+        return sb.toString();
+    }
+    
     /** Top response (Used both in get request and search request) */
     private static class ESResponse
     {
@@ -456,38 +329,84 @@ class EtmArticleCategoryESOperator extends AOperator
     private static class Doc
     {
         @JsonProperty("_source")
-        Source source;
+        Map<String, Object> source;
 
         @JsonProperty("_id")
         String docId;
 
         public boolean isValid()
         {
-            return source != null && source.payload != null;
+            return source != null;
         }
-    }
-
-    private static class Source
-    {
-        @JsonProperty
-        Map<String, Payload> payload;
-
-        @JsonProperty("_timestamp")
-        String timestamp;
-    }
-
-    private static class Payload
-    {
-        @JsonProperty
-        String[] columns;
-        @JsonProperty
-        List<Object[]> rows;
     }
 
     @Override
     public String toString()
     {
         return String.format("ID: %d, %s", nodeId, (index != null ? "index" : "scan") + " (" + tableAlias.toString() + ")");
+    }
+    
+    /** Class representing a endpoint/index/type combo. */
+    static class EsType
+    {
+        final String endpoint;
+        final String index;
+        final String type;
+        
+        EsType(String endpoint, String index, String type)
+        {
+            this.endpoint = endpoint;
+            this.index = index;
+            this.type = type;
+        }
+        
+        /** Create type from provided session/table */
+        static EsType of(QuerySession session, String catalogAlias, QualifiedName table)
+        {
+            String endpoint;
+            String indexName;
+            String type;
+
+            List<String> parts = table.getParts();
+
+            // Three part qualified name -> <endpoint>.<index>.<type>
+            if (parts.size() == 3)
+            {
+                endpoint = parts.get(0);
+                indexName = parts.get(1);
+                type = parts.get(2);
+            }
+            // Tow or one part qualified name -> <index>.<type> or <type>
+            else if (parts.size() <= 2)
+            {
+                endpoint = (String) session.getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY);
+                if (isBlank(endpoint))
+                {
+                    throw new IllegalArgumentException("Missing endpoint key in catalog properties.");
+                }
+
+                if (parts.size() == 2)
+                {
+                    indexName = parts.get(0);
+                    type = parts.get(1);
+                }
+                else
+                {
+                    indexName = (String) session.getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY);
+                    if (isBlank(indexName))
+                    {
+                        throw new IllegalArgumentException("Missing index key in catalog properties.");
+                    }
+                    type = parts.get(0);
+                }
+            }
+            else
+            {
+                throw new IllegalArgumentException("Invalid qualified table name " + table + ". Requires 1 to 3 parts. <endpoint>.<index>.<type>");
+            }
+            
+            return new EsType(endpoint, indexName, type);
+        }
     }
 
     /** Class the streams doc id's to _mget endpoint in ES */
@@ -500,15 +419,11 @@ class EtmArticleCategoryESOperator extends AOperator
         private static final Header APPLICATION_JSON = new BasicHeader("Content-Type", "application/json");
 
         private final OperatorContext context;
-        private final String pattern;
-        private final byte[] prefixBytes;
         private final AtomicLong sentBytes;
 
-        private DocIdStreamingEntity(OperatorContext context, String instance, String pattern, AtomicLong sentBytes)
+        private DocIdStreamingEntity(OperatorContext context, AtomicLong sentBytes)
         {
             this.context = context;
-            this.prefixBytes = (instance + "_").getBytes();
-            this.pattern = pattern;
             this.sentBytes = sentBytes;
         }
 
@@ -570,8 +485,7 @@ class EtmArticleCategoryESOperator extends AOperator
                     }
                     first = false;
                     bos.write(QUOTE_BYTES);
-                    bos.write(prefixBytes);
-                    String docId = String.format(pattern, values.next());
+                    String docId = String.valueOf(values.next()[0]);
                     bos.write(docId.getBytes());
                     bos.write(QUOTE_BYTES);
                 }

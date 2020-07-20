@@ -18,40 +18,40 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
 
-/** Operator that limits number of rows in batches.
- * Is used in conjunction with {@link BatchRepeatOperator} 
+/**
+ * Operator that limits number of rows in batches. Is used in conjunction with {@link BatchRepeatOperator}
  **/
 class BatchLimitOperator extends AOperator
 {
     private final Operator operator;
     private final Expression batchLimitExpression;
-    
+
     BatchLimitOperator(int nodeId, Operator operator, Expression batchLimitExpression)
     {
         super(nodeId);
         this.operator = requireNonNull(operator, "operator");
         this.batchLimitExpression = requireNonNull(batchLimitExpression, "batchLimitExpression");
     }
-    
+
     @Override
     public List<Operator> getChildOperators()
     {
         return asList(operator);
     }
-    
+
     @Override
     public String getName()
     {
         return "Batch limit";
     }
-    
+
     @Override
     public Map<String, Object> getDescribeProperties()
     {
         return ofEntries(true,
                 entry(DescribeUtils.BATCH_SIZE, batchLimitExpression));
     }
-    
+
     @Override
     public Iterator<Row> open(ExecutionContext context)
     {
@@ -80,7 +80,7 @@ class BatchLimitOperator extends AOperator
                 Row row = it.next();
                 return row;
             }
-            
+
             @Override
             public boolean hasNext()
             {
@@ -92,7 +92,25 @@ class BatchLimitOperator extends AOperator
             }
         };
     }
-    
+
+    @Override
+    public int hashCode()
+    {
+        return operator.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof BatchLimitOperator)
+        {
+            BatchLimitOperator that = (BatchLimitOperator) obj;
+            return operator.equals(that.operator)
+                && batchLimitExpression.equals(that.batchLimitExpression);
+        }
+        return false;
+    }
+
     @Override
     public String toString(int indent)
     {
@@ -101,14 +119,15 @@ class BatchLimitOperator extends AOperator
         return desc + System.lineSeparator()
             +
             indentString + operator.toString(indent + 1);
-    }    
+    }
+
     /** Data for this operator */
     private static class Data extends NodeData implements BatchLimitData
     {
         Iterator<Row> iterator;
         MutableInt count = new MutableInt();
         int limit;
-        
+
         @Override
         public boolean isComplete()
         {

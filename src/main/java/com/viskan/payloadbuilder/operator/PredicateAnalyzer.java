@@ -31,7 +31,7 @@ import org.apache.commons.lang3.tuple.Pair;
  * equal expressions be their alias and columns
  * </pre>
  **/
-class PredicateAnalyzer
+public class PredicateAnalyzer
 {
     private PredicateAnalyzer()
     {
@@ -163,13 +163,18 @@ class PredicateAnalyzer
     public static class AnalyzeResult
     {
         private static final AnalyzeResult EMPTY = new AnalyzeResult(emptyList());
-        final List<AnalyzePair> pairs;
+        private final List<AnalyzePair> pairs;
 
-        AnalyzeResult(List<AnalyzePair> pairs)
+        public AnalyzeResult(List<AnalyzePair> pairs)
         {
             this.pairs = requireNonNull(pairs);
         }
 
+        public List<AnalyzePair> getPairs()
+        {
+            return pairs;
+        }
+        
         /**
          * <pre>
          * Extracts push down predicate for provided alias.

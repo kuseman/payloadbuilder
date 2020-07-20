@@ -1,11 +1,12 @@
-package com.viskan.payloadbuilder.catalog.elastic;
+package com.viskan.payloadbuilder.catalog.etmarticlecategoryes;
 
 import com.viskan.payloadbuilder.QuerySession;
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.editor.AutoCompletionComboBox;
 import com.viskan.payloadbuilder.editor.ICatalogExtension;
 
-import static com.viskan.payloadbuilder.catalog.elastic.EtmArticleCategoryESOperator.CLIENT;
+import static com.viskan.payloadbuilder.catalog.etmarticlecategoryes.EtmArticleCategoryESOperator.CLIENT;
+import static com.viskan.payloadbuilder.catalog.etmarticlecategoryes.EtmArticleCategoryESOperator.MAPPER;
 
 import java.awt.BorderLayout;
 import java.awt.Component;
@@ -38,15 +39,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-/** Extension for EtmArticleCategory (V2) data located in ES */
-public class EtmArticleCategoryESCatalogExtension implements ICatalogExtension
+/** Editor extension {@link EtmArticleCategoryESCatalog} */
+class EtmArticleCategoryESCatalogExtension implements ICatalogExtension
 {
-    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String ENDPOINTS = "endpoints";
-//    private static final String TYPEMAPPINGS = "typemappings";
-//    private static final String[] TYPE_MAPPING_COLUMNS = new String[] {"Type", "Table names", "DocType", "SubType", "DocId pattern", "DocId columns"};
     private static final Catalog CATALOG = new EtmArticleCategoryESCatalog();
 
     private final PropertyChangeSupport pcs = new PropertyChangeSupport(this);
@@ -162,12 +158,6 @@ public class EtmArticleCategoryESCatalogExtension implements ICatalogExtension
     {
         return (List<String>) properties.computeIfAbsent(ENDPOINTS, k -> new ArrayList<String>());
     }
-
-//    @SuppressWarnings("unchecked")
-//    private List<TypeMapping> getTypeMappings()
-//    {
-//        return (List<TypeMapping>) properties.computeIfAbsent(TYPEMAPPINGS, k -> new ArrayList<TypeMapping>());
-//    }
 
     private void reloadInstances()
     {
@@ -295,7 +285,6 @@ public class EtmArticleCategoryESCatalogExtension implements ICatalogExtension
     private class ConfigPanel extends JPanel
     {
         private final JList<String> listEndpoints;
-//        private final JTable mappingsTable;
 
         ConfigPanel()
         {
@@ -363,126 +352,12 @@ public class EtmArticleCategoryESCatalogExtension implements ICatalogExtension
                 update();
             });
             panelEndpoints.add(removeEndpoint, new GridBagConstraints(0, 2, 1, 1, 0.0, 1.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
-
-//            JPanel panelTypeMappings = new JPanel();
-//            panelTypeMappings.setBorder(BorderFactory.createTitledBorder("Type mappings"));
-//            panelTypeMappings.setLayout(new GridBagLayout());
-//            
-//            mappingsTable = createTypeMappingsTable();
-//            
-//            panelTypeMappings.add(new JScrollPane(mappingsTable),
-//                    new GridBagConstraints(0, 0, 4, 1, 1.0, 1.0, GridBagConstraints.BASELINE, GridBagConstraints.BOTH, new Insets(0, 0, 5, 0), 0, 0));
-//
-//            JButton addTypeMapping = new JButton("Add");
-//            addTypeMapping.addActionListener(l -> 
-//            {
-//                List<TypeMapping> mappings = getTypeMappings();
-//                TypeMapping mapping = new TypeMapping();
-//                mapping.name = "mapping_" + mappings.size();
-//                mappings.add(mapping);
-//                ((AbstractTableModel) mappingsTable.getModel()).fireTableDataChanged();
-//            });
-//            panelTypeMappings.add(addTypeMapping, new GridBagConstraints(0, 1, 1, 1, 0.0, 0.0, GridBagConstraints.BASELINE, GridBagConstraints.BOTH, new Insets(0, 0, 5, 0), 0, 0));
-//            JButton removeTypeMapping = new JButton("Remove");
-//            panelTypeMappings.add(removeTypeMapping, new GridBagConstraints(1, 1, 1, 1, 0.0, 0.0, GridBagConstraints.BASELINE, GridBagConstraints.BOTH, new Insets(0, 0, 5, 0), 0, 0));
-
             add(panelEndpoints, BorderLayout.CENTER);
-//            add(panelTypeMappings, BorderLayout.CENTER);
         }
 
         private void update()
         {
             listEndpoints.setModel(new DefaultComboBoxModel<>(getEndpoints().toArray(ArrayUtils.EMPTY_STRING_ARRAY)));
-//            ((AbstractTableModel) mappingsTable.getModel()).fireTableDataChanged();
         }
-        
-//        private JTable createTypeMappingsTable()
-//        {
-//            JTable table = new JTable();
-//
-//            TableModel model = new AbstractTableModel()
-//            {
-//                @Override
-//                public String getColumnName(int column)
-//                {
-//                    return TYPE_MAPPING_COLUMNS[column];
-//                }
-//
-//                @Override
-//                public boolean isCellEditable(int rowIndex, int columnIndex)
-//                {
-//                    return false;
-//                }
-////
-////                @Override
-////                public void setValueAt(Object aValue, int rowIndex, int columnIndex)
-////                {
-////                    TypeMapping typeMapping = getTypeMappings().get(rowIndex);
-////                    switch (columnIndex)
-////                    {
-////                        case 0:
-////                            typeMapping.name = (String) aValue;
-////                            break;
-////                        case 1:
-////                            typeMapping.tableNames = stream(((String) aValue).split(","))
-////                                    .map(n -> StringUtils.trim(n))
-////                                    .collect(toSet());
-////                            break;
-////                        case 2:
-////                            typeMapping.doctype = (String) aValue;
-////                            break;
-////                        case 3:
-////                            typeMapping.subtype = (String) aValue;
-////                            break;
-////                        case 4:
-////                            typeMapping.docIdPattern = (String) aValue;
-////                            break;
-////                        case 5:
-////                            typeMapping.docIdPatternColumnNames = stream(((String) aValue).split(","))
-////                                    .map(n -> StringUtils.trim(n))
-////                                    .collect(toList());
-////                            break;
-////                    }
-////                }
-//
-//                @Override
-//                public Object getValueAt(int rowIndex, int columnIndex)
-//                {
-//                    TypeMapping typeMapping = getTypeMappings().get(rowIndex);
-//                    switch (columnIndex)
-//                    {
-//                        case 0:
-//                            return typeMapping.name;
-//                        case 1:
-//                            return typeMapping.tableNames.stream().collect(joining(", "));
-//                        case 2:
-//                            return typeMapping.doctype;
-//                        case 3:
-//                            return typeMapping.subtype;
-//                        case 4:
-//                            return typeMapping.docIdPattern;
-//                        case 5:
-//                            return typeMapping.docIdPatternColumnNames.stream().collect(joining(", "));
-//                        default:
-//                            return null;
-//                    }
-//                }
-//
-//                @Override
-//                public int getRowCount()
-//                {
-//                    return getTypeMappings().size();
-//                }
-//
-//                @Override
-//                public int getColumnCount()
-//                {
-//                    return TYPE_MAPPING_COLUMNS.length;
-//                }
-//            };
-//
-//            table.setModel(model);
-//            return table;
-//        }
     }
 }

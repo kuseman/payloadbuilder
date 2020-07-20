@@ -18,11 +18,11 @@ import java.util.List;
 import org.apache.commons.io.FileUtils;
 
 /** Catalog providing file system functionality */
-public class FilesystemCatalog extends Catalog
+class FilesystemCatalog extends Catalog
 {
     private static final String[] COLUMNS = new String[] {"name", "path", "size", "isDirectory", "_path"};
 
-    public FilesystemCatalog()
+    FilesystemCatalog()
     {
         super("Filesystem");
         registerFunction(new ListFunction(this));

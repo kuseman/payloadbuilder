@@ -105,6 +105,24 @@ class BatchRepeatOperator extends AOperator
     }
     
     @Override
+    public int hashCode()
+    {
+        return operator.hashCode();
+    }
+    
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof BatchRepeatOperator)
+        {
+            BatchRepeatOperator that = (BatchRepeatOperator) obj;
+            return operator.equals(that.operator)
+                    && targetNodeId == that.targetNodeId;
+        }
+        return false;
+    }
+    
+    @Override
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);

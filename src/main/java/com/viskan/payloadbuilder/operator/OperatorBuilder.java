@@ -2,6 +2,7 @@ package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.QuerySession;
 import com.viskan.payloadbuilder.catalog.Catalog;
+import com.viskan.payloadbuilder.catalog.Catalog.TablePredicate;
 import com.viskan.payloadbuilder.catalog.Index;
 import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.catalog.TableFunctionInfo;
@@ -218,61 +219,72 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     public Void visit(Select query, Context context)
     {
         TableSourceJoined tsj = query.getFrom();
-        List<AJoin> joins = tsj != null ? tsj.getJoins() : emptyList();
-        int joinSize = joins.size();
-
         Expression where = query.getWhere();
-        AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(where);
         
         Index index = null;
         List<Expression> outerValuesExpressions = null;
         
-        // Anaylyze where to see if there is a potential index access
+        // 1. analyze index usage
+        // 2. apply push down predicate even with no joins
+        
+        
+        // Table from clause
+        // Analyze index possibilities
+        // Extract push down predicate candidates
         if (tsj != null && tsj.getTableSource().getTable() != null)
         {
             TableSource ts = tsj.getTableSource();
+            AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(where);
             List<AnalyzePair> equiPairs = analyzeResult.getEquiPairs(ts.getAlias(), true, true);
             if (!equiPairs.isEmpty())
             {
                 Pair<String, Catalog> pair = getCatalog(context, ts.getCatalog(), ts.getToken());
                 index = getIndex(equiPairs, ts.getAlias(), pair.getValue().getIndices(context.session, pair.getKey(), ts.getTable()));
+                // Index found, extract index predicate columns
+                // and set where predicate to left overs
+                if (index != null)
+                {
+                    IndexOperatorFoundation foundation = new IndexOperatorFoundation(ts.getAlias(), index, analyzeResult.getPairs(), equiPairs);
+                    outerValuesExpressions = foundation.outerValueExpressions;
+                    analyzeResult = foundation.leftOverAnalyzeResult;
+                    where = analyzeResult.getPredicate();
+                }
             }
             
-            if (index != null)
+            /* TODO:
+            Push down can applied to non populating joins ie:
+            select s.id
+            from source s
+            inner join article a
+              on a.id = s.id
+            inner join brand b
+              on b.id = a.bid
+            where s.id > 0        <--- Pushed down to source (DONE!)
+            and a.id2 < 10        <--- Can be pushed to article
+            and b.id3 != 10       <--- can be pushed to brand
+            */
+            
+            // Extract push down predicates
+            Pair<Expression, AnalyzeResult> pair = analyzeResult.extractPushdownPredicate(ts.getAlias(), true);
+            if (pair.getKey() != null)
             {
-                IndexOperatorFoundation foundation = new IndexOperatorFoundation(ts.getAlias(), index, analyzeResult.pairs, equiPairs);
-                outerValuesExpressions = foundation.outerValueExpressions;
-                analyzeResult = foundation.leftOverAnalyzeResult;
-                where = analyzeResult.getPredicate();
+                context.appendPushDownPredicate(ts.getAlias(), pair.getKey());
+                //pushDownPredicate = pair.getKey();
+                where = pair.getValue().getPredicate();
             }
         } 
         
-        Expression pushDownPredicate = null;
-        if (joinSize > 0)
-        {
-            /* TODO:
-              Push down can applied to non populating joins ie:
-              select s.id
-              from source s
-              inner join article a
-                on a.id = s.id
-              inner join brand b
-                on b.id = a.bid
-              where s.id > 0        <--- Pushed down to source (DONE!)
-              and a.id2 < 10        <--- Can be pushed to article
-              and b.id3 != 10       <--- can be pushed to brand
+//        Expression pushDownPredicate = null;
+//        if (joinSize > 0)
+//        {
+           
             
-            */
-            Pair<Expression, AnalyzeResult> pair = analyzeResult.extractPushdownPredicate(tsj.getTableSource().getAlias(), true);
-            if (pair.getKey() != null)
-            {
-                pushDownPredicate = pair.getKey();
-                where = pair.getValue().getPredicate();
-            }
-        }
+//        }
 
         TableOption batchLimitOption = null;
         int batchLimitId = -1;
+        List<AJoin> joins = tsj != null ? tsj.getJoins() : emptyList();
+        int joinSize = joins.size();
         // No need to batch when there is no joins
         if (joinSize > 0)
         {
@@ -287,18 +299,30 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             {
                 throw new RuntimeException("Index " + index + " should have been consumed by " + tsj.getTableSource().getTable());
             }
+            
+            Expression predicate = context.pushDownPredicateByAlias.remove(tsj.getTableSource().getAlias());
+            // Gather columns from remaining predicate
+            visit(predicate, context);
+            if (predicate != null)
+            {
+                context.operator = new FilterOperator(context.acquireNodeId(), context.operator, new ExpressionPredicate(predicate));
+            }
             if (outerValuesExpressions != null)
             {
                 context.operator = new OuterValuesOperator(context.acquireNodeId(), context.operator, outerValuesExpressions);
             }
         }
+//        else
+//        {
+//            
+//        }
 
         // Collect columns from pushed down predicate
-        if (pushDownPredicate != null)
-        {
-            context.operator = new FilterOperator(context.acquireNodeId(), context.operator, new ExpressionPredicate(pushDownPredicate));
-            visit(pushDownPredicate, context);
-        }
+//        if (pushDownPredicate != null)
+//        {
+//            context.operator = new FilterOperator(context.acquireNodeId(), context.operator, new ExpressionPredicate(pushDownPredicate));
+//            visit(pushDownPredicate, context);
+//        }
 
         if (batchLimitOption != null)
         {
@@ -437,6 +461,10 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     @Override
     protected void visit(Expression expression, Context context)
     {
+        if (expression == null)
+        {
+            return;
+        }
         // Resolve columns
         ColumnsVisitor.getColumnsByAlias(context.session, context.columnsByAlias, context.parent, expression);
     }
@@ -538,15 +566,19 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         Pair<String, Catalog> pair = getCatalog(context, table.getCatalog(), table.getToken());
         TableAlias alias = context.appendTableAlias(table.getTable(), table.getAlias(), null);
         int nodeId = context.acquireNodeId();
+        
+        TablePredicate predicate = new TablePredicate(context.pushDownPredicateByAlias.get(table.getAlias()));
         if (context.index != null)
         {
-            context.operator = pair.getValue().getIndexOperator(context.session, nodeId, pair.getKey(), alias, context.index, table.getTableOptions());
+            context.operator = pair.getValue().getIndexOperator(context.session, nodeId, pair.getKey(), alias, context.index, predicate, table.getTableOptions());
             context.index = null;
         }
         else
         {
-            context.operator = pair.getValue().getScanOperator(context.session, nodeId, pair.getKey(), alias, table.getTableOptions());
+            context.operator = pair.getValue().getScanOperator(context.session, nodeId, pair.getKey(), alias, predicate, table.getTableOptions());
         }
+        // Set leftover predicate to context
+        context.pushDownPredicateByAlias.put(table.getAlias(), predicate.getPredicate());
         return null;
     }
 
@@ -683,7 +715,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         // MergeJoin
 
         Index index = getIndex(equiPairs, innerAlias, indices);
-        IndexOperatorFoundation foundation = new IndexOperatorFoundation(innerAlias, index, analyzeResult.pairs, equiPairs);
+        IndexOperatorFoundation foundation = new IndexOperatorFoundation(innerAlias, index, analyzeResult.getPairs(), equiPairs);
         
         // No indices for inner -> HashJoin
         if (index == null)

@@ -10,6 +10,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -45,7 +46,8 @@ class QueryFileModel
     private String query = "";
     private Output output = Output.TABLE;
 
-    private final QuerySession querySession = new QuerySession(new CatalogRegistry());
+    private final Map<String, Object> parameters = new HashMap<>();
+    private final QuerySession querySession = new QuerySession(new CatalogRegistry(), parameters);
     private Map<ICatalogExtension, CatalogExtensionModel> catalogExtensions;
 
     /** Execution fields */
@@ -276,6 +278,11 @@ class QueryFileModel
     QuerySession getQuerySession()
     {
         return querySession;
+    }
+    
+    Map<String, Object> getParameters()
+    {
+        return parameters;
     }
 
     List<ResultModel> getResults()

@@ -91,6 +91,7 @@ class QueryFileView extends JPanel
         textEditor.setRows(40);
         textEditor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_SQL);
         textEditor.setCodeFoldingEnabled(true);
+        textEditor.setBracketMatchingEnabled(true);
         textEditor.setTabSize(2);
         textEditor.setTabsEmulated(true);
         textEditor.setText(file.getQuery());
@@ -379,6 +380,7 @@ class QueryFileView extends JPanel
                         rta.setRows(40);
                         rta.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JSON);
                         rta.setCodeFoldingEnabled(true);
+                        rta.setBracketMatchingEnabled(true);
                         rta.setText(ResultModel.getPrettyJson(value));
                         rta.setCaretPosition(0);
                         rta.setEditable(false);

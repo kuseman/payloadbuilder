@@ -1,15 +1,6 @@
 package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.catalog.TableAlias;
-import com.viskan.payloadbuilder.operator.DefaultRowMerger;
-import com.viskan.payloadbuilder.operator.ExpressionHashFunction;
-import com.viskan.payloadbuilder.operator.ExpressionPredicate;
-import com.viskan.payloadbuilder.operator.ExpressionProjection;
-import com.viskan.payloadbuilder.operator.FilterOperator;
-import com.viskan.payloadbuilder.operator.HashJoin;
-import com.viskan.payloadbuilder.operator.ObjectProjection;
-import com.viskan.payloadbuilder.operator.Operator;
-import com.viskan.payloadbuilder.operator.OperatorBuilder;
 import com.viskan.payloadbuilder.parser.QualifiedName;
 
 import static java.util.Arrays.asList;

@@ -4,7 +4,7 @@ import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.editor.ICatalogExtension;
 
 /** Catalog editor extension for {@link FilesystemCatalog} */
-public class FilesystemCatalogExtension implements ICatalogExtension
+class FilesystemCatalogExtension implements ICatalogExtension
 {
     private static final Catalog CATALOG = new FilesystemCatalog();
 

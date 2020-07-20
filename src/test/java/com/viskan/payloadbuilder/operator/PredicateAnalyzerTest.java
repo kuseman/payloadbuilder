@@ -114,18 +114,18 @@ public class PredicateAnalyzerTest extends Assert
         e = e("s.art_id = a.art_id");
         actual = PredicateAnalyzer.analyze(e);
         assertEquals(result(pair(asSet("s"), "art_id", e("s.art_id"), asSet("a"), "art_id", e("a.art_id"))), actual);
-        assertEquals("art_id", actual.pairs.get(0).getColumn("a", true));
-        assertEquals("art_id", actual.pairs.get(0).getColumn("s", true));
+        assertEquals("art_id", actual.getPairs().get(0).getColumn("a", true));
+        assertEquals("art_id", actual.getPairs().get(0).getColumn("s", true));
 
         e = e("a.art_id = s.art_id OR a.active_flg");
         actual = PredicateAnalyzer.analyze(e);
         assertEquals(result(pair(null, null, e("a.art_id = s.art_id OR a.active_flg"), null, null, null)), actual);
-        assertNull(actual.pairs.get(0).getColumn("a", true));
+        assertNull(actual.getPairs().get(0).getColumn("a", true));
 
         e = e("a.art_id = s.art_id + a.id");
         actual = PredicateAnalyzer.analyze(e);
         assertEquals(result(pair(asSet("a"), "art_id", e("a.art_id"), asSet("s", "a"), null, e("s.art_id + a.id"))), actual);
-        assertNull(actual.pairs.get(0).getColumn("s", true));
+        assertNull(actual.getPairs().get(0).getColumn("s", true));
 
         e = e("a.art_id + s.id = s.art_id");
         actual = PredicateAnalyzer.analyze(e);

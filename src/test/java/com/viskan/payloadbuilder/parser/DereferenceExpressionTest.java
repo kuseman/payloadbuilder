@@ -9,9 +9,11 @@ import static com.viskan.payloadbuilder.utils.MapUtils.entry;
 import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
 import static java.util.Arrays.asList;
 
+import org.junit.Ignore;
 import org.junit.Test;
 
 /** Test {@link DereferenceExpression} */
+@Ignore
 public class DereferenceExpressionTest extends AParserTest
 {
     @Test

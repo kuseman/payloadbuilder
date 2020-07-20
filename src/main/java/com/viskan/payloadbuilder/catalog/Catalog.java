@@ -2,6 +2,7 @@ package com.viskan.payloadbuilder.catalog;
 
 import com.viskan.payloadbuilder.QuerySession;
 import com.viskan.payloadbuilder.operator.Operator;
+import com.viskan.payloadbuilder.parser.Expression;
 import com.viskan.payloadbuilder.parser.QualifiedName;
 import com.viskan.payloadbuilder.parser.TableOption;
 
@@ -52,7 +53,9 @@ public abstract class Catalog
      * @param session Current query session
      * @param nodeId Unique id for operator node
      * @param catalogAlias Alias used for this catalog in the query
-     * @param tableAlias Table alias to retrieve operator for
+     * @param tableAlias Table alias to retrieve operator for. If {@link TableAlias#getColumns()} is null 
+     * then operator <b>MUST</b> set all available columns on alias.
+     * @param predicate Predicate (if any) for this table
      * @param tableOptions Provided options for this table.
      */
     public Operator getScanOperator(
@@ -60,6 +63,7 @@ public abstract class Catalog
             int nodeId,
             String catalogAlias,
             TableAlias tableAlias,
+            TablePredicate predicate,
             List<TableOption> tableOptions)
     {
         throw new IllegalArgumentException("Catalog " + catalogAlias + " (" + name + ") doesn't support scan operators.");
@@ -71,8 +75,10 @@ public abstract class Catalog
      * @param session Current query session
      * @param nodeId Unique id for operator node
      * @param catalogAlias Alias used for this catalog in the query
-     * @param tableAlias Table alias to retrieve operator for
+     * @param tableAlias Table alias to retrieve operator for. If {@link TableAlias#getColumns()} is null 
+     * then operator <b>MUST</b> set all available columns on alias.
      * @param index Index to use
+     * @param predicate Predicate (if any) for this table
      * @param tableOptions Provided options for this table.
      */
     public Operator getIndexOperator(
@@ -81,6 +87,7 @@ public abstract class Catalog
             String catalogAlias,
             TableAlias tableAlias,
             Index index,
+            TablePredicate predicate,
             List<TableOption> tableOptions)
     {
         throw new IllegalArgumentException("Catalog " + catalogAlias + " (" + name + ") doesn't support index operators.");
@@ -97,5 +104,40 @@ public abstract class Catalog
     public FunctionInfo getFunction(String name)
     {
         return functionByName.get(requireNonNull(name).toLowerCase());
+    }
+    
+    /** Predicate for a table if any. Is sent to catalog by framework
+     * to let catalogs that supports predicate analyze and extract supported
+     * predicates and return left over ones.
+     * <pre>
+     * 
+     * Example
+     * table:       article
+     * predicate:   active_flg && internet_flg
+     * 
+     * Catalog is able to filter active_flg on it's own
+     * but not internet_flg
+     * then predicate part <b>active_flg</b> is extracted and <b>internet_flg</b>
+     * is returned to framework for filter.
+     * </pre>
+     **/
+    public static class TablePredicate
+    {
+        public static TablePredicate EMPTY = new TablePredicate(null);
+        private Expression predicate;
+        public TablePredicate(Expression predicate)
+        {
+            this.predicate = predicate;
+        }
+        
+        public Expression getPredicate()
+        {
+            return predicate;
+        }
+        
+        public void setPredicate(Expression predicate)
+        {
+            this.predicate = predicate;
+        }
     }
 }

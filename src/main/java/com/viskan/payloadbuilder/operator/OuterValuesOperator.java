@@ -5,6 +5,7 @@ import com.viskan.payloadbuilder.parser.Expression;
 
 import static com.viskan.payloadbuilder.utils.MapUtils.entry;
 import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
+import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 
 import java.util.Iterator;
@@ -39,6 +40,12 @@ class OuterValuesOperator extends AOperator
     public Map<String, Object> getDescribeProperties()
     {
         return ofEntries(entry("Values", valueExpressions.toString()));
+    }
+    
+    @Override
+    public List<Operator> getChildOperators()
+    {
+        return asList(operator);
     }
 
     @SuppressWarnings("unchecked")

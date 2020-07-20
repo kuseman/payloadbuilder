@@ -8,15 +8,12 @@ import com.viskan.payloadbuilder.utils.MapUtils;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.tuple.Pair;
 
 /**
  * Expression of a qualified name type. Column reference with a nested path. Ie. field.subField.value
@@ -113,8 +110,6 @@ public class QualifiedReferenceExpression extends Expression
     
     private int columnIndex = -2;
     
-    public static Map<Pair<String, QualifiedName>, AtomicInteger> executionsByName = new HashMap<>();
-    
     @Override
     public Object eval(ExecutionContext context)
     {
@@ -151,11 +146,6 @@ public class QualifiedReferenceExpression extends Expression
             return null;
         }
 
-        Pair<String, QualifiedName> key = Pair.of(row.getTableAlias().getRootPath(), qname);
-        
-        executionsByName.computeIfAbsent(key, k -> new AtomicInteger()).incrementAndGet();
-
-        
         if (qname.getParts().size() == 2)
         {
             TableAlias tableAlias = row.getTableAlias();

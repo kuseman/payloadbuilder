@@ -49,7 +49,7 @@ public class ManualOperatorTest extends Assert
             }
             
             @Override
-            public Operator getScanOperator(QuerySession session, int nodeId, String catalogAlias, TableAlias tableAlias, List<TableOption> tableOptions)
+            public Operator getScanOperator(QuerySession session, int nodeId, String catalogAlias, TableAlias tableAlias, TablePredicate predicate, List<TableOption> tableOptions)
             {
                 return new Operator()
                 {
@@ -120,7 +120,8 @@ public class ManualOperatorTest extends Assert
             }
         }; 
         
-        session.setDefaultCatalog(c);
+        session.getCatalogRegistry().registerCatalog("c", c);
+        session.setDefaultCatalog("c");
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
 
         System.out.println(pair.getKey().toString(1));

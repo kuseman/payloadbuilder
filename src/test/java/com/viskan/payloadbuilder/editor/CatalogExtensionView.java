@@ -6,6 +6,7 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.Dimension;
+import java.awt.Frame;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
@@ -19,7 +20,7 @@ import javax.swing.ButtonGroup;
 import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
-import javax.swing.JFrame;
+import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
@@ -106,7 +107,8 @@ class CatalogExtensionView extends JPanel
         });
         btnConfig.addActionListener(l -> 
         {
-            JFrame dialog = new JFrame("Config " + extension.getTitle());
+            JDialog dialog = new JDialog((Frame) null, true);
+            dialog.setTitle("Config " + extension.getTitle());
             dialog.getContentPane().setLayout(new BorderLayout());
             dialog.getContentPane().add(extension.getConfigComponent(), BorderLayout.CENTER);
             dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);

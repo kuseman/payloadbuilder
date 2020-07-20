@@ -32,47 +32,51 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         String queryString = "SELECT a.art_if FROM article a WHERE 10 = a.art_id AND a.active_flg";
         List<Operator> operators = new ArrayList<>();
         Catalog c = catalog(ofEntries(
-                entry("article", asList("art_id"))
-                ), operators);
-        session.setDefaultCatalog(c);
-        
+                entry("article", asList("art_id"))), operators);
+        session.getCatalogRegistry().registerCatalog("c", c);
+        session.setDefaultCatalog("c");
+
         Select select = parser.parseSelect(queryString);
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
-        
-        Operator expected = new FilterOperator(
+
+        Operator expected = new OuterValuesOperator(
                 2,
-                new OuterValuesOperator(1, operators.get(0), asList(e("10"))),
-                new ExpressionPredicate(e("a.active_flg")));
+                new FilterOperator(
+                        1,
+                        operators.get(0),
+                        new ExpressionPredicate(e("a.active_flg"))),
+                asList(e("10")));
 
 //        System.err.println(pair.getKey().toString(1));
+//        System.err.println();
 //        System.out.println(expected.toString(1));
-        
+
         assertEquals(expected, pair.getKey());
     }
-    
+
     @Test
     public void test_nested_inner_join_with_pushdown()
     {
         String queryString = "SELECT a.art_id " +
-                "FROM source s " +
-                "INNER JOIN " +
-                "[" +
-                "  article a " +
-                "  INNER JOIN article_attribute aa " +
-                "    ON aa.art_id = s.art_id " +
-                "    AND aa.active_flg " +
-                "] a " +
-                "  ON a.art_id = s.art_id " +
-                "  AND a.club_id = 1337 + 123 " +
-                "  AND a.country_id = 0 " +
-                "  AND a.active_flg = 1";
-        
+            "FROM source s " +
+            "INNER JOIN " +
+            "[" +
+            "  article a " +
+            "  INNER JOIN article_attribute aa " +
+            "    ON aa.art_id = s.art_id " +
+            "    AND aa.active_flg " +
+            "] a " +
+            "  ON a.art_id = s.art_id " +
+            "  AND a.club_id = 1337 + 123 " +
+            "  AND a.country_id = 0 " +
+            "  AND a.active_flg = 1";
+
         List<Operator> operators = new ArrayList<>();
         Catalog c = catalog(ofEntries(
                 entry("article", asList("club_id", "country_id", "art_id")),
-                entry("article_attribute", asList("art_id"))
-                ), operators);
-        session.setDefaultCatalog(c);
+                entry("article_attribute", asList("art_id"))), operators);
+        session.getCatalogRegistry().registerCatalog("c", c);
+        session.setDefaultCatalog("c");
 
         Select select = parser.parseSelect(queryString);
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
@@ -100,32 +104,33 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 true,
                 false,
                 c.getIndices(session, "", QualifiedName.of("article")).get(0));
-                
+
         Operator actual = pair.getKey();
-        
-//        System.out.println(actual.toString(1));
-//        System.err.println(expected.toString(1));
+
+        //        System.out.println(actual.toString(1));
+        //        System.err.println(expected.toString(1));
 
         assertEquals(expected, actual);
-        
+
         Iterator<Row> it = actual.open(new ExecutionContext(session));
         assertFalse(it.hasNext());
     }
-    
+
     @Test
     public void test_inner_join_with_pushdown()
     {
         String queryString = "SELECT a.art_id " +
-                "FROM source s " +
-                "INNER JOIN article a " +
-                "  ON a.art_id = s.art_id " +
-                "  AND a.club_id = 1337 + 123 " +
-                "  AND a.country_id = 0 " +
-                "  AND a.active_flg = 1";
-        
+            "FROM source s " +
+            "INNER JOIN article a " +
+            "  ON a.art_id = s.art_id " +
+            "  AND a.club_id = 1337 + 123 " +
+            "  AND a.country_id = 0 " +
+            "  AND a.active_flg = 1";
+
         List<Operator> operators = new ArrayList<>();
         Catalog c = catalog(ofEntries(entry("article", asList("club_id", "country_id", "art_id"))), operators);
-        session.setDefaultCatalog(c);
+        session.getCatalogRegistry().registerCatalog("c", c);
+        session.setDefaultCatalog("c");
 
         Select select = parser.parseSelect(queryString);
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
@@ -142,32 +147,33 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 false,
                 false,
                 c.getIndices(session, "", QualifiedName.of("article")).get(0));
-                
+
         Operator actual = pair.getKey();
-        
-//        System.out.println(actual.toString(1));
-//        System.err.println(expected.toString(1));
+
+        //        System.out.println(actual.toString(1));
+        //        System.err.println(expected.toString(1));
 
         assertEquals(expected, actual);
-        
+
         Iterator<Row> it = actual.open(new ExecutionContext(session));
         assertFalse(it.hasNext());
     }
-    
+
     @Test
     public void test_inner_join_with_populate_and_filter_and_join_pushdown()
     {
         String queryString = "SELECT a.art_id " +
-                "FROM source s " +
-                "INNER JOIN [article where internet_flg = 1] a " +
-                "  ON a.art_id = s.art_id " +
-                "  AND a.club_id = 1337 + 123 " +
-                "  AND a.country_id = 0 " +
-                "  AND a.active_flg = 1";
-        
+            "FROM source s " +
+            "INNER JOIN [article where internet_flg = 1] a " +
+            "  ON a.art_id = s.art_id " +
+            "  AND a.club_id = 1337 + 123 " +
+            "  AND a.country_id = 0 " +
+            "  AND a.active_flg = 1";
+
         List<Operator> operators = new ArrayList<>();
         Catalog c = catalog(ofEntries(entry("article", asList("club_id", "country_id", "art_id"))), operators);
-        session.setDefaultCatalog(c);
+        session.getCatalogRegistry().registerCatalog("c", c);
+        session.setDefaultCatalog("c");
 
         Select select = parser.parseSelect(queryString);
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
@@ -184,14 +190,14 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 true,
                 false,
                 c.getIndices(session, "", QualifiedName.of("article")).get(0));
-                
+
         Operator actual = pair.getKey();
-        
-//        System.out.println(actual.toString(1));
-//        System.err.println(expected.toString(1));
+
+        //        System.out.println(actual.toString(1));
+        //        System.err.println(expected.toString(1));
 
         assertEquals(expected, actual);
-        
+
         Iterator<Row> it = actual.open(new ExecutionContext(session));
         assertFalse(it.hasNext());
     }
@@ -200,16 +206,17 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
     public void test_left_join_with_populate_and_filter_doesnt_pushdown_predicate()
     {
         String queryString = "SELECT a.art_id " +
-                "FROM source s " +
-                "LEFT JOIN [article where internet_flg = 1] a " +
-                "  ON a.art_id = s.art_id " +
-                "  AND a.club_id = 1337 + 123 " +
-                "  AND a.country_id = 0 " +
-                "  AND a.active_flg = 1";
-        
+            "FROM source s " +
+            "LEFT JOIN [article where internet_flg = 1] a " +
+            "  ON a.art_id = s.art_id " +
+            "  AND a.club_id = 1337 + 123 " +
+            "  AND a.country_id = 0 " +
+            "  AND a.active_flg = 1";
+
         List<Operator> operators = new ArrayList<>();
         Catalog c = catalog(ofEntries(entry("article", asList("club_id", "country_id", "art_id"))), operators);
-        session.setDefaultCatalog(c);
+        session.getCatalogRegistry().registerCatalog("c", c);
+        session.setDefaultCatalog("c");
 
         Select select = parser.parseSelect(queryString);
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
@@ -226,35 +233,36 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 true,
                 true,
                 c.getIndices(session, "", QualifiedName.of("article")).get(0));
-                
+
         Operator actual = pair.getKey();
-        
-//        System.out.println(actual.toString(1));
-//        System.err.println(expected.toString(1));
+
+        //        System.out.println(actual.toString(1));
+        //        System.err.println(expected.toString(1));
 
         assertEquals(expected, actual);
-        
+
         Iterator<Row> it = actual.open(new ExecutionContext(session));
         assertFalse(it.hasNext());
     }
-    
+
     @Test
     public void test_left_join_doesnt_pushdown_predicate()
     {
         String queryString = "SELECT a.art_id " +
-                "FROM source s " +
-                "LEFT JOIN article a " +
-                "  ON a.art_id = s.art_id " +
-                "  AND a.club_id = 1337 + 123 " +
-                "  AND a.country_id = 0 " +
-                "  AND a.active_flg = 1";
-        
+            "FROM source s " +
+            "LEFT JOIN article a " +
+            "  ON a.art_id = s.art_id " +
+            "  AND a.club_id = 1337 + 123 " +
+            "  AND a.country_id = 0 " +
+            "  AND a.active_flg = 1";
+
         List<Operator> operators = new ArrayList<>();
         Catalog c = catalog(ofEntries(entry("article", asList("club_id", "country_id", "art_id"))), operators);
-        session.setDefaultCatalog(c);
+        session.getCatalogRegistry().registerCatalog("c", c);
+        session.setDefaultCatalog("c");
 
         Select select = parser.parseSelect(queryString);
-        Pair<Operator, Projection> pair = OperatorBuilder.create(session, select );
+        Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
 
         Operator expected = new BatchHashJoin(
                 2,
@@ -268,18 +276,18 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 false,
                 true,
                 c.getIndices(session, "", QualifiedName.of("article")).get(0));
-                
+
         Operator actual = pair.getKey();
-        
-//        System.out.println(actual.toString(1));
-//        System.err.println(expected.toString(1));
+
+        //        System.out.println(actual.toString(1));
+        //        System.err.println(expected.toString(1));
 
         assertEquals(expected, actual);
-        
+
         Iterator<Row> it = actual.open(new ExecutionContext(session));
         assertFalse(it.hasNext());
     }
-    
+
     private Catalog catalog(
             Map<String, List<String>> keysByTable,
             List<Operator> operators)
@@ -294,7 +302,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             }
 
             @Override
-            public Operator getScanOperator(QuerySession session, int nodeId, String catalogAlias, TableAlias alias, List<TableOption> tableOptions)
+            public Operator getScanOperator(QuerySession session, int nodeId, String catalogAlias, TableAlias alias, TablePredicate predicate, List<TableOption> tableOptions)
             {
                 Operator op = op("scan " + alias.getTable().toString());
                 operators.add(op);
@@ -302,13 +310,13 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             }
 
             @Override
-            public Operator getIndexOperator(QuerySession session, int nodeId, String catalogAlias, TableAlias alias, Index index, List<TableOption> tableOptions)
+            public Operator getIndexOperator(QuerySession session, int nodeId, String catalogAlias, TableAlias alias, Index index, TablePredicate predicate, List<TableOption> tableOptions)
             {
                 Operator op = op("index " + alias.getTable().toString());
                 operators.add(op);
                 return op;
             }
-            
+
             private Operator op(final String name)
             {
                 return new Operator()
@@ -318,7 +326,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                     {
                         return 0;
                     }
-                    
+
                     @Override
                     public Iterator<Row> open(ExecutionContext context)
                     {

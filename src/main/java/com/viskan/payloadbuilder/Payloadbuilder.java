@@ -14,18 +14,14 @@ public class Payloadbuilder
      * BACKEND
      *   - QualifiedReferenceExpression
      *      Cache lookup path
-     *      Make traversal of maps work correctly
-     *   - DeferenceExpression
-     *      Implement
+     *      Traverse up through parents
      *   - Correlated queries support
      *   - Extensibility
      *      Override parts of query and/remove/alter
      *   - Sources support (art_id/attr1_id lists)
      *      Built in operator ?  
-     *   - Catalog supported predicates
-     *      Catalog function for supported predicate fields
-     *      Extract those fields from predicate and send into create operator method
-     *      Add the rest as filter as usual
+     *   - Rewrite OperatorBuilder#visit(PopulateTableSource ...)
+     *      Fix so push down predicates is set in context for catalog usage
      *   - Insert into temptable
      *      Needed for campaigns etc. Eventual stockhouse
      *   - Add more builtin functions
@@ -35,23 +31,26 @@ public class Payloadbuilder
      *      - leftpad
      *      - dateadd
      *      - Make sure everything from old payloadbuilder is supported
+     *   - Try to rewrite PredicateAnalyzer
+     *      Make it easier to work with
+     *      Add type in pair to be able to easier add range queries etc.
+     *      See if the includeEmptyAlias thing can be removed
      *   - Describe support
+     *      Catalog (show functions, tables, description of catalog)
      *      Function (show metadata, arguments, documentation)
      *   - Analyze select
      *      Perform select and measure stuff like catalog times, execution count
      *      Let catalogs provide data, like bytes fetched etc.
-     *   - Add support for project alias.*
+     *   - Add support for project alias.*, *
      *   - Write SQL server catalog
      *   - BatchMergeJoin
      *      Fix broken implementation
      *   - Caching parsed query
      *   - Codegen of expressions
+     *   - DeferenceExpression
+     *      Implement
      * 
      * UI
-     *   - Parameters toolbar button
-     *      - Find out parameters by traversing query
-     *      - Populate key/value editor (JSON values)
-     *      - Store current params in QueryFileModel/session
      *   - Move UI to own bundle
 
      */

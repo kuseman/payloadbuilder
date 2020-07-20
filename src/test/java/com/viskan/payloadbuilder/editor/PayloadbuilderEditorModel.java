@@ -4,6 +4,7 @@ import static java.util.Collections.emptyMap;
 import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 
 import java.beans.PropertyChangeListener;
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +31,9 @@ class PayloadbuilderEditorModel
                 Class<?> clazz = Class.forName(configClass);
                 if (ICatalogExtension.class.isAssignableFrom(clazz))
                 {
-                    extensions.add((ICatalogExtension) clazz.newInstance());
+                    Constructor<?> ctor = clazz.getDeclaredConstructors()[0];
+                    ctor.setAccessible(true);
+                    extensions.add((ICatalogExtension) ctor.newInstance());
                 }
             }
             catch (Exception e)

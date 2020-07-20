@@ -36,7 +36,7 @@ class CountFunction extends ScalarFunctionInfo
         {
             count = ((Collection<Object>) obj).size();
         }
-        else
+        else if (obj != null)
         {
             // Everything else is 1
             count = 1;
