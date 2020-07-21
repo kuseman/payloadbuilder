@@ -89,7 +89,10 @@ selectStatement
 
 selectItem
  : 
- (((OBJECT | ARRAY) nestedSelectItem) | expression) (AS? identifier)?
+ 	ASTERISK
+ |  alias=identifier '.' ASTERISK
+ |  (OBJECT | ARRAY) nestedSelectItem (AS? identifier)?
+ |  expression 						  (AS? identifier)?
  ;
  
 nestedSelectItem

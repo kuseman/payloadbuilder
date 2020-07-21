@@ -46,7 +46,6 @@ public class ObjectProjection implements Projection
         Row prevParentRow = rowToUse;
         if (selection != null)
         {
-//            context.setParentRow(row);
             Iterator<Row> it = selection.open(context);
             rowToUse = it.hasNext() ? it.next() : null;
             
@@ -68,13 +67,7 @@ public class ObjectProjection implements Projection
         
         context.setRow(prevParentRow);
     }
-    
-    @Override
-    public String[] getColumns()
-    {
-        return columns;
-    }
-    
+
     @Override
     public int hashCode()
     {

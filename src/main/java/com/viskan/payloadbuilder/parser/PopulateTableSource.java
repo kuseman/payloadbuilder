@@ -47,6 +47,12 @@ public class PopulateTableSource extends TableSource
         return tableSourceJoined.getTableSource().getTable();
     }
     
+    @Override
+    public List<TableOption> getTableOptions()
+    {
+        return tableSourceJoined.getTableSource().getTableOptions();
+    }
+    
     public List<SortItem> getOrderBy()
     {
         return orderBy;

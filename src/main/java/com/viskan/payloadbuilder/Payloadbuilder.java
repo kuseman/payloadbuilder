@@ -35,13 +35,13 @@ public class Payloadbuilder
      *      Make it easier to work with
      *      Add type in pair to be able to easier add range queries etc.
      *      See if the includeEmptyAlias thing can be removed
+     *      Now it's not possible to use a "NOT a.col = b.col" for example
      *   - Describe support
      *      Catalog (show functions, tables, description of catalog)
      *      Function (show metadata, arguments, documentation)
      *   - Analyze select
      *      Perform select and measure stuff like catalog times, execution count
      *      Let catalogs provide data, like bytes fetched etc.
-     *   - Add support for project alias.*, *
      *   - Write SQL server catalog
      *   - BatchMergeJoin
      *      Fix broken implementation

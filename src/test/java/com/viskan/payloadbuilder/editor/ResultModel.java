@@ -29,7 +29,6 @@ class ResultModel extends AbstractTableModel
     private final List<Object[]> rows = new ArrayList<>(50);
     private String[] columns = EMPTY_STRING_ARRAY;
     private boolean complete;
-    
     private int lastNotifyRowIndex = -1;
     
     ResultModel(QueryFileModel file)

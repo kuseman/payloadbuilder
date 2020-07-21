@@ -2,6 +2,7 @@ package com.viskan.payloadbuilder.operator;
 
 import com.viskan.payloadbuilder.catalog.Index;
 import com.viskan.payloadbuilder.parser.ExecutionContext;
+import com.viskan.payloadbuilder.parser.TableOption;
 
 import static com.viskan.payloadbuilder.DescribeUtils.BATCH_SIZE;
 import static com.viskan.payloadbuilder.DescribeUtils.INDEX;
@@ -24,6 +25,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.function.BiPredicate;
 
 import org.apache.commons.lang3.StringUtils;
@@ -59,7 +61,7 @@ class BatchHashJoin extends AOperator
     private final boolean emitEmptyOuterRows;
     private final Index innerIndex;
     private final int valuesSize;
-    private final int batchSize;
+    private final TableOption batchSizeOption;
 
     /* Statistics */
     private int executionCount;
@@ -75,7 +77,8 @@ class BatchHashJoin extends AOperator
             RowMerger rowMerger,
             boolean populating,
             boolean emitEmptyOuterRows,
-            Index innerIndex)
+            Index innerIndex,
+            TableOption batchSizeOption)
     {
         super(nodeId);
         this.logicalOperator = requireNonNull(logicalOperator, "logicalOperator");
@@ -89,7 +92,7 @@ class BatchHashJoin extends AOperator
         this.emitEmptyOuterRows = emitEmptyOuterRows;
         this.innerIndex = requireNonNull(innerIndex, "innerIndex");
         this.valuesSize = innerIndex.getColumns().size();
-        this.batchSize = innerIndex.getBatchSize();
+        this.batchSizeOption = batchSizeOption;
     }
 
     @Override
@@ -110,7 +113,7 @@ class BatchHashJoin extends AOperator
         return ofEntries(true,
                 entry(LOGICAL_OPERATOR, logicalOperator),
                 entry(POPULATING, populating),
-                entry(BATCH_SIZE, batchSize),
+                entry(BATCH_SIZE, batchSizeOption != null ? batchSizeOption.getValueExpression().toString() : innerIndex.getBatchSize()),
                 entry(PREDICATE, predicate),
                 entry(INDEX, innerIndex),
                 entry(OUTER_VALUES, outerValuesExtractor),
@@ -122,6 +125,17 @@ class BatchHashJoin extends AOperator
     {
         executionCount++;
         final Iterator<Row> outerIt = outer.open(context);
+        int temp = innerIndex.getBatchSize();
+        if (batchSizeOption != null)
+        {
+            Object obj = batchSizeOption.getValueExpression().eval(context);
+            if (!(obj instanceof Integer) || (Integer) obj < 0)
+            {
+                throw new OperatorException("Batch size expression " + batchSizeOption.getValueExpression() + " should return a positive Integer. Got: " + obj);
+            }
+            temp = (int) obj;
+        }
+        final int batchSize = temp;
         return new Iterator<Row>()
         {
             /** Batched rows */
@@ -445,7 +459,8 @@ class BatchHashJoin extends AOperator
                 && rowMerger.equals(that.rowMerger)
                 && populating == that.populating
                 && emitEmptyOuterRows == that.emitEmptyOuterRows
-                && batchSize == that.batchSize;
+                && innerIndex.equals(that.innerIndex)
+                && Objects.equals(batchSizeOption, that.batchSizeOption);
         }
         return false;
     }
@@ -461,7 +476,7 @@ class BatchHashJoin extends AOperator
                 populating,
                 emitEmptyOuterRows,
                 executionCount,
-                batchSize,
+                batchSizeOption != null ? batchSizeOption.getValueExpression().toString() : innerIndex.getBatchSize(),
                 innerIndex,
                 outerValuesExtractor,
                 innerValuesExtractor,

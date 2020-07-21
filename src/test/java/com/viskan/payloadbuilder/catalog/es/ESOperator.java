@@ -25,8 +25,8 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -170,6 +170,8 @@ class ESOperator extends AOperator
     {
         return new Iterator<Row>()
         {
+            boolean asteriskColumns = tableAlias.getColumns() == null;
+            LinkedHashSet<String> columns;
             int rowPos = 0;
             MutableObject<String> scrollId = new MutableObject<>();
             Iterator<Doc> docIt;
@@ -228,12 +230,19 @@ class ESOperator extends AOperator
                     {
                         continue;
                     }
-
-                    if (tableAlias.getColumns() == null && !doc.source.keySet().isEmpty())
+                    
+                    if (asteriskColumns)
                     {
-                        List<String> columns = new ArrayList<>(doc.source.keySet());
-                        columns.add(DOCID);
-                        tableAlias.setColumns(columns.toArray(EMPTY_STRING_ARRAY));
+                        if (columns == null)
+                        {
+                            columns = new LinkedHashSet<>(doc.source.keySet());
+                            columns.add(DOCID);
+                            tableAlias.setColumns(columns.toArray(EMPTY_STRING_ARRAY));
+                        }
+                        else if (columns.addAll(doc.source.keySet()))
+                        {
+                            tableAlias.setColumns(columns.toArray(EMPTY_STRING_ARRAY));
+                        }
                     }
                     
                     Object[] data;

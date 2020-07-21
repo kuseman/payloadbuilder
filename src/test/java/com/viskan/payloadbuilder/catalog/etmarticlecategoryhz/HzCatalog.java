@@ -1,10 +1,12 @@
-package com.viskan.payloadbuilder.provider.hazelcast;
+package com.viskan.payloadbuilder.catalog.etmarticlecategoryhz;
 
+import com.viskan.payloadbuilder.QuerySession;
 import com.viskan.payloadbuilder.catalog.Catalog;
 import com.viskan.payloadbuilder.catalog.Index;
 import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.operator.Operator;
 import com.viskan.payloadbuilder.parser.QualifiedName;
+import com.viskan.payloadbuilder.parser.TableOption;
 
 import static java.util.Arrays.asList;
 
@@ -40,7 +42,7 @@ public class HzCatalog extends Catalog
     }
 
     @Override
-    public Operator getScanOperator(int nodeId, TableAlias alias)
+    public Operator getScanOperator(QuerySession session, int nodeId, String catalogAlias, TableAlias tableAlias, TablePredicate predicate, List<TableOption> tableOptions)
     {
         //        if ("source".equals(alias.getTable().toString()))
         //        {
@@ -57,13 +59,13 @@ public class HzCatalog extends Catalog
         //            
         //        }
 
-        return new HzOperator(hazelcast, nodeId, alias);
+        return new HzOperator(hazelcast, nodeId, tableAlias);
     }
 
     @Override
-    public Operator getIndexOperator(int nodeId, TableAlias alias, Index index)
+    public Operator getIndexOperator(QuerySession session, int nodeId, String catalogAlias, TableAlias tableAlias, Index index, TablePredicate predicate, List<TableOption> tableOptions)
     {
-        return new HzOperator(hazelcast, nodeId, alias, index);
+        return new HzOperator(hazelcast, nodeId, tableAlias, index);
     }
 
     Set<String> ART_ID_INDEX_TABLES = new HashSet<>(asList(
@@ -82,7 +84,7 @@ public class HzCatalog extends Catalog
     ));
 
     @Override
-    public List<Index> getIndices(QualifiedName table)
+    public List<Index> getIndices(QuerySession session, String catalogAlias, QualifiedName table)
     {
         if ("articlePrice".equals(table.toString()))
         {
@@ -124,6 +126,6 @@ public class HzCatalog extends Catalog
         {
             return asList(new Index(table, asList("cat_id"), BATCH_SIZE));
         }
-        return super.getIndices(table);
+        return super.getIndices(session, catalogAlias, table);
     }
 }

@@ -96,14 +96,16 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                         DefaultRowMerger.DEFAULT,
                         false,
                         false,
-                        c.getIndices(session, "", QualifiedName.of("article_attribute")).get(0)),
+                        c.getIndices(session, "", QualifiedName.of("article_attribute")).get(0),
+                        null),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("s.art_id"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
                 DefaultRowMerger.DEFAULT,
                 true,
                 false,
-                c.getIndices(session, "", QualifiedName.of("article")).get(0));
+                c.getIndices(session, "", QualifiedName.of("article")).get(0),
+                null);
 
         Operator actual = pair.getKey();
 
@@ -146,7 +148,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                c.getIndices(session, "", QualifiedName.of("article")).get(0));
+                c.getIndices(session, "", QualifiedName.of("article")).get(0),
+                null);
 
         Operator actual = pair.getKey();
 
@@ -189,7 +192,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 true,
                 false,
-                c.getIndices(session, "", QualifiedName.of("article")).get(0));
+                c.getIndices(session, "", QualifiedName.of("article")).get(0),
+                null);
 
         Operator actual = pair.getKey();
 
@@ -232,7 +236,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 true,
                 true,
-                c.getIndices(session, "", QualifiedName.of("article")).get(0));
+                c.getIndices(session, "", QualifiedName.of("article")).get(0),
+                null);
 
         Operator actual = pair.getKey();
 
@@ -275,7 +280,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 false,
                 true,
-                c.getIndices(session, "", QualifiedName.of("article")).get(0));
+                c.getIndices(session, "", QualifiedName.of("article")).get(0),
+                null);
 
         Operator actual = pair.getKey();
 

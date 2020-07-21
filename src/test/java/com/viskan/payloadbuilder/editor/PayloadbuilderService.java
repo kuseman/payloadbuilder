@@ -66,7 +66,7 @@ class PayloadbuilderService
                     }
                     ResultModel resultModel = new ResultModel(file);
                     file.addResult(resultModel);
-                    setupColumns(resultModel, queryResult.getResultMetaData());
+                    //                    setupColumns(resultModel, queryResult.getResultMetaData());
 
                     ObjectWriter writer = new ObjectWriter(resultModel);
                     queryResult.writeResult(writer);
@@ -107,7 +107,7 @@ class PayloadbuilderService
             }
         });
     }
-    
+
     /** Get named parameters from query */
     static Set<String> getParameters(String query)
     {
@@ -126,17 +126,17 @@ class PayloadbuilderService
         parsedQuery.getStatements().forEach(s -> s.accept(NAMED_PARAMETERS_VISITOR, parameters));
         return parameters;
     }
-    
+
     private static class NamedParameterVisitor extends AStatementVisitor<Void, Set<String>>
     {
         private static final ExpressionVisitor EXPRESSION_VISITOR = new ExpressionVisitor();
-        
+
         @Override
         protected void visitExpression(Set<String> context, Expression expression)
         {
             expression.accept(EXPRESSION_VISITOR, context);
         }
-        
+
         private static class ExpressionVisitor extends AExpressionVisitor<Void, Set<String>>
         {
             @Override
@@ -148,16 +148,16 @@ class PayloadbuilderService
         }
     }
 
-    private static void setupColumns(ResultModel model, QueryResult.QueryResultMetaData metaData)
-    {
-        List<String> columns = new ArrayList<>();
-        columns.add("");
-        for (String column : metaData.getColumns())
-        {
-            columns.add(column);
-        }
-        model.setColumns(columns.toArray(ArrayUtils.EMPTY_STRING_ARRAY));
-    }
+    //    private static void setupColumns(ResultModel model, QueryResult.QueryResultMetaData metaData)
+    //    {
+    //        List<String> columns = new ArrayList<>();
+    //        columns.add("");
+    //        for (String column : metaData.getColumns())
+    //        {
+    //            columns.add(column);
+    //        }
+    //        model.setColumns(columns.toArray(ArrayUtils.EMPTY_STRING_ARRAY));
+    //    }
 
     /** Writer that writes object structure from a projection */
     private static class ObjectWriter implements OutputWriter
@@ -193,10 +193,21 @@ class PayloadbuilderService
 
             return result;
         }
-        
+
         @Override
         public void endRow()
         {
+            // Adjust columns
+            PairList pairList = (PairList) parent.peek();
+            if (pairList.size() > 0 && resultModel.getColumnCount() != (pairList.size() + 1))
+            {
+                List<String> columns = new ArrayList<>(pairList.size() + 1);
+                // Row id column
+                columns.add("");
+                pairList.stream().map(p -> p.getKey()).forEach(column -> columns.add(column));
+                resultModel.setColumns(columns.toArray(ArrayUtils.EMPTY_STRING_ARRAY));
+            }
+
             resultModel.addRow(getValue(resultModel.getRowCount() + 1));
         }
 

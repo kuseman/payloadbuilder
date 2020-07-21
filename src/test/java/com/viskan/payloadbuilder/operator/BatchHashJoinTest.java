@@ -40,7 +40,8 @@ public class BatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                index);
+                index,
+                null);
 
         assertFalse(op.open(new ExecutionContext(session)).hasNext());
     }
@@ -69,7 +70,8 @@ public class BatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                index);
+                index,
+                null);
 
         assertFalse(op.open(new ExecutionContext(session)).hasNext());
     }
@@ -92,7 +94,8 @@ public class BatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                index);
+                index,
+                null);
 
         op.open(new ExecutionContext(session)).hasNext();
     }
@@ -120,7 +123,8 @@ public class BatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                index);
+                index,
+                null);
 
         op.open(new ExecutionContext(session)).hasNext();
     }
@@ -151,7 +155,8 @@ public class BatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                index);
+                index,
+                null);
 
         op.open(new ExecutionContext(session)).hasNext();
     }
@@ -191,7 +196,8 @@ public class BatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                index);
+                index,
+                null);
 
         Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -257,7 +263,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 false,
                 true,
-                index);
+                index, null);
 
         Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -327,7 +333,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                index);
+                index, null);
 
         Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -388,7 +394,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 false,
                 true,
-                index);
+                index, null);
 
         Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -462,7 +468,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                index);
+                index, null);
 
         Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -528,7 +534,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 false,
                 true,
-                index);
+                index, null);
 
         Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -608,7 +614,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 false,
                 false,
-                index);
+                index, null);
 
         Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -679,7 +685,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 false,
                 true,
-                index);
+                index, null);
 
         int[] expectedOuterPositions = new int[] {
                 0, 1, 2,
@@ -757,7 +763,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 true,
                 false,
-                index);
+                index, null);
 
         Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -821,7 +827,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 true,
                 true,
-                index);
+                index, null);
 
         Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -891,7 +897,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 true,
                 false,
-                index);
+                index, null);
 
         Iterator<Row> it = op.open(new ExecutionContext(session));
 
@@ -953,7 +959,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 true,
                 true,
-                index);
+                index, null);
 
         Iterator<Row> it = op.open(new ExecutionContext(session));
 
@@ -1030,7 +1036,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 true,
                 false,
-                index);
+                index, null);
 
         Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -1098,7 +1104,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 true,
                 true,
-                index);
+                index, null);
 
         Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -1208,7 +1214,7 @@ public class BatchHashJoinTest extends AOperatorTest
 //                DefaultRowMerger.DEFAULT,
 //                false,
 //                false,
-//                index);
+//                index, null);
 //
 //        for (int i = 0; i < 150; i++)
 //        {

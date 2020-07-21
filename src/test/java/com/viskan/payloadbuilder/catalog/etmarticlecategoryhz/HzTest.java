@@ -1,4 +1,4 @@
-package com.viskan.payloadbuilder.provider.hazelcast;
+package com.viskan.payloadbuilder.catalog.etmarticlecategoryhz;
 
 import com.viskan.payloadbuilder.catalog.CatalogRegistry;
 import com.viskan.payloadbuilder.operator.JsonStringWriter;

@@ -43,6 +43,7 @@ class PayloadbuilderEditorView extends JFrame
     //    private static final String FORMAT = "Format";
     private static final String NEW_QUERY = "NewQuery";
     private static final String EXECUTE = "Execute";
+    private static final String STOP = "Stop";
     private static final String EDIT_PARAMETERS = "EditParameters";
     
     private static final Icon FOLDER_OPEN_O = FontIcon.of(FontAwesome.FOLDER_OPEN_O);
@@ -142,11 +143,13 @@ class PayloadbuilderEditorView extends JFrame
         topPanel.add(toolBar, BorderLayout.SOUTH);
 
         topPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_E, InputEvent.CTRL_DOWN_MASK), EXECUTE);
+        topPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), STOP);
         topPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.CTRL_DOWN_MASK), NEW_QUERY);
         //        topPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_F, InputEvent.CTRL_DOWN_MASK), FORMAT);
         topPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.CTRL_DOWN_MASK), TOGGLE_RESULT);
         topPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_7, InputEvent.CTRL_DOWN_MASK), TOGGLE_COMMENT);
         topPanel.getActionMap().put(EXECUTE, executeAction);
+        topPanel.getActionMap().put(STOP, stopAction);
         topPanel.getActionMap().put(NEW_QUERY, newQueryAction);
         //        topPanel.getActionMap().put(FORMAT, formatAction);
         topPanel.getActionMap().put(TOGGLE_RESULT, toggleResultAction);

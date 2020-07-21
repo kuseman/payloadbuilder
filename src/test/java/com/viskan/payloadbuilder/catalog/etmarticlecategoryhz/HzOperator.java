@@ -1,11 +1,12 @@
-package com.viskan.payloadbuilder.provider.hazelcast;
+package com.viskan.payloadbuilder.catalog.etmarticlecategoryhz;
 
 import com.viskan.payloadbuilder.catalog.Index;
 import com.viskan.payloadbuilder.catalog.TableAlias;
-import com.viskan.payloadbuilder.operator.Operator;
+import com.viskan.payloadbuilder.operator.AOperator;
 import com.viskan.payloadbuilder.operator.OperatorContext;
-import com.viskan.payloadbuilder.operator.Row;
 import com.viskan.payloadbuilder.operator.OperatorContext.NodeData;
+import com.viskan.payloadbuilder.operator.Row;
+import com.viskan.payloadbuilder.parser.ExecutionContext;
 
 import static com.viskan.payloadbuilder.utils.MapUtils.entry;
 import static com.viskan.payloadbuilder.utils.MapUtils.ofEntries;
@@ -25,13 +26,12 @@ import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 import com.hazelcast.core.HazelcastInstance;
 import com.hazelcast.core.IMap;
 
-class HzOperator implements Operator
+class HzOperator extends AOperator
 {
     private static final ObjectMapper SMILE_MAPPER = new ObjectMapper(new SmileFactory())
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private final HazelcastInstance hazelcast;
-    private final int nodeId;
     private final TableAlias tableAlias;
     private final Index index;
 
@@ -42,8 +42,8 @@ class HzOperator implements Operator
     
     public HzOperator(HazelcastInstance hazelcast, int nodeId, TableAlias tableAlias, Index index)
     {
+        super(nodeId);
         this.hazelcast = hazelcast;
-        this.nodeId = nodeId;
         this.tableAlias = tableAlias;
         this.index = index;
     }
@@ -87,17 +87,17 @@ class HzOperator implements Operator
     /* END OPERATOR CONTEXT FIELDS */
 
     @Override
-    public Iterator<Row> open(OperatorContext context)
+    public Iterator<Row> open(ExecutionContext context)
     {
-        Data data = getData(context);
+        Data data = getData(context.getOperatorContext());
         Map<Object, byte[]> map = data.mapRows;
         // Index operator, extract keys and retrieve map of those keys
         if (index != null)
         {
             Set<Object> keys = new HashSet<>();
-            while (context.getOuterIndexValues().hasNext())
+            while (context.getOperatorContext().getOuterIndexValues().hasNext())
             {
-                Object[] array = context.getOuterIndexValues().next();
+                Object[] array = context.getOperatorContext().getOuterIndexValues().next();
                 // TODO: extract correct keys
                 Object key = array[0];
                 if (key != null)

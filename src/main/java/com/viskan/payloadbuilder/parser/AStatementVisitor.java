@@ -151,6 +151,12 @@ public class AStatementVisitor<TR, TC> implements StatementVisitor<TR, TC>, Sele
         nestedSelectItem.getOrderBy().forEach(o -> o.accept(this, context));
         return null;
     }
+    
+    @Override
+    public TR visit(AsteriskSelectItem selectItem, TC context)
+    {
+        return null;
+    }
 
     @Override
     public TR visit(Table table, TC context)

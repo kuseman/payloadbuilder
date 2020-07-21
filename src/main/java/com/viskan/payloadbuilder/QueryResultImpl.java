@@ -1,6 +1,5 @@
 package com.viskan.payloadbuilder;
 
-import com.viskan.payloadbuilder.QueryResult.QueryResultMetaData;
 import com.viskan.payloadbuilder.catalog.TableAlias;
 import com.viskan.payloadbuilder.operator.Operator;
 import com.viskan.payloadbuilder.operator.OperatorBuilder;
@@ -37,7 +36,7 @@ import org.apache.commons.lang3.tuple.Pair;
 /**
  * Implementation of {@link QueryResult}. Using a visitor to traverse statements
  */
-class QueryResultImpl implements QueryResult, QueryResultMetaData, StatementVisitor<Void, Void>
+class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
 {
     private static final Row DUMMY_ROW = Row.of(TableAlias.of(null, "dummy", "d"), 0, EMPTY_OBJECT_ARRAY);
     private static final TableAlias SHOW_PARAMETERS_ALIAS = new TableAlias(null, QualifiedName.of("parameters"), "p", new String[] {"Name", "Value"});
@@ -272,22 +271,5 @@ class QueryResultImpl implements QueryResult, QueryResultMetaData, StatementVisi
         currentSelect = null;
         //        System.out.println(QualifiedReferenceExpression.executionsByName);
         //        QualifiedReferenceExpression.executionsByName.clear();
-    }
-
-    @Override
-    public String[] getColumns()
-    {
-        if (currentSelect == null)
-        {
-            throw new IllegalArgumentException("No more results");
-        }
-
-        return currentSelect.getValue().getColumns();
-    }
-
-    @Override
-    public QueryResultMetaData getResultMetaData()
-    {
-        return this;
     }
 }

@@ -1,4 +1,4 @@
-package com.viskan.payloadbuilder.provider.hazelcast;
+package com.viskan.payloadbuilder.catalog.etmarticlecategoryhz;
 
 import java.io.Serializable;
 

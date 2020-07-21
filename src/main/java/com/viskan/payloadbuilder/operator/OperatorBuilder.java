@@ -12,6 +12,7 @@ import com.viskan.payloadbuilder.parser.AJoin;
 import com.viskan.payloadbuilder.parser.ASelectVisitor;
 import com.viskan.payloadbuilder.parser.Apply;
 import com.viskan.payloadbuilder.parser.Apply.ApplyType;
+import com.viskan.payloadbuilder.parser.AsteriskSelectItem;
 import com.viskan.payloadbuilder.parser.Expression;
 import com.viskan.payloadbuilder.parser.ExpressionSelectItem;
 import com.viskan.payloadbuilder.parser.Join;
@@ -59,7 +60,9 @@ import gnu.trove.map.hash.THashMap;
 public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Context>
 {
     private static final String BATCH_LIMIT = "batch_limit";
-
+    private static final String BATCH_SIZE = "batch_size";
+    /** Marker array for asterisk select items */
+    private static final String[] ASTERISK_COLUMNS = new String[0];
     private static final OperatorBuilder VISITOR = new OperatorBuilder();
 
     private static final BiFunction<String, TableAlias, RuntimeException> MULTIPLE_ALIAS_EXCEPTION = (alias,
@@ -172,6 +175,21 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 e.getKey().setColumns(e.getValue().toArray(EMPTY_STRING_ARRAY));
             }
         });
+        
+        List<TableAlias> queue = new ArrayList<>();
+        queue.add(context.parent);
+        while (!queue.isEmpty())
+        {
+            TableAlias alias = queue.remove(0);
+            
+            if (alias.getColumns() == ASTERISK_COLUMNS)
+            {
+                alias.setColumns(null);
+            }
+            
+            queue.addAll(alias.getChildAliases());
+        }
+        
         return Pair.of(context.operator, context.projection);
     }
 
@@ -274,13 +292,6 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             }
         } 
         
-//        Expression pushDownPredicate = null;
-//        if (joinSize > 0)
-//        {
-           
-            
-//        }
-
         TableOption batchLimitOption = null;
         int batchLimitId = -1;
         List<AJoin> joins = tsj != null ? tsj.getJoins() : emptyList();
@@ -288,7 +299,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         // No need to batch when there is no joins
         if (joinSize > 0)
         {
-            batchLimitOption = getBatchLimitoption(tsj.getTableSource());
+            batchLimitOption = getBatchLimitOption(tsj.getTableSource());
         }
 
         if (tsj != null)
@@ -312,17 +323,6 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 context.operator = new OuterValuesOperator(context.acquireNodeId(), context.operator, outerValuesExpressions);
             }
         }
-//        else
-//        {
-//            
-//        }
-
-        // Collect columns from pushed down predicate
-//        if (pushDownPredicate != null)
-//        {
-//            context.operator = new FilterOperator(context.acquireNodeId(), context.operator, new ExpressionPredicate(pushDownPredicate));
-//            visit(pushDownPredicate, context);
-//        }
 
         if (batchLimitOption != null)
         {
@@ -455,6 +455,30 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         Expression expression = selectItem.getExpression();
         visit(expression, context);
         context.projection = new ExpressionProjection(expression);
+        return null;
+    }
+    
+    @Override
+    public Void visit(AsteriskSelectItem selectItem, Context context)
+    {
+        // Set asterisk columns on aliases 
+        if (selectItem.getAlias() != null)
+        {
+            TableAlias childAlias = context.parent.getChildAlias(selectItem.getAlias());
+            if (childAlias != null)
+            {
+                childAlias.setColumns(ASTERISK_COLUMNS);
+            }
+        }
+        else
+        {
+            context.parent.setColumns(ASTERISK_COLUMNS);
+            for (TableAlias alias : context.parent.getChildAliases())
+            {
+                alias.setColumns(ASTERISK_COLUMNS);
+            }
+        }
+        context.projection = selectItem;
         return null;
     }
 
@@ -623,13 +647,26 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     //        return isCorrelated;
     //    }
 
-    /** Reutrn a batch limit option for provided table source (if any) */
-    private TableOption getBatchLimitoption(TableSource ts)
+    /** Return a batch limit option for provided table source (if any) */
+    private TableOption getBatchLimitOption(TableSource ts)
     {
         return ts
                 .getTableOptions()
                 .stream()
                 .filter(o -> BATCH_LIMIT.equals(lowerCase(o.getOption().toString())))
+                .findFirst()
+                .orElse(null);
+    }
+    
+    /** Return a batch size option for provided table source (if any)
+     * Used to override default {@link Index#getBatchSize()} for a table
+     **/
+    private TableOption getBatchSizeOption(TableSource ts)
+    {
+        return ts
+                .getTableOptions()
+                .stream()
+                .filter(o -> BATCH_SIZE.equals(lowerCase(o.getOption().toString())))
                 .findFirst()
                 .orElse(null);
     }
@@ -753,6 +790,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         ExpressionValuesExtractor outerValuesExtractor = new ExpressionValuesExtractor(foundation.outerValueExpressions);
         ExpressionValuesExtractor innerValuesExtractor = new ExpressionValuesExtractor(foundation.innerValueExpressions);
 
+        TableOption batchSizeOption = getBatchSizeOption(innerTableSource);
+        
         return new BatchHashJoin(
                 context.acquireNodeId(),
                 logicalOperator,
@@ -764,7 +803,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 DefaultRowMerger.DEFAULT,
                 populating,
                 emitEmptyOuterRows,
-                index);
+                index,
+                batchSizeOption);
 
         // If outer is sorted on index keys (fully or partly)
         //

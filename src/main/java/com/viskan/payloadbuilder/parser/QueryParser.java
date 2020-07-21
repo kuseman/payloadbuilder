@@ -218,7 +218,11 @@ public class QueryParser
         {
             List<SelectItem> selectItems = ctx.selectItem().stream().map(s -> (SelectItem) visit(s)).collect(toList());
 
-            Optional<SelectItem> item = selectItems.stream().filter(si -> isBlank(si.getIdentifier())).findAny();
+            Optional<SelectItem> item = 
+                    selectItems
+                    .stream()
+                    .filter(si -> !(si instanceof AsteriskSelectItem) && isBlank(si.getIdentifier()))
+                    .findAny();
 
             if (item.isPresent())
             {
@@ -265,17 +269,16 @@ public class QueryParser
         public Object visitSelectItem(SelectItemContext ctx)
         {
             String identifier = getIdentifier(ctx.identifier());
-            Expression expression = getExpression(ctx.expression());
-            if (expression != null)
+            // Expression selet item
+            if (ctx.expression() != null)
             {
+                Expression expression = getExpression(ctx.expression());
                 return new ExpressionSelectItem(expression, identifier);
             }
+            // Nested select item
             else if (ctx.nestedSelectItem() != null)
             {
                 NestedSelectItem.Type type = ctx.OBJECT() != null ? NestedSelectItem.Type.OBJECT : NestedSelectItem.Type.ARRAY;
-                
-                
-                
                 List<SelectItem> selectItems = ctx.nestedSelectItem().selectItem().stream().map(s -> (SelectItem) visit(s)).collect(toList());
                 Expression from = getExpression(ctx.nestedSelectItem().from);
                 Expression where = getExpression(ctx.nestedSelectItem().where);
@@ -332,6 +335,17 @@ public class QueryParser
                 }
 
                 return new NestedSelectItem(type, selectItems, from, where, identifier, groupBy, orderBy);
+            }
+            // Wildcard select item
+            else if (ctx.ASTERISK() != null)
+            {
+                String alias = null;
+                if (ctx.alias != null)
+                {
+                    alias = getIdentifier(ctx.alias);
+                }
+                
+                return new AsteriskSelectItem(alias);
             }
 
             throw new ParseException("Caould no create a select item.", ctx.start);
