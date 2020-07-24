@@ -20,6 +20,8 @@ public class Payloadbuilder
      *      Override parts of query and/remove/alter
      *   - Sources support (art_id/attr1_id lists)
      *      Built in operator ?  
+     *   - DeferenceExpression
+     *      Implement
      *   - Rewrite OperatorBuilder#visit(PopulateTableSource ...)
      *      Fix so push down predicates is set in context for catalog usage
      *   - Insert into temptable
@@ -35,7 +37,8 @@ public class Payloadbuilder
      *      Make it easier to work with
      *      Add type in pair to be able to easier add range queries etc.
      *      See if the includeEmptyAlias thing can be removed
-     *      Now it's not possible to use a "NOT a.col = b.col" for example
+     *      Now it's not possible to use a "NOT a.col = b.col" for example, which would
+     *      be a fully working Elastic predicate
      *   - Describe support
      *      Catalog (show functions, tables, description of catalog)
      *      Function (show metadata, arguments, documentation)
@@ -47,12 +50,6 @@ public class Payloadbuilder
      *      Fix broken implementation
      *   - Caching parsed query
      *   - Codegen of expressions
-     *   - DeferenceExpression
-     *      Implement
-     * 
-     * UI
-     *   - Move UI to own bundle
-
      */
     
     private Payloadbuilder()

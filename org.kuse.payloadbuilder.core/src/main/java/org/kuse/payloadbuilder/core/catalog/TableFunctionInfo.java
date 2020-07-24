@@ -25,6 +25,7 @@ public abstract class TableFunctionInfo extends FunctionInfo
     /** Open iterator for this function 
      * @param context Context
      * @param tableAlias Table alias used for this function
+     * NOTE! If columns are null the function must set ALL available columns for the function
      * @param arguments Arguments to function
      **/
     public abstract Iterator<Row> open(ExecutionContext context, TableAlias tableAlias, List<Object> arguments);

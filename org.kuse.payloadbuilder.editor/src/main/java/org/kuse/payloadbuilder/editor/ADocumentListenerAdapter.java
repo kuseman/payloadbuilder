@@ -4,7 +4,7 @@ import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 
 /** Document listener adapter */
-public abstract class ADocumentListenerAdapter implements DocumentListener
+abstract class ADocumentListenerAdapter implements DocumentListener
 {
     @Override
     public void insertUpdate(DocumentEvent e)

@@ -70,9 +70,11 @@ class MapToRowFunction extends TableFunctionInfo
                         return false;
                     }
                         
+                    // TODO: asterisk columns
                     // TODO: type check and throw
                     @SuppressWarnings("unchecked")
                     Map<String, Object> item = (Map<String, Object>) it.next();
+                    
                     Object[] values = new Object[length];
                     for (int i = 0; i < length; i++)
                     {

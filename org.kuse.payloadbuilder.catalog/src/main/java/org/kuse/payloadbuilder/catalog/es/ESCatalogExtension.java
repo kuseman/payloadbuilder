@@ -1,6 +1,7 @@
 package org.kuse.payloadbuilder.catalog.es;
 
 import static org.kuse.payloadbuilder.catalog.es.ESOperator.CLIENT;
+import static org.kuse.payloadbuilder.catalog.es.ESOperator.MAPPER;
 
 import java.awt.BorderLayout;
 import java.awt.Component;
@@ -37,12 +38,9 @@ import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.editor.AutoCompletionComboBox;
 import org.kuse.payloadbuilder.editor.ICatalogExtension;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 /** Editor extension for {@link ESCatalog} */
 class ESCatalogExtension implements ICatalogExtension
 {
-    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String ENDPOINTS = "endpoints";
     private static final Catalog CATALOG = new ESCatalog();
 
@@ -295,6 +293,7 @@ class ESCatalogExtension implements ICatalogExtension
                     {
                         endpoints.add(endpoint);
                         update();
+                        pcs.firePropertyChange(CONFIG, null, null);
                     }
                 }
             });
@@ -335,6 +334,7 @@ class ESCatalogExtension implements ICatalogExtension
             {
                 getEndpoints().remove(listEndpoints.getSelectedValue());
                 update();
+                pcs.firePropertyChange(CONFIG, null, null);
             });
             panelEndpoints.add(removeEndpoint, new GridBagConstraints(0, 2, 1, 1, 0.0, 1.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
             add(panelEndpoints, BorderLayout.CENTER);

@@ -8,8 +8,7 @@
     </parent>
     <groupId>org.kuse.payloadbuilder</groupId>
     <artifactId>org.kuse.payloadbuilder.editor</artifactId>
-    <name>Payloadbuilder Editor</name>
-    <description>Payloadbuilder Editor</description>
+    <name>Payloadbuilder Editor IDE</name>
 
     <properties>
         <!-- Build -->

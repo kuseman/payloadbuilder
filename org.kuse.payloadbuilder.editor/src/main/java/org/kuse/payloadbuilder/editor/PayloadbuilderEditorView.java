@@ -12,6 +12,7 @@ import java.awt.event.KeyEvent;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.Icon;
+import javax.swing.InputMap;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
@@ -44,7 +45,7 @@ class PayloadbuilderEditorView extends JFrame
     private static final String EXECUTE = "Execute";
     private static final String STOP = "Stop";
     private static final String EDIT_PARAMETERS = "EditParameters";
-    
+
     private static final Icon FOLDER_OPEN_O = FontIcon.of(FontAwesome.FOLDER_OPEN_O);
     private static final Icon SAVE = FontIcon.of(FontAwesome.SAVE);
     private static final Icon PLAY_CIRCLE = FontIcon.of(FontAwesome.PLAY_CIRCLE);
@@ -54,7 +55,7 @@ class PayloadbuilderEditorView extends JFrame
     private static final Icon ARROWS_H = FontIcon.of(FontAwesome.ARROWS_H);
     private static final Icon INDENT = FontIcon.of(FontAwesome.INDENT);
     private static final Icon EDIT = FontIcon.of(FontAwesome.EDIT);
-    
+
     private final JSplitPane splitPane;
     private final JTabbedPane tabEditor;
     private final JPanel panelCatalogs;
@@ -79,10 +80,10 @@ class PayloadbuilderEditorView extends JFrame
     private Runnable toggleCommentRunnable;
     private Runnable outputChangedRunnable;
     private Runnable editParametersRunnable;
-    
+
     private boolean catalogsCollapsed = false;
     private int prevCatalogsDividerLocation;
-    
+
     //    private Runnable parametersAction;
 
     PayloadbuilderEditorView()
@@ -116,6 +117,8 @@ class PayloadbuilderEditorView extends JFrame
         JMenuBar menuBar = new JMenuBar();
         topPanel.add(menuBar, BorderLayout.NORTH);
 
+        
+        
         JMenu menu = new JMenu("File");
         openItem = new JMenuItem(openAction);
         openItem.setText("Open");
@@ -141,12 +144,19 @@ class PayloadbuilderEditorView extends JFrame
         toolBar.setFloatable(false);
         topPanel.add(toolBar, BorderLayout.SOUTH);
 
-        topPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_E, InputEvent.CTRL_DOWN_MASK), EXECUTE);
-        topPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), STOP);
-        topPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.CTRL_DOWN_MASK), NEW_QUERY);
+        KeyStroke executeKeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_E, InputEvent.CTRL_DOWN_MASK);
+        KeyStroke stopKeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0);
+        KeyStroke newQueryKeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.CTRL_DOWN_MASK);
+        KeyStroke toggleResultKeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.CTRL_DOWN_MASK);
+        KeyStroke toggleCommentKeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_7, InputEvent.CTRL_DOWN_MASK);
+        
+        InputMap inputMap = topPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        inputMap.put(executeKeyStroke, EXECUTE);
+        inputMap.put(stopKeyStroke, STOP);
+        inputMap.put(newQueryKeyStroke , NEW_QUERY);
         //        topPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_F, InputEvent.CTRL_DOWN_MASK), FORMAT);
-        topPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.CTRL_DOWN_MASK), TOGGLE_RESULT);
-        topPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_7, InputEvent.CTRL_DOWN_MASK), TOGGLE_COMMENT);
+        inputMap.put(toggleResultKeyStroke, TOGGLE_RESULT);
+        inputMap.put(toggleCommentKeyStroke, TOGGLE_COMMENT);
         topPanel.getActionMap().put(EXECUTE, executeAction);
         topPanel.getActionMap().put(STOP, stopAction);
         topPanel.getActionMap().put(NEW_QUERY, newQueryAction);
@@ -156,23 +166,23 @@ class PayloadbuilderEditorView extends JFrame
 
         JButton newQueryButton = new JButton(newQueryAction);
         newQueryButton.setText("New query");
-        newQueryButton.setToolTipText("Open new query windows");
+        newQueryButton.setToolTipText("Open new query window (" + getAcceleratorText(newQueryKeyStroke) + ")");
 
         JButton executeButton = new JButton(executeAction);
         executeButton.setText("Execute");
-        executeButton.setToolTipText("Execute query");
+        executeButton.setToolTipText("Execute query (" + getAcceleratorText(executeKeyStroke) + ")");
 
-        toolBar.add(openAction).setToolTipText("Open file");
-        toolBar.add(saveAction).setToolTipText("Save current file");
+        toolBar.add(openAction).setToolTipText("Open file (" + getAcceleratorText(openItem.getAccelerator()) + ")");
+        toolBar.add(saveAction).setToolTipText("Save current file (" + getAcceleratorText(saveItem.getAccelerator()) + ")");
         toolBar.addSeparator();
         toolBar.add(newQueryButton);
         toolBar.add(executeButton);
-        toolBar.add(stopAction).setToolTipText("Cancel query");
+        toolBar.add(stopAction).setToolTipText("Cancel query (" + getAcceleratorText(stopKeyStroke) + ")");
         toolBar.addSeparator();
         toolBar.add(toggleCatalogsAction).setToolTipText("Toggle catalogs pane");
-        toolBar.add(toggleResultAction).setToolTipText("Toggle result pane");
+        toolBar.add(toggleResultAction).setToolTipText("Toggle result pane (" + getAcceleratorText(toggleResultKeyStroke) + ")");
         //        toolBar.add(formatAction).setToolTipText("Format query");
-        toolBar.add(toggleCommentAction).setToolTipText("Toggle comment on selected lines");
+        toolBar.add(toggleCommentAction).setToolTipText("Toggle comment on selected lines (" + getAcceleratorText(toggleCommentKeyStroke) + ")");
         toolBar.add(editParametersAction).setToolTipText("Edit parameters");
 
         comboOutput = new JComboBox<>(Output.values());
@@ -192,8 +202,7 @@ class PayloadbuilderEditorView extends JFrame
         splitPane.setRightComponent(tabEditor);
 
         panelCatalogs = new JPanel();
-        panelCatalogs.setLayout(new GridBagLayout()); //new BoxLayout(panelCatalogs, BoxLayout.Y_AXIS));
-//        panelCatalogs.setPreferredSize(new Dimension(250, 0));
+        panelCatalogs.setLayout(new GridBagLayout());
         splitPane.setLeftComponent(new JScrollPane(panelCatalogs));
 
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -217,7 +226,23 @@ class PayloadbuilderEditorView extends JFrame
     //            }
     //        }
     //    }
-    
+
+    private String getAcceleratorText(KeyStroke accelerator)
+    {
+        String acceleratorText = "";
+        if (accelerator != null)
+        {
+            int modifiers = accelerator.getModifiers();
+            if (modifiers > 0)
+            {
+                acceleratorText = KeyEvent.getKeyModifiersText(modifiers);
+                acceleratorText += "+";
+            }
+            acceleratorText += KeyEvent.getKeyText(accelerator.getKeyCode());
+        }
+        return acceleratorText;
+    }
+
     private final Action openAction = new AbstractAction("OPEN", FOLDER_OPEN_O)
     {
         @Override
@@ -304,7 +329,7 @@ class PayloadbuilderEditorView extends JFrame
         @Override
         public void actionPerformed(ActionEvent e)
         {
-         // Expanded
+            // Expanded
             if (!catalogsCollapsed)
             {
                 prevCatalogsDividerLocation = splitPane.getDividerLocation();
@@ -336,7 +361,7 @@ class PayloadbuilderEditorView extends JFrame
             run(editParametersRunnable);
         }
     };
-    
+
     private void run(Runnable runnable)
     {
         if (runnable != null)
@@ -344,7 +369,7 @@ class PayloadbuilderEditorView extends JFrame
             runnable.run();
         }
     }
-    
+
     JPanel getPanelCatalogs()
     {
         return panelCatalogs;
@@ -359,7 +384,7 @@ class PayloadbuilderEditorView extends JFrame
     {
         return labelMemory;
     }
-    
+
     JComboBox<Output> getOutputCombo()
     {
         return comboOutput;
@@ -419,12 +444,12 @@ class PayloadbuilderEditorView extends JFrame
     {
         this.editParametersRunnable = editParametersRunnable;
     }
-    
+
     void setCancelAction(Runnable cancelRunnable)
     {
         this.cancelRunnable = cancelRunnable;
     }
-    
+
     public void setOutputChangedAction(Runnable outputChangedRunnable)
     {
         this.outputChangedRunnable = outputChangedRunnable;

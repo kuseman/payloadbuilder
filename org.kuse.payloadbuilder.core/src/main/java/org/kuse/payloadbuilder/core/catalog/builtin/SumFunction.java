@@ -16,7 +16,8 @@ class SumFunction extends ScalarFunctionInfo
     {
         super(catalog, "sum", Type.SCALAR);
     }
-    
+
+    @SuppressWarnings("unchecked")
     @Override
     public Object eval(ExecutionContext context, List<Expression> arguments)
     {
@@ -24,23 +25,32 @@ class SumFunction extends ScalarFunctionInfo
         Object sum = null;
         if (obj instanceof Iterator)
         {
-            @SuppressWarnings("unchecked")
-            Iterator<Object> it = (Iterator<Object>) obj;
-            while (it.hasNext())
-            {
-                if (sum == null)
-                {
-                    sum = it.next();
-                }
-                else
-                {
-                    sum = ExpressionMath.add(sum, it.next());
-                }
-            }
+            sum = sum((Iterator<Object>) obj);
+        }
+        else if (obj instanceof Iterable)
+        {
+            sum = sum(((Iterable<Object>) obj).iterator());
         }
         else
         {
             return obj;
+        }
+        return sum;
+    }
+
+    private Object sum(Iterator<Object> it)
+    {
+        Object sum = null;
+        while (it.hasNext())
+        {
+            if (sum == null)
+            {
+                sum = it.next();
+            }
+            else
+            {
+                sum = ExpressionMath.add(sum, it.next());
+            }
         }
         return sum;
     }

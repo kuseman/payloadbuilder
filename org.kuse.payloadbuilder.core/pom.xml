@@ -8,6 +8,7 @@
     </parent>
     <groupId>org.kuse.payloadbuilder</groupId>
     <artifactId>org.kuse.payloadbuilder.core</artifactId>
+    <name>Payloadbuilder Core Module</name>
 
     <properties>
         <!-- Build -->

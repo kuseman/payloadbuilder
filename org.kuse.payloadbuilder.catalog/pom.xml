@@ -8,8 +8,7 @@
     </parent>
     <groupId>org.kuse.payloadbuilder</groupId>
     <artifactId>org.kuse.payloadbuilder.catalog</artifactId>
-    <name>Payloadbuilder catalogs</name>
-    <description>Standard catalog implementations</description>
+    <name>Payloadbuilder Catalogs</name>
 
     <properties>
         <!-- Build -->

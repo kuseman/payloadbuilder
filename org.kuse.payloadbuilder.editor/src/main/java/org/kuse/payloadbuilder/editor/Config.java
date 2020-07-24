@@ -14,17 +14,17 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /** Editor config */
-public class Config
+class Config
 {
     @JsonProperty
     private List<Catalog> catalogs;
 
-    public List<Catalog> getCatalogs()
+    List<Catalog> getCatalogs()
     {
         return catalogs;
     }
 
-    public void initExtensions()
+    void initExtensions()
     {
         if (catalogs == null)
         {
@@ -61,7 +61,7 @@ public class Config
     }
 
     /** Catalog extension */
-    public static class Catalog
+    static class Catalog
     {
         @JsonProperty
         private String jar;
@@ -72,32 +72,32 @@ public class Config
         @JsonIgnore
         private ICatalogExtension catalogExtension;
 
-        public String getJar()
+        String getJar()
         {
             return jar;
         }
 
-        public String getClassName()
+        String getClassName()
         {
             return className;
         }
 
-        public Map<String, Object> getConfig()
+        Map<String, Object> getConfig()
         {
             return config;
         }
 
-        public void setConfig(Map<String, Object> config)
+        void setConfig(Map<String, Object> config)
         {
             this.config = config;
         }
 
-        public ICatalogExtension getCatalogExtension()
+        ICatalogExtension getCatalogExtension()
         {
             return catalogExtension;
         }
 
-        public void setCatalogExtension(ICatalogExtension catalogExtension)
+        void setCatalogExtension(ICatalogExtension catalogExtension)
         {
             this.catalogExtension = catalogExtension;
         }
