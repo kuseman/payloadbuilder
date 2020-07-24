@@ -1,0 +1,195 @@
+package org.kuse.payloadbuilder.core.operator;
+
+import static java.util.Collections.emptyMap;
+import static org.kuse.payloadbuilder.core.utils.CollectionUtils.asSet;
+import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
+import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
+import org.junit.Assert;
+import org.junit.Test;
+import org.kuse.payloadbuilder.core.QuerySession;
+import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
+import org.kuse.payloadbuilder.core.catalog.TableAlias;
+import org.kuse.payloadbuilder.core.operator.ColumnsVisitor;
+import org.kuse.payloadbuilder.core.parser.Expression;
+import org.kuse.payloadbuilder.core.parser.QueryParser;
+
+/** Test {@link ColumnsVisitor} */
+public class ColumnVisitorTest extends Assert
+{
+    private final QueryParser parser = new QueryParser();
+    private final QuerySession session = new QuerySession(new CatalogRegistry());
+
+    @Test
+    public void test()
+    {
+        TableAlias source = TableAlias.of(null, "source", "s");
+        TableAlias article = TableAlias.of(source, "article", "a");
+        TableAlias articleAttribute = TableAlias.of(source, "articleAttribute", "aa");
+        TableAlias articlePrice = TableAlias.of(articleAttribute, "ariclePrice", "ap");
+        TableAlias.of(articleAttribute, "aricleBalance", "ab");
+        TableAlias articleBrand = TableAlias.of(source, "aricleBrand", "aBrand");
+
+        Set<TableAlias> actual;
+        Expression e;
+        Map<TableAlias, Set<String>> columnsByAlias = new HashMap<>();
+        
+        e = e("a.col");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(source), actual);
+        assertEquals(ofEntries(entry(article, asSet("col"))), columnsByAlias);
+
+        columnsByAlias.clear();
+        e = e("col");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(source), actual);
+        assertEquals(ofEntries(entry(source, asSet("col"))), columnsByAlias);
+
+        columnsByAlias.clear();
+        e = e("aa");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(articleAttribute), actual);
+        assertEquals(emptyMap(), columnsByAlias);
+
+        columnsByAlias.clear();
+        e = e("aa.ap");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(articlePrice), actual);
+        assertEquals(emptyMap(), columnsByAlias);
+
+        columnsByAlias.clear();
+        e = e("aa.map(x -> x.ap)");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(articlePrice), actual);
+        assertEquals(emptyMap(), columnsByAlias);
+        
+        columnsByAlias.clear();
+        e = e("aa.map(x -> x.ap.price_sales)");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(source), actual);
+        assertEquals(ofEntries(entry(articlePrice, asSet("price_sales"))), columnsByAlias);
+
+        columnsByAlias.clear();
+        e = e("aa.map(x -> x.ap)");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(articlePrice), actual);
+        assertEquals(emptyMap(), columnsByAlias);
+
+        columnsByAlias.clear();
+        e = e("concat(aa, aa.ap)");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(articleAttribute, articlePrice), actual);
+        assertEquals(emptyMap(), columnsByAlias);
+
+        // Traverse down and then up to root again
+        columnsByAlias.clear();
+        e = e("concat(aa, aa.ap).map(x -> x.s.art_id)");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(source), actual);
+        assertEquals(ofEntries(entry(source, asSet("art_id"))), columnsByAlias);
+
+        // Combined column of different aliases
+        columnsByAlias.clear();
+        e = e("concat(aa, aa.ap).map(x -> x.art_id)");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(source), actual);
+        assertEquals(ofEntries(entry(articleAttribute, asSet("art_id")), entry(articlePrice, asSet("art_id"))), columnsByAlias);
+
+        columnsByAlias.clear();
+        e = e("a.art_id = aa.art_id");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(source), actual);
+        assertEquals(ofEntries(entry(article, asSet("art_id")), entry(articleAttribute, asSet("art_id"))), columnsByAlias);
+
+        columnsByAlias.clear();
+        e = e("a.art_id = aa.art_id and a.col1 = s.col2");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(source), actual);
+        assertEquals(ofEntries(entry(article, asSet("art_id", "col1")), entry(articleAttribute, asSet("art_id")), entry(source, asSet("col2"))), columnsByAlias);
+
+        columnsByAlias.clear();
+        e = e("hash(1,2,2)");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(source), actual);
+        assertEquals(emptyMap(), columnsByAlias);
+
+        columnsByAlias.clear();
+        e = e("hash()");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(source), actual);
+        assertEquals(emptyMap(), columnsByAlias);
+
+        columnsByAlias.clear();
+        e = e("hash(art_id, aa.sku_id)");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(source), actual);
+        assertEquals(ofEntries(entry(source, asSet("art_id")), entry(articleAttribute, asSet("sku_id"))), columnsByAlias);
+
+        columnsByAlias.clear();
+        // List refers to source
+        // field Id is a column belonging to List which isn't
+        // among the table hierarchy and hence unknown
+        e = e("list.filter(l -> l.id > 0)");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(source), actual);
+        assertEquals(ofEntries(entry(source, asSet("list"))), columnsByAlias);
+
+        columnsByAlias.clear();
+        e = e("aa.map(aa -> aa.ap.map(ap -> ap.price_sales + ap.price_org))");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(source), actual);
+        assertEquals(ofEntries(entry(articlePrice, asSet("price_sales", "price_org"))), columnsByAlias);
+
+        columnsByAlias.clear();
+        e = e("aa.flatmap(aa -> aa.ap.map(ap -> ap.price_sales + ap.price_org))");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(source), actual);
+        assertEquals(ofEntries(entry(articlePrice, asSet("price_sales", "price_org"))), columnsByAlias);
+
+        columnsByAlias.clear();
+        e = e("aa.map(aa -> aa.ap.map(ap -> ap.price_sales + ap.price_org + s.id))");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(source), actual);
+        assertEquals(ofEntries(entry(source, asSet("id")), entry(articlePrice, asSet("price_sales", "price_org"))), columnsByAlias);
+
+        columnsByAlias.clear();
+        e = e("aa.field.unknown");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(source), actual);
+        assertEquals(ofEntries(entry(articleAttribute, asSet("field"))), columnsByAlias);
+        
+        columnsByAlias.clear();
+        e = e("aa.filter(aa -> aa.sku_id > 0)");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(articleAttribute), actual);
+        assertEquals(ofEntries(entry(articleAttribute, asSet("sku_id"))), columnsByAlias);
+
+        columnsByAlias.clear();
+        e = e("filter(aa.filter(aa -> aa.sku_id > 0), aa -> aa.attr1_id > 0)");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(articleAttribute), actual);
+        assertEquals(ofEntries(entry(articleAttribute, asSet("sku_id", "attr1_id"))), columnsByAlias);
+
+        columnsByAlias.clear();
+        e = e("ap.sku_id = aa.sku_id");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, articlePrice, e);
+        assertEquals(asSet(articlePrice), actual);
+        assertEquals(ofEntries(entry(articleAttribute, asSet("sku_id")), entry(articlePrice, asSet("sku_id"))), columnsByAlias);
+
+        // Traverse up in hierarchy and then down
+        columnsByAlias.clear();
+        e = e("aBrand.articleBrandId = a.articleBrandId");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, articleBrand, e);
+        assertEquals(asSet(articleBrand), actual);
+        assertEquals(ofEntries(entry(articleBrand, asSet("articleBrandId")), entry(article, asSet("articleBrandId"))), columnsByAlias);
+    }
+    
+    private Expression e(String expression)
+    {
+        return parser.parseExpression(expression);
+    }
+}
