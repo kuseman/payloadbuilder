@@ -66,7 +66,8 @@ class NestedLoopJoin extends AOperator
     public Map<String, Object> getDescribeProperties()
     {
         return ofEntries(
-                entry(DescribeUtils.PREDICATE, predicate));
+                entry(DescribeUtils.PREDICATE, predicate),
+                entry(DescribeUtils.POPULATING, populating));
     }
     
     @Override

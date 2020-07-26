@@ -160,11 +160,6 @@ public class Row
         predicateParent = parent;
     }
 
-    public Row getPredicateParent()
-    {
-        return predicateParent;
-    }
-
     public void clearPredicateParent()
     {
         predicateParent = null;

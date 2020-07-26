@@ -17,16 +17,6 @@ import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
-import org.kuse.payloadbuilder.core.operator.BatchHashJoin;
-import org.kuse.payloadbuilder.core.operator.DefaultRowMerger;
-import org.kuse.payloadbuilder.core.operator.ExpressionPredicate;
-import org.kuse.payloadbuilder.core.operator.ExpressionValuesExtractor;
-import org.kuse.payloadbuilder.core.operator.FilterOperator;
-import org.kuse.payloadbuilder.core.operator.Operator;
-import org.kuse.payloadbuilder.core.operator.OperatorBuilder;
-import org.kuse.payloadbuilder.core.operator.OuterValuesOperator;
-import org.kuse.payloadbuilder.core.operator.Projection;
-import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.Select;
@@ -62,6 +52,58 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         assertEquals(expected, pair.getKey());
     }
+    
+    @Test
+    public void test_correlated_with_index_access()
+    {
+        String queryString = "SELECT s.art_id "
+            + "FROM source s "
+            + "INNER JOIN "
+            + "["
+            + "  article a"
+            + "  INNER JOIN [articleAttribute] aa"
+            + "    ON aa.art_id = a.art_id "
+            + "    AND s.id "
+            + "] a"
+            + "  ON a.art_id = s.art_id";
+
+        List<Operator> operators = new ArrayList<>();
+        Catalog c = catalog(ofEntries(
+                entry("article", asList("art_id"))), operators);
+        session.getCatalogRegistry().registerCatalog("c", c);
+        session.setDefaultCatalog("c");
+        
+        Select select = parser.parseSelect(queryString);
+        Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
+        
+        Operator expected = new NestedLoopJoin(
+                5,
+                "INNER JOIN",
+                operators.get(0),
+                new OuterValuesOperator(
+                        4,
+                        new HashJoin(
+                                3,
+                                "INNER JOIN",
+                                operators.get(1),
+                                operators.get(2),
+                                new ExpressionHashFunction(asList(e("a.art_id"))),
+                                new ExpressionHashFunction(asList(e("aa.art_id"))),
+                                new ExpressionPredicate(e("aa.art_id = a.art_id AND s.id")),
+                                DefaultRowMerger.DEFAULT,
+                                true,
+                                false),
+                        asList(e("s.art_id"))),
+                new ExpressionPredicate(e("a.art_id = s.art_id")),
+                DefaultRowMerger.DEFAULT,
+                true,
+                false);
+        
+//        System.out.println(pair.getKey().toString(1));
+//        System.out.println(expected.toString(1));
+
+        assertEquals(expected, pair.getKey());
+    }
 
     @Test
     public void test_nested_inner_join_with_pushdown()
@@ -72,7 +114,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             "[" +
             "  article a " +
             "  INNER JOIN article_attribute aa " +
-            "    ON aa.art_id = s.art_id " +
+            "    ON aa.art_id = a.art_id " +
             "    AND aa.active_flg " +
             "] a " +
             "  ON a.art_id = s.art_id " +
@@ -99,9 +141,9 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                         "INNER JOIN",
                         new FilterOperator(2, operators.get(1), new ExpressionPredicate(e("a.active_flg = 1"))),
                         new FilterOperator(4, operators.get(2), new ExpressionPredicate(e("aa.active_flg"))),
-                        new ExpressionValuesExtractor(asList(e("s.art_id"))),
+                        new ExpressionValuesExtractor(asList(e("a.art_id"))),
                         new ExpressionValuesExtractor(asList(e("aa.art_id"))),
-                        new ExpressionPredicate(e("aa.art_id = s.art_id")),
+                        new ExpressionPredicate(e("aa.art_id = a.art_id")),
                         DefaultRowMerger.DEFAULT,
                         false,
                         false,

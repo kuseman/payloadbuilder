@@ -135,6 +135,7 @@ class BatchHashJoin extends AOperator
             temp = (int) obj;
         }
         final int batchSize = temp;
+        final Row contextParent = context.getRow();
         return new Iterator<Row>()
         {
             /** Batched rows */
@@ -216,7 +217,6 @@ class BatchHashJoin extends AOperator
                         }
 
                         outerRow = outerRows.get(outerRowIndex);
-
                         TableValue tableValue = table.get(outerRow.hash);
                         if (tableValue == null)
                         {
@@ -246,6 +246,7 @@ class BatchHashJoin extends AOperator
                     }
 
                     Row innerRow = innerRows.get(innerRowIndex++);
+                    outerRow.setPredicateParent(contextParent);
                     innerRow.setPredicateParent(outerRow);
 
                     if (predicate.test(context, innerRow))
@@ -259,6 +260,7 @@ class BatchHashJoin extends AOperator
                     }
 
                     innerRow.clearPredicateParent();
+                    outerRow.clearPredicateParent();
                 }
                 return true;
             }

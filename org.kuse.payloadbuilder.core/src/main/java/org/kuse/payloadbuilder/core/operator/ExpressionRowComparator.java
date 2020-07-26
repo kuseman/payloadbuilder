@@ -87,5 +87,4 @@ class ExpressionRowComparator implements RowComparator
     {
         return items.toString();
     }
-
 }

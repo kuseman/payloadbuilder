@@ -2,6 +2,7 @@ package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toSet;
+import static org.apache.commons.collections.CollectionUtils.containsAny;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
@@ -26,8 +27,10 @@ import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzeResult;
+import org.kuse.payloadbuilder.core.parser.AExpressionVisitor;
 import org.kuse.payloadbuilder.core.parser.AJoin;
 import org.kuse.payloadbuilder.core.parser.ASelectVisitor;
+import org.kuse.payloadbuilder.core.parser.AStatementVisitor;
 import org.kuse.payloadbuilder.core.parser.Apply;
 import org.kuse.payloadbuilder.core.parser.Apply.ApplyType;
 import org.kuse.payloadbuilder.core.parser.AsteriskSelectItem;
@@ -41,6 +44,7 @@ import org.kuse.payloadbuilder.core.parser.NestedSelectItem.Type;
 import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.PopulateTableSource;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
+import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 import org.kuse.payloadbuilder.core.parser.Select;
 import org.kuse.payloadbuilder.core.parser.SelectItem;
 import org.kuse.payloadbuilder.core.parser.SelectStatement;
@@ -66,6 +70,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
     private static final BiFunction<String, TableAlias, RuntimeException> MULTIPLE_ALIAS_EXCEPTION = (alias,
             parent) -> new IllegalArgumentException("Alias " + alias + " is defined multiple times for parent: " + parent);
+
+    private final CorrelatedDetector correlatedDetector = new CorrelatedDetector();
 
     /** Context used during visiting tree */
     static class Context
@@ -174,77 +180,36 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 e.getKey().setColumns(e.getValue().toArray(EMPTY_STRING_ARRAY));
             }
         });
-        
+
         List<TableAlias> queue = new ArrayList<>();
         queue.add(context.parent);
         while (!queue.isEmpty())
         {
             TableAlias alias = queue.remove(0);
-            
+
             if (alias.getColumns() == ASTERISK_COLUMNS)
             {
                 alias.setColumns(null);
             }
-            
+
             queue.addAll(alias.getChildAliases());
         }
-        
+
         return Pair.of(context.operator, context.projection);
     }
 
-    /** Class containing information needed to build a index operator */
-    private static class IndexOperatorFoundation
-    {
-        final List<Expression> outerValueExpressions;
-        final List<Expression> innerValueExpressions;
-        final List<AnalyzePair> indexPairs;
-        final AnalyzeResult leftOverAnalyzeResult;
-        
-        IndexOperatorFoundation(
-                String alias,
-                Index index,
-                List<AnalyzePair> analyzePairs,
-                List<AnalyzePair> equiPairs)
-        {
-            int size = equiPairs.size();
-            outerValueExpressions = new ArrayList<>(size);
-            innerValueExpressions = new ArrayList<>(size);
-            indexPairs = new ArrayList<>(size);
-            
-            populateValueExtractors(
-                    alias,
-                    equiPairs,
-                    index,
-                    outerValueExpressions,
-                    innerValueExpressions,
-                    indexPairs);
-            List<AnalyzePair> pairs = new ArrayList<>(analyzePairs);
-            pairs.removeAll(indexPairs);
-
-            // Remove all pushdown candidates from index items,
-            // these are contained within index and no need to push down
-            // and is neither needed in join condition
-            indexPairs.removeIf(pair -> pair.isPushDown(alias, true));
-
-            // Create a new analyze result from resulting pairs
-            pairs.addAll(indexPairs);
-            this.leftOverAnalyzeResult = new AnalyzeResult(pairs);
-        }
-    }
-    
     @Override
     public Void visit(Select query, Context context)
     {
         TableSourceJoined tsj = query.getFrom();
         Expression where = query.getWhere();
-        
+
         Index index = null;
         List<Expression> outerValuesExpressions = null;
-        
+
         // 1. analyze index usage
         // 2. apply push down predicate even with no joins
-        
-        
+
         // Table from clause
         // Analyze index possibilities
         // Extract push down predicate candidates
@@ -267,7 +232,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                     where = analyzeResult.getPredicate();
                 }
             }
-            
+
             /* TODO:
             Push down can applied to non populating joins ie:
             select s.id
@@ -280,7 +245,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             and a.id2 < 10        <--- Can be pushed to article
             and b.id3 != 10       <--- can be pushed to brand
             */
-            
+
             // Extract push down predicates
             Pair<Expression, AnalyzeResult> pair = analyzeResult.extractPushdownPredicate(ts.getAlias(), true);
             if (pair.getKey() != null)
@@ -289,8 +254,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 //pushDownPredicate = pair.getKey();
                 where = pair.getValue().getPredicate();
             }
-        } 
-        
+        }
+
         TableOption batchLimitOption = null;
         int batchLimitId = -1;
         List<AJoin> joins = tsj != null ? tsj.getJoins() : emptyList();
@@ -309,7 +274,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             {
                 throw new RuntimeException("Index " + index + " should have been consumed by " + tsj.getTableSource().getTable());
             }
-            
+
             Expression predicate = context.pushDownPredicateByAlias.remove(tsj.getTableSource().getAlias());
             // Gather columns from remaining predicate
             visit(predicate, context);
@@ -456,11 +421,11 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         context.projection = new ExpressionProjection(expression);
         return null;
     }
-    
+
     @Override
     public Void visit(AsteriskSelectItem selectItem, Context context)
     {
-        // Set asterisk columns on aliases 
+        // Set asterisk columns on aliases
         if (selectItem.getAlias() != null)
         {
             TableAlias childAlias = context.parent.getChildAlias(selectItem.getAlias());
@@ -571,11 +536,11 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             groupBys.forEach(e -> visit(e, context));
             context.operator = createGroupBy(context.acquireNodeId(), tsj.getTableSource().getAlias(), groupBys, context.operator);
         }
-        // TODO: wrap context.operator with order by
         List<SortItem> sortBys = tableSource.getOrderBy();
         if (!sortBys.isEmpty())
         {
             sortBys.forEach(si -> si.accept(this, context));
+            context.operator = new SortByOperator(context.acquireNodeId(), context.operator, new ExpressionRowComparator(sortBys));
         }
 
         // Restore values before leaving
@@ -589,7 +554,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         Pair<String, Catalog> pair = getCatalog(context, table.getCatalog(), table.getToken());
         TableAlias alias = context.appendTableAlias(table.getTable(), table.getAlias(), null);
         int nodeId = context.acquireNodeId();
-        
+
         TablePredicate predicate = new TablePredicate(context.pushDownPredicateByAlias.get(table.getAlias()));
         if (context.index != null)
         {
@@ -618,34 +583,6 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         return null;
     }
 
-    //    private boolean detectCorrelated(TableSource tableSource, Context context)
-    //    {
-    //        // Store aliases before visiting table source to be able to detect if this join is correlated
-    //        Map<TableAlias, Set<String>> columnsByAlias = context.columnsByAlias;
-    //        context.columnsByAlias = new THashMap<>();
-    //
-    //        // If there are any references to current parent
-    //        // or any parent or parents children, then table source is correlated
-    //        Set<TableAlias> parents = new THashSet<>();
-    //        parents.add(context.parent);
-    //        TableAlias current = context.parent.getParent();
-    //        while (current != null)
-    //        {
-    //            parents.add(current);
-    //            parents.addAll(current.getChildAliases());
-    //            current = current.getParent();
-    //        }
-    //
-    //        tableSource.accept(this, context);
-    //
-    //        boolean isCorrelated = context.columnsByAlias.keySet().stream().anyMatch(alias -> parents.contains(alias));
-    //
-    //        columnsByAlias.putAll(context.columnsByAlias);
-    //        context.columnsByAlias = columnsByAlias;
-    //
-    //        return isCorrelated;
-    //    }
-
     /** Return a batch limit option for provided table source (if any) */
     private TableOption getBatchLimitOption(TableSource ts)
     {
@@ -656,9 +593,9 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 .findFirst()
                 .orElse(null);
     }
-    
-    /** Return a batch size option for provided table source (if any)
-     * Used to override default {@link Index#getBatchSize()} for a table
+
+    /**
+     * Return a batch size option for provided table source (if any) Used to override default {@link Index#getBatchSize()} for a table
      **/
     private TableOption getBatchSizeOption(TableSource ts)
     {
@@ -680,6 +617,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         Operator outer = context.operator;
         context.operator = null;
 
+        boolean isCorrelated = correlatedDetector.isCorrelated(context.parent, join);
+
         Operator joinOperator = createJoin(
                 context,
                 logicalOperator,
@@ -687,7 +626,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 join.getTableSource(),
                 condition,
                 emitEmptyOuterRows,
-                false);
+                isCorrelated);
 
         if (condition != null)
         {
@@ -712,19 +651,46 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         List<AnalyzePair> equiPairs = analyzeResult.getEquiPairs(innerAlias, true);
         int equiPairSize = equiPairs.size();
 
-        // TODO: correlated
+        List<Index> indices = emptyList();
+        if (innerTableSource.getTable() != null)
+        {
+            Pair<String, Catalog> pair = getCatalog(context, innerTableSource.getCatalog(), innerTableSource.getToken());
+            QualifiedName table = innerTableSource.getTable();
+            indices = pair.getValue().getIndices(context.session, pair.getKey(), table);
+        }
+        // TODO: If outer is ordered and no inner indices
+        // then the inner could be created and after, check it's order for a potential
+        // MergeJoin
+        
+        Index index = getIndex(equiPairs, innerAlias, indices);
+        IndexOperatorFoundation foundation = new IndexOperatorFoundation(innerAlias, index, analyzeResult.getPairs(), equiPairs);
 
-        /* No equi items in condition => NestedLoop */
-        if (equiPairSize == 0)
+        /* No equi items in condition or a correlated query => NestedLoop */
+        if (isCorrelated || equiPairSize == 0)
         {
             condition = extractPushDownPredicate(context, innerAlias, emitEmptyOuterRows, analyzeResult);
+            
+            boolean hasIndex = index != null;
+            context.index = index;
             innerTableSource.accept(this, context);
+            if (context.index != null)
+            {
+                throw new RuntimeException("Index " + index + " should have been consumed by " + innerTableSource.getTable());
+            }
+            
             Operator inner = wrapWithPushDown(context, context.operator, innerAlias);
 
-            /* Cache inner operator */
+            // Cache inner operator if this is a regular nested loop 
             if (!isCorrelated)
             {
                 inner = new CachingOperator(context.acquireNodeId(), inner);
+            }
+            // If we have a correlated query and a inner index
+            // wrap inner operator with an outer values operator to
+            // let the inner utilize each nested loops outer rows index values
+            else if (hasIndex)
+            {
+                inner = new OuterValuesOperator(context.acquireNodeId(), inner, foundation.outerValueExpressions);
             }
 
             return new NestedLoopJoin(
@@ -738,21 +704,6 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                     emitEmptyOuterRows);
         }
 
-        List<Index> indices = emptyList();
-
-        if (innerTableSource.getTable() != null)
-        {
-            Pair<String, Catalog> pair = getCatalog(context, innerTableSource.getCatalog(), innerTableSource.getToken());
-            QualifiedName table = innerTableSource.getTable();
-            indices = pair.getValue().getIndices(context.session, pair.getKey(), table);
-        }
-        // TODO: If outer is ordered and no inner indices
-        // then the inner could be created and after check it's order for a potential
-        // MergeJoin
-
-        Index index = getIndex(equiPairs, innerAlias, indices);
-        IndexOperatorFoundation foundation = new IndexOperatorFoundation(innerAlias, index, analyzeResult.getPairs(), equiPairs);
-        
         // No indices for inner -> HashJoin
         if (index == null)
         {
@@ -774,7 +725,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                     populating,
                     emitEmptyOuterRows);
         }
-        
+
         // Extract pushdown and new join condition
         condition = extractPushDownPredicate(context, innerAlias, emitEmptyOuterRows, foundation.leftOverAnalyzeResult);
         context.index = index;
@@ -790,7 +741,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         ExpressionValuesExtractor innerValuesExtractor = new ExpressionValuesExtractor(foundation.innerValueExpressions);
 
         TableOption batchSizeOption = getBatchSizeOption(innerTableSource);
-        
+
         return new BatchHashJoin(
                 context.acquireNodeId(),
                 logicalOperator,
@@ -835,7 +786,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         //        throw new RuntimeException("No operator could be created for join");
     }
-    
+
     private Index getIndex(List<AnalyzePair> equiPairs, String alias, List<Index> indices)
     {
         /* Extract all references inner columns from equi items */
@@ -856,7 +807,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                     .findFirst()
                     .orElse(null);
         }
-        
+
         return index;
     }
 
@@ -906,14 +857,14 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 {
                     continue;
                 }
-                
+
                 if (!processedColumns.add(column))
                 {
                     // TODO: pick the best avaiable expression
                     // Ie. Expression#isConstant over any other
                     continue;
                 }
-                
+
                 indexPairs.add(pair);
             }
 
@@ -1023,5 +974,92 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         }
 
         return Pair.of(catalogAlias, catalog);
+    }
+
+    /** Class containing information needed to build a index operator */
+    private static class IndexOperatorFoundation
+    {
+        final List<Expression> outerValueExpressions;
+        final List<Expression> innerValueExpressions;
+        final List<AnalyzePair> indexPairs;
+        final AnalyzeResult leftOverAnalyzeResult;
+
+        IndexOperatorFoundation(
+                String alias,
+                Index index,
+                List<AnalyzePair> analyzePairs,
+                List<AnalyzePair> equiPairs)
+        {
+            int size = equiPairs.size();
+            outerValueExpressions = new ArrayList<>(size);
+            innerValueExpressions = new ArrayList<>(size);
+            indexPairs = new ArrayList<>(size);
+
+            populateValueExtractors(
+                    alias,
+                    equiPairs,
+                    index,
+                    outerValueExpressions,
+                    innerValueExpressions,
+                    indexPairs);
+            List<AnalyzePair> pairs = new ArrayList<>(analyzePairs);
+            pairs.removeAll(indexPairs);
+
+            // Remove all pushdown candidates from index items,
+            // these are contained within index and no need to push down
+            // and is neither needed in join condition
+            indexPairs.removeIf(pair -> pair.isPushDown(alias, true));
+
+            // Create a new analyze result from resulting pairs
+            pairs.addAll(indexPairs);
+            this.leftOverAnalyzeResult = new AnalyzeResult(pairs);
+        }
+    }
+    
+    /**
+     * Detects correlated queries by analyzing qualified expression references in child join to see if any aliases from outer context is referenced.
+     */
+    private class CorrelatedDetector extends AStatementVisitor<Void, Set<String>>
+    {
+        private final AExpressionVisitor<Void, Set<String>> expressionVisitor = new AExpressionVisitor<Void, Set<String>>()
+        {
+            @Override
+            public Void visit(QualifiedReferenceExpression expression, Set<String> aliases)
+            {
+                String alias = expression.getQname().getAlias();
+                if (alias != null)
+                {
+                    aliases.add(alias);
+                }
+                return null;
+            }
+        };
+
+        @Override
+        protected void visitExpression(Set<String> context, Expression expression)
+        {
+            expression.accept(expressionVisitor, context);
+        }
+
+        boolean isCorrelated(TableAlias alias, AJoin join)
+        {
+            TableAlias current = alias;
+            Set<String> aliases = new HashSet<>();
+            // Collect all current aliases
+            // Including parents and parents child aliases
+            while (current != null)
+            {
+                aliases.add(current.getAlias());
+                current.getChildAliases().forEach(a -> aliases.add(a.getAlias()));
+                current = current.getParent();
+            }
+
+            // If any of these are referenced in provided join then we have a
+            // correlated query
+            Set<String> joinAliases = new HashSet<>();
+            join.getTableSource().accept(this, joinAliases);
+
+            return containsAny(aliases, joinAliases);
+        }
     }
 }

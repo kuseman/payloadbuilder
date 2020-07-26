@@ -7,32 +7,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang3.mutable.MutableObject;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
-import org.kuse.payloadbuilder.core.operator.ArrayProjection;
-import org.kuse.payloadbuilder.core.operator.BatchLimitOperator;
-import org.kuse.payloadbuilder.core.operator.BatchRepeatOperator;
-import org.kuse.payloadbuilder.core.operator.CachingOperator;
-import org.kuse.payloadbuilder.core.operator.DefaultRowMerger;
-import org.kuse.payloadbuilder.core.operator.ExpressionHashFunction;
-import org.kuse.payloadbuilder.core.operator.ExpressionOperator;
-import org.kuse.payloadbuilder.core.operator.ExpressionPredicate;
-import org.kuse.payloadbuilder.core.operator.ExpressionProjection;
-import org.kuse.payloadbuilder.core.operator.ExpressionRowComparator;
-import org.kuse.payloadbuilder.core.operator.ExpressionValuesExtractor;
-import org.kuse.payloadbuilder.core.operator.FilterOperator;
-import org.kuse.payloadbuilder.core.operator.GroupByOperator;
-import org.kuse.payloadbuilder.core.operator.HashJoin;
-import org.kuse.payloadbuilder.core.operator.NestedLoopJoin;
-import org.kuse.payloadbuilder.core.operator.ObjectProjection;
-import org.kuse.payloadbuilder.core.operator.Operator;
-import org.kuse.payloadbuilder.core.operator.OperatorBuilder;
-import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer;
-import org.kuse.payloadbuilder.core.operator.Projection;
-import org.kuse.payloadbuilder.core.operator.SortByOperator;
-import org.kuse.payloadbuilder.core.operator.TableFunctionOperator;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzeResult;
 import org.kuse.payloadbuilder.core.parser.Expression;
@@ -502,7 +479,6 @@ public class OperatorBuilderTest extends AOperatorTest
                 result.projection);
     }
 
-    @Ignore
     @Test
     public void test_correlated()
     {
@@ -532,11 +508,11 @@ public class OperatorBuilderTest extends AOperatorTest
         Operator expected =
                 // Correlated => nested loop
                 new NestedLoopJoin(
-                        0,
+                        4,
                         "",
                         result.tableOperators.get(0),
                         new HashJoin(
-                                0,
+                                3,
                                 "",
                                 result.tableOperators.get(1),
                                 result.tableOperators.get(2),
@@ -551,8 +527,8 @@ public class OperatorBuilderTest extends AOperatorTest
                         true,
                         false);
 
-        //                System.err.println(expected.toString(1));
-        //                System.out.println(result.operator.toString(1));
+//                        System.err.println(expected.toString(1));
+//                        System.out.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
 
@@ -561,66 +537,4 @@ public class OperatorBuilderTest extends AOperatorTest
                         asList(new ExpressionProjection(e("s.art_id")))),
                 result.projection);
     }
-
-    //    @Ignore
-    //    @Test
-    //    public void test_correlated_manual()
-    //    {
-    //        String query = "SELECT s.art_id "
-    //            + "FROM source s "
-    //            + "INNER JOIN "
-    //            + "["
-    //            + "  article a"
-    //            + "  INNER JOIN [articleAttribute] aa"
-    //            + "    ON aa.art_id = a.art_id "
-    //            + "    AND s.id "
-    //            + "] a"
-    //            + "  ON a.art_id = s.art_id";
-    //
-    //        Catalog c = new Catalog("TEST")
-    //        {
-    //            Random rnd = new Random();
-    //
-    //            @Override
-    //            public Operator getScanOperator(int nodeId, String catalogAlias, TableAlias alias, List<TableOption> tableOptions)
-    //            {
-    //                QualifiedName qname = alias.getTable();
-    //                if (qname.toString().equals("source"))
-    //                {
-    //                    return new CachingOperator(0, c -> IntStream.range(0, 1000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextBoolean(), rnd.nextInt(100)})).iterator());
-    //                }
-    //                else if (qname.toString().equals("article"))
-    //                {
-    //                    return new CachingOperator(0, c -> IntStream.range(0, 1000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextInt(1000)})).iterator());
-    //                }
-    //
-    //                return new CachingOperator(0, c -> IntStream.range(0, 10000).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextInt(1000)})).iterator());
-    //            }
-    //        };
-    //
-    //        session.setDefaultCatalog(c);
-    //
-    //        Pair<Operator, Projection> pair = null;
-    //        for (int i = 0; i < 10; i++)
-    //        {
-    //            pair = OperatorBuilder.create(session, parser.parseSelect(query));
-    //            ExecutionContext context = new ExecutionContext(session);
-    //            Iterator<Row> it = pair.getKey().open(context);
-    //            StopWatch sw = new StopWatch();
-    //            sw.start();
-    //            int count = 0;
-    //            while (it.hasNext())
-    //            {
-    //                Row row = it.next();
-    //                //            System.out.println(row);
-    //                count++;
-    //            }
-    //            sw.stop();
-    //            System.out.println("Time: " + sw.toString() + ", rows: " + count);
-    //            System.out.println(FileUtils.byteCountToDisplaySize(Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()));
-    //        }
-    //
-    //        System.out.println(pair.getKey().toString(1));
-    //
-    //    }
 }
