@@ -1,5 +1,6 @@
 package org.kuse.payloadbuilder.catalog.es;
 
+import static java.util.Collections.emptyIterator;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
@@ -22,9 +23,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.CountingInputStream;
 import org.apache.commons.io.output.CountingOutputStream;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.Header;
@@ -98,7 +101,9 @@ class ESOperator extends AOperator
     {
         Map<String, Object> result = ofEntries(true,
                 entry(CATALOG, ESCatalog.NAME),
-                entry(PREDICATE, fieldPredicates.stream().map(p -> p.getKey() + " = " + p.getValue()).collect(joining(" AND "))));
+                entry(PREDICATE, fieldPredicates
+                        .stream()
+                        .map(p -> p.getKey() + " = " + (p.getValue() != null ? p.getValue() : "true")).collect(joining(" AND "))));
 
         if (index != null)
         {
@@ -120,16 +125,28 @@ class ESOperator extends AOperator
 
         if (index != null)
         {
+            if (context.getOperatorContext().getOuterIndexValues() == null || !context.getOperatorContext().getOuterIndexValues().hasNext())
+            {
+                return emptyIterator();
+            }
+            
             String mgetUrl = String.format("%s/%s/%s/_mget?filter_path=docs._source,docs._id", esType.endpoint, esType.index, esType.type);
             // TODO: thread up all ids in executor and join
             DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getOperatorContext(), sentBytes);
+            MutableBoolean doRequest = new MutableBoolean(true);
             return getIterator(
                     receivedBytes,
                     scrollId ->
                     {
-                        HttpPost post = new HttpPost(mgetUrl);
-                        post.setEntity(entity);
-                        return post;
+                        if (doRequest.isTrue())
+                        {
+                            HttpPost post = new HttpPost(mgetUrl);
+                            post.setEntity(entity);
+                            doRequest.setFalse();
+                            return post;
+                        }
+                        
+                        return null;
                     });
         }
 
@@ -197,9 +214,19 @@ class ESOperator extends AOperator
                     if (docIt == null)
                     {
                         HttpUriRequest request = requestSupplier.apply(scrollId);
+                        
+                        if (request == null)
+                        {
+                            return false;
+                        }
+                        
                         ESResponse esReponse;
                         try (CloseableHttpResponse response = CLIENT.execute(request);)
                         {
+                            if (response.getStatusLine().getStatusCode() != 200)
+                            {
+                                throw new RuntimeException("Error query Elastic. " + IOUtils.toString(response.getEntity().getContent()));
+                            }
                             CountingInputStream cis = new CountingInputStream(response.getEntity().getContent());
                             esReponse = MAPPER.readValue(cis, ESResponse.class);
                             receivedBytes.addAndGet(cis.getByteCount());
@@ -291,7 +318,17 @@ class ESOperator extends AOperator
                 sb.append("+AND+");
             }
             
-            Object value = pair.getValue().eval(context);
+            Object value;
+            // Null expression then assume the field is a boolean => add true as value
+            // Predicate is of type "active_flg"
+            if(pair.getValue() == null)
+            {
+                value = true;
+            }
+            else
+            {
+                value = pair.getValue().eval(context);
+            }
             sb.append(pair.getKey()).append(":").append(value);
         }
         
@@ -420,7 +457,7 @@ class ESOperator extends AOperator
     /** Class the streams doc id's to _mget endpoint in ES */
     private static class DocIdStreamingEntity implements HttpEntity
     {
-        private static final byte[] HEADER_BYTES = "{ \"ids\": [".getBytes();
+        private static final byte[] HEADER_BYTES = "{\"ids\":[".getBytes();
         private static final byte[] FOOTER_BYTES = "]}".getBytes();
         private static final byte[] QUOTE_BYTES = "\"".getBytes();
         private static final byte[] COMMA_BYTES = ",".getBytes();
@@ -475,11 +512,6 @@ class ESOperator extends AOperator
         public void writeTo(OutputStream outStream) throws IOException
         {
             Iterator<Object[]> values = context.getOuterIndexValues();
-            if (values == null || !values.hasNext())
-            {
-                return;
-            }
-
             try (CountingOutputStream bos = new CountingOutputStream(outStream))
             {
                 bos.write(HEADER_BYTES);
@@ -487,13 +519,13 @@ class ESOperator extends AOperator
                 boolean first = true;
                 while (values.hasNext())
                 {
+                    String docId = String.valueOf(values.next()[0]);
                     if (!first)
                     {
                         bos.write(COMMA_BYTES);
                     }
                     first = false;
                     bos.write(QUOTE_BYTES);
-                    String docId = String.valueOf(values.next()[0]);
                     bos.write(docId.getBytes());
                     bos.write(QUOTE_BYTES);
                 }
@@ -506,7 +538,7 @@ class ESOperator extends AOperator
         @Override
         public boolean isStreaming()
         {
-            return true;
+            return false;
         }
 
         @Override

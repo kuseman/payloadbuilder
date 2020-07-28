@@ -2,6 +2,10 @@ package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Objects.requireNonNull;
 
+import java.util.Map;
+
+import org.kuse.payloadbuilder.core.operator.Row;
+
 public class DereferenceExpression extends Expression
 {
     private final Expression left;
@@ -23,65 +27,31 @@ public class DereferenceExpression extends Expression
         return right;
     }
 
-//    @Override
-//    public Object eval(ExecutionContext context)
-//    {
-//        Object leftResult = left.eval(context);
-//
-//        /** Extract first result from iterator */
-//        if (leftResult instanceof Iterator)
-//        {
-//            @SuppressWarnings("unchecked")
-//            Iterator<Object> it = (Iterator<Object>) leftResult;
-//            leftResult = it.hasNext() ? it.next() : null;
-//        }
-//        if (leftResult == null)
-//        {
-//            return null;
-//        }
-//
-//        throw new RuntimeException("IMPLEMENT");
-//        
-////        QualifiedReferenceContainer container = evaluationContext.getContainer(right.getQname(), right.getUniqueId());
-////        return container.getValue(leftResult);
-//    }
-//
-//    @Override
-//    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
-//    {
-//        /*
-//         * a.func().b
-//         *
-//         * Input res_1 = new Input(a.func());
-//         * res_1 = res_1.getObject('b');
-//         *
-//         *
-//         */
-//
-//        System.out.println(right);
-//
-//        ExpressionCode leftCode = left.generateCode(context, parentCode);
-//        ExpressionCode code = ExpressionCode.code(context, leftCode);
-//
-//        String template = "%s"
-//            + "boolean %s = %s != null;\n"
-//            + "Object %s = null;\n"
-//            + "if (!%s)\n"
-//            + "{\n"
-//            + "  %s = dereference(%s, %s);\n"
-//            + "  %s = %s != null;\n"
-//            + "}\n";
-//
-//        code.setCode(String.format(template,
-//                leftCode.getCode(),
-//                code.getIsNull(), leftCode.getResVar(),
-//                code.getResVar(),
-//                leftCode.getIsNull(),
-//                code.getResVar(), leftCode.getResVar(), "\"rightCode\"",
-//                code.getIsNull(), code.getResVar()));
-//
-//        return code;
-//    }
+    @Override
+    public Object eval(ExecutionContext context)
+    {
+        Object leftResult = left.eval(context);
+
+        if (leftResult == null)
+        {
+            return null;
+        }
+        
+        if (leftResult instanceof Row)
+        {
+            context.setRow((Row) leftResult);
+            return right.eval(context);
+        }
+        else if (leftResult instanceof Map)
+        {
+            @SuppressWarnings("unchecked")
+            Map<Object, Object> map = (Map<Object, Object>) leftResult;
+            // A dereference only has one part so pick first and use as key
+            return map.get(right.getQname().getFirst());
+        }
+
+        throw new IllegalArgumentException("Cannot dereference " + leftResult.getClass().getSimpleName() + " value: " + leftResult);
+    }
 
     @Override
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)

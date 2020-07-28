@@ -157,16 +157,23 @@ class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsVisitor.
     @Override
     public Set<TableAlias> visit(QualifiedFunctionCallExpression expression, Context context)
     {
+        /*  map(flatmap(aa, x -> x.ap), x -> x.price_sales)
+             Lambda binding of map = arg0 => arg1
+             Visit 
+        */
+        
         ScalarFunctionInfo functionInfo = expression.getFunctionInfo(context.session);
         
         // Store parent aliases before resolving this function call
         Set<TableAlias> parentAliases = context.parentAliases;
         // Bind lambda parameters
+        List<Expression> arguments = new ArrayList<>(expression.getArguments());
         if (functionInfo instanceof LambdaFunction)
         {
             List<Pair<Expression, LambdaExpression>> lambdaBindings = ((LambdaFunction) functionInfo).getLambdaBindings(expression.getArguments());
             for (Pair<Expression, LambdaExpression> pair : lambdaBindings)
             {
+                arguments.remove(pair.getLeft());
                 Set<TableAlias> lambdaAliases = pair.getLeft().accept(this, context);
                 if (isEmpty(lambdaAliases))
                 {
@@ -180,8 +187,8 @@ class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsVisitor.
             }
         }
 
-        // Visit all arguments
-        expression.getArguments().forEach(a -> a.accept(this, context));
+        // Visit non visited arguments
+        arguments.forEach(a -> a.accept(this, context));
         
         // Resolve alias from function
         Set<TableAlias> result = functionInfo.resolveAlias(parentAliases, expression.getArguments(), e -> e.accept(this, context));

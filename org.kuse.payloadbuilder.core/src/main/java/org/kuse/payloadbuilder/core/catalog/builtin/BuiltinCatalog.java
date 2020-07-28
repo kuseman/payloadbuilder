@@ -35,6 +35,8 @@ public class BuiltinCatalog
         catalog.registerFunction(new IsNullFunction(catalog));
         catalog.registerFunction(new CoalesceFunction(catalog));
         catalog.registerFunction(new JsonValueFunction(catalog));
+        catalog.registerFunction(new CastFunction(catalog, "cast"));
+        catalog.registerFunction(new CastFunction(catalog, "convert"));
         
         // Table functions
         catalog.registerFunction(new Range(catalog));

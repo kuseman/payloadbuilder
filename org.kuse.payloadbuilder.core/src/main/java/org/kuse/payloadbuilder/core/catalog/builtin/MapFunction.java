@@ -67,7 +67,7 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
         return new TransformIterator(IteratorUtils.getIterator(argResult), input -> 
         {
             context.setLambdaValue(lambdaId, input);
-            return le.getExpression().eval(context);   
+            return le.getExpression().eval(context);
         });
     }
     

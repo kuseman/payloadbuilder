@@ -14,12 +14,11 @@ import org.junit.Test;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
-import org.kuse.payloadbuilder.core.operator.ColumnsVisitor;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QueryParser;
 
 /** Test {@link ColumnsVisitor} */
-public class ColumnVisitorTest extends Assert
+public class ColumnsVisitorTest extends Assert
 {
     private final QueryParser parser = new QueryParser();
     private final QuerySession session = new QuerySession(new CatalogRegistry());
@@ -186,6 +185,12 @@ public class ColumnVisitorTest extends Assert
         actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, articleBrand, e);
         assertEquals(asSet(articleBrand), actual);
         assertEquals(ofEntries(entry(articleBrand, asSet("articleBrandId")), entry(article, asSet("articleBrandId"))), columnsByAlias);
+        
+        columnsByAlias.clear();
+        e = e("aa.flatMap(x -> x.ap).map(x -> x.price_sales)");
+        actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
+        assertEquals(asSet(source), actual);
+        assertEquals(ofEntries(entry(articlePrice, asSet("price_sales"))), columnsByAlias);
     }
     
     private Expression e(String expression)

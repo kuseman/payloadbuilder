@@ -1,8 +1,16 @@
 package org.kuse.payloadbuilder.core.operator;
 
+import static java.util.Arrays.asList;
 import static java.util.Collections.emptyIterator;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
+import static org.kuse.payloadbuilder.core.DescribeUtils.INNER_VALUES;
+import static org.kuse.payloadbuilder.core.DescribeUtils.LOGICAL_OPERATOR;
+import static org.kuse.payloadbuilder.core.DescribeUtils.OUTER_VALUES;
+import static org.kuse.payloadbuilder.core.DescribeUtils.POPULATING;
+import static org.kuse.payloadbuilder.core.DescribeUtils.PREDICATE;
+import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
+import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -54,7 +62,30 @@ class HashJoin extends AOperator
         this.populating = populating;
         this.emitEmptyOuterRows = emitEmptyOuterRows;
     }
+    
+    @Override
+    public String getName()
+    {
+        return "Hash Join";
+    }
 
+    @Override
+    public List<Operator> getChildOperators()
+    {
+        return asList(outer, inner);
+    }
+    
+    @Override
+    public Map<String, Object> getDescribeProperties()
+    {
+        return ofEntries(true,
+                entry(LOGICAL_OPERATOR, logicalOperator),
+                entry(POPULATING, populating),
+                entry(PREDICATE, predicate),
+                entry(OUTER_VALUES, outerHashFunction),
+                entry(INNER_VALUES, innerHashFunction));
+    }
+    
     @SuppressWarnings("unchecked")
     @Override
     public Iterator<Row> open(ExecutionContext context)

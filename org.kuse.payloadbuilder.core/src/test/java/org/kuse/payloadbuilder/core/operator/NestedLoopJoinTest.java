@@ -4,22 +4,82 @@ import static java.util.Collections.emptyList;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.IntStream;
 
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
-import org.kuse.payloadbuilder.core.operator.DefaultRowMerger;
-import org.kuse.payloadbuilder.core.operator.NestedLoopJoin;
-import org.kuse.payloadbuilder.core.operator.Operator;
-import org.kuse.payloadbuilder.core.operator.Row;
-import org.kuse.payloadbuilder.core.operator.TableFunctionOperator;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 
 /** Test {@link NestedLoopJoin} */
 public class NestedLoopJoinTest extends AOperatorTest
 {
+    @Test
+    public void test_correlated()
+    {
+        // Test that a correlated query with a batch hash join
+        // uses the context row into consideration when joining
+
+        TableAlias a = TableAlias.of(null, "tableA", "a");
+        TableAlias b = TableAlias.of(a, "tableB", "b");
+        TableAlias c = TableAlias.of(b, "tableC", "c");
+
+        /**
+         * <pre>
+         * from tableA a
+         * inner join
+         * [
+         *   tableB b
+         *   inner join [tableC] c
+         *      on c.id2 = a.id2
+         *      or c.id = b.id
+         * ] b
+         *   on b.id = a.id
+         * </pre>
+         */
+
+        Operator opA = op(ctx -> IntStream.of(1, 2, 3, 4, 5).mapToObj(i -> Row.of(a, i, new Object[] {i, "val" + i})).iterator());
+        Operator opB = op(ctx -> IntStream.of(4, 5, 6, 7).mapToObj(i -> Row.of(b, i, new Object[] {i})).iterator());
+        Operator opC = op(ctx -> IntStream.of(1, 2, 3, 4, 5, 6, 7).mapToObj(i -> Row.of(c, i, new Object[] {i, "val" + i})).iterator());
+
+        Operator op = new NestedLoopJoin(
+                0,
+                "",
+                opA,
+                new NestedLoopJoin(
+                        1,
+                        "",
+                        opB,
+                        opC,
+                        (ctx, row) -> Objects.equals(row.getObject(1), row.getParent().getParent().getObject(1))
+                            || (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0)
+                            ,
+                        DefaultRowMerger.DEFAULT,
+                        true,
+                        false),
+                (ctx, row) -> (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
+                DefaultRowMerger.DEFAULT,
+                true,
+                false);
+
+        int[] tableAPos = new int[] {4, 5};
+        int[] tableBPos = new int[] {4, 5};
+        int[] tableCPos = new int[] {4, 5};
+
+        int count = 0;
+        Iterator<Row> it = op.open(new ExecutionContext(session));
+        while (it.hasNext())
+        {
+            Row row = it.next();
+            assertEquals(row.getPos(), tableAPos[count]);
+            assertEquals(row.getChildRows(0).get(0).getPos(), tableBPos[count]);
+            assertEquals(row.getChildRows(0).get(0).getChildRows(0).get(0).getPos(), tableCPos[count]);
+            count++;
+        }
+    }
+    
     @Test
     public void test_cross_join_no_populate()
     {

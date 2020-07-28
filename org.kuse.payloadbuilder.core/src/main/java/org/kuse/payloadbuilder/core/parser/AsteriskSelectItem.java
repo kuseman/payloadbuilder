@@ -49,6 +49,12 @@ public class AsteriskSelectItem extends SelectItem implements Projection
         }
         else
         {
+            // The alias for the row itself
+            if (alias.equals(row.getTableAlias().getAlias()))
+            {
+                writeRow(row, writer); 
+                return;
+            }
             TableAlias childAlias = row.getTableAlias().getChildAlias(alias);
             if (childAlias != null)
             {

@@ -103,7 +103,7 @@ class NestedLoopJoin extends AOperator
                 {
                     if (ii == null && !it.hasNext())
                     {
-                        context.setRow(contextParent);
+//                        context.setRow(contextParent);
                         return false;
                     }
 

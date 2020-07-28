@@ -23,6 +23,10 @@ public class ExpressionSelectItem extends SelectItem
         {
             return ((QualifiedReferenceExpression) expression).getQname().getLast();
         }
+        else if (expression instanceof DereferenceExpression)
+        {
+            return ((DereferenceExpression) expression).getRight().getQname().getLast();
+        }
         
         return null;
     }

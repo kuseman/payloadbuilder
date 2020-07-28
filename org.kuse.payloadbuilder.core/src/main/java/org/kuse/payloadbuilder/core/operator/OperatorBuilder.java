@@ -181,18 +181,21 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             }
         });
 
-        List<TableAlias> queue = new ArrayList<>();
-        queue.add(context.parent);
-        while (!queue.isEmpty())
+        if (context.parent != null)
         {
-            TableAlias alias = queue.remove(0);
-
-            if (alias.getColumns() == ASTERISK_COLUMNS)
+            List<TableAlias> queue = new ArrayList<>();
+            queue.add(context.parent);
+            while (!queue.isEmpty())
             {
-                alias.setColumns(null);
+                TableAlias alias = queue.remove(0);
+    
+                if (alias.getColumns() == ASTERISK_COLUMNS)
+                {
+                    alias.setColumns(null);
+                }
+    
+                queue.addAll(alias.getChildAliases());
             }
-
-            queue.addAll(alias.getChildAliases());
         }
 
         return Pair.of(context.operator, context.projection);
@@ -421,17 +424,33 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         context.projection = new ExpressionProjection(expression);
         return null;
     }
+    
+    private static final Projection NO_OP_PROJECTION = (writer, context) ->
+    {
+    };
 
     @Override
     public Void visit(AsteriskSelectItem selectItem, Context context)
     {
+        if (context.parent == null)
+        {
+            context.projection = NO_OP_PROJECTION;
+            return null;
+        }
         // Set asterisk columns on aliases
         if (selectItem.getAlias() != null)
         {
-            TableAlias childAlias = context.parent.getChildAlias(selectItem.getAlias());
-            if (childAlias != null)
+            if (context.parent.getAlias().equals(selectItem.getAlias()))
             {
-                childAlias.setColumns(ASTERISK_COLUMNS);
+                context.parent.setColumns(ASTERISK_COLUMNS);
+            }
+            else
+            {
+                TableAlias childAlias = context.parent.getChildAlias(selectItem.getAlias());
+                if (childAlias != null)
+                {
+                    childAlias.setColumns(ASTERISK_COLUMNS);
+                }
             }
         }
         else
@@ -630,7 +649,17 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         if (condition != null)
         {
+            TableAlias parent = context.parent;
+            // Set inner table alias into context before analyzing condition
+            // This to be able to use alias less references pointint to the inner table
+            // ie.
+            // from tableA a
+            // inner join tableB b
+            //   on col = a.col    <------ col here refers to tableB
+            //
+            context.parent = context.parent.getChildAlias(join.getTableSource().getAlias());
             visit(condition, context);
+            context.parent = parent;
         }
         context.operator = joinOperator;
     }
@@ -749,7 +778,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 inner,
                 outerValuesExtractor,
                 innerValuesExtractor,
-                new ExpressionPredicate(condition),
+                condition != null ? new ExpressionPredicate(condition) : (ctx, row) -> true,
                 DefaultRowMerger.DEFAULT,
                 populating,
                 emitEmptyOuterRows,

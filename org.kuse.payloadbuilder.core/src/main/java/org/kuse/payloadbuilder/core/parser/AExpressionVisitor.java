@@ -141,6 +141,12 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
     }
 
     @Override
+    public TR visit(SubscriptExpression expression, TC context)
+    {
+        return visitChildren(context, expression.getValue(), expression.getSubscript());
+    }
+    
+    @Override
     public TR visit(LambdaExpression expression, TC context)
     {
         return visitChildren(context, expression.getExpression());

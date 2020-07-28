@@ -10,7 +10,6 @@ import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Assert;
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzeItem;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzeResult;
@@ -89,17 +88,17 @@ public class PredicateAnalyzerTest extends Assert
 
         e = e("art_id = s.art_id");
         actual = PredicateAnalyzer.analyze(e);
-        assertEquals(result(pair(asSet(""), "art_id", e("art_id"), asSet("s"), "art_id", e("s.art_id"))), actual);
-        assertEquals(asList(pair(asSet(""), "art_id", e("art_id"), asSet("s"), "art_id", e("s.art_id"))), actual.getEquiPairs("a", true));
+        assertEquals(result(pair(asSet(), "art_id", e("art_id"), asSet("s"), "art_id", e("s.art_id"))), actual);
+        assertEquals(asList(pair(asSet(), "art_id", e("art_id"), asSet("s"), "art_id", e("s.art_id"))), actual.getEquiPairs("a", true));
         assertNull(actual.extractPushdownPredicate("a", false).getKey());
         assertEquals(Pair.of(e("art_id"), e("s.art_id")), actual.getEquiPairs("a", true).get(0).getExpressionPair("a", true));
-        assertEquals(Pair.of(e("s.art_id"), e("art_id")), actual.getEquiPairs("a", true).get(0).getExpressionPair("s", false));
+        assertEquals(Pair.of(e("art_id"), e("s.art_id")), actual.getEquiPairs("a", true).get(0).getExpressionPair("s", false));
         assertEquals(Pair.of(e("art_id"), e("s.art_id")), actual.getEquiPairs("a", true).get(0).getExpressionPair("s", true));
 
         e = e("s.art_id = art_id");
         actual = PredicateAnalyzer.analyze(e);
-        assertEquals(result(pair(asSet("s"), "art_id", e("s.art_id"), asSet(""), "art_id", e("art_id"))), actual);
-        assertEquals(asList(pair(asSet("s"), "art_id", e("s.art_id"), asSet(""), "art_id", e("art_id"))), actual.getEquiPairs("s", true));
+        assertEquals(result(pair(asSet("s"), "art_id", e("s.art_id"), asSet(), "art_id", e("art_id"))), actual);
+        assertEquals(asList(pair(asSet("s"), "art_id", e("s.art_id"), asSet(), "art_id", e("art_id"))), actual.getEquiPairs("s", true));
         assertNull(actual.extractPushdownPredicate("a", false).getKey());
         assertEquals(Pair.of(e("art_id"), e("s.art_id")), actual.getEquiPairs("a", true).get(0).getExpressionPair("a", true));
         //        assertEquals(Pair.of(e("art_id"), e("s.art_id")), actual.getEquiItems("b", true).get(0).getExpressionPair("b", true));
@@ -108,7 +107,7 @@ public class PredicateAnalyzerTest extends Assert
 
         e = e("art_id = s.art_id");
         actual = PredicateAnalyzer.analyze(e);
-        assertEquals(result(pair(asSet(""), "art_id", e("art_id"), asSet("s"), "art_id", e("s.art_id"))), actual);
+        assertEquals(result(pair(asSet(), "art_id", e("art_id"), asSet("s"), "art_id", e("s.art_id"))), actual);
         assertEquals(e, actual.getPredicate());
 
         e = e("s.art_id = a.art_id");
@@ -169,7 +168,7 @@ public class PredicateAnalyzerTest extends Assert
         e = e("aa.art_id = a.art_id AND active_flg");
         actual = PredicateAnalyzer.analyze(e);
         assertEquals(result(
-                pair(asSet(""), "active_flg", e("active_flg"), emptySet(), null, null),
+                pair(asSet(), "active_flg", e("active_flg"), emptySet(), null, null),
                 pair(asSet("aa"), "art_id", e("aa.art_id"), asSet("a"), "art_id", e("a.art_id"))), actual);
         
         Pair<Expression, AnalyzeResult> pair = actual.extractPushdownPredicate("s", true);

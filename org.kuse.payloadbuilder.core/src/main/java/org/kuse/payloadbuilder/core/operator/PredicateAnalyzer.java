@@ -16,11 +16,11 @@ import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.parser.AExpressionVisitor;
 import org.kuse.payloadbuilder.core.parser.ComparisonExpression;
+import org.kuse.payloadbuilder.core.parser.ComparisonExpression.Type;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.LogicalBinaryExpression;
 import org.kuse.payloadbuilder.core.parser.NestedExpression;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
-import org.kuse.payloadbuilder.core.parser.ComparisonExpression.Type;
 
 /**
  * Analyzes a join predicate
@@ -153,7 +153,10 @@ public class PredicateAnalyzer
         public Void visit(QualifiedReferenceExpression expression, Set<String> aliases)
         {
             String alias = expression.getQname().getAlias();
-            aliases.add(alias != null ? alias : "");
+            if (alias != null)
+            {
+                aliases.add(alias/* != null ? alias : ""*/);
+            }
             return null;
         }
     }

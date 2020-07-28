@@ -29,9 +29,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.parser.Apply.ApplyType;
 import org.kuse.payloadbuilder.core.parser.ComparisonExpression.Type;
 import org.kuse.payloadbuilder.core.parser.Join.JoinType;
-import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryBaseVisitor;
-import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryLexer;
-import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ArithmeticBinaryContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ArithmeticUnaryContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ColumnReferenceContext;
@@ -59,6 +56,7 @@ import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SelectState
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SetStatementContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ShowStatementContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SortItemContext;
+import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SubscriptContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceJoinedContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceOptionContext;
@@ -448,11 +446,21 @@ public class QueryParser
             FunctionCallInfo functionCallInfo = (FunctionCallInfo) visit(ctx.functionCall());
             return new QualifiedFunctionCallExpression(functionCallInfo.catalog, functionCallInfo.function, functionCallInfo.arguments, functionCallInfo.functionId, ctx.functionCall().start);
         }
+        
+        @Override
+        public Object visitSubscript(SubscriptContext ctx)
+        {
+            Expression value = getExpression(ctx.value);
+            Expression subscript = getExpression(ctx.subscript);
+            return new SubscriptExpression(value, subscript);
+        }
 
         @Override
         public Object visitFunctionCall(FunctionCallContext ctx)
         {
+            // Store left dereference
             Expression prevLeftDereference = leftDereference;
+            leftDereference = null;
             String catalog = lowerCase(ctx.functionName().catalog != null ? ctx.functionName().catalog.getText() : null);
             String function = getIdentifier(ctx.functionName().function);
             
@@ -670,7 +678,7 @@ public class QueryParser
         @Override
         public Object visitDereference(DereferenceContext ctx)
         {
-            Expression prevLeftDereference = leftDereference;
+//            Expression prevLeftDereference = leftDereference;
             Expression left = getExpression(ctx.left);
             leftDereference = left;
 
@@ -698,7 +706,7 @@ public class QueryParser
                 result = new QualifiedFunctionCallExpression(functionCallInfo.catalog, functionCallInfo.function, functionCallInfo.arguments, functionCallInfo.functionId, ctx.functionCall().start);
             }
 
-            leftDereference = prevLeftDereference;
+            leftDereference = null;//prevLeftDereference;
             return result;
         }
 

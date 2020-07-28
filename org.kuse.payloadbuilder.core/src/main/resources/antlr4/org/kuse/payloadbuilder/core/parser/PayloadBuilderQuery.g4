@@ -178,7 +178,7 @@ primary
  | functionCall 											#functionCallExpression	
  | identifier '->' expression                               #lambdaExpression
  | '(' identifier (',' identifier)+ ')' '->' expression  	#lambdaExpression
- | value=primary '[' index=expression ']'    				#subscript	
+ | value=primary '[' subscript=expression ']'    			#subscript	
  | namedParameter											#namedParameterExpression
  | variable													#variableExpression
  | '(' expression ')' 										#nestedExpression			

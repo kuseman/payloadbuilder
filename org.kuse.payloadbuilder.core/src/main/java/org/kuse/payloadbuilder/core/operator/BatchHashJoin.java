@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.function.BiPredicate;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.TableOption;
@@ -431,6 +432,15 @@ class BatchHashJoin extends AOperator
         for (int i = 0; i < length; i++)
         {
             Object value = values[i];
+            
+            // If value is string and is digits, use the intvalue as
+            // hash instead of string to be able to compare ints and strings
+            // on left/right side of join
+            if (value instanceof String && NumberUtils.isDigits((String) value))
+            {
+                value = Integer.parseInt((String) value);
+            }
+            
             result = 31 * result + (value == null ? 0 : value.hashCode());
         }
         return result;

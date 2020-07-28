@@ -15,15 +15,13 @@ public class Payloadbuilder
      *   - QualifiedReferenceExpression
      *      Cache lookup path
      *      Traverse up through parents
-     *   - Correlated queries support
      *   - Extensibility
      *      Override parts of query and/remove/alter
      *   - Sources support (art_id/attr1_id lists)
      *      Built in operator ?  
-     *   - DeferenceExpression
-     *      Implement
-     *   - Rewrite OperatorBuilder#visit(PopulateTableSource ...)
-     *      Fix so push down predicates is set in context for catalog usage
+     *   - Rewrite OperatorBuilder
+     *      visit(PopulateTableSource ...)
+     *        Fix so push down predicates is set in context for catalog usage
      *   - Insert into temptable
      *      Needed for campaigns etc. Eventual stockhouse
      *   - Add more builtin functions

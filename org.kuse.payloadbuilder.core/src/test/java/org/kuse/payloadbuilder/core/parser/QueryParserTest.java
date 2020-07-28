@@ -3,17 +3,6 @@ package org.kuse.payloadbuilder.core.parser;
 import static java.util.Arrays.asList;
 
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.parser.ArithmeticBinaryExpression;
-import org.kuse.payloadbuilder.core.parser.DereferenceExpression;
-import org.kuse.payloadbuilder.core.parser.Expression;
-import org.kuse.payloadbuilder.core.parser.LambdaExpression;
-import org.kuse.payloadbuilder.core.parser.LiteralIntegerExpression;
-import org.kuse.payloadbuilder.core.parser.NamedParameterExpression;
-import org.kuse.payloadbuilder.core.parser.ParseException;
-import org.kuse.payloadbuilder.core.parser.QualifiedFunctionCallExpression;
-import org.kuse.payloadbuilder.core.parser.QualifiedName;
-import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
-import org.kuse.payloadbuilder.core.parser.QueryStatement;
 import org.kuse.payloadbuilder.core.parser.ArithmeticBinaryExpression.Type;
 
 /** Test query parser */
@@ -51,6 +40,34 @@ public class QueryParserTest extends AParserTest
         assertExpression("a.filter(x -> x.val > 0).sort(x -> x.val).sum(x -> x.val2)");
         assertExpression("a.filter(x -> x.val > 0)");
         assertExpression("a.b.c.utils#filter(x -> x.val > 0).utils2#func().sort()");
+
+        QualifiedFunctionCallExpression expected = new QualifiedFunctionCallExpression(
+                null,
+                "map",
+                asList(
+                        new QualifiedFunctionCallExpression(
+                                null,
+                                "flatMap",
+                                asList(
+                                        new QualifiedReferenceExpression(QualifiedName.of("aa"), -1),
+                                        new LambdaExpression(
+                                                asList("x"),
+                                                new QualifiedReferenceExpression(QualifiedName.of("x", "ap"), 0),
+                                                new int[] {0})),
+                                0),
+                        new LambdaExpression(
+                                asList("x"),
+                                new QualifiedFunctionCallExpression(
+                                        null,
+                                        "cast",
+                                        asList(
+                                                new QualifiedReferenceExpression(QualifiedName.of("x", "price_sales"), 0),
+                                                new QualifiedReferenceExpression(QualifiedName.of("float"), -1)),
+                                        1),
+                                new int[] {0})),
+                2);
+
+        assertExpression("aa.flatMap(x -> x.ap).map(x -> cast(x.price_sales, float))", expected);
     }
 
     @Test

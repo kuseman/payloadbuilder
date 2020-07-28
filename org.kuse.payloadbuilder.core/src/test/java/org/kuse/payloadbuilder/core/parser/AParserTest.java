@@ -1,14 +1,14 @@
 package org.kuse.payloadbuilder.core.parser;
 
 import org.junit.Assert;
-import org.kuse.payloadbuilder.core.parser.Expression;
-import org.kuse.payloadbuilder.core.parser.QueryParser;
-import org.kuse.payloadbuilder.core.parser.QueryStatement;
+import org.kuse.payloadbuilder.core.QuerySession;
+import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 
 /** Base class for parser tests */
 abstract class AParserTest extends Assert
 {
     private final QueryParser p = new QueryParser();
+    protected final ExecutionContext context = new ExecutionContext(new QuerySession(new CatalogRegistry()));
     
     protected QueryStatement q(String query)
     {

@@ -163,7 +163,7 @@ public class BatchHashJoinTest extends AOperatorTest
     }
 
     @Test
-    public void test_inner_join_taking_context_row_into_consideration()
+    public void test_correlated()
     {
         // Test that a correlated query with a batch hash join
         // uses the context row into consideration when joining

@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.function.ToIntBiFunction;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.math.NumberUtils;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
@@ -22,11 +23,18 @@ class ExpressionHashFunction implements ToIntBiFunction<ExecutionContext, Row>
     @Override
     public int applyAsInt(ExecutionContext context, Row row)
     {
+        context.setRow(row);
         int hash = 37;
         for (Expression expression : expressions)
         {
-            context.setRow(row);
             Object result = expression.eval(context);
+            // If value is string and is digits, use the intvalue as
+            // hash instead of string to be able to compare ints and strings
+            // on left/right side of join
+            if (result instanceof String && NumberUtils.isDigits((String) result))
+            {
+                result = Integer.parseInt((String) result);
+            }
             hash += 17 * (result != null ? result.hashCode() : 0);
         }
         return hash;
@@ -53,5 +61,4 @@ class ExpressionHashFunction implements ToIntBiFunction<ExecutionContext, Row>
     {
         return expressions.stream().map(Object::toString).collect(Collectors.joining(", "));
     }
-
 }
