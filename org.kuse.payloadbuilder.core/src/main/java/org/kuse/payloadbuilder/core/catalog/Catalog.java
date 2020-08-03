@@ -53,8 +53,8 @@ public abstract class Catalog
      * @param session Current query session
      * @param nodeId Unique id for operator node
      * @param catalogAlias Alias used for this catalog in the query
-     * @param tableAlias Table alias to retrieve operator for. If {@link TableAlias#getColumns()} is null 
-     * then operator <b>MUST</b> set all available columns on alias.
+     * @param tableAlias Table alias to retrieve operator for. If {@link TableAlias#isAsteriskColumns()()} is set
+     * to true then the operator <b>MUST</b> set all available columns on alias using {@link TableAlias#setColumns(String[])}
      * @param predicate Predicate (if any) for this table
      * @param tableOptions Provided options for this table.
      */
@@ -75,8 +75,8 @@ public abstract class Catalog
      * @param session Current query session
      * @param nodeId Unique id for operator node
      * @param catalogAlias Alias used for this catalog in the query
-     * @param tableAlias Table alias to retrieve operator for. If {@link TableAlias#getColumns()} is null 
-     * then operator <b>MUST</b> set all available columns on alias.
+     * @param tableAlias Table alias to retrieve operator for. If {@link TableAlias#isAsteriskColumns()()} is set
+     * to true then the operator <b>MUST</b> set all available columns on alias using {@link TableAlias#setColumns(String[])}
      * @param index Index to use
      * @param predicate Predicate (if any) for this table
      * @param tableOptions Provided options for this table.

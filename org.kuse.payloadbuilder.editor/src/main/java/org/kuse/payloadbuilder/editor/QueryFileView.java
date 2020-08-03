@@ -1,6 +1,10 @@
 package org.kuse.payloadbuilder.editor;
 
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
+import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -24,11 +28,13 @@ import javax.swing.Icon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
+import javax.swing.JViewport;
 import javax.swing.SwingConstants;
 import javax.swing.Timer;
 import javax.swing.UIManager;
@@ -46,6 +52,9 @@ import org.fife.ui.rsyntaxtextarea.TextEditorPane;
 import org.fife.ui.rtextarea.RTextScrollPane;
 import org.kordamp.ikonli.fontawesome.FontAwesome;
 import org.kordamp.ikonli.swing.FontIcon;
+import org.kuse.payloadbuilder.core.catalog.TableAlias;
+import org.kuse.payloadbuilder.core.operator.Row;
+import org.kuse.payloadbuilder.core.operator.Row.ChildRows;
 import org.kuse.payloadbuilder.editor.QueryFileModel.State;
 
 /** Content of a query editor. Text editor and a result panel separated with a split panel */
@@ -60,7 +69,8 @@ class QueryFileView extends JPanel
     private static final Icon CLOSE_ICON = FontIcon.of(FontAwesome.CLOSE);
     private static final Icon WARNING_ICON = FontIcon.of(FontAwesome.WARNING);
     private static final Icon EXTERNAL_LINK = FontIcon.of(FontAwesome.EXTERNAL_LINK);
-
+    private static final int SCROLLBAR_WIDTH = ((Integer)UIManager.get("ScrollBar.width")).intValue();
+    
     private final JSplitPane splitPane;
     private final TextEditorPane textEditor;
     private final JTabbedPane resultTabs;
@@ -244,12 +254,18 @@ class QueryFileView extends JPanel
         for (int i = 0; i < size; i++)
         {
             JTable table = tables.get(i);
-            JTable prevTable = i > 0 ? tables.get(i-1) : null;
+            JTable prevTable = i > 0 ? tables.get(i - 1) : null;
             int prevTableHeight = -1;
             if (i > 0)
             {
+                JScrollBar horizontalScrollBar = ((JScrollPane) ((JViewport) prevTable.getParent()).getParent()).getHorizontalScrollBar();
+                
                 // The least of 8 rows or actual rows in prev table
                 prevTableHeight = Math.min((prevTable.getRowCount() + 1) * prevTable.getRowHeight() + 15, tablHeight);
+                if (horizontalScrollBar.isVisible())
+                {
+                    prevTableHeight += SCROLLBAR_WIDTH;
+                }
             }
             // Single table
             if (i == 0)
@@ -274,10 +290,10 @@ class QueryFileView extends JPanel
             {
                 JSplitPane prevSp = (JSplitPane) parent;
                 Component rc = prevSp.getRightComponent();
-                
+
                 JSplitPane sp = new JSplitPane();
                 sp.setOrientation(JSplitPane.VERTICAL_SPLIT);
-                
+
                 // Adjust prev tables height
                 if (rc instanceof JScrollPane)
                 {
@@ -291,10 +307,10 @@ class QueryFileView extends JPanel
                 }
                 sp.setRightComponent(new JScrollPane(table));
                 sp.getRightComponent().setPreferredSize(new Dimension(0, tablHeight));
-                
+
                 JSplitPane topSp = new JSplitPane();
                 topSp.setOrientation(JSplitPane.VERTICAL_SPLIT);
-                
+
                 // Replace the right component with the new split panel
                 prevSp.setRightComponent(sp);
             }
@@ -326,9 +342,29 @@ class QueryFileView extends JPanel
         resultTable.setDefaultRenderer(Object.class, new DefaultTableCellRenderer()
         {
             @Override
-            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column)
+            public Component getTableCellRendererComponent(JTable table, Object val, boolean isSelected, boolean hasFocus, int row, int column)
             {
+                Object value = val;
                 super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+
+                if (value instanceof Row)
+                {
+                    Row pbRow = (Row) value;
+                    TableAlias alias = pbRow.getTableAlias();
+                    value = ofEntries(
+                            entry("table", alias.getTable().toString()));
+                }
+                else if (value instanceof ChildRows)
+                {
+                    ChildRows childRows = (ChildRows) value;
+                    value = emptyList();
+                    if (childRows.size() > 0)
+                    {
+                        TableAlias alias = childRows.get(0).getTableAlias();
+                        value = ofEntries(
+                                entry("table", alias.getTable().toString()));
+                    }
+                }
 
                 // Add icon to map/list results to indicate click-ability
                 if (value instanceof Collection || value instanceof Map)
@@ -371,9 +407,33 @@ class QueryFileView extends JPanel
                     int col = resultTable.columnAtPoint(point);
 
                     Object value = resultTable.getValueAt(row, col);
+                    if (value instanceof Row)
+                    {
+                        Row pbRow = (Row) value;
+                        TableAlias alias = pbRow.getTableAlias();
+                        value = ofEntries(
+                                entry("table", alias.getTable().toString()),
+                                entry("columns", alias.getColumns()),
+                                entry("values", pbRow.getValues()));
+                    }
+                    else if (value instanceof ChildRows)
+                    {
+                        ChildRows childRows = (ChildRows) value;
+                        value = emptyList();
+                        if (childRows.size() > 0)
+                        {
+                            TableAlias alias = childRows.get(0).getTableAlias();
+                            value = ofEntries(
+                                    entry("table", alias.getTable().toString()),
+                                    entry("columns", alias.getColumns()),
+                                    entry("rows", childRows.stream().map(r -> r.getValues()).collect(toList())));
+                        }
+                    }
+
                     if (value instanceof Collection || value instanceof Map)
                     {
                         JFrame frame = new JFrame("Json viewer - " + resultTable.getColumnName(col) + " (Row: " + (row + 1) + ")");
+                        frame.setIconImages(PayloadbuilderEditorView.APPLICATION_ICONS);
                         RSyntaxTextArea rta = new RSyntaxTextArea();
                         rta.setColumns(80);
                         rta.setRows(40);

@@ -32,7 +32,12 @@ class CastFunction extends ScalarFunctionInfo
         }
         else
         {
-            dataTypeString = String.valueOf(dataTypeExpression.eval(context));
+            Object obj = dataTypeExpression.eval(context);
+            if (obj == null)
+            {
+                return null;
+            }
+            dataTypeString = String.valueOf(obj);
         }
         
         DataType dataType = DataType.valueOf(dataTypeString.toUpperCase());
@@ -66,7 +71,7 @@ class CastFunction extends ScalarFunctionInfo
                 {
                     return Boolean.parseBoolean((String) source);
                 }
-                return null;
+                throw new IllegalArgumentException("Cannot cast " + source + " to Boolean.");
             }
         },
 //        DATE,

@@ -1,14 +1,22 @@
 package org.kuse.payloadbuilder.editor;
 
+import static java.util.Arrays.asList;
+import static java.util.stream.Collectors.toList;
+
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.GridBagLayout;
+import java.awt.Image;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
+import java.io.IOException;
+import java.util.List;
+import java.util.Objects;
 
+import javax.imageio.ImageIO;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.Icon;
@@ -55,6 +63,23 @@ class PayloadbuilderEditorView extends JFrame
     private static final Icon ARROWS_H = FontIcon.of(FontAwesome.ARROWS_H);
     private static final Icon INDENT = FontIcon.of(FontAwesome.INDENT);
     private static final Icon EDIT = FontIcon.of(FontAwesome.EDIT);
+    static final List<? extends Image> APPLICATION_ICONS = asList("icons8-database-administrator-48.png", "icons8-database-administrator-96.png")
+            .stream()
+            .map(name -> PayloadbuilderEditorView.class.getResource("/icons/" + name))
+            .map(stream ->
+            {
+                try
+                {
+                    return ImageIO.read(stream);
+                }
+                catch (IOException e)
+                {
+                    e.printStackTrace();
+                    return null;
+                }
+            })
+            .filter(Objects::nonNull)
+            .collect(toList());
 
     private final JSplitPane splitPane;
     private final JTabbedPane tabEditor;
@@ -117,8 +142,6 @@ class PayloadbuilderEditorView extends JFrame
         JMenuBar menuBar = new JMenuBar();
         topPanel.add(menuBar, BorderLayout.NORTH);
 
-        
-        
         JMenu menu = new JMenu("File");
         openItem = new JMenuItem(openAction);
         openItem.setText("Open");
@@ -149,11 +172,11 @@ class PayloadbuilderEditorView extends JFrame
         KeyStroke newQueryKeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.CTRL_DOWN_MASK);
         KeyStroke toggleResultKeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.CTRL_DOWN_MASK);
         KeyStroke toggleCommentKeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_7, InputEvent.CTRL_DOWN_MASK);
-        
+
         InputMap inputMap = topPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
         inputMap.put(executeKeyStroke, EXECUTE);
         inputMap.put(stopKeyStroke, STOP);
-        inputMap.put(newQueryKeyStroke , NEW_QUERY);
+        inputMap.put(newQueryKeyStroke, NEW_QUERY);
         //        topPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_F, InputEvent.CTRL_DOWN_MASK), FORMAT);
         inputMap.put(toggleResultKeyStroke, TOGGLE_RESULT);
         inputMap.put(toggleCommentKeyStroke, TOGGLE_COMMENT);
@@ -204,6 +227,8 @@ class PayloadbuilderEditorView extends JFrame
         panelCatalogs = new JPanel();
         panelCatalogs.setLayout(new GridBagLayout());
         splitPane.setLeftComponent(new JScrollPane(panelCatalogs));
+
+        setIconImages(APPLICATION_ICONS);
 
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setPreferredSize(new Dimension(1200, 800));

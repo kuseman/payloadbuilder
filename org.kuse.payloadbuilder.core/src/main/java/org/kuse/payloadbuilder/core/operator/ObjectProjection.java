@@ -60,10 +60,10 @@ public class ObjectProjection implements Projection
             }
         }
 
-        context.setRow(rowToUse);
         writer.startObject();
         for (int i = 0; i < length; i++)
         {
+            context.setRow(rowToUse);
             writer.writeFieldName(columns[i]);
             projections.get(i).writeValue(writer, context);
         }

@@ -108,6 +108,7 @@ class CatalogExtensionView extends JPanel
         btnConfig.addActionListener(l -> 
         {
             JDialog dialog = new JDialog((Frame) null, true);
+            dialog.setIconImages(PayloadbuilderEditorView.APPLICATION_ICONS);
             dialog.setTitle("Config " + extension.getTitle());
             dialog.getContentPane().setLayout(new BorderLayout());
             dialog.getContentPane().add(extension.getConfigComponent(), BorderLayout.CENTER);

@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.IntStream;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
@@ -19,7 +20,9 @@ public class TableAlias
     private final QualifiedName table;
     private final String alias;
     private final List<TableAlias> childAliases = new ArrayList<>();
-    private String[] columns;
+    private String[] columns = ArrayUtils.EMPTY_STRING_ARRAY;
+    /** Is all columns wanted for this table alias. */
+    private boolean asteriskColumns;
     private String rootPath;
     // Index of rows of this type in parent row
     private int parentIndex;
@@ -136,6 +139,16 @@ public class TableAlias
     public void setColumns(String[] columns)
     {
         this.columns = columns;
+    }
+    
+    public boolean isAsteriskColumns()
+    {
+        return asteriskColumns;
+    }
+    
+    public void setAsteriskColumns()
+    {
+        this.asteriskColumns = true;
     }
 
     public int getParentIndex()

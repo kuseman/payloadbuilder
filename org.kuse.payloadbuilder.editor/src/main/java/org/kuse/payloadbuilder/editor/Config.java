@@ -1,5 +1,6 @@
 package org.kuse.payloadbuilder.editor;
 
+import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.groupingBy;
 
 import java.io.File;
@@ -21,6 +22,10 @@ class Config
 
     List<Catalog> getCatalogs()
     {
+        if (catalogs == null)
+        {
+            return emptyList();
+        }
         return catalogs;
     }
 

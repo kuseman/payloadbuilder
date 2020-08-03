@@ -1,6 +1,6 @@
 package org.kuse.payloadbuilder.catalog.es;
 
-import static java.util.Collections.emptyIterator;
+import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
@@ -15,10 +15,15 @@ import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
@@ -53,16 +58,25 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 
 /** Operator for Elastic search */
 class ESOperator extends AOperator
 {
+    private static final String FIELDS = "fields";
     static final String DOCID = "__id";
     static final ObjectMapper MAPPER = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-
+    private static final ObjectReader READER = MAPPER.readerFor(ESResponse.class);
+    
     private static final PoolingHttpClientConnectionManager CONNECTION_MANAGER = new PoolingHttpClientConnectionManager();
     static final CloseableHttpClient CLIENT = HttpClientBuilder
             .create()
@@ -125,11 +139,6 @@ class ESOperator extends AOperator
 
         if (index != null)
         {
-            if (context.getOperatorContext().getOuterIndexValues() == null || !context.getOperatorContext().getOuterIndexValues().hasNext())
-            {
-                return emptyIterator();
-            }
-            
             String mgetUrl = String.format("%s/%s/%s/_mget?filter_path=docs._source,docs._id", esType.endpoint, esType.index, esType.type);
             // TODO: thread up all ids in executor and join
             DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getOperatorContext(), sentBytes);
@@ -186,8 +195,8 @@ class ESOperator extends AOperator
     {
         return new Iterator<Row>()
         {
-            boolean asteriskColumns = tableAlias.getColumns() == null;
-            LinkedHashSet<String> columns;
+            Set<String> columns = new HashSet<>(tableAlias.isAsteriskColumns() ? emptyList() : asList(tableAlias.getColumns()));
+            Set<String> addedColumns;
             int rowPos = 0;
             MutableObject<String> scrollId = new MutableObject<>();
             Iterator<Doc> docIt;
@@ -228,7 +237,7 @@ class ESOperator extends AOperator
                                 throw new RuntimeException("Error query Elastic. " + IOUtils.toString(response.getEntity().getContent()));
                             }
                             CountingInputStream cis = new CountingInputStream(response.getEntity().getContent());
-                            esReponse = MAPPER.readValue(cis, ESResponse.class);
+                            esReponse = READER.withAttribute(FIELDS, columns).readValue(cis);
                             receivedBytes.addAndGet(cis.getByteCount());
                         }
                         catch (IOException e)
@@ -257,17 +266,17 @@ class ESOperator extends AOperator
                         continue;
                     }
                     
-                    if (asteriskColumns)
+                    if (tableAlias.isAsteriskColumns())
                     {
-                        if (columns == null)
+                        if (addedColumns == null)
                         {
-                            columns = new LinkedHashSet<>(doc.source.keySet());
-                            columns.add(DOCID);
-                            tableAlias.setColumns(columns.toArray(EMPTY_STRING_ARRAY));
+                            addedColumns = new LinkedHashSet<>(doc.source.keySet());
+                            addedColumns.add(DOCID);
+                            tableAlias.setColumns(addedColumns.toArray(EMPTY_STRING_ARRAY));
                         }
-                        else if (columns.addAll(doc.source.keySet()))
+                        else if (addedColumns.addAll(doc.source.keySet()))
                         {
-                            tableAlias.setColumns(columns.toArray(EMPTY_STRING_ARRAY));
+                            tableAlias.setColumns(addedColumns.toArray(EMPTY_STRING_ARRAY));
                         }
                     }
                     
@@ -329,7 +338,26 @@ class ESOperator extends AOperator
             {
                 value = pair.getValue().eval(context);
             }
-            sb.append(pair.getKey()).append(":").append(value);
+            
+            if (value == null)
+            {
+                continue;
+            }
+            
+            String stringValue = String.valueOf(value);
+            if (value instanceof String)
+            {
+                try
+                {
+                    stringValue = URLEncoder.encode("\"" + stringValue + "\"", "utf-8");
+                }
+                catch (UnsupportedEncodingException e)
+                {
+                }
+                
+            }
+            
+            sb.append(pair.getKey()).append(":").append(stringValue);
         }
         
         return sb.toString();
@@ -373,6 +401,7 @@ class ESOperator extends AOperator
 
     private static class Doc
     {
+        @JsonDeserialize(using = SourceDeserializer.class)
         @JsonProperty("_source")
         Map<String, Object> source;
 
@@ -382,6 +411,34 @@ class ESOperator extends AOperator
         public boolean isValid()
         {
             return source != null;
+        }
+    }
+    
+    /** Custom deserializer for _source field that only picks wanted fields */
+    private static class SourceDeserializer extends JsonDeserializer<Map<String, Object>>
+    {
+        @Override
+        public Map<String, Object> deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JsonProcessingException
+        {
+            @SuppressWarnings("unchecked")
+            Set<String> fields = (Set<String>) ctxt.getAttribute(FIELDS);
+            Map<String, Object> result = new HashMap<>();
+            p.nextToken();  // START_OBJECT
+            while (p.currentToken() != JsonToken.END_OBJECT)
+            {
+                String name = p.currentName();
+                if (fields.isEmpty() || fields.contains(name))
+                {
+                    p.nextToken();
+                    result.put(name, p.readValueAs(Object.class));
+                }
+                else
+                {
+                    p.skipChildren();
+                }
+                p.nextToken();
+            }
+            return result;
         }
     }
     

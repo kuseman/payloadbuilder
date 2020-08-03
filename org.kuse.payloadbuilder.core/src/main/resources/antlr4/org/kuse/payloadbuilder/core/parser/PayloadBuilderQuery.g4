@@ -80,7 +80,7 @@ topSelect
  ;
 
 selectStatement
- : SELECT selectItem (',' selectItem)*
+ : SELECT (TOP top=NUMBER)? selectItem (',' selectItem)*
    (FROM tableSourceJoined)?
    (WHERE where=expression)?
    (GROUPBY groupBy+=expression (',' groupBy+=expression)*)?
@@ -286,6 +286,7 @@ SESSION		 : S E S S I O N;
 SET			 : S E T;
 SHOW		 : S H O W;
 THEN		 : T H E N;
+TOP			 : T O P;
 TRUE	     : T R U E;
 USE			 : U S E;
 VARIABLES	 : V A R I A B L E S;

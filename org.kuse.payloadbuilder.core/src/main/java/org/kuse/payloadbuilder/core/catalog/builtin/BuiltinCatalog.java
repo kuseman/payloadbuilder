@@ -33,8 +33,9 @@ public class BuiltinCatalog
         catalog.registerFunction(new RandomInt(catalog));
         catalog.registerFunction(new CountFunction(catalog));
         catalog.registerFunction(new IsNullFunction(catalog));
+        catalog.registerFunction(new IsBlankFunction(catalog));
         catalog.registerFunction(new CoalesceFunction(catalog));
-        catalog.registerFunction(new JsonValueFunction(catalog));
+        catalog.registerFunction(new FromJsonFunction(catalog));
         catalog.registerFunction(new CastFunction(catalog, "cast"));
         catalog.registerFunction(new CastFunction(catalog, "convert"));
         

@@ -159,11 +159,6 @@ class BatchMergeJoin extends AOperator
                         continue;
                     }
 
-                    //                    if (outerRows != null && outerRows.size() == 0)
-                    //                    {
-                    //                        System.out.println();
-                    //                    }
-
                     if (outerRows == null || outerRows.isEmpty())
                     {
                         batchOuterRows();

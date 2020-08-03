@@ -16,13 +16,36 @@ import org.kuse.payloadbuilder.editor.QueryFileModel.Output;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.util.DefaultIndenter;
+import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
+import com.fasterxml.jackson.core.util.DefaultPrettyPrinter.Indenter;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 
 /** Resulting model of a query */
 class ResultModel extends AbstractTableModel
 {
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
+    private static final ObjectWriter WRITER;
+    static
+    {
+        DefaultPrettyPrinter printer = new DefaultPrettyPrinter();
+        printer.indentArraysWith(new Indenter()
+        {
+            @Override
+            public void writeIndentation(JsonGenerator g, int level) throws IOException
+            {
+                DefaultIndenter.SYSTEM_LINEFEED_INSTANCE.writeIndentation(g, level);
+            }
+            
+            @Override
+            public boolean isInline()
+            {
+                return false;
+            }
+        });
+        WRITER = new ObjectMapper().writer(printer);
+    }
+    
     private final QueryFileModel file;
     private final List<Object[]> rows = new ArrayList<>(50);
     private String[] columns = EMPTY_STRING_ARRAY;
@@ -133,7 +156,7 @@ class ResultModel extends AbstractTableModel
     static String getLabel(Object value, int size)
     {
         StringWriter sw = new StringWriter(size);
-        try(JsonGenerator generator = MAPPER.getFactory().createGenerator(sw))
+        try(JsonGenerator generator = WRITER.getFactory().createGenerator(sw))
         {
             if (value instanceof List)
             {
@@ -167,7 +190,7 @@ class ResultModel extends AbstractTableModel
     {
         try
         {
-            return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(value);
+            return WRITER.writeValueAsString(value);
         }
         catch (JsonProcessingException e)
         {

@@ -64,8 +64,6 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 {
     private static final String BATCH_LIMIT = "batch_limit";
     private static final String BATCH_SIZE = "batch_size";
-    /** Marker array for asterisk select items */
-    private static final String[] ASTERISK_COLUMNS = new String[0];
     private static final OperatorBuilder VISITOR = new OperatorBuilder();
 
     private static final BiFunction<String, TableAlias, RuntimeException> MULTIPLE_ALIAS_EXCEPTION = (alias,
@@ -180,23 +178,6 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 e.getKey().setColumns(e.getValue().toArray(EMPTY_STRING_ARRAY));
             }
         });
-
-        if (context.parent != null)
-        {
-            List<TableAlias> queue = new ArrayList<>();
-            queue.add(context.parent);
-            while (!queue.isEmpty())
-            {
-                TableAlias alias = queue.remove(0);
-    
-                if (alias.getColumns() == ASTERISK_COLUMNS)
-                {
-                    alias.setColumns(null);
-                }
-    
-                queue.addAll(alias.getChildAliases());
-            }
-        }
 
         return Pair.of(context.operator, context.projection);
     }
@@ -326,6 +307,11 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             sortBys.forEach(si -> si.accept(this, context));
             context.operator = new SortByOperator(context.acquireNodeId(), context.operator, new ExpressionRowComparator(sortBys));
         }
+        
+        if (query.getTop() >= 0)
+        {
+            context.operator = new TopOperator(context.acquireNodeId(), context.operator, query.getTop());
+        }
 
         List<String> projectionAliases = new ArrayList<>();
         List<Projection> projections = new ArrayList<>();
@@ -442,23 +428,23 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         {
             if (context.parent.getAlias().equals(selectItem.getAlias()))
             {
-                context.parent.setColumns(ASTERISK_COLUMNS);
+                context.parent.setAsteriskColumns();
             }
             else
             {
                 TableAlias childAlias = context.parent.getChildAlias(selectItem.getAlias());
                 if (childAlias != null)
                 {
-                    childAlias.setColumns(ASTERISK_COLUMNS);
+                    childAlias.setAsteriskColumns();
                 }
             }
         }
         else
         {
-            context.parent.setColumns(ASTERISK_COLUMNS);
+            context.parent.setAsteriskColumns();
             for (TableAlias alias : context.parent.getChildAliases())
             {
-                alias.setColumns(ASTERISK_COLUMNS);
+                alias.setAsteriskColumns();
             }
         }
         context.projection = selectItem;

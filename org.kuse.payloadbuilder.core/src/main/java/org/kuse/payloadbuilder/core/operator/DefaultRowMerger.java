@@ -28,7 +28,7 @@ class DefaultRowMerger implements RowMerger
         }
         
         // Parent is always populated
-        inner.getParents().add(result);
+        inner.addParent(result);
         List<Row> childRows = result.getChildRows(inner.getTableAlias().getParentIndex());
         if (limit < 0 || childRows.size() < limit)
         {

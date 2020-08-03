@@ -19,7 +19,8 @@ class ExpressionProjection implements Projection
     @Override
     public void writeValue(OutputWriter writer, ExecutionContext context)
     {
-        writer.writeValue(expression.eval(context));
+        Object value = expression.eval(context);
+        writer.writeValue(value);
     }
 
     @Override

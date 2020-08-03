@@ -5,8 +5,6 @@ import static org.kuse.payloadbuilder.core.parser.LiteralBooleanExpression.TRUE_
 import static org.kuse.payloadbuilder.core.parser.LiteralNullExpression.NULL_LITERAL;
 
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.parser.Expression;
-import org.kuse.payloadbuilder.core.parser.InExpression;
 
 /** Unit test of {@link InExpression} */
 public class InExpressionTest extends AParserTest
@@ -41,6 +39,5 @@ public class InExpressionTest extends AParserTest
         e = e("(1 + 1 + a) in (null, 1 +2,2,c)");
         assertFalse(e.isConstant());
         assertEquals(e("(2 + a) in (null, 3,2,c)"), e);
-        
     }
 }

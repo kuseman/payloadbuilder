@@ -11,12 +11,12 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /** Turns a json string into object */
-class JsonValueFunction extends ScalarFunctionInfo
+class FromJsonFunction extends ScalarFunctionInfo
 {
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    JsonValueFunction(Catalog catalog)
+    FromJsonFunction(Catalog catalog)
     {
-        super(catalog, "json_value", Type.SCALAR);
+        super(catalog, "from_json", Type.SCALAR);
     }
     
     @Override

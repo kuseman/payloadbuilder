@@ -232,6 +232,7 @@ public class QueryParser
             }
 
             TableSourceJoined joinedTableSource = ctx.tableSourceJoined() != null ? (TableSourceJoined) visit(ctx.tableSourceJoined()) : null;
+            int top = ctx.top != null ? Integer.parseInt(ctx.top.getText()) : -1;
             if (joinedTableSource != null && joinedTableSource.getTableSource() instanceof PopulateTableSource)
             {
                 throw new ParseException("Top table source cannot be a populating table source.", ctx.tableSourceJoined().start);
@@ -250,12 +251,16 @@ public class QueryParser
                 {
                     throw new ParseException("Cannot have a ORDER BY clause without a FROM.", ctx.sortItem().get(0).start);
                 }
+                else if (top >= 0)
+                {
+                    throw new ParseException("Cannot have a TOP clause without a FROM.", ctx.TOP().getSymbol());
+                }
             }
 
             Expression where = getExpression(ctx.where);
             List<Expression> groupBy = ctx.groupBy != null ? ctx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
             List<SortItem> orderBy = ctx.sortItem() != null ? ctx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
-            Select select = new Select(selectItems, joinedTableSource, where, groupBy, orderBy);
+            Select select = new Select(selectItems, joinedTableSource, top, where, groupBy, orderBy);
             return new SelectStatement(select);
         }
 
@@ -484,127 +489,6 @@ public class QueryParser
             }
             
             return new FunctionCallInfo(id, catalog, function, arguments);
-            //            /*
-            //             * Function call.
-            //             * Depending on the size of the parts in the qualified name
-            //             * a correct lookup needs to be made.
-            //             * Ie.
-            //             *
-            //             * field.func()
-            //             *   Can either be a column reference with a dereferenced function
-            //             *   or a catalog function with catalog name "func".
-            //             *
-            //             * field.field.CATALOG.func()
-            //             *   Dereference with a catalog function. Because dereferenced functions is
-            //             *   noting other that syntactic sugar this is equivalent to
-            //             *   CATALOG.func(field.field) and hence the part before the catalog
-            //             *   will be extracted and used as argument to function
-            //             *
-            //             * If we are inside a dereference (dot)
-            //             *   Left: field1.func()
-            //             *   This: field.func()
-            //             *
-            //             *   Should be transformed into:
-            //             *   func(field1.func().field);
-            //             *
-            //             *   Or if there is a catalog match like:
-            //             *   Left: field1.func()
-            //             *   This: UTILS.func()
-            //             *
-            //             *   Should be transformed into:
-            //             *   UTILS.func(field1.func());
-            //             *
-            //             * partN..partX.func()
-            //             *
-            //             * Last part before function name is either a catalog reference
-            //             * or column referemce
-            //             * qname.getParts().get(size - 2)
-            //             *
-            //             */
-            //
-            //            QualifiedName qname = getQualifiedName(ctx.qname());
-            //            int size = qname.getParts().size();
-            //
-            //            /*
-            //             * func()                       <- default
-            //             * Utils.func()                 <- catalog
-            //             * field.func()                 <- dereference
-            //             * field.field.Utils.func()     <- dereference with catalog
-            //             */
-            //
-            //            String functionName = qname.getLast();
-            //            String potentialCatalog = size == 1 ? BuiltinCatalog.NAME : qname.getParts().get(size - 2);
-            //
-            //            Catalog catalog = catalogRegistry.getCatalog(potentialCatalog);
-            //            boolean catalogHit = catalog != null;
-            //            if (catalog == null)
-            //            {
-            //                // Assume built in catalog if none potential found
-            //                catalog = catalogRegistry.getBuiltin();
-            //            }
-            //
-            //            FunctionInfo functionInfo = catalog.getFunction(functionName);
-            //            if (functionInfo == null)
-            //            {
-            //                throw new ParseException("Could not find a function named: " + (qname.getLast() + " in catalog: " + catalog.getName()), ctx.start);
-            //            }
-            //
-            //            int extractTo = size - 1 - (catalogHit ? 1 : 0);
-            //            List<Expression> arguments = ctx.expression().stream().map(a -> getExpression(a)).collect(toList());
-            //
-            //            Expression arg = null;
-            //            // Extract qualified name without function name (last part)
-            //            // And if there was a catalog hit, remove that also
-            //            if (extractTo > 0)
-            //            {
-            //                QualifiedName leftPart = qname.extract(0, extractTo);
-            //
-            //                Integer lambdaId = lambdaParameters.get(leftPart.getFirst());
-            //                arg = new QualifiedReferenceExpression(leftPart, lambdaId != null ? lambdaId.intValue() : -1);
-            //            }
-            //
-            //            /* Wrap argument in a dereference expression if we are inside a dereference
-            //             * Ie.
-            //             * Left dereference:
-            //             *  func(field)
-            //             *
-            //             * Right:
-            //             *   field.func2()
-            //             *
-            //             * Rewrite to:
-            //             *
-            //             *  func2(func(field).field)
-            //             */
-            //            if (leftDereference != null)
-            //            {
-            //                arg = arg != null ? new DereferenceExpression(leftDereference, (QualifiedReferenceExpression) arg) : leftDereference;
-            //            }
-            //            if (arg != null)
-            //            {
-            //                arguments.add(0, arg);
-            //            }
-            //
-            //            if (functionInfo.getInputTypes() != null)
-            //            {
-            //                List<Class<? extends Expression>> inputTypes = functionInfo.getInputTypes();
-            //                size = inputTypes.size();
-            //                if (arguments.size() != size)
-            //                {
-            //                    throw new ParseException("Function " + functionInfo.getName() + " expected " + inputTypes.size() + " parameters, found " + arguments.size(), ctx.start);
-            //                }
-            //                for (int i = 0; i < size; i++)
-            //                {
-            //                    Class<? extends Expression> inputType = inputTypes.get(i);
-            //                    if (!inputType.isAssignableFrom(arguments.get(i).getClass()))
-            //                    {
-            //                        throw new ParseException(
-            //                                "Function " + functionInfo.getName() + " expects " + inputType.getSimpleName() + " as parameter at index " + i + " but got "
-            //                                    + arguments.get(i).getClass().getSimpleName(), ctx.start);
-            //                    }
-            //                }
-            //            }
-            //
-            //            return new FunctionCall(functionInfo, arguments);
         }
 
         @Override

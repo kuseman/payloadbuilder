@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import org.apache.commons.collections.CollectionUtils;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
@@ -19,19 +18,18 @@ public class QualifiedReferenceExpression extends Expression
     private final QualifiedName qname;
     /**
      * <pre>
-     * If this references a lambda parameter, this points to it's unique id in current scope. 
+     * If this references a lambda parameter, this points to it's unique id in current scope.
      * Used to retrieve the current lambda value from evaluation context
      * </pre>
      */
     private final int lambdaId;
 
-    
     public QualifiedReferenceExpression(QualifiedName qname, int lambdaId)
     {
         this.qname = requireNonNull(qname, "qname");
         this.lambdaId = lambdaId;
     }
-    
+
     public QualifiedName getQname()
     {
         return qname;
@@ -41,7 +39,7 @@ public class QualifiedReferenceExpression extends Expression
     {
         return lambdaId;
     }
-  
+
     @Override
     public Object eval(ExecutionContext context)
     {
@@ -49,35 +47,35 @@ public class QualifiedReferenceExpression extends Expression
         if (lambdaId >= 0)
         {
             Object value = context.getLambdaValue(lambdaId);
-            
-            if (qname.getParts().size() > 1)
+
+            List<String> parts = qname.getParts();
+            if (value != null && parts.size() > 1)
             {
-                List<String> subParts = qname.getParts().subList(1, qname.getParts().size());
-                
                 if (value instanceof Row)
                 {
-                    return getValue((Row) value, subParts);
+                    parts = parts.subList(1, parts.size());
+                    return getValue((Row) value, parts);
                 }
                 else if (value instanceof Map)
                 {
                     @SuppressWarnings("unchecked")
                     Map<Object, Object> map = (Map<Object, Object>) value;
-                    return MapUtils.traverse(map, subParts);
+                    return MapUtils.traverse(map, 1, parts);
                 }
-                
+
                 throw new IllegalArgumentException("Cannot dereference value: " + value);
             }
-            
+
             return value;
         }
-        
+
         Row row = context.getRow();
         // No row set in context
         if (row == null)
         {
             return null;
         }
-        
+
         return getValue(row, qname.getParts());
     }
 
@@ -92,81 +90,122 @@ public class QualifiedReferenceExpression extends Expression
     {
         return true;
     }
-    
+
     /** Get value for provided row and parts */
     private Object getValue(Row row, List<String> parts)
     {
         TableAlias current = row.getTableAlias();
         Row resultRow = row;
+        int size = parts.size();
         int partIndex = 0;
-        
-        while (resultRow != null && partIndex < parts.size() - 1)
+        String part;
+        // aliasA.aliasB.col2
+       
+        // Traverse alias path
+        while (resultRow != null && partIndex < size - 1)
         {
-            String part = parts.get(partIndex);
+            part = parts.get(partIndex);
 
             // 1. Alias match, move on
             if (Objects.equals(part, current.getAlias()))
             {
-                partIndex ++;
+                partIndex++;
                 continue;
             }
 
-            // 2. Child alias
+            // 2. Child alias, extract first row from child collection
             TableAlias alias = current.getChildAlias(part);
             if (alias != null)
             {
-                partIndex ++;
+                partIndex++;
                 current = alias;
-                List<Row> childAlias = resultRow.getChildRows(alias.getParentIndex());
-                resultRow = !childAlias.isEmpty() ? (Row) CollectionUtils.get(childAlias, 0) : null;
+                List<Row> childRows = resultRow.getChildRows(alias.getParentIndex());
+                resultRow = !childRows.isEmpty()
+                    ? childRows.get(0)
+                    : null;
                 continue;
             }
 
-            if (current.getParent() == null)
-            {
-                break;
-            }
-            
             // 3. Parent alias match upwards
-            resultRow = resultRow.getParent();
-            current = resultRow != null ? resultRow.getTableAlias() : null;
+            // Parent traversal is only possible on first part of qname
+            if (partIndex == 0)
+            {
+                // NOTE! getParent is used here and not getParents
+                // since we are inside a multipart qname then we use
+                // the singular method since that one includes a predicate parent
+                // used in joins to avoid adding/indexing into lists too much.
+                Row temp = resultRow.getParent();
+                while (temp != null)
+                {
+                    if (Objects.equals(part, temp.getTableAlias().getAlias()))
+                    {
+                        break;
+                    }
+
+                    temp = temp.getParent();
+                }
+
+                // A parent was found
+                if (temp != null)
+                {
+                    resultRow = temp;
+                    current = resultRow.getTableAlias();
+                    partIndex++;
+                    continue;
+                }
+            }
+
+            // If we came here, there cannot be any more alias traversal matches
+            break;
         }
 
         if (resultRow == null)
         {
             return null;
         }
-        
-        String lastPart = parts.get(partIndex);
-        // Child rows pointer
-        current = resultRow.getTableAlias().getChildAlias(lastPart);
+
+        part = parts.get(partIndex);
+        current = resultRow.getTableAlias().getChildAlias(part);
         if (current != null)
         {
             return resultRow.getChildRows(current.getParentIndex());
         }
-        // Parent rows pointer
-        else if (resultRow.getTableAlias().getParent() != null && Objects.equals(lastPart, resultRow.getTableAlias().getParent().getAlias()))
+
+        List<Row> tempRows = resultRow.getParents();
+        TableAlias temp = resultRow.getTableAlias().getParent();
+        while (temp != null && !tempRows.isEmpty())
         {
-            return resultRow.getParents();
+            if (Objects.equals(part, temp.getAlias()))
+            {
+                return tempRows;
+            }
+
+            temp = temp.getParent();
+            tempRows = tempRows.get(0).getParents();
         }
-        
-        Object result = resultRow.getObject(parts.get(partIndex));
-        if (result instanceof Map && partIndex < parts.size() -1)
+
+        Object result = resultRow.getObject(part);
+        if (result != null && partIndex < size - 1)
         {
-            @SuppressWarnings("unchecked")
-            Map<Object, Object> map = (Map<Object, Object>) result;
-            return MapUtils.traverse(map, parts.subList(partIndex + 1, parts.size()));
+            if (result instanceof Map)
+            {
+                @SuppressWarnings("unchecked")
+                Map<Object, Object> map = (Map<Object, Object>) result;
+                return MapUtils.traverse(map, partIndex + 1, parts);
+            }
+            
+            throw new IllegalArgumentException("Cannot dereference value: " + result);
         }
-        
+
         return result;
     }
-    
+
     @Override
     public int hashCode()
     {
         return qname.hashCode();
     }
-    
+
     @Override
     public boolean equals(Object obj)
     {
@@ -174,7 +213,7 @@ public class QualifiedReferenceExpression extends Expression
         {
             QualifiedReferenceExpression that = (QualifiedReferenceExpression) obj;
             return qname.equals(that.qname)
-                    && lambdaId == that.lambdaId;
+                && lambdaId == that.lambdaId;
         }
         return false;
     }

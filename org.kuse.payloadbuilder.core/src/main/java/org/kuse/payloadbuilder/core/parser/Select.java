@@ -10,18 +10,21 @@ public class Select extends ASelectNode
 {
     private final List<SelectItem> selectItems;
     private final TableSourceJoined from;
+    private final int top;
     private final Expression where;
     private final List<Expression> groupBy;
     private final List<SortItem> orderBy;
     
     Select(List<SelectItem> selectItems,
             TableSourceJoined from,
+            int top,
             Expression where,
             List<Expression> groupBy,
             List<SortItem> orderBy)
     {
         this.selectItems = requireNonNull(selectItems, "selectItems");
         this.from = from;
+        this.top = top;
         this.where = where;
         this.groupBy = requireNonNull(groupBy, "groupBy");
         this.orderBy = requireNonNull(orderBy, "orderBy");
@@ -35,6 +38,11 @@ public class Select extends ASelectNode
     public TableSourceJoined getFrom()
     {
         return from;
+    }
+    
+    public int getTop()
+    {
+        return top;
     }
     
     public Expression getWhere()

@@ -1,6 +1,8 @@
 package org.kuse.payloadbuilder.core.catalog.builtin;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 
 import java.util.Iterator;
 
@@ -128,6 +130,62 @@ public class BuiltinCatalogTest extends Assert
         assertFunction(asList(-1, -2, 3, null, -1, -2, 3, null, -1, -2, 3, null, -1, -2, 3, null), row, "a.flatMap(l -> a)");
         assertFunction(asList(-1, -2, 3, -1, -2, 3, -1, -2, 3, -1, -2, 3), row, "a.flatMap(l -> a).filter(a -> a IS NOT NULL)");
         assertFunction(asList(null, null, null, null), row, "a.flatMap(l -> a).filter(a -> a IS NULL)");
+    }
+
+    @Test
+    public void test_function_from_json()
+    {
+        assertFunction(null, null, "from_json(null)");
+        assertFunction(emptyMap(), null, "from_json('{}')");
+        assertFunction(emptyList(), null, "from_json('[]')");
+    }
+    
+    @Test
+    public void test_function_isnull()
+    {
+        assertFunction(null, null, "isnull(null, null)");
+        assertFunction(1, null, "isnull(null, 1)");
+        assertFunction(1, null, "isnull(1, null)");
+    }
+    
+    @Test
+    public void test_function_isblank()
+    {
+        assertFunction(1, null, "isblank(null, 1)");
+        assertFunction(1, null, "isblank('', 1)");
+        assertFunction("str", null, "isblank('str', null)");
+    }
+    
+    @Test
+    public void test_function_cast()
+    {
+        assertFunction(null, null, "cast(null, integer)");
+        assertFunction(null, null, "cast(1, null)");
+
+        assertFunction(1, null, "cast(1, integer)");
+        assertFunction(1l, null, "cast(1, long)");
+        assertFunction(1.0f, null, "cast(1, float)");
+        assertFunction(1.0d, null, "cast(1, double)");
+
+        assertFunction(1, null, "cast('1', integer)");
+        assertFunction(1l, null, "cast('1', long)");
+        assertFunction(1.0f, null, "cast('1', float)");
+        assertFunction(1.0d, null, "cast('1', double)");
+        
+        assertFunction("1.0", null, "cast(1.0, string)");
+        assertFunction("1.0", null, "cast(1.0, 'string')");
+
+        assertFunction(true, null, "cast(1, boolean)");
+        assertFunction(true, null, "cast(1.20, boolean)");
+        assertFunction(false, null, "cast(0, 'boolean')");
+        assertFunction(true, null, "cast('TRUE', boolean)");
+        assertFunction(false, null, "cast('false', 'boolean')");
+        assertFunction(false, null, "cast('hello', 'boolean')");
+        
+        assertFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, integer)");
+        assertFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, long)");
+        assertFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, float)");
+        assertFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, double)");
     }
 
     @SuppressWarnings("unchecked")

@@ -1,5 +1,8 @@
 package org.kuse.payloadbuilder.core.operator;
 
+import static java.util.Collections.emptyList;
+import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -61,6 +64,26 @@ public class Row
         return copy;
     }
 
+    public int getColumnCount()
+    {
+        return tableAlias.getColumns() != null ? tableAlias.getColumns().length : 0;
+    }
+
+    /** Extracts values into an object array */
+    public Object[] getValues()
+    {
+        if (values instanceof ObjectValues)
+        {
+            return ((ObjectValues) values).values;
+        }
+        Object[] values = new Object[getColumnCount()];
+        for (int i = 0; i < values.length; i++)
+        {
+            values[i] = getObject(i);
+        }
+        return values;
+    }
+
     public Object getObject(int ordinal)
     {
         if (ordinal < 0)
@@ -98,18 +121,17 @@ public class Row
         return null;
     }
 
-    @SuppressWarnings("unchecked")
     public List<Row> getChildRows(int index)
     {
         if (childRows == null)
         {
-            childRows = new List[tableAlias.getChildAliases().size()];
+            childRows = new ChildRows[tableAlias.getChildAliases().size()];
         }
 
         List<Row> rows = childRows[index];
         if (rows == null)
         {
-            rows = new ArrayList<>();
+            rows = new ChildRows();
             childRows[index] = rows;
         }
 
@@ -145,14 +167,20 @@ public class Row
 
         return null;
     }
-
-    public List<Row> getParents()
+    
+    /** Add provided row as parent to this row */
+    public void addParent(Row row)
     {
         if (parents == null)
         {
             parents = new ArrayList<>();
         }
-        return parents;
+        parents.add(row);
+    }
+
+    public List<Row> getParents()
+    {
+        return defaultIfNull(parents, emptyList());
     }
 
     public void setPredicateParent(Row parent)
@@ -208,6 +236,11 @@ public class Row
         return tableAlias.getTable() + " (" + pos + ") " + values;
     }
 
+    /** Child rows list. For easier instanceof etc. to detect if a value is child rows */
+    public static class ChildRows extends ArrayList<Row>
+    {
+    }
+
     /** Values definition of a rows values */
     public interface Values
     {
@@ -233,7 +266,7 @@ public class Row
 
             return values[ordinal];
         }
-        
+
         @Override
         public String toString()
         {

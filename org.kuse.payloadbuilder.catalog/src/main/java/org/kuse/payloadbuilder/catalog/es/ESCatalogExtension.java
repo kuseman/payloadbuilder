@@ -174,7 +174,7 @@ class ESCatalogExtension implements ICatalogExtension
                     Map<String, Object> indices = MAPPER.readValue(response.getEntity().getContent(), Map.class);
                     for (String index : indices.keySet())
                     {
-                        esIndices.add(new EsIndex(endpoint, index));
+                        esIndices.add(new EsIndex(endpoint, index, false));
                     }
 
                 }
@@ -203,11 +203,13 @@ class ESCatalogExtension implements ICatalogExtension
     {
         private final String endpoint;
         private final String index;
+        private final boolean showEndpoint;
 
-        EsIndex(String endpoint, String index)
+        EsIndex(String endpoint, String index, boolean showEndpoint)
         {
             this.endpoint = endpoint;
             this.index = index;
+            this.showEndpoint = showEndpoint;
         }
 
         @Override
@@ -233,14 +235,14 @@ class ESCatalogExtension implements ICatalogExtension
         @Override
         public String toString()
         {
-            return index;
+            return (showEndpoint ? endpoint + "/" : "") + index;
         }
     }
 
     /** Quick properties panel */
     private class QuickPropertiesPanel extends JPanel
     {
-        private final EsIndex prototype = new EsIndex("", "somelongindexname");
+        private final EsIndex prototype = new EsIndex("", "somelongindexname", false);
         private final JComboBox<EsIndex> indices;
 
         QuickPropertiesPanel()
@@ -343,6 +345,10 @@ class ESCatalogExtension implements ICatalogExtension
         private void update()
         {
             listEndpoints.setModel(new DefaultComboBoxModel<>(getEndpoints().toArray(ArrayUtils.EMPTY_STRING_ARRAY)));
+            if (listEndpoints.getModel().getSize() > 0)
+            {
+                reloadIndices();
+            }
         }
     }
 }

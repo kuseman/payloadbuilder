@@ -14,7 +14,6 @@ public class Payloadbuilder
      * BACKEND
      *   - QualifiedReferenceExpression
      *      Cache lookup path
-     *      Traverse up through parents
      *   - Extensibility
      *      Override parts of query and/remove/alter
      *   - Sources support (art_id/attr1_id lists)
@@ -30,12 +29,14 @@ public class Payloadbuilder
      *      - rtrim
      *      - leftpad
      *      - dateadd
+     *   - Show tables
+     *     Show tables for default catalog (if any)
      *      - Make sure everything from old payloadbuilder is supported
      *   - Try to rewrite PredicateAnalyzer
      *      Make it easier to work with
      *      Add type in pair to be able to easier add range queries etc.
      *      See if the includeEmptyAlias thing can be removed
-     *      Now it's not possible to use a "NOT a.col = b.col" for example, which would
+     *      Now it's not possible to use a "NOT a.flag" for example, which would
      *      be a fully working Elastic predicate
      *   - Describe support
      *      Catalog (show functions, tables, description of catalog)
@@ -48,6 +49,10 @@ public class Payloadbuilder
      *      Fix broken implementation
      *   - Caching parsed query
      *   - Codegen of expressions
+     *   - Child first class loader
+     *      If there is conflicts between deps in extensions, we need
+     *      to change to a child first class loader so extensions can embed their own versions
+     *      This is a security issue but think it's no problem.
      */
     
     private Payloadbuilder()

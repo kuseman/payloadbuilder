@@ -294,6 +294,11 @@ class BatchHashJoin extends AOperator
             private void hashInnerBatch()
             {
                 outerValuesIterator = outerValuesIterator(context);
+                if (!outerValuesIterator.hasNext())
+                {
+                    return;
+                }
+                
                 context.getOperatorContext().setOuterIndexValues(outerValuesIterator);
                 Iterator<Row> it = inner.open(context);
 
