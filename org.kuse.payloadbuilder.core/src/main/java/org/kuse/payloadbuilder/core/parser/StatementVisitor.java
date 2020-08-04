@@ -11,7 +11,6 @@ public interface StatementVisitor<TR, TC>
     TR visit(SetStatement statement, TC context);
     TR visit(UseStatement statement, TC context);
     TR visit(DescribeTableStatement statement, TC context);
-    TR visit(DescribeFunctionStatement statement, TC context);
     TR visit(DescribeSelectStatement statement, TC context);
     TR visit(ShowStatement statement, TC context);
     

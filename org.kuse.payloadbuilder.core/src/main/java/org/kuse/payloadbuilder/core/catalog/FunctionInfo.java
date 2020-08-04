@@ -27,6 +27,12 @@ public abstract class FunctionInfo
     {
         return name;
     }
+    
+    /** Description of function. Used in show statement for a description of the function. */
+    public String getDescription()
+    {
+        return "";
+    }
 
     public Catalog getCatalog()
     {

@@ -24,6 +24,8 @@ public class ShowStatement extends Statement
     public enum Type
     {
         PARAMETERS,
-        VARIABLES
+        VARIABLES,
+        TABLES,
+        FUNCTIONS
     }
 }

@@ -21,6 +21,7 @@ import org.antlr.v4.runtime.Token;
 import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
+import org.kuse.payloadbuilder.core.catalog.Catalog.OperatorData;
 import org.kuse.payloadbuilder.core.catalog.Catalog.TablePredicate;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
@@ -101,6 +102,9 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         /** Predicate pushed down from join to table source */
         private final Map<String, Expression> pushDownPredicateByAlias = new THashMap<>();
 
+        /** Sort items. Sent to catalog to for usage if supported.  */
+        private List<SortItem> sortItems;
+        
         /** Acquire next unique node id */
         private int acquireNodeId()
         {
@@ -183,10 +187,10 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     }
 
     @Override
-    public Void visit(Select query, Context context)
+    public Void visit(Select select, Context context)
     {
-        TableSourceJoined tsj = query.getFrom();
-        Expression where = query.getWhere();
+        TableSourceJoined tsj = select.getFrom();
+        Expression where = select.getWhere();
 
         Index index = null;
         List<Expression> outerValuesExpressions = null;
@@ -250,6 +254,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             batchLimitOption = getBatchLimitOption(tsj.getTableSource());
         }
 
+        context.sortItems = new ArrayList<>(select.getOrderBy());
+        
         if (tsj != null)
         {
             context.index = index;
@@ -289,8 +295,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             visit(where, context);
         }
 
-        List<Expression> groupBys = query.getGroupBy();
-        if (!query.getGroupBy().isEmpty())
+        List<Expression> groupBys = select.getGroupBy();
+        if (!select.getGroupBy().isEmpty())
         {
             groupBys.forEach(e -> visit(e, context));
             context.operator = createGroupBy(context.acquireNodeId(), tsj.getTableSource().getAlias(), groupBys, context.operator);
@@ -301,21 +307,21 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             context.operator = new BatchRepeatOperator(context.acquireNodeId(), batchLimitId, context.operator);
         }
 
-        List<SortItem> sortBys = query.getOrderBy();
-        if (!sortBys.isEmpty())
+        if (!context.sortItems.isEmpty())
         {
-            sortBys.forEach(si -> si.accept(this, context));
-            context.operator = new SortByOperator(context.acquireNodeId(), context.operator, new ExpressionRowComparator(sortBys));
+            context.sortItems.forEach(si -> si.accept(this, context));
+            context.operator = new SortByOperator(context.acquireNodeId(), context.operator, new ExpressionRowComparator(context.sortItems));
         }
         
-        if (query.getTop() >= 0)
+        if (select.getTopExpression() != null)
         {
-            context.operator = new TopOperator(context.acquireNodeId(), context.operator, query.getTop());
+            visit(select.getTopExpression(), context);
+            context.operator = new TopOperator(context.acquireNodeId(), context.operator, select.getTopExpression());
         }
 
         List<String> projectionAliases = new ArrayList<>();
         List<Projection> projections = new ArrayList<>();
-        query.getSelectItems().forEach(s ->
+        select.getSelectItems().forEach(s ->
         {
             s.accept(this, context);
             projectionAliases.add(s.getIdentifier());
@@ -563,12 +569,27 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         TablePredicate predicate = new TablePredicate(context.pushDownPredicateByAlias.get(table.getAlias()));
         if (context.index != null)
         {
-            context.operator = pair.getValue().getIndexOperator(context.session, nodeId, pair.getKey(), alias, context.index, predicate, table.getTableOptions());
+            context.operator = pair.getValue().getIndexOperator(new OperatorData(
+                    context.session,
+                    nodeId,
+                    pair.getKey(),
+                    alias,
+                    predicate,
+                    emptyList(),
+                    table.getTableOptions()),
+                    context.index);
             context.index = null;
         }
         else
         {
-            context.operator = pair.getValue().getScanOperator(context.session, nodeId, pair.getKey(), alias, predicate, table.getTableOptions());
+            context.operator = pair.getValue().getScanOperator(new OperatorData(
+                    context.session,
+                    nodeId,
+                    pair.getKey(),
+                    alias,
+                    predicate,
+                    context.sortItems,
+                    table.getTableOptions()));
         }
         // Set leftover predicate to context
         context.pushDownPredicateByAlias.put(table.getAlias(), predicate.getPredicate());

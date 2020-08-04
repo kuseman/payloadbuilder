@@ -42,17 +42,12 @@ describeStatement
  : DESCRIBE 
  (
  	 tableName 
-   | functionName '('')'
    | selectStatement 
  )
  ;
 
 showStatement
- : SHOW
- (
- 	VARIABLES
- |  PARAMETERS
- )
+ : SHOW type=(VARIABLES | PARAMETERS| TABLES | FUNCTIONS)
  ;
 
 controlFlowStatement
@@ -80,11 +75,16 @@ topSelect
  ;
 
 selectStatement
- : SELECT (TOP top=NUMBER)? selectItem (',' selectItem)*
+ : SELECT (TOP topCount)? selectItem (',' selectItem)*
    (FROM tableSourceJoined)?
    (WHERE where=expression)?
    (GROUPBY groupBy+=expression (',' groupBy+=expression)*)?
    (ORDERBY sortItem (',' sortItem)*)?
+ ;
+
+topCount
+ : NUMBER
+ | '(' expression ')'
  ;
 
 selectItem
@@ -262,6 +262,7 @@ END			 : E N D;
 FALSE	     : F A L S E;
 FIRST	     : F I R S T;
 FROM	     : F R O M;
+FUNCTIONS	 : F U N C T I O N S;
 GROUPBY      : G R O U P ' ' B Y;
 HAVING       : H A V I N G;
 IF           : I F;
@@ -285,6 +286,7 @@ SELECT	     : S E L E C T;
 SESSION		 : S E S S I O N;
 SET			 : S E T;
 SHOW		 : S H O W;
+TABLES		 : T A B L E S;
 THEN		 : T H E N;
 TOP			 : T O P;
 TRUE	     : T R U E;

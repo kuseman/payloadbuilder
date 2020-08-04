@@ -9,14 +9,15 @@ import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 
 class OperatorBuilderUtils
 {
-    
-    
-    /** Creates a group by operator for provided expressions 
+
+    /**
+     * Creates a group by operator for provided expressions
+     * 
      * @param nodeId Unique node id for operator
      * @param alias Alias of the belonging table source
      * @param groupBys Group by expressions
      * @param operator Downstream operator to group
-     * */
+     */
     static Operator createGroupBy(
             int nodeId,
             String alias,
@@ -29,7 +30,8 @@ class OperatorBuilderUtils
         List<String> columnReferences = groupBys.stream()
                 .filter(e -> e instanceof QualifiedReferenceExpression)
                 .map(e -> (QualifiedReferenceExpression) e)
-                .filter(e -> e.getQname().getParts().size() == 2 && e.getQname().getAlias().equals(alias))
+                .filter(e -> (e.getQname().getParts().size() == 2 && e.getQname().getAlias().equals(alias))
+                    || (e.getQname().getParts().size() == 1))
                 .map(e -> e.getQname().getLast())
                 .collect(toList());
 

@@ -17,9 +17,10 @@ import java.util.stream.IntStream;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
+import org.kuse.payloadbuilder.core.catalog.Catalog.OperatorData;
+import org.kuse.payloadbuilder.core.catalog.Catalog.TablePredicate;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
-import org.kuse.payloadbuilder.core.catalog.Catalog.TablePredicate;
 import org.kuse.payloadbuilder.core.operator.ObjectProjection;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.OperatorBuilder;
@@ -74,7 +75,8 @@ public class DescribeUtils
         }
 
         TableAlias tableAlias = TableAlias.of(null, tableName, "");
-        Operator operator = catalog.getScanOperator(context.getSession(), 0, catalogAlias, tableAlias, TablePredicate.EMPTY, emptyList());
+        tableAlias.setAsteriskColumns();
+        Operator operator = catalog.getScanOperator(new OperatorData(context.getSession(), 0, catalogAlias, tableAlias, TablePredicate.EMPTY, emptyList(), emptyList()));
 
         context.clear();
         // Get first row from scan operator

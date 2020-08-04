@@ -60,7 +60,6 @@ import org.kuse.payloadbuilder.editor.QueryFileModel.State;
 /** Content of a query editor. Text editor and a result panel separated with a split panel */
 class QueryFileView extends JPanel
 {
-    private static final int VIEW_LENGTH_OF_COMPLEX_VALUES = 50;
     private static final int COLUMN_ADJUST_ROW_LIMIT = 30;
     private static final Color TABLE_NULL_BACKGROUND = new Color(255, 253, 237);
     private static final Color TABLE_REGULAR_BACKGROUND = UIManager.getColor("Table.dropCellBackground");
@@ -68,9 +67,8 @@ class QueryFileView extends JPanel
     private static final Icon PLAY_ICON = FontIcon.of(FontAwesome.PLAY);
     private static final Icon CLOSE_ICON = FontIcon.of(FontAwesome.CLOSE);
     private static final Icon WARNING_ICON = FontIcon.of(FontAwesome.WARNING);
-    private static final Icon EXTERNAL_LINK = FontIcon.of(FontAwesome.EXTERNAL_LINK);
-    private static final int SCROLLBAR_WIDTH = ((Integer)UIManager.get("ScrollBar.width")).intValue();
-    
+    private static final int SCROLLBAR_WIDTH = ((Integer) UIManager.get("ScrollBar.width")).intValue();
+
     private final JSplitPane splitPane;
     private final TextEditorPane textEditor;
     private final JTabbedPane resultTabs;
@@ -259,7 +257,7 @@ class QueryFileView extends JPanel
             if (i > 0)
             {
                 JScrollBar horizontalScrollBar = ((JScrollPane) ((JViewport) prevTable.getParent()).getParent()).getHorizontalScrollBar();
-                
+
                 // The least of 8 rows or actual rows in prev table
                 prevTableHeight = Math.min((prevTable.getRowCount() + 1) * prevTable.getRowHeight() + 15, tablHeight);
                 if (horizontalScrollBar.isVisible())
@@ -366,19 +364,6 @@ class QueryFileView extends JPanel
                     }
                 }
 
-                // Add icon to map/list results to indicate click-ability
-                if (value instanceof Collection || value instanceof Map)
-                {
-                    setIcon(EXTERNAL_LINK);
-                    setText(ResultModel.getLabel(value, VIEW_LENGTH_OF_COMPLEX_VALUES));
-                    setHorizontalTextPosition(SwingConstants.TRAILING);
-                    setAlignmentX(SwingConstants.LEFT);
-                }
-                else
-                {
-                    setIcon(null);
-                }
-
                 if (value == null)
                 {
                     setText("NULL");
@@ -430,25 +415,29 @@ class QueryFileView extends JPanel
                         }
                     }
 
+                    JFrame frame = new JFrame("Json viewer - " + resultTable.getColumnName(col) + " (Row: " + (row + 1) + ")");
+                    frame.setIconImages(PayloadbuilderEditorView.APPLICATION_ICONS);
+                    RSyntaxTextArea rta = new RSyntaxTextArea();
+                    rta.setColumns(80);
+                    rta.setRows(40);
                     if (value instanceof Collection || value instanceof Map)
                     {
-                        JFrame frame = new JFrame("Json viewer - " + resultTable.getColumnName(col) + " (Row: " + (row + 1) + ")");
-                        frame.setIconImages(PayloadbuilderEditorView.APPLICATION_ICONS);
-                        RSyntaxTextArea rta = new RSyntaxTextArea();
-                        rta.setColumns(80);
-                        rta.setRows(40);
                         rta.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JSON);
                         rta.setCodeFoldingEnabled(true);
                         rta.setBracketMatchingEnabled(true);
                         rta.setText(ResultModel.getPrettyJson(value));
-                        rta.setCaretPosition(0);
-                        rta.setEditable(false);
-                        RTextScrollPane sp = new RTextScrollPane(rta);
-                        frame.getContentPane().add(sp);
-                        frame.setSize(600, 400);
-                        frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
-                        frame.setVisible(true);
                     }
+                    else
+                    {
+                        rta.setText(String.valueOf(value));
+                    }
+                    rta.setCaretPosition(0);
+                    rta.setEditable(false);
+                    RTextScrollPane sp = new RTextScrollPane(rta);
+                    frame.getContentPane().add(sp);
+                    frame.setSize(600, 400);
+                    frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+                    frame.setVisible(true);
                 }
                 else if (e.getClickCount() == 1 && e.getButton() == MouseEvent.BUTTON1)
                 {

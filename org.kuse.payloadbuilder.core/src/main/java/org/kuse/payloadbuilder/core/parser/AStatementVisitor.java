@@ -72,12 +72,6 @@ public class AStatementVisitor<TR, TC> implements StatementVisitor<TR, TC>, Sele
     }
 
     @Override
-    public TR visit(DescribeFunctionStatement statement, TC context)
-    {
-        return null;
-    }
-
-    @Override
     public TR visit(DescribeSelectStatement statement, TC context)
     {
         statement.getSelectStatement().getSelect().accept(this, context);

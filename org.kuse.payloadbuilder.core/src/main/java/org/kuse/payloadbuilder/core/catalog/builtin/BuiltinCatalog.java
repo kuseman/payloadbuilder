@@ -2,6 +2,7 @@ package org.kuse.payloadbuilder.core.catalog.builtin;
 
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.builtin.AMatchFunction.MatchType;
+import org.kuse.payloadbuilder.core.catalog.builtin.TrimFunction.Type;
 
 /** Built in catalog with functions etc. */
 public class BuiltinCatalog
@@ -38,6 +39,14 @@ public class BuiltinCatalog
         catalog.registerFunction(new FromJsonFunction(catalog));
         catalog.registerFunction(new CastFunction(catalog, "cast"));
         catalog.registerFunction(new CastFunction(catalog, "convert"));
+        catalog.registerFunction(new RegexpLikeFunction(catalog));
+        catalog.registerFunction(new LowerUpperFunction(catalog, true));
+        catalog.registerFunction(new LowerUpperFunction(catalog, false));
+        catalog.registerFunction(new TrimFunction(catalog, Type.BOTH));
+        catalog.registerFunction(new TrimFunction(catalog, Type.LEFT));
+        catalog.registerFunction(new TrimFunction(catalog, Type.RIGHT));
+        catalog.registerFunction(new PadFunction(catalog, true));
+        catalog.registerFunction(new PadFunction(catalog, false));
         
         // Table functions
         catalog.registerFunction(new Range(catalog));

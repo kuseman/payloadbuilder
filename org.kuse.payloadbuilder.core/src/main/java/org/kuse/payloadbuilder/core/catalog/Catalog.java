@@ -3,6 +3,7 @@ package org.kuse.payloadbuilder.core.catalog;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -11,6 +12,7 @@ import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
+import org.kuse.payloadbuilder.core.parser.SortItem;
 import org.kuse.payloadbuilder.core.parser.TableOption;
 
 /**
@@ -35,6 +37,7 @@ public abstract class Catalog
 
     /**
      * Get indices for provided table
+     *
      * @param session Current query session
      * @param catalogAlias Alias used for this catalog in the query
      * @param table Table to retrieve index for
@@ -46,51 +49,46 @@ public abstract class Catalog
     {
         return emptyList();
     }
-
+    
     /**
-     * Get operator for provided alias
-     *
-     * @param session Current query session
-     * @param nodeId Unique id for operator node
-     * @param catalogAlias Alias used for this catalog in the query
-     * @param tableAlias Table alias to retrieve operator for. If {@link TableAlias#isAsteriskColumns()()} is set
-     * to true then the operator <b>MUST</b> set all available columns on alias using {@link TableAlias#setColumns(String[])}
-     * @param predicate Predicate (if any) for this table
-     * @param tableOptions Provided options for this table.
-     */
-    public Operator getScanOperator(
-            QuerySession session,
-            int nodeId,
-            String catalogAlias,
-            TableAlias tableAlias,
-            TablePredicate predicate,
-            List<TableOption> tableOptions)
+     * Return registered functions in this Catalog 
+     **/
+    public Collection<FunctionInfo> getFunctions()
     {
-        throw new IllegalArgumentException("Catalog " + catalogAlias + " (" + name + ") doesn't support scan operators.");
+        return functionByName.values();
+    }
+    
+    /** 
+     * <pre>
+     * Get tables for current session.
+     * Implementations can choose to implement this method
+     * to allow "SHOW tables" for list current tables
+     * </pre>
+     * @param session Current query session
+     * @param catalogAlias Alias used for this catalog in the query
+     * */
+    public List<String> getTables(
+            QuerySession session,
+            String catalogAlias)
+    {
+        return emptyList();
     }
 
     /**
      * Get operator for provided alias
-     *
-     * @param session Current query session
-     * @param nodeId Unique id for operator node
-     * @param catalogAlias Alias used for this catalog in the query
-     * @param tableAlias Table alias to retrieve operator for. If {@link TableAlias#isAsteriskColumns()()} is set
-     * to true then the operator <b>MUST</b> set all available columns on alias using {@link TableAlias#setColumns(String[])}
-     * @param index Index to use
-     * @param predicate Predicate (if any) for this table
-     * @param tableOptions Provided options for this table.
      */
-    public Operator getIndexOperator(
-            QuerySession session,
-            int nodeId,
-            String catalogAlias,
-            TableAlias tableAlias,
-            Index index,
-            TablePredicate predicate,
-            List<TableOption> tableOptions)
+    public Operator getScanOperator(OperatorData data)
     {
-        throw new IllegalArgumentException("Catalog " + catalogAlias + " (" + name + ") doesn't support index operators.");
+        throw new IllegalArgumentException("Catalog " + data.catalogAlias + " (" + name + ") doesn't support scan operators.");
+    }
+
+    /**
+     * Get operator for provided alias
+     * @param index Index to use
+     */
+    public Operator getIndexOperator(OperatorData data, Index index)
+    {
+        throw new IllegalArgumentException("Catalog " + data.catalogAlias + " (" + name + ") doesn't support index operators.");
     }
 
     /** Register function */
@@ -105,16 +103,17 @@ public abstract class Catalog
     {
         return functionByName.get(requireNonNull(name).toLowerCase());
     }
-    
-    /** Predicate for a table if any. Is sent to catalog by framework
-     * to let catalogs that supports predicate analyze and extract supported
-     * predicates and return left over ones.
+
+    /**
+     * Predicate for a table if any. Is sent to catalog by framework to let catalogs that supports predicate analyze and extract supported predicates
+     * and return left over ones.
+     *
      * <pre>
-     * 
+     *
      * Example
      * table:       article
      * predicate:   active_flg && internet_flg
-     * 
+     *
      * Catalog is able to filter active_flg on it's own
      * but not internet_flg
      * then predicate part <b>active_flg</b> is extracted and <b>internet_flg</b>
@@ -125,19 +124,110 @@ public abstract class Catalog
     {
         public static TablePredicate EMPTY = new TablePredicate(null);
         private Expression predicate;
+
         public TablePredicate(Expression predicate)
         {
             this.predicate = predicate;
         }
-        
+
         public Expression getPredicate()
         {
             return predicate;
         }
-        
+
         public void setPredicate(Expression predicate)
         {
             this.predicate = predicate;
+        }
+    }
+
+    /** Class containing data used by Catalog implementations to create operators */
+    public static class OperatorData
+    {
+        private final QuerySession session;
+        private final int nodeId;
+        private final String catalogAlias;
+        private final TableAlias tableAlias;
+        private final TablePredicate predicate;
+        private final List<SortItem> sortItems;
+        private final List<TableOption> tableOptions;
+
+        public OperatorData(
+                QuerySession session,
+                int nodeId,
+                String catalogAlias,
+                TableAlias tableAlias,
+                TablePredicate predicate,
+                List<SortItem> sortItems,
+                List<TableOption> tableOptions)
+        {
+            this.session = session;
+            this.nodeId = nodeId;
+            this.catalogAlias = catalogAlias;
+            this.tableAlias = tableAlias;
+            this.predicate = predicate;
+            this.sortItems = sortItems;
+            this.tableOptions = tableOptions;
+        }
+
+        /** Current query session */
+        public QuerySession getSession()
+        {
+            return session;
+        }
+
+        /** Unique id for operator node */
+        public int getNodeId()
+        {
+            return nodeId;
+        }
+
+        /** Alias used for this catalog in the query */
+        public String getCatalogAlias()
+        {
+            return catalogAlias;
+        }
+
+        /**
+         * <pre>
+         * Table alias to retrieve operator for.
+         * If {@link TableAlias#isAsteriskColumns()} is set to true then the operator
+         *  <b>MUST</b> set all available columns on alias using {@link TableAlias#setColumns(String[])} 
+         * </pre>
+         */ 
+        public TableAlias getTableAlias()
+        {
+            return tableAlias;
+        }
+        
+        /**
+         * <pre>
+         * Predicate (if any) for this table.
+         * Should be consumed by implementation if applicable, this to push down
+         * predicates as much as possible. 
+         * </pre>
+         * */
+        public TablePredicate getPredicate()
+        {
+            return predicate;
+        }
+
+        /**
+         * <pre>
+         * Sort items (if any) for this table.
+         * Should be consumed by implementation  if applicable or leaved if not supported,
+         * this to push down ordering as much as possible
+         * </pre>
+         */
+        public List<SortItem> getSortItems()
+        {
+            return sortItems;
+        }
+
+        /** Provided options for this table. */
+        public List<TableOption> getTableOptions()
+        {
+            return tableOptions;
         }
     }
 }

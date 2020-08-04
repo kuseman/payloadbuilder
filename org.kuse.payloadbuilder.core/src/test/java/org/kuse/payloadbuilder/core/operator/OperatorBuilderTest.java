@@ -414,7 +414,7 @@ public class OperatorBuilderTest extends AOperatorTest
                 }
             }
             p.setPredicate(new AnalyzeResult(leftOvers).getPredicate());
-        });
+        }, null);
 
         assertEquals(e("s.flag1"), catalogPredicate.getValue());
 
@@ -428,6 +428,38 @@ public class OperatorBuilderTest extends AOperatorTest
 
         //        System.out.println(expected.toString(1));
         //        System.out.println(result.operator.toString(1));
+
+        assertEquals(expected, result.operator);
+        assertEquals(new ObjectProjection(asList("id1", "flag1"),
+                asList(
+                        new ExpressionProjection(e("s.id1")),
+                        new ExpressionProjection(e("s.flag1")))),
+                result.projection);
+    }
+
+    @Test
+    public void test_catalog_supported_order_by()
+    {
+        String query = "select s.id1, s.flag1 from source s order by s.id1";
+
+        MutableObject<List<SortItem>> catalogOrderBy = new MutableObject<>();
+
+        QueryResult result = getQueryResult(query, null, s ->
+        {
+            catalogOrderBy.setValue(new ArrayList<>(s));
+            s.clear();
+        });
+
+        List<SortItem> expectedSortItems = asList(new SortItem(e("s.id1"), Order.ASC, NullOrder.UNDEFINED));
+        assertEquals(expectedSortItems, catalogOrderBy.getValue());
+
+        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"flag1", "id1"});
+        assertTrue(source.isEqual(result.alias));
+
+        Operator expected = result.tableOperators.get(0);
+
+//                System.out.println(expected.toString(1));
+//                System.out.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
         assertEquals(new ObjectProjection(asList("id1", "flag1"),
@@ -527,8 +559,8 @@ public class OperatorBuilderTest extends AOperatorTest
                         true,
                         false);
 
-//                        System.err.println(expected.toString(1));
-//                        System.out.println(result.operator.toString(1));
+        //                        System.err.println(expected.toString(1));
+        //                        System.out.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
 

@@ -76,7 +76,7 @@ class ESOperator extends AOperator
     static final ObjectMapper MAPPER = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private static final ObjectReader READER = MAPPER.readerFor(ESResponse.class);
-    
+
     private static final PoolingHttpClientConnectionManager CONNECTION_MANAGER = new PoolingHttpClientConnectionManager();
     static final CloseableHttpClient CLIENT = HttpClientBuilder
             .create()
@@ -89,19 +89,22 @@ class ESOperator extends AOperator
     private final Index index;
     private final String catalogAlias;
     private final List<Pair<String, Expression>> fieldPredicates;
-    
+    private final List<Pair<String, String>> sortItems;
+
     public ESOperator(
             int nodeId,
             String catalogAlias,
             TableAlias tableAlias,
             Index index,
-            List<Pair<String, Expression>> fieldPredicates)
+            List<Pair<String, Expression>> fieldPredicates,
+            List<Pair<String, String>> sortItems)
     {
         super(nodeId);
         this.catalogAlias = catalogAlias;
         this.tableAlias = tableAlias;
         this.index = index;
         this.fieldPredicates = requireNonNull(fieldPredicates, "fieldPredicates");
+        this.sortItems = requireNonNull(sortItems, "sortItems");
     }
 
     @Override
@@ -117,7 +120,12 @@ class ESOperator extends AOperator
                 entry(CATALOG, ESCatalog.NAME),
                 entry(PREDICATE, fieldPredicates
                         .stream()
-                        .map(p -> p.getKey() + " = " + (p.getValue() != null ? p.getValue() : "true")).collect(joining(" AND "))));
+                        .map(p -> p.getKey() + " = " + (p.getValue() != null ? p.getValue() : "true"))
+                        .collect(joining(" AND "))),
+                entry("Sort", sortItems
+                        .stream()
+                        .map(i -> i.getKey() + ":" + i.getValue())
+                        .collect(joining(","))));
 
         if (index != null)
         {
@@ -125,7 +133,7 @@ class ESOperator extends AOperator
         }
         return result;
     }
-    
+
     @Override
     public Iterator<Row> open(ExecutionContext context)
     {
@@ -154,19 +162,20 @@ class ESOperator extends AOperator
                             doRequest.setFalse();
                             return post;
                         }
-                        
+
                         return null;
                     });
         }
 
         final String searchUrl = String.format(
-                "%s/%s/%s/_search?%s&size=%d&scroll=%s&filter_path=_scroll_id,hits.hits._id,hits.hits._source",
+                "%s/%s/%s/_search?%s&size=%d%s&scroll=%s&filter_path=_scroll_id,hits.hits._id,hits.hits._source",
                 esType.endpoint,
                 esType.index,
                 esType.type,
                 getPredicateParam(context),
                 // TODO: table option for batch size
                 1000,
+                getSortParam(),
                 "2m");
         String scrollUrl = String.format("%s/_search/scroll?scroll=%s&scroll_id=", esType.endpoint, "2m");
 
@@ -223,12 +232,12 @@ class ESOperator extends AOperator
                     if (docIt == null)
                     {
                         HttpUriRequest request = requestSupplier.apply(scrollId);
-                        
+
                         if (request == null)
                         {
                             return false;
                         }
-                        
+
                         ESResponse esReponse;
                         try (CloseableHttpResponse response = CLIENT.execute(request);)
                         {
@@ -265,7 +274,7 @@ class ESOperator extends AOperator
                     {
                         continue;
                     }
-                    
+
                     if (tableAlias.isAsteriskColumns())
                     {
                         if (addedColumns == null)
@@ -279,7 +288,7 @@ class ESOperator extends AOperator
                             tableAlias.setColumns(addedColumns.toArray(EMPTY_STRING_ARRAY));
                         }
                     }
-                    
+
                     Object[] data;
                     if (tableAlias.getColumns() != null)
                     {
@@ -326,11 +335,11 @@ class ESOperator extends AOperator
             {
                 sb.append("+AND+");
             }
-            
+
             Object value;
             // Null expression then assume the field is a boolean => add true as value
             // Predicate is of type "active_flg"
-            if(pair.getValue() == null)
+            if (pair.getValue() == null)
             {
                 value = true;
             }
@@ -338,12 +347,12 @@ class ESOperator extends AOperator
             {
                 value = pair.getValue().eval(context);
             }
-            
+
             if (value == null)
             {
                 continue;
             }
-            
+
             String stringValue = String.valueOf(value);
             if (value instanceof String)
             {
@@ -354,15 +363,40 @@ class ESOperator extends AOperator
                 catch (UnsupportedEncodingException e)
                 {
                 }
-                
+
             }
-            
+
             sb.append(pair.getKey()).append(":").append(stringValue);
         }
-        
+
         return sb.toString();
     }
-    
+
+    private String getSortParam()
+    {
+        if (sortItems.isEmpty())
+        {
+            return "";
+        }
+
+        StringBuilder sb = new StringBuilder();
+
+        for (Pair<String, String> sortItem : sortItems)
+        {
+            if (sb.length() == 0)
+            {
+                sb.append("&sort=");
+            }
+            else if (sb.length() > 0)
+            {
+                sb.append(",");
+            }
+            sb.append(sortItem.getKey()).append(":").append(sortItem.getValue());
+        }
+
+        return sb.toString();
+    }
+
     /** Top response (Used both in get request and search request) */
     private static class ESResponse
     {
@@ -413,7 +447,7 @@ class ESOperator extends AOperator
             return source != null;
         }
     }
-    
+
     /** Custom deserializer for _source field that only picks wanted fields */
     private static class SourceDeserializer extends JsonDeserializer<Map<String, Object>>
     {
@@ -441,20 +475,20 @@ class ESOperator extends AOperator
             return result;
         }
     }
-    
+
     @Override
     public String toString()
     {
         return String.format("ID: %d, %s", nodeId, (index != null ? "index" : "scan") + " (" + tableAlias.toString() + ")");
     }
-    
+
     /** Class representing a endpoint/index/type combo. */
     static class EsType
     {
         final String endpoint;
         final String index;
         final String type;
-        
+
         EsType(String endpoint, String index, String type)
         {
             this.endpoint = endpoint;
@@ -506,7 +540,7 @@ class ESOperator extends AOperator
             {
                 throw new IllegalArgumentException("Invalid qualified table name " + table + ". Requires 1 to 3 parts. <endpoint>.<index>.<type>");
             }
-            
+
             return new EsType(endpoint, indexName, type);
         }
     }

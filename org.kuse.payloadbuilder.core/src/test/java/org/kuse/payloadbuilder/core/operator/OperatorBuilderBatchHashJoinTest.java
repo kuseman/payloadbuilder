@@ -16,11 +16,9 @@ import org.junit.Test;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.Index;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.Select;
-import org.kuse.payloadbuilder.core.parser.TableOption;
 
 /** Test of {@link OperatorBuilder} with index on tables */
 public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
@@ -359,17 +357,17 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             }
 
             @Override
-            public Operator getScanOperator(QuerySession session, int nodeId, String catalogAlias, TableAlias alias, TablePredicate predicate, List<TableOption> tableOptions)
+            public Operator getScanOperator(OperatorData data)
             {
-                Operator op = op("scan " + alias.getTable().toString());
+                Operator op = op("scan " + data.getTableAlias().getTable().toString());
                 operators.add(op);
                 return op;
             }
 
             @Override
-            public Operator getIndexOperator(QuerySession session, int nodeId, String catalogAlias, TableAlias alias, Index index, TablePredicate predicate, List<TableOption> tableOptions)
+            public Operator getIndexOperator(OperatorData data, Index index)
             {
-                Operator op = op("index " + alias.getTable().toString());
+                Operator op = op("index " + data.getTableAlias().getTable().toString());
                 operators.add(op);
                 return op;
             }

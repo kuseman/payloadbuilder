@@ -13,17 +13,13 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Assert;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
+import org.kuse.payloadbuilder.core.catalog.Catalog.TablePredicate;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
-import org.kuse.payloadbuilder.core.catalog.Catalog.TablePredicate;
-import org.kuse.payloadbuilder.core.operator.Operator;
-import org.kuse.payloadbuilder.core.operator.OperatorBuilder;
-import org.kuse.payloadbuilder.core.operator.Projection;
-import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QueryParser;
-import org.kuse.payloadbuilder.core.parser.TableOption;
+import org.kuse.payloadbuilder.core.parser.SortItem;
 
 /** Base class of {@link OperatorBuilder} tests. */
 public class AOperatorTest extends Assert
@@ -56,32 +52,31 @@ public class AOperatorTest extends Assert
     }
     protected QueryResult getQueryResult(String query)
     {
-        return getQueryResult(query, null);
+        return getQueryResult(query, null, null);
     }
     
-    protected QueryResult getQueryResult(String query, Consumer<TablePredicate> predicateConsumer)
+    protected QueryResult getQueryResult(String query, Consumer<TablePredicate> predicateConsumer, Consumer<List<SortItem>> sortItemsConsumer)
     {
         List<Operator> tableOperators = new ArrayList<>();
         MutableObject<TableAlias> mAlias = new MutableObject<>();
         Catalog c = new Catalog("Test")
         {
             @Override
-            public Operator getScanOperator(
-                    QuerySession session,
-                    int nodeId,
-                    String catalogAlias,
-                    TableAlias alias,
-                    TablePredicate predicate,
-                    List<TableOption> tableOptions)
+            public Operator getScanOperator(OperatorData data)
             {
                 if (predicateConsumer != null)
                 {
-                    predicateConsumer.accept(predicate);
+                    predicateConsumer.accept(data.getPredicate());
+                }
+                
+                if (sortItemsConsumer != null)
+                {
+                    sortItemsConsumer.accept(data.getSortItems());
                 }
                 
                 if (mAlias.getValue() == null)
                 {
-                    mAlias.setValue(alias);
+                    mAlias.setValue(data.getTableAlias());
                 }
                 Operator op = new Operator()
                 {
@@ -100,7 +95,7 @@ public class AOperatorTest extends Assert
                     @Override
                     public String toString()
                     {
-                        return String.format("%s (%d)", alias.getTable().toString(), nodeId);
+                        return String.format("%s (%d)", data.getTableAlias().getTable().toString(), data.getNodeId());
                     }
                 };
 

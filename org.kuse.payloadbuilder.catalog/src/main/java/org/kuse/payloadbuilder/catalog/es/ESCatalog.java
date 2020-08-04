@@ -2,14 +2,18 @@ package org.kuse.payloadbuilder.catalog.es;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.kuse.payloadbuilder.catalog.es.ESOperator.CLIENT;
 import static org.kuse.payloadbuilder.catalog.es.ESOperator.MAPPER;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.Set;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -25,7 +29,10 @@ import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzeResult;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
-import org.kuse.payloadbuilder.core.parser.TableOption;
+import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
+import org.kuse.payloadbuilder.core.parser.SortItem;
+import org.kuse.payloadbuilder.core.parser.SortItem.NullOrder;
+import org.kuse.payloadbuilder.core.parser.SortItem.Order;
 
 /** Catalog for querying elastic search */
 class ESCatalog extends Catalog
@@ -38,6 +45,32 @@ class ESCatalog extends Catalog
     {
         super("EsCatalog");
     }
+    
+    @SuppressWarnings("unchecked")
+    @Override
+    public List<String> getTables(QuerySession session, String catalogAlias)
+    {
+        String endpoint = (String) session.getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY);
+        String index = (String) session.getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY);
+        
+        if (isBlank(endpoint) || isBlank(index))
+        {
+            throw new IllegalArgumentException("Missing endpoint/index in catalog properties.");
+        }
+        
+        HttpGet getMappings = new HttpGet(String.format("%s/%s/_mapping", endpoint, index));
+        try (CloseableHttpResponse response = CLIENT.execute(getMappings))
+        {
+            Map<String, Object> map = MAPPER.readValue(response.getEntity().getContent(), Map.class);
+            map = (Map<String, Object>) map.get(index);
+            map = (Map<String, Object>) map.get("mappings");
+            return new ArrayList<>(map.keySet());
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Error querying " + endpoint, e);
+        }
+    }
 
     @Override
     public List<Index> getIndices(QuerySession session, String catalogAlias, QualifiedName table)
@@ -47,57 +80,123 @@ class ESCatalog extends Catalog
     }
 
     @Override
-    public Operator getScanOperator(
-            QuerySession session,
-            int nodeId,
-            String catalogAlias,
-            TableAlias tableAlias,
-            TablePredicate predicate,
-            List<TableOption> tableOptions)
+    public Operator getScanOperator(OperatorData data)
     {
         List<Pair<String, Expression>> fieldPredicates = emptyList();
+        List<Pair<String, String>> sortItems = emptyList();
         // Extract potential predicate to send to ES
-        if (predicate.getPredicate() != null)
+        if (data.getPredicate().getPredicate() != null || !data.getSortItems().isEmpty())
         {
-            fieldPredicates = new ArrayList<>();
-            List<String> names = getAnalyzedPropertyNames(session, catalogAlias, tableAlias.getTable());
-            AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(predicate.getPredicate());
-            List<AnalyzePair> leftOvers = new ArrayList<>();
-            for (AnalyzePair pair : analyzeResult.getPairs())
+            // Fetch analyzed properties
+            Set<String> analyzedFields = getAnalyzedPropertyNames(data.getSession(), data.getCatalogAlias(), data.getTableAlias().getTable());
+
+            if (data.getPredicate().getPredicate() != null)
             {
-                String column = pair.getColumn(tableAlias.getAlias(), true);
-                if (names.contains(column))
-                {
-                    Pair<Expression, Expression> expressionPair = pair.getExpressionPair(tableAlias.getAlias(), true);
-                    fieldPredicates.add(Pair.of(column, expressionPair.getRight()));
-                }
-                else
-                {
-                    leftOvers.add(pair);
-                }
+                fieldPredicates = new ArrayList<>();
+                collectPredicates(data.getTableAlias(), data.getPredicate(), analyzedFields, fieldPredicates);
             }
-            predicate.setPredicate(new AnalyzeResult(leftOvers).getPredicate());
+
+            if (!data.getSortItems().isEmpty())
+            {
+                sortItems = collectSortItems(data.getTableAlias(), analyzedFields, data.getSortItems());
+            }
         }
 
-        return new ESOperator(nodeId, catalogAlias, tableAlias, null, fieldPredicates);
+        return new ESOperator(
+                data.getNodeId(),
+                data.getCatalogAlias(),
+                data.getTableAlias(),
+                null,
+                fieldPredicates,
+                sortItems);
     }
 
     @Override
-    public Operator getIndexOperator(
-            QuerySession session,
-            int nodeId,
-            String catalogAlias,
-            TableAlias tableAlias,
-            Index index,
-            TablePredicate predicate,
-            List<TableOption> tableOptions)
+    public Operator getIndexOperator(OperatorData data, Index index)
     {
-        return new ESOperator(nodeId, catalogAlias, tableAlias, index, emptyList());
+        return new ESOperator(
+                data.getNodeId(),
+                data.getCatalogAlias(),
+                data.getTableAlias(),
+                index,
+                emptyList(),
+                emptyList());
     };
+
+    private void collectPredicates(
+            TableAlias tableAlias,
+            TablePredicate predicate,
+            Set<String> analyzedFields,
+            List<Pair<String, Expression>> fieldPredicates)
+    {
+        AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(predicate.getPredicate());
+        List<AnalyzePair> leftOvers = new ArrayList<>();
+        for (AnalyzePair pair : analyzeResult.getPairs())
+        {
+            String column = pair.getColumn(tableAlias.getAlias(), true);
+            if (analyzedFields.contains(column))
+            {
+                Pair<Expression, Expression> expressionPair = pair.getExpressionPair(tableAlias.getAlias(), true);
+                fieldPredicates.add(Pair.of(column, expressionPair.getRight()));
+            }
+            else
+            {
+                leftOvers.add(pair);
+            }
+        }
+        predicate.setPredicate(new AnalyzeResult(leftOvers).getPredicate());
+    }
+
+    private List<Pair<String, String>> collectSortItems(
+            TableAlias tableAlias,
+            Set<String> analyzedFields,
+            List<SortItem> sortItems)
+    {
+        List<Pair<String, String>> result = null;
+        for (SortItem sortItem : sortItems)
+        {
+            if (sortItem.getNullOrder() != NullOrder.UNDEFINED)
+            {
+                return emptyList();
+            }
+            else if (!(sortItem.getExpression() instanceof QualifiedReferenceExpression))
+            {
+                return emptyList();
+            }
+
+            QualifiedReferenceExpression qe = (QualifiedReferenceExpression) sortItem.getExpression();
+            QualifiedName qname = qe.getQname();
+            // Wrong alias or multipart qualified name not supported
+            // TODO: move this check to framework, might probably never be supported by any catalog
+            // especially not if a child alias is referenced
+            if (qname.getParts().size() > 2
+                || (qname.getParts().size() == 2 && !Objects.equals(tableAlias.getAlias(), qname.getAlias())))
+            {
+                return emptyList();
+            }
+
+            String column = qname.getLast();
+
+            if (!analyzedFields.contains(column))
+            {
+                return emptyList();
+            }
+
+            if (result == null)
+            {
+                result = new ArrayList<>();
+            }
+            result.add(Pair.of(column, sortItem.getOrder() == Order.ASC ? "asc" : "desc"));
+        }
+
+        // Consume items from framework
+        sortItems.clear();
+        return result;
+    }
 
     /** Returns mapping for provided table */
     @SuppressWarnings("unchecked")
-    private List<String> getAnalyzedPropertyNames(QuerySession session, String catalogAlias, QualifiedName table)
+    private Set<String> getAnalyzedPropertyNames(QuerySession session, String catalogAlias, QualifiedName table)
     {
         EsType esType = EsType.of(session, catalogAlias, table);
         HttpGet getMappings = new HttpGet(String.format("%s/%s/%s/_mapping", esType.endpoint, esType.index, esType.type));
@@ -109,7 +208,7 @@ class ESCatalog extends Catalog
             map = (Map<String, Object>) map.get(esType.type);
             map = (Map<String, Object>) map.get("properties");
 
-            List<String> result = new ArrayList<>();
+            Set<String> result = new HashSet<>();
             for (Entry<String, Object> entry : map.entrySet())
             {
                 Map<String, Object> properties = (Map<String, Object>) entry.getValue();
@@ -120,9 +219,7 @@ class ESCatalog extends Catalog
                 String type = (String) properties.get("type");
                 String index = (String) properties.get("index");
                 if ((index == null || "not_analyzed".equals(index))
-                    &&
-                    !("object".equals(type)
-                        || "nested".equals(type)))
+                    && !("object".equals(type) || "nested".equals(type)))
                 {
                     result.add(entry.getKey());
                 }

@@ -9,37 +9,39 @@ import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
-/** Returns first item if not null else second item */
-class IsNullFunction extends ScalarFunctionInfo
+/** Lower and upper function */
+class LowerUpperFunction extends ScalarFunctionInfo
 {
-    IsNullFunction(Catalog catalog)
+    private final boolean lower;
+
+    LowerUpperFunction(Catalog catalog, boolean lower)
     {
-        super(catalog, "isnull", Type.SCALAR);
+        super(catalog, lower ? "lower" : "upper", Type.SCALAR);
+        this.lower = lower;
     }
-    
+
     @Override
     public String getDescription()
     {
-        return "Returns first non null value of provided arguments. " + System.lineSeparator() +
-                "Ex. isnull(expression, expression)"  + System.lineSeparator() +
-                "If both arguments yield null, null is returned.";
+        return "Returns " + (lower ? "lower" : "upper") + " case of provided argument." + System.lineSeparator() +
+            "NOTE! Argument is converted to a string.";
     }
-    
+
     @Override
     public List<Class<? extends Expression>> getInputTypes()
     {
-        return asList(Expression.class, Expression.class);
+        return asList(Expression.class);
     }
-    
+
     @Override
     public Object eval(ExecutionContext context, List<Expression> arguments)
     {
         Object obj = arguments.get(0).eval(context);
-        if (obj != null)
+        if (obj == null)
         {
-            return obj;
+            return null;
         }
-        
-        return arguments.get(1).eval(context);
+        String value = String.valueOf(obj);
+        return lower ? value.toLowerCase() : value.toUpperCase();
     }
 }

@@ -8,19 +8,20 @@ import java.util.List;
 import java.util.Map;
 
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
+import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
 
 /** Operator for TOP expressions */
 class TopOperator extends AOperator
 {
     private final Operator target;
-    private final int top;
+    private final Expression topExpression;
 
-    TopOperator(int nodeId, Operator target, int top)
+    TopOperator(int nodeId, Operator target, Expression topExpression)
     {
         super(nodeId);
         this.target = requireNonNull(target, "target");
-        this.top = top;
+        this.topExpression = requireNonNull(topExpression, "topExpression");
     }
 
     @Override
@@ -32,7 +33,7 @@ class TopOperator extends AOperator
     @Override
     public Map<String, Object> getDescribeProperties()
     {
-        return MapUtils.ofEntries(MapUtils.entry("Value", top));
+        return MapUtils.ofEntries(MapUtils.entry("Value", topExpression));
     }
 
     @Override
@@ -44,6 +45,12 @@ class TopOperator extends AOperator
     @Override
     public Iterator<Row> open(ExecutionContext context)
     {
+        Object obj = topExpression.eval(context);
+        if (!(obj instanceof Integer) || (Integer) obj < 0)
+        {
+            throw new OperatorException("Top expression " + topExpression + " should return a zero or positive Integer. Got: " + obj);
+        }
+        final int top = ((Integer) obj).intValue();
         final Iterator<Row> it = target.open(context);
         return new Iterator<Row>()
         {
@@ -77,7 +84,7 @@ class TopOperator extends AOperator
         {
             TopOperator that = (TopOperator) obj;
             return target.equals(that.target)
-                && top == that.top;
+                && topExpression.equals(that.topExpression);
         }
         return false;
     }

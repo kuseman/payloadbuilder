@@ -5,6 +5,7 @@ import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
+import static org.apache.commons.lang3.StringUtils.upperCase;
 import static org.kuse.payloadbuilder.core.parser.LiteralExpression.createLiteralDecimalExpression;
 import static org.kuse.payloadbuilder.core.parser.LiteralExpression.createLiteralNumericExpression;
 
@@ -60,6 +61,7 @@ import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SubscriptCo
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceJoinedContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceOptionContext;
+import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.TopCountContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.TopExpressionContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.TopSelectContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.UseStatementContext;
@@ -191,11 +193,6 @@ public class QueryParser
                 String catalog = lowerCase(ctx.tableName().catalog != null ? ctx.tableName().catalog.getText() : null);
                 return new DescribeTableStatement(catalog, getQualifiedName(ctx.tableName().qname()));
             }
-            else if (ctx.functionName() != null)
-            {
-                String catalog = lowerCase(ctx.functionName().catalog != null ? ctx.functionName().catalog.getText() : null);
-                return new DescribeFunctionStatement(catalog, ctx.functionName().function.getText());
-            }
             
             return new DescribeSelectStatement((SelectStatement) visit(ctx.selectStatement()));
         }
@@ -203,7 +200,7 @@ public class QueryParser
         @Override
         public Object visitShowStatement(ShowStatementContext ctx)
         {
-            ShowStatement.Type type = ctx.PARAMETERS() != null ? ShowStatement.Type.PARAMETERS : ShowStatement.Type.VARIABLES;
+            ShowStatement.Type type = ShowStatement.Type.valueOf(upperCase(ctx.type.getText()));
             return new ShowStatement(type);
         }
         
@@ -232,7 +229,7 @@ public class QueryParser
             }
 
             TableSourceJoined joinedTableSource = ctx.tableSourceJoined() != null ? (TableSourceJoined) visit(ctx.tableSourceJoined()) : null;
-            int top = ctx.top != null ? Integer.parseInt(ctx.top.getText()) : -1;
+            Expression topExpression = ctx.topCount() != null ? (Expression) visit(ctx.topCount()) : null;
             if (joinedTableSource != null && joinedTableSource.getTableSource() instanceof PopulateTableSource)
             {
                 throw new ParseException("Top table source cannot be a populating table source.", ctx.tableSourceJoined().start);
@@ -251,7 +248,7 @@ public class QueryParser
                 {
                     throw new ParseException("Cannot have a ORDER BY clause without a FROM.", ctx.sortItem().get(0).start);
                 }
-                else if (top >= 0)
+                else if (topExpression != null)
                 {
                     throw new ParseException("Cannot have a TOP clause without a FROM.", ctx.TOP().getSymbol());
                 }
@@ -260,8 +257,18 @@ public class QueryParser
             Expression where = getExpression(ctx.where);
             List<Expression> groupBy = ctx.groupBy != null ? ctx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
             List<SortItem> orderBy = ctx.sortItem() != null ? ctx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
-            Select select = new Select(selectItems, joinedTableSource, top, where, groupBy, orderBy);
+            Select select = new Select(selectItems, joinedTableSource, topExpression, where, groupBy, orderBy);
             return new SelectStatement(select);
+        }
+        
+        @Override
+        public Object visitTopCount(TopCountContext ctx)
+        {
+            if (ctx.expression() != null)
+            {
+                return getExpression(ctx.expression());
+            }
+            return LiteralExpression.createLiteralNumericExpression(ctx.NUMBER().getText());
         }
 
         @Override
@@ -274,7 +281,7 @@ public class QueryParser
         public Object visitSelectItem(SelectItemContext ctx)
         {
             String identifier = getIdentifier(ctx.identifier());
-            // Expression selet item
+            // Expression select item
             if (ctx.expression() != null)
             {
                 Expression expression = getExpression(ctx.expression());
