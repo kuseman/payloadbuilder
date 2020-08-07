@@ -135,7 +135,7 @@ class ESCatalog extends Catalog
         List<AnalyzePair> leftOvers = new ArrayList<>();
         for (AnalyzePair pair : analyzeResult.getPairs())
         {
-            String column = pair.getColumn(tableAlias.getAlias(), true);
+            String column = pair.getColumn(tableAlias.getAlias());
             if (analyzedFields.contains(column))
             {
                 Pair<Expression, Expression> expressionPair = pair.getExpressionPair(tableAlias.getAlias(), true);

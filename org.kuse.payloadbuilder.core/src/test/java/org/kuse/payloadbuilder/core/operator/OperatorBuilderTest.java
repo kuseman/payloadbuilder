@@ -404,7 +404,7 @@ public class OperatorBuilderTest extends AOperatorTest
             List<AnalyzePair> leftOvers = new ArrayList<>();
             for (AnalyzePair pair : analyzeResult.getPairs())
             {
-                if (pair.getColumn("s", true).equals("flag1"))
+                if (pair.getColumn("s").equals("flag1"))
                 {
                     catalogPredicate.setValue(pair.getPredicate());
                 }

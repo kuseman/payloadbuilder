@@ -205,7 +205,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         {
             TableSource ts = tsj.getTableSource();
             AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(where);
-            List<AnalyzePair> equiPairs = analyzeResult.getEquiPairs(ts.getAlias(), true, true);
+            List<AnalyzePair> equiPairs = analyzeResult.getEquiPairs(ts.getAlias());
             if (!equiPairs.isEmpty())
             {
                 Pair<String, Catalog> pair = getCatalog(context, ts.getCatalog(), ts.getToken());
@@ -684,7 +684,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(joinCondition);
         String innerAlias = innerTableSource.getAlias();
         boolean populating = innerTableSource instanceof PopulateTableSource;
-        List<AnalyzePair> equiPairs = analyzeResult.getEquiPairs(innerAlias, true);
+        List<AnalyzePair> equiPairs = analyzeResult.getEquiPairs(innerAlias);
         int equiPairSize = equiPairs.size();
 
         List<Index> indices = emptyList();
@@ -828,7 +828,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         /* Extract all references inner columns from equi items */
         Set<String> columnItems = equiPairs
                 .stream()
-                .map(pair -> pair.getColumn(alias, true))
+                .map(pair -> pair.getColumn(alias))
                 .filter(Objects::nonNull)
                 .collect(toSet());
 
@@ -884,7 +884,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             AnalyzePair pair = equiPairs.get(i);
 
             // Find out the index of the
-            String column = pair.getColumn(innerAlias, true);
+            String column = pair.getColumn(innerAlias);
             int columnIndex = 0;
             if (index != null && column != null)
             {
@@ -1044,7 +1044,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             // Remove all pushdown candidates from index items,
             // these are contained within index and no need to push down
             // and is neither needed in join condition
-            indexPairs.removeIf(pair -> pair.isPushDown(alias, true));
+            indexPairs.removeIf(pair -> pair.isSingleAlias(alias));
 
             // Create a new analyze result from resulting pairs
             pairs.addAll(indexPairs);
