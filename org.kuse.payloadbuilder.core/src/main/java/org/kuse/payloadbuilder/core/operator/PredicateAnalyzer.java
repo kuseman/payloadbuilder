@@ -3,22 +3,24 @@ package org.kuse.payloadbuilder.core.operator;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
+import static org.kuse.payloadbuilder.core.utils.CollectionUtils.asSet;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Stream;
 
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.parser.AExpressionVisitor;
 import org.kuse.payloadbuilder.core.parser.ComparisonExpression;
-import org.kuse.payloadbuilder.core.parser.ComparisonExpression.Type;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.InExpression;
+import org.kuse.payloadbuilder.core.parser.LiteralBooleanExpression;
 import org.kuse.payloadbuilder.core.parser.LogicalBinaryExpression;
+import org.kuse.payloadbuilder.core.parser.LogicalNotExpression;
 import org.kuse.payloadbuilder.core.parser.NestedExpression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
@@ -190,34 +192,34 @@ public class PredicateAnalyzer
          * Extracts push down predicate for provided alias.
          * </pre>
          */
-        //        public Pair<Expression, AnalyzeResult> extractPushdownPredicate(String alias, boolean includeAliasLess)
-        //        {
-        //            if (pairs.isEmpty())
-        //            {
-        //                return Pair.of(null, this);
-        //            }
-        //
-        //            Expression result = null;
-        //            int size = pairs.size();
-        //            List<AnalyzePair> leftOvers = new ArrayList<>(size);
-        //            for (int i = 0; i < size; i++)
-        //            {
-        //                AnalyzePair pair = pairs.get(i);
-        //                if (pair.isSingleAlias(alias) || (includeAliasLess && pair.isSingleAlias("")))
-        //                {
-        //                    Expression expression = pair.getPredicate();
-        //                    result = result == null
-        //                        ? expression
-        //                        : new LogicalBinaryExpression(LogicalBinaryExpression.Type.AND, result, expression);
-        //                }
-        //                else
-        //                {
-        //                    leftOvers.add(pair);
-        //                }
-        //            }
-        //
-        //            return Pair.of(result, new AnalyzeResult(leftOvers));
-        //        }
+        Pair<Expression, AnalyzeResult> extractPushdownPredicate(String alias)
+        {
+            if (pairs.isEmpty())
+            {
+                return Pair.of(null, this);
+            }
+
+            Expression result = null;
+            int size = pairs.size();
+            List<AnalyzePair> leftOvers = new ArrayList<>(size);
+            for (int i = 0; i < size; i++)
+            {
+                AnalyzePair pair = pairs.get(i);
+                if (pair.isPushdown(alias))
+                {
+                    Expression expression = pair.getPredicate();
+                    result = result == null
+                        ? expression
+                        : new LogicalBinaryExpression(LogicalBinaryExpression.Type.AND, result, expression);
+                }
+                else
+                {
+                    leftOvers.add(pair);
+                }
+            }
+
+            return Pair.of(result, new AnalyzeResult(leftOvers));
+        }
 
         /** Return the full predicate (source) for this analyze result */
         public Expression getPredicate()
@@ -241,23 +243,24 @@ public class PredicateAnalyzer
         /** Returns pairs that are of Comparison EQUAL type and referencing provided alias on one side only */
         public List<AnalyzePair> getEquiPairs(String alias)
         {
-            return getEquiStream()
-                    .filter(p -> p.isSingleAlias(alias))
+            return pairs
+                    .stream()
+                    .filter(p -> p.isEqui(alias))
                     .collect(toList());
         }
 
-        /** Return pairs that are of Comparison EQUAL type */
-        public List<AnalyzePair> getEquiPairs()
-        {
-            return getEquiStream().collect(toList());
-        }
-
-        private Stream<AnalyzePair> getEquiStream()
-        {
-            return pairs
-                    .stream()
-                    .filter(pair -> pair.comparisonType == Type.EQUAL);
-        }
+//        /** Return pairs that are of Comparison EQUAL type */
+//        public List<AnalyzePair> getEquiPairs()
+//        {
+//            return getEquiStream().collect(toList());
+//        }
+//
+//        private Stream<AnalyzePair> getEquiStream()
+//        {
+//            return pairs
+//                    .stream()
+//                    .filter(pair -> pair.comparisonType == Type.EQUAL);
+//        }
 
         /** Return equi items for provided alias */
         //        public List<AnalyzePair> getEquiPairs(String alias, boolean includeAliasLess)
@@ -340,12 +343,12 @@ public class PredicateAnalyzer
             return comparisonType;
         }
 
-        public AnalyzeItem getLeft()
+        AnalyzeItem getLeft()
         {
             return left;
         }
 
-        public AnalyzeItem getRight()
+        AnalyzeItem getRight()
         {
             return right;
         }
@@ -369,30 +372,30 @@ public class PredicateAnalyzer
             return left.expression;
         }
 
-        //        /**
-        //         * Returns expression pair for provided alias.
-        //         *
-        //         * @return Returns a Pair with the expression belonging to the alias as left value and opposite as right.
-        //         */
-        //        public Pair<Expression, Expression> getExpressionPair(String alias, boolean includeAliasLess)
-        //        {
-        //            if (left.column != null
-        //                && (left.isSingleAlias(alias)
-        //                    || (includeAliasLess && left.isSingleAlias(""))))
-        //            {
-        //                return Pair.of(left.expression, right.expression);
-        //            }
-        //            else if (right.column != null
-        //                && (right.isSingleAlias(alias)
-        //                    || (includeAliasLess && right.isSingleAlias(""))))
-        //            {
-        //                return Pair.of(right.expression, left.expression);
-        //            }
-        //            throw new IllegalArgumentException("No expressions could be found in this pair for alias " + alias);
-        //        }
-        //
         /**
-         * Returns the column for provided alias (if any exits). Only single part qualified names are allowed
+         * Returns expression pair for provided alias.
+         *
+         * @return Returns a Pair with the expression belonging to the alias as left value and opposite as right.
+         */
+        public Pair<Expression, Expression> getExpressionPair(String alias)
+        {
+            if (left.isSingleAlias(alias, false, true))
+            {
+                return Pair.of(left.expression, right.expression);
+            }
+            else if (right.isSingleAlias(alias, false, true))
+            {
+                return Pair.of(right.expression, left.expression);
+            }
+
+            throw new IllegalArgumentException("No expressions could be found in this pair for alias " + alias);
+        }
+
+        /**
+         * <pre>
+         * Returns the column for provided alias (if any exits).
+         * Only single part qualified names are taken into consideration
+         * </pre>
          */
         public String getColumn(String alias)
         {
@@ -403,22 +406,22 @@ public class PredicateAnalyzer
                 && right.qname.getParts().size() == 1;
 
             if (leftEligable
-                && alias.equals(left.alias))
+                && left.aliases.contains(alias))
             {
                 return left.qname.getFirst();
             }
             else if (rightEligable
-                && alias.equals(right.alias))
+                && right.aliases.contains(alias))
             {
                 return right.qname.getFirst();
             }
             else if (leftEligable
-                && "".equals(left.alias))
+                && left.aliases.contains(""))
             {
                 return left.qname.getFirst();
             }
             else if (rightEligable
-                && "".equals(right.alias))
+                && right.aliases.contains(""))
             {
                 return right.qname.getFirst();
             }
@@ -426,30 +429,65 @@ public class PredicateAnalyzer
             return null;
         }
 
-        /** Is this pair a single alias reference */
-        boolean isSingleAlias(String alias)
+        /**
+         * Checks if this pair is a push down candidate for provided alias
+         *
+         * <pre>
+         *  A push down pair is a pair only referencing an empty alias
+         *  or the provided alias. And one of the sides must have an alias
+         *
+         *  Ie.
+         *  from source s
+         *  inner join article a
+         *    on  a.art_id = s.art_id
+         *    and a.active_flg                  <--- push down for alias 'a'
+         *    and internet_flg                  <--- push down for all aliases, and thus true for 'a'
+         *    and a.field > :var                <--- push down for a
+         * </pre>
+         */
+        boolean isPushdown(String alias)
         {
-            //
-            
-            return left.isSingleAlias(alias) && (right == null || right.isSingleAlias(alias));
+            return left.isSingleAlias(alias, true, true)
+                && (right == null
+                    || right.isSingleAlias(alias, true, true));
         }
 
-        //        /**
-        //         * <pre>
-        //         * Return true if this pair is an equi pair matching provided alias.
-        //         * An equi pair is a pair where provided alias is not referenced on both sides
-        //         * </pre>
-        //         **/
-        //        boolean isEqui(String alias)
-        //        {
-        //            if (left.isEmpty() || right.isEmpty())
-        //            {
-        //                return false;
-        //            }
-        //
-        //            return (left.isSingleAlias(alias) && !right.contains(alias))
-        //                || (!left.contains(alias) && right.isSingleAlias(alias));
-        //        }
+        /** Checks if this pair is a EQUI pair for provided alias
+         * 
+         * <pre>
+         *  A EQUI pair is a pair with type EQUAL
+         *  and have provided alias referenced on one AND ONLY one side
+         *  and that alias is not referenced on the other side.
+         *  
+         *  Ie
+         *  
+         *   a.art_id = 10                                ok
+         *   10 = a.art_id                                ok
+         *   a.art_id = a.id                              not ok
+         *   a.art_id = art_id                            not ok
+         *   a.art_id = s.art_id                          ok
+         *   func(a.art_id) = func(s.art_id + s.id)       ok
+         *   a.art_id > 10                                not ok
+         *   a.art_id = other_id                          not ok           
+         *   
+         * </pre>
+         */
+        boolean isEqui(String alias)
+        {
+            // Not an equi type
+            if (comparisonType != ComparisonExpression.Type.EQUAL)
+            {
+                return false;
+            }
+
+            if (left.isSingleAlias(alias, false, true))
+            {
+                return !right.aliases.contains(alias)
+                    && !right.aliases.contains("");
+            }
+
+            return right.isSingleAlias(alias, false, true);
+        }
 
         @Override
         public int hashCode()
@@ -493,9 +531,9 @@ public class PredicateAnalyzer
                 AnalyzeItem leftItem = getQualifiedItem(ce.getLeft());
                 AnalyzeItem rightItem = getQualifiedItem(ce.getRight());
 
-                boolean sameAlias = Objects.equals(leftItem.alias, rightItem.alias);
-                
-                if (!sameAlias && (leftItem.alias != null || rightItem.alias != null))
+                boolean sameAlias = !leftItem.aliases.isEmpty() && Objects.equals(leftItem.aliases, rightItem.aliases);
+
+                if (!sameAlias)
                 {
                     return new AnalyzePair(Type.COMPARISION, ce.getType(), leftItem, rightItem);
                 }
@@ -514,14 +552,29 @@ public class PredicateAnalyzer
                         QualifiedReferenceVisitor.getAliases(arg, aliases);
                     }
 
-                    AnalyzeItem rightItem = new AnalyzeItem(ie, aliases.size() == 1 ? aliases.iterator().next() : null, null);
+                    AnalyzeItem rightItem = new AnalyzeItem(ie, aliases, null);
                     return new AnalyzePair(Type.IN, leftItem, rightItem);
                 }
             }
 
+            if (expression instanceof QualifiedReferenceExpression)
+            {
+                // A single qualified expression in a predicate is a boolean expression
+                // Turn this into a comparison expression
+                // ie. active_flg = true
+                
+                return AnalyzePair.of(new ComparisonExpression(ComparisonExpression.Type.EQUAL, expression, LiteralBooleanExpression.TRUE_LITERAL));
+            }
+            else if (expression instanceof LogicalNotExpression && ((LogicalNotExpression) expression).getExpression() instanceof QualifiedReferenceExpression)
+            {
+                // A single qualified expression in a predicate is a boolean expression
+                // Turn this into a comparison expression
+                // ie. not active_flg
+                return AnalyzePair.of(new ComparisonExpression(ComparisonExpression.Type.EQUAL, ((LogicalNotExpression) expression).getExpression(), LiteralBooleanExpression.FALSE_LITERAL));
+            }
             Set<String> aliases = new HashSet<>();
             QualifiedReferenceVisitor.getAliases(expression, aliases);
-            return new AnalyzePair(Type.UNDEFINED, new AnalyzeItem(expression, aliases.size() == 1 ? aliases.iterator().next() : null, null), null);
+            return new AnalyzePair(Type.UNDEFINED, new AnalyzeItem(expression, aliases, null), null);
         }
 
         private static AnalyzeItem getQualifiedItem(Expression expression)
@@ -532,10 +585,12 @@ public class PredicateAnalyzer
                 List<String> parts = qre.getQname().getParts();
                 String alias = parts.size() > 1 ? parts.get(0) : "";
                 QualifiedName qname = qre.getQname().extract(parts.size() > 1 ? 1 : 0);
-                return new AnalyzeItem(expression, alias, qname);
+                return new AnalyzeItem(expression, asSet(alias), qname);
             }
 
-            return new AnalyzeItem(expression, null, null);
+            Set<String> aliases = new HashSet<>();
+            QualifiedReferenceVisitor.getAliases(expression, aliases);
+            return new AnalyzeItem(expression, aliases, null);
         }
 
         /** Type of Pair */
@@ -555,8 +610,8 @@ public class PredicateAnalyzer
     {
         /** Expression representing this item */
         private final Expression expression;
-        /** Alias (if any) referenced by this item */
-        private final String alias;
+        /** Aliases (if any) referenced by this item */
+        final Set<String> aliases;
         /**
          * Qualified name (if any) referenced by this item If set then {@link #alias} is omitted from qname.
          **/
@@ -564,18 +619,18 @@ public class PredicateAnalyzer
 
         AnalyzeItem(
                 Expression expression,
-                String alias,
+                Set<String> aliases,
                 QualifiedName qname)
         {
             this.expression = expression;
-            this.alias = alias;
+            this.aliases = requireNonNull(aliases, "aliases");
             this.qname = qname;
         }
-        
-        String getAlias()
-        {
-            return alias;
-        }
+
+        //        String getAlias()
+        //        {
+        //            return alias;
+        //        }
 
         /** Returns true if this item is empty */
         //        boolean isEmpty()
@@ -590,12 +645,29 @@ public class PredicateAnalyzer
         //        }
         //
 
-        //        /** Checks if this item is a single alias. Ie only only alias is referenced in the expression. */
-        boolean isSingleAlias(String alias)
+        /**
+         * Checks if this item is a single alias. Ie. no alias or empty alias or provided alias
+         */
+        boolean isSingleAlias(String alias, boolean includeNonAliases, boolean includeEmptyAlias)
         {
-            return this.alias == null
-                || alias.equals(this.alias)
-                || "".equals(this.alias);
+            if (includeNonAliases && aliases.isEmpty())
+            {
+                return true;
+            }
+
+            if (aliases.size() == 1)
+            {
+                return aliases.contains(alias)
+                    || (includeEmptyAlias && aliases.contains(""));
+            }
+            else if (aliases.size() == 2)
+            {
+                return aliases.contains(alias)
+                    && includeEmptyAlias
+                    && aliases.contains("");
+            }
+
+            return false;
         }
 
         @Override
@@ -612,7 +684,7 @@ public class PredicateAnalyzer
             {
                 AnalyzeItem that = (AnalyzeItem) obj;
                 return Objects.equals(expression, that.expression)
-                    && Objects.equals(alias, that.alias)
+                    && Objects.equals(aliases, that.aliases)
                     && Objects.equals(qname, that.qname);
             }
 

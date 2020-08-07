@@ -102,9 +102,9 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         /** Predicate pushed down from join to table source */
         private final Map<String, Expression> pushDownPredicateByAlias = new THashMap<>();
 
-        /** Sort items. Sent to catalog to for usage if supported.  */
+        /** Sort items. Sent to catalog to for usage if supported. */
         private List<SortItem> sortItems;
-        
+
         /** Acquire next unique node id */
         private int acquireNodeId()
         {
@@ -205,22 +205,26 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         {
             TableSource ts = tsj.getTableSource();
             AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(where);
-            List<AnalyzePair> equiPairs = analyzeResult.getEquiPairs(ts.getAlias());
-            if (!equiPairs.isEmpty())
-            {
-                Pair<String, Catalog> pair = getCatalog(context, ts.getCatalog(), ts.getToken());
-                index = getIndex(equiPairs, ts.getAlias(), pair.getValue().getIndices(context.session, pair.getKey(), ts.getTable()));
+            Pair<String, Catalog> pair = getCatalog(context, ts.getCatalog(), ts.getToken());
+            List<Index> indices = pair.getValue().getIndices(context.session, pair.getKey(), ts.getTable());
+            IndexOperatorFoundation foundation = new IndexOperatorFoundation(ts.getAlias(), indices, analyzeResult, false);
+//            List<AnalyzePair> equiPairs = analyzeResult.getEquiPairs(ts.getAlias());
+//            if (!equiPairs.isEmpty())
+//            {
+//                index = getIndex(equiPairs, ts.getAlias(), pair.getValue().getIndices(context.session, pair.getKey(), ts.getTable()));
                 // Index found, extract index predicate columns
                 // and set where predicate to left overs
-                if (index != null)
+                if (foundation.index != null)
                 {
-                    IndexOperatorFoundation foundation = new IndexOperatorFoundation(ts.getAlias(), index, analyzeResult.getPairs(), equiPairs);
                     outerValuesExpressions = foundation.outerValueExpressions;
-                    analyzeResult = foundation.leftOverAnalyzeResult;
-                    where = analyzeResult.getPredicate();
+//                    analyzeResult = foundation.leftOverAnalyzeResult;
+//                    where = analyzeResult.getPredicate();
                 }
-            }
-
+//            }
+              
+                context.appendPushDownPredicate(ts.getAlias(), foundation.pushDownExpression);   
+                where = foundation.condition;
+                
             /* TODO:
             Push down can applied to non populating joins ie:
             select s.id
@@ -235,13 +239,13 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             */
 
             // Extract push down predicates
-            Pair<Expression, AnalyzeResult> pair = analyzeResult.extractPushdownPredicate(ts.getAlias(), true);
-            if (pair.getKey() != null)
-            {
-                context.appendPushDownPredicate(ts.getAlias(), pair.getKey());
-                //pushDownPredicate = pair.getKey();
-                where = pair.getValue().getPredicate();
-            }
+//            Pair<Expression, AnalyzeResult> pair = analyzeResult.extractPushdownPredicate(ts.getAlias());
+//            if (pair.getKey() != null)
+//            {
+//                context.appendPushDownPredicate(ts.getAlias(), pair.getKey());
+//                //pushDownPredicate = pair.getKey();
+//                where = pair.getValue().getPredicate();
+//            }
         }
 
         TableOption batchLimitOption = null;
@@ -255,7 +259,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         }
 
         context.sortItems = new ArrayList<>(select.getOrderBy());
-        
+
         if (tsj != null)
         {
             context.index = index;
@@ -312,7 +316,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             context.sortItems.forEach(si -> si.accept(this, context));
             context.operator = new SortByOperator(context.acquireNodeId(), context.operator, new ExpressionRowComparator(context.sortItems));
         }
-        
+
         if (select.getTopExpression() != null)
         {
             visit(select.getTopExpression(), context);
@@ -416,7 +420,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         context.projection = new ExpressionProjection(expression);
         return null;
     }
-    
+
     private static final Projection NO_OP_PROJECTION = (writer, context) ->
     {
     };
@@ -503,7 +507,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         {
             // Analyze expression to see if there is push down candidates
             AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(where);
-            Pair<Expression, AnalyzeResult> pair = analyzeResult.extractPushdownPredicate(tableSource.getAlias(), true);
+            Pair<Expression, AnalyzeResult> pair = analyzeResult.extractPushdownPredicate(tableSource.getAlias());
             if (pair.getKey() != null)
             {
                 pushDownPredicate = pair.getKey();
@@ -569,27 +573,29 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         TablePredicate predicate = new TablePredicate(context.pushDownPredicateByAlias.get(table.getAlias()));
         if (context.index != null)
         {
-            context.operator = pair.getValue().getIndexOperator(new OperatorData(
-                    context.session,
-                    nodeId,
-                    pair.getKey(),
-                    alias,
-                    predicate,
-                    emptyList(),
-                    table.getTableOptions()),
-                    context.index);
+            context.operator = pair.getValue()
+                    .getIndexOperator(new OperatorData(
+                            context.session,
+                            nodeId,
+                            pair.getKey(),
+                            alias,
+                            predicate,
+                            emptyList(),
+                            table.getTableOptions()),
+                            context.index);
             context.index = null;
         }
         else
         {
-            context.operator = pair.getValue().getScanOperator(new OperatorData(
-                    context.session,
-                    nodeId,
-                    pair.getKey(),
-                    alias,
-                    predicate,
-                    context.sortItems,
-                    table.getTableOptions()));
+            context.operator = pair.getValue()
+                    .getScanOperator(new OperatorData(
+                            context.session,
+                            nodeId,
+                            pair.getKey(),
+                            alias,
+                            predicate,
+                            context.sortItems,
+                            table.getTableOptions()));
         }
         // Set leftover predicate to context
         context.pushDownPredicateByAlias.put(table.getAlias(), predicate.getPredicate());
@@ -680,32 +686,37 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             boolean emitEmptyOuterRows,
             boolean isCorrelated)
     {
-        Expression condition = joinCondition;
-        AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(joinCondition);
+//        Expression condition = joinCondition;
         String innerAlias = innerTableSource.getAlias();
         boolean populating = innerTableSource instanceof PopulateTableSource;
-        List<AnalyzePair> equiPairs = analyzeResult.getEquiPairs(innerAlias);
-        int equiPairSize = equiPairs.size();
+        //        List<AnalyzePair> equiPairs = analyzeResult.getEquiPairs(innerAlias);
+        //        int equiPairSize = equiPairs.size();
 
         List<Index> indices = emptyList();
         if (innerTableSource.getTable() != null)
         {
             Pair<String, Catalog> pair = getCatalog(context, innerTableSource.getCatalog(), innerTableSource.getToken());
-            QualifiedName table = innerTableSource.getTable();
-            indices = pair.getValue().getIndices(context.session, pair.getKey(), table);
+            indices = pair.getValue().getIndices(context.session, pair.getKey(), innerTableSource.getTable());
         }
         // TODO: If outer is ordered and no inner indices
         // then the inner could be created and after, check it's order for a potential
         // MergeJoin
-        
-        Index index = getIndex(equiPairs, innerAlias, indices);
-        IndexOperatorFoundation foundation = new IndexOperatorFoundation(innerAlias, index, analyzeResult.getPairs(), equiPairs);
 
+        // - Resolve index
+        // - Extract valueExtractors
+        // - Extract pushdown predicate
+
+        AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(joinCondition);
+        IndexOperatorFoundation foundation = new IndexOperatorFoundation(innerAlias, indices, analyzeResult, emitEmptyOuterRows);
+        Index index = foundation.index;
+        Expression condition = foundation.condition;
+        context.appendPushDownPredicate(innerAlias, foundation.pushDownExpression);
+        
         /* No equi items in condition or a correlated query => NestedLoop */
-        if (isCorrelated || equiPairSize == 0)
+        if (isCorrelated || !foundation.isEqui())
         {
-            condition = extractPushDownPredicate(context, innerAlias, emitEmptyOuterRows, analyzeResult);
-            
+//            condition = extractPushDownPredicate(context, innerAlias, emitEmptyOuterRows, analyzeResult);
+
             boolean hasIndex = index != null;
             context.index = index;
             innerTableSource.accept(this, context);
@@ -713,10 +724,10 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             {
                 throw new RuntimeException("Index " + index + " should have been consumed by " + innerTableSource.getTable());
             }
-            
+
             Operator inner = wrapWithPushDown(context, context.operator, innerAlias);
 
-            // Cache inner operator if this is a regular nested loop 
+            // Cache inner operator if this is a regular nested loop
             if (!isCorrelated)
             {
                 inner = new CachingOperator(context.acquireNodeId(), inner);
@@ -743,7 +754,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         // No indices for inner -> HashJoin
         if (index == null)
         {
-            condition = extractPushDownPredicate(context, innerAlias, emitEmptyOuterRows, analyzeResult);
+//            condition = extractPushDownPredicate(context, innerAlias, emitEmptyOuterRows, analyzeResult);
             innerTableSource.accept(this, context);
             Operator inner = wrapWithPushDown(context, context.operator, innerAlias);
 
@@ -763,7 +774,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         }
 
         // Extract pushdown and new join condition
-        condition = extractPushDownPredicate(context, innerAlias, emitEmptyOuterRows, foundation.leftOverAnalyzeResult);
+//        condition = extractPushDownPredicate(context, innerAlias, emitEmptyOuterRows, foundation.leftOverAnalyzeResult);
         context.index = index;
         innerTableSource.accept(this, context);
         if (context.index != null)
@@ -823,7 +834,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         //        throw new RuntimeException("No operator could be created for join");
     }
 
-    private Index getIndex(List<AnalyzePair> equiPairs, String alias, List<Index> indices)
+    private static Index getIndex(List<AnalyzePair> equiPairs, String alias, List<Index> indices)
     {
         /* Extract all references inner columns from equi items */
         Set<String> columnItems = equiPairs
@@ -875,7 +886,9 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             Index index,
             List<Expression> outerValueExpressions,
             List<Expression> innerValueExpressions,
-            List<AnalyzePair> indexPairs)
+            List<AnalyzePair> indexPairs,
+            List<AnalyzePair> pushDownPairs,
+            boolean emitEmptyOuterRows)
     {
         Set<String> processedColumns = new HashSet<>();
         int size = equiPairs.size();
@@ -883,6 +896,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         {
             AnalyzePair pair = equiPairs.get(i);
 
+            boolean isIndexPair;
             // Find out the index of the
             String column = pair.getColumn(innerAlias);
             int columnIndex = 0;
@@ -901,10 +915,11 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                     continue;
                 }
 
-                indexPairs.add(pair);
+                isIndexPair = true;
+                //                indexPairs.add(pair);
             }
 
-            Pair<Expression, Expression> p = pair.getExpressionPair(innerAlias, true);
+            Pair<Expression, Expression> p = pair.getExpressionPair(innerAlias);
 
             if (outerValueExpressions.size() > columnIndex)
             {
@@ -916,12 +931,19 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 outerValueExpressions.add(p.getRight());
                 innerValueExpressions.add(p.getLeft());
             }
+
+            // If 
+
+            if (!emitEmptyOuterRows && pair.isPushdown(innerAlias))
+            {
+                pushDownPairs.add(pair);
+                continue;
+            }
         }
     }
 
     /**
      * <pre>
-     *
      * Extracts pushdown predicate from provided analyze result
      * and pushes it to context for later extract when operator is created
      * </pre>
@@ -936,7 +958,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     {
         if (!emitEmptyOuterRows)
         {
-            Pair<Expression, AnalyzeResult> pushdownPair = analyzeResult.extractPushdownPredicate(innerAlias, true);
+            Pair<Expression, AnalyzeResult> pushdownPair = analyzeResult.extractPushdownPredicate(innerAlias);
             if (pushdownPair.getKey() != null)
             {
                 context.appendPushDownPredicate(innerAlias, pushdownPair.getKey());
@@ -1015,43 +1037,167 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     /** Class containing information needed to build a index operator */
     private static class IndexOperatorFoundation
     {
-        final List<Expression> outerValueExpressions;
-        final List<Expression> innerValueExpressions;
-        final List<AnalyzePair> indexPairs;
-        final AnalyzeResult leftOverAnalyzeResult;
+        List<Expression> outerValueExpressions;
+        List<Expression> innerValueExpressions;
+//        AnalyzeResult analyzeResult;
+        Expression condition;
+        Expression pushDownExpression;
+        Index index;
+        
+        boolean isEqui()
+        {
+            return outerValueExpressions != null && outerValueExpressions.size() > 0;
+        }
 
         IndexOperatorFoundation(
                 String alias,
-                Index index,
-                List<AnalyzePair> analyzePairs,
-                List<AnalyzePair> equiPairs)
+                List<Index> indices,
+                AnalyzeResult analyzeResult,
+                boolean emitEmptyOuterRows)
         {
-            int size = equiPairs.size();
+            int size = analyzeResult.getPairs().size();
+            List<AnalyzePair> equiItems = new ArrayList<>(size);
+            List<AnalyzePair> leftOverEquiItems = new ArrayList<>(size);
+            for (int i = 0; i < size; i++)
+            {
+                AnalyzePair pair = analyzeResult.getPairs().get(i);
+                if (pair.isEqui(alias))
+                {
+                    equiItems.add(pair);
+                }
+                else
+                {
+                    leftOverEquiItems.add(pair);
+                }
+            }
+
+            if (equiItems.size() == 0)
+            {
+                Pair<Expression, AnalyzeResult> pair = analyzeResult.extractPushdownPredicate(alias);
+                if (pair.getKey() != null)
+                {
+                    pushDownExpression = pair.getKey();
+                    condition = pair.getValue().getPredicate();
+                }
+                else
+                {
+                    condition = pair.getValue().getPredicate();
+                }
+                return;
+            }
+
+            // equiItems
+            //   index items -> no
+            // nonEquiItems
+            
+            // Populate value extractors
+            index = getIndex(equiItems, alias, indices);
+            size = equiItems.size();
             outerValueExpressions = new ArrayList<>(size);
             innerValueExpressions = new ArrayList<>(size);
-            indexPairs = new ArrayList<>(size);
+            Set<String> processedColumns = new HashSet<>();
+            for (int i = 0; i < size; i++)
+            {
+                AnalyzePair pair = equiItems.get(i);
+                boolean isPushdown = pair.isPushdown(alias);
+                String column = pair.getColumn(alias);
+                int columnIndex = 0;
+                boolean isIndexPair = false;
+                if (index != null && column != null)
+                {
+                    columnIndex = index.getColumns().indexOf(column);
+                    if (columnIndex == -1)
+                    {
+                        leftOverEquiItems.add(pair);
+                        continue;
+                    }
 
-            populateValueExtractors(
-                    alias,
-                    equiPairs,
-                    index,
-                    outerValueExpressions,
-                    innerValueExpressions,
-                    indexPairs);
-            List<AnalyzePair> pairs = new ArrayList<>(analyzePairs);
-            pairs.removeAll(indexPairs);
+                    if (!processedColumns.add(column))
+                    {
+                        // TODO: pick the best avaiable expression
+                        // Ie. Expression#isConstant over any other
+                        continue;
+                    }
 
-            // Remove all pushdown candidates from index items,
-            // these are contained within index and no need to push down
-            // and is neither needed in join condition
-            indexPairs.removeIf(pair -> pair.isSingleAlias(alias));
+                    isIndexPair = true;
+                    //                indexPairs.add(pair);
+                }
+                
+                if (isIndexPair || !isPushdown)
+                {
+                    Pair<Expression, Expression> p = pair.getExpressionPair(alias);
+                    if (outerValueExpressions.size() > columnIndex)
+                    {
+                        outerValueExpressions.add(columnIndex, p.getRight());
+                        innerValueExpressions.add(columnIndex, p.getLeft());
+                    }
+                    else
+                    {
+                        outerValueExpressions.add(p.getRight());
+                        innerValueExpressions.add(p.getLeft());
+                    }
+                }
+                
+                // Don't re-add pair if it's a index-pushdown item
+                if (!(isIndexPair && pair.isPushdown(alias)))
+                {
+                    leftOverEquiItems.add(pair);
+                }
+            }
 
-            // Create a new analyze result from resulting pairs
-            pairs.addAll(indexPairs);
-            this.leftOverAnalyzeResult = new AnalyzeResult(pairs);
+            AnalyzeResult result = new AnalyzeResult(leftOverEquiItems);
+            
+            // No push down in LEFT JOINS
+            if (emitEmptyOuterRows)
+            {
+                condition = result.getPredicate();
+                return;
+            }
+            
+            Pair<Expression, AnalyzeResult> pair = result.extractPushdownPredicate(alias);
+            if (pair.getKey() != null)
+            {
+                pushDownExpression = pair.getKey();
+                condition = pair.getValue().getPredicate();
+            }
+            else
+            {
+                condition = pair.getValue().getPredicate();
+            }
+            
+            //            outerValueExpressions = new ArrayList<>(size);
+            //            innerValueExpressions = new ArrayList<>(size);
+            //            List<AnalyzePair> indexPairs = new ArrayList<>(size);
+            //            List<AnalyzePair> pushDownPairs = new ArrayList<>(size);
+            //
+            //            
+            //            
+            //            populateValueExtractors(
+            //                    alias,
+            //                    equiPairs,
+            //                    index,
+            //                    outerValueExpressions,
+            //                    innerValueExpressions,
+            //                    indexPairs,
+            //                    pushDownPairs,
+            //                    emitEmptyOuterRows);
+            //            List<AnalyzePair> pairs = new ArrayList<>(analyzePairs);
+            //            // Remove all consumed indexPairs
+            //            pairs.removeAll(indexPairs);
+            //  All - indexPairs - 
+            //            // Remove all pushdown candidates from index items,
+            //            // these are contained within index and no need to push down
+            //            // and is neither needed in join condition
+            ////            indexPairs.removeIf(pair -> pair.isPushdown(alias));
+            //
+            //            // Create a new analyze result from resulting pairs
+            //            pairs.addAll(indexPairs);
+            //            this.leftOverAnalyzeResult = new AnalyzeResult(pairs);
+            //            this.pushDownExpression = pushDownPairs.isEmpty() ? null : new AnalyzeResult(pushDownPairs).getPredicate();
         }
+
     }
-    
+
     /**
      * Detects correlated queries by analyzing qualified expression references in child join to see if any aliases from outer context is referenced.
      */

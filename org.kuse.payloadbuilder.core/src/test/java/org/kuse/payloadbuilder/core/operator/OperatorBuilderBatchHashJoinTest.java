@@ -41,7 +41,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 new FilterOperator(
                         1,
                         operators.get(0),
-                        new ExpressionPredicate(e("a.active_flg"))),
+                        new ExpressionPredicate(e("a.active_flg = true"))),
                 asList(e("10")));
 
 //        System.err.println(pair.getKey().toString(1));
@@ -87,7 +87,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                                 operators.get(2),
                                 new ExpressionHashFunction(asList(e("a.art_id"))),
                                 new ExpressionHashFunction(asList(e("aa.art_id"))),
-                                new ExpressionPredicate(e("aa.art_id = a.art_id AND s.id")),
+                                new ExpressionPredicate(e("aa.art_id = a.art_id AND s.id = true")),
                                 DefaultRowMerger.DEFAULT,
                                 true,
                                 false),
@@ -138,7 +138,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                         5,
                         "INNER JOIN",
                         new FilterOperator(2, operators.get(1), new ExpressionPredicate(e("a.active_flg = 1"))),
-                        new FilterOperator(4, operators.get(2), new ExpressionPredicate(e("aa.active_flg"))),
+                        new FilterOperator(4, operators.get(2), new ExpressionPredicate(e("aa.active_flg = true"))),
                         new ExpressionValuesExtractor(asList(e("a.art_id"))),
                         new ExpressionValuesExtractor(asList(e("aa.art_id"))),
                         new ExpressionPredicate(e("aa.art_id = a.art_id")),
@@ -158,8 +158,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         Operator actual = pair.getKey();
 
-        //        System.out.println(actual.toString(1));
-        //        System.err.println(expected.toString(1));
+//                System.out.println(actual.toString(1));
+//                System.err.println(expected.toString(1));
 
         assertEquals(expected, actual);
 

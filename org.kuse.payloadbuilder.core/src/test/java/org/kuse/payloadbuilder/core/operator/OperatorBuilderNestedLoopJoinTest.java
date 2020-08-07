@@ -4,14 +4,6 @@ import static java.util.Arrays.asList;
 
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
-import org.kuse.payloadbuilder.core.operator.CachingOperator;
-import org.kuse.payloadbuilder.core.operator.DefaultRowMerger;
-import org.kuse.payloadbuilder.core.operator.ExpressionPredicate;
-import org.kuse.payloadbuilder.core.operator.ExpressionProjection;
-import org.kuse.payloadbuilder.core.operator.FilterOperator;
-import org.kuse.payloadbuilder.core.operator.NestedLoopJoin;
-import org.kuse.payloadbuilder.core.operator.ObjectProjection;
-import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Test building of nested loops */
@@ -31,7 +23,7 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorTest
                 4,
                 "",
                 result.tableOperators.get(0),
-                new CachingOperator(3, new FilterOperator(2, result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg")))),
+                new CachingOperator(3, new FilterOperator(2, result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg = true")))),
                 new ExpressionPredicate(e("a.art_id = s.art_id or s.id1 > 0")),
                 DefaultRowMerger.DEFAULT,
                 false,
@@ -63,7 +55,7 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorTest
                 4,
                 "",
                 result.tableOperators.get(0),
-                new CachingOperator(3, new FilterOperator(2, result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg AND a.internet_flg")))),
+                new CachingOperator(3, new FilterOperator(2, result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg = true AND a.internet_flg = true")))),
                 new ExpressionPredicate(e("a.art_id = s.art_id or s.id1 > 0")),
                 DefaultRowMerger.DEFAULT,
                 true,

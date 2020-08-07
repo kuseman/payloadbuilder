@@ -138,7 +138,7 @@ class ESCatalog extends Catalog
             String column = pair.getColumn(tableAlias.getAlias());
             if (analyzedFields.contains(column))
             {
-                Pair<Expression, Expression> expressionPair = pair.getExpressionPair(tableAlias.getAlias(), true);
+                Pair<Expression, Expression> expressionPair = pair.getExpressionPair(tableAlias.getAlias());
                 fieldPredicates.add(Pair.of(column, expressionPair.getRight()));
             }
             else

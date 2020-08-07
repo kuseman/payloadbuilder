@@ -233,7 +233,7 @@ public class OperatorBuilderTest extends AOperatorTest
                                 new HashJoin(
                                         6,
                                         "",
-                                        new FilterOperator(4, queryResult.tableOperators.get(2), new ExpressionPredicate(e("active_flg"))),
+                                        new FilterOperator(4, queryResult.tableOperators.get(2), new ExpressionPredicate(e("active_flg = true"))),
                                         queryResult.tableOperators.get(3),
                                         new ExpressionHashFunction(asList(e("aa.sku_id"))),
                                         new ExpressionHashFunction(asList(e("ap.sku_id"))),
@@ -256,8 +256,8 @@ public class OperatorBuilderTest extends AOperatorTest
                 true,
                 false);
 
-        //                System.err.println(expected.toString(1));
-        //                System.out.println(queryResult.operator.toString(1));
+//                        System.err.println(expected.toString(1));
+//                        System.out.println(queryResult.operator.toString(1));
 
         assertEquals(expected, queryResult.operator);
 
@@ -416,7 +416,7 @@ public class OperatorBuilderTest extends AOperatorTest
             p.setPredicate(new AnalyzeResult(leftOvers).getPredicate());
         }, null);
 
-        assertEquals(e("s.flag1"), catalogPredicate.getValue());
+        assertEquals(e("s.flag1 = true"), catalogPredicate.getValue());
 
         TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"flag2", "flag1", "id1"});
         assertTrue(source.isEqual(result.alias));
@@ -424,7 +424,7 @@ public class OperatorBuilderTest extends AOperatorTest
         Operator expected = new FilterOperator(
                 1,
                 result.tableOperators.get(0),
-                new ExpressionPredicate(e("s.flag2")));
+                new ExpressionPredicate(e("s.flag2 = true")));
 
         //        System.out.println(expected.toString(1));
         //        System.out.println(result.operator.toString(1));
@@ -479,7 +479,7 @@ public class OperatorBuilderTest extends AOperatorTest
         Operator expected = new FilterOperator(
                 1,
                 result.tableOperators.get(0),
-                new ExpressionPredicate(e("flag2 and s.flag")));
+                new ExpressionPredicate(e("flag2 = true and s.flag = true")));
 
 //                                System.out.println(expected.toString(1));
 //                                System.err.println(result.operator.toString(1));
@@ -502,9 +502,9 @@ public class OperatorBuilderTest extends AOperatorTest
 
         Operator expected = new HashJoin(
                 4,
-                "",
+                "INNER JOIN",
                 new FilterOperator(1, result.tableOperators.get(0), new ExpressionPredicate(e("s.id3 > 0"))),
-                new FilterOperator(3, result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg and note_id > 0"))),
+                new FilterOperator(3, result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg = true and note_id > 0"))),
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
@@ -512,8 +512,8 @@ public class OperatorBuilderTest extends AOperatorTest
                 true,
                 false);
         
-        //                        System.out.println(expected.toString(1));
-        //                        System.err.println(result.operator.toString(1));
+//                                System.out.println(expected.toString(1));
+//                                System.err.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
 
@@ -569,7 +569,7 @@ public class OperatorBuilderTest extends AOperatorTest
                                 result.tableOperators.get(2),
                                 new ExpressionHashFunction(asList(e("a.art_id"))),
                                 new ExpressionHashFunction(asList(e("aa.art_id"))),
-                                new ExpressionPredicate(e("aa.art_id = a.art_id AND s.id")),
+                                new ExpressionPredicate(e("aa.art_id = a.art_id AND s.id = true")),
                                 DefaultRowMerger.DEFAULT,
                                 true,
                                 false),
