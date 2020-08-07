@@ -55,6 +55,10 @@ public class QualifiedName
     /** Extracts a new qualified name from this instance with parts defined in from to last part */
     public QualifiedName extract(int from)
     {
+        if (from == 0)
+        {
+            return this;
+        }
         return new QualifiedName(parts.subList(from, parts.size()));
     }
 

@@ -14,7 +14,7 @@ query
  ;
  
 statements
- : (statement ';'?)+
+ : (stms+=statement ';'?)+
  ;
  
 statement
@@ -31,7 +31,7 @@ miscStatement
  ;
 
 setStatement
- : SET qname EQUALS expression
+ : SET '@' qname EQUALS expression
  ;
  
 useStatement
@@ -57,8 +57,8 @@ controlFlowStatement
 
 ifStatement
  : IF condition=expression THEN
-   statements
-   (ELSE elseStatements+=statements)?
+   stms=statements
+   (ELSE elseStatements=statements)?
    END IF 
  ;
 

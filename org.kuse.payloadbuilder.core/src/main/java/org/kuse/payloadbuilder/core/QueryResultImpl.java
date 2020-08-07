@@ -75,13 +75,13 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     public Void visit(IfStatement statement, Void ctx)
     {
         Object value = statement.getCondition().eval(context);
-        if ((Boolean) value)
+        if (value != null && (Boolean) value)
         {
-            queue.addAll(statement.getStatements());
+            queue.addAll(0, statement.getStatements());
         }
         else
         {
-            queue.addAll(statement.getElseStatements());
+            queue.addAll(0, statement.getElseStatements());
         }
         return null;
     }

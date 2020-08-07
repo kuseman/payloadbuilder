@@ -9,6 +9,7 @@ import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Point;
@@ -41,6 +42,7 @@ import javax.swing.UIManager;
 import javax.swing.WindowConstants;
 import javax.swing.event.TableModelEvent;
 import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.TableColumn;
 import javax.swing.text.BadLocationException;
 
 import org.apache.commons.lang3.mutable.MutableInt;
@@ -80,7 +82,7 @@ class QueryFileView extends JPanel
     private final JLabel labelExecutionStatus;
     private final Timer executionTimer;
     private final PrintStream messagePrintStream;
-    private final List<JTable> tables = new ArrayList<>();
+    private final List<ResultTable> tables = new ArrayList<>();
 
     private boolean resultCollapsed;
     private int prevDividerLocation;
@@ -193,6 +195,7 @@ class QueryFileView extends JPanel
             case COMPLETED:
                 setExecutionStats();
                 executionTimer.stop();
+                resizeLastTablesColumns();
                 break;
             case ABORTED:
                 setExecutionStats();
@@ -215,33 +218,37 @@ class QueryFileView extends JPanel
             resultTabs.setSelectedIndex(1);
         }
     }
+    
+    private void resizeLastTablesColumns()
+    {
+        // Resize last columns if not already done
+        if (tables.size() > 0 && !tables.get(tables.size() - 1).columnsAdjusted.get())
+        {
+            ResultTable lastTable = tables.get(tables.size() - 1);
+            lastTable.adjustColumns();
+        }
+    }
 
     private void handleResultModelAdded(final ResultModel resultModel)
     {
-        JTable resultTable = createResultTable();
-        final TableColumnAdjuster columnAdjuster = new TableColumnAdjuster(resultTable, 10, 250);
-        // Add listener to adjust columns upon reaching 30 rows or query is complete
-        final AtomicBoolean columnsAdjusted = new AtomicBoolean();
-
+        ResultTable resultTable = createResultTable();
         resultModel.addTableModelListener(e ->
         {
             if (e.getType() == TableModelEvent.INSERT
-                && !columnsAdjusted.get()
-                && (
-            // Row limit reached
-            resultModel.getRowCount() > COLUMN_ADJUST_ROW_LIMIT
-                // This result set is complete
-                || resultModel.isComplete()))
+                && !resultTable.columnsAdjusted.get()
+                && resultModel.getRowCount() > COLUMN_ADJUST_ROW_LIMIT)
             {
-                columnAdjuster.adjustColumns();
-                columnsAdjusted.set(true);
+                resultTable.adjustColumns();
             }
         });
         resultTable.setModel(resultModel);
 
+        if (tables.size() > 0)
+        {
+            resizeLastTablesColumns();
+        }
         tables.add(resultTable);
         int size = tables.size();
-
         resultsPanel.removeAll();
 
         // 8 rows plus header plus spacing
@@ -316,9 +323,9 @@ class QueryFileView extends JPanel
         resultsPanel.add(new JScrollPane(parent), BorderLayout.CENTER);
     }
 
-    private JTable createResultTable()
+    private ResultTable createResultTable()
     {
-        JTable resultTable = new JTable()
+        ResultTable resultTable = new ResultTable()
         {
             @Override
             public boolean isCellSelected(int row, int column)
@@ -380,6 +387,25 @@ class QueryFileView extends JPanel
                 return this;
             }
         });
+        resultTable.getTableHeader().addMouseListener(new MouseAdapter()
+        {
+            @Override
+            public void mouseClicked(MouseEvent e)
+            {
+                if (e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1 && resultTable.getTableHeader().getCursor().getType() == Cursor.E_RESIZE_CURSOR)
+                {
+                    // Move the point a bit to left to avoid resizing wrong column
+                    Point p = new Point(e.getPoint().x - 15, e.getPoint().y);
+                    int col = resultTable.getTableHeader().columnAtPoint(p);
+                    TableColumn column = resultTable.getColumnModel().getColumn(col);
+                    if (column != null)
+                    {
+                        resultTable.adjuster.adjustColumn(col, -1);
+                    }
+                }
+            }
+        });
+        
         resultTable.addMouseListener(new MouseAdapter()
         {
             @Override
@@ -391,53 +417,11 @@ class QueryFileView extends JPanel
                     int row = resultTable.rowAtPoint(point);
                     int col = resultTable.columnAtPoint(point);
 
-                    Object value = resultTable.getValueAt(row, col);
-                    if (value instanceof Row)
+                    if (row >= 0)
                     {
-                        Row pbRow = (Row) value;
-                        TableAlias alias = pbRow.getTableAlias();
-                        value = ofEntries(
-                                entry("table", alias.getTable().toString()),
-                                entry("columns", alias.getColumns()),
-                                entry("values", pbRow.getValues()));
+                        showValueDialog(resultTable, row, col);
                     }
-                    else if (value instanceof ChildRows)
-                    {
-                        ChildRows childRows = (ChildRows) value;
-                        value = emptyList();
-                        if (childRows.size() > 0)
-                        {
-                            TableAlias alias = childRows.get(0).getTableAlias();
-                            value = ofEntries(
-                                    entry("table", alias.getTable().toString()),
-                                    entry("columns", alias.getColumns()),
-                                    entry("rows", childRows.stream().map(r -> r.getValues()).collect(toList())));
-                        }
-                    }
-
-                    JFrame frame = new JFrame("Json viewer - " + resultTable.getColumnName(col) + " (Row: " + (row + 1) + ")");
-                    frame.setIconImages(PayloadbuilderEditorView.APPLICATION_ICONS);
-                    RSyntaxTextArea rta = new RSyntaxTextArea();
-                    rta.setColumns(80);
-                    rta.setRows(40);
-                    if (value instanceof Collection || value instanceof Map)
-                    {
-                        rta.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JSON);
-                        rta.setCodeFoldingEnabled(true);
-                        rta.setBracketMatchingEnabled(true);
-                        rta.setText(ResultModel.getPrettyJson(value));
-                    }
-                    else
-                    {
-                        rta.setText(String.valueOf(value));
-                    }
-                    rta.setCaretPosition(0);
-                    rta.setEditable(false);
-                    RTextScrollPane sp = new RTextScrollPane(rta);
-                    frame.getContentPane().add(sp);
-                    frame.setSize(600, 400);
-                    frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
-                    frame.setVisible(true);
+                    
                 }
                 else if (e.getClickCount() == 1 && e.getButton() == MouseEvent.BUTTON1)
                 {
@@ -452,6 +436,62 @@ class QueryFileView extends JPanel
             }
         });
         return resultTable;
+    }
+    
+    private void showValueDialog(JTable resultTable, int row, int col)
+    {
+        Object value = resultTable.getValueAt(row, col);
+        if (value == null)
+        {
+            return;
+        }
+
+        if (value instanceof Row)
+        {
+            Row pbRow = (Row) value;
+            TableAlias alias = pbRow.getTableAlias();
+            value = ofEntries(
+                    entry("table", alias.getTable().toString()),
+                    entry("columns", alias.getColumns()),
+                    entry("values", pbRow.getValues()));
+        }
+        else if (value instanceof ChildRows)
+        {
+            ChildRows childRows = (ChildRows) value;
+            value = emptyList();
+            if (childRows.size() > 0)
+            {
+                TableAlias alias = childRows.get(0).getTableAlias();
+                value = ofEntries(
+                        entry("table", alias.getTable().toString()),
+                        entry("columns", alias.getColumns()),
+                        entry("rows", childRows.stream().map(r -> r.getValues()).collect(toList())));
+            }
+        }
+
+        JFrame frame = new JFrame("Json viewer - " + resultTable.getColumnName(col) + " (Row: " + (row + 1) + ")");
+        frame.setIconImages(PayloadbuilderEditorView.APPLICATION_ICONS);
+        RSyntaxTextArea rta = new RSyntaxTextArea();
+        rta.setColumns(80);
+        rta.setRows(40);
+        if (value instanceof Collection || value instanceof Map)
+        {
+            rta.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JSON);
+            rta.setCodeFoldingEnabled(true);
+            rta.setBracketMatchingEnabled(true);
+            rta.setText(ResultModel.getPrettyJson(value));
+        }
+        else
+        {
+            rta.setText(String.valueOf(value));
+        }
+        rta.setCaretPosition(0);
+        rta.setEditable(false);
+        RTextScrollPane sp = new RTextScrollPane(rta);
+        frame.getContentPane().add(sp);
+        frame.setSize(800, 600);
+        frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        frame.setVisible(true);
     }
 
     private Icon getIconFromState(State state)
@@ -634,5 +674,20 @@ class QueryFileView extends JPanel
     private boolean between(int start, int end, int value)
     {
         return value >= start && value <= end;
+    }
+    
+    /** Wrapper class with a connected column adjuster */
+    private static class ResultTable extends JTable
+    {
+        private final TableColumnAdjuster adjuster = new TableColumnAdjuster(this, 10);
+        private final AtomicBoolean columnsAdjusted = new AtomicBoolean();
+        void adjustColumns()
+        {
+            if (!columnsAdjusted.get())
+            {
+                adjuster.adjustColumns(250);
+                columnsAdjusted.set(true);
+            }
+        }
     }
 }

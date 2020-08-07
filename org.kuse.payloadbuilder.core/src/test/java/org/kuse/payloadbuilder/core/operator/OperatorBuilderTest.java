@@ -470,6 +470,25 @@ public class OperatorBuilderTest extends AOperatorTest
     }
 
     @Test
+    public void test_pushdown_mixed_alias_aliasless()
+    {
+        String query = "select s.id from source s where s.flag and flag2";
+        QueryResult result = getQueryResult(query);
+        
+        
+        Operator expected = new FilterOperator(
+                1,
+                result.tableOperators.get(0),
+                new ExpressionPredicate(e("flag2 and s.flag")));
+
+//                                System.out.println(expected.toString(1));
+//                                System.err.println(result.operator.toString(1));
+
+        assertEquals(expected, result.operator);
+
+    }
+    
+    @Test
     public void test_select_item_with_filter()
     {
         String query = "select object(s.id1, a.id2 from s where s.id4 > 0) arr from source s inner join [article where note_id > 0] a on a.art_id = s.art_id and a.active_flg where s.id3 > 0";
@@ -492,7 +511,7 @@ public class OperatorBuilderTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 true,
                 false);
-        //
+        
         //                        System.out.println(expected.toString(1));
         //                        System.err.println(result.operator.toString(1));
 

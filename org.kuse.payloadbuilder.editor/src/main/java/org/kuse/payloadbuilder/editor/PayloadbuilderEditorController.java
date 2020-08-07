@@ -1,6 +1,8 @@
 package org.kuse.payloadbuilder.editor;
 
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 import static org.apache.commons.io.FileUtils.byteCountToDisplaySize;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
@@ -118,11 +120,54 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         }
 
         view.getEditorsTabbedPane().addChangeListener(new SelectedFileListener());
-        // TODO: check of unsaved files
-        view.setExitAction(() -> System.exit(0));
+        view.setExitAction(this::exit);
 
         view.getMemoryLabel().setText(getMemoryString());
         new Timer(250, evt -> view.getMemoryLabel().setText(getMemoryString())).start();
+    }
+
+    private void exit()
+    {
+        List<QueryFileModel> dirtyFiles = model
+                .getFiles()
+                .stream()
+                .filter(f -> f.isDirty())
+                .collect(toList());
+        if (dirtyFiles.size() == 0)
+        {
+            System.exit(0);
+        }
+
+        int result = JOptionPane.showConfirmDialog(
+                view,
+                "Save changes to the following files: " +
+                    System.lineSeparator() +
+                    dirtyFiles
+                            .stream()
+                            .map(f -> FilenameUtils.getName(f.getFilename()))
+                            .collect(joining(System.lineSeparator())),
+                "Unsaved changes",
+                JOptionPane.YES_NO_CANCEL_OPTION);
+
+        if (result == JOptionPane.CANCEL_OPTION)
+        {
+            return;
+        }
+        else if (result == JOptionPane.NO_OPTION)
+        {
+            System.exit(0);
+        }
+
+        for (QueryFileModel file : dirtyFiles)
+        {
+            // Abort on first Cancel
+            if (!save(file))
+            {
+                return;
+            }
+        }
+
+        System.exit(0);
     }
 
     private void configChanged(ICatalogExtension catalogExtension)
@@ -135,7 +180,6 @@ class PayloadbuilderEditorController implements PropertyChangeListener
             }
         }
 
-        //        getCatalogConfig().put(catalogExtension.getClass().getName(), catalogExtension.getProperties());
         saveConfig();
         // Also populate new properties in current session if config changed
         propertiesChanged(catalogExtension);
@@ -186,12 +230,6 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         Runtime runtime = Runtime.getRuntime();
         return String.format("%s / %s", byteCountToDisplaySize(runtime.totalMemory()), byteCountToDisplaySize(runtime.freeMemory()));
     }
-
-    //    @SuppressWarnings("unchecked")
-    //    private Map<String, Object> getCatalogConfig()
-    //    {
-    //        return (Map<String, Object>) config.computeIfAbsent(CATALOG_CONFIG, k -> new HashMap<String, Object>());
-    //    }
 
     private void saveConfig()
     {

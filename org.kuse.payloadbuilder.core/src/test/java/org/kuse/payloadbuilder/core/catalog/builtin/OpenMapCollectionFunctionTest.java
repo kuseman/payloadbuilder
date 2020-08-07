@@ -12,16 +12,16 @@ import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
-import org.kuse.payloadbuilder.core.catalog.builtin.MapToRowFunction;
+import org.kuse.payloadbuilder.core.catalog.builtin.OpenMapCollectionFunction;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 
-/** Test {@link MapToRowFunction} */
-public class MapToRowFunctionTest extends Assert
+/** Test {@link OpenMapCollectionFunction} */
+public class OpenMapCollectionFunctionTest extends Assert
 {
-    private final MapToRowFunction f = new MapToRowFunction(new Catalog("test") {});
+    private final OpenMapCollectionFunction f = new OpenMapCollectionFunction(new Catalog("test") {});
 
     @Test
     public void test()

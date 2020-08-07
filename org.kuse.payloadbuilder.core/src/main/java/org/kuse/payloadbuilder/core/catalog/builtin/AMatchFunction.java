@@ -16,10 +16,10 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.LambdaExpression;
 
 /** Any function. Check if any of inputs is true */
-abstract class AMatchFunction extends ScalarFunctionInfo implements LambdaFunction
+class MatchFunction extends ScalarFunctionInfo implements LambdaFunction
 {
     private final MatchType type;
-    AMatchFunction(Catalog catalog, MatchType type)
+    MatchFunction(Catalog catalog, MatchType type)
     {
         super(catalog, type.name, Type.SCALAR);
         this.type = type;

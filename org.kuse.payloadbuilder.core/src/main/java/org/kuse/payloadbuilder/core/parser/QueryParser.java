@@ -145,8 +145,8 @@ public class QueryParser
         public Object visitIfStatement(IfStatementContext ctx)
         {
             Expression condition = getExpression(ctx.condition);
-            List<Statement> statements = ctx.statements().stream().map(s -> (Statement) visit(s)).collect(toList());
-            List<Statement> elseStatements = ctx.elseStatements != null ? ctx.elseStatements.stream().map(s -> (Statement) visit(s)).collect(toList()) : emptyList();
+            List<Statement> statements = ctx.stms.stms.stream().map(s -> (Statement) visit(s)).collect(toList());
+            List<Statement> elseStatements = ctx.elseStatements != null ? ctx.elseStatements.stms.stream().map(s -> (Statement) visit(s)).collect(toList()) : emptyList();
             return new IfStatement(condition, statements, elseStatements);
         }
 

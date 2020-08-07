@@ -4,6 +4,7 @@ import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -21,7 +22,7 @@ public class ExecutionContext
     /** Holder for lambda references during evaluation */
     private List<Object> lambdaValues;
     private Map<String, Object> variables; 
-    private final long now = System.currentTimeMillis();
+    private final ZonedDateTime now = ZonedDateTime.now();
     private final OperatorContext operatorContext = new OperatorContext();
     
     /** <pre>
@@ -61,7 +62,7 @@ public class ExecutionContext
     }
     
     /** Return current time in local time */
-    public long getNow()
+    public ZonedDateTime getNow()
     {
         return now;
     }    

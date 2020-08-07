@@ -2,6 +2,7 @@ package org.kuse.payloadbuilder.catalog.es;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.kuse.payloadbuilder.catalog.es.ESOperator.CLIENT;
 import static org.kuse.payloadbuilder.catalog.es.ESOperator.MAPPER;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -45,19 +47,19 @@ class ESCatalog extends Catalog
     {
         super("EsCatalog");
     }
-    
+
     @SuppressWarnings("unchecked")
     @Override
     public List<String> getTables(QuerySession session, String catalogAlias)
     {
         String endpoint = (String) session.getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY);
         String index = (String) session.getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY);
-        
+
         if (isBlank(endpoint) || isBlank(index))
         {
             throw new IllegalArgumentException("Missing endpoint/index in catalog properties.");
         }
-        
+
         HttpGet getMappings = new HttpGet(String.format("%s/%s/_mapping", endpoint, index));
         try (CloseableHttpResponse response = CLIENT.execute(getMappings))
         {
@@ -202,33 +204,60 @@ class ESCatalog extends Catalog
         HttpGet getMappings = new HttpGet(String.format("%s/%s/%s/_mapping", esType.endpoint, esType.index, esType.type));
         try (CloseableHttpResponse response = CLIENT.execute(getMappings))
         {
+            if (response.getStatusLine().getStatusCode() != 200)
+            {
+                return emptySet();
+            }
+
             Map<String, Object> map = MAPPER.readValue(response.getEntity().getContent(), Map.class);
-            map = (Map<String, Object>) map.get(esType.index);
-            map = (Map<String, Object>) map.get("mappings");
-            map = (Map<String, Object>) map.get(esType.type);
-            map = (Map<String, Object>) map.get("properties");
+            map = Optional.of(map)
+                    .map(m -> (Map<String, Object>) m.get(esType.index))
+                    .map(m -> (Map<String, Object>) m.get("mappings"))
+                    .map(m -> (Map<String, Object>) m.get(esType.type))
+                    .map(m -> (Map<String, Object>) m.get("properties"))
+                    .orElse(null);
+
+            if (map == null)
+            {
+                return emptySet();
+            }
 
             Set<String> result = new HashSet<>();
-            for (Entry<String, Object> entry : map.entrySet())
-            {
-                Map<String, Object> properties = (Map<String, Object>) entry.getValue();
-                // - Type should no be nested/object
-                //   Not supported to filter on
-                // - index cannot be NO
-
-                String type = (String) properties.get("type");
-                String index = (String) properties.get("index");
-                if ((index == null || "not_analyzed".equals(index))
-                    && !("object".equals(type) || "nested".equals(type)))
-                {
-                    result.add(entry.getKey());
-                }
-            }
+            populateAnalyzedFields(result, map, null);
             return result;
         }
         catch (IOException e)
         {
-            throw new RuntimeException("Error fetching mappings from " + esType.endpoint);
+            throw new RuntimeException("Error fetching mappings from " + esType.endpoint, e);
+        }
+    }
+
+    private void populateAnalyzedFields(Set<String> result, Map<String, Object> properties, String parentKey)
+    {
+        for (Entry<String, Object> entry : properties.entrySet())
+        {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> propertiesMap = (Map<String, Object>) entry.getValue();
+            @SuppressWarnings("unchecked")
+            Map<String, Object> subProperties = (Map<String, Object>) propertiesMap.get("properties");
+            // Collected nested properties one level down only
+            if (parentKey == null && subProperties != null)
+            {
+                populateAnalyzedFields(result, subProperties, entry.getKey());
+                continue;
+            }
+
+            String type = (String) propertiesMap.get("type");
+            String index = (String) propertiesMap.get("index");
+
+            // - Type should no be nested/object
+            //   Not supported to filter on
+            // - index cannot be NO
+            if ((index == null || "not_analyzed".equals(index))
+                && !("object".equals(type) || "nested".equals(type)))
+            {
+                result.add((parentKey != null ? parentKey + "." : "") + entry.getKey());
+            }
         }
     }
 }

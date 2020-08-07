@@ -1,9 +1,0 @@
-Etm elastic operator
- - Use key lookup index
-
- - Table scan
-   * Query count http://192.168.10.78:9200/ramossportshopentestcust_c0_v3/data/_count?filter_path=count&q=_docType:EtmArticleV2%20AND%20_subType:article
-   * Fetch batches of doc_ids starting from 1 and continue until count is reached
- 
- - Index scan
-   * Construct doc ids from lookup index

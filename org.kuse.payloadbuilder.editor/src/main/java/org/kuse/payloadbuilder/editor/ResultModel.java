@@ -25,7 +25,7 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 /** Resulting model of a query */
 class ResultModel extends AbstractTableModel
 {
-    private static final ObjectWriter WRITER;
+    static final ObjectWriter WRITER;
     static
     {
         DefaultPrettyPrinter printer = new DefaultPrettyPrinter();

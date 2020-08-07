@@ -52,6 +52,7 @@ class PayloadbuilderService
     {
         EXECUTOR.execute(() ->
         {
+            int queryId = file.incrementAndGetQueryId();
             file.setState(State.EXECUTING);
             try
             {
@@ -66,8 +67,6 @@ class PayloadbuilderService
                     }
                     ResultModel resultModel = new ResultModel(file);
                     file.addResult(resultModel);
-                    //                    setupColumns(resultModel, queryResult.getResultMetaData());
-
                     ObjectWriter writer = new ObjectWriter(resultModel);
                     queryResult.writeResult(writer);
 
@@ -93,17 +92,27 @@ class PayloadbuilderService
             }
             catch (Exception e)
             {
-                file.setError(e.getMessage());
-                file.setState(State.ERROR);
-                e.printStackTrace();
+                // Only set error messages if this is the latest query made
+                if (queryId == file.getQueryId())
+                {
+                    file.setError(e.getMessage());
+                    file.setState(State.ERROR);
+                    if (System.getProperty("devEnv") != null)
+                    {
+                        e.printStackTrace();
+                    }
+                }
             }
             finally
             {
-                if (file.getState() == State.EXECUTING)
+                if (queryId == file.getQueryId())
                 {
-                    file.setState(State.COMPLETED);
+                    if (file.getState() == State.EXECUTING)
+                    {
+                        file.setState(State.COMPLETED);
+                    }
+                    queryFinnishedCallback.run();
                 }
-                queryFinnishedCallback.run();
             }
         });
     }

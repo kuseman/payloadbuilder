@@ -1,5 +1,11 @@
 package org.kuse.payloadbuilder.core.catalog.builtin;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 
 import org.kuse.payloadbuilder.core.catalog.Catalog;
@@ -76,6 +82,51 @@ class CastFunction extends ScalarFunctionInfo
         },
 //        DATE,
 //        DATETIME,
+        DATETIME
+        {
+            @Override
+            Object convert(Object source, int style)
+            {
+                // Unix epoch
+                if (source instanceof Long)
+                {
+                    return LocalDateTime.ofInstant(Instant.ofEpochMilli(((Long) source).longValue()), ZoneId.systemDefault());
+                }
+                else if (source instanceof String)
+                {
+                    try
+                    {
+                        return LocalDateTime.parse((String) source);
+                    }
+                    catch (DateTimeParseException e)
+                    {
+                        // Try zoned datetime and then convert to local
+                        ZonedDateTime dateTime = ZonedDateTime.parse((String) source);
+                        ZonedDateTime localZoned = dateTime.withZoneSameInstant(ZoneId.systemDefault());
+                        return localZoned.toLocalDateTime();
+                    }
+                }
+                throw new IllegalArgumentException("Cannot cast " + source + " to DateTime.");
+            }
+        },
+        DATETIMEOFFSET
+        {
+            @Override
+            Object convert(Object source, int style)
+            {
+                // Unix epoch
+                if (source instanceof Long)
+                {
+                    return ZonedDateTime.ofInstant(Instant.ofEpochMilli(((Long) source).longValue()), ZoneOffset.UTC);
+                }
+                else if (source instanceof String)
+                {
+                    return ZonedDateTime.parse((String) source);
+                }
+                
+                throw new IllegalArgumentException("Cannot cast " + source + " to DateTimeOffset.");
+            }
+        },
         DOUBLE
         {
             @Override

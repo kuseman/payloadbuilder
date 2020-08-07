@@ -9,14 +9,15 @@ import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
 
 /** Turns a json string into object */
-class FromJsonFunction extends ScalarFunctionInfo
+class JsonValueFunction extends ScalarFunctionInfo
 {
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-    FromJsonFunction(Catalog catalog)
+    private static final ObjectReader READER = new ObjectMapper().readerFor(Object.class);
+    JsonValueFunction(Catalog catalog)
     {
-        super(catalog, "from_json", Type.SCALAR);
+        super(catalog, "json_value", Type.SCALAR);
     }
     
     @Override
@@ -30,7 +31,7 @@ class FromJsonFunction extends ScalarFunctionInfo
         
         try
         {
-            return MAPPER.readValue(String.valueOf(arg), Object.class);
+            return READER.readValue(String.valueOf(arg));
         }
         catch (IOException e)
         {

@@ -70,7 +70,7 @@ class ParametersDialog extends JDialog
         cancel = false;
         try
         {
-            textEditor.setText(MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(existingParameters));
+            textEditor.setText(ResultModel.WRITER.writeValueAsString(existingParameters));
         }
         catch (JsonProcessingException e)
         {
@@ -85,7 +85,7 @@ class ParametersDialog extends JDialog
         }
         try
         {
-            return MAPPER.readValue(textEditor.getText(), Map.class);
+            return MAPPER.readValue(textEditor.getText().replace("\\R+", ""), Map.class);
         }
         catch (JsonProcessingException e)
         {

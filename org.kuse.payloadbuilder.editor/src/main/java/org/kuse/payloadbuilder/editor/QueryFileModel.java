@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.swing.SwingUtilities;
 import javax.swing.event.SwingPropertyChangeSupport;
@@ -35,6 +36,7 @@ class QueryFileModel
     static final String QUERY = "query";
     static final String STATE = "state";
 
+    private final AtomicInteger queryId = new AtomicInteger();
     private boolean dirty;
     private boolean newFile = true;
     private String filename = "";
@@ -87,6 +89,16 @@ class QueryFileModel
         {
             querySession.setDefaultCatalog(catalogs.get(0).getCatalogExtension().getDefaultAlias());
         }
+    }
+    
+    int getQueryId()
+    {
+        return queryId.get();
+    }
+    
+    int incrementAndGetQueryId()
+    {
+        return queryId.incrementAndGet();
     }
 
     boolean isDirty()

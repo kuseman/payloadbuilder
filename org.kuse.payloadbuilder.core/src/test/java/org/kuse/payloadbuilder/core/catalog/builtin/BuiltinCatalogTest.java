@@ -36,12 +36,6 @@ public class BuiltinCatalogTest extends Assert
     }
 
     @Test
-    public void test_function_now()
-    {
-        assertFunction(true, null, "now() > 0");
-    }
-    
-    @Test
     public void test_function_coalesce()
     {
         assertFunction(10, null, "coalesce(null, null, 10)");
@@ -133,11 +127,11 @@ public class BuiltinCatalogTest extends Assert
     }
 
     @Test
-    public void test_function_from_json()
+    public void test_function_json_value()
     {
-        assertFunction(null, null, "from_json(null)");
-        assertFunction(emptyMap(), null, "from_json('{}')");
-        assertFunction(emptyList(), null, "from_json('[]')");
+        assertFunction(null, null, "json_value(null)");
+        assertFunction(emptyMap(), null, "json_value('{}')");
+        assertFunction(emptyList(), null, "json_value('[]')");
     }
     
     @Test
