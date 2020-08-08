@@ -8,9 +8,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang3.ObjectUtils;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.operator.Operator;
-import org.kuse.payloadbuilder.core.parser.Expression;
+import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.SortItem;
 import org.kuse.payloadbuilder.core.parser.TableOption;
@@ -111,33 +112,29 @@ public abstract class Catalog
      * <pre>
      *
      * Example
-     * table:       article
-     * predicate:   active_flg && internet_flg
+     * table:   article
+     * pairs:   active_flg = true
+     *          internet_flg = true
      *
      * Catalog is able to filter active_flg on it's own
      * but not internet_flg
-     * then predicate part <b>active_flg</b> is extracted and <b>internet_flg</b>
+     * then pair <b>active_flg = true</b> is consumed and <b>internet_flg</b>
      * is returned to framework for filter.
      * </pre>
      **/
     public static class TablePredicate
     {
-        public static TablePredicate EMPTY = new TablePredicate(null);
-        private Expression predicate;
+        public static TablePredicate EMPTY = new TablePredicate(emptyList());
+        private final List<AnalyzePair> pairs;
 
-        public TablePredicate(Expression predicate)
+        public TablePredicate(List<AnalyzePair> pairs)
         {
-            this.predicate = predicate;
+            this.pairs = ObjectUtils.defaultIfNull(pairs, emptyList());
         }
-
-        public Expression getPredicate()
+        
+        public List<AnalyzePair> getPairs()
         {
-            return predicate;
-        }
-
-        public void setPredicate(Expression predicate)
-        {
-            this.predicate = predicate;
+            return pairs;
         }
     }
 

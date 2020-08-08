@@ -12,12 +12,6 @@ public class Payloadbuilder
     /*
      * TODO:
      * BACKEND
-     *   - Try to rewrite PredicateAnalyzer
-     *      Make it easier to work with
-     *      Add type in pair to be able to easier add range queries etc.
-     *      See if the includeEmptyAlias thing can be removed
-     *      Now it's not possible to use a "NOT a.flag" for example, which would
-     *      be a fully working Elastic predicate
      *   - Pushdown filter is not grouped when one or the other is written without alias
      *      Could not re-produce, might been with a join, leaving it here
      *   - QualifiedReferenceExpression
@@ -46,6 +40,8 @@ public class Payloadbuilder
      *      If there is conflicts between deps in extensions, we need
      *      to change to a child first class loader so extensions can embed their own versions
      *      This is a security issue but think it's no problem.
+     * ESCatalog
+     *   - Change to a POST search instead of q=.....
      */
     
     private Payloadbuilder()

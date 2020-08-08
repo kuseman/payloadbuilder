@@ -4,6 +4,7 @@ import static java.util.Arrays.asList;
 import static org.kuse.payloadbuilder.core.parser.QualifiedName.of;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import org.apache.commons.lang3.mutable.MutableObject;
@@ -11,7 +12,6 @@ import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
-import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzeResult;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.SortItem;
@@ -417,20 +417,16 @@ public class OperatorBuilderTest extends AOperatorTest
         QueryResult result = getQueryResult(query, p ->
         {
             // flag1 is supported as filter
-            AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(p.getPredicate());
-            List<AnalyzePair> leftOvers = new ArrayList<>();
-            for (AnalyzePair pair : analyzeResult.getPairs())
+            Iterator<AnalyzePair> it = p.getPairs().iterator();
+            while (it.hasNext())
             {
+                AnalyzePair pair = it.next();
                 if (pair.getColumn("s").equals("flag1"))
                 {
                     catalogPredicate.setValue(pair.getPredicate());
-                }
-                else
-                {
-                    leftOvers.add(pair);
+                    it.remove();
                 }
             }
-            p.setPredicate(new AnalyzeResult(leftOvers).getPredicate());
         }, null);
 
         assertEquals(e("s.flag1 = true"), catalogPredicate.getValue());
@@ -496,7 +492,7 @@ public class OperatorBuilderTest extends AOperatorTest
         Operator expected = new FilterOperator(
                 1,
                 result.tableOperators.get(0),
-                new ExpressionPredicate(e("flag2 = true and s.flag = true")));
+                new ExpressionPredicate(e("s.flag = true and flag2 = true")));
 
 //                                System.out.println(expected.toString(1));
 //                                System.err.println(result.operator.toString(1));
@@ -521,7 +517,7 @@ public class OperatorBuilderTest extends AOperatorTest
                 4,
                 "INNER JOIN",
                 new FilterOperator(1, result.tableOperators.get(0), new ExpressionPredicate(e("s.id3 > 0"))),
-                new FilterOperator(3, result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg = true and note_id > 0"))),
+                new FilterOperator(3, result.tableOperators.get(1), new ExpressionPredicate(e("note_id > 0 and a.active_flg = true "))),
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),

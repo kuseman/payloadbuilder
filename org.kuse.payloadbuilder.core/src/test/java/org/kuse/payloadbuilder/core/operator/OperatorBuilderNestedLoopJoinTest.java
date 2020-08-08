@@ -55,7 +55,7 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorTest
                 4,
                 "",
                 result.tableOperators.get(0),
-                new CachingOperator(3, new FilterOperator(2, result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg = true AND a.internet_flg = true")))),
+                new CachingOperator(3, new FilterOperator(2, result.tableOperators.get(1), new ExpressionPredicate(e("a.internet_flg = true AND a.active_flg = true")))),
                 new ExpressionPredicate(e("a.art_id = s.art_id or s.id1 > 0")),
                 DefaultRowMerger.DEFAULT,
                 true,

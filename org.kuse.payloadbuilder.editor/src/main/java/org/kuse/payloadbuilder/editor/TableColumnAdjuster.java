@@ -28,8 +28,6 @@ class TableColumnAdjuster// implements PropertyChangeListener, TableModelListene
     private boolean isColumnHeaderIncluded;
     private boolean isColumnDataIncluded;
     private boolean isOnlyAdjustLarger;
-    private boolean isDynamicAdjustment;
-    //    private final Map<TableColumn, Integer> columnSizes = new HashMap<>();
 
     /*
      *  Specify the table and use default spacing
@@ -49,7 +47,6 @@ class TableColumnAdjuster// implements PropertyChangeListener, TableModelListene
         setColumnHeaderIncluded(true);
         setColumnDataIncluded(true);
         setOnlyAdjustLarger(false);
-//        setDynamicAdjustment(false);
     }
     
     /*
@@ -198,101 +195,4 @@ class TableColumnAdjuster// implements PropertyChangeListener, TableModelListene
         table.getTableHeader().setResizingColumn(tableColumn);
         tableColumn.setWidth(maxWidth != -1 ? Math.min(width, maxWidth) : width);
     }
-
-    /*
-     *  Indicate whether changes to the model should cause the width to be
-     *  dynamically recalculated.
-     */
-//    public void setDynamicAdjustment(boolean isDynamicAdjustment)
-//    {
-//        //  May need to add or remove the TableModelListener when changed
-//
-//        if (this.isDynamicAdjustment != isDynamicAdjustment)
-//        {
-//            if (isDynamicAdjustment)
-//            {
-//                table.addPropertyChangeListener(this);
-//                table.getModel().addTableModelListener(this);
-//            }
-//            else
-//            {
-//                table.removePropertyChangeListener(this);
-//                table.getModel().removeTableModelListener(this);
-//            }
-//        }
-//
-//        this.isDynamicAdjustment = isDynamicAdjustment;
-//    }
-
-    //
-    //  Implement the PropertyChangeListener
-    //
-//    @Override
-//    public void propertyChange(PropertyChangeEvent e)
-//    {
-//        //  When the TableModel changes we need to update the listeners
-//        //  and column widths
-//
-//        if ("model".equals(e.getPropertyName()))
-//        {
-//            TableModel model = (TableModel) e.getOldValue();
-//            model.removeTableModelListener(this);
-//
-//            model = (TableModel) e.getNewValue();
-//            model.addTableModelListener(this);
-//            adjustColumns();
-//        }
-//    }
-
-    //
-    //  Implement the TableModelListener
-    //
-//    @Override
-//    public void tableChanged(TableModelEvent e)
-//    {
-//        if (!isColumnDataIncluded)
-//        {
-//            return;
-//        }
-//
-//        //  Needed when table is sorted.
-//
-//        SwingUtilities.invokeLater(() ->
-//        {
-//            //  A cell has been updated
-//
-//            int column = table.convertColumnIndexToView(e.getColumn());
-//
-//            if (e.getType() == TableModelEvent.UPDATE && column != -1)
-//            {
-//                //  Only need to worry about an increase in width for this cell
-//
-//                if (isOnlyAdjustLarger)
-//                {
-//                    int row = e.getFirstRow();
-//                    TableColumn tableColumn = table.getColumnModel().getColumn(column);
-//
-//                    if (tableColumn.getResizable())
-//                    {
-//                        int width = getCellDataWidth(row, column);
-//                        updateTableColumn(column, width);
-//                    }
-//                }
-//
-//                //  Could be an increase of decrease so check all rows
-//
-//                else
-//                {
-//                    adjustColumn(column);
-//                }
-//            }
-//
-//            //  The update affected more than one column so adjust all columns
-//
-//            else
-//            {
-//                adjustColumns();
-//            }
-//        });
-//    }
 }

@@ -23,6 +23,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -52,9 +53,12 @@ import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.operator.AOperator;
 import org.kuse.payloadbuilder.core.operator.OperatorContext;
 import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
+import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
+import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair.Type;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
+import org.kuse.payloadbuilder.core.parser.InExpression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -88,7 +92,7 @@ class ESOperator extends AOperator
     private final TableAlias tableAlias;
     private final Index index;
     private final String catalogAlias;
-    private final List<Pair<String, Expression>> fieldPredicates;
+    private final List<PropertyPredicate> propertyPredicates;
     private final List<Pair<String, String>> sortItems;
 
     public ESOperator(
@@ -96,14 +100,14 @@ class ESOperator extends AOperator
             String catalogAlias,
             TableAlias tableAlias,
             Index index,
-            List<Pair<String, Expression>> fieldPredicates,
+            List<PropertyPredicate> propertyPredicates,
             List<Pair<String, String>> sortItems)
     {
         super(nodeId);
         this.catalogAlias = catalogAlias;
         this.tableAlias = tableAlias;
         this.index = index;
-        this.fieldPredicates = requireNonNull(fieldPredicates, "fieldPredicates");
+        this.propertyPredicates = requireNonNull(propertyPredicates, "propertyPredicates");
         this.sortItems = requireNonNull(sortItems, "sortItems");
     }
 
@@ -118,9 +122,9 @@ class ESOperator extends AOperator
     {
         Map<String, Object> result = ofEntries(true,
                 entry(CATALOG, ESCatalog.NAME),
-                entry(PREDICATE, fieldPredicates
+                entry(PREDICATE, propertyPredicates
                         .stream()
-                        .map(p -> p.getKey() + " = " + (p.getValue() != null ? p.getValue() : "true"))
+                        .map(PropertyPredicate::getDescription)
                         .collect(joining(" AND "))),
                 entry("Sort", sortItems
                         .stream()
@@ -320,12 +324,12 @@ class ESOperator extends AOperator
 
     private String getPredicateParam(ExecutionContext context)
     {
-        if (fieldPredicates.isEmpty())
+        if (propertyPredicates.isEmpty())
         {
             return "";
         }
         StringBuilder sb = new StringBuilder();
-        for (Pair<String, Expression> pair : fieldPredicates)
+        for (PropertyPredicate predicate : propertyPredicates)
         {
             if (sb.length() == 0)
             {
@@ -336,37 +340,7 @@ class ESOperator extends AOperator
                 sb.append("+AND+");
             }
 
-            Object value;
-            // Null expression then assume the field is a boolean => add true as value
-            // Predicate is of type "active_flg"
-            if (pair.getValue() == null)
-            {
-                value = true;
-            }
-            else
-            {
-                value = pair.getValue().eval(context);
-            }
-
-            if (value == null)
-            {
-                continue;
-            }
-
-            String stringValue = String.valueOf(value);
-            if (value instanceof String)
-            {
-                try
-                {
-                    stringValue = URLEncoder.encode("\"" + stringValue + "\"", "utf-8");
-                }
-                catch (UnsupportedEncodingException e)
-                {
-                }
-
-            }
-
-            sb.append(pair.getKey()).append(":").append(stringValue);
+            sb.append(predicate.getQueryParam(context));
         }
 
         return sb.toString();
@@ -542,6 +516,98 @@ class ESOperator extends AOperator
             }
 
             return new EsType(endpoint, indexName, type);
+        }
+    }
+
+    /** Predicate for a property */
+    static class PropertyPredicate
+    {
+        final String alias;
+        final String property;
+        final AnalyzePair pair;
+
+        PropertyPredicate(String alias, String property, AnalyzePair pair)
+        {
+            this.alias = alias;
+            this.property = requireNonNull(property, "property");
+            this.pair = requireNonNull(pair, "pair");
+        }
+
+        private String getDescription()
+        {
+            if (pair.getType() == Type.COMPARISION)
+            {
+                Pair<Expression, Expression> ePair = pair.getExpressionPair(alias);
+                return property + " " + pair.getComparisonType().getValue() + " " + ePair.getRight().toString();
+            }
+            else if (pair.getType() == Type.IN)
+            {
+                return property + " IN (" + ((InExpression) pair.getRight().getExpression()).getArguments() + ")";
+            }
+
+            return "";
+        }
+
+        private String getQueryParam(ExecutionContext context)
+        {
+            if (pair.getType() == Type.COMPARISION)
+            {
+                Pair<Expression, Expression> ePair = pair.getExpressionPair(alias);
+                Object value = ePair.getRight().eval(context);
+                if (value == null)
+                {
+                    return "";
+                }
+                String string = encode(value, true);
+                switch (pair.getComparisonType())
+                {
+                    case EQUAL:
+                        return property + ":" + string;
+                    case NOT_EQUAL:
+                        return "";
+                    case GREATER_THAN:
+                    case GREATER_THAN_EQUAL:
+                    case LESS_THAN:
+                    case LESS_THAN_EQUAL:
+                        return property + ":" + encode(pair.getComparisonType().getValue(), false) + string;
+                }
+            }
+            else if (pair.getType() == Type.IN)
+            {
+                List<Expression> arguments = ((InExpression) pair.getRight().getExpression()).getArguments();
+
+                return property + ":(" +
+                    arguments
+                            .stream()
+                            .map(e -> e.eval(context))
+                            .filter(Objects::nonNull)
+                            .map(o -> encode(o, true))
+                            .collect(joining("+OR+"))
+                    + ")";
+            }
+
+            return "";
+        }
+
+        private String encode(Object value, boolean addQuotes)
+        {
+            String stringValue = String.valueOf(value);
+            if (value instanceof String)
+            {
+                try
+                {
+                    if (addQuotes)
+                    {
+                        return URLEncoder.encode("\"" + stringValue + "\"", "utf-8");
+                    }
+                    
+                    return URLEncoder.encode(stringValue, "utf-8");
+                }
+                catch (UnsupportedEncodingException e)
+                {
+                }
+            }
+            return stringValue;
         }
     }
 

@@ -236,7 +236,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 3,
                 "INNER JOIN",
                 operators.get(0),
-                new FilterOperator(2, operators.get(1), new ExpressionPredicate(e("a.active_flg = 1 AND internet_flg = 1"))),
+                new FilterOperator(2, operators.get(1), new ExpressionPredicate(e("internet_flg = 1 AND a.active_flg = 1"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("s.art_id"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),

@@ -39,7 +39,6 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.ExpressionSelectItem;
 import org.kuse.payloadbuilder.core.parser.Join;
 import org.kuse.payloadbuilder.core.parser.Join.JoinType;
-import org.kuse.payloadbuilder.core.parser.LogicalBinaryExpression;
 import org.kuse.payloadbuilder.core.parser.NestedSelectItem;
 import org.kuse.payloadbuilder.core.parser.NestedSelectItem.Type;
 import org.kuse.payloadbuilder.core.parser.ParseException;
@@ -100,7 +99,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         private Index index;
 
         /** Predicate pushed down from join to table source */
-        private final Map<String, Expression> pushDownPredicateByAlias = new THashMap<>();
+        private final Map<String, List<AnalyzePair>> pushDownPredicateByAlias = new THashMap<>();
 
         /** Sort items. Sent to catalog to for usage if supported. */
         private List<SortItem> sortItems;
@@ -114,21 +113,13 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         }
 
         /** Appends push down predicate for provided alias */
-        private void appendPushDownPredicate(String alias, Expression expression)
+        private void appendPushDownPredicate(String alias, List<AnalyzePair> pairs)
         {
-            if (expression == null)
+            if (pairs == null || pairs.isEmpty())
             {
                 return;
             }
-            pushDownPredicateByAlias.compute(alias, (k, v) ->
-            {
-                if (v == null)
-                {
-                    return expression;
-                }
-
-                return new LogicalBinaryExpression(LogicalBinaryExpression.Type.AND, v, expression);
-            });
+            pushDownPredicateByAlias.computeIfAbsent(alias, key -> new ArrayList<>()).addAll(pairs);
         }
 
         /** Appends table alias to hierarchy */
@@ -211,7 +202,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 outerValuesExpressions = foundation.outerValueExpressions;
             }
 
-            context.appendPushDownPredicate(ts.getAlias(), foundation.pushDownExpression);
+            context.appendPushDownPredicate(ts.getAlias(), foundation.pushDownPairs);
             where = foundation.condition;
 
             /* TODO:
@@ -249,12 +240,16 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 throw new RuntimeException("Index " + index + " should have been consumed by " + tsj.getTableSource().getTable());
             }
 
-            Expression predicate = context.pushDownPredicateByAlias.remove(tsj.getTableSource().getAlias());
-            // Gather columns from remaining predicate
-            visit(predicate, context);
-            if (predicate != null)
+            List<AnalyzePair> pairs = context.pushDownPredicateByAlias.remove(tsj.getTableSource().getAlias());
+            if (pairs != null)
             {
-                context.operator = new FilterOperator(context.acquireNodeId(), context.operator, new ExpressionPredicate(predicate));
+                Expression predicate = new AnalyzeResult(pairs).getPredicate();
+                // Gather columns from remaining predicate
+                visit(predicate, context);
+                if (predicate != null)
+                {
+                    context.operator = new FilterOperator(context.acquireNodeId(), context.operator, new ExpressionPredicate(predicate));
+                }
             }
             if (outerValuesExpressions != null)
             {
@@ -482,17 +477,15 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         TableSourceJoined tsj = tableSource.getTableSourceJoined();
 
         Expression where = tableSource.getWhere();
-        Expression pushDownPredicate = null;
         if (where != null)
         {
             // Analyze expression to see if there is push down candidates
             AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(where);
-            Pair<Expression, AnalyzeResult> pair = analyzeResult.extractPushdownPredicate(tableSource.getAlias());
-            if (pair.getKey() != null)
+            Pair<List<AnalyzePair>, AnalyzeResult> pair = analyzeResult.extractPushdownPairs(tableSource.getAlias());
+            if (!pair.getKey().isEmpty())
             {
-                pushDownPredicate = pair.getKey();
+                context.appendPushDownPredicate(tableSource.getAlias(), pair.getKey());
                 where = pair.getValue().getPredicate();
-                context.appendPushDownPredicate(tableSource.getAlias(), pushDownPredicate);
             }
         }
 
@@ -506,14 +499,13 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         // Analyze pushed down predicate for columns
         // Need to be performed post visit of tableSource above
         // to have correct table alias in context
-        if (pushDownPredicate != null)
+        List<AnalyzePair> pairs = context.pushDownPredicateByAlias.remove(tableSource.getAlias());
+
+        if (pairs != null)
         {
-            visit(pushDownPredicate, context);
-        }
-        pushDownPredicate = context.pushDownPredicateByAlias.remove(tableSource.getAlias());
-        if (pushDownPredicate != null)
-        {
-            context.operator = new FilterOperator(context.acquireNodeId(), context.operator, new ExpressionPredicate(pushDownPredicate));
+            Expression predicate = new AnalyzeResult(pairs).getPredicate();
+            visit(predicate, context);
+            context.operator = new FilterOperator(context.acquireNodeId(), context.operator, new ExpressionPredicate(predicate));
         }
 
         // Child joins
@@ -577,8 +569,12 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                             context.sortItems,
                             table.getTableOptions()));
         }
-        // Set leftover predicate to context
-        context.pushDownPredicateByAlias.put(table.getAlias(), predicate.getPredicate());
+        
+        // No pairs left, remove from context
+        if (predicate.getPairs().isEmpty())
+        {
+            context.pushDownPredicateByAlias.remove(table.getAlias());
+        }
         return null;
     }
 
@@ -682,7 +678,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         IndexOperatorFoundation foundation = new IndexOperatorFoundation(innerAlias, indices, analyzeResult, emitEmptyOuterRows);
         Index index = foundation.index;
         Expression condition = foundation.condition;
-        context.appendPushDownPredicate(innerAlias, foundation.pushDownExpression);
+        context.appendPushDownPredicate(innerAlias, foundation.pushDownPairs);
 
         /* No equi items in condition or a correlated query => NestedLoop */
         if (isCorrelated || !foundation.isEqui())
@@ -860,10 +856,11 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     /** Wraps provided operator with push down predicate filter for provided alias **/
     private Operator wrapWithPushDown(Context context, Operator operator, String alias)
     {
-        Expression pushDownPredicate = context.pushDownPredicateByAlias.remove(alias);
+        List<AnalyzePair> pushDownPairs = context.pushDownPredicateByAlias.remove(alias);
         /* Apply any pushdown filter */
-        if (pushDownPredicate != null)
+        if (pushDownPairs != null)
         {
+            Expression pushDownPredicate = new AnalyzeResult(pushDownPairs).getPredicate();
             return new FilterOperator(context.acquireNodeId(), operator, new ExpressionPredicate(pushDownPredicate));
         }
         return operator;
@@ -897,7 +894,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         List<Expression> outerValueExpressions;
         List<Expression> innerValueExpressions;
         Expression condition;
-        Expression pushDownExpression;
+        List<AnalyzePair> pushDownPairs;
         Index index;
 
         boolean isEqui()
@@ -929,10 +926,10 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
             if (equiItems.size() == 0)
             {
-                Pair<Expression, AnalyzeResult> pair = analyzeResult.extractPushdownPredicate(alias);
-                if (pair.getKey() != null)
+                Pair<List<AnalyzePair>, AnalyzeResult> pair = analyzeResult.extractPushdownPairs(alias);
+                if (!pair.getKey().isEmpty())
                 {
-                    pushDownExpression = pair.getKey();
+                    pushDownPairs = pair.getKey();
                     condition = pair.getValue().getPredicate();
                 }
                 else
@@ -1023,10 +1020,10 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 return;
             }
 
-            Pair<Expression, AnalyzeResult> pair = result.extractPushdownPredicate(alias);
+            Pair<List<AnalyzePair>, AnalyzeResult> pair = result.extractPushdownPairs(alias);
             if (pair.getKey() != null)
             {
-                pushDownExpression = pair.getKey();
+                pushDownPairs = pair.getKey();
                 condition = pair.getValue().getPredicate();
             }
             else

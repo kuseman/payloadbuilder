@@ -1,10 +1,12 @@
 package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static org.kuse.payloadbuilder.core.parser.QualifiedName.of;
 import static org.kuse.payloadbuilder.core.utils.CollectionUtils.asSet;
 
+import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -28,13 +30,13 @@ public class PredicateAnalyzerTest extends Assert
     @Test
     public void test_AnalyzeResult()
     {
-        Pair<Expression, AnalyzeResult> pair;
+        Pair<List<AnalyzePair>, AnalyzeResult> pair;
         AnalyzeResult result;
         result = PredicateAnalyzer.analyze(null);
         assertEquals(result, AnalyzeResult.EMPTY);
         assertNull(result.getPredicate());
-        pair = result.extractPushdownPredicate("a");
-        assertNull(pair.getLeft());
+        pair = result.extractPushdownPairs("a");
+        assertEquals(emptyList(), pair.getLeft());
         assertEquals(AnalyzeResult.EMPTY, pair.getValue());
         
         result = PredicateAnalyzer.analyze(e("(a.flag)"));
@@ -43,8 +45,11 @@ public class PredicateAnalyzerTest extends Assert
                         pair(Type.COMPARISION, ComparisonExpression.Type.EQUAL, e("a.flag"), asSet("a"), of("flag"), e("true"), emptySet(), null)),
                 result);
         assertEquals(e("(a.flag = true)"), result.getPredicate());
-        pair = result.extractPushdownPredicate("a");
-        assertEquals(e("a.flag = true"), pair.getLeft());
+        pair = result.extractPushdownPairs("a");
+        assertEquals(asList(
+                pair(Type.COMPARISION, ComparisonExpression.Type.EQUAL, e("a.flag"), asSet("a"), of("flag"), e("true"), emptySet(), null)
+                ),
+                pair.getLeft());
         assertEquals(AnalyzeResult.EMPTY, pair.getValue());
 
         result = PredicateAnalyzer.analyze(e("a.art_id = s.art_id"));
@@ -53,8 +58,8 @@ public class PredicateAnalyzerTest extends Assert
                         pair(Type.COMPARISION, ComparisonExpression.Type.EQUAL, e("a.art_id"), asSet("a"), of("art_id"), e("s.art_id"), asSet("s"), of("art_id"))),
                 result);
         assertEquals(e("a.art_id = s.art_id"), result.getPredicate());
-        pair = result.extractPushdownPredicate("a");
-        assertNull(pair.getLeft());
+        pair = result.extractPushdownPairs("a");
+        assertEquals(emptyList(), pair.getLeft());
         assertEquals(result, pair.getValue());
 
         result = PredicateAnalyzer.analyze(e("a.art_id = s.art_id and sku_id = s.sku_id and active_flg and not a.internet_flg and a.value > 100"));
@@ -74,8 +79,13 @@ public class PredicateAnalyzerTest extends Assert
                 pair(Type.COMPARISION, ComparisonExpression.Type.EQUAL, e("a.art_id"), asSet("a"), of("art_id"), e("s.art_id"), asSet("s"), of("art_id"))
                 ), result.getEquiPairs("a"));
         assertEquals(e("a.art_id = s.art_id and sku_id = s.sku_id and active_flg = true and a.internet_flg = false and a.value > 100"), result.getPredicate());
-        pair = result.extractPushdownPredicate("a");
-        assertEquals(e("a.value > 100 AND a.internet_flg = false AND active_flg = true"), pair.getLeft());
+        pair = result.extractPushdownPairs("a");
+        assertEquals(asList(
+                pair(Type.COMPARISION, ComparisonExpression.Type.GREATER_THAN, e("a.value"), asSet("a"), of("value"), e("100"), asSet(), null),
+                pair(Type.COMPARISION, ComparisonExpression.Type.EQUAL, e("a.internet_flg"), asSet("a"), of("internet_flg"), e("false"), asSet(), null),
+                pair(Type.COMPARISION, ComparisonExpression.Type.EQUAL, e("active_flg"), asSet(""), of("active_flg"), e("true"), asSet(), null)
+                ),
+                pair.getLeft());
         assertEquals(
                 result(
                         pair(Type.COMPARISION, ComparisonExpression.Type.EQUAL, e("sku_id"), asSet(""), of("sku_id"), e("s.sku_id"), asSet("s"), of("sku_id")),

@@ -172,7 +172,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
                         4,
                         "",
                         new FilterOperator(1, result.tableOperators.get(0), new ExpressionPredicate(e("s.id3 > 0"))),
-                        new FilterOperator(3, result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg = true AND note_id > 0"))),
+                        new FilterOperator(3, result.tableOperators.get(1), new ExpressionPredicate(e("note_id > 0 AND a.active_flg = true"))),
                         new ExpressionHashFunction(asList(e("s.art_id"))),
                         new ExpressionHashFunction(asList(e("a.art_id"))),
                         new ExpressionPredicate(e("a.art_id = s.art_id")),

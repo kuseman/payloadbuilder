@@ -96,33 +96,34 @@ public class PredicateAnalyzer
          * Extracts push down predicate for provided alias.
          * </pre>
          */
-        Pair<Expression, AnalyzeResult> extractPushdownPredicate(String alias)
+        Pair<List<AnalyzePair>, AnalyzeResult> extractPushdownPairs(String alias)
         {
             if (pairs.isEmpty())
             {
-                return Pair.of(null, this);
+                return Pair.of(emptyList(), this);
             }
 
-            Expression result = null;
             int size = pairs.size();
-            List<AnalyzePair> leftOvers = new ArrayList<>(size);
+            List<AnalyzePair> leftovers = new ArrayList<>(size);
+            List<AnalyzePair> pushdowns = new ArrayList<>(size);
             for (int i = 0; i < size; i++)
             {
                 AnalyzePair pair = pairs.get(i);
                 if (pair.isPushdown(alias))
                 {
-                    Expression expression = pair.getPredicate();
-                    result = result == null
-                        ? expression
-                        : new LogicalBinaryExpression(LogicalBinaryExpression.Type.AND, result, expression);
+                    pushdowns.add(pair);
+//                    Expression expression = pair.getPredicate();
+//                    result = result == null
+//                        ? expression
+//                        : new LogicalBinaryExpression(LogicalBinaryExpression.Type.AND, result, expression);
                 }
                 else
                 {
-                    leftOvers.add(pair);
+                    leftovers.add(pair);
                 }
             }
 
-            return Pair.of(result, new AnalyzeResult(leftOvers));
+            return Pair.of(pushdowns, new AnalyzeResult(leftovers));
         }
 
         /** Return the full predicate (source) for this analyze result */
@@ -260,6 +261,30 @@ public class PredicateAnalyzer
             }
 
             throw new IllegalArgumentException("No expressions could be found in this pair for alias " + alias);
+        }
+        
+        /** Return qualified name for provided alias.
+         * Returns first match on either left or right side. */
+        public QualifiedName getQname(String alias)
+        {
+            if (left.qname != null && left.aliases.contains(alias))
+            {
+                return left.qname;
+            }
+            else if (right != null && right.qname != null && right.aliases.contains(alias))
+            {
+                return right.qname;
+            }
+            else if (left.qname != null && left.aliases.contains(""))
+            {
+                return left.qname;
+            }
+            else if (right != null && right.qname != null && right.aliases.contains(""))
+            {
+                return right.qname;
+            }
+            
+            return null;
         }
 
         /**
@@ -503,6 +528,11 @@ public class PredicateAnalyzer
             return qname;
         }
 
+        public Expression getExpression()
+        {
+            return expression;
+        }
+        
         /**
          * Checks if this item is a single alias. Ie. no alias or empty alias or provided alias
          */
