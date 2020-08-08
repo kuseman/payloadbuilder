@@ -135,11 +135,21 @@ class ESCatalog extends Catalog
         List<AnalyzePair> leftOvers = new ArrayList<>();
         for (AnalyzePair pair : analyzeResult.getPairs())
         {
-            String column = pair.getColumn(tableAlias.getAlias());
-            if (analyzedFields.contains(column))
+            QualifiedName qname = pair.getLeft().getQname();
+            if (qname == null)
+            {
+                qname = pair.getRight() != null ? pair.getRight().getQname() : null;
+            }
+            if (qname == null)
+            {
+                continue;
+            }
+            
+            String property = qname.toString();
+            if (analyzedFields.contains(property))
             {
                 Pair<Expression, Expression> expressionPair = pair.getExpressionPair(tableAlias.getAlias());
-                fieldPredicates.add(Pair.of(column, expressionPair.getRight()));
+                fieldPredicates.add(Pair.of(property, expressionPair.getRight()));
             }
             else
             {

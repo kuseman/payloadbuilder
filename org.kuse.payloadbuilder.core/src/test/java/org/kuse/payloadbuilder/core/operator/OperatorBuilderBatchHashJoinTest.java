@@ -36,6 +36,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         Select select = parser.parseSelect(queryString);
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
 
+        assertTrue("Operator should index access", ((TestOperator) operators.get(0)).index);
+        
         Operator expected = new OuterValuesOperator(
                 2,
                 new FilterOperator(
@@ -359,7 +361,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             @Override
             public Operator getScanOperator(OperatorData data)
             {
-                Operator op = op("scan " + data.getTableAlias().getTable().toString());
+                Operator op = new TestOperator("index " + data.getTableAlias().getTable().toString(), keysByTable, false);
                 operators.add(op);
                 return op;
             }
@@ -367,38 +369,47 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             @Override
             public Operator getIndexOperator(OperatorData data, Index index)
             {
-                Operator op = op("index " + data.getTableAlias().getTable().toString());
+                Operator op = new TestOperator("index " + data.getTableAlias().getTable().toString(), keysByTable, true);
                 operators.add(op);
                 return op;
             }
-
-            private Operator op(final String name)
-            {
-                return new Operator()
-                {
-                    @Override
-                    public int getNodeId()
-                    {
-                        return 0;
-                    }
-
-                    @Override
-                    public Iterator<Row> open(ExecutionContext context)
-                    {
-                        if (keysByTable.containsKey(name))
-                        {
-                            assertNotNull(context.getOperatorContext().getOuterIndexValues());
-                        }
-                        return emptyIterator();
-                    }
-
-                    @Override
-                    public String toString()
-                    {
-                        return name;
-                    }
-                };
-            }
         };
+    }
+    
+    private static class TestOperator implements Operator
+    {
+        private final String name;
+        private final Map<String, List<String>> keysByTable;
+        private final boolean index;
+
+        TestOperator(String name, Map<String, List<String>> keysByTable, boolean index)
+        {
+            this.name = name;
+            this.keysByTable = keysByTable;
+            this.index = index;
+        }
+       
+        @Override
+        public int getNodeId()
+        {
+            return 0;
+        }
+
+        @Override
+        public Iterator<Row> open(ExecutionContext context)
+        {
+            if (keysByTable.containsKey(name))
+            {
+                assertNotNull(context.getOperatorContext().getOuterIndexValues());
+            }
+            return emptyIterator();
+        }
+
+        @Override
+        public String toString()
+        {
+            return name;
+        }
+        
     }
 }

@@ -21,7 +21,6 @@ import org.kuse.payloadbuilder.core.parser.InExpression;
 import org.kuse.payloadbuilder.core.parser.LiteralBooleanExpression;
 import org.kuse.payloadbuilder.core.parser.LogicalBinaryExpression;
 import org.kuse.payloadbuilder.core.parser.LogicalNotExpression;
-import org.kuse.payloadbuilder.core.parser.NestedExpression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 
@@ -59,11 +58,6 @@ public class PredicateAnalyzer
         while (!queue.isEmpty())
         {
             Expression e = queue.remove(0);
-            if (e instanceof NestedExpression)
-            {
-                queue.add(0, e = ((NestedExpression) e).getExpression());
-                continue;
-            }
             if (e instanceof LogicalBinaryExpression)
             {
                 LogicalBinaryExpression lbe = (LogicalBinaryExpression) e;
@@ -73,11 +67,6 @@ public class PredicateAnalyzer
                     queue.add(0, lbe.getRight());
                     continue;
                 }
-                //                resultItems.add(new AnalyzePair(
-                //                        new AnalyzeItem(e, null, null),
-                //                        AnalyzeItem.EMPTY));
-                //null, null, e, null, null, null));
-                //                continue;
             }
 
             resultItems.add(AnalyzePair.of(e));
@@ -86,95 +75,10 @@ public class PredicateAnalyzer
         return new AnalyzeResult(resultItems);
     }
 
-    //    /**
-    //     * Constructs an {@link AnalyzePair} from provided expression
-    //     *
-    //     * @param expression Expression to retrieve item for
-    //     */
-    //    private static AnalyzePair getPair(Expression expression)
-    //    {
-    //        Expression left = expression;
-    //        Expression right = null;
-    //
-    //        /* Split up equal expressions, these are sources for equi expression */
-    //        if (expression instanceof ComparisonExpression)
-    //        {
-    //            ComparisonExpression ce = (ComparisonExpression) expression;
-    //            if (ce.getType() == Type.EQUAL)
-    //            {
-    //                left = ce.getLeft();
-    //                right = ce.getRight();
-    //            }
-    //        }
-    //        // TODO:
-    ////        else if (expression instanceof InExpression)
-    ////        {
-    ////            InExpression ie = (InExpression) expression;
-    ////            left = ie.getExpression();
-    ////            right = ie.getArguments().stream().reduce((a, b) -> new LogicalBinaryExpression(LogicalBinaryExpression.Type.OR, a, b)).get();
-    ////        }
-    //
-    //        Set<String> leftAliases = QualifiedReferenceVisitor.getAliases(left);
-    //        Set<String> rightAliases = QualifiedReferenceVisitor.getAliases(right);
-    //
-    //        String leftColumn = null;
-    //        String rightColumn = null;
-    //
-    //        if (left instanceof QualifiedReferenceExpression)
-    //        {
-    //            QualifiedReferenceExpression qre = (QualifiedReferenceExpression) left;
-    //            if (qre.getQname().getParts().size() <= 2)
-    //            {
-    //                leftColumn = qre.getQname().getLast();
-    //            }
-    //        }
-    //        if (right instanceof QualifiedReferenceExpression)
-    //        {
-    //            QualifiedReferenceExpression qre = (QualifiedReferenceExpression) right;
-    //            if (qre.getQname().getParts().size() <= 2)
-    //            {
-    //                rightColumn = qre.getQname().getLast();
-    //            }
-    //        }
-    //
-    //        return new AnalyzePair(
-    //                new AnalyzeItem(left, leftAliases, leftColumn),
-    //                new AnalyzeItem(right, rightAliases, rightColumn));
-    //    }
-
-    /** Extracts qualified reference aliases for an expression */
-    //    private static class QualifiedReferenceVisitor extends AExpressionVisitor<Void, Set<String>>
-    //    {
-    //        private static final QualifiedReferenceVisitor QR_VISITOR = new QualifiedReferenceVisitor();
-    //
-    //        /** Get aliases for provided expression */
-    //        static Set<String> getAliases(Expression expression)
-    //        {
-    //            if (expression == null)
-    //            {
-    //                return emptySet();
-    //            }
-    //            Set<String> aliases = new HashSet<>();
-    //            expression.accept(QR_VISITOR, aliases);
-    //            return aliases;
-    //        }
-    //
-    //        @Override
-    //        public Void visit(QualifiedReferenceExpression expression, Set<String> aliases)
-    //        {
-    //            String alias = expression.getQname().getAlias();
-    //            if (alias != null)
-    //            {
-    //                aliases.add(alias/* != null ? alias : ""*/);
-    //            }
-    //            return null;
-    //        }
-    //    }
-
     /** Result of analysis */
     public static class AnalyzeResult
     {
-        private static final AnalyzeResult EMPTY = new AnalyzeResult(emptyList());
+        static final AnalyzeResult EMPTY = new AnalyzeResult(emptyList());
         private final List<AnalyzePair> pairs;
 
         public AnalyzeResult(List<AnalyzePair> pairs)
@@ -249,39 +153,6 @@ public class PredicateAnalyzer
                     .collect(toList());
         }
 
-//        /** Return pairs that are of Comparison EQUAL type */
-//        public List<AnalyzePair> getEquiPairs()
-//        {
-//            return getEquiStream().collect(toList());
-//        }
-//
-//        private Stream<AnalyzePair> getEquiStream()
-//        {
-//            return pairs
-//                    .stream()
-//                    .filter(pair -> pair.comparisonType == Type.EQUAL);
-//        }
-
-        /** Return equi items for provided alias */
-        //        public List<AnalyzePair> getEquiPairs(String alias, boolean includeAliasLess)
-        //        {
-        //            return getEquiPairs(alias, includeAliasLess, false);
-        //        }
-        //
-        //        /** Return equi items for provided alias */
-        //        public List<AnalyzePair> getEquiPairs(String alias, boolean includeAliasLess, boolean onlySingleAlias)
-        //        {
-        //            if (pairs.isEmpty())
-        //            {
-        //                return emptyList();
-        //            }
-        //            return pairs.stream()
-        //                    .filter(pair -> pair.isEqui(alias)
-        //                        || (includeAliasLess && pair.isEqui("")))
-        //                    .filter(pair -> !onlySingleAlias || pair.isSingleAlias(alias))
-        //                    .collect(toList());
-        //        }
-
         @Override
         public int hashCode()
         {
@@ -343,12 +214,12 @@ public class PredicateAnalyzer
             return comparisonType;
         }
 
-        AnalyzeItem getLeft()
+        public AnalyzeItem getLeft()
         {
             return left;
         }
 
-        AnalyzeItem getRight()
+        public AnalyzeItem getRight()
         {
             return right;
         }
@@ -494,7 +365,7 @@ public class PredicateAnalyzer
         {
             return 17 +
                 31 * left.hashCode() +
-                37 * right.hashCode();
+                37 * (right != null ? right.hashCode() : 0);
         }
 
         @Override
@@ -506,9 +377,9 @@ public class PredicateAnalyzer
                 return type == that.type
                     && comparisonType == that.comparisonType
                     && left.equals(that.left)
-                    && right.equals(that.right);
+                    && Objects.equals(right, that.right);
             }
-            return super.equals(obj);
+            return false;
         }
 
         @Override
@@ -600,7 +471,7 @@ public class PredicateAnalyzer
             COMPARISION,
             /** In pair. {@link InExpression} is used */
             IN,
-            /** Undefined type. No analyze could be made for this item. */
+            /** Undefined type. No analyze could be made for this item. Full expression is accessed via {@link AnalyzePair#getLeft()} */
             UNDEFINED
         }
     }
@@ -626,24 +497,11 @@ public class PredicateAnalyzer
             this.aliases = requireNonNull(aliases, "aliases");
             this.qname = qname;
         }
-
-        //        String getAlias()
-        //        {
-        //            return alias;
-        //        }
-
-        /** Returns true if this item is empty */
-        //        boolean isEmpty()
-        //        {
-        //            return expression == null /*|| CollectionUtils.isEmpty(aliases)*/;
-        //        }
-
-        /** Returns true if this item contains provided alias */
-        //        boolean contains(String alias)
-        //        {
-        //            return aliases != null && aliases.contains(alias);
-        //        }
-        //
+        
+        public QualifiedName getQname()
+        {
+            return qname;
+        }
 
         /**
          * Checks if this item is a single alias. Ie. no alias or empty alias or provided alias

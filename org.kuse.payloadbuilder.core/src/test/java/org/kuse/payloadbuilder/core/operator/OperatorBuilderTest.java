@@ -93,6 +93,23 @@ public class OperatorBuilderTest extends AOperatorTest
     }
 
     @Test
+    public void test_top()
+    {
+        String query = "select top 10 a.art_id from article a";
+        QueryResult queryResult = getQueryResult(query);
+
+        Operator expected = new TopOperator(
+                1,
+                queryResult.tableOperators.get(0),
+                e("10"));
+
+        //                System.out.println(queryResult.operator.toString(1));
+        //                System.err.println(expected.toString(1));
+
+        assertEquals(expected, queryResult.operator);
+    }
+    
+    @Test
     public void test_groupBy()
     {
         String query = "select a.art_id from article a group by a.art_id";
