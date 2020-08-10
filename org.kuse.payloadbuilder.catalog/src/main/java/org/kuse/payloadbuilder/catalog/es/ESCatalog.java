@@ -2,21 +2,21 @@ package org.kuse.payloadbuilder.catalog.es;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
-import static java.util.Collections.emptySet;
+import static java.util.Collections.emptyMap;
+import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.kuse.payloadbuilder.catalog.es.ESOperator.CLIENT;
 import static org.kuse.payloadbuilder.catalog.es.ESOperator.MAPPER;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -46,6 +46,7 @@ class ESCatalog extends Catalog
     ESCatalog()
     {
         super("EsCatalog");
+        registerFunction(new MustacheCompileFunction(this));
     }
 
     @SuppressWarnings("unchecked")
@@ -87,15 +88,15 @@ class ESCatalog extends Catalog
         List<PropertyPredicate> propertyPredicates = emptyList();
         List<Pair<String, String>> sortItems = emptyList();
         // Extract potential predicate to send to ES
-        if (!data.getPredicate().getPairs().isEmpty() || !data.getSortItems().isEmpty())
+        if (!data.getPredicatePairs().isEmpty() || !data.getSortItems().isEmpty())
         {
             // Fetch analyzed properties
-            Set<String> analyzedFields = getAnalyzedPropertyNames(data.getSession(), data.getCatalogAlias(), data.getTableAlias().getTable());
+            Map<String, String> analyzedFields = getAnalyzedPropertyNames(data.getSession(), data.getCatalogAlias(), data.getTableAlias().getTable());
 
-            if (!data.getPredicate().getPairs().isEmpty())
+            if (!data.getPredicatePairs().isEmpty())
             {
                 propertyPredicates = new ArrayList<>();
-                collectPredicates(data.getTableAlias(), data.getPredicate(), analyzedFields, propertyPredicates);
+                collectPredicates(data.getTableAlias(), data.getPredicatePairs(), analyzedFields, propertyPredicates);
             }
 
             if (!data.getSortItems().isEmpty())
@@ -127,11 +128,11 @@ class ESCatalog extends Catalog
 
     private void collectPredicates(
             TableAlias tableAlias,
-            TablePredicate predicate,
-            Set<String> analyzedFields,
+            List<AnalyzePair> predicatePairs,
+            Map<String, String> analyzedProperties,
             List<ESOperator.PropertyPredicate> propertyPredicates)
     {
-        Iterator<AnalyzePair> it = predicate.getPairs().iterator();
+        Iterator<AnalyzePair> it = predicatePairs.iterator();
         while (it.hasNext())
         {
             AnalyzePair pair = it.next();
@@ -146,10 +147,11 @@ class ESCatalog extends Catalog
                 continue;
             }
             
-            String property = qname.toString();
-            if (analyzedFields.contains(property))
+            String column = qname.toString();
+            String key = analyzedProperties.get(column);                    
+            if (key != null)
             {
-                propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), property, pair));
+                propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), defaultIfBlank(key, column), pair));
                 it.remove();
             }
         }
@@ -157,7 +159,7 @@ class ESCatalog extends Catalog
 
     private List<Pair<String, String>> collectSortItems(
             TableAlias tableAlias,
-            Set<String> analyzedFields,
+            Map<String, String> analyzedProperties,
             List<SortItem> sortItems)
     {
         List<Pair<String, String>> result = null;
@@ -174,18 +176,20 @@ class ESCatalog extends Catalog
 
             QualifiedReferenceExpression qe = (QualifiedReferenceExpression) sortItem.getExpression();
             QualifiedName qname = qe.getQname();
-            // Wrong alias or multipart qualified name not supported
-            // TODO: move this check to framework, might probably never be supported by any catalog
-            // especially not if a child alias is referenced
-            if (qname.getParts().size() > 2
-                || (qname.getParts().size() == 2 && !Objects.equals(tableAlias.getAlias(), qname.getAlias())))
+
+            String column;
+            // Remove alias from qname
+            if (Objects.equals(tableAlias.getAlias(), qname.getAlias()))
             {
-                return emptyList();
+                column = qname.extract(1).toString();
             }
-
-            String column = qname.getLast();
-
-            if (!analyzedFields.contains(column))
+            else
+            {
+                column = qname.toString();
+            }
+            
+            String key = analyzedProperties.get(column);
+            if (key == null)
             {
                 return emptyList();
             }
@@ -194,7 +198,7 @@ class ESCatalog extends Catalog
             {
                 result = new ArrayList<>();
             }
-            result.add(Pair.of(column, sortItem.getOrder() == Order.ASC ? "asc" : "desc"));
+            result.add(Pair.of(defaultIfBlank(key, column), sortItem.getOrder() == Order.ASC ? "asc" : "desc"));
         }
 
         // Consume items from framework
@@ -204,7 +208,7 @@ class ESCatalog extends Catalog
 
     /** Returns mapping for provided table */
     @SuppressWarnings("unchecked")
-    private Set<String> getAnalyzedPropertyNames(QuerySession session, String catalogAlias, QualifiedName table)
+    private Map<String, String> getAnalyzedPropertyNames(QuerySession session, String catalogAlias, QualifiedName table)
     {
         EsType esType = EsType.of(session, catalogAlias, table);
         HttpGet getMappings = new HttpGet(String.format("%s/%s/%s/_mapping", esType.endpoint, esType.index, esType.type));
@@ -212,7 +216,7 @@ class ESCatalog extends Catalog
         {
             if (response.getStatusLine().getStatusCode() != 200)
             {
-                return emptySet();
+                return emptyMap();
             }
 
             Map<String, Object> map = MAPPER.readValue(response.getEntity().getContent(), Map.class);
@@ -225,10 +229,10 @@ class ESCatalog extends Catalog
 
             if (map == null)
             {
-                return emptySet();
+                return emptyMap();
             }
 
-            Set<String> result = new HashSet<>();
+            Map<String, String> result = new HashMap<>();
             populateAnalyzedFields(result, map, null);
             return result;
         }
@@ -238,7 +242,7 @@ class ESCatalog extends Catalog
         }
     }
 
-    private void populateAnalyzedFields(Set<String> result, Map<String, Object> properties, String parentKey)
+    private void populateAnalyzedFields(Map<String, String> result, Map<String, Object> properties, String parentKey)
     {
         for (Entry<String, Object> entry : properties.entrySet())
         {
@@ -246,6 +250,7 @@ class ESCatalog extends Catalog
             Map<String, Object> propertiesMap = (Map<String, Object>) entry.getValue();
             @SuppressWarnings("unchecked")
             Map<String, Object> subProperties = (Map<String, Object>) propertiesMap.get("properties");
+            
             // Collected nested properties one level down only
             if (parentKey == null && subProperties != null)
             {
@@ -253,16 +258,40 @@ class ESCatalog extends Catalog
                 continue;
             }
 
-            String type = (String) propertiesMap.get("type");
             String index = (String) propertiesMap.get("index");
 
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fields = (Map<String, Object>) propertiesMap.get("fields");
+            
+            // if index is null and there exists a field that is not_analyzed pick that one
+            if (index == null && fields != null)
+            {
+                boolean added = false;
+                for (Entry<String, Object> e : fields.entrySet())
+                {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> fieldProperties = (Map<String, Object>) e.getValue();
+                    String fieldIndex = (String) fieldProperties.get("index");
+                    if ("not_analyzed".equals(fieldIndex))
+                    {
+                        String property = (parentKey != null ? parentKey + "." : "") + entry.getKey();
+                        result.put(property, property + "." + e.getKey());
+                        added = true;
+                        break;
+                    }
+                }
+                if (added)
+                {
+                    continue;
+                }
+            }
+            
             // - Type should no be nested/object
             //   Not supported to filter on
             // - index cannot be NO
-            if ((index == null || "not_analyzed".equals(index))
-                && !("object".equals(type) || "nested".equals(type)))
+            if ((index == null || "not_analyzed".equals(index)))
             {
-                result.add((parentKey != null ? parentKey + "." : "") + entry.getKey());
+                result.put((parentKey != null ? parentKey + "." : "") + entry.getKey(), "");
             }
         }
     }

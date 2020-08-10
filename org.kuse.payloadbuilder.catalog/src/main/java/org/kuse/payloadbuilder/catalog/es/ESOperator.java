@@ -15,8 +15,7 @@ import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
+import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -43,6 +42,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
@@ -56,6 +56,7 @@ import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair.Type;
 import org.kuse.payloadbuilder.core.operator.Row;
+import org.kuse.payloadbuilder.core.parser.ComparisonExpression;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.InExpression;
@@ -172,17 +173,15 @@ class ESOperator extends AOperator
         }
 
         final String searchUrl = String.format(
-                "%s/%s/%s/_search?%s&size=%d%s&scroll=%s&filter_path=_scroll_id,hits.hits._id,hits.hits._source",
+                "%s/%s/%s/_search?size=%d&scroll=%s&filter_path=_scroll_id,hits.hits._id,hits.hits._source",
                 esType.endpoint,
                 esType.index,
                 esType.type,
-                getPredicateParam(context),
                 // TODO: table option for batch size
                 1000,
-                getSortParam(),
                 "2m");
-        String scrollUrl = String.format("%s/_search/scroll?scroll=%s&scroll_id=", esType.endpoint, "2m");
-
+        String scrollUrl = String.format("%s/_search/scroll?filter_path=_scroll_id,hits.hits._id,hits.hits._source&scroll=%s&scroll_id=", esType.endpoint, "2m");
+        String body = getSearchBody(context);
         return getIterator(
                 receivedBytes,
                 scrollId ->
@@ -190,8 +189,10 @@ class ESOperator extends AOperator
                     scrollCount.incrementAndGet();
                     if (scrollId.getValue() == null)
                     {
-                        sentBytes.addAndGet(searchUrl.length());
-                        return new HttpGet(searchUrl);
+                        sentBytes.addAndGet(searchUrl.length() + body.length());
+                        HttpPost post = new HttpPost(searchUrl);
+                        post.setEntity(new StringEntity(body, Charset.forName("UTF-8")));
+                        return post;
                     }
                     else
                     {
@@ -322,53 +323,68 @@ class ESOperator extends AOperator
         };
     }
 
-    private String getPredicateParam(ExecutionContext context)
+    private String getSearchBody(ExecutionContext context)
     {
-        if (propertyPredicates.isEmpty())
+        StringBuilder sb = new StringBuilder("{");
+        appendSortItems(sb);
+        if (sb.length() > 1)
         {
-            return "";
+            sb.append(",");
         }
-        StringBuilder sb = new StringBuilder();
-        for (PropertyPredicate predicate : propertyPredicates)
+        appendPropertyPredicates(sb, context);
+        if (sb.charAt(sb.length() - 1) == ',')
         {
-            if (sb.length() == 0)
-            {
-                sb.append("q=");
-            }
-            else if (sb.length() > 0)
-            {
-                sb.append("+AND+");
-            }
-
-            sb.append(predicate.getQueryParam(context));
+            sb.deleteCharAt(sb.length() - 1);
         }
-
+        sb.append("}");
         return sb.toString();
     }
 
-    private String getSortParam()
+    private void appendPropertyPredicates(StringBuilder sb, ExecutionContext context)
     {
-        if (sortItems.isEmpty())
+        if (propertyPredicates.isEmpty())
         {
-            return "";
+            return;
         }
-
-        StringBuilder sb = new StringBuilder();
-
-        for (Pair<String, String> sortItem : sortItems)
+        sb.append("\"filter\":{\"bool\":{\"must\":[");
+        for (PropertyPredicate predicate : propertyPredicates)
         {
-            if (sb.length() == 0)
-            {
-                sb.append("&sort=");
-            }
-            else if (sb.length() > 0)
+            predicate.appendBooleanClause(sb, context);
+            if (sb.charAt(sb.length() - 1) != ',')
             {
                 sb.append(",");
             }
-            sb.append(sortItem.getKey()).append(":").append(sortItem.getValue());
+        }
+        if (sb.charAt(sb.length() - 1) == ',')
+        {
+            sb.deleteCharAt(sb.length() - 1);
+        }
+        sb.append("]}}");
+    }
+
+    private void appendSortItems(StringBuilder sb)
+    {
+        if (sortItems.isEmpty())
+        {
+            return;
         }
 
-        return sb.toString();
+        sb.append("\"sort\":[");
+        for (Pair<String, String> sortItem : sortItems)
+        {
+            // { "field": { "order": "desc" } }
+            sb.append("{\"")
+                    .append(sortItem.getKey())
+                    .append("\":{\"order\":\"")
+                    .append(sortItem.getValue())
+                    .append("\"}}")
+                    .append(",");
+        }
+        if (sb.charAt(sb.length() - 1) == ',')
+        {
+            sb.deleteCharAt(sb.length() - 1);
+        }
+        sb.append("]");
     }
 
     /** Top response (Used both in get request and search request) */
@@ -548,7 +564,7 @@ class ESOperator extends AOperator
             return "";
         }
 
-        private String getQueryParam(ExecutionContext context)
+        private void appendBooleanClause(StringBuilder sb, ExecutionContext context)
         {
             if (pair.getType() == Type.COMPARISION)
             {
@@ -556,56 +572,98 @@ class ESOperator extends AOperator
                 Object value = ePair.getRight().eval(context);
                 if (value == null)
                 {
-                    return "";
+                    // if we have null here this means we have a
+                    // query that should always return no rows
+                    // This because something compared to NULL using
+                    // a NON Null-predicate (is null, is not null) always
+                    // yields false so add a term that can never be true
+                    sb.append("{\"term\": { \"_id\": \"\" }}");
+                    
+                    return;
                 }
-                String string = encode(value, true);
+                String stringValue = quote(value);
                 switch (pair.getComparisonType())
                 {
-                    case EQUAL:
-                        return property + ":" + string;
                     case NOT_EQUAL:
-                        return "";
+                        // TODO: move this must_not since not filter is deprecated
+                        // { "not": { ..... } }
+                        sb.append("{\"not\":");
+                    case EQUAL:
+
+                        // { "term": { "property": value }}
+                        sb.append("{\"term\":{\"")
+                                .append(property)
+                                .append("\":")
+                                .append(stringValue)
+                                .append("}}");
+
+                        if (pair.getComparisonType() == ComparisonExpression.Type.NOT_EQUAL)
+                        {
+                            sb.append("}");
+                        }
+                        return;
                     case GREATER_THAN:
                     case GREATER_THAN_EQUAL:
                     case LESS_THAN:
                     case LESS_THAN_EQUAL:
-                        return property + ":" + encode(pair.getComparisonType().getValue(), false) + string;
+
+                        // { "range": { "property": { "gt": 100 }}}
+                        sb.append("{\"range\":{\"")
+                                .append(property)
+                                .append("\":{\"")
+                                .append(getRangeOp(pair.getComparisonType()))
+                                .append("\":")
+                                .append(stringValue)
+                                .append("}}}");
                 }
             }
             else if (pair.getType() == Type.IN)
             {
+                // { "terms": { "property": [ "value", "value2"] }}
+                sb.append("{\"terms\":{\"")
+                        .append(property)
+                        .append("\":[");
+
                 List<Expression> arguments = ((InExpression) pair.getRight().getExpression()).getArguments();
+                sb.append(arguments
+                        .stream()
+                        .map(e -> e.eval(context))
+                        .filter(Objects::nonNull)
+                        .map(o -> quote(o))
+                        .collect(joining(",")));
 
-                return property + ":(" +
-                    arguments
-                            .stream()
-                            .map(e -> e.eval(context))
-                            .filter(Objects::nonNull)
-                            .map(o -> encode(o, true))
-                            .collect(joining("+OR+"))
-                    + ")";
+                sb.append("]}}");
             }
-
-            return "";
         }
 
-        private String encode(Object value, boolean addQuotes)
+        private String getRangeOp(ComparisonExpression.Type type)
         {
-            String stringValue = String.valueOf(value);
-            if (value instanceof String)
+            switch (type)
             {
-                try
-                {
-                    if (addQuotes)
-                    {
-                        return URLEncoder.encode("\"" + stringValue + "\"", "utf-8");
-                    }
-                    
-                    return URLEncoder.encode(stringValue, "utf-8");
-                }
-                catch (UnsupportedEncodingException e)
-                {
-                }
+                case GREATER_THAN:
+                    return "gt";
+                case GREATER_THAN_EQUAL:
+                    return "gte";
+                case LESS_THAN:
+                    return "lt";
+                case LESS_THAN_EQUAL:
+                    return "lte";
+                default:
+                    return "";
+            }
+        }
+
+        private String quote(Object value)
+        {
+            if (value == null)
+            {
+                return "null";
+            }
+            
+            String stringValue = String.valueOf(value);
+            if (!(value instanceof Number || value instanceof Boolean))
+            {
+                return "\"" + stringValue + "\"";
             }
             return stringValue;
         }

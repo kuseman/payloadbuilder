@@ -108,7 +108,7 @@ public class OperatorBuilderTest extends AOperatorTest
 
         assertEquals(expected, queryResult.operator);
     }
-    
+
     @Test
     public void test_groupBy()
     {
@@ -124,6 +124,57 @@ public class OperatorBuilderTest extends AOperatorTest
 
         //        System.out.println(queryResult.operator.toString(1));
         //        System.err.println(expected.toString(1));
+
+        assertEquals(expected, queryResult.operator);
+    }
+
+    @Test
+    public void test_push_down_from_where_to_join()
+    {
+        String query = "select * from source s inner join article a on a.art_id = s.art_id where a.active_flg";
+        QueryResult queryResult = getQueryResult(query);
+
+        Operator expected = new HashJoin(
+                3,
+                "INNER JOIN",
+                queryResult.tableOperators.get(0),
+                new FilterOperator(2, queryResult.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg = true"))),
+                new ExpressionHashFunction(asList(e("s.art_id"))),
+                new ExpressionHashFunction(asList(e("a.art_id"))),
+                new ExpressionPredicate(e("a.art_id = s.art_id")),
+                DefaultRowMerger.DEFAULT,
+                false,
+                false);
+
+//        System.out.println(queryResult.operator.toString(1));
+//        System.err.println(expected.toString(1));
+
+        assertEquals(expected, queryResult.operator);
+    }
+
+    @Test
+    public void test_not_push_down_from_where_to_join_when_left()
+    {
+        String query = "select * from source s left join article a on a.art_id = s.art_id where a.active_flg";
+        QueryResult queryResult = getQueryResult(query);
+
+        Operator expected = new FilterOperator(
+                3,
+                new HashJoin(
+                        2,
+                        "LEFT JOIN",
+                        queryResult.tableOperators.get(0),
+                        queryResult.tableOperators.get(1),
+                        new ExpressionHashFunction(asList(e("s.art_id"))),
+                        new ExpressionHashFunction(asList(e("a.art_id"))),
+                        new ExpressionPredicate(e("a.art_id = s.art_id")),
+                        DefaultRowMerger.DEFAULT,
+                        false,
+                        true),
+                new ExpressionPredicate(e("a.active_flg = true")));
+
+//        System.out.println(queryResult.operator.toString(1));
+//        System.err.println(expected.toString(1));
 
         assertEquals(expected, queryResult.operator);
     }
@@ -273,8 +324,8 @@ public class OperatorBuilderTest extends AOperatorTest
                 true,
                 false);
 
-//                        System.err.println(expected.toString(1));
-//                        System.out.println(queryResult.operator.toString(1));
+        //                        System.err.println(expected.toString(1));
+        //                        System.out.println(queryResult.operator.toString(1));
 
         assertEquals(expected, queryResult.operator);
 
@@ -417,7 +468,7 @@ public class OperatorBuilderTest extends AOperatorTest
         QueryResult result = getQueryResult(query, p ->
         {
             // flag1 is supported as filter
-            Iterator<AnalyzePair> it = p.getPairs().iterator();
+            Iterator<AnalyzePair> it = p.iterator();
             while (it.hasNext())
             {
                 AnalyzePair pair = it.next();
@@ -471,8 +522,8 @@ public class OperatorBuilderTest extends AOperatorTest
 
         Operator expected = result.tableOperators.get(0);
 
-//                System.out.println(expected.toString(1));
-//                System.out.println(result.operator.toString(1));
+        //                System.out.println(expected.toString(1));
+        //                System.out.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
         assertEquals(new ObjectProjection(asList("id1", "flag1"),
@@ -487,20 +538,19 @@ public class OperatorBuilderTest extends AOperatorTest
     {
         String query = "select s.id from source s where s.flag and flag2";
         QueryResult result = getQueryResult(query);
-        
-        
+
         Operator expected = new FilterOperator(
                 1,
                 result.tableOperators.get(0),
                 new ExpressionPredicate(e("s.flag = true and flag2 = true")));
 
-//                                System.out.println(expected.toString(1));
-//                                System.err.println(result.operator.toString(1));
+        //                                System.out.println(expected.toString(1));
+        //                                System.err.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
 
     }
-    
+
     @Test
     public void test_select_item_with_filter()
     {
@@ -524,9 +574,9 @@ public class OperatorBuilderTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 true,
                 false);
-        
-//                                System.out.println(expected.toString(1));
-//                                System.err.println(result.operator.toString(1));
+
+        //                                System.out.println(expected.toString(1));
+        //                                System.err.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
 
@@ -564,8 +614,8 @@ public class OperatorBuilderTest extends AOperatorTest
         TableAlias article = new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"art_id"});
         new TableAlias(article, QualifiedName.of("articleAttribute"), "aa", new String[] {"art_id"});
 
-        //        System.out.println(source.printHierarchy(1));
-        //        System.out.println(result.aliases.get(0).printHierarchy(1));
+        //                System.out.println(source.printHierarchy(1));
+        //                System.out.println(result.aliases.get(0).printHierarchy(1));
         //
         assertTrue(source.isEqual(result.alias));
 
@@ -573,11 +623,11 @@ public class OperatorBuilderTest extends AOperatorTest
                 // Correlated => nested loop
                 new NestedLoopJoin(
                         4,
-                        "",
+                        "INNER JOIN",
                         result.tableOperators.get(0),
                         new HashJoin(
                                 3,
-                                "",
+                                "INNER JOIN",
                                 result.tableOperators.get(1),
                                 result.tableOperators.get(2),
                                 new ExpressionHashFunction(asList(e("a.art_id"))),
@@ -591,8 +641,8 @@ public class OperatorBuilderTest extends AOperatorTest
                         true,
                         false);
 
-        //                        System.err.println(expected.toString(1));
-        //                        System.out.println(result.operator.toString(1));
+        //                                System.err.println(expected.toString(1));
+        //                                System.out.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
 

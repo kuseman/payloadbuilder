@@ -44,7 +44,7 @@ public class PredicateAnalyzer
      * @param condition Join condition to analyze
      * @return Analyze result of expression
      */
-    public static AnalyzeResult analyze(Expression predicate)
+    public static AnalyzeResult analyze(Expression predicate, Set<String> availableAliases)
     {
         if (predicate == null)
         {
@@ -69,7 +69,7 @@ public class PredicateAnalyzer
                 }
             }
 
-            resultItems.add(AnalyzePair.of(e));
+            resultItems.add(AnalyzePair.of(e, availableAliases));
         }
 
         return new AnalyzeResult(resultItems);
@@ -112,10 +112,6 @@ public class PredicateAnalyzer
                 if (pair.isPushdown(alias))
                 {
                     pushdowns.add(pair);
-//                    Expression expression = pair.getPredicate();
-//                    result = result == null
-//                        ? expression
-//                        : new LogicalBinaryExpression(LogicalBinaryExpression.Type.AND, result, expression);
                 }
                 else
                 {
@@ -177,7 +173,6 @@ public class PredicateAnalyzer
         {
             return ReflectionToStringBuilder.toString(this, ToStringStyle.MULTI_LINE_STYLE);
         }
-
     }
 
     /** Analyzed pair. A binary operator with left and right analyzed items */
@@ -414,7 +409,7 @@ public class PredicateAnalyzer
         }
 
         /** Construct a pair from provided expression */
-        static AnalyzePair of(Expression expression)
+        static AnalyzePair of(Expression expression, Set<String> availableAliases)
         {
             if (expression instanceof ComparisonExpression)
             {
@@ -424,8 +419,8 @@ public class PredicateAnalyzer
                 // eligable for hash join.
                 // ie. func(a.art_id) = func2(s.id)
 
-                AnalyzeItem leftItem = getQualifiedItem(ce.getLeft());
-                AnalyzeItem rightItem = getQualifiedItem(ce.getRight());
+                AnalyzeItem leftItem = getQualifiedItem(ce.getLeft(), availableAliases);
+                AnalyzeItem rightItem = getQualifiedItem(ce.getRight(), availableAliases);
 
                 boolean sameAlias = !leftItem.aliases.isEmpty() && Objects.equals(leftItem.aliases, rightItem.aliases);
 
@@ -439,53 +434,68 @@ public class PredicateAnalyzer
                 InExpression ie = (InExpression) expression;
                 if (ie.getExpression() instanceof QualifiedReferenceExpression)
                 {
-                    AnalyzeItem leftItem = getQualifiedItem(ie.getExpression());
+                    AnalyzeItem leftItem = getQualifiedItem(ie.getExpression(), availableAliases);
 
                     // Fetch all aliases from arguments
                     Set<String> aliases = new HashSet<>();
                     for (Expression arg : ie.getArguments())
                     {
-                        QualifiedReferenceVisitor.getAliases(arg, aliases);
+                        QualifiedReferenceVisitor.getAliases(arg, aliases, availableAliases);
                     }
 
                     AnalyzeItem rightItem = new AnalyzeItem(ie, aliases, null);
                     return new AnalyzePair(Type.IN, leftItem, rightItem);
                 }
             }
-
-            if (expression instanceof QualifiedReferenceExpression)
+            else if (expression instanceof QualifiedReferenceExpression)
             {
                 // A single qualified expression in a predicate is a boolean expression
                 // Turn this into a comparison expression
                 // ie. active_flg = true
                 
-                return AnalyzePair.of(new ComparisonExpression(ComparisonExpression.Type.EQUAL, expression, LiteralBooleanExpression.TRUE_LITERAL));
+                return AnalyzePair.of(new ComparisonExpression(ComparisonExpression.Type.EQUAL, expression, LiteralBooleanExpression.TRUE_LITERAL), availableAliases);
             }
             else if (expression instanceof LogicalNotExpression && ((LogicalNotExpression) expression).getExpression() instanceof QualifiedReferenceExpression)
             {
                 // A single qualified expression in a predicate is a boolean expression
                 // Turn this into a comparison expression
                 // ie. not active_flg
-                return AnalyzePair.of(new ComparisonExpression(ComparisonExpression.Type.EQUAL, ((LogicalNotExpression) expression).getExpression(), LiteralBooleanExpression.FALSE_LITERAL));
+                return AnalyzePair.of(new ComparisonExpression(ComparisonExpression.Type.EQUAL, ((LogicalNotExpression) expression).getExpression(), LiteralBooleanExpression.FALSE_LITERAL), availableAliases);
             }
+            
             Set<String> aliases = new HashSet<>();
-            QualifiedReferenceVisitor.getAliases(expression, aliases);
+            QualifiedReferenceVisitor.getAliases(expression, aliases, availableAliases);
             return new AnalyzePair(Type.UNDEFINED, new AnalyzeItem(expression, aliases, null), null);
         }
 
-        private static AnalyzeItem getQualifiedItem(Expression expression)
+        private static final Set<String> EMPTY_ALIASES = asSet("");
+        
+        private static AnalyzeItem getQualifiedItem(Expression expression, Set<String> availableAliases)
         {
             if (expression instanceof QualifiedReferenceExpression)
             {
                 QualifiedReferenceExpression qre = (QualifiedReferenceExpression) expression;
-                List<String> parts = qre.getQname().getParts();
-                String alias = parts.size() > 1 ? parts.get(0) : "";
-                QualifiedName qname = qre.getQname().extract(parts.size() > 1 ? 1 : 0);
-                return new AnalyzeItem(expression, asSet(alias), qname);
+                QualifiedName qname = qre.getQname();
+                String alias = qname.getAlias();
+                Set<String> aliases;
+                if (availableAliases.contains(alias))
+                {
+                    aliases = asSet(alias);
+                    qname = qname.extract(1);
+                }
+                else
+                {
+                    aliases = EMPTY_ALIASES;
+                }
+                
+//                List<String> parts = qre.getQname().getParts();
+//                String alias = parts.size() > 1 ? parts.get(0) : "";
+//                QualifiedName qname = qre.getQname().extract(parts.size() > 1 ? 1 : 0);
+                return new AnalyzeItem(expression, aliases, qname);
             }
 
             Set<String> aliases = new HashSet<>();
-            QualifiedReferenceVisitor.getAliases(expression, aliases);
+            QualifiedReferenceVisitor.getAliases(expression, aliases, availableAliases);
             return new AnalyzeItem(expression, aliases, null);
         }
 
@@ -587,28 +597,38 @@ public class PredicateAnalyzer
     }
 
     /** Extracts qualified reference aliases for an expression */
-    private static class QualifiedReferenceVisitor extends AExpressionVisitor<Void, Set<String>>
+    private static class QualifiedReferenceVisitor extends AExpressionVisitor<Void, QualifiedReferenceVisitor.Context>
     {
         private static final QualifiedReferenceVisitor QR_VISITOR = new QualifiedReferenceVisitor();
 
+        private static class Context
+        {
+            Set<String> result;
+            Set<String> availableAliases;
+        }
+        
         /**
          * Get aliases for provided expression
          *
          * @param aliases
          */
-        static Set<String> getAliases(Expression expression, Set<String> aliases)
+        static Set<String> getAliases(Expression expression, Set<String> result, Set<String> availableAliases)
         {
-            expression.accept(QR_VISITOR, aliases);
-            return aliases;
+            Context context = new Context();
+            context.result = result;
+            context.availableAliases = availableAliases;
+            expression.accept(QR_VISITOR, context);
+            return context.result;
         }
 
         @Override
-        public Void visit(QualifiedReferenceExpression expression, Set<String> aliases)
+        public Void visit(QualifiedReferenceExpression expression, Context context)
         {
             String alias = expression.getQname().getAlias();
-            aliases.add(alias != null
-                ? alias
-                : "");
+            if (context.availableAliases.contains(alias))
+            {
+                context.result.add(alias);
+            }
             return null;
         }
     }

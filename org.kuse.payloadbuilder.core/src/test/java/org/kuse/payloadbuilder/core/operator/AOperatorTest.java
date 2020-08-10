@@ -13,9 +13,9 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Assert;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
-import org.kuse.payloadbuilder.core.catalog.Catalog.TablePredicate;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
+import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QueryParser;
@@ -55,7 +55,7 @@ public class AOperatorTest extends Assert
         return getQueryResult(query, null, null);
     }
     
-    protected QueryResult getQueryResult(String query, Consumer<TablePredicate> predicateConsumer, Consumer<List<SortItem>> sortItemsConsumer)
+    protected QueryResult getQueryResult(String query, Consumer<List<AnalyzePair>> predicateConsumer, Consumer<List<SortItem>> sortItemsConsumer)
     {
         List<Operator> tableOperators = new ArrayList<>();
         MutableObject<TableAlias> mAlias = new MutableObject<>();
@@ -66,7 +66,7 @@ public class AOperatorTest extends Assert
             {
                 if (predicateConsumer != null)
                 {
-                    predicateConsumer.accept(data.getPredicate());
+                    predicateConsumer.accept(data.getPredicatePairs());
                 }
                 
                 if (sortItemsConsumer != null)

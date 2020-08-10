@@ -204,7 +204,7 @@ class QueryFileView extends JPanel
                 break;
             case ERROR:
                 resultTabs.setSelectedIndex(1);
-                messages.setText(file.getError());
+                messagePrintStream.println(file.getError());
                 if (file.getParseErrorLocation() != null)
                 {
                     highLight(file.getParseErrorLocation().getKey(), file.getParseErrorLocation().getValue());

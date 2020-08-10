@@ -32,14 +32,14 @@ public class PredicateAnalyzerTest extends Assert
     {
         Pair<List<AnalyzePair>, AnalyzeResult> pair;
         AnalyzeResult result;
-        result = PredicateAnalyzer.analyze(null);
+        result = PredicateAnalyzer.analyze(null, emptySet());
         assertEquals(result, AnalyzeResult.EMPTY);
         assertNull(result.getPredicate());
         pair = result.extractPushdownPairs("a");
         assertEquals(emptyList(), pair.getLeft());
         assertEquals(AnalyzeResult.EMPTY, pair.getValue());
         
-        result = PredicateAnalyzer.analyze(e("(a.flag)"));
+        result = PredicateAnalyzer.analyze(e("(a.flag)"), asSet("a"));
         assertEquals(
                 result(
                         pair(Type.COMPARISION, ComparisonExpression.Type.EQUAL, e("a.flag"), asSet("a"), of("flag"), e("true"), emptySet(), null)),
@@ -52,7 +52,7 @@ public class PredicateAnalyzerTest extends Assert
                 pair.getLeft());
         assertEquals(AnalyzeResult.EMPTY, pair.getValue());
 
-        result = PredicateAnalyzer.analyze(e("a.art_id = s.art_id"));
+        result = PredicateAnalyzer.analyze(e("a.art_id = s.art_id"), asSet("a", "s"));
         assertEquals(
                 result(
                         pair(Type.COMPARISION, ComparisonExpression.Type.EQUAL, e("a.art_id"), asSet("a"), of("art_id"), e("s.art_id"), asSet("s"), of("art_id"))),
@@ -62,7 +62,7 @@ public class PredicateAnalyzerTest extends Assert
         assertEquals(emptyList(), pair.getLeft());
         assertEquals(result, pair.getValue());
 
-        result = PredicateAnalyzer.analyze(e("a.art_id = s.art_id and sku_id = s.sku_id and active_flg and not a.internet_flg and a.value > 100"));
+        result = PredicateAnalyzer.analyze(e("a.art_id = s.art_id and sku_id = s.sku_id and active_flg and not a.internet_flg and a.value > 100"), asSet("a", "s"));
 
         assertEquals(
                 result(
@@ -93,11 +93,11 @@ public class PredicateAnalyzerTest extends Assert
                 pair.getValue());
         assertEquals(e("a.art_id = s.art_id and sku_id = s.sku_id"), pair.getValue().getPredicate());
         
-        result = PredicateAnalyzer.analyze(e("a.art_id = s.art_id or (sku_id = s.sku_id and active_flg and not a.internet_flg and a.value > 100)"));
+        result = PredicateAnalyzer.analyze(e("a.art_id = s.art_id or (sku_id = s.sku_id and active_flg and not a.internet_flg and a.value > 100)"), asSet("a", "s"));
 
         assertEquals(
                 result(
-                        pair(Type.UNDEFINED, null, e("a.art_id = s.art_id or (sku_id = s.sku_id and active_flg and not a.internet_flg and a.value > 100)"), asSet("a", "s", ""), null)),
+                        pair(Type.UNDEFINED, null, e("a.art_id = s.art_id or (sku_id = s.sku_id and active_flg and not a.internet_flg and a.value > 100)"), asSet("a", "s"), null)),
                 result);
     }
 
@@ -169,7 +169,7 @@ public class PredicateAnalyzerTest extends Assert
 
         AnalyzePair p;
 
-        p = PredicateAnalyzer.AnalyzePair.of(e(":val > s.art_id"));
+        p = PredicateAnalyzer.AnalyzePair.of(e(":val > s.art_id"), asSet("s"));
         assertEquals(Type.COMPARISION, p.getType());
         assertEquals(ComparisonExpression.Type.GREATER_THAN, p.getComparisonType());
         assertEquals(e(":val > s.art_id"), p.getPredicate());
@@ -189,7 +189,7 @@ public class PredicateAnalyzerTest extends Assert
             assertTrue(e.getMessage().contains("No expressions could be found"));
         }
 
-        p = PredicateAnalyzer.AnalyzePair.of(e("s.value + value2 > 10"));
+        p = PredicateAnalyzer.AnalyzePair.of(e("s.value + value2 > 10"), asSet("s"));
         assertEquals(Type.COMPARISION, p.getType());
         assertEquals(ComparisonExpression.Type.GREATER_THAN, p.getComparisonType());
         assertEquals(e("s.value + value2 > 10"), p.getPredicate());
@@ -199,7 +199,7 @@ public class PredicateAnalyzerTest extends Assert
         assertFalse(p.isPushdown("b"));
         assertEquals(Pair.of(e("s.value + value2"), e("10")), p.getExpressionPair("s"));
 
-        p = PredicateAnalyzer.AnalyzePair.of(e("s.value + value2 + c.value > 10"));
+        p = PredicateAnalyzer.AnalyzePair.of(e("s.value + value2 + c.value > 10"), asSet("s", "c"));
         assertEquals(Type.COMPARISION, p.getType());
         assertEquals(ComparisonExpression.Type.GREATER_THAN, p.getComparisonType());
         assertEquals(e("s.value + value2 + c.value > 10"), p.getPredicate());
@@ -208,7 +208,7 @@ public class PredicateAnalyzerTest extends Assert
         assertFalse(p.isPushdown("s"));
         assertFalse(p.isPushdown("b"));
 
-        p = PredicateAnalyzer.AnalyzePair.of(e("func(a.id) = func(s.id)"));
+        p = PredicateAnalyzer.AnalyzePair.of(e("func(a.id) = func(s.id)"), asSet("a", "s"));
         assertEquals(Type.COMPARISION, p.getType());
         assertEquals(ComparisonExpression.Type.EQUAL, p.getComparisonType());
         assertEquals(e("func(a.id) = func(s.id)"), p.getPredicate());
@@ -222,7 +222,7 @@ public class PredicateAnalyzerTest extends Assert
         assertEquals(Pair.of(e("func(a.id)"), e("func(s.id)")), p.getExpressionPair("a"));
         assertEquals(Pair.of(e("func(s.id)"), e("func(a.id)")), p.getExpressionPair("s"));
 
-        p = PredicateAnalyzer.AnalyzePair.of(e("a.art_id = art_id_rel"));
+        p = PredicateAnalyzer.AnalyzePair.of(e("a.art_id = art_id_rel"), asSet("a"));
         assertEquals(Type.COMPARISION, p.getType());
         assertEquals(ComparisonExpression.Type.EQUAL, p.getComparisonType());
         assertEquals(e("a.art_id = art_id_rel"), p.getPredicate());
@@ -232,7 +232,7 @@ public class PredicateAnalyzerTest extends Assert
         assertTrue(p.isPushdown("a"));
         assertFalse(p.isPushdown("b"));
 
-        p = PredicateAnalyzer.AnalyzePair.of(e("art_id = s.art_id_rel"));
+        p = PredicateAnalyzer.AnalyzePair.of(e("art_id = s.art_id_rel"), asSet("s"));
         assertEquals(Type.COMPARISION, p.getType());
         assertEquals(ComparisonExpression.Type.EQUAL, p.getComparisonType());
         assertEquals(e("art_id = s.art_id_rel"), p.getPredicate());
@@ -242,7 +242,7 @@ public class PredicateAnalyzerTest extends Assert
         assertFalse(p.isPushdown("a"));
         assertFalse(p.isPushdown("b"));
 
-        p = PredicateAnalyzer.AnalyzePair.of(e("s.active"));
+        p = PredicateAnalyzer.AnalyzePair.of(e("s.active"), asSet("s"));
         assertEquals(Type.COMPARISION, p.getType());
         assertEquals(ComparisonExpression.Type.EQUAL, p.getComparisonType());
         assertEquals(e("s.active = true"), p.getPredicate());
@@ -252,7 +252,7 @@ public class PredicateAnalyzerTest extends Assert
         assertFalse(p.isPushdown("b"));
         assertTrue(p.isEqui("s"));
 
-        p = PredicateAnalyzer.AnalyzePair.of(e("active"));
+        p = PredicateAnalyzer.AnalyzePair.of(e("active"), asSet("s"));
         assertEquals(Type.COMPARISION, p.getType());
         assertEquals(ComparisonExpression.Type.EQUAL, p.getComparisonType());
         assertEquals(e("active = true"), p.getPredicate());
@@ -261,7 +261,7 @@ public class PredicateAnalyzerTest extends Assert
         assertTrue(p.isPushdown("s"));
         assertTrue(p.isPushdown("b"));
 
-        p = PredicateAnalyzer.AnalyzePair.of(e("s.id = s.id2"));
+        p = PredicateAnalyzer.AnalyzePair.of(e("s.id = s.id2"), asSet("s"));
         assertEquals(Type.UNDEFINED, p.getType());
         assertNull(p.getComparisonType());
         assertEquals(e("s.id = s.id2"), p.getPredicate());
@@ -271,7 +271,7 @@ public class PredicateAnalyzerTest extends Assert
         assertTrue(p.isPushdown("s"));
         assertFalse(p.isPushdown("a"));
 
-        p = PredicateAnalyzer.AnalyzePair.of(e("s.art_id > :val"));
+        p = PredicateAnalyzer.AnalyzePair.of(e("s.art_id > :val"), asSet("s"));
         assertEquals(Type.COMPARISION, p.getType());
         assertEquals(ComparisonExpression.Type.GREATER_THAN, p.getComparisonType());
         assertEquals(e("s.art_id > :val"), p.getPredicate());
@@ -279,7 +279,7 @@ public class PredicateAnalyzerTest extends Assert
         assertEquals("art_id", p.getColumn("s"));
         assertTrue(p.isPushdown("s"));
 
-        p = PredicateAnalyzer.AnalyzePair.of(e("a.art_id = s.art_id + a.id"));
+        p = PredicateAnalyzer.AnalyzePair.of(e("a.art_id = s.art_id + a.id"), asSet("a", "s"));
         assertEquals(Type.COMPARISION, p.getType());
         assertEquals(ComparisonExpression.Type.EQUAL, p.getComparisonType());
         assertEquals(e("a.art_id = s.art_id + a.id"), p.getPredicate());
@@ -292,7 +292,7 @@ public class PredicateAnalyzerTest extends Assert
         assertFalse(p.isEqui("s"));
         assertFalse(p.isEqui("b"));
 
-        p = PredicateAnalyzer.AnalyzePair.of(e("a.art_id = art_id_rel"));
+        p = PredicateAnalyzer.AnalyzePair.of(e("a.art_id = art_id_rel"), asSet("a"));
         assertEquals(Type.COMPARISION, p.getType());
         assertEquals(ComparisonExpression.Type.EQUAL, p.getComparisonType());
         assertEquals(e("a.art_id = art_id_rel"), p.getPredicate());
@@ -302,21 +302,21 @@ public class PredicateAnalyzerTest extends Assert
         assertTrue(p.isEqui("s"));
         assertTrue(p.isEqui("b"));
 
-        p = PredicateAnalyzer.AnalyzePair.of(e("a.b.art_id = s.art_id_rel"));
+        p = PredicateAnalyzer.AnalyzePair.of(e("a.b.art_id = s.art_id_rel"), asSet("a", "s"));
         assertEquals(Type.COMPARISION, p.getType());
         assertEquals(ComparisonExpression.Type.EQUAL, p.getComparisonType());
         assertEquals(e("a.b.art_id = s.art_id_rel"), p.getPredicate());
         assertNull(p.getColumn("a"));
         assertEquals("art_id_rel", p.getColumn("s"));
 
-        p = PredicateAnalyzer.AnalyzePair.of(e("a.art_id = s.d.art_id_rel"));
+        p = PredicateAnalyzer.AnalyzePair.of(e("a.art_id = s.d.art_id_rel"), asSet("a", "s"));
         assertEquals(Type.COMPARISION, p.getType());
         assertEquals(ComparisonExpression.Type.EQUAL, p.getComparisonType());
         assertEquals(e("a.art_id = s.d.art_id_rel"), p.getPredicate());
         assertEquals("art_id", p.getColumn("a"));
         assertNull(p.getColumn("s"));
 
-        p = PredicateAnalyzer.AnalyzePair.of(e("a.art_id >= s.art_id"));
+        p = PredicateAnalyzer.AnalyzePair.of(e("a.art_id >= s.art_id"), asSet("a", "s"));
         assertEquals(Type.COMPARISION, p.getType());
         assertEquals(ComparisonExpression.Type.GREATER_THAN_EQUAL, p.getComparisonType());
         assertEquals(e("a.art_id >= s.art_id"), p.getPredicate());
@@ -324,7 +324,7 @@ public class PredicateAnalyzerTest extends Assert
         assertEquals("art_id", p.getColumn("a"));
         assertEquals("art_id", p.getColumn("s"));
 
-        p = PredicateAnalyzer.AnalyzePair.of(e("severity in (200, 300)"));
+        p = PredicateAnalyzer.AnalyzePair.of(e("severity in (200, 300)"), asSet("s"));
         assertEquals(Type.IN, p.getType());
         assertNull(p.getComparisonType());
         assertEquals(e("severity in (200, 300)"), p.getPredicate());
@@ -332,7 +332,7 @@ public class PredicateAnalyzerTest extends Assert
         assertEquals("severity", p.getColumn("a"));
         assertEquals("severity", p.getColumn("s"));
 
-        p = PredicateAnalyzer.AnalyzePair.of(e("a.art_id in (s.id, b.id)"));
+        p = PredicateAnalyzer.AnalyzePair.of(e("a.art_id in (s.id, b.id)"), asSet("a", "s", "b"));
         assertEquals(Type.IN, p.getType());
         assertNull(p.getComparisonType());
         assertEquals(e("a.art_id in (s.id, b.id)"), p.getPredicate());
@@ -340,7 +340,7 @@ public class PredicateAnalyzerTest extends Assert
         assertEquals("art_id", p.getColumn("a"));
         assertNull(p.getColumn("s"));
 
-        p = PredicateAnalyzer.AnalyzePair.of(e(":val in (200, 300)"));
+        p = PredicateAnalyzer.AnalyzePair.of(e(":val in (200, 300)"), asSet("s"));
         assertEquals(Type.UNDEFINED, p.getType());
         assertNull(p.getComparisonType());
         assertEquals(e(":val in (200, 300)"), p.getPredicate());
@@ -348,7 +348,7 @@ public class PredicateAnalyzerTest extends Assert
         assertNull(p.getColumn("a"));
         assertNull(p.getColumn("s"));
 
-        p = PredicateAnalyzer.AnalyzePair.of(e("not (a.art_id > s.art_id)"));
+        p = PredicateAnalyzer.AnalyzePair.of(e("not (a.art_id > s.art_id)"), asSet("a", "s"));
         assertEquals(Type.UNDEFINED, p.getType());
         assertNull(p.getComparisonType());
         assertEquals(e("not (a.art_id > s.art_id)"), p.getPredicate());
@@ -356,7 +356,7 @@ public class PredicateAnalyzerTest extends Assert
         assertNull(p.getColumn("a"));
         assertNull(p.getColumn("s"));
 
-        p = PredicateAnalyzer.AnalyzePair.of(e("not a.flag"));
+        p = PredicateAnalyzer.AnalyzePair.of(e("not a.flag"), asSet("a"));
         assertEquals(Type.COMPARISION, p.getType());
         assertEquals(ComparisonExpression.Type.EQUAL, p.getComparisonType());
         assertEquals(e("a.flag = false"), p.getPredicate());

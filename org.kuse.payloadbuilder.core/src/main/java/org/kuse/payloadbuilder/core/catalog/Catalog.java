@@ -8,7 +8,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.lang3.ObjectUtils;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
@@ -105,39 +104,6 @@ public abstract class Catalog
         return functionByName.get(requireNonNull(name).toLowerCase());
     }
 
-    /**
-     * Predicate for a table if any. Is sent to catalog by framework to let catalogs that supports predicate analyze and extract supported predicates
-     * and return left over ones.
-     *
-     * <pre>
-     *
-     * Example
-     * table:   article
-     * pairs:   active_flg = true
-     *          internet_flg = true
-     *
-     * Catalog is able to filter active_flg on it's own
-     * but not internet_flg
-     * then pair <b>active_flg = true</b> is consumed and <b>internet_flg</b>
-     * is returned to framework for filter.
-     * </pre>
-     **/
-    public static class TablePredicate
-    {
-        public static TablePredicate EMPTY = new TablePredicate(emptyList());
-        private final List<AnalyzePair> pairs;
-
-        public TablePredicate(List<AnalyzePair> pairs)
-        {
-            this.pairs = ObjectUtils.defaultIfNull(pairs, emptyList());
-        }
-        
-        public List<AnalyzePair> getPairs()
-        {
-            return pairs;
-        }
-    }
-
     /** Class containing data used by Catalog implementations to create operators */
     public static class OperatorData
     {
@@ -145,7 +111,7 @@ public abstract class Catalog
         private final int nodeId;
         private final String catalogAlias;
         private final TableAlias tableAlias;
-        private final TablePredicate predicate;
+        private final List<AnalyzePair> predicatePairs;
         private final List<SortItem> sortItems;
         private final List<TableOption> tableOptions;
 
@@ -154,7 +120,7 @@ public abstract class Catalog
                 int nodeId,
                 String catalogAlias,
                 TableAlias tableAlias,
-                TablePredicate predicate,
+                List<AnalyzePair> predicatePairs,
                 List<SortItem> sortItems,
                 List<TableOption> tableOptions)
         {
@@ -162,7 +128,7 @@ public abstract class Catalog
             this.nodeId = nodeId;
             this.catalogAlias = catalogAlias;
             this.tableAlias = tableAlias;
-            this.predicate = predicate;
+            this.predicatePairs = predicatePairs;
             this.sortItems = sortItems;
             this.tableOptions = tableOptions;
         }
@@ -199,14 +165,24 @@ public abstract class Catalog
         
         /**
          * <pre>
-         * Predicate (if any) for this table.
-         * Should be consumed by implementation if applicable, this to push down
-         * predicates as much as possible. 
+         * Predicate pairs for a table if any. 
+         * Is sent to catalog by framework to let catalogs that supports 
+         * predicate extract supported predicate pairs and return left over ones.
+         *
+         * Example
+         * table:   article
+         * pairs:   active_flg = true
+         *          internet_flg = true
+         *
+         * Catalog is able to filter active_flg on it's own
+         * but not internet_flg
+         * then pair <b>active_flg = true</b> is consumed and <b>internet_flg = true</b>
+         * is returned to framework for filter.
          * </pre>
-         * */
-        public TablePredicate getPredicate()
+         **/
+        public List<AnalyzePair> getPredicatePairs()
         {
-            return predicate;
+            return predicatePairs;
         }
 
         /**

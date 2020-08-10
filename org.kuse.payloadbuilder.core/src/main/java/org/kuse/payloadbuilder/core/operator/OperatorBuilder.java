@@ -22,7 +22,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.Catalog.OperatorData;
-import org.kuse.payloadbuilder.core.catalog.Catalog.TablePredicate;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
@@ -192,7 +191,11 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         if (tsj != null && tsj.getTableSource().getTable() != null)
         {
             TableSource ts = tsj.getTableSource();
-            AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(where);
+            Set<String> availableAliases = new HashSet<>();
+            availableAliases.add(ts.getAlias());
+            tsj.getJoins().forEach(j -> availableAliases.add(j.getTableSource().getAlias()));
+
+            AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(where, availableAliases);
             Pair<String, Catalog> pair = getCatalog(context, ts.getCatalog(), ts.getToken());
             List<Index> indices = pair.getValue().getIndices(context.session, pair.getKey(), ts.getTable());
             IndexOperatorFoundation foundation = new IndexOperatorFoundation(ts.getAlias(), indices, analyzeResult, false);
@@ -203,8 +206,23 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             }
 
             context.appendPushDownPredicate(ts.getAlias(), foundation.pushDownPairs);
-            where = foundation.condition;
+            analyzeResult = foundation.condition;
 
+            /* Push down predicates for joins */
+            for (AJoin join : tsj.getJoins())
+            {
+                if (join instanceof Join && ((Join) join).getType() == JoinType.INNER)
+                {
+                    Pair<List<AnalyzePair>, AnalyzeResult> p = analyzeResult.extractPushdownPairs(join.getTableSource().getAlias());
+                    if (!p.getKey().isEmpty())
+                    {
+                        context.appendPushDownPredicate(join.getTableSource().getAlias(), p.getKey());
+                        analyzeResult = p.getValue();
+                    }
+                }
+            }
+
+            where = analyzeResult.getPredicate();
             /* TODO:
             Push down can applied to non populating joins ie:
             select s.id
@@ -479,8 +497,10 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         Expression where = tableSource.getWhere();
         if (where != null)
         {
+            Set<String> availableAliases = getAvailableAliases(context, tableSource);
+            tsj.getJoins().forEach(j -> availableAliases.add(j.getTableSource().getAlias()));
             // Analyze expression to see if there is push down candidates
-            AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(where);
+            AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(where, availableAliases);
             Pair<List<AnalyzePair>, AnalyzeResult> pair = analyzeResult.extractPushdownPairs(tableSource.getAlias());
             if (!pair.getKey().isEmpty())
             {
@@ -496,11 +516,11 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         context.alias = null;
         context.setParent = false;
 
-        // Analyze pushed down predicate for columns
-        // Need to be performed post visit of tableSource above
-        // to have correct table alias in context
+        /* Is there any left push down that catalog
+         * didn't used, then add a filter.
+         * NOTE! This is done'e prior to joins to get the filter
+         * as close to the source as possible. */
         List<AnalyzePair> pairs = context.pushDownPredicateByAlias.remove(tableSource.getAlias());
-
         if (pairs != null)
         {
             Expression predicate = new AnalyzeResult(pairs).getPredicate();
@@ -542,7 +562,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         TableAlias alias = context.appendTableAlias(table.getTable(), table.getAlias(), null);
         int nodeId = context.acquireNodeId();
 
-        TablePredicate predicate = new TablePredicate(context.pushDownPredicateByAlias.get(table.getAlias()));
+        List<AnalyzePair> predicatePairs = context.pushDownPredicateByAlias.get(table.getAlias());
         if (context.index != null)
         {
             context.operator = pair.getValue()
@@ -551,7 +571,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                             nodeId,
                             pair.getKey(),
                             alias,
-                            predicate,
+                            predicatePairs,
                             emptyList(),
                             table.getTableOptions()),
                             context.index);
@@ -565,13 +585,13 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                             nodeId,
                             pair.getKey(),
                             alias,
-                            predicate,
+                            predicatePairs,
                             context.sortItems,
                             table.getTableOptions()));
         }
-        
+
         // No pairs left, remove from context
-        if (predicate.getPairs().isEmpty())
+        if (predicatePairs != null && predicatePairs.isEmpty())
         {
             context.pushDownPredicateByAlias.remove(table.getAlias());
         }
@@ -653,6 +673,19 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         context.operator = joinOperator;
     }
 
+    private Set<String> getAvailableAliases(Context context, TableSource tableSource)
+    {
+        Set<String> availableAliases = new HashSet<>();
+        TableAlias alias = context.parent;
+        while (alias != null)
+        {
+            availableAliases.add(alias.getAlias());
+            alias = alias.getParent();
+        }
+        availableAliases.add(tableSource.getAlias());
+        return availableAliases;
+    }
+
     private Operator createJoin(
             Context context,
             String logicalOperator,
@@ -674,10 +707,10 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         // then the inner could be created and after, check it's order for a potential
         // MergeJoin
 
-        AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(joinCondition);
+        AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(joinCondition, getAvailableAliases(context, innerTableSource));
         IndexOperatorFoundation foundation = new IndexOperatorFoundation(innerAlias, indices, analyzeResult, emitEmptyOuterRows);
         Index index = foundation.index;
-        Expression condition = foundation.condition;
+        Expression condition = foundation.condition.getPredicate();
         context.appendPushDownPredicate(innerAlias, foundation.pushDownPairs);
 
         /* No equi items in condition or a correlated query => NestedLoop */
@@ -893,7 +926,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     {
         List<Expression> outerValueExpressions;
         List<Expression> innerValueExpressions;
-        Expression condition;
+        AnalyzeResult condition;
         List<AnalyzePair> pushDownPairs;
         Index index;
 
@@ -930,11 +963,11 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 if (!pair.getKey().isEmpty())
                 {
                     pushDownPairs = pair.getKey();
-                    condition = pair.getValue().getPredicate();
+                    condition = pair.getValue();
                 }
                 else
                 {
-                    condition = pair.getValue().getPredicate();
+                    condition = pair.getValue();
                 }
                 return;
             }
@@ -1016,7 +1049,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             // No push down in LEFT JOINS
             if (emitEmptyOuterRows)
             {
-                condition = result.getPredicate();
+                condition = result;
                 return;
             }
 
@@ -1024,11 +1057,11 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             if (pair.getKey() != null)
             {
                 pushDownPairs = pair.getKey();
-                condition = pair.getValue().getPredicate();
+                condition = pair.getValue();
             }
             else
             {
-                condition = pair.getValue().getPredicate();
+                condition = pair.getValue();
             }
         }
     }

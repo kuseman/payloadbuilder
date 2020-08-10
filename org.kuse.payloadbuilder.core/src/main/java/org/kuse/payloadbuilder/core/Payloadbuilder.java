@@ -12,15 +12,16 @@ public class Payloadbuilder
     /*
      * TODO:
      * BACKEND
-     *   - Pushdown filter is not grouped when one or the other is written without alias
-     *      Could not re-produce, might been with a join, leaving it here
+     *   - PredicateAnalyzer
+     *       "@timestamp" > cast('2020-08-09T07:00:09.086', datetime) 
+     *         This one is UNDEFINED, and shouldn't, it's because of function arguments has a QRE which is a 
+     *         fake QRE only used for toString of Qname to determine datatype
+     *       Add types for NULL predicate IS NULL, IS NOT NULL, for easier building of predicates in Catalogs
      *   - QualifiedReferenceExpression
      *      Cache lookup path
+     *   - Show functions should take an optional catalog (es#functions)
      *   - Extensibility
      *      Override parts of query and/remove/alter
-     *   - Rewrite OperatorBuilder
-     *      visit(PopulateTableSource ...)
-     *        Fix so push down predicates is set in context for catalog usage
      *   - Insert into temptable
      *      Needed for campaigns etc. Eventual stockhouse
      *   - Add more builtin functions
@@ -41,7 +42,11 @@ public class Payloadbuilder
      *      to change to a child first class loader so extensions can embed their own versions
      *      This is a security issue but think it's no problem.
      * ESCatalog
-     *   - Change to a POST search instead of q=.....
+     *   - Add functions 
+     *        search(index, body)
+     *          - Search index with body (index empty/null search all)
+     *        searchTemplate(index, template, params)
+     *          - Search index with template (index empty/null search all)
      */
     
     private Payloadbuilder()
