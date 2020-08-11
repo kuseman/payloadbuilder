@@ -15,6 +15,7 @@ import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
+import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Table value function that extracts row from a collection of maps in target expression
  * <pre> 
@@ -36,7 +37,7 @@ class OpenMapCollectionFunction extends TableFunctionInfo
 {
     OpenMapCollectionFunction(Catalog catalog)
     {
-        super(catalog, "open_map_collection", Type.TABLE);
+        super(catalog, "open_map_collection");
     }
     
     @Override
@@ -54,9 +55,9 @@ class OpenMapCollectionFunction extends TableFunctionInfo
     }
     
     @Override
-    public Iterator<Row> open(ExecutionContext context, TableAlias tableAlias, List<Object> arguments)
+    public Iterator<Row> open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
     {
-        final Object value = arguments.get(0);
+        final Object value = arguments.get(0).eval(context);
         final Iterator<Object> it = IteratorUtils.getIterator(value);
         return new Iterator<Row>()
         {

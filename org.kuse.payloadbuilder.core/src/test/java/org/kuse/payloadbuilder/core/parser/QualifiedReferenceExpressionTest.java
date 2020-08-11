@@ -14,12 +14,18 @@ import org.kuse.payloadbuilder.core.operator.Row;
 /** Test of {@link QualifiedReferenceExpression} */
 public class QualifiedReferenceExpressionTest extends AParserTest
 {
-    private TableAlias a, b, c, d;
+    private TableAlias a, b, c, d, e;
     private Row aRow;
 
     @Before
     public void setup()
     {
+        /*
+         * a
+         *   b
+         *     c
+         *   d
+         */
         a = TableAlias.of(null, "tableA", "a");
         a.setColumns(new String[] {"col1", "mapCol"});
         b = TableAlias.of(a, "tableB", "b");
@@ -28,6 +34,8 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         c.setColumns(new String[] {"col1", "mapCol"});
         d = TableAlias.of(a, "tableD", "d");
         d.setColumns(new String[] {"col1", "mapCol"});
+        e = TableAlias.of(a, "tableE", "e");
+        e.setColumns(new String[] {"col1"});
 
         aRow = Row.of(a, 0, new Object[] {1337, ofEntries(entry("key", "value"))});
 
@@ -43,6 +51,9 @@ public class QualifiedReferenceExpressionTest extends AParserTest
             aRow.getChildRows(0).add(bRow);
             bRow.addParent(aRow);
         }
+        
+        aRow.getChildRows(2).add(Row.of(e, 0, new Object[] {"e0"}));
+        aRow.getChildRows(2).get(0).addParent(aRow);
     }
 
     @Test
@@ -68,6 +79,10 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         assertReference("cValue", "b", "c", "mapCol", "key");
         assertReference("subValue", "b", "c", "mapCol", "key2", "subKey");
 
+        // Parent + child traversal
+        // From e TO b
+        assertReference("b0", aRow.getChildRows(2).get(0), -1, null, "b", "col1");
+        
         // Parent access with column
         assertReference(1337, aRow.getChildRows(0).get(0).getChildRows(0).get(0), -1, null, "a", "col1");
         // Parent access 
@@ -75,7 +90,10 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         // Parent access with child rows
         assertReference(aRow.getChildRows(0), aRow.getChildRows(0).get(0).getChildRows(0).get(0), -1, null, "a", "b");
         
-     // Invalid dereference
+        //
+        
+        
+        // Invalid dereference
         try
         {
             assertReference("value", aRow, -1, new Date(), "b", "col2", "col3");

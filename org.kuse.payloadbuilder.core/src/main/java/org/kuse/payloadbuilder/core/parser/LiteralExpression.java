@@ -95,17 +95,20 @@ public abstract class LiteralExpression extends Expression
     /** Create a literal numeric expression from provided string */
     public static LiteralExpression createLiteralNumericExpression(String value)
     {
+        char forceChar = value.charAt(value.length() - 1);
+        if (forceChar == 'l' || forceChar == 'L')
+        {
+            return new LiteralLongExpression(value.substring(0, value.length() - 1));
+        }
         try
         {
-            int intValue = Integer.parseInt(value);
-            return new LiteralIntegerExpression(intValue);
+            return new LiteralIntegerExpression(value);
         }
         catch (NumberFormatException e)
         {
             try
             {
-                long longValue = Long.parseLong(value);
-                return new LiteralLongExpression(longValue);
+                return new LiteralLongExpression(value);
             }
             catch (NumberFormatException ee)
             {
@@ -117,17 +120,24 @@ public abstract class LiteralExpression extends Expression
     /** Create a literal decimal expression from provided string */
     public static LiteralExpression createLiteralDecimalExpression(String value)
     {
+        char forceChar = value.charAt(value.length() - 1);
+        if (forceChar == 'f' || forceChar == 'F')
+        {
+            return new LiteralFloatExpression(value.substring(0, value.length() - 1));
+        }
+        else if (forceChar == 'd' || forceChar == 'D')
+        {
+            return new LiteralDoubleExpression(value.substring(0, value.length() - 1));
+        }
         try
         {
-            float floatValue = Float.parseFloat(value);
-            return new LiteralFloatExpression(floatValue);
+            return new LiteralFloatExpression(value);
         }
         catch (NumberFormatException e)
         {
             try
             {
-                double doubleValue = Double.parseDouble(value);
-                return new LiteralDoubleExpression(doubleValue);
+                return new LiteralDoubleExpression(value);
             }
             catch (NumberFormatException ee)
             {

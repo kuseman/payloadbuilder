@@ -7,6 +7,11 @@ public class LiteralFloatExpression extends LiteralExpression
 {
     private final float value;
 
+    LiteralFloatExpression(String value)
+    {
+        this(Float.parseFloat(value));
+    }
+    
     LiteralFloatExpression(float value)
     {
         super(value);

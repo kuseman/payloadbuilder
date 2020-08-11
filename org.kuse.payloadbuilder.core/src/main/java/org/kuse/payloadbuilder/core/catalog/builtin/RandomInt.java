@@ -19,7 +19,7 @@ class RandomInt extends ScalarFunctionInfo
 
     RandomInt(Catalog catalog)
     {
-        super(catalog, "randomInt", Type.SCALAR);
+        super(catalog, "randomInt");
         this.random = new Random();
     }
     

@@ -26,7 +26,7 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
 {
     MapFunction(Catalog catalog)
     {
-        super(catalog, "map", Type.SCALAR);
+        super(catalog, "map");
     }
     
     @Override

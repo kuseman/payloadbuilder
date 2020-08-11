@@ -28,6 +28,7 @@ class ExpressionHashFunction implements ToIntBiFunction<ExecutionContext, Row>
         for (Expression expression : expressions)
         {
             Object result = expression.eval(context);
+            
             // If value is string and is digits, use the intvalue as
             // hash instead of string to be able to compare ints and strings
             // on left/right side of join

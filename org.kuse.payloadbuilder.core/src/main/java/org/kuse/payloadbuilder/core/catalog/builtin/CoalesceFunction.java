@@ -12,7 +12,7 @@ class CoalesceFunction extends ScalarFunctionInfo
 {
     CoalesceFunction(Catalog catalog)
     {
-        super(catalog, "coalesce", Type.SCALAR);
+        super(catalog, "coalesce");
     }
     
     @Override

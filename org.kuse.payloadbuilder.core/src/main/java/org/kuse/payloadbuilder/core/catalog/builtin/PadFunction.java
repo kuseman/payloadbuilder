@@ -15,7 +15,7 @@ class PadFunction extends ScalarFunctionInfo
 
     PadFunction(Catalog catalog, boolean left)
     {
-        super(catalog, left ? "leftpad" : "rightpad", Type.SCALAR);
+        super(catalog, left ? "leftpad" : "rightpad");
         this.left = left;
     }
 

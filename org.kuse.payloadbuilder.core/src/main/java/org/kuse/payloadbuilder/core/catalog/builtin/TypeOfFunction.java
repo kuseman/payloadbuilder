@@ -14,7 +14,7 @@ class TypeOfFunction extends ScalarFunctionInfo
 {
     TypeOfFunction(Catalog catalog)
     {
-        super(catalog, "typeof", Type.SCALAR);
+        super(catalog, "typeof");
     }
     
     @Override

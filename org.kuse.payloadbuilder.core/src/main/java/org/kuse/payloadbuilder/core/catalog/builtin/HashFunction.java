@@ -18,7 +18,7 @@ class HashFunction extends ScalarFunctionInfo
 {
     HashFunction(Catalog catalog)
     {
-        super(catalog, "hash", Type.SCALAR);
+        super(catalog, "hash");
     }
     
     @Override

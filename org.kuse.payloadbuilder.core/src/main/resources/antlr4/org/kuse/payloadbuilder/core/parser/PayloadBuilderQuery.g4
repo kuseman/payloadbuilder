@@ -83,7 +83,7 @@ selectStatement
  ;
 
 topCount
- : NUMBER
+ : NUMERIC_LITERAL
  | '(' expression ')'
  ;
 
@@ -195,8 +195,8 @@ functionName
 literal
  : NULL														
  | booleanLiteral											
- | numericLiteral											
- | decimalLiteral											
+ | numericLiteral 								
+ | decimalLiteral
  | stringLiteral											
  ;
  
@@ -228,11 +228,11 @@ identifier
  ;
  
 numericLiteral
- : NUMBER
+ : NUMERIC_LITERAL
  ;
  
 decimalLiteral
- : DECIMAL
+ : DECIMAL_LITERAL
  ;
 
 stringLiteral
@@ -309,15 +309,15 @@ PERCENT				: '%';
 PLUS				: '+';
 SLASH				: '/';
 
-NUMBER
- : DIGIT+
+NUMERIC_LITERAL
+ : ('0' | [1-9] (DIGITS? | '_'+ DIGITS)) [lL]?
  ;
-
-DECIMAL
- : DIGIT+ '.' DIGIT*
- | '.' DIGIT+
+ 
+DECIMAL_LITERAL
+ : (DIGITS '.' DIGITS? | '.' DIGITS) EXPONENTPART? [fFdD]?
+ |  DIGITS (EXPONENTPART [fFdD]? | [fFdD])
  ;
-
+ 
 STRING
  : '\'' ( ~'\'' | '\'\'' )* '\''
  ;
@@ -345,9 +345,17 @@ SPACE
 fragment LETTER
  : [A-Za-z]
  ;
-  
+ 
 fragment DIGIT 
  : [0-9]
+ ;
+ 
+fragment DIGITS
+ : [0-9] ([0-9_]* [0-9])?
+ ;
+
+fragment EXPONENTPART
+ : [eE] [+-]? DIGITS
  ;
  
 fragment A : [aA]; 

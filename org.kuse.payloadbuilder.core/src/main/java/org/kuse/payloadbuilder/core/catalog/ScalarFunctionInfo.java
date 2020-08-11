@@ -13,9 +13,9 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 /** Definition of a scalar function */
 public abstract class ScalarFunctionInfo extends FunctionInfo
 {
-    public ScalarFunctionInfo(Catalog catalog, String name, Type type)
+    public ScalarFunctionInfo(Catalog catalog, String name)
     {
-        super(catalog, name, type);
+        super(catalog, name, Type.SCALAR);
     }
 
     /**

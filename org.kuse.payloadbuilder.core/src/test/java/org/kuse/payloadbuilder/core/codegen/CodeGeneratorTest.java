@@ -13,7 +13,6 @@ import org.junit.Test;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
-import org.kuse.payloadbuilder.core.catalog.FunctionInfo.Type;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Row;
@@ -65,6 +64,18 @@ public class CodeGeneratorTest extends Assert
         assertExpression(false, null, "1 < '0'");
         assertExpression(false, null, "'1' <= 0");
         assertExpression(false, null, "1 <= '0'");
+        
+        assertExpression(false, null, "1L <= '0'");
+        assertExpression(false, null, "1D <= '0'");
+        
+    }
+    
+    @Test
+    public void test_auto_cast_booleans() throws Exception
+    {
+        assertExpression(true, null, "1 = true");
+        assertExpression(true, null, "2 > true");
+        assertExpression(true, null, "0 = false");
     }
     
     @Test
@@ -116,7 +127,7 @@ public class CodeGeneratorTest extends Assert
     public void test_catalog() throws Exception
     {
         Catalog utils = new Catalog("UTILS") {};
-        utils.registerFunction(new ScalarFunctionInfo(utils, "uuid", Type.SCALAR)
+        utils.registerFunction(new ScalarFunctionInfo(utils, "uuid")
         {
             @Override
             public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode, List<Expression> arguments)
@@ -564,12 +575,12 @@ public class CodeGeneratorTest extends Assert
         assertExpression(true, row, "false <= false");
 
         // Test different types
-        assertFail(IllegalArgumentException.class, "Cannot compare true", "true = 10");
-        assertFail(IllegalArgumentException.class, "Cannot compare true", "true != 10");
-        assertFail(IllegalArgumentException.class, "Cannot compare true", "true > 10");
-        assertFail(IllegalArgumentException.class, "Cannot compare true", "true >= 10");
-        assertFail(IllegalArgumentException.class, "Cannot compare true", "true < 10");
-        assertFail(IllegalArgumentException.class, "Cannot compare true", "true <= 10");
+        assertFail(IllegalArgumentException.class, "Cannot compare ", "getdate() = 10");
+        assertFail(IllegalArgumentException.class, "Cannot compare ", "getdate() != 10");
+        assertFail(IllegalArgumentException.class, "Cannot compare ", "getdate() > 10");
+        assertFail(IllegalArgumentException.class, "Cannot compare ", "getdate() >= 10");
+        assertFail(IllegalArgumentException.class, "Cannot compare ", "getdate() < 10");
+        assertFail(IllegalArgumentException.class, "Cannot compare ", "getdate() <= 10");
     }
 
     private void assertFail(Class<? extends Exception> e, String messageContains, String expression)
@@ -617,7 +628,7 @@ public class CodeGeneratorTest extends Assert
 
     private void assertExpression(Object value, Row row, String expression) throws Exception
     {
-        TableAlias alias = row != null ? row.getTableAlias() : TableAlias.of(null, "article", "a");
+//        TableAlias alias = row != null ? row.getTableAlias() : TableAlias.of(null, "article", "a");
 
         try
         {

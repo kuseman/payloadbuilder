@@ -15,7 +15,7 @@ class IsBlankFunction extends ScalarFunctionInfo
 {
     IsBlankFunction(Catalog catalog)
     {
-        super(catalog, "isblank", Type.SCALAR);
+        super(catalog, "isblank");
     }
 
     @Override

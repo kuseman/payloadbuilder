@@ -47,6 +47,7 @@ class ESCatalog extends Catalog
     {
         super("EsCatalog");
         registerFunction(new MustacheCompileFunction(this));
+        registerFunction(new SearchFunction(this));
     }
 
     @SuppressWarnings("unchecked")
@@ -79,7 +80,7 @@ class ESCatalog extends Catalog
     public List<Index> getIndices(QuerySession session, String catalogAlias, QualifiedName table)
     {
         // All tables have a doc id index
-        return asList(new Index(table, asList(ESOperator.DOCID), 250));
+        return asList(new IdIndex(table), new ParentIndex(table));
     }
 
     @Override
@@ -117,6 +118,7 @@ class ESCatalog extends Catalog
     @Override
     public Operator getIndexOperator(OperatorData data, Index index)
     {
+        // TODO: if index is of ParentId-type then push down of predicate is possible
         return new ESOperator(
                 data.getNodeId(),
                 data.getCatalogAlias(),
@@ -239,6 +241,24 @@ class ESCatalog extends Catalog
         catch (IOException e)
         {
             throw new RuntimeException("Error fetching mappings from " + esType.endpoint, e);
+        }
+    }
+    
+    /** Maker class for _id index */
+    static class IdIndex extends Index
+    {
+        IdIndex(QualifiedName table)
+        {
+            super(table, asList(ESOperator.DOCID), 250);
+        }
+    }
+    
+    /** Maker class for _parent index */
+    static class ParentIndex extends Index
+    {
+        ParentIndex(QualifiedName table)
+        {
+            super(table, asList(ESOperator.PARENTID), 250);
         }
     }
 

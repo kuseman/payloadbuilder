@@ -27,7 +27,7 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
 {
     FlatMapFunction(Catalog catalog)
     {
-        super(catalog, "flatmap", Type.SCALAR);
+        super(catalog, "flatmap");
     }
     
     @Override

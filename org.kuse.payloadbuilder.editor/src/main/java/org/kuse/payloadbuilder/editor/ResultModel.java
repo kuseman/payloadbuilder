@@ -20,12 +20,14 @@ import com.fasterxml.jackson.core.util.DefaultIndenter;
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter.Indenter;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.ObjectWriter;
 
 /** Resulting model of a query */
 class ResultModel extends AbstractTableModel
 {
     static final ObjectWriter WRITER;
+    static final ObjectReader READER;
     static
     {
         DefaultPrettyPrinter printer = new DefaultPrettyPrinter();
@@ -43,7 +45,10 @@ class ResultModel extends AbstractTableModel
                 return false;
             }
         });
-        WRITER = new ObjectMapper().writer(printer);
+        
+        ObjectMapper mapper = new ObjectMapper();
+        WRITER = mapper.writer(printer);
+        READER = mapper.readerFor(Object.class);
     }
     
     private final QueryFileModel file;

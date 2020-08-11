@@ -17,7 +17,7 @@ class JsonValueFunction extends ScalarFunctionInfo
     private static final ObjectReader READER = new ObjectMapper().readerFor(Object.class);
     JsonValueFunction(Catalog catalog)
     {
-        super(catalog, "json_value", Type.SCALAR);
+        super(catalog, "json_value");
     }
     
     @Override
@@ -35,7 +35,7 @@ class JsonValueFunction extends ScalarFunctionInfo
         }
         catch (IOException e)
         {
-            throw new IllegalArgumentException("Error deserializing " + arg, e);
+            throw new IllegalArgumentException("Error deserializing '" + arg + "'", e);
         }
     }
 }

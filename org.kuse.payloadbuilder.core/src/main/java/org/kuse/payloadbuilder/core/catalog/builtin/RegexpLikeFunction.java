@@ -13,7 +13,7 @@ class RegexpLikeFunction extends ScalarFunctionInfo
 {
     RegexpLikeFunction(Catalog catalog)
     {
-        super(catalog, "regexp_like", Type.SCALAR);
+        super(catalog, "regexp_like");
     }
     
     @Override

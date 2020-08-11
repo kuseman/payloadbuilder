@@ -26,7 +26,7 @@ class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
 {
     FilterFunction(Catalog catalog)
     {
-        super(catalog, "filter", Type.SCALAR);
+        super(catalog, "filter");
     }
 
     @Override

@@ -16,7 +16,7 @@ class LowerUpperFunction extends ScalarFunctionInfo
 
     LowerUpperFunction(Catalog catalog, boolean lower)
     {
-        super(catalog, lower ? "lower" : "upper", Type.SCALAR);
+        super(catalog, lower ? "lower" : "upper");
         this.lower = lower;
     }
 

@@ -17,6 +17,9 @@ public class Payloadbuilder
      *         This one is UNDEFINED, and shouldn't, it's because of function arguments has a QRE which is a 
      *         fake QRE only used for toString of Qname to determine datatype
      *       Add types for NULL predicate IS NULL, IS NOT NULL, for easier building of predicates in Catalogs
+     *   - QueryParser
+     *     Build TableAlias at parse time and calculate path to destination for QRE at that time (might be problematic 
+     *      for complex select items)
      *   - QualifiedReferenceExpression
      *      Cache lookup path
      *   - Show functions should take an optional catalog (es#functions)
@@ -31,6 +34,15 @@ public class Payloadbuilder
      *   - Analyze select
      *      Perform select and measure stuff like catalog times, execution count
      *      Let catalogs provide data, like bytes fetched etc.
+     *   - Long running queries not returning any rows, aren't ending when aborted
+     *      Need to inside operators check for abort in ExecutionContext
+     *   - Join hint (HashJoin, hash_inner = true)
+     *   - Catalog   
+     *      Send in Ex
+     *   - Index types
+     *      Full (all columns must be present)
+     *      Random (one or more random columns)
+     *      Left (one or more sequential columns from left)
      *   - Write SQL server catalog
      *   - UNION
      *   - BatchMergeJoin
@@ -42,6 +54,9 @@ public class Payloadbuilder
      *      to change to a child first class loader so extensions can embed their own versions
      *      This is a security issue but think it's no problem.
      * ESCatalog
+     *   - All non_analyzed fields are potential index-columns
+     *   - Extract searchUrl/scrollUrl to a common place and add logic to it
+     *      _index,_type_,_id,_parent cols shouldn't be fetched if not needed, check index/table alias
      *   - Add functions 
      *        search(index, body)
      *          - Search index with body (index empty/null search all)

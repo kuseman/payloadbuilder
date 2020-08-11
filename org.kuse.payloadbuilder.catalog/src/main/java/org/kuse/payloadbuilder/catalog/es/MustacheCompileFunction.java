@@ -23,8 +23,17 @@ class MustacheCompileFunction extends ScalarFunctionInfo
 
     MustacheCompileFunction(Catalog catalog)
     {
-        super(catalog, "mustachecompile", Type.SCALAR);
+        super(catalog, "mustachecompile");
     }
+    
+    @Override
+    public String getDescription()
+    {
+        return "Compiles provided mustable template with provided params." + System.lineSeparator() + 
+               "Ex. mustachecompile(templateExpression, paramsExpression)" + System.lineSeparator() +
+               "NOTE! paramsExpression should evaluate to a Map.";
+    }
+
 
     @Override
     public Class<?> getDataType()

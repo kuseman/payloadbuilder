@@ -890,7 +890,11 @@ public final class ExpressionMath
         {
             return (Number) other;
         }
-
+        else if (other instanceof Boolean)
+        {
+            return (Boolean) other ? 1 : 0;
+        }
+        
         if (!(other instanceof String))
         {
             return null;

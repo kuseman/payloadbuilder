@@ -12,9 +12,9 @@ import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
-import org.kuse.payloadbuilder.core.catalog.builtin.OpenMapCollectionFunction;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
+import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 
@@ -39,8 +39,8 @@ public class OpenMapCollectionFunctionTest extends Assert
         
         ExecutionContext context = new ExecutionContext(new QuerySession(new CatalogRegistry()));
         context.setRow(row);
-        Object value = new QualifiedReferenceExpression(new QualifiedName(asList("a", "article_attribute", "attribute1", "buckets")), -1).eval(context);
-        Iterator<Row> it = f.open(context, func, asList(value));
+        Expression arg = new QualifiedReferenceExpression(new QualifiedName(asList("a", "article_attribute", "attribute1", "buckets")), -1);
+        Iterator<Row> it = f.open(context, "", func, asList(arg));
         while (it.hasNext())
         {
             Row r = it.next();

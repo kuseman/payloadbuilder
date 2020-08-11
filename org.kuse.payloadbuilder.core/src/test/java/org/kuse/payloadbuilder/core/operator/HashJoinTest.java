@@ -40,7 +40,7 @@ public class HashJoinTest extends AOperatorTest
         HashJoin op = new HashJoin(0,
                 "",
                 left,
-                new TableFunctionOperator(0, r, new NestedLoopJoinTest.Range(5), emptyList()),
+                new TableFunctionOperator(0, "", r, new NestedLoopJoinTest.Range(5), emptyList()),
                 (c, row) -> (Integer) row.getObject(0),
                 (c, row) -> (Integer) row.getObject(0),
                 (ctx, row) -> (int) row.getObject(0) == (int) row.getParent().getObject(0),

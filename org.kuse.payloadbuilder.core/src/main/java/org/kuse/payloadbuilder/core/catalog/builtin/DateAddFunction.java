@@ -19,7 +19,7 @@ class DateAddFunction extends ScalarFunctionInfo
 {
     DateAddFunction(Catalog catalog)
     {
-        super(catalog, "dateadd", Type.SCALAR);
+        super(catalog, "dateadd");
     }
 
     @Override

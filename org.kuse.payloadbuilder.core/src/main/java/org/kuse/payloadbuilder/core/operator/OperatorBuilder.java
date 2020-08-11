@@ -18,6 +18,7 @@ import java.util.Set;
 import java.util.function.BiFunction;
 
 import org.antlr.v4.runtime.Token;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
@@ -196,7 +197,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             tsj.getJoins().forEach(j -> availableAliases.add(j.getTableSource().getAlias()));
 
             AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(where, availableAliases);
-            Pair<String, Catalog> pair = getCatalog(context, ts.getCatalog(), ts.getToken());
+            Pair<String, Catalog> pair = getCatalog(context, ts.getCatalogAlias(), ts.getToken());
             List<Index> indices = pair.getValue().getIndices(context.session, pair.getKey(), ts.getTable());
             IndexOperatorFoundation foundation = new IndexOperatorFoundation(ts.getAlias(), indices, analyzeResult, false);
             index = foundation.index;
@@ -558,11 +559,11 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     @Override
     public Void visit(Table table, Context context)
     {
-        Pair<String, Catalog> pair = getCatalog(context, table.getCatalog(), table.getToken());
+        Pair<String, Catalog> pair = getCatalog(context, table.getCatalogAlias(), table.getToken());
         TableAlias alias = context.appendTableAlias(table.getTable(), table.getAlias(), null);
         int nodeId = context.acquireNodeId();
 
-        List<AnalyzePair> predicatePairs = context.pushDownPredicateByAlias.get(table.getAlias());
+        List<AnalyzePair> predicatePairs = ObjectUtils.defaultIfNull(context.pushDownPredicateByAlias.get(table.getAlias()), emptyList());
         if (context.index != null)
         {
             context.operator = pair.getValue()
@@ -607,7 +608,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 tableFunction.getAlias(),
                 functionInfo.getColumns());
         tableFunction.getArguments().forEach(a -> visit(a, context));
-        context.operator = new TableFunctionOperator(context.acquireNodeId(), alias, functionInfo, tableFunction.getArguments());
+        context.operator = new TableFunctionOperator(context.acquireNodeId(), tableFunction.getCatalogAlias(), alias, functionInfo, tableFunction.getArguments());
         return null;
     }
 
@@ -680,6 +681,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         while (alias != null)
         {
             availableAliases.add(alias.getAlias());
+            alias.getChildAliases().forEach(a -> availableAliases.add(a.getAlias()));
             alias = alias.getParent();
         }
         availableAliases.add(tableSource.getAlias());
@@ -700,7 +702,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         List<Index> indices = emptyList();
         if (innerTableSource.getTable() != null)
         {
-            Pair<String, Catalog> pair = getCatalog(context, innerTableSource.getCatalog(), innerTableSource.getToken());
+            Pair<String, Catalog> pair = getCatalog(context, innerTableSource.getCatalogAlias(), innerTableSource.getToken());
             indices = pair.getValue().getIndices(context.session, pair.getKey(), innerTableSource.getTable());
         }
         // TODO: If outer is ordered and no inner indices

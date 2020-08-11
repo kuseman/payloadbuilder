@@ -16,7 +16,7 @@ class GetDateFunction extends ScalarFunctionInfo
     private final boolean utc;
     GetDateFunction(Catalog catalog, boolean utc)
     {
-        super(catalog, utc ? "getutcdate" : "getdate", Type.SCALAR);
+        super(catalog, utc ? "getutcdate" : "getdate");
         this.utc = utc;
     }
     

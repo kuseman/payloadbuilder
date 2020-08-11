@@ -13,6 +13,7 @@ import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Point;
+import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.IOException;
@@ -25,10 +26,13 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
+import javax.swing.AbstractAction;
+import javax.swing.Action;
 import javax.swing.Icon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
@@ -69,6 +73,7 @@ class QueryFileView extends JPanel
     private static final Icon PLAY_ICON = FontIcon.of(FontAwesome.PLAY);
     private static final Icon CLOSE_ICON = FontIcon.of(FontAwesome.CLOSE);
     private static final Icon WARNING_ICON = FontIcon.of(FontAwesome.WARNING);
+    private static final Icon STICKY_NOTE_O = FontIcon.of(FontAwesome.STICKY_NOTE_O);
     private static final int SCROLLBAR_WIDTH = ((Integer) UIManager.get("ScrollBar.width")).intValue();
 
     private final JSplitPane splitPane;
@@ -80,10 +85,12 @@ class QueryFileView extends JPanel
     private final JLabel labelRunTime;
     private final JLabel labelRowCount;
     private final JLabel labelExecutionStatus;
+    private final JPopupMenu tablePopupMenu = new JPopupMenu();
     private final Timer executionTimer;
     private final PrintStream messagePrintStream;
     private final List<ResultTable> tables = new ArrayList<>();
-
+    private final Point tableClickLocation = new Point();
+    
     private boolean resultCollapsed;
     private int prevDividerLocation;
 
@@ -174,6 +181,7 @@ class QueryFileView extends JPanel
         });
 
         file.getQuerySession().setPrintStream(messagePrintStream);
+        tablePopupMenu.add(viewAsJsonAction);
     }
 
     private void handleStateChanged(State state)
@@ -342,6 +350,14 @@ class QueryFileView extends JPanel
                 return super.isCellSelected(row, column);
             }
         };
+        resultTable.addMouseListener(new MouseAdapter()
+        {
+            @Override
+            public void mouseClicked(MouseEvent e)
+            {
+                tableClickLocation.setLocation(e.getPoint());
+            }
+        });
         resultTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         resultTable.setCellSelectionEnabled(true);
         resultTable.setDefaultRenderer(Object.class, new DefaultTableCellRenderer()
@@ -419,7 +435,7 @@ class QueryFileView extends JPanel
 
                     if (row >= 0)
                     {
-                        showValueDialog(resultTable, row, col);
+                        showValueDialog(resultTable, resultTable.getValueAt(row, col), row, col);
                     }
                     
                 }
@@ -435,12 +451,36 @@ class QueryFileView extends JPanel
                 }
             }
         });
+        
+        resultTable.setComponentPopupMenu(tablePopupMenu);
         return resultTable;
     }
     
-    private void showValueDialog(JTable resultTable, int row, int col)
+    private final Action viewAsJsonAction = new AbstractAction("View as JSON", STICKY_NOTE_O)
     {
-        Object value = resultTable.getValueAt(row, col);
+        @Override
+        public void actionPerformed(ActionEvent e)
+        {
+            JTable table = (JTable) tablePopupMenu.getInvoker();
+            int row = table.rowAtPoint(tableClickLocation);
+            int col = table.columnAtPoint(tableClickLocation);
+            Object value = table.getValueAt(row, col);
+            if (value instanceof String)
+            {
+                try
+                {
+                    value = ResultModel.READER.readValue((String) value);
+                }
+                catch (IOException ee)
+                {
+                }
+            }
+            showValueDialog(table, value, row, col);
+        }
+    };
+    
+    private void showValueDialog(JTable resultTable, Object value, int row, int col)
+    {
         if (value == null)
         {
             return;

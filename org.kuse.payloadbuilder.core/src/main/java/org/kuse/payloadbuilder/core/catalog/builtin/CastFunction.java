@@ -19,7 +19,7 @@ class CastFunction extends ScalarFunctionInfo
 {
     CastFunction(Catalog catalog, String name)
     {
-        super(catalog, name, Type.SCALAR);
+        super(catalog, name);
     }
     
     @Override
@@ -87,7 +87,7 @@ class CastFunction extends ScalarFunctionInfo
             @Override
             Object convert(Object source, int style)
             {
-                // Unix epoch
+                // Time in millis
                 if (source instanceof Long)
                 {
                     return LocalDateTime.ofInstant(Instant.ofEpochMilli(((Long) source).longValue()), ZoneId.systemDefault());
@@ -114,7 +114,7 @@ class CastFunction extends ScalarFunctionInfo
             @Override
             Object convert(Object source, int style)
             {
-                // Unix epoch
+             // Time in millis
                 if (source instanceof Long)
                 {
                     return ZonedDateTime.ofInstant(Instant.ofEpochMilli(((Long) source).longValue()), ZoneOffset.UTC);

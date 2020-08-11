@@ -14,7 +14,7 @@ class IsNullFunction extends ScalarFunctionInfo
 {
     IsNullFunction(Catalog catalog)
     {
-        super(catalog, "isnull", Type.SCALAR);
+        super(catalog, "isnull");
     }
     
     @Override

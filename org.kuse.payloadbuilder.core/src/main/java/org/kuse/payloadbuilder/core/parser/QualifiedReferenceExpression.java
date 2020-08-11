@@ -141,7 +141,15 @@ public class QualifiedReferenceExpression extends Expression
                     {
                         break;
                     }
-
+                    // Child access on parent
+                    alias = temp.getTableAlias().getChildAlias(part);
+                    if (alias != null)
+                    {
+                        List<Row> childRows = temp.getChildRows(alias.getParentIndex());
+                        temp = childRows.isEmpty() ? null : childRows.get(0);
+                        break;
+                    }
+                    
                     temp = temp.getParent();
                 }
 

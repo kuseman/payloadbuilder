@@ -7,6 +7,11 @@ public class LiteralDoubleExpression extends LiteralExpression
 {
     private final double value;
 
+    LiteralDoubleExpression(String value)
+    {
+        this(Double.parseDouble(value));
+    }
+    
     LiteralDoubleExpression(double value)
     {
         super(value);

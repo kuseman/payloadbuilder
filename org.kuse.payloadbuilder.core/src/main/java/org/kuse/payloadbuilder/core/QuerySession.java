@@ -246,16 +246,16 @@ public class QuerySession
      * 
      * @param functionId Unique function id to cache a lookup
      */
-    public FunctionInfo resolveFunctionInfo(String catalogName, String function, int functionId)
+    public FunctionInfo resolveFunctionInfo(String catalogAlias, String function, int functionId)
     {
         Catalog catalog;
-        if (catalogName == null)
+        if (catalogAlias == null)
         {
             catalog = catalogRegistry.getBuiltin();
         }
         else
         {
-            catalog = catalogRegistry.getCatalog(catalogName);
+            catalog = catalogRegistry.getCatalog(catalogAlias);
         }
 
         if (catalog == null)

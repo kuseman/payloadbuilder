@@ -21,7 +21,7 @@ class MatchFunction extends ScalarFunctionInfo implements LambdaFunction
     private final MatchType type;
     MatchFunction(Catalog catalog, MatchType type)
     {
-        super(catalog, type.name, Type.SCALAR);
+        super(catalog, type.name);
         this.type = type;
     }
     

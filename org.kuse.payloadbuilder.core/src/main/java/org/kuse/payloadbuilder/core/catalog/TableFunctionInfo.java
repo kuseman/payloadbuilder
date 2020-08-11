@@ -5,15 +5,16 @@ import java.util.List;
 
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
+import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Definition of a table valued function
  * These functions are applied row by row.
  **/
 public abstract class TableFunctionInfo extends FunctionInfo
 {
-    public TableFunctionInfo(Catalog catalog, String name, Type type)
+    public TableFunctionInfo(Catalog catalog, String name)
     {
-        super(catalog, name, type);
+        super(catalog, name, Type.TABLE);
     }
 
     /** Returns columns for this function or null if this function's columns is dynamic. */
@@ -25,8 +26,9 @@ public abstract class TableFunctionInfo extends FunctionInfo
     /** Open iterator for this function 
      * @param context Context
      * @param tableAlias Table alias used for this function
-     * NOTE! If columns are null the function must set ALL available columns for the function
+     * NOTE If {@link TableAlias#isAsteriskColumns()} is set to true then the operator
+     *  <b>MUST</b> set all available columns on alias using {@link TableAlias#setColumns(String[])} 
      * @param arguments Arguments to function
      **/
-    public abstract Iterator<Row> open(ExecutionContext context, TableAlias tableAlias, List<Object> arguments);
+    public abstract Iterator<Row> open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments);
 }

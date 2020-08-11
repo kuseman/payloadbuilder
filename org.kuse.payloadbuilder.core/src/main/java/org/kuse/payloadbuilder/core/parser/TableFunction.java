@@ -14,16 +14,16 @@ import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 /** Table function */
 public class TableFunction extends TableSource
 {
-    private final String catalog;
+    private final String catalogAlias;
     private final String function;
     private final List<Expression> arguments;
     private final int functionId;
     private final List<TableOption> tableOptions;
 
-    public TableFunction(String catalog, String function, List<Expression> arguments, String alias, List<TableOption> tableOptions, int functionId, Token token)
+    public TableFunction(String catalogAlias, String function, List<Expression> arguments, String alias, List<TableOption> tableOptions, int functionId, Token token)
     {
         super(alias, token);
-        this.catalog = catalog;
+        this.catalogAlias = catalogAlias;
         this.function = requireNonNull(function, "function");
         this.arguments = requireNonNull(arguments, "arguments");
         this.tableOptions = requireNonNull(tableOptions, "tableOptions");
@@ -31,9 +31,9 @@ public class TableFunction extends TableSource
     }
     
     @Override
-    public String getCatalog()
+    public String getCatalogAlias()
     {
-        return catalog;
+        return catalogAlias;
     }
     
     public String getFunction()
@@ -49,7 +49,7 @@ public class TableFunction extends TableSource
     
     public TableFunctionInfo getFunctionInfo(QuerySession session)
     {
-        FunctionInfo functionInfo = session.resolveFunctionInfo(catalog, function, functionId);
+        FunctionInfo functionInfo = session.resolveFunctionInfo(catalogAlias, function, functionId);
         
         if (functionInfo == null)
         {
@@ -79,7 +79,7 @@ public class TableFunction extends TableSource
     @Override
     public String toString()
     {
-        return catalog != null ? (catalog + "#")
+        return catalogAlias != null ? (catalogAlias + "#")
             : ""
                 + function
                 + "(" + arguments.stream().map(a -> a.toString()).collect(joining(", ")) + ") " + alias;

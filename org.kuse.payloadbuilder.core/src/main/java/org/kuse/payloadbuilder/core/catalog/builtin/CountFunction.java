@@ -15,7 +15,7 @@ class CountFunction extends ScalarFunctionInfo
 {
     CountFunction(Catalog catalog)
     {
-        super(catalog, "count", Type.SCALAR);
+        super(catalog, "count");
     }
     
     @SuppressWarnings({"unchecked", "rawtypes"})

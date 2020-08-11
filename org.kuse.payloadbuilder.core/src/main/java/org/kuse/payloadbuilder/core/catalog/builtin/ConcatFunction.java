@@ -22,7 +22,7 @@ class ConcatFunction extends ScalarFunctionInfo
 {
     ConcatFunction(Catalog catalog)
     {
-        super(catalog, "concat", Type.SCALAR);
+        super(catalog, "concat");
     }
     
     @Override

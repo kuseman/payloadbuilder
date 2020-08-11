@@ -12,6 +12,7 @@ import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
+import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Test {@link NestedLoopJoin} */
 public class NestedLoopJoinTest extends AOperatorTest
@@ -90,7 +91,7 @@ public class NestedLoopJoinTest extends AOperatorTest
                 0,
                 "",
                 left,
-                new TableFunctionOperator(0, r, new Range(2), emptyList()),
+                new TableFunctionOperator(0, "", r, new Range(2), emptyList()),
                 null,   // Null predicate => cross
                 DefaultRowMerger.DEFAULT,
                 false,
@@ -120,7 +121,7 @@ public class NestedLoopJoinTest extends AOperatorTest
                 0,
                 "",
                 left,
-                new TableFunctionOperator(0, r, new Range(2), emptyList()),
+                new TableFunctionOperator(0, "", r, new Range(2), emptyList()),
                 null,   // Null predicate => cross
                 DefaultRowMerger.DEFAULT,
                 true,
@@ -150,7 +151,7 @@ public class NestedLoopJoinTest extends AOperatorTest
                 0,
                 "",
                 left,
-                new TableFunctionOperator(0, r, new Range(0), emptyList()),
+                new TableFunctionOperator(0, "", r, new Range(0), emptyList()),
                 null,   // Null predicate => cross
                 DefaultRowMerger.DEFAULT,
                 false,
@@ -180,7 +181,7 @@ public class NestedLoopJoinTest extends AOperatorTest
                 0,
                 "",
                 left,
-                new TableFunctionOperator(0, r, new Range(2), emptyList()),
+                new TableFunctionOperator(0, "", r, new Range(2), emptyList()),
                 // Even parent rows are joined
                 (ctx, row) -> row.getParent().getPos() % 2 == 0,
                 DefaultRowMerger.DEFAULT,
@@ -224,7 +225,7 @@ public class NestedLoopJoinTest extends AOperatorTest
                 0,
                 "",
                 left,
-                new TableFunctionOperator(0, r, new Range(2), emptyList()),
+                new TableFunctionOperator(0, "", r, new Range(2), emptyList()),
                 // Even parent rows are joined
                 (ctx, row) -> row.getParent().getPos() % 2 == 0,
                 DefaultRowMerger.DEFAULT,
@@ -258,12 +259,12 @@ public class NestedLoopJoinTest extends AOperatorTest
 
         Range(int to)
         {
-            super(new Catalog("test") {}, "Range", Type.TABLE);
+            super(new Catalog("test") {}, "Range");
             this.to = to;
         }
 
         @Override
-        public Iterator<Row> open(ExecutionContext context, TableAlias tableAlias, List<Object> arguments)
+        public Iterator<Row> open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
         {
             if (tableAlias.getColumns() == null)
             {

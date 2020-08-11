@@ -2,6 +2,7 @@ package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Objects.requireNonNull;
 
+/** Select item that is built from an expression */
 public class ExpressionSelectItem extends SelectItem
 {
     private final Expression expression;
@@ -28,7 +29,7 @@ public class ExpressionSelectItem extends SelectItem
             return ((DereferenceExpression) expression).getRight().getQname().getLast();
         }
         
-        return null;
+        return "No column name";
     }
     
     public Expression getExpression()

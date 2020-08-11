@@ -201,16 +201,16 @@ public class OperatorBuilderTest extends AOperatorTest
                 new NestedLoopJoin(
                         3,
                         "",
-                        new TableFunctionOperator(0, r, range, asList(
+                        new TableFunctionOperator(0, "", r, range, asList(
                                 e("randomInt(100)"),
                                 e("randomInt(100) + 100"))),
-                        new CachingOperator(2, new TableFunctionOperator(1, r1, range, asList(
+                        new CachingOperator(2, new TableFunctionOperator(1, "", r1, range, asList(
                                 e("randomInt(100)")))),
                         new ExpressionPredicate(e("r1.Value <= r.Value")),
                         DefaultRowMerger.DEFAULT,
                         true,
                         false),
-                new TableFunctionOperator(4, r2, range, asList(
+                new TableFunctionOperator(4, "", r2, range, asList(
                         e("randomInt(100)"),
                         e("randomInt(100) + 100"))),
                 new ExpressionHashFunction(asList(e("r.Value"))),

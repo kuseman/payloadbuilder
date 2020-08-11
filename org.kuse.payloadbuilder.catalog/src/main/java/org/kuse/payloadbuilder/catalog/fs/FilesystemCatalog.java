@@ -33,7 +33,7 @@ class FilesystemCatalog extends Catalog
     {
         public ContentsFunction(Catalog catalog)
         {
-            super(catalog, "contents", Type.SCALAR);
+            super(catalog, "contents");
         }
 
         @Override
@@ -60,18 +60,18 @@ class FilesystemCatalog extends Catalog
     {
         public ListFunction(Catalog catalog)
         {
-            super(catalog, "list", Type.TABLE);
+            super(catalog, "list");
         }
 
         @Override
-        public Iterator<Row> open(ExecutionContext context, TableAlias tableAlias, List<Object> arguments)
+        public Iterator<Row> open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
         {
             tableAlias.setColumns(COLUMNS);
             String path = String.valueOf(arguments.get(0));
             boolean recursive = false;
             if (arguments.size() > 1)
             {
-                recursive = (boolean) arguments.get(1);
+                recursive = (boolean) arguments.get(1).eval(context);
             }
 
             final Iterator<Path> it = getIterator(path, recursive);

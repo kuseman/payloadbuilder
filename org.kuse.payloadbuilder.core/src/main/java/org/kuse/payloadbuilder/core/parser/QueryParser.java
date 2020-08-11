@@ -215,19 +215,6 @@ public class QueryParser
         {
             List<SelectItem> selectItems = ctx.selectItem().stream().map(s -> (SelectItem) visit(s)).collect(toList());
 
-            Optional<SelectItem> item = 
-                    selectItems
-                    .stream()
-                    .filter(si -> !(si instanceof AsteriskSelectItem) && isBlank(si.getIdentifier()))
-                    .findAny();
-
-            if (item.isPresent())
-            {
-                int index = selectItems.indexOf(item.get());
-                SelectItemContext itemCtx = ctx.selectItem(index);
-                throw new ParseException("Select items on ROOT level must have aliaes. Item: " + item.get(), itemCtx.start);
-            }
-
             TableSourceJoined joinedTableSource = ctx.tableSourceJoined() != null ? (TableSourceJoined) visit(ctx.tableSourceJoined()) : null;
             Expression topExpression = ctx.topCount() != null ? (Expression) visit(ctx.topCount()) : null;
             if (joinedTableSource != null && joinedTableSource.getTableSource() instanceof PopulateTableSource)
@@ -268,7 +255,7 @@ public class QueryParser
             {
                 return getExpression(ctx.expression());
             }
-            return LiteralExpression.createLiteralNumericExpression(ctx.NUMBER().getText());
+            return LiteralExpression.createLiteralNumericExpression(ctx.NUMERIC_LITERAL().getText());
         }
 
         @Override

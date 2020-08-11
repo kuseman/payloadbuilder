@@ -40,11 +40,13 @@ public class BuiltinCatalog
         catalog.registerFunction(new TrimFunction(catalog, Type.RIGHT));
         catalog.registerFunction(new PadFunction(catalog, true));
         catalog.registerFunction(new PadFunction(catalog, false));
+        catalog.registerFunction(new ReplaceFunction(catalog));
         catalog.registerFunction(new TypeOfFunction(catalog));
         catalog.registerFunction(new GetDateFunction(catalog, true));
         catalog.registerFunction(new GetDateFunction(catalog, false));
         catalog.registerFunction(new DatePartFunction(catalog));
         catalog.registerFunction(new DateAddFunction(catalog));
+        catalog.registerFunction(new UnixTimeStampFunction(catalog));
 
         // Table functions
         catalog.registerFunction(new Range(catalog));

@@ -7,6 +7,11 @@ public class LiteralIntegerExpression extends LiteralExpression
 {
     private final int value;
 
+    LiteralIntegerExpression(String value)
+    {
+        this(Integer.parseInt(value));
+    }
+    
     LiteralIntegerExpression(int value)
     {
         super(value);

@@ -2,12 +2,12 @@ package org.kuse.payloadbuilder.catalog.es;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.kuse.payloadbuilder.core.DescribeUtils.CATALOG;
-import static org.kuse.payloadbuilder.core.DescribeUtils.INDEX;
 import static org.kuse.payloadbuilder.core.DescribeUtils.PREDICATE;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -38,7 +39,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
@@ -47,6 +47,8 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicHeader;
+import org.kuse.payloadbuilder.catalog.es.ESCatalog.IdIndex;
+import org.kuse.payloadbuilder.catalog.es.ESCatalog.ParentIndex;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
@@ -76,8 +78,12 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 /** Operator for Elastic search */
 class ESOperator extends AOperator
 {
+    static final Charset UTF_8 = Charset.forName("UTF-8");
     private static final String FIELDS = "fields";
+    static final String INDEX = "__index";
+    static final String TYPE = "__type";
     static final String DOCID = "__id";
+    static final String PARENTID = "__parent_id";
     static final ObjectMapper MAPPER = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private static final ObjectReader READER = MAPPER.readerFor(ESResponse.class);
@@ -150,13 +156,14 @@ class ESOperator extends AOperator
         AtomicLong receivedBytes = (AtomicLong) nodeData.properties.computeIfAbsent("receivedCount", k -> new AtomicLong());
         AtomicInteger scrollCount = (AtomicInteger) nodeData.properties.computeIfAbsent("scrollCount", k -> new AtomicInteger());
 
-        if (index != null)
+        if (index instanceof IdIndex)
         {
-            String mgetUrl = String.format("%s/%s/%s/_mget?filter_path=docs._source,docs._id", esType.endpoint, esType.index, esType.type);
+            String mgetUrl = String.format("%s/%s/%s/_mget?filter_path=docs._source,docs._index,docs._type,docs._id", esType.endpoint, esType.index, esType.type);
             // TODO: thread up all ids in executor and join
             DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getOperatorContext(), sentBytes);
             MutableBoolean doRequest = new MutableBoolean(true);
             return getIterator(
+                    tableAlias,
                     receivedBytes,
                     scrollId ->
                     {
@@ -171,18 +178,61 @@ class ESOperator extends AOperator
                         return null;
                     });
         }
-
+        
+        // TODO: alter these path based on index. 
+        //  - only append _index,_type,_id if table alias is asterisk or explicit in columns
+        //  - only append fields, _parent if asterisk or explicit in columns or index is parent index
+        
         final String searchUrl = String.format(
-                "%s/%s/%s/_search?size=%d&scroll=%s&filter_path=_scroll_id,hits.hits._id,hits.hits._source",
+                "%s/%s/%s/_search?size=%d&scroll=%s&fields=_source,_parent&filter_path=_scroll_id,hits.hits._index,hits.hits._type,hits.hits._id,hits.hits._source,hits.hits.fields",
                 esType.endpoint,
                 esType.index,
                 esType.type,
                 // TODO: table option for batch size
                 1000,
                 "2m");
-        String scrollUrl = String.format("%s/_search/scroll?filter_path=_scroll_id,hits.hits._id,hits.hits._source&scroll=%s&scroll_id=", esType.endpoint, "2m");
+        final String scrollUrl = String.format("%s/_search/scroll?fields=_source,_parent&filter_path=_scroll_id,hits.hits._index,hits.hits._type,hits.hits._id,hits.hits._source,hits.hits.fields&scroll=%s", esType.endpoint, "2m");
+        
+        if (index instanceof ParentIndex)
+        {
+            List<String> parentIds = new ArrayList<>();
+            while (context.getOperatorContext().getOuterIndexValues().hasNext())
+            {
+                Object[] array = context.getOperatorContext().getOuterIndexValues().next();
+                if (array[0] != null)
+                {
+                    parentIds.add(String.valueOf(array[0]));
+                }
+            }
+            
+            String body = "{ \"filter\": { \"terms\": { \"_parent\": [ " + parentIds.stream().collect(joining(",")) +  " ] } } }";
+            return getIterator(
+                    tableAlias,
+                    receivedBytes,
+                    scrollId ->
+                    {
+                        scrollCount.incrementAndGet();
+                        if (scrollId.getValue() == null)
+                        {
+                            sentBytes.addAndGet(searchUrl.length() + body.length());
+                            HttpPost post = new HttpPost(searchUrl);
+                            post.setEntity(new StringEntity(body, UTF_8));
+                            return post;
+                        }
+                        else
+                        {
+                            String id = scrollId.getValue();
+                            scrollId.setValue(null);
+                            HttpPost post = new HttpPost(scrollUrl);
+                            post.setEntity(new StringEntity(id, UTF_8));
+                            return post;
+                        }
+                    });
+        }
+        
         String body = getSearchBody(context);
         return getIterator(
+                tableAlias,
                 receivedBytes,
                 scrollId ->
                 {
@@ -191,19 +241,22 @@ class ESOperator extends AOperator
                     {
                         sentBytes.addAndGet(searchUrl.length() + body.length());
                         HttpPost post = new HttpPost(searchUrl);
-                        post.setEntity(new StringEntity(body, Charset.forName("UTF-8")));
+                        post.setEntity(new StringEntity(body, UTF_8));
                         return post;
                     }
                     else
                     {
                         String id = scrollId.getValue();
                         scrollId.setValue(null);
-                        return new HttpGet(scrollUrl + id);
+                        HttpPost post = new HttpPost(scrollUrl);
+                        post.setEntity(new StringEntity(id, UTF_8));
+                        return post;
                     }
                 });
     }
 
-    private Iterator<Row> getIterator(
+    static Iterator<Row> getIterator(
+            TableAlias tableAlias,
             AtomicLong receivedBytes,
             Function<MutableObject<String>, HttpUriRequest> requestSupplier)
     {
@@ -284,8 +337,12 @@ class ESOperator extends AOperator
                     {
                         if (addedColumns == null)
                         {
-                            addedColumns = new LinkedHashSet<>(doc.source.keySet());
+                            addedColumns = new LinkedHashSet<>(doc.source.keySet().size() + 3);
+                            addedColumns.add(INDEX);
+                            addedColumns.add(TYPE);
                             addedColumns.add(DOCID);
+                            addedColumns.add(PARENTID);
+                            addedColumns.addAll(doc.source.keySet());
                             tableAlias.setColumns(addedColumns.toArray(EMPTY_STRING_ARRAY));
                         }
                         else if (addedColumns.addAll(doc.source.keySet()))
@@ -301,9 +358,21 @@ class ESOperator extends AOperator
                         int index = 0;
                         for (String column : tableAlias.getColumns())
                         {
-                            if (DOCID.equals(column))
+                            if (INDEX.equals(column))
+                            {
+                                data[index++] = doc.index;
+                            }
+                            else if (TYPE.equals(column))
+                            {
+                                data[index++] = doc.type;
+                            }
+                            else if (DOCID.equals(column))
                             {
                                 data[index++] = doc.docId;
+                            }
+                            else if (PARENTID.equals(column))
+                            {
+                                data[index++] = doc.fields != null ? doc.fields.get("_parent") : null;
                             }
                             else
                             {
@@ -428,9 +497,15 @@ class ESOperator extends AOperator
         @JsonDeserialize(using = SourceDeserializer.class)
         @JsonProperty("_source")
         Map<String, Object> source;
-
+        @JsonProperty("fields")
+        Map<String, Object> fields = emptyMap();
+        @JsonProperty("_index")
+        String index;
+        @JsonProperty("_type")
+        String type;
         @JsonProperty("_id")
         String docId;
+        
 
         public boolean isValid()
         {

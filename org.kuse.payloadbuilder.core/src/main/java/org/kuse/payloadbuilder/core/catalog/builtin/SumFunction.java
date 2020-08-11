@@ -14,7 +14,7 @@ class SumFunction extends ScalarFunctionInfo
 {
     SumFunction(Catalog catalog)
     {
-        super(catalog, "sum", Type.SCALAR);
+        super(catalog, "sum");
     }
 
     @SuppressWarnings("unchecked")

@@ -6,7 +6,6 @@ import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
-import org.kuse.payloadbuilder.core.catalog.FunctionInfo;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
@@ -17,7 +16,7 @@ class TrimFunction extends ScalarFunctionInfo
     private final Type type;
     TrimFunction(Catalog catalog, Type type)
     {
-        super(catalog, type.name, FunctionInfo.Type.SCALAR);
+        super(catalog, type.name);
         this.type = type;
     }
 

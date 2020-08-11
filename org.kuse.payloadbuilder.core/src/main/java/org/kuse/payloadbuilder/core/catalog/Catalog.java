@@ -128,8 +128,8 @@ public abstract class Catalog
             this.nodeId = nodeId;
             this.catalogAlias = catalogAlias;
             this.tableAlias = tableAlias;
-            this.predicatePairs = predicatePairs;
-            this.sortItems = sortItems;
+            this.predicatePairs = requireNonNull(predicatePairs, "predicatePairs");
+            this.sortItems = requireNonNull(sortItems, "sortItems");
             this.tableOptions = tableOptions;
         }
 

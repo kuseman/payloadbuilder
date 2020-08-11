@@ -32,7 +32,7 @@ public abstract class TableSource extends ASelectNode
     }
     
     /** Return catalog (if applicable) for this table source */
-    public String getCatalog()
+    public String getCatalogAlias()
     {
         return null;
     }

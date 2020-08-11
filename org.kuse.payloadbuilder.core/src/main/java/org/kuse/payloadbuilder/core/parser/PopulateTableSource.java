@@ -36,9 +36,9 @@ public class PopulateTableSource extends TableSource
     }
     
     @Override
-    public String getCatalog()
+    public String getCatalogAlias()
     {
-        return tableSourceJoined.getTableSource().getCatalog();
+        return tableSourceJoined.getTableSource().getCatalogAlias();
     }
     
     @Override

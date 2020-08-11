@@ -20,7 +20,7 @@ class DatePartFunction extends ScalarFunctionInfo
 {
     DatePartFunction(Catalog catalog)
     {
-        super(catalog, "datepart", Type.SCALAR);
+        super(catalog, "datepart");
     }
 
     @Override

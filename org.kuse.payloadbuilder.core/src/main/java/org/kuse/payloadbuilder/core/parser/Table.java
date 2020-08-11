@@ -9,14 +9,14 @@ import org.antlr.v4.runtime.Token;
 /** A table */
 public class Table extends TableSource
 {
-    private final String catalog;
+    private final String catalogAlias;
     private final QualifiedName table;
     private final List<TableOption> options;
 
-    public Table(String catalog, QualifiedName table, String alias, List<TableOption> options, Token token)
+    public Table(String catalogAlias, QualifiedName table, String alias, List<TableOption> options, Token token)
     {
         super(alias, token);
-        this.catalog = catalog;
+        this.catalogAlias = catalogAlias;
         this.table = requireNonNull(table, "table");
         this.options = requireNonNull(options, "options");
     }
@@ -28,9 +28,9 @@ public class Table extends TableSource
     }
     
     @Override
-    public String getCatalog()
+    public String getCatalogAlias()
     {
-        return catalog;
+        return catalogAlias;
     }
     
     @Override
