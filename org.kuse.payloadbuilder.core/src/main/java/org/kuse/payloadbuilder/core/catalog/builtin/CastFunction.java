@@ -1,11 +1,13 @@
 package org.kuse.payloadbuilder.core.catalog.builtin;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeParseException;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAccessor;
 import java.util.List;
 
 import org.kuse.payloadbuilder.core.catalog.Catalog;
@@ -17,6 +19,8 @@ import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 /** Cast and convert function */
 class CastFunction extends ScalarFunctionInfo
 {
+    private final static DateTimeFormatter ISO_DATE_OPTIONAL_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd['T'HH:mm[:ss][.SSS][X]]");
+    
     CastFunction(Catalog catalog, String name)
     {
         super(catalog, name);
@@ -94,17 +98,25 @@ class CastFunction extends ScalarFunctionInfo
                 }
                 else if (source instanceof String)
                 {
-                    try
+                    String string = ((String) source).replace(' ', 'T');
+                    TemporalAccessor parsed = ISO_DATE_OPTIONAL_TIME_FORMATTER.parseBest(string, ZonedDateTime::from, LocalDateTime::from, LocalDate::from);
+                    if (parsed instanceof ZonedDateTime)
                     {
-                        return LocalDateTime.parse((String) source);
-                    }
-                    catch (DateTimeParseException e)
-                    {
-                        // Try zoned datetime and then convert to local
-                        ZonedDateTime dateTime = ZonedDateTime.parse((String) source);
-                        ZonedDateTime localZoned = dateTime.withZoneSameInstant(ZoneId.systemDefault());
+                        ZonedDateTime localZoned = ((ZonedDateTime) parsed).withZoneSameInstant(ZoneId.systemDefault());
                         return localZoned.toLocalDateTime();
                     }
+                    if (parsed instanceof LocalDateTime)
+                    {
+                        return parsed;
+                    }
+                    else if (parsed instanceof LocalDate)
+                    {
+                        return ((LocalDate) parsed).atStartOfDay();
+                    }
+                }
+                else if (source instanceof ZonedDateTime)
+                {
+                    return ((ZonedDateTime) source).toLocalDateTime();
                 }
                 throw new IllegalArgumentException("Cannot cast " + source + " to DateTime.");
             }
@@ -114,7 +126,7 @@ class CastFunction extends ScalarFunctionInfo
             @Override
             Object convert(Object source, int style)
             {
-             // Time in millis
+                // Time in millis
                 if (source instanceof Long)
                 {
                     return ZonedDateTime.ofInstant(Instant.ofEpochMilli(((Long) source).longValue()), ZoneOffset.UTC);
@@ -122,6 +134,10 @@ class CastFunction extends ScalarFunctionInfo
                 else if (source instanceof String)
                 {
                     return ZonedDateTime.parse((String) source);
+                }
+                else if (source instanceof LocalDateTime)
+                {
+                    return ((LocalDateTime) source).atZone(ZoneId.systemDefault());
                 }
                 
                 throw new IllegalArgumentException("Cannot cast " + source + " to DateTimeOffset.");

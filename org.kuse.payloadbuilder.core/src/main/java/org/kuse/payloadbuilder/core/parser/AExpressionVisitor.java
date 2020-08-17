@@ -63,12 +63,6 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
     }
     
     @Override
-    public TR visit(NamedParameterExpression expression, TC context)
-    {
-        return defaultResult(context);
-    }
-    
-    @Override
     public TR visit(VariableExpression expression, TC context)
     {
         return defaultResult(context);

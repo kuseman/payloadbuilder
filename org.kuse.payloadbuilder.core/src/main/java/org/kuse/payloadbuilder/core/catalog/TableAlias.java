@@ -72,7 +72,7 @@ public class TableAlias
     {
         return childAliases;
     }
-    
+
     /** Get root path from alias */
     public String getRootPath()
     {
@@ -89,7 +89,6 @@ public class TableAlias
         }
         return rootPath;
     }
-
 
     /** Find table alias for provided alias relative to this */
     public TableAlias findAlias(String alias)
@@ -120,8 +119,10 @@ public class TableAlias
         {
             return null;
         }
-        for (TableAlias child : childAliases)
+        int size = childAliases.size();
+        for (int i = 0; i < size; i++)
         {
+            TableAlias child = childAliases.get(i);
             if (Objects.equals(child.alias, alias))
             {
                 return child;
@@ -140,12 +141,12 @@ public class TableAlias
     {
         this.columns = columns;
     }
-    
+
     public boolean isAsteriskColumns()
     {
         return asteriskColumns;
     }
-    
+
     public void setAsteriskColumns()
     {
         this.asteriskColumns = true;

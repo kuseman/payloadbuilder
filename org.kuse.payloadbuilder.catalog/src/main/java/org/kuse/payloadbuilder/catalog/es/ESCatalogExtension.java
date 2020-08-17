@@ -1,5 +1,6 @@
 package org.kuse.payloadbuilder.catalog.es;
 
+import static java.util.Collections.emptyList;
 import static org.kuse.payloadbuilder.catalog.es.ESOperator.CLIENT;
 import static org.kuse.payloadbuilder.catalog.es.ESOperator.MAPPER;
 
@@ -48,7 +49,8 @@ class ESCatalogExtension implements ICatalogExtension
     private final PropertyChangeSupport pcs = new PropertyChangeSupport(this);
     private final QuickPropertiesPanel quickPropertiesPanel;
     private final ConfigPanel configPanel;
-    
+    private final Map<String, List<String>> indicesByEndpoint = new HashMap<>();
+
     ESCatalogExtension()
     {
         quickPropertiesPanel = new QuickPropertiesPanel();
@@ -66,25 +68,25 @@ class ESCatalogExtension implements ICatalogExtension
     {
         return "es";
     }
-    
+
     @Override
     public Catalog getCatalog()
     {
         return CATALOG;
     }
-    
+
     @Override
     public void addPropertyChangeListener(PropertyChangeListener listener)
     {
         pcs.addPropertyChangeListener(listener);
     }
-    
+
     @Override
     public void removePropertyChangeListener(PropertyChangeListener listener)
     {
         pcs.removePropertyChangeListener(listener);
     }
-    
+
     @Override
     public Component getQuickPropertiesComponent()
     {
@@ -100,50 +102,65 @@ class ESCatalogExtension implements ICatalogExtension
     @Override
     public void setup(String catalogAlias, QuerySession querySession)
     {
-        if (quickPropertiesPanel.indices.getSelectedItem() instanceof EsIndex)
-        {
-            EsIndex index = (EsIndex) quickPropertiesPanel.indices.getSelectedItem();
-            if (index != null)
-            {
-                querySession.setCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY, index.endpoint);
-                querySession.setCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY, index.index);
-            }
-        }
+        String endpoint = (String) quickPropertiesPanel.endpoints.getSelectedItem();
+        String index = (String) quickPropertiesPanel.indices.getSelectedItem();
+        querySession.setCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY, endpoint);
+        querySession.setCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY, index);
     }
 
     @Override
     public void update(String catalogAlias, QuerySession querySession)
     {
-        String index = (String) querySession.getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY);
-        EsIndex valueToSelect = null; 
-        int count = quickPropertiesPanel.indices.getItemCount();
+        String endointToSet = null;
+        String endpoint = (String) querySession.getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY);
+        int count = quickPropertiesPanel.endpoints.getItemCount();
         for (int i = 0; i < count; i++)
         {
-            EsIndex esIndex = quickPropertiesPanel.indices.getItemAt(i);
-            if (StringUtils.equalsIgnoreCase(index, esIndex.index))
+            String uiEndpoint = quickPropertiesPanel.endpoints.getItemAt(i);
+            if (StringUtils.equalsIgnoreCase(endpoint, uiEndpoint))
             {
-                valueToSelect = esIndex;
+                endointToSet = uiEndpoint;
                 break;
             }
         }
         
+        String index = (String) querySession.getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY);
+        String indexToSet = null;
+        count = quickPropertiesPanel.indices.getItemCount();
+        for (int i = 0; i < count; i++)
+        {
+            String uiIndex = quickPropertiesPanel.indices.getItemAt(i);
+            if (StringUtils.equalsIgnoreCase(index, uiIndex))
+            {
+                indexToSet = uiIndex;
+                break;
+            }
+        }
+
         if (SwingUtilities.isEventDispatchThread())
         {
-            quickPropertiesPanel.indices.getModel().setSelectedItem(valueToSelect);
+            quickPropertiesPanel.endpoints.getModel().setSelectedItem(endointToSet);
+            quickPropertiesPanel.indices.getModel().setSelectedItem(indexToSet);
         }
         else
         {
-            final EsIndex temp = valueToSelect;
-            SwingUtilities.invokeLater(() -> quickPropertiesPanel.indices.getModel().setSelectedItem(temp));
+            final String tempA = endointToSet;
+            final String tempB = indexToSet;
+            
+            SwingUtilities.invokeLater(() -> 
+            {
+                quickPropertiesPanel.endpoints.getModel().setSelectedItem(tempA);
+                quickPropertiesPanel.indices.getModel().setSelectedItem(tempB);
+            });
         }
     }
-    
+
     @Override
     public Map<String, Object> getProperties()
     {
         return properties;
     }
-    
+
     @Override
     public void load(Map<String, Object> properties)
     {
@@ -162,32 +179,35 @@ class ESCatalogExtension implements ICatalogExtension
     {
         Thread thread = new Thread(() ->
         {
-            Object selectedItem = quickPropertiesPanel.indices.getSelectedItem();
+            indicesByEndpoint.clear();
+            
+            Object selectedEndpoint = quickPropertiesPanel.endpoints.getSelectedItem();
+            Object selectedIndex = quickPropertiesPanel.indices.getSelectedItem();
 
-            List<EsIndex> esIndices = new ArrayList<>();
+            List<String> endpoints = getEndpoints();
             List<Exception> errors = new ArrayList<>();
-            for (String endpoint : getEndpoints())
+            for (String endpoint : endpoints)
             {
+                List<String> indices = new ArrayList<>();
+                indicesByEndpoint.put(endpoint, indices);
                 HttpGet getIndices = new HttpGet(endpoint + "/*/_aliases");
                 try (CloseableHttpResponse response = CLIENT.execute(getIndices))
                 {
-                    Map<String, Object> indices = MAPPER.readValue(response.getEntity().getContent(), Map.class);
-                    for (String index : indices.keySet())
-                    {
-                        esIndices.add(new EsIndex(endpoint, index, false));
-                    }
+                    indices.addAll(MAPPER.readValue(response.getEntity().getContent(), Map.class).keySet());
 
                 }
                 catch (IOException e)
                 {
                     errors.add(new RuntimeException("Error fetching instances from endpont " + endpoint, e));
                 }
+                indices.sort((a, b) -> String.CASE_INSENSITIVE_ORDER.compare(a, b));
             }
 
-            esIndices.sort((a, b) -> String.CASE_INSENSITIVE_ORDER.compare(a.index, b.index));
-            quickPropertiesPanel.indices.setModel(new DefaultComboBoxModel<>(esIndices.toArray(new EsIndex[0])));
-            quickPropertiesPanel.indices.setSelectedItem(selectedItem);
-
+            quickPropertiesPanel.endpointsModel.removeAllElements();
+            endpoints.forEach(endpoint -> quickPropertiesPanel.endpointsModel.addElement(endpoint));
+            quickPropertiesPanel.endpoints.setSelectedItem(selectedEndpoint);
+            quickPropertiesPanel.indices.setSelectedItem(selectedIndex);
+            
             if (!errors.isEmpty())
             {
                 // TODO: Central logging panel/window
@@ -198,71 +218,51 @@ class ESCatalogExtension implements ICatalogExtension
         thread.start();
     }
 
-    /** Class representing a endpoint/index combo */
-    private static class EsIndex
-    {
-        private final String endpoint;
-        private final String index;
-        private final boolean showEndpoint;
-
-        EsIndex(String endpoint, String index, boolean showEndpoint)
-        {
-            this.endpoint = endpoint;
-            this.index = index;
-            this.showEndpoint = showEndpoint;
-        }
-
-        @Override
-        public int hashCode()
-        {
-            return 17
-                + (37 * endpoint.hashCode())
-                + (37 * index.hashCode());
-        }
-
-        @Override
-        public boolean equals(Object obj)
-        {
-            if (obj instanceof EsIndex)
-            {
-                EsIndex that = (EsIndex) obj;
-                return endpoint.equals(that.endpoint)
-                    && index.equals(that.index);
-            }
-            return false;
-        }
-
-        @Override
-        public String toString()
-        {
-            return (showEndpoint ? endpoint + "/" : "") + index;
-        }
-    }
-
     /** Quick properties panel */
     private class QuickPropertiesPanel extends JPanel
     {
-        private final EsIndex prototype = new EsIndex("", "somelongindexname", false);
-        private final JComboBox<EsIndex> indices;
+        private final String endpointPrototype = "http://elasticsearch.viskanint.local";
+        private final String indexPrototype = "somelongindexname";
+        private final JComboBox<String> endpoints;
+        private final JComboBox<String> indices;
+        private final DefaultComboBoxModel<String> indicesModel = new DefaultComboBoxModel<>();
+        private final DefaultComboBoxModel<String> endpointsModel = new DefaultComboBoxModel<>();
 
         QuickPropertiesPanel()
         {
             setLayout(new GridBagLayout());
 
-            add(new JLabel("Index"), new GridBagConstraints(0, 0, 1, 1, 0.0, 0.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.NONE, new Insets(0, 0, 0, 5), 0, 0));
+            add(new JLabel("Endpoint"), new GridBagConstraints(0, 0, 1, 1, 0.0, 0.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.NONE, new Insets(0, 0, 0, 5), 0, 0));
+            endpoints = new JComboBox<>();
+            endpoints.setModel(endpointsModel);
+            endpoints.addItemListener(l ->
+            {
+                indicesModel.removeAllElements();
+                for (String index : indicesByEndpoint.getOrDefault(endpoints.getSelectedItem(), emptyList()))
+                {
+                    indicesModel.addElement(index);
+                }
+                pcs.firePropertyChange(ICatalogExtension.PROPERTIES, null, null);
+            });
+            endpoints.setPrototypeDisplayValue(endpointPrototype);
+            endpoints.setMaximumRowCount(25);
+            AutoCompletionComboBox.enable(endpoints);
+            add(endpoints, new GridBagConstraints(1, 0, 1, 1, 1.0, 0.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
+
+            add(new JLabel("Index"), new GridBagConstraints(0, 1, 1, 1, 0.0, 0.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.NONE, new Insets(0, 0, 0, 5), 0, 0));
             indices = new JComboBox<>();
+            indices.setModel(indicesModel);
             indices.addItemListener(l -> pcs.firePropertyChange(ICatalogExtension.PROPERTIES, null, null));
-            indices.setPrototypeDisplayValue(prototype);
+            indices.setPrototypeDisplayValue(indexPrototype);
             indices.setMaximumRowCount(25);
             AutoCompletionComboBox.enable(indices);
-
-            add(indices, new GridBagConstraints(1, 0, 1, 1, 1.0, 0.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
+            add(indices, new GridBagConstraints(1, 1, 1, 1, 1.0, 0.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
 
             JButton reloadInstances = new JButton("Reload");
             reloadInstances.addActionListener(l -> reloadIndices());
-            add(reloadInstances, new GridBagConstraints(1, 1, 1, 1, 1.0, 1.0, GridBagConstraints.BASELINE, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
-            
-            setPreferredSize(new Dimension(200, 50));
+            add(reloadInstances, new GridBagConstraints(1, 2, 1, 1, 1.0, 1.0, GridBagConstraints.BASELINE, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
+
+            setPreferredSize(new Dimension(240, 75));
         }
     }
 

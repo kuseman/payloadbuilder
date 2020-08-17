@@ -86,9 +86,10 @@ public class InExpression extends Expression
             return null;
         }
 
-        for (Expression arg : arguments)
+        int size = arguments.size();
+        for (int i = 0; i < size; i++)
         {
-            Object argValue = arg.eval(context);
+            Object argValue = arguments.get(i).eval(context);
             if (argValue == null)
             {
                 continue;

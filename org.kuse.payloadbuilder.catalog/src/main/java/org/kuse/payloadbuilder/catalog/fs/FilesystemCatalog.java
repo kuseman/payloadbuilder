@@ -67,7 +67,7 @@ class FilesystemCatalog extends Catalog
         public Iterator<Row> open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
         {
             tableAlias.setColumns(COLUMNS);
-            String path = String.valueOf(arguments.get(0));
+            String path = String.valueOf(arguments.get(0).eval(context));
             boolean recursive = false;
             if (arguments.size() > 1)
             {

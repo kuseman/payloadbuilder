@@ -18,9 +18,9 @@ public class TableFunction extends TableSource
     private final String function;
     private final List<Expression> arguments;
     private final int functionId;
-    private final List<TableOption> tableOptions;
+    private final List<Option> tableOptions;
 
-    public TableFunction(String catalogAlias, String function, List<Expression> arguments, String alias, List<TableOption> tableOptions, int functionId, Token token)
+    public TableFunction(String catalogAlias, String function, List<Expression> arguments, String alias, List<Option> tableOptions, int functionId, Token token)
     {
         super(alias, token);
         this.catalogAlias = catalogAlias;
@@ -42,7 +42,7 @@ public class TableFunction extends TableSource
     }
     
     @Override
-    public List<TableOption> getTableOptions()
+    public List<Option> getOptions()
     {
         return tableOptions;
     }

@@ -30,6 +30,7 @@ import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair.Type;
+import org.kuse.payloadbuilder.core.parser.ComparisonExpression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 import org.kuse.payloadbuilder.core.parser.SortItem;
@@ -142,16 +143,33 @@ class ESCatalog extends Catalog
             {
                 continue;
             }
-            
+
             QualifiedName qname = pair.getQname(tableAlias.getAlias());
             if (qname == null)
             {
                 continue;
             }
-            
+
             String column = qname.toString();
-            String key = analyzedProperties.get(column);                    
-            if (key != null)
+            String key = analyzedProperties.get(column);
+            // Extra columns only support EQUALS
+            if (ESOperator.INDEX.equals(column) && pair.getComparisonType() == ComparisonExpression.Type.EQUAL)
+            {
+                propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), "_index", pair));
+                it.remove();
+            }
+            else if (ESOperator.TYPE.equals(column) && pair.getComparisonType() == ComparisonExpression.Type.EQUAL)
+            {
+                propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), "_type", pair));
+                it.remove();
+            }
+            else if (ESOperator.DOCID.equals(column) && pair.getComparisonType() == ComparisonExpression.Type.EQUAL)
+            {
+                propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), "_id", pair));
+                it.remove();
+            }
+            // TODO: strings only support equals
+            else if(key != null)
             {
                 propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), defaultIfBlank(key, column), pair));
                 it.remove();
@@ -189,17 +207,35 @@ class ESCatalog extends Catalog
             {
                 column = qname.toString();
             }
-            
-            String key = analyzedProperties.get(column);
-            if (key == null)
-            {
-                return emptyList();
-            }
 
             if (result == null)
             {
                 result = new ArrayList<>();
             }
+
+            if (ESOperator.PARENTID.equals(column))
+            {
+                result.add(Pair.of("_parent", sortItem.getOrder() == Order.ASC ? "asc" : "desc"));
+                continue;
+            }
+            else if (ESOperator.INDEX.equals(column))
+            {
+                result.add(Pair.of("_index", sortItem.getOrder() == Order.ASC ? "asc" : "desc"));
+                continue;
+            }
+            else if (ESOperator.DOCID.equals(column))
+            {
+                result.add(Pair.of("_id", sortItem.getOrder() == Order.ASC ? "asc" : "desc"));
+                continue;
+            }
+            
+            String key = analyzedProperties.get(column);
+            
+            if (key == null)
+            {
+                return emptyList();
+            }
+
             result.add(Pair.of(defaultIfBlank(key, column), sortItem.getOrder() == Order.ASC ? "asc" : "desc"));
         }
 
@@ -222,20 +258,27 @@ class ESCatalog extends Catalog
             }
 
             Map<String, Object> map = MAPPER.readValue(response.getEntity().getContent(), Map.class);
-            map = Optional.of(map)
-                    .map(m -> (Map<String, Object>) m.get(esType.index))
-                    .map(m -> (Map<String, Object>) m.get("mappings"))
-                    .map(m -> (Map<String, Object>) m.get(esType.type))
-                    .map(m -> (Map<String, Object>) m.get("properties"))
-                    .orElse(null);
-
             if (map == null)
             {
                 return emptyMap();
             }
-
             Map<String, String> result = new HashMap<>();
-            populateAnalyzedFields(result, map, null);
+            // Loop all indices in mappings result
+            for (Entry<String, Object> e : map.entrySet())
+            {
+                Optional.of((Map<String, Object>) e.getValue())
+                        .map(m -> (Map<String, Object>) m.get("mappings"))
+                        .map(m -> (Map<String, Object>) m.get(esType.type))
+                        .map(m -> (Map<String, Object>) m.get("properties"))
+                        .ifPresent(m -> populateAnalyzedFields(result, m, null));
+                //
+                //                if (map == null)
+                //                {
+                //                    return emptyMap();
+                //                }
+                //
+                //                populateAnalyzedFields(result, map, null);
+            }
             return result;
         }
         catch (IOException e)
@@ -243,7 +286,7 @@ class ESCatalog extends Catalog
             throw new RuntimeException("Error fetching mappings from " + esType.endpoint, e);
         }
     }
-    
+
     /** Maker class for _id index */
     static class IdIndex extends Index
     {
@@ -252,7 +295,7 @@ class ESCatalog extends Catalog
             super(table, asList(ESOperator.DOCID), 250);
         }
     }
-    
+
     /** Maker class for _parent index */
     static class ParentIndex extends Index
     {
@@ -270,7 +313,7 @@ class ESCatalog extends Catalog
             Map<String, Object> propertiesMap = (Map<String, Object>) entry.getValue();
             @SuppressWarnings("unchecked")
             Map<String, Object> subProperties = (Map<String, Object>) propertiesMap.get("properties");
-            
+
             // Collected nested properties one level down only
             if (parentKey == null && subProperties != null)
             {
@@ -279,12 +322,13 @@ class ESCatalog extends Catalog
             }
 
             String index = (String) propertiesMap.get("index");
-
+            String type = (String) propertiesMap.get("type");
+            
             @SuppressWarnings("unchecked")
             Map<String, Object> fields = (Map<String, Object>) propertiesMap.get("fields");
-            
+
             // if index is null and there exists a field that is not_analyzed pick that one
-            if (index == null && fields != null)
+            if (index == null && fields != null && "string".equals(type))
             {
                 boolean added = false;
                 for (Entry<String, Object> e : fields.entrySet())
@@ -305,7 +349,7 @@ class ESCatalog extends Catalog
                     continue;
                 }
             }
-            
+
             // - Type should no be nested/object
             //   Not supported to filter on
             // - index cannot be NO

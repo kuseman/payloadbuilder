@@ -23,16 +23,17 @@ import org.kuse.payloadbuilder.core.QueryResult;
 import org.kuse.payloadbuilder.core.parser.AExpressionVisitor;
 import org.kuse.payloadbuilder.core.parser.AStatementVisitor;
 import org.kuse.payloadbuilder.core.parser.Expression;
-import org.kuse.payloadbuilder.core.parser.NamedParameterExpression;
 import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.QueryParser;
 import org.kuse.payloadbuilder.core.parser.QueryStatement;
+import org.kuse.payloadbuilder.core.parser.VariableExpression;
+import org.kuse.payloadbuilder.editor.QueryFileModel.Output;
 import org.kuse.payloadbuilder.editor.QueryFileModel.State;
 
 /** Class the executes queries etc. */
 class PayloadbuilderService
 {
-    private static final NamedParameterVisitor NAMED_PARAMETERS_VISITOR = new NamedParameterVisitor();
+    private static final VariableVisitor VARIABLES_VISITOR = new VariableVisitor();
     private static final QueryParser PARSER = new QueryParser();
     private static final AtomicInteger THREAD_ID = new AtomicInteger(1);
     private static final Executor EXECUTOR = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2, r ->
@@ -67,7 +68,15 @@ class PayloadbuilderService
                     }
                     ResultModel resultModel = new ResultModel(file);
                     file.addResult(resultModel);
-                    ObjectWriter writer = new ObjectWriter(resultModel);
+                    OutputWriter writer = null;
+                    if (file.getOutput() == Output.TABLE)
+                    {
+                        writer = new ObjectWriter(resultModel);
+                    }
+                    else
+                    {
+                        writer = new NoneOutputWriter(resultModel);
+                    }
                     queryResult.writeResult(writer);
 
                     resultModel.done();
@@ -118,7 +127,7 @@ class PayloadbuilderService
     }
 
     /** Get named parameters from query */
-    static Set<String> getParameters(String query)
+    static Set<String> getVariables(String query)
     {
         QueryStatement parsedQuery;
         try
@@ -131,11 +140,11 @@ class PayloadbuilderService
             return emptySet();
         }
         Set<String> parameters = new HashSet<>();
-        parsedQuery.getStatements().forEach(s -> s.accept(NAMED_PARAMETERS_VISITOR, parameters));
+        parsedQuery.getStatements().forEach(s -> s.accept(VARIABLES_VISITOR, parameters));
         return parameters;
     }
 
-    private static class NamedParameterVisitor extends AStatementVisitor<Void, Set<String>>
+    private static class VariableVisitor extends AStatementVisitor<Void, Set<String>>
     {
         private static final ExpressionVisitor EXPRESSION_VISITOR = new ExpressionVisitor();
 
@@ -148,24 +157,60 @@ class PayloadbuilderService
         private static class ExpressionVisitor extends AExpressionVisitor<Void, Set<String>>
         {
             @Override
-            public Void visit(NamedParameterExpression expression, Set<String> context)
+            public Void visit(VariableExpression expression, Set<String> context)
             {
                 context.add(expression.getName());
                 return null;
             }
         }
     }
+    
+    /** Output writer used in NONE output mode */
+    private static class NoneOutputWriter implements OutputWriter
+    {
+        private final ResultModel resultModel;
 
-    //    private static void setupColumns(ResultModel model, QueryResult.QueryResultMetaData metaData)
-    //    {
-    //        List<String> columns = new ArrayList<>();
-    //        columns.add("");
-    //        for (String column : metaData.getColumns())
-    //        {
-    //            columns.add(column);
-    //        }
-    //        model.setColumns(columns.toArray(ArrayUtils.EMPTY_STRING_ARRAY));
-    //    }
+        NoneOutputWriter(ResultModel resultModel)
+        {
+            this.resultModel = resultModel;
+        }
+        
+        @Override
+        public void endRow()
+        {
+            resultModel.addRow(ArrayUtils.EMPTY_OBJECT_ARRAY);
+        }
+        
+        @Override
+        public void writeFieldName(String name)
+        {
+        }
+
+        @Override
+        public void writeValue(Object value)
+        {
+        }
+
+        @Override
+        public void startObject()
+        {
+        }
+
+        @Override
+        public void endObject()
+        {
+        }
+
+        @Override
+        public void startArray()
+        {
+        }
+
+        @Override
+        public void endArray()
+        {
+        }
+    }
 
     /** Writer that writes object structure from a projection */
     private static class ObjectWriter implements OutputWriter

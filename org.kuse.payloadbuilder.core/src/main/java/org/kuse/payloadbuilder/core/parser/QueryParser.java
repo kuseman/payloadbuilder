@@ -36,6 +36,7 @@ import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ColumnRefer
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ComparisonExpressionContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.DereferenceContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.DescribeStatementContext;
+import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.FunctionArgumentContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.FunctionCallContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.FunctionCallExpressionContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.IfStatementContext;
@@ -45,7 +46,6 @@ import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.LambdaExpre
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.LiteralContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.LogicalBinaryContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.LogicalNotContext;
-import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.NamedParameterExpressionContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.NestedExpressionContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.NullPredicateContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.PopulateQueryContext;
@@ -200,8 +200,9 @@ public class QueryParser
         @Override
         public Object visitShowStatement(ShowStatementContext ctx)
         {
-            ShowStatement.Type type = ShowStatement.Type.valueOf(upperCase(ctx.type.getText()));
-            return new ShowStatement(type);
+            String catalog = getIdentifier(ctx.catalog);
+            ShowStatement.Type type = ShowStatement.Type.valueOf(upperCase(ctx.getChild(ctx.getChildCount() - 1).getText()));
+            return new ShowStatement(type, catalog, ctx.start);
         }
         
         @Override
@@ -378,7 +379,7 @@ public class QueryParser
         public Object visitTableSource(TableSourceContext ctx)
         {
             String alias = getIdentifier(ctx.identifier());
-            List<TableOption> tableOptions = ctx.tableSourceOptions() != null ? ctx.tableSourceOptions().options.stream().map(to -> (TableOption) visit(to)).collect(toList()) : emptyList();
+            List<Option> tableOptions = ctx.tableSourceOptions() != null ? ctx.tableSourceOptions().options.stream().map(to -> (Option) visit(to)).collect(toList()) : emptyList();
             if (ctx.functionCall() != null)
             {
                 FunctionCallInfo functionCallInfo = (FunctionCallInfo) visit(ctx.functionCall());
@@ -416,7 +417,7 @@ public class QueryParser
         {
             QualifiedName option = getQualifiedName(ctx.qname());
             Expression valueExpression = getExpression(ctx.expression());
-            return new TableOption(option, valueExpression);
+            return new Option(option, valueExpression);
         }
         
         @Override
@@ -425,12 +426,6 @@ public class QueryParser
             String identifier = getIdentifier(ctx.identifier());
             Integer lambdaId = lambdaParameters.get(identifier);
             return new QualifiedReferenceExpression(QualifiedName.of(identifier), lambdaId != null ? lambdaId.intValue() : -1);
-        }
-
-        @Override
-        public Object visitNamedParameterExpression(NamedParameterExpressionContext ctx)
-        {
-            return new NamedParameterExpression(getIdentifier(ctx.namedParameter().identifier()));
         }
 
         @Override
@@ -483,6 +478,14 @@ public class QueryParser
             }
             
             return new FunctionCallInfo(id, catalog, function, arguments);
+        }
+        
+        @Override
+        public Object visitFunctionArgument(FunctionArgumentContext ctx)
+        {
+            Expression expression = getExpression(ctx.expression);
+            String name = getIdentifier(ctx.name);
+            return name != null ? new NamedExpression(name, expression) : expression;
         }
 
         @Override

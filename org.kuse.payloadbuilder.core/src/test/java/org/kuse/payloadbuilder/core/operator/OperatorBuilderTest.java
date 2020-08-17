@@ -146,8 +146,8 @@ public class OperatorBuilderTest extends AOperatorTest
                 false,
                 false);
 
-//        System.out.println(queryResult.operator.toString(1));
-//        System.err.println(expected.toString(1));
+        //        System.out.println(queryResult.operator.toString(1));
+        //        System.err.println(expected.toString(1));
 
         assertEquals(expected, queryResult.operator);
     }
@@ -173,8 +173,8 @@ public class OperatorBuilderTest extends AOperatorTest
                         true),
                 new ExpressionPredicate(e("a.active_flg = true")));
 
-//        System.out.println(queryResult.operator.toString(1));
-//        System.err.println(expected.toString(1));
+        //        System.out.println(queryResult.operator.toString(1));
+        //        System.err.println(expected.toString(1));
 
         assertEquals(expected, queryResult.operator);
     }
@@ -274,14 +274,14 @@ public class OperatorBuilderTest extends AOperatorTest
         new TableAlias(articleAttribute, of("articlePrice"), "ap", new String[] {"price_sales", "sku_id"});
         new TableAlias(articleAttribute, of("attribute1"), "a1", new String[] {"attr1_id"});
 
-        //                                System.out.println(source.printHierarchy(0));
-        //                                System.out.println(queryResult.aliases.get(0).printHierarchy(0));
+//                                        System.out.println(source.printHierarchy(0));
+//                                        System.out.println(queryResult.alias.printHierarchy(0));
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(queryResult.alias));
 
         Operator expected = new HashJoin(
                 10,
-                "",
+                "INNER JOIN",
                 new HashJoin(
                         2,
                         "",
@@ -293,30 +293,27 @@ public class OperatorBuilderTest extends AOperatorTest
                         DefaultRowMerger.DEFAULT,
                         true,
                         false),
-                new FilterOperator(
+                new HashJoin(
                         9,
+                        "INNER JOIN",
                         new HashJoin(
-                                8,
-                                "",
-                                new HashJoin(
-                                        6,
-                                        "",
-                                        new FilterOperator(4, queryResult.tableOperators.get(2), new ExpressionPredicate(e("active_flg = true"))),
-                                        queryResult.tableOperators.get(3),
-                                        new ExpressionHashFunction(asList(e("aa.sku_id"))),
-                                        new ExpressionHashFunction(asList(e("ap.sku_id"))),
-                                        new ExpressionPredicate(e("ap.sku_id = aa.sku_id")),
-                                        DefaultRowMerger.DEFAULT,
-                                        false,
-                                        false),
-                                queryResult.tableOperators.get(4),
-                                new ExpressionHashFunction(asList(e("aa.attr1_id"))),
-                                new ExpressionHashFunction(asList(e("a1.attr1_id"))),
-                                new ExpressionPredicate(e("a1.attr1_id = aa.attr1_id")),
+                                7,
+                                "INNER JOIN",
+                                new FilterOperator(4, queryResult.tableOperators.get(2), new ExpressionPredicate(e("active_flg = true"))),
+                                new FilterOperator(6, queryResult.tableOperators.get(3), new ExpressionPredicate(e("ap.price_sales > 0"))),
+                                new ExpressionHashFunction(asList(e("aa.sku_id"))),
+                                new ExpressionHashFunction(asList(e("ap.sku_id"))),
+                                new ExpressionPredicate(e("ap.sku_id = aa.sku_id")),
                                 DefaultRowMerger.DEFAULT,
-                                true,
+                                false,
                                 false),
-                        new ExpressionPredicate(e("ap.price_sales > 0"))),
+                        queryResult.tableOperators.get(4),
+                        new ExpressionHashFunction(asList(e("aa.attr1_id"))),
+                        new ExpressionHashFunction(asList(e("a1.attr1_id"))),
+                        new ExpressionPredicate(e("a1.attr1_id = aa.attr1_id")),
+                        DefaultRowMerger.DEFAULT,
+                        true,
+                        false),
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("aa.art_id"))),
                 new ExpressionPredicate(e("aa.art_id = s.art_id")),
@@ -324,8 +321,8 @@ public class OperatorBuilderTest extends AOperatorTest
                 true,
                 false);
 
-        //                        System.err.println(expected.toString(1));
-        //                        System.out.println(queryResult.operator.toString(1));
+//                                System.err.println(expected.toString(1));
+//                                System.out.println(queryResult.operator.toString(1));
 
         assertEquals(expected, queryResult.operator);
 
@@ -567,10 +564,10 @@ public class OperatorBuilderTest extends AOperatorTest
                 4,
                 "INNER JOIN",
                 new FilterOperator(1, result.tableOperators.get(0), new ExpressionPredicate(e("s.id3 > 0"))),
-                new FilterOperator(3, result.tableOperators.get(1), new ExpressionPredicate(e("note_id > 0 and a.active_flg = true "))),
+                new FilterOperator(3, result.tableOperators.get(1), new ExpressionPredicate(e("note_id > 0"))),
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
-                new ExpressionPredicate(e("a.art_id = s.art_id")),
+                new ExpressionPredicate(e("a.art_id = s.art_id and a.active_flg = true")),
                 DefaultRowMerger.DEFAULT,
                 true,
                 false);
@@ -650,5 +647,30 @@ public class OperatorBuilderTest extends AOperatorTest
                 new ObjectProjection(asList("art_id"),
                         asList(new ExpressionProjection(e("s.art_id")))),
                 result.projection);
+    }
+    
+    @Test
+    public void test1()
+    {
+        String query = "" +
+            "    select * " +    
+            "    from article_attribute aa\r\n" + 
+            "    inner join [campaign] c\r\n" + 
+            "        on \r\n" + 
+            "        (\r\n" + 
+            "            c.apply_to_articles = 1\r\n" + 
+            "            or (c.includeArtIds in (aa.art_id) or c.includeSkuIds in (aa.sku_id))\r\n" + 
+            "        )\r\n" + 
+            "        and not(c.excludeArtIds in (aa.art_id) or c.excludeSkuIds in (aa.sku_id))\r\n" + 
+            "        and\r\n" + 
+            "        (\r\n" + 
+            "            c.apply_to_price_setting = 0\r\n" + 
+            "            or (c.apply_to_price_setting = 1 and aa.ap.price_sales >= aa.ap.price_org)\r\n" + 
+            "            or (c.apply_to_price_setting = 2 and aa.ap.price_sales < aa.ap.price_org)\r\n" + 
+            "        ) and c.active_flg\r\n";
+            
+        QueryResult result = getQueryResult(query);
+
+            System.out.println(result.operator.toString(1));
     }
 }

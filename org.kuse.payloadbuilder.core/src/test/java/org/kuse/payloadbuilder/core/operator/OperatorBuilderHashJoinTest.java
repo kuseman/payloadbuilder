@@ -166,17 +166,20 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
-        Operator expected = new HashJoin(
-                4,
-                "",
-                new FilterOperator(1, result.tableOperators.get(0), new ExpressionPredicate(e("s.id3 > 0"))),
-                new FilterOperator(3, result.tableOperators.get(1), new ExpressionPredicate(e("note_id > 0 AND a.active_flg = true AND a.id2 = 10"))),
-                new ExpressionHashFunction(asList(e("s.art_id"))),
-                new ExpressionHashFunction(asList(e("a.art_id"))),
-                new ExpressionPredicate(e("a.art_id = s.art_id")),
-                DefaultRowMerger.DEFAULT,
-                true,
-                false);
+        Operator expected = new FilterOperator(
+                5,
+                new HashJoin(
+                        4,
+                        "INNER JOIN",
+                        new FilterOperator(1, result.tableOperators.get(0), new ExpressionPredicate(e("s.id3 > 0"))),
+                        new FilterOperator(3, result.tableOperators.get(1), new ExpressionPredicate(e("note_id > 0"))),
+                        new ExpressionHashFunction(asList(e("s.art_id"))),
+                        new ExpressionHashFunction(asList(e("a.art_id"))),
+                        new ExpressionPredicate(e("a.art_id = s.art_id AND a.active_flg = true")),
+                        DefaultRowMerger.DEFAULT,
+                        true,
+                        false),
+                new ExpressionPredicate(e("a.id2 = 10")));
 
 //        System.err.println(expected.toString(1));
 //        System.out.println(result.operator.toString(1));

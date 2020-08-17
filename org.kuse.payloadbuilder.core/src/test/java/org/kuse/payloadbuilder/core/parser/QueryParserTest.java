@@ -74,10 +74,10 @@ public class QueryParserTest extends AParserTest
     public void test_dereference()
     {
         assertExpression("a.b.c", new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1));
-        assertExpression(":list.filter(x -> x.value)",
+        assertExpression("@list.filter(x -> x.value)",
                 new QualifiedFunctionCallExpression(null, "filter",
                         asList(
-                                new NamedParameterExpression("list"),
+                                new VariableExpression(QualifiedName.of("list")),
                                 new LambdaExpression(asList("x"),
                                         new QualifiedReferenceExpression(QualifiedName.of("x", "value"), 0),
                                         new int[] {0})),
@@ -130,7 +130,7 @@ public class QueryParserTest extends AParserTest
         assertQuery("select art_id from article a cross apply articleAttribute aa");
         assertQuery("select art_id from article a outer apply articleAttribute aa");
         assertQuery("select art_id from article a outer apply range(10) r");
-        assertQuery("select art_id from article a outer apply range(:from) r");
+        assertQuery("select art_id from article a outer apply range(@from) r");
 
         // Populate joins
         assertQuery("select art_id from article a inner join [articleAttribute] aa on aa.art_id = a.art_id ");
@@ -168,7 +168,7 @@ public class QueryParserTest extends AParserTest
         assertExpression("a != 1");
         assertExpression("not a != 1");
         assertExpression("not a in (1,1,true,2,3.,3,null,false)");
-        assertExpression(":value > 10 AND :value_two < 20");
+        assertExpression("@value > 10 AND @value_two < 20");
 
     }
 

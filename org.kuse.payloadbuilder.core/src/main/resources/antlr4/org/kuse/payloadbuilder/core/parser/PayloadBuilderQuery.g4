@@ -47,7 +47,12 @@ describeStatement
  ;
 
 showStatement
- : SHOW type=(VARIABLES | PARAMETERS| TABLES | FUNCTIONS)
+ : SHOW 
+ (
+ 	  VARIABLES 
+ 	| (catalog=identifier '#')? TABLES 
+ 	| (catalog=identifier '#')? FUNCTIONS
+ )
  ;
 
 controlFlowStatement
@@ -179,13 +184,16 @@ primary
  | identifier '->' expression                               #lambdaExpression
  | '(' identifier (',' identifier)+ ')' '->' expression  	#lambdaExpression
  | value=primary '[' subscript=expression ']'    			#subscript	
- | namedParameter											#namedParameterExpression
  | variable													#variableExpression
  | '(' expression ')' 										#nestedExpression			
  ;
 
 functionCall
- : functionName '(' ( arguments+=expression (',' arguments+=expression)*)? ')'
+ : functionName '(' ( arguments+=functionArgument (',' arguments+=functionArgument)*)? ')'
+ ;
+ 
+functionArgument
+ : (name=identifier ':')? arguments+=expression
  ;
  
 functionName
@@ -202,10 +210,6 @@ literal
  
 variable
  : '@' qname
- ;
- 
-namedParameter
- : COLON identifier
  ;
  
 compareOperator
@@ -309,10 +313,12 @@ PERCENT				: '%';
 PLUS				: '+';
 SLASH				: '/';
 
+// From java-grammar
 NUMERIC_LITERAL
  : ('0' | [1-9] (DIGITS? | '_'+ DIGITS)) [lL]?
  ;
  
+// From java-grammar 
 DECIMAL_LITERAL
  : (DIGITS '.' DIGITS? | '.' DIGITS) EXPONENTPART? [fFdD]?
  |  DIGITS (EXPONENTPART [fFdD]? | [fFdD])

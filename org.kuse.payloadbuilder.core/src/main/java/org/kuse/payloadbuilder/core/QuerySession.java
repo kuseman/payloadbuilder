@@ -12,25 +12,19 @@ import java.util.function.BooleanSupplier;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.FunctionInfo;
-import org.kuse.payloadbuilder.core.parser.NamedParameterExpression;
+import org.kuse.payloadbuilder.core.parser.VariableExpression;
 
 /**
  * A query session. Holds properties for catalog implementations etc. Can live through multiple query executions
  **/
 public class QuerySession
 {
-    //    private static final String CATALOG = "catalog";
-    //    private static final String DEFAULTCATALOG = "defaultCatalog";
     private final CatalogRegistry catalogRegistry;
-    /** Parameter values for {@link NamedParameterExpression}'s */
-    private final Map<String, Object> parameters;
-    /** Session scoped variables for {@link VariableExpression}'s */
-
+    /** Variable values for {@link VariableExpression}'s */
+    private final Map<String, Object> variables;
     /** Catalog properties by catalog alias */
     private Map<String, Map<String, Object>> catalogProperties;
 
-    //    private Map<String, Object> variables;
-    //    private PropertyChangeSupport pcs;
     private String defaultCatalogAlias;
     private PrintStream printStream;
     private BooleanSupplier abortSupplier;
@@ -40,10 +34,10 @@ public class QuerySession
         this(catalogRegistry, emptyMap());
     }
 
-    public QuerySession(CatalogRegistry catalogRegistry, Map<String, Object> parameters)
+    public QuerySession(CatalogRegistry catalogRegistry, Map<String, Object> variables)
     {
         this.catalogRegistry = requireNonNull(catalogRegistry, "catalogRegistry");
-        this.parameters = requireNonNull(parameters, "parameters");
+        this.variables = requireNonNull(variables, "variables");
     }
 
     /** Set print stream */
@@ -70,12 +64,6 @@ public class QuerySession
         return catalogRegistry;
     }
 
-    /** Return value for named parameter */
-    public Object getParameterValue(String name)
-    {
-        return parameters.get(name);
-    }
-
     /** Get default catalog for this session */
     public Catalog getDefaultCatalog()
     {
@@ -95,91 +83,14 @@ public class QuerySession
      **/
     public void setDefaultCatalog(String alias)
     {
-//        Catalog oldValue = this.defaultCatalog;
         defaultCatalogAlias = alias;
-//        if (!Objects.equals(oldValue, newValue))
-//        {
-//            this.defaultCatalog = newValue;
-//            //            if (pcs != null)
-//            //            {
-//            //                pcs.firePropertyChange(DEFAULTCATALOG, oldValue, newValue);
-//            //            }
-//        }
     }
 
-    //    /** Set a variable to session */
-    //    public void setVariable(String name, Object value)
-    //    {
-    ////        if (variables == null)
-    ////        {
-    ////            variables = new HashMap<>();
-    ////        }
-    //
-    //        // Default catalog key
-    ////        if (CATALOG.equals(lowerCase(name)))
-    ////        {
-    ////            String alias = String.valueOf(value);
-    ////            Catalog c = catalogRegistry.getCatalog(alias);
-    ////            if (c == null)
-    ////            {
-    ////                throw new IllegalArgumentException("Cannot find a catalog with alias " + alias);
-    ////            }
-    ////            setDefaultCatalog(c);
-    ////            return;
-    ////        }
-    //        
-    ////        Object oldValue = variables.put(name, value);
-    ////        if (!Objects.equals(oldValue, value))
-    ////        {
-    ////            if (pcs != null)
-    ////            {
-    ////                pcs.firePropertyChange(name, oldValue, value);
-    ////            }
-    ////        }
-    //    }
-    //
-    //    /** Return variables map */
-    //    public Map<String, Object> getVariables()
-    //    {
-    //        return ObjectUtils.defaultIfNull(variables, emptyMap());
-    //    }
-
-    /** Return parameters map */
-    public Map<String, Object> getParameters()
+    /** Return variables map */
+    public Map<String, Object> getVariables()
     {
-        return parameters;
+        return variables;
     }
-
-    //    /** Get property by key */
-    //    public Object getVariableValue(String name)
-    //    {
-    //        if (variables == null)
-    //        {
-    //            return null;
-    //        }
-    //        
-    //        return variables.get(name);
-    //    }
-
-    //    /** Add property change listener */
-    //    public void addPropertyChangeListener(PropertyChangeListener listener)
-    //    {
-    //        if (pcs == null)
-    //        {
-    //            pcs = new PropertyChangeSupport(this);
-    //        }
-    //        pcs.addPropertyChangeListener(listener);
-    //    }
-    //
-    //    /** Remove property change listener */
-    //    public void remvoePropertyChangeListener(PropertyChangeListener listener)
-    //    {
-    //        if (pcs == null)
-    //        {
-    //            return;
-    //        }
-    //        pcs.removePropertyChangeListener(listener);
-    //    }
 
     /** Print value to print stream if set */
     public void printLine(Object value)
@@ -189,7 +100,7 @@ public class QuerySession
             printStream.println(value);
         }
     }
-
+    
     /** Set catalog property */
     public void setCatalogProperty(String alias, String key, Object value)
     {
@@ -197,11 +108,6 @@ public class QuerySession
         {
             catalogProperties = new HashMap<>();
         }
-
-//        if (catalogRegistry.getCatalog(alias) == null)
-//        {
-//            throw new IllegalArgumentException("No catalog found with alias " + alias);
-//        }
 
         catalogProperties
                 .computeIfAbsent(alias, k -> new HashMap<>())
@@ -218,28 +124,6 @@ public class QuerySession
         
         return catalogProperties.getOrDefault(alias, emptyMap()).get(key);
     }
-
-    //    /** Set internal property */
-    //    public void setProperty(String name, Object value)
-    //    {
-    //        if (catalogProperties == null)
-    //        {
-    //            catalogProperties = new HashMap<>();
-    //        }
-    //        
-    //        catalogProperties.put(name, value);
-    //    }
-    //    
-    //    /** Get internal property by name */
-    //    @SuppressWarnings("unchecked")
-    //    public <T> T getProperty(String name)
-    //    {
-    //        if (catalogProperties == null)
-    //        {
-    //            return null;
-    //        }
-    //        return (T) catalogProperties.get(name);
-    //    }
 
     /**
      * Resolves function info from provided

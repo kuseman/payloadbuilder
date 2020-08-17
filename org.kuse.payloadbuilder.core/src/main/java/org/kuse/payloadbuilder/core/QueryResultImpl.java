@@ -3,6 +3,7 @@ package org.kuse.payloadbuilder.core;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_OBJECT_ARRAY;
+import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.join;
 
@@ -27,6 +28,7 @@ import org.kuse.payloadbuilder.core.parser.DescribeSelectStatement;
 import org.kuse.payloadbuilder.core.parser.DescribeTableStatement;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.IfStatement;
+import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.PrintStatement;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QueryStatement;
@@ -130,30 +132,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         Operator operator = null;
         MutableInt pos = new MutableInt();
         String[] columns = null;
-        if (statement.getType() == Type.PARAMETERS)
-        {
-            Map<String, Object> parameters = context.getSession().getParameters();
-            columns = SHOW_PARAMETERS_ALIAS.getColumns();
-            operator = new Operator()
-            {
-                @Override
-                public Iterator<Row> open(ExecutionContext context)
-                {
-                    return parameters
-                            .entrySet()
-                            .stream()
-                            .map(e -> Row.of(SHOW_PARAMETERS_ALIAS, pos.incrementAndGet(), new Object[] {e.getKey(), e.getValue()}))
-                            .iterator();
-                }
-
-                @Override
-                public int getNodeId()
-                {
-                    return 0;
-                }
-            };
-        }
-        else if (statement.getType() == Type.VARIABLES)
+        if (statement.getType() == Type.VARIABLES)
         {
             Map<String, Object> variables = context.getVariables();
             columns = SHOW_VARIABLES_ALIAS.getColumns();
@@ -178,12 +157,18 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         }
         else if (statement.getType() == Type.TABLES)
         {
-            if (isBlank(session.getDefaultCatalogAlias()))
+            String alias = defaultIfBlank(statement.getCatalog(), session.getDefaultCatalogAlias());
+            if (isBlank(alias))
             {
-                throw new IllegalArgumentException("No default catalog set.");
+                throw new ParseException("No catalog alias provided.", statement.getToken());
+            }
+            Catalog catalog = session.getCatalogRegistry().getCatalog(alias);
+            if (catalog == null)
+            {
+                throw new ParseException("No catalog found with alias: " + alias, statement.getToken());
             }
 
-            List<String> tables = session.getDefaultCatalog().getTables(session, session.getDefaultCatalogAlias());
+            List<String> tables = catalog.getTables(session, alias);
             columns = SHOW_TABLES_ALIAS.getColumns();
             operator = new Operator()
             {
@@ -205,8 +190,19 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         }
         else if (statement.getType() == Type.FUNCTIONS)
         {
+            String alias = defaultIfBlank(statement.getCatalog(), session.getDefaultCatalogAlias());
+//            if (isBlank(alias))
+//            {
+//                throw new ParseException("No catalog alias provided.", statement.getToken());
+//            }
+            Catalog catalog = session.getCatalogRegistry().getCatalog(alias);
+            if (!isBlank(statement.getCatalog()) && catalog == null)
+            {
+                throw new ParseException("No catalog found with alias: " + statement.getCatalog(), statement.getToken());
+            }
+            
             Catalog builtIn = session.getCatalogRegistry().getBuiltin();
-            Collection<FunctionInfo> functions = !isBlank(session.getDefaultCatalogAlias()) ? session.getDefaultCatalog().getFunctions() : emptyList();
+            Collection<FunctionInfo> functions = catalog != null ? catalog.getFunctions() : emptyList();
             columns = SHOW_FUNCTIONS_ALIAS.getColumns();
             operator = new Operator()
             {

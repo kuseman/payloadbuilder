@@ -26,7 +26,7 @@ public abstract class TableSource extends ASelectNode
     }
     
     /** Get table options (if applicable) */
-    public List<TableOption> getTableOptions()
+    public List<Option> getOptions()
     {
         return emptyList();
     }

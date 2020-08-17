@@ -24,36 +24,6 @@ import org.kuse.payloadbuilder.core.parser.Select;
 public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 {
     @Test
-    public void test_index_access_on_from()
-    {
-        String queryString = "SELECT a.art_if FROM article a WHERE 10 = a.art_id AND a.active_flg";
-        List<Operator> operators = new ArrayList<>();
-        Catalog c = catalog(ofEntries(
-                entry("article", asList("art_id"))), operators);
-        session.getCatalogRegistry().registerCatalog("c", c);
-        session.setDefaultCatalog("c");
-
-        Select select = parser.parseSelect(queryString);
-        Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
-
-        assertTrue("Operator should index access", ((TestOperator) operators.get(0)).index);
-        
-        Operator expected = new OuterValuesOperator(
-                2,
-                new FilterOperator(
-                        1,
-                        operators.get(0),
-                        new ExpressionPredicate(e("a.active_flg = true"))),
-                asList(e("10")));
-
-//        System.err.println(pair.getKey().toString(1));
-//        System.err.println();
-//        System.out.println(expected.toString(1));
-
-        assertEquals(expected, pair.getKey());
-    }
-    
-    @Test
     public void test_correlated_with_index_access()
     {
         String queryString = "SELECT s.art_id "
@@ -133,14 +103,14 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
 
         Operator expected = new BatchHashJoin(
-                6,
+                5,
                 "INNER JOIN",
                 operators.get(0),
                 new BatchHashJoin(
-                        5,
+                        4,
                         "INNER JOIN",
-                        new FilterOperator(2, operators.get(1), new ExpressionPredicate(e("a.active_flg = 1"))),
-                        new FilterOperator(4, operators.get(2), new ExpressionPredicate(e("aa.active_flg = true"))),
+                        operators.get(1),
+                        new FilterOperator(3, operators.get(2), new ExpressionPredicate(e("aa.active_flg = true"))),
                         new ExpressionValuesExtractor(asList(e("a.art_id"))),
                         new ExpressionValuesExtractor(asList(e("aa.art_id"))),
                         new ExpressionPredicate(e("aa.art_id = a.art_id")),
@@ -151,7 +121,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                         null),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("s.art_id"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("a.art_id"))),
-                new ExpressionPredicate(e("a.art_id = s.art_id")),
+                new ExpressionPredicate(e("a.art_id = s.art_id AND a.active_flg = 1")),
                 DefaultRowMerger.DEFAULT,
                 true,
                 false,
@@ -236,10 +206,10 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 3,
                 "INNER JOIN",
                 operators.get(0),
-                new FilterOperator(2, operators.get(1), new ExpressionPredicate(e("internet_flg = 1 AND a.active_flg = 1"))),
+                new FilterOperator(2, operators.get(1), new ExpressionPredicate(e("internet_flg = 1"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("s.art_id"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("a.art_id"))),
-                new ExpressionPredicate(e("a.art_id = s.art_id")),
+                new ExpressionPredicate(e("a.art_id = s.art_id AND a.active_flg = 1")),
                 DefaultRowMerger.DEFAULT,
                 true,
                 false,
@@ -292,8 +262,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         Operator actual = pair.getKey();
 
-        //        System.out.println(actual.toString(1));
-        //        System.err.println(expected.toString(1));
+//                System.out.println(actual.toString(1));
+//                System.err.println(expected.toString(1));
 
         assertEquals(expected, actual);
 
@@ -302,7 +272,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
     }
 
     @Test
-    public void test_left_join_doesnt_pushdown_predicate()
+    public void test_left_join_pushdown_predicate()
     {
         String queryString = "SELECT a.art_id " +
             "FROM source s " +
@@ -321,13 +291,13 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
 
         Operator expected = new BatchHashJoin(
-                2,
+                3,
                 "LEFT JOIN",
                 operators.get(0),
-                operators.get(1),
+                new FilterOperator(2,  operators.get(1), new ExpressionPredicate(e("a.active_flg = 1"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("s.art_id"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("a.art_id"))),
-                new ExpressionPredicate(e("a.art_id = s.art_id AND a.active_flg = 1")),
+                new ExpressionPredicate(e("a.art_id = s.art_id")),
                 DefaultRowMerger.DEFAULT,
                 false,
                 true,
@@ -336,8 +306,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         Operator actual = pair.getKey();
 
-        //        System.out.println(actual.toString(1));
-        //        System.err.println(expected.toString(1));
+//                System.out.println(actual.toString(1));
+//                System.err.println(expected.toString(1));
 
         assertEquals(expected, actual);
 
@@ -361,7 +331,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             @Override
             public Operator getScanOperator(OperatorData data)
             {
-                Operator op = new TestOperator("index " + data.getTableAlias().getTable().toString(), keysByTable, false);
+                Operator op = new TestOperator("scan " + data.getTableAlias().getTable().toString(), keysByTable);
                 operators.add(op);
                 return op;
             }
@@ -369,7 +339,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             @Override
             public Operator getIndexOperator(OperatorData data, Index index)
             {
-                Operator op = new TestOperator("index " + data.getTableAlias().getTable().toString(), keysByTable, true);
+                Operator op = new TestOperator("index " + data.getTableAlias().getTable().toString(), keysByTable);
                 operators.add(op);
                 return op;
             }
@@ -380,13 +350,11 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
     {
         private final String name;
         private final Map<String, List<String>> keysByTable;
-        private final boolean index;
 
-        TestOperator(String name, Map<String, List<String>> keysByTable, boolean index)
+        TestOperator(String name, Map<String, List<String>> keysByTable)
         {
             this.name = name;
             this.keysByTable = keysByTable;
-            this.index = index;
         }
        
         @Override

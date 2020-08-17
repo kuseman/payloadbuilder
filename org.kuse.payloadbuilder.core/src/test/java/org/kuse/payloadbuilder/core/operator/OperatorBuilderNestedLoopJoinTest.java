@@ -53,16 +53,16 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorTest
 
         Operator expected = new NestedLoopJoin(
                 4,
-                "",
+                "INNER JOIN",
                 result.tableOperators.get(0),
-                new CachingOperator(3, new FilterOperator(2, result.tableOperators.get(1), new ExpressionPredicate(e("a.internet_flg = true AND a.active_flg = true")))),
-                new ExpressionPredicate(e("a.art_id = s.art_id or s.id1 > 0")),
+                new CachingOperator(3, new FilterOperator(2, result.tableOperators.get(1), new ExpressionPredicate(e("a.internet_flg = true")))),
+                new ExpressionPredicate(e("a.active_flg = true AND (a.art_id = s.art_id or s.id1 > 0)")),
                 DefaultRowMerger.DEFAULT,
                 true,
                 false);
 
-        //        System.out.println(expected.toString(1));
-        //        System.err.println( result.operator.toString(1));
+//                System.out.println(expected.toString(1));
+//                System.err.println( result.operator.toString(1));
 
         assertEquals(expected, result.operator);
 

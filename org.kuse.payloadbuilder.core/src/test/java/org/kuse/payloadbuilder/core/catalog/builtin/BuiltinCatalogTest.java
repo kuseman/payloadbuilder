@@ -4,6 +4,8 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.Iterator;
 
 import org.apache.commons.collections.IteratorUtils;
@@ -175,7 +177,13 @@ public class BuiltinCatalogTest extends Assert
         assertFunction(true, null, "cast('TRUE', boolean)");
         assertFunction(false, null, "cast('false', 'boolean')");
         assertFunction(false, null, "cast('hello', 'boolean')");
+
+        assertFunction(LocalDateTime.parse("2000-10-10T00:00:00"), null, "cast('2000-10-10', 'datetime')");
+        assertFunction(LocalDateTime.parse("2000-10-10T10:10:00"), null, "cast('2000-10-10 10:10', 'datetime')");
+        assertFunction(LocalDateTime.parse("2000-10-10T12:10:00"), null, "cast('2000-10-10 10:10Z', 'datetime')");
+        assertFunction(LocalDateTime.parse("2000-10-10T12:10:10.123"), null, "cast('2000-10-10 10:10:10.123Z', 'datetime')");
         
+        assertFail(DateTimeParseException.class, "Text 'jibberish' could not", null, "cast('jibberish', 'datetime')");
         assertFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, integer)");
         assertFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, long)");
         assertFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, float)");

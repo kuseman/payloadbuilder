@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 
 import org.apache.commons.collections.IteratorUtils;
+import org.apache.commons.lang3.StringUtils;
 
 public final class ObjectUtils
 {
@@ -16,6 +17,16 @@ public final class ObjectUtils
     public static Iterator<Object> concat(Iterator<Object>... iterators)
     {
         return IteratorUtils.chainedIterator(iterators);
+    }
+    
+    /** Checks that provided string is not blank, throws exception otherwise */
+    public static String requireNonBlank(String string, String message) 
+    {
+        if (StringUtils.isBlank(string))
+        {
+            throw new IllegalArgumentException(message);
+        }
+        return string;
     }
 
     /** Concat arguments as a string omitting nulls */

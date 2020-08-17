@@ -54,7 +54,7 @@ class PayloadbuilderEditorView extends JFrame
     private static final String NEW_QUERY = "NewQuery";
     private static final String EXECUTE = "Execute";
     private static final String STOP = "Stop";
-    private static final String EDIT_PARAMETERS = "EditParameters";
+    private static final String EDIT_VARIABLES = "EditVariables";
 
     private static final Icon FOLDER_OPEN_O = FontIcon.of(FontAwesome.FOLDER_OPEN_O);
     private static final Icon SAVE = FontIcon.of(FontAwesome.SAVE);
@@ -106,7 +106,7 @@ class PayloadbuilderEditorView extends JFrame
     private Runnable toggleResultRunnable;
     private Runnable toggleCommentRunnable;
     private Runnable outputChangedRunnable;
-    private Runnable editParametersRunnable;
+    private Runnable editVariablesRunnable;
 
     private boolean catalogsCollapsed = false;
     private int prevCatalogsDividerLocation;
@@ -208,7 +208,7 @@ class PayloadbuilderEditorView extends JFrame
         toolBar.add(toggleResultAction).setToolTipText("Toggle result pane (" + getAcceleratorText(toggleResultKeyStroke) + ")");
         //        toolBar.add(formatAction).setToolTipText("Format query");
         toolBar.add(toggleCommentAction).setToolTipText("Toggle comment on selected lines (" + getAcceleratorText(toggleCommentKeyStroke) + ")");
-        toolBar.add(editParametersAction).setToolTipText("Edit parameters");
+        toolBar.add(editVariablesAction).setToolTipText("Edit parameters");
 
         comboOutput = new JComboBox<>(Output.values());
         comboOutput.setSelectedItem(Output.TABLE);
@@ -389,12 +389,12 @@ class PayloadbuilderEditorView extends JFrame
         }
     };
 
-    private final Action editParametersAction = new AbstractAction(EDIT_PARAMETERS, EDIT)
+    private final Action editVariablesAction = new AbstractAction(EDIT_VARIABLES, EDIT)
     {
         @Override
         public void actionPerformed(ActionEvent e)
         {
-            run(editParametersRunnable);
+            run(editVariablesRunnable);
         }
     };
 
@@ -476,9 +476,9 @@ class PayloadbuilderEditorView extends JFrame
         this.toggleCommentRunnable = toggleCommentRunnable;
     }
 
-    void setEditParametersRunnable(Runnable editParametersRunnable)
+    void setEditVariablesRunnable(Runnable editVariablesRunnable)
     {
-        this.editParametersRunnable = editParametersRunnable;
+        this.editVariablesRunnable = editVariablesRunnable;
     }
 
     void setCancelAction(Runnable cancelRunnable)

@@ -1,5 +1,6 @@
 package org.kuse.payloadbuilder.core.utils;
 
+import static java.util.Collections.emptyIterator;
 import static java.util.Objects.requireNonNull;
 
 import java.util.Collection;
@@ -29,6 +30,10 @@ public class IteratorUtils
         }
         else if (obj instanceof Collection)
         {
+            if (((Collection) obj).size() == 0)
+            {
+                return emptyIterator();
+            }
             return ((Collection) obj).iterator();
 
         }

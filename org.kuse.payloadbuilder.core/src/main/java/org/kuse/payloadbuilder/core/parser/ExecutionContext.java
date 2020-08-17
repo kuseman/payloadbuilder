@@ -41,6 +41,8 @@ public class ExecutionContext
     public ExecutionContext(QuerySession session)
     {
         this.session = requireNonNull(session, "session");
+        // Copy session variables if any
+        this.variables = session.getVariables() != null ? new HashMap<>(session.getVariables()) : null;
     }
     
     /** Get current row */

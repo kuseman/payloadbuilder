@@ -28,7 +28,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
-import org.kuse.payloadbuilder.core.parser.TableOption;
+import org.kuse.payloadbuilder.core.parser.Option;
 
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
@@ -61,7 +61,7 @@ class BatchHashJoin extends AOperator
     private final boolean emitEmptyOuterRows;
     private final Index innerIndex;
     private final int valuesSize;
-    private final TableOption batchSizeOption;
+    private final Option batchSizeOption;
 
     /* Statistics */
     private int executionCount;
@@ -78,7 +78,7 @@ class BatchHashJoin extends AOperator
             boolean populating,
             boolean emitEmptyOuterRows,
             Index innerIndex,
-            TableOption batchSizeOption)
+            Option batchSizeOption)
     {
         super(nodeId);
         this.logicalOperator = requireNonNull(logicalOperator, "logicalOperator");

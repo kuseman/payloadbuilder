@@ -1,127 +1,156 @@
 package org.kuse.payloadbuilder.catalog.es;
 
-import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
+import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.kuse.payloadbuilder.catalog.es.ESOperator.UTF_8;
 
-import java.nio.charset.Charset;
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
+import org.kuse.payloadbuilder.catalog.es.ESOperator.EsType;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
+import org.kuse.payloadbuilder.core.parser.NamedExpression;
 
 /** Search ES */
 class SearchFunction extends TableFunctionInfo
 {
-    private static final Charset UTF_8 = Charset.forName("UTF-8");
     SearchFunction(Catalog catalog)
     {
         super(catalog, "search");
     }
 
     @Override
+    public boolean requiresNamedArguments()
+    {
+        return true;
+    }
+
+    @Override
     public Iterator<Row> open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
     {
-        /*
-           - Endpoint set in properties
-               search(index, body)
-           - No endpoint set in properties
-               search(endpoint, index, body)
+        String endpoint = null;
+        String index = null;
+        String type = null;
+        String body = null;
+        String params = null;
+        String template = null;
+        boolean scroll = false;
 
-         */
+        for (Expression arg : arguments)
+        {
+            NamedExpression namedArg = (NamedExpression) arg;
+            String name = namedArg.getName();
+            Expression expression = namedArg.getExpression();
+            if ("endpoint".equals(name))
+            {
+                endpoint = getArg(context, expression, String.class, "endpoint");
+            }
+            else if ("index".equals(name))
+            {
+                index = getArg(context, expression, String.class, "index");
+            }
+            else if ("type".equals(name))
+            {
+                type = getArg(context, expression, String.class, "type");
+            }
+            else if ("body".equals(name))
+            {
+                body = getArg(context, expression, String.class, "body");
+            }
+            else if ("template".equals(name))
+            {
+                template = getArg(context, expression, String.class, "template");
+            }
+            else if ("scroll".equals(name))
+            {
+                scroll = getArg(context, expression, Boolean.class, "scroll");
+            }
+            else if ("params".equals(name))
+            {
+                Object obj = expression.eval(context);
+                if (obj instanceof String)
+                {
+                    params = (String) obj;
+                }
+                else if (obj instanceof Map)
+                {
+                    try
+                    {
+                        params = ESOperator.MAPPER.writeValueAsString(obj);
+                    }
+                    catch (IOException e)
+                    {
+                        throw new RuntimeException("Error deserializing: " + obj, e);
+                    }
+                }
+                else if (params != null)
+                {
+                    throw new IllegalArgumentException("Expected 'params' as String or Map but bot: " + obj);
+                }
+            }
+        }
 
-//        int size = arguments.size();
+        if (endpoint == null)
+        {
+            endpoint = EsType.getEndpoint(context.getSession(), catalogAlias);
+        }
+        if (index == null)
+        {
+            index = EsType.getIndex(context.getSession(), catalogAlias);
+        }
 
-        String endpoint = getString(context, arguments, "endpoint", 0, (String) context.getSession().getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY));
-        String index = getString(context, arguments, "index", 1, defaultIfNull((String) context.getSession().getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY), ""));
-        String type = getString(context, arguments, "type", 2, "");
-        String body = getString(context, arguments, "body", 3, "");
+        if (template != null && body != null)
+        {
+            throw new IllegalArgumentException("'template' and 'body' arguments are mutual exclusive for function " + getName());
+        }
 
-        // No properties
-        // size = 4 => endpoint/index/type/body
-        // size = 3 => endpoint/index/type
-        // size = 2 => endpoint/index
-        // size = 1 => endpoint
-        
-        // Endpoint set
-        // size = 3 => index/type/body
-        // size = 2 => index/type
-        // size = 1 => index
-        
-        // Index set
-        // size = 3 => endpoint/type/body
-        // size = 2 => endpoint/type
-        // size = 1 => endpoint
-        
-        // Endpoint + index set
-        // size = 2 => type/body
-        // size = 1 => type
-        
-//        int minArgCount = isBlank(endpoint) ? 1 : 0;
-//
-//        if (size < minArgCount || size > minArgCount + 2)
-//        {
-//            throw new IllegalArgumentException("Expected " + minArgCount + " or " + (minArgCount + 2) + " arguments for function " + getName() + " but found " + arguments.size());
-//        }
-//
-//        if (isBlank(endpoint))
-//        {
-//            endpoint = getString(context, arguments, "endpoint", 0);
-//            if (isBlank(index) && size > 1)
-//            {
-//                index = getString(context, arguments, "endpoint", 1);
-//            }
-//        }
-//        else if (isBlank(index))
-//        {
-//            index = getString(context, arguments, "index", 0);
-//        }
-//
-//        if (size == minArgCount + 2)
-//        {
-//            type = getString(context, arguments, "type", size - 2);
-//            body = getString(context, arguments, "body", size - 1);
-//        }
-//        else if (size == minArgCount + 1)
-//        {
-//            type = getString(context, arguments, "type", minArgCount);
-//        }
-
-        // TODO: move url:s to common location
-        final String searchUrl = String.format(
-                "%s%s%s/_search?size=%d&scroll=%s&filter_path=_scroll_id,hits.hits._index,hits.hits._type,hits.hits._id,hits.hits._source",
+        final String searchUrl = !isBlank(template) ? ESOperator.getSearchTemplateUrl(
                 endpoint,
-                !isBlank(index) ? "/" + index : "",
-                !isBlank(type)  
-                ? ((isBlank(index) ? "/*" : "") + "/" + type) 
-                : "",
-                // TODO: table option for batch size
-                100,
-                "2m");
-        final String scrollUrl = String.format("%s/_search/scroll?filter_path=_scroll_id,hits.hits._index,hits.hits._type,hits.hits._idhits.hits._source&scroll=%s", endpoint, "2m");
-        AtomicInteger scrollCount = new AtomicInteger();
+                index,
+                type,
+                scroll ? 1000 : null,
+                scroll ? 2 : null,
+                tableAlias,
+                null)
+            : ESOperator.getSearchUrl(
+                    endpoint,
+                    index,
+                    type,
+                    scroll ? 1000 : null,
+                    scroll ? 2 : null,
+                    tableAlias,
+                    null);
+        final String scrollUrl = scroll ? ESOperator.getScrollUrl(endpoint, 2, tableAlias, null) : null;
+
         AtomicLong sentBytes = new AtomicLong();
-        String actualBody = body != null ? body : "";
-        return ESOperator.getIterator(tableAlias, new AtomicLong(),
+        String actualBody = getBody(body, template, defaultIfBlank(params, "{}"));
+        MutableBoolean doRequest = new MutableBoolean(true);
+        return ESOperator.getIterator(
+                context,
+                tableAlias,
+                new AtomicLong(),
                 scrollId ->
                 {
-                    scrollCount.incrementAndGet();
-                    if (scrollId.getValue() == null)
+                    if (doRequest.getValue())
                     {
                         sentBytes.addAndGet(searchUrl.length() + actualBody.length());
                         HttpPost post = new HttpPost(searchUrl);
                         post.setEntity(new StringEntity(actualBody, UTF_8));
+                        doRequest.setFalse();
                         return post;
                     }
-                    else
+                    else if (scrollUrl != null)
                     {
                         String id = scrollId.getValue();
                         scrollId.setValue(null);
@@ -129,18 +158,36 @@ class SearchFunction extends TableFunctionInfo
                         post.setEntity(new StringEntity(id, UTF_8));
                         return post;
                     }
+
+                    return null;
                 });
     }
 
-    private String getString(ExecutionContext context, List<Expression> arguments, String key, int index, String defaultValue)
+    private String getBody(String body, String template, String params)
     {
-        Object string = defaultIfNull(
-                index <arguments.size() ? arguments.get(index).eval(context) : null,
-                defaultValue);
-        if (!(string instanceof String))
+        if (!isBlank(body))
         {
-            throw new IllegalArgumentException("Expected a String for " + key + " argument for function " + getName() + " but got: " + string);
+            return body;
         }
-        return (String) string;
+        else if (!isBlank(template))
+        {
+            return "{ \"id\":\"" + template + "\", \"params\":" + params + "}";
+        }
+        return "";
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> T getArg(ExecutionContext context, Expression argument, Class<? extends T> clazz, String key)
+    {
+        Object obj = argument.eval(context);
+        if (obj == null)
+        {
+            return null;
+        }
+        if (!clazz.isAssignableFrom(obj.getClass()))
+        {
+            throw new IllegalArgumentException("Expected a " + clazz.getSimpleName() + " for argument " + key + " for function " + getName() + " but got: " + obj);
+        }
+        return (T) obj;
     }
 }

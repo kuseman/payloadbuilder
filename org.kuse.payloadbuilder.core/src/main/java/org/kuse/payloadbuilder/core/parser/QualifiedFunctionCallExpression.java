@@ -17,8 +17,6 @@ public class QualifiedFunctionCallExpression extends Expression
 {
     private final String catalog;
     private final String function;
-
-    //    private final ScalarFunctionInfo functionInfo;
     private final List<Expression> arguments;
 
     /**
@@ -72,7 +70,11 @@ public class QualifiedFunctionCallExpression extends Expression
     {
         FunctionInfo functionInfo = session.resolveFunctionInfo(catalog, function, functionId);
 
-        if (!(functionInfo instanceof ScalarFunctionInfo))
+        if (functionInfo == null)
+        {
+            throw new ParseException("No function found with name " + function, token);
+        }
+        else if (!(functionInfo instanceof ScalarFunctionInfo))
         {
             throw new ParseException("Expected a scalar function but got " + functionInfo, token);
         }

@@ -18,14 +18,14 @@ import org.fife.ui.rsyntaxtextarea.TextEditorPane;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-/** Parameters dialog */
-class ParametersDialog extends JDialog
+/** Variables dialog */
+class VariablesDialog extends JDialog
 {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private final TextEditorPane textEditor;
     private boolean cancel;
 
-    ParametersDialog(JFrame parent)
+    VariablesDialog(JFrame parent)
     {
         super(parent, true);
         getContentPane().setLayout(new BorderLayout());
@@ -64,20 +64,20 @@ class ParametersDialog extends JDialog
     }
 
     /** Init dialog */
-    void init(String title, Map<String, Object> existingParameters)
+    void init(String title, Map<String, Object> existingVariables)
     {
-        setTitle("Edit parameters: " + title);
+        setTitle("Edit variables: " + title);
         cancel = false;
         try
         {
-            textEditor.setText(ResultModel.WRITER.writeValueAsString(existingParameters));
+            textEditor.setText(ResultModel.WRITER.writeValueAsString(existingVariables));
         }
         catch (JsonProcessingException e)
         {
         }
     }
 
-    Map<String, Object> getParameters()
+    Map<String, Object> getVariables()
     {
         if (cancel)
         {

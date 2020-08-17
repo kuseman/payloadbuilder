@@ -38,7 +38,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private final PayloadbuilderEditorView view;
     private final PayloadbuilderEditorModel model;
-    private final ParametersDialog parametersDialog;
+    private final VariablesDialog variablesDialog;
     private final CaretChangedListener caretChangedListener = new CaretChangedListener();
     private final Config config;
     private final List<CatalogExtensionView> catalogExtensionViews = new ArrayList<>();
@@ -54,7 +54,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         this.view = requireNonNull(view, "view");
         this.model = requireNonNull(model, "model");
         this.model.addPropertyChangeListener(this);
-        this.parametersDialog = new ParametersDialog(view);
+        this.variablesDialog = new VariablesDialog(view);
         init();
     }
 
@@ -89,7 +89,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                 editor.toggleComments();
             }
         });
-        view.setEditParametersRunnable(new EditParametersListener());
+        view.setEditVariablesRunnable(new EditVariablesListener());
         view.setOutputChangedAction(() ->
         {
             QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
@@ -414,8 +414,8 @@ class PayloadbuilderEditorController implements PropertyChangeListener
             });
         }
     }
-
-    private class EditParametersListener implements Runnable
+    
+    private class EditVariablesListener implements Runnable
     {
         @Override
         public void run()
@@ -433,24 +433,24 @@ class PayloadbuilderEditorController implements PropertyChangeListener
 
             QueryFileModel fileModel = editor.getFile();
 
-            Set<String> parameterNames = PayloadbuilderService.getParameters(queryString);
+            Set<String> variableNames = PayloadbuilderService.getVariables(queryString);
 
-            for (String name : parameterNames)
+            for (String name : variableNames)
             {
-                if (!fileModel.getParameters().containsKey(name))
+                if (!fileModel.getVariables().containsKey(name))
                 {
-                    fileModel.getParameters().put(name, null);
+                    fileModel.getVariables().put(name, null);
                 }
             }
 
-            parametersDialog.init(FilenameUtils.getName(fileModel.getFilename()), fileModel.getParameters());
-            parametersDialog.setVisible(true);
+            variablesDialog.init(FilenameUtils.getName(fileModel.getFilename()), fileModel.getVariables());
+            variablesDialog.setVisible(true);
 
-            Map<String, Object> parameters = parametersDialog.getParameters();
-            if (parameters != null)
+            Map<String, Object> variables = variablesDialog.getVariables();
+            if (variables != null)
             {
-                fileModel.getParameters().clear();
-                fileModel.getParameters().putAll(parameters);
+                fileModel.getVariables().clear();
+                fileModel.getVariables().putAll(variables);
             }
         }
     }

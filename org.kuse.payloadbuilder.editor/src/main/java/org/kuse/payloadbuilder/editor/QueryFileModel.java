@@ -46,8 +46,8 @@ class QueryFileModel
     private String query = "";
     private Output output = Output.TABLE;
 
-    private final Map<String, Object> parameters = new HashMap<>();
-    private final QuerySession querySession = new QuerySession(new CatalogRegistry(), parameters);
+    private final Map<String, Object> variables = new HashMap<>();
+    private final QuerySession querySession = new QuerySession(new CatalogRegistry(), variables);
     private Map<ICatalogExtension, CatalogExtensionModel> catalogExtensions;
 
     /** Execution fields */
@@ -290,9 +290,9 @@ class QueryFileModel
         return querySession;
     }
     
-    Map<String, Object> getParameters()
+    Map<String, Object> getVariables()
     {
-        return parameters;
+        return variables;
     }
 
     List<ResultModel> getResults()
@@ -309,7 +309,7 @@ class QueryFileModel
         }
     }
 
-    public Map<ICatalogExtension, CatalogExtensionModel> getCatalogExtensions()
+    Map<ICatalogExtension, CatalogExtensionModel> getCatalogExtensions()
     {
         return catalogExtensions;
     }

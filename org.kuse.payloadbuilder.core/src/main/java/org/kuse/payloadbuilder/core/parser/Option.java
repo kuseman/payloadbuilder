@@ -2,13 +2,13 @@ package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Objects.requireNonNull;
 
-/** Table source option (WITH) */
-public class TableOption
+/** Option (WITH) */
+public class Option
 {
     private final QualifiedName option;
     private final Expression valueExpression;
     
-    TableOption(QualifiedName option, Expression valueExpression)
+    Option(QualifiedName option, Expression valueExpression)
     {
         this.option = requireNonNull(option, "option");
         this.valueExpression = requireNonNull(valueExpression, "valueExpression");
@@ -35,9 +35,9 @@ public class TableOption
     @Override
     public boolean equals(Object obj)
     {
-        if (obj instanceof TableOption)
+        if (obj instanceof Option)
         {
-            TableOption that = (TableOption) obj;
+            Option that = (Option) obj;
             return option.equals(that.option)
                     && valueExpression.equals(that.valueExpression);
         }

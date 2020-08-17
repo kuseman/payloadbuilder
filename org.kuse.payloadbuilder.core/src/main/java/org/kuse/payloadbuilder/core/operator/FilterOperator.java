@@ -80,7 +80,7 @@ class FilterOperator extends AOperator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        String desc = String.format("FILTER (ID: %d, EXECUTION COUNT: %s, PREDICATE: %s", nodeId, 0, predicate);
+        String desc = String.format("FILTER (ID: %d, EXECUTION COUNT: %s, PREDICATE: %s)", nodeId, 0, predicate);
         return desc + System.lineSeparator()
             +
             indentString + operator.toString(indent + 1);

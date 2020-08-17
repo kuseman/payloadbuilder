@@ -155,7 +155,7 @@ public class AStatementVisitor<TR, TC> implements StatementVisitor<TR, TC>, Sele
     @Override
     public TR visit(Table table, TC context)
     {
-        table.getTableOptions().forEach(to -> visitExpression(context, to.getValueExpression()));
+        table.getOptions().forEach(to -> visitExpression(context, to.getValueExpression()));
         return null;
     }
 
@@ -163,7 +163,7 @@ public class AStatementVisitor<TR, TC> implements StatementVisitor<TR, TC>, Sele
     public TR visit(TableFunction tableFunction, TC context)
     {
         tableFunction.getArguments().forEach(a -> visitExpression(context, a));
-        tableFunction.getTableOptions().forEach(to -> visitExpression(context, to.getValueExpression()));
+        tableFunction.getOptions().forEach(to -> visitExpression(context, to.getValueExpression()));
         return null;
     }
 
@@ -186,7 +186,7 @@ public class AStatementVisitor<TR, TC> implements StatementVisitor<TR, TC>, Sele
     public TR visit(PopulateTableSource populatingJoin, TC context)
     {
         populatingJoin.getTableSourceJoined().accept(this, context);
-        populatingJoin.getTableOptions().forEach(to -> visitExpression(context, to.getValueExpression()));
+        populatingJoin.getOptions().forEach(to -> visitExpression(context, to.getValueExpression()));
 
         if (populatingJoin.getWhere() != null)
         {

@@ -12,6 +12,11 @@ public class Payloadbuilder
     /*
      * TODO:
      * BACKEND
+     *   - Pushdown is possible when LEFT JOIN on the inner table ONLY
+     *       
+     *   - WHERE count(a.aam) > 0 is pushed down which is wrong QRE with alias access cannot be pushed
+     *     - Push down can be made to populating where but not to table level
+     *     - Fix in PredicateAnalyzer
      *   - PredicateAnalyzer
      *       "@timestamp" > cast('2020-08-09T07:00:09.086', datetime) 
      *         This one is UNDEFINED, and shouldn't, it's because of function arguments has a QRE which is a 
@@ -22,13 +27,20 @@ public class Payloadbuilder
      *      for complex select items)
      *   - QualifiedReferenceExpression
      *      Cache lookup path
-     *   - Show functions should take an optional catalog (es#functions)
+     *   - Return a compiled query that clients can cache and reuse
+     *      This would be good for performance because parse/operator build will be skipped.
      *   - Extensibility
      *      Override parts of query and/remove/alter
+     *      Merge two queries?
+     *      Hook to process query at AST level
      *   - Insert into temptable
      *      Needed for campaigns etc. Eventual stockhouse
-     *   - Add more builtin functions
-     *      - Make sure everything from old payloadbuilder is supported
+     *      WITH cache option
+     *        Cache key: used variable names + statement id + all used catalog properties
+     *          Ie. @country_id + 2 + { "es": { "endpoint": "....", "index": "...." } }
+     *        Caching, framework or client ?
+     *        Cache eviction
+     *   - Catalog supported top operator
      *   - Top operator for populating table source
      *      Top should be applied PER parent row and not as a stream as whole
      *   - Analyze select
@@ -37,14 +49,23 @@ public class Payloadbuilder
      *   - Long running queries not returning any rows, aren't ending when aborted
      *      Need to inside operators check for abort in ExecutionContext
      *   - Join hint (HashJoin, hash_inner = true)
+     *   - Remove concept parameters (:params) and instead only use variables
+     *     Then one can use expressions like "set @lang_id = isnull(@lang_id, 3)
+     *     to fallback on missing input parameters
      *   - Catalog   
-     *      Send in Ex
+     *      Send in ExecutionContext when fetching indcies, to let catalog store information
+     *      that will be used later on then operators are created
      *   - Index types
      *      Full (all columns must be present)
      *      Random (one or more random columns)
      *      Left (one or more sequential columns from left)
      *   - Write SQL server catalog
-     *   - UNION
+     *   - Operators
+     *      Union
+     *      Except
+     *      Intersect
+     *      Semi join (where exists)
+     *      Anti join (where not exists)
      *   - BatchMergeJoin
      *      Fix broken implementation
      *   - Caching parsed query
@@ -54,14 +75,22 @@ public class Payloadbuilder
      *      to change to a child first class loader so extensions can embed their own versions
      *      This is a security issue but think it's no problem.
      * ESCatalog
+     *   - UI: Split endpoint/index selection dropdowns
      *   - All non_analyzed fields are potential index-columns
-     *   - Extract searchUrl/scrollUrl to a common place and add logic to it
-     *      _index,_type_,_id,_parent cols shouldn't be fetched if not needed, check index/table alias
      *   - Add functions 
      *        search(index, body)
      *          - Search index with body (index empty/null search all)
      *        searchTemplate(index, template, params)
      *          - Search index with template (index empty/null search all)
+     * EtmArticleCategoryESCatalog
+     *   - UI: Split endpoint/index selection dropdowns
+     *   - Refactor and reuse stuff from ESCatalog if possible
+     *   - Implement predicate support for index-column
+     *   
+     * EDITOR:
+     *   - Bug in service when columns are gathered
+     *     select array(*)  <-- should yield a no column name but gets the last column from the array values
+     *     from article_category 
      */
     
     private Payloadbuilder()

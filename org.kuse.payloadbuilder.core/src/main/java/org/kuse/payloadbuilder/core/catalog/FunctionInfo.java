@@ -7,6 +7,7 @@ import java.util.List;
 import org.antlr.v4.runtime.Token;
 import org.kuse.payloadbuilder.core.catalog.builtin.BuiltinCatalog;
 import org.kuse.payloadbuilder.core.parser.Expression;
+import org.kuse.payloadbuilder.core.parser.NamedExpression;
 import org.kuse.payloadbuilder.core.parser.ParseException;
 
 /** Definition of a function */
@@ -27,7 +28,7 @@ public abstract class FunctionInfo
     {
         return name;
     }
-    
+
     /** Description of function. Used in show statement for a description of the function. */
     public String getDescription()
     {
@@ -42,6 +43,12 @@ public abstract class FunctionInfo
     public Type getType()
     {
         return type;
+    }
+
+    /** Returns true if all arguments should be named for this function else false. */
+    public boolean requiresNamedArguments()
+    {
+        return false;
     }
 
     /** Returns expression types wanted as input */
@@ -110,6 +117,14 @@ public abstract class FunctionInfo
                                 + arguments.get(i).getClass().getSimpleName(),
                             token);
                 }
+            }
+        }
+        if (functionInfo.requiresNamedArguments() && (arguments.size() <= 0 || arguments.stream().anyMatch(a -> !(a instanceof NamedExpression))))
+        {
+            if (arguments.stream().anyMatch(a -> !(a instanceof NamedExpression)))
+            {
+                throw new ParseException(
+                        "Function " + functionInfo.getName() + " expects named parameters", token);
             }
         }
     }

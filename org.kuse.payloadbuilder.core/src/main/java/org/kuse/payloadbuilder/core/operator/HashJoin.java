@@ -118,7 +118,6 @@ class HashJoin extends AOperator
         // Left join
         // 1. Probe matched rows
         // 2. Probe non matched rows from table
-        //        return posOrderIterator(probeIterator, tableIterator(table, false));
         return new IteratorChain(
                 probeIterator,
                 tableIterator(table, TableIteratorType.NON_MATCHED));

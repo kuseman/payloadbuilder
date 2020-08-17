@@ -78,7 +78,7 @@ class CachingOperator extends AOperator
     public String toString(int indent)
     {
         String indentString = repeat("  ", indent);
-        return String.format("CACHING (ID: %d, EXECUTION COUNT: %d", nodeId, executionCount) + System.lineSeparator()
+        return String.format("CACHING (ID: %d, EXECUTION COUNT: %d)", nodeId, executionCount) + System.lineSeparator()
             +
             indentString + operator.toString(indent + 1);
     }

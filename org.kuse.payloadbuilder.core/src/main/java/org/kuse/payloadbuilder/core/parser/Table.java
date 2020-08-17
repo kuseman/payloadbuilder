@@ -11,9 +11,9 @@ public class Table extends TableSource
 {
     private final String catalogAlias;
     private final QualifiedName table;
-    private final List<TableOption> options;
+    private final List<Option> options;
 
-    public Table(String catalogAlias, QualifiedName table, String alias, List<TableOption> options, Token token)
+    public Table(String catalogAlias, QualifiedName table, String alias, List<Option> options, Token token)
     {
         super(alias, token);
         this.catalogAlias = catalogAlias;
@@ -22,7 +22,7 @@ public class Table extends TableSource
     }
     
     @Override
-    public List<TableOption> getTableOptions()
+    public List<Option> getOptions()
     {
         return options;
     }

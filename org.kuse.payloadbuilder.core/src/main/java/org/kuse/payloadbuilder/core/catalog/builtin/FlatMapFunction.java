@@ -77,7 +77,12 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
                     context.setLambdaValue(lambdaId, input);
                     Object value = le.getExpression().eval(context);
                     it = IteratorUtils.getIterator(value);
-                    return it;
+                    Object result = it;
+                    if (!it.hasNext())
+                    {
+                        it = null;
+                    }
+                    return result;
                 }
                 else if (!it.hasNext())
                 {

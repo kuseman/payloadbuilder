@@ -13,7 +13,7 @@ import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.SortItem;
-import org.kuse.payloadbuilder.core.parser.TableOption;
+import org.kuse.payloadbuilder.core.parser.Option;
 
 /**
  * Catalog. Top schema type, which defines the hooking points for retrieving data, functions etc.
@@ -113,7 +113,7 @@ public abstract class Catalog
         private final TableAlias tableAlias;
         private final List<AnalyzePair> predicatePairs;
         private final List<SortItem> sortItems;
-        private final List<TableOption> tableOptions;
+        private final List<Option> tableOptions;
 
         public OperatorData(
                 QuerySession session,
@@ -122,7 +122,7 @@ public abstract class Catalog
                 TableAlias tableAlias,
                 List<AnalyzePair> predicatePairs,
                 List<SortItem> sortItems,
-                List<TableOption> tableOptions)
+                List<Option> tableOptions)
         {
             this.session = session;
             this.nodeId = nodeId;
@@ -198,7 +198,7 @@ public abstract class Catalog
         }
 
         /** Provided options for this table. */
-        public List<TableOption> getTableOptions()
+        public List<Option> getTableOptions()
         {
             return tableOptions;
         }

@@ -685,7 +685,7 @@ class QueryFileView extends JPanel
     {
         try
         {
-            int pos = textEditor.getLineStartOffset(line - 1) + column - 1;
+            int pos = Math.max(textEditor.getLineStartOffset(line - 1) + column - 1, 0);
             textEditor.getHighlighter().addHighlight(pos, pos + 3, new SquiggleUnderlineHighlightPainter(Color.RED));
         }
         catch (BadLocationException e)

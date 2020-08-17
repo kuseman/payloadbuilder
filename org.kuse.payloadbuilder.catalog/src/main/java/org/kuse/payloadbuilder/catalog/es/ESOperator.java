@@ -6,6 +6,7 @@ import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
+import static org.apache.commons.lang3.ArrayUtils.indexOf;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.kuse.payloadbuilder.core.DescribeUtils.CATALOG;
 import static org.kuse.payloadbuilder.core.DescribeUtils.PREDICATE;
@@ -63,6 +64,7 @@ import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.InExpression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
+import org.kuse.payloadbuilder.core.utils.ObjectUtils;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonParser;
@@ -158,11 +160,17 @@ class ESOperator extends AOperator
 
         if (index instanceof IdIndex)
         {
-            String mgetUrl = String.format("%s/%s/%s/_mget?filter_path=docs._source,docs._index,docs._type,docs._id", esType.endpoint, esType.index, esType.type);
+            String mgetUrl = getUrl(
+                    String.format("%s/%s/%s/_mget?", esType.endpoint, esType.index, esType.type),
+                    "docs",
+                    tableAlias,
+                    index);
+
             // TODO: thread up all ids in executor and join
             DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getOperatorContext(), sentBytes);
             MutableBoolean doRequest = new MutableBoolean(true);
             return getIterator(
+                    context,
                     tableAlias,
                     receivedBytes,
                     scrollId ->
@@ -178,21 +186,23 @@ class ESOperator extends AOperator
                         return null;
                     });
         }
-        
-        // TODO: alter these path based on index. 
-        //  - only append _index,_type,_id if table alias is asterisk or explicit in columns
-        //  - only append fields, _parent if asterisk or explicit in columns or index is parent index
-        
-        final String searchUrl = String.format(
-                "%s/%s/%s/_search?size=%d&scroll=%s&fields=_source,_parent&filter_path=_scroll_id,hits.hits._index,hits.hits._type,hits.hits._id,hits.hits._source,hits.hits.fields",
+
+        final String searchUrl = getSearchUrl(
                 esType.endpoint,
                 esType.index,
                 esType.type,
-                // TODO: table option for batch size
                 1000,
-                "2m");
-        final String scrollUrl = String.format("%s/_search/scroll?fields=_source,_parent&filter_path=_scroll_id,hits.hits._index,hits.hits._type,hits.hits._id,hits.hits._source,hits.hits.fields&scroll=%s", esType.endpoint, "2m");
-        
+                2,
+                tableAlias,
+                index);
+        final String scrollUrl = getScrollUrl(
+                esType.endpoint,
+                2,
+                tableAlias,
+                index);
+
+        String body;
+        // Parent index, query parents
         if (index instanceof ParentIndex)
         {
             List<String> parentIds = new ArrayList<>();
@@ -204,34 +214,17 @@ class ESOperator extends AOperator
                     parentIds.add(String.valueOf(array[0]));
                 }
             }
-            
-            String body = "{ \"filter\": { \"terms\": { \"_parent\": [ " + parentIds.stream().collect(joining(",")) +  " ] } } }";
-            return getIterator(
-                    tableAlias,
-                    receivedBytes,
-                    scrollId ->
-                    {
-                        scrollCount.incrementAndGet();
-                        if (scrollId.getValue() == null)
-                        {
-                            sentBytes.addAndGet(searchUrl.length() + body.length());
-                            HttpPost post = new HttpPost(searchUrl);
-                            post.setEntity(new StringEntity(body, UTF_8));
-                            return post;
-                        }
-                        else
-                        {
-                            String id = scrollId.getValue();
-                            scrollId.setValue(null);
-                            HttpPost post = new HttpPost(scrollUrl);
-                            post.setEntity(new StringEntity(id, UTF_8));
-                            return post;
-                        }
-                    });
+
+            body = "{ \"filter\": { \"terms\": { \"_parent\": [ " + parentIds.stream().collect(joining(",")) + " ] } } }";
         }
-        
-        String body = getSearchBody(context);
+        else
+        {
+            body = getSearchBody(context);
+        }
+
+        String actualBody = body;
         return getIterator(
+                context,
                 tableAlias,
                 receivedBytes,
                 scrollId ->
@@ -239,9 +232,9 @@ class ESOperator extends AOperator
                     scrollCount.incrementAndGet();
                     if (scrollId.getValue() == null)
                     {
-                        sentBytes.addAndGet(searchUrl.length() + body.length());
+                        sentBytes.addAndGet(searchUrl.length() + actualBody.length());
                         HttpPost post = new HttpPost(searchUrl);
-                        post.setEntity(new StringEntity(body, UTF_8));
+                        post.setEntity(new StringEntity(actualBody, UTF_8));
                         return post;
                     }
                     else
@@ -255,7 +248,113 @@ class ESOperator extends AOperator
                 });
     }
 
+    static String getSearchUrl(
+            String endpoint,
+            String index,
+            String type,
+            Integer size,
+            Integer scrollMinutes,
+            TableAlias alias,
+            Index operatorIndex)
+    {
+        ObjectUtils.requireNonBlank(endpoint, "endpoint is required");
+        return getUrl(String.format("%s/%s/%s_search?%s%s",
+                endpoint,
+                isBlank(index) ? "*" : index,
+                isBlank(type) ? "" : type + "/",
+                scrollMinutes != null ? ("scroll=" + scrollMinutes + "m") : "",
+                size != null ? ("&size=" + size) : ""), "hits.hits", alias, operatorIndex);
+    }
+    
+    static String getSearchTemplateUrl(
+            String endpoint,
+            String index,
+            String type,
+            Integer size,
+            Integer scrollMinutes,
+            TableAlias alias,
+            Index operatorIndex)
+    {
+        ObjectUtils.requireNonBlank(endpoint, "endpoint is required");
+        return getUrl(String.format("%s/%s/%s_search/template?%s",
+                endpoint,
+                isBlank(index) ? "*" : index,
+                isBlank(type) ? "" : type + "/",
+                scrollMinutes != null ? ("scroll=" + scrollMinutes + "m") : "",
+                size != null ? ("&size=" + size) : ""), "hits.hits", alias, operatorIndex);
+    }
+
+    static String getScrollUrl(
+            String endpoint,
+            int scrollMinutes,
+            TableAlias alias,
+            Index operatorIndex)
+    {
+        ObjectUtils.requireNonBlank(endpoint, "endpoint is required");
+        return getUrl(String.format("%s/_search/scroll?scroll=%dm",
+                endpoint,
+                scrollMinutes), "hits.hits", alias, operatorIndex);
+    }
+
+    private static String getUrl(
+            String prefix,
+            String filterPathPrefix,
+            TableAlias alias,
+            Index operatorIndex)
+    {
+        boolean includeParent = alias.isAsteriskColumns()
+            || indexOf(alias.getColumns(), PARENTID) != -1
+            || operatorIndex instanceof ParentIndex;
+        boolean includeIndex = alias.isAsteriskColumns()
+            || indexOf(alias.getColumns(), INDEX) != -1;
+        boolean includeType = alias.isAsteriskColumns()
+            || indexOf(alias.getColumns(), TYPE) != -1;
+        boolean includeId = alias.isAsteriskColumns()
+            || indexOf(alias.getColumns(), DOCID) != -1;
+
+        String filterPath = getFilterPath(filterPathPrefix, includeParent, includeIndex, includeType, includeId);
+        String fields = getFields(includeParent);
+        return prefix + filterPath
+            + (!isBlank(fields) ? ("&" + fields) : "");
+    }
+
+    private static String getFields(boolean includeParent)
+    {
+        return includeParent ? "fields=_source,_parent" : "";
+    }
+
+    private static String getFilterPath(
+            String filterPathPrefix,
+            boolean includeParent,
+            boolean includeIndex,
+            boolean includeType,
+            boolean includeId)
+    {
+        StringBuilder sb = new StringBuilder("&filter_path=_scroll_id,")
+                .append(filterPathPrefix)
+                .append("._source");
+        if (includeParent)
+        {
+            sb.append(",").append(filterPathPrefix).append(".fields");
+        }
+        if (includeIndex)
+        {
+            sb.append(",").append(filterPathPrefix).append("._index");
+        }
+        if (includeType)
+        {
+            sb.append(",").append(filterPathPrefix).append("._type");
+        }
+        if (includeId)
+        {
+            sb.append(",").append(filterPathPrefix).append("._id");
+        }
+        return sb.toString();
+    }
+
+    // TODO: clean scroll
     static Iterator<Row> getIterator(
+            ExecutionContext context,
             TableAlias tableAlias,
             AtomicLong receivedBytes,
             Function<MutableObject<String>, HttpUriRequest> requestSupplier)
@@ -287,6 +386,11 @@ class ESOperator extends AOperator
             {
                 while (next == null)
                 {
+                    if (context.getSession().abortQuery())
+                    {
+                        return false;
+                    }
+
                     if (docIt == null)
                     {
                         HttpUriRequest request = requestSupplier.apply(scrollId);
@@ -505,7 +609,6 @@ class ESOperator extends AOperator
         String type;
         @JsonProperty("_id")
         String docId;
-        
 
         public boolean isValid()
         {
@@ -561,6 +664,26 @@ class ESOperator extends AOperator
             this.type = type;
         }
 
+        static String getEndpoint(QuerySession session, String catalogAlias)
+        {
+            String endpoint = (String) session.getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY);
+            if (isBlank(endpoint))
+            {
+                throw new IllegalArgumentException("Missing endpoint key in catalog properties.");
+            }
+            return endpoint;
+        }
+        
+        static String getIndex(QuerySession session, String catalogAlias)
+        {
+            String index = (String) session.getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY);
+            if (isBlank(index))
+            {
+                throw new IllegalArgumentException("Missing index key in catalog properties.");
+            }
+            return index;
+        }
+
         /** Create type from provided session/table */
         static EsType of(QuerySession session, String catalogAlias, QualifiedName table)
         {
@@ -574,18 +697,19 @@ class ESOperator extends AOperator
             if (parts.size() == 3)
             {
                 endpoint = parts.get(0);
+                // If first part is blank then try to get from properties
+                // This to support reusing selected endpoint but use another index
+                if (isBlank(endpoint))
+                {
+                    endpoint = getEndpoint(session, catalogAlias);
+                }
                 indexName = parts.get(1);
                 type = parts.get(2);
             }
             // Tow or one part qualified name -> <index>.<type> or <type>
             else if (parts.size() <= 2)
             {
-                endpoint = (String) session.getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY);
-                if (isBlank(endpoint))
-                {
-                    throw new IllegalArgumentException("Missing endpoint key in catalog properties.");
-                }
-
+                endpoint = getEndpoint(session, catalogAlias);
                 if (parts.size() == 2)
                 {
                     indexName = parts.get(0);
@@ -593,11 +717,7 @@ class ESOperator extends AOperator
                 }
                 else
                 {
-                    indexName = (String) session.getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY);
-                    if (isBlank(indexName))
-                    {
-                        throw new IllegalArgumentException("Missing index key in catalog properties.");
-                    }
+                    indexName = getIndex(session, catalogAlias);                            
                     type = parts.get(0);
                 }
             }
@@ -653,7 +773,7 @@ class ESOperator extends AOperator
                     // a NON Null-predicate (is null, is not null) always
                     // yields false so add a term that can never be true
                     sb.append("{\"term\": { \"_id\": \"\" }}");
-                    
+
                     return;
                 }
                 String stringValue = quote(value);
@@ -734,7 +854,7 @@ class ESOperator extends AOperator
             {
                 return "null";
             }
-            
+
             String stringValue = String.valueOf(value);
             if (!(value instanceof Number || value instanceof Boolean))
             {
