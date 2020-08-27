@@ -17,11 +17,14 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiPredicate;
 import java.util.function.ToIntBiFunction;
 
 import org.apache.commons.collections.iterators.IteratorChain;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.time.DurationFormatUtils;
+import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 
 /**
@@ -84,6 +87,19 @@ class HashJoin extends AOperator
                 entry(PREDICATE, predicate),
                 entry(OUTER_VALUES, outerHashFunction),
                 entry(INNER_VALUES, innerHashFunction));
+    }
+    
+    class Data extends NodeData
+    {
+        AtomicLong time = new AtomicLong();
+        long innerHashTime;
+        long outerHashTime;
+        
+        @Override
+        public String toString()
+        {
+            return "Timings. innerTime: " + innerHashTime + ", outerTime: " + outerHashTime + "): " + DurationFormatUtils.formatDurationHMS(time.get());
+        }
     }
     
     @SuppressWarnings("unchecked")

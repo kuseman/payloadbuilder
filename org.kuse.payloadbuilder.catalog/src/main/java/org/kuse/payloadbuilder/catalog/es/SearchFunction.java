@@ -131,7 +131,7 @@ class SearchFunction extends TableFunctionInfo
                     scroll ? 2 : null,
                     tableAlias,
                     null);
-        final String scrollUrl = scroll ? ESOperator.getScrollUrl(endpoint, 2, tableAlias, null) : null;
+        final String scrollUrl = scroll ? ESOperator.getScrollUrl(endpoint, type, 2, tableAlias, null) : null;
 
         AtomicLong sentBytes = new AtomicLong();
         String actualBody = getBody(body, template, defaultIfBlank(params, "{}"));

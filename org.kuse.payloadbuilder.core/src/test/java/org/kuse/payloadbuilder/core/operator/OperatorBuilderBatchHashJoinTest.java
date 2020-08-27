@@ -42,10 +42,10 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 entry("article", asList("art_id"))), operators);
         session.getCatalogRegistry().registerCatalog("c", c);
         session.setDefaultCatalog("c");
-        
+
         Select select = parser.parseSelect(queryString);
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
-        
+
         Operator expected = new NestedLoopJoin(
                 5,
                 "INNER JOIN",
@@ -68,9 +68,9 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 true,
                 false);
-        
-//        System.out.println(pair.getKey().toString(1));
-//        System.out.println(expected.toString(1));
+
+        //        System.out.println(pair.getKey().toString(1));
+        //        System.out.println(expected.toString(1));
 
         assertEquals(expected, pair.getKey());
     }
@@ -103,14 +103,14 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
 
         Operator expected = new BatchHashJoin(
-                5,
+                6,
                 "INNER JOIN",
                 operators.get(0),
                 new BatchHashJoin(
-                        4,
+                        5,
                         "INNER JOIN",
-                        operators.get(1),
-                        new FilterOperator(3, operators.get(2), new ExpressionPredicate(e("aa.active_flg = true"))),
+                        new FilterOperator(2, operators.get(1), new ExpressionPredicate(e("a.active_flg = 1"))),
+                        new FilterOperator(4, operators.get(2), new ExpressionPredicate(e("aa.active_flg = true"))),
                         new ExpressionValuesExtractor(asList(e("a.art_id"))),
                         new ExpressionValuesExtractor(asList(e("aa.art_id"))),
                         new ExpressionPredicate(e("aa.art_id = a.art_id")),
@@ -121,7 +121,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                         null),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("s.art_id"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("a.art_id"))),
-                new ExpressionPredicate(e("a.art_id = s.art_id AND a.active_flg = 1")),
+                new ExpressionPredicate(e("a.art_id = s.art_id")),
                 DefaultRowMerger.DEFAULT,
                 true,
                 false,
@@ -130,8 +130,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         Operator actual = pair.getKey();
 
-//                System.out.println(actual.toString(1));
-//                System.err.println(expected.toString(1));
+        //                System.out.println(actual.toString(1));
+        //                System.err.println(expected.toString(1));
 
         assertEquals(expected, actual);
 
@@ -206,10 +206,10 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 3,
                 "INNER JOIN",
                 operators.get(0),
-                new FilterOperator(2, operators.get(1), new ExpressionPredicate(e("internet_flg = 1"))),
+                new FilterOperator(2, operators.get(1), new ExpressionPredicate(e("internet_flg = 1 AND a.active_flg = 1"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("s.art_id"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("a.art_id"))),
-                new ExpressionPredicate(e("a.art_id = s.art_id AND a.active_flg = 1")),
+                new ExpressionPredicate(e("a.art_id = s.art_id")),
                 DefaultRowMerger.DEFAULT,
                 true,
                 false,
@@ -236,7 +236,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             "  ON a.art_id = s.art_id " +
             "  AND a.club_id = 1337 + 123 " +
             "  AND a.country_id = 0 " +
-            "  AND a.active_flg = 1";
+            "  AND a.active_flg = 1" +
+            "  AND s.flag";
 
         List<Operator> operators = new ArrayList<>();
         Catalog c = catalog(ofEntries(entry("article", asList("club_id", "country_id", "art_id"))), operators);
@@ -250,10 +251,10 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 3,
                 "LEFT JOIN",
                 operators.get(0),
-                new FilterOperator(2, operators.get(1), new ExpressionPredicate(e("internet_flg = 1"))),
+                new FilterOperator(2, operators.get(1), new ExpressionPredicate(e("internet_flg = 1 AND a.active_flg = 1"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("s.art_id"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("a.art_id"))),
-                new ExpressionPredicate(e("a.art_id = s.art_id AND a.active_flg = 1")),
+                new ExpressionPredicate(e("a.art_id = s.art_id AND s.flag = true")),
                 DefaultRowMerger.DEFAULT,
                 true,
                 true,
@@ -262,8 +263,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         Operator actual = pair.getKey();
 
-//                System.out.println(actual.toString(1));
-//                System.err.println(expected.toString(1));
+//        System.out.println(actual.toString(1));
+//        System.err.println(expected.toString(1));
 
         assertEquals(expected, actual);
 
@@ -294,7 +295,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 3,
                 "LEFT JOIN",
                 operators.get(0),
-                new FilterOperator(2,  operators.get(1), new ExpressionPredicate(e("a.active_flg = 1"))),
+                new FilterOperator(2, operators.get(1), new ExpressionPredicate(e("a.active_flg = 1"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("s.art_id"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
@@ -306,8 +307,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         Operator actual = pair.getKey();
 
-//                System.out.println(actual.toString(1));
-//                System.err.println(expected.toString(1));
+        //                System.out.println(actual.toString(1));
+        //                System.err.println(expected.toString(1));
 
         assertEquals(expected, actual);
 
@@ -345,7 +346,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             }
         };
     }
-    
+
     private static class TestOperator implements Operator
     {
         private final String name;
@@ -356,7 +357,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             this.name = name;
             this.keysByTable = keysByTable;
         }
-       
+
         @Override
         public int getNodeId()
         {
@@ -378,6 +379,6 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         {
             return name;
         }
-        
+
     }
 }

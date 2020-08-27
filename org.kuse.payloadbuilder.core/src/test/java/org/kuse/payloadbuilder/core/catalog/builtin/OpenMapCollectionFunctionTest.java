@@ -34,7 +34,7 @@ public class OpenMapCollectionFunctionTest extends Assert
                                 ofEntries(true, entry("key", 10), entry("count", 20)),
                                 ofEntries(true, entry("key", 11), entry("count", 15)))))))
         });
-        TableAlias func = TableAlias.of(a, "a", "a");
+        TableAlias func = TableAlias.of(a, "func", "f");
         func.setColumns(new String[] { "key", "count" });
         
         ExecutionContext context = new ExecutionContext(new QuerySession(new CatalogRegistry()));

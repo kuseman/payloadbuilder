@@ -9,7 +9,9 @@ import java.util.List;
 import org.antlr.v4.runtime.Token;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.FunctionInfo;
+import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
+import org.kuse.payloadbuilder.core.catalog.builtin.BuiltinCatalog;
 
 /** Table function */
 public class TableFunction extends TableSource
@@ -20,9 +22,9 @@ public class TableFunction extends TableSource
     private final int functionId;
     private final List<Option> tableOptions;
 
-    public TableFunction(String catalogAlias, String function, List<Expression> arguments, String alias, List<Option> tableOptions, int functionId, Token token)
+    public TableFunction(String catalogAlias, TableAlias tableAlias, String function, List<Expression> arguments/*, String alias*/, List<Option> tableOptions, int functionId, Token token)
     {
-        super(alias, token);
+        super(tableAlias/*, alias*/, token);
         this.catalogAlias = catalogAlias;
         this.function = requireNonNull(function, "function");
         this.arguments = requireNonNull(arguments, "arguments");
@@ -79,9 +81,8 @@ public class TableFunction extends TableSource
     @Override
     public String toString()
     {
-        return catalogAlias != null ? (catalogAlias + "#")
-            : ""
+        return (catalogAlias != null ? catalogAlias : BuiltinCatalog.NAME) + "#"
                 + function
-                + "(" + arguments.stream().map(a -> a.toString()).collect(joining(", ")) + ") " + alias;
+                + "(" + arguments.stream().map(a -> a.toString()).collect(joining(", ")) + ") " + tableAlias.getAlias();
     }
 }

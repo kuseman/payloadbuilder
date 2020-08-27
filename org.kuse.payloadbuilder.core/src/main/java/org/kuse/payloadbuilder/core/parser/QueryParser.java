@@ -27,6 +27,7 @@ import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.atn.PredictionMode;
 import org.antlr.v4.runtime.misc.ParseCancellationException;
 import org.apache.commons.lang3.tuple.Pair;
+import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.parser.Apply.ApplyType;
 import org.kuse.payloadbuilder.core.parser.ComparisonExpression.Type;
 import org.kuse.payloadbuilder.core.parser.Join.JoinType;
@@ -141,6 +142,10 @@ public class QueryParser
         private final Map<String, Integer> lambdaParameters = new HashMap<>();
         private Expression leftDereference;
 
+        private String parentAlias;
+        private TableAlias parentTableAlias;
+        private TableAlias currentTableAlias;
+        
         @Override
         public Object visitIfStatement(IfStatementContext ctx)
         {
@@ -354,8 +359,30 @@ public class QueryParser
         @Override
         public Object visitTableSourceJoined(TableSourceJoinedContext ctx)
         {
+//            String prevAlias = parentAlias;
+            TableAlias prevParent = parentTableAlias;
+            
+
             TableSource tableSource = (TableSource) visit(ctx.tableSource());
-            List<AJoin> joins = ctx.joinPart().stream().map(j -> (AJoin) visit(j)).collect(toList());
+            
+//            parentAlias = tableSource.alias;
+            parentTableAlias = currentTableAlias;
+            
+            
+            List<AJoin> joins = ctx
+                    .joinPart()
+                    .stream()
+                    .map(j ->
+                    { 
+                        parentAlias = getIdentifier(j.tableSource().identifier());
+//                        AJoin join = (AJoin) visit(j);
+                        return (AJoin) visit(j);
+                    })
+                    .collect(toList());
+            
+            parentTableAlias = prevParent;
+//            parentAlias = prevAlias;
+            
             return new TableSourceJoined(tableSource, joins);
         }
 
@@ -375,15 +402,23 @@ public class QueryParser
             return new Apply(tableSource, applyType);
         }
 
+        private TableAlias getParentTableAlias()
+        {
+            return parentTableAlias;//.size() > 0 ? parentTableAlias.peek() : null;
+        }
+        
         @Override
         public Object visitTableSource(TableSourceContext ctx)
         {
             String alias = getIdentifier(ctx.identifier());
+            
             List<Option> tableOptions = ctx.tableSourceOptions() != null ? ctx.tableSourceOptions().options.stream().map(to -> (Option) visit(to)).collect(toList()) : emptyList();
             if (ctx.functionCall() != null)
             {
+//                System.out.println("Visit func: " + alias);
                 FunctionCallInfo functionCallInfo = (FunctionCallInfo) visit(ctx.functionCall());
-                return new TableFunction(functionCallInfo.catalog,  functionCallInfo.function, functionCallInfo.arguments, defaultIfNull(alias, ""), tableOptions, functionCallInfo.functionId, ctx.functionCall().start);
+                currentTableAlias = TableAlias.of(getParentTableAlias(), QualifiedName.of(functionCallInfo.function), defaultIfNull(parentAlias, defaultIfNull(alias, "")), ctx.functionCall().start);
+                return new TableFunction(functionCallInfo.catalog, currentTableAlias, functionCallInfo.function, functionCallInfo.arguments/*, defaultIfNull(alias, "")*/, tableOptions, functionCallInfo.functionId, ctx.functionCall().start);
             }
             else if (ctx.populateQuery() != null)
             {
@@ -393,8 +428,9 @@ public class QueryParser
                 }
 
                 PopulateQueryContext populateQueryCtx = ctx.populateQuery();
-                TableSourceJoined tableSourceJoined = (TableSourceJoined) visit(populateQueryCtx.tableSourceJoined());
 
+                TableSourceJoined tableSourceJoined = (TableSourceJoined) visit(populateQueryCtx.tableSourceJoined());
+                
                 if (tableSourceJoined.getTableSource() instanceof PopulateTableSource)
                 {
                     throw new ParseException("Table source in populate query cannot be a populate table source", populateQueryCtx.start);
@@ -404,12 +440,14 @@ public class QueryParser
                 List<Expression> groupBy = populateQueryCtx.groupBy != null ? populateQueryCtx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
                 List<SortItem> orderBy = populateQueryCtx.sortItem() != null ? populateQueryCtx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
 
-                return new PopulateTableSource(alias, tableSourceJoined, where, groupBy, orderBy, ctx.populateQuery().start);
+                return new PopulateTableSource(currentTableAlias/*, alias*/, tableSourceJoined, where, groupBy, orderBy, ctx.populateQuery().start);
             }
 
-            String catalog = ctx.tableName().catalog != null ? ctx.tableName().catalog.getText() : null;
             QualifiedName table = getQualifiedName(ctx.tableName().qname());
-            return new Table(catalog, table, defaultIfNull(alias, ""), tableOptions, ctx.tableName().start);
+            
+            currentTableAlias = TableAlias.of(getParentTableAlias(), table, defaultIfNull(parentAlias, defaultIfNull(alias, "")), ctx.tableName().start);
+            String catalog = ctx.tableName().catalog != null ? ctx.tableName().catalog.getText() : null;
+            return new Table(catalog, currentTableAlias/*, table, defaultIfNull(alias, "")*/, tableOptions, ctx.tableName().start);
         }
 
         @Override

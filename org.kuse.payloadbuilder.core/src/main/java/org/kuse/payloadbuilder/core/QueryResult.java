@@ -10,4 +10,7 @@ public interface QueryResult
      * @throws IllegalArgumentException if there are no more results
      */
     void writeResult(OutputWriter writer);
+    
+    /** Resets the query result to initial state */
+    void reset();
 }

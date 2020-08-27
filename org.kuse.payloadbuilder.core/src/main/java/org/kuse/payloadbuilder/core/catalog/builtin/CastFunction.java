@@ -20,12 +20,12 @@ import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 class CastFunction extends ScalarFunctionInfo
 {
     private final static DateTimeFormatter ISO_DATE_OPTIONAL_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd['T'HH:mm[:ss][.SSS][X]]");
-    
+
     CastFunction(Catalog catalog, String name)
     {
         super(catalog, name);
     }
-    
+
     @Override
     public Object eval(ExecutionContext context, List<Expression> arguments)
     {
@@ -49,9 +49,14 @@ class CastFunction extends ScalarFunctionInfo
             }
             dataTypeString = String.valueOf(obj);
         }
-        
+
         DataType dataType = DataType.valueOf(dataTypeString.toUpperCase());
-        
+
+        if (dataType.type.isAssignableFrom(source.getClass()))
+        {
+            return source;
+        }
+
         int style = 0;
         if (arguments.size() >= 3)
         {
@@ -62,13 +67,13 @@ class CastFunction extends ScalarFunctionInfo
             }
             style = ((Integer) styleObject).intValue();
         }
-        
+
         return dataType.convert(source, style);
     }
-    
+
     enum DataType
     {
-        BOOLEAN
+        BOOLEAN(Boolean.class)
         {
             @Override
             Object convert(Object source, int style)
@@ -84,9 +89,7 @@ class CastFunction extends ScalarFunctionInfo
                 throw new IllegalArgumentException("Cannot cast " + source + " to Boolean.");
             }
         },
-//        DATE,
-//        DATETIME,
-        DATETIME
+        DATETIME(LocalDateTime.class)
         {
             @Override
             Object convert(Object source, int style)
@@ -116,12 +119,12 @@ class CastFunction extends ScalarFunctionInfo
                 }
                 else if (source instanceof ZonedDateTime)
                 {
-                    return ((ZonedDateTime) source).toLocalDateTime();
+                    return ((ZonedDateTime) source).withZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime();
                 }
                 throw new IllegalArgumentException("Cannot cast " + source + " to DateTime.");
             }
         },
-        DATETIMEOFFSET
+        DATETIMEOFFSET(ZonedDateTime.class)
         {
             @Override
             Object convert(Object source, int style)
@@ -139,11 +142,11 @@ class CastFunction extends ScalarFunctionInfo
                 {
                     return ((LocalDateTime) source).atZone(ZoneId.systemDefault());
                 }
-                
+
                 throw new IllegalArgumentException("Cannot cast " + source + " to DateTimeOffset.");
             }
         },
-        DOUBLE
+        DOUBLE(Double.class)
         {
             @Override
             Object convert(Object source, int style)
@@ -159,7 +162,7 @@ class CastFunction extends ScalarFunctionInfo
                 throw new IllegalArgumentException("Cannot cast " + source + " to Double.");
             }
         },
-        FLOAT
+        FLOAT(Float.class)
         {
             @Override
             Object convert(Object source, int style)
@@ -175,7 +178,7 @@ class CastFunction extends ScalarFunctionInfo
                 throw new IllegalArgumentException("Cannot cast " + source + " to Float.");
             }
         },
-        INTEGER
+        INTEGER(Integer.class)
         {
             @Override
             Object convert(Object source, int style)
@@ -191,7 +194,7 @@ class CastFunction extends ScalarFunctionInfo
                 throw new IllegalArgumentException("Cannot cast " + source + " to Integer.");
             }
         },
-        LONG
+        LONG(Long.class)
         {
             @Override
             Object convert(Object source, int style)
@@ -207,7 +210,7 @@ class CastFunction extends ScalarFunctionInfo
                 throw new IllegalArgumentException("Cannot cast " + source + " to Long.");
             }
         },
-        STRING
+        STRING(String.class)
         {
             @Override
             Object convert(Object source, int style)
@@ -215,7 +218,14 @@ class CastFunction extends ScalarFunctionInfo
                 return String.valueOf(source);
             }
         };
-        
+
+        final Class<?> type;
+
+        DataType(Class<?> type)
+        {
+            this.type = type;
+        }
+
         /** Convert provided source */
         abstract Object convert(Object source, int style);
     }

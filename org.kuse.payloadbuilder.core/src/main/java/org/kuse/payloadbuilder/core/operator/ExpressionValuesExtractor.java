@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 
+import org.apache.commons.lang3.time.StopWatch;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
@@ -18,15 +19,21 @@ class ExpressionValuesExtractor implements ValuesExtractor
         this.expressions = requireNonNull(expressions, "expressions");
         this.size = expressions.size();
     }
+    
+    StopWatch sw = new StopWatch();
 
     @Override
     public void extract(ExecutionContext context, Row row, Object[] values)
     {
+        sw.start();
         context.setRow(row);
         for (int i = 0; i < size; i++)
         {
             values[i] = expressions.get(i).eval(context);
         }
+        sw.stop();
+        context.evalTime.addAndGet(sw.getTime());
+        sw.reset();
     }
 
     @Override

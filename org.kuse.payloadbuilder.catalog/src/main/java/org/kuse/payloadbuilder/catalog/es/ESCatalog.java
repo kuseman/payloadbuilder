@@ -18,6 +18,7 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -43,6 +44,7 @@ class ESCatalog extends Catalog
     public static final String NAME = "Elastic search";
     public static final String ENDPOINT_KEY = "endpoint";
     public static final String INDEX_KEY = "index";
+    static final String SINGLE_TYPE_TABLE_NAME = "__data__";
 
     ESCatalog()
     {
@@ -66,9 +68,23 @@ class ESCatalog extends Catalog
         HttpGet getMappings = new HttpGet(String.format("%s/%s/_mapping", endpoint, index));
         try (CloseableHttpResponse response = CLIENT.execute(getMappings))
         {
+            if (response.getStatusLine().getStatusCode() != 200)
+            {
+                throw new RuntimeException("Error query Elastic for mappings." + IOUtils.toString(response.getEntity().getContent()));
+            }
+            
             Map<String, Object> map = MAPPER.readValue(response.getEntity().getContent(), Map.class);
             map = (Map<String, Object>) map.get(index);
             map = (Map<String, Object>) map.get("mappings");
+            
+            Map<String, Object> properties = (Map<String, Object>) map.get("properties");
+            
+            // Single type ES version, return dummy table_name
+            if (properties != null && !properties.containsKey("properties"))
+            {
+                return asList(SINGLE_TYPE_TABLE_NAME);
+            }
+            
             return new ArrayList<>(map.keySet());
         }
         catch (IOException e)
@@ -168,6 +184,11 @@ class ESCatalog extends Catalog
                 propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), "_id", pair));
                 it.remove();
             }
+            else if (ESOperator.PARENTID.equals(column) && pair.getComparisonType() == ComparisonExpression.Type.EQUAL)
+            {
+                propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), "_parent", pair));
+                it.remove();
+            }
             // TODO: strings only support equals
             else if(key != null)
             {
@@ -249,7 +270,8 @@ class ESCatalog extends Catalog
     private Map<String, String> getAnalyzedPropertyNames(QuerySession session, String catalogAlias, QualifiedName table)
     {
         EsType esType = EsType.of(session, catalogAlias, table);
-        HttpGet getMappings = new HttpGet(String.format("%s/%s/%s/_mapping", esType.endpoint, esType.index, esType.type));
+        final boolean isSingleType = SINGLE_TYPE_TABLE_NAME.equals(esType.type);
+        HttpGet getMappings = new HttpGet(String.format("%s/%s/%s_mapping", esType.endpoint, esType.index, isSingleType ? "" : esType.type + "/"));
         try (CloseableHttpResponse response = CLIENT.execute(getMappings))
         {
             if (response.getStatusLine().getStatusCode() != 200)
@@ -268,16 +290,9 @@ class ESCatalog extends Catalog
             {
                 Optional.of((Map<String, Object>) e.getValue())
                         .map(m -> (Map<String, Object>) m.get("mappings"))
-                        .map(m -> (Map<String, Object>) m.get(esType.type))
+                        .map(m -> isSingleType ? m : (Map<String, Object>) m.get(esType.type))
                         .map(m -> (Map<String, Object>) m.get("properties"))
                         .ifPresent(m -> populateAnalyzedFields(result, m, null));
-                //
-                //                if (map == null)
-                //                {
-                //                    return emptyMap();
-                //                }
-                //
-                //                populateAnalyzedFields(result, map, null);
             }
             return result;
         }
@@ -315,9 +330,9 @@ class ESCatalog extends Catalog
             Map<String, Object> subProperties = (Map<String, Object>) propertiesMap.get("properties");
 
             // Collected nested properties one level down only
-            if (parentKey == null && subProperties != null)
+            if (/*parentKey == null && */subProperties != null)
             {
-                populateAnalyzedFields(result, subProperties, entry.getKey());
+                populateAnalyzedFields(result, subProperties, (parentKey == null ? "" : parentKey + ".") + entry.getKey());
                 continue;
             }
 
@@ -328,7 +343,7 @@ class ESCatalog extends Catalog
             Map<String, Object> fields = (Map<String, Object>) propertiesMap.get("fields");
 
             // if index is null and there exists a field that is not_analyzed pick that one
-            if (index == null && fields != null && "string".equals(type))
+            if (index == null && fields != null && ("string".equals(type) || "text".equals(type)))
             {
                 boolean added = false;
                 for (Entry<String, Object> e : fields.entrySet())
@@ -336,7 +351,8 @@ class ESCatalog extends Catalog
                     @SuppressWarnings("unchecked")
                     Map<String, Object> fieldProperties = (Map<String, Object>) e.getValue();
                     String fieldIndex = (String) fieldProperties.get("index");
-                    if ("not_analyzed".equals(fieldIndex))
+                    String fieldType = (String) fieldProperties.get("type");
+                    if ("not_analyzed".equals(fieldIndex) || "keyword".equals(fieldType))
                     {
                         String property = (parentKey != null ? parentKey + "." : "") + entry.getKey();
                         result.put(property, property + "." + e.getKey());

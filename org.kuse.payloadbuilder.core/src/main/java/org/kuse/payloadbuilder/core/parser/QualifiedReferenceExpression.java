@@ -23,7 +23,7 @@ public class QualifiedReferenceExpression extends Expression
      * </pre>
      */
     private final int lambdaId;
-
+    
     public QualifiedReferenceExpression(QualifiedName qname, int lambdaId)
     {
         this.qname = requireNonNull(qname, "qname");

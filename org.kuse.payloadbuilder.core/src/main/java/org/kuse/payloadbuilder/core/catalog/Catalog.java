@@ -11,9 +11,9 @@ import java.util.Map;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
+import org.kuse.payloadbuilder.core.parser.Option;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.SortItem;
-import org.kuse.payloadbuilder.core.parser.Option;
 
 /**
  * Catalog. Top schema type, which defines the hooking points for retrieving data, functions etc.
@@ -76,6 +76,8 @@ public abstract class Catalog
 
     /**
      * Get operator for provided alias
+     * NOTE! In main loop of operator add check of {@link QuerySession#abortQuery()}
+     * to not hang a thread in execution state.
      */
     public Operator getScanOperator(OperatorData data)
     {
@@ -85,6 +87,8 @@ public abstract class Catalog
     /**
      * Get operator for provided alias
      * @param index Index to use
+     * NOTE! In main loop of operator add check of {@link QuerySession#abortQuery()}
+     * to not hang a thread in execution state.
      */
     public Operator getIndexOperator(OperatorData data, Index index)
     {

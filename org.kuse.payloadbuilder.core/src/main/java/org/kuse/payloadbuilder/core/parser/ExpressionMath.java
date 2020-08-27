@@ -115,7 +115,7 @@ public final class ExpressionMath
         if (left instanceof Number)
         {
             Number l = (Number) left;
-            Number r = convert(l, right, true);
+            Number r = convertToNumber(l, right, true);
             if (r != null)
             {
                 return gt(l, r);
@@ -124,7 +124,7 @@ public final class ExpressionMath
         else if (right instanceof Number)
         {
             Number r = (Number) right;
-            Number l = convert(r, left, true);
+            Number l = convertToNumber(r, left, true);
             if (l != null)
             {
                 return gt(l, r);
@@ -151,7 +151,7 @@ public final class ExpressionMath
         if (left instanceof Number)
         {
             Number l = (Number) left;
-            Number r = convert(l, right, true);
+            Number r = convertToNumber(l, right, true);
             if (r != null)
             {
                 return gte(l, r);
@@ -160,7 +160,7 @@ public final class ExpressionMath
         else if (right instanceof Number)
         {
             Number r = (Number) right;
-            Number l = convert(r, left, true);
+            Number l = convertToNumber(r, left, true);
             if (l != null)
             {
                 return gte(l, r);
@@ -187,7 +187,7 @@ public final class ExpressionMath
         if (left instanceof Number)
         {
             Number l = (Number) left;
-            Number r = convert(l, right, true);
+            Number r = convertToNumber(l, right, true);
             if (r != null)
             {
                 return lt(l, r);
@@ -196,7 +196,7 @@ public final class ExpressionMath
         else if (right instanceof Number)
         {
             Number r = (Number) right;
-            Number l = convert(r, left, true);
+            Number l = convertToNumber(r, left, true);
             if (l != null)
             {
                 return lt(l, r);
@@ -223,7 +223,7 @@ public final class ExpressionMath
         if (left instanceof Number)
         {
             Number l = (Number) left;
-            Number r = convert(l, right, true);
+            Number r = convertToNumber(l, right, true);
             if (r != null)
             {
                 return lte(l, r);
@@ -232,7 +232,7 @@ public final class ExpressionMath
         else if (right instanceof Number)
         {
             Number r = (Number) right;
-            Number l = convert(r, left, true);
+            Number l = convertToNumber(r, left, true);
             if (l != null)
             {
                 return lte(l, r);
@@ -275,7 +275,7 @@ public final class ExpressionMath
         if (left instanceof Number)
         {
             Number l = (Number) left;
-            Number r = convert(l, right, throwIfNotComparable);
+            Number r = convertToNumber(l, right, throwIfNotComparable);
             if (r != null)
             {
                 return eq(l, r);
@@ -284,7 +284,7 @@ public final class ExpressionMath
         else if (right instanceof Number)
         {
             Number r = (Number) right;
-            Number l = convert(r, left, throwIfNotComparable);
+            Number l = convertToNumber(r, left, throwIfNotComparable);
             if (l != null)
             {
                 return eq(l, r);
@@ -884,7 +884,7 @@ public final class ExpressionMath
     /* MISC METHODS */
 
     /** Converts an object to a number (if applicable) taking the number type into consideration */
-    private static Number convert(Number number, Object other, boolean throwIfNotConvertible)
+    private static Number convertToNumber(Number number, Object other, boolean throwIfNotConvertible)
     {
         if (other instanceof Number)
         {

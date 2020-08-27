@@ -16,9 +16,15 @@ public class JsonStringWriter implements OutputWriter
         sb.append(string);
     }
     
+    @Override
+    public void endRow()
+    {
+        sb.append(System.lineSeparator());
+    }
+    
     public String getAndReset()
     {
-        if (sb.charAt(sb.length() - 1) == ',')
+        if (sb.length() > 0 && sb.charAt(sb.length() - 1) == ',')
         {
             sb.deleteCharAt(sb.length() - 1);
         }

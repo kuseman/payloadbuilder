@@ -46,13 +46,13 @@ import org.kuse.payloadbuilder.core.parser.UseStatement;
 class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
 {
     private static final Row DUMMY_ROW = Row.of(TableAlias.of(null, "dummy", "d"), 0, EMPTY_OBJECT_ARRAY);
-    private static final TableAlias SHOW_PARAMETERS_ALIAS = new TableAlias(null, QualifiedName.of("parameters"), "p", new String[] {"Name", "Value"});
     private static final TableAlias SHOW_VARIABLES_ALIAS = new TableAlias(null, QualifiedName.of("variables"), "v", new String[] {"Name", "Value"});
     private static final TableAlias SHOW_TABLES_ALIAS = new TableAlias(null, QualifiedName.of("tables"), "t", new String[] {"Name"});
     private static final TableAlias SHOW_FUNCTIONS_ALIAS = new TableAlias(null, QualifiedName.of("functions"), "f", new String[] {"Name", "Type", "Description"});
 
     private final QuerySession session;
-    private final ExecutionContext context;
+    private ExecutionContext context;
+    private final QueryStatement query;
     private Pair<Operator, Projection> currentSelect;
 
     /** Queue of statement to process */
@@ -61,8 +61,17 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     QueryResultImpl(QuerySession session, QueryStatement query)
     {
         this.session = session;
+        this.query = query;
         this.context = new ExecutionContext(session);
         queue.addAll(query.getStatements());
+    }
+    
+    @Override
+    public void reset()
+    {
+        queue.clear();
+        queue.addAll(query.getStatements());
+        context = new ExecutionContext(session);
     }
 
     @Override
@@ -191,10 +200,6 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         else if (statement.getType() == Type.FUNCTIONS)
         {
             String alias = defaultIfBlank(statement.getCatalog(), session.getDefaultCatalogAlias());
-//            if (isBlank(alias))
-//            {
-//                throw new ParseException("No catalog alias provided.", statement.getToken());
-//            }
             Catalog catalog = session.getCatalogRegistry().getCatalog(alias);
             if (!isBlank(statement.getCatalog()) && catalog == null)
             {
@@ -282,6 +287,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         {
             throw new IllegalArgumentException("No more results");
         }
+        
         Operator operator = currentSelect.getKey();
         Projection projection = currentSelect.getValue();
 
@@ -317,22 +323,6 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             writer.endRow();
         }
 
-        //        ObjectWriter printer = new ObjectMapper().writerWithDefaultPrettyPrinter();
-        //        context.getOperatorContext().getNodeData().forEachEntry((i, e) ->
-        //        {
-        //            try
-        //            {
-        //                System.out.println("Node: " + i);
-        //                System.out.println(printer.writeValueAsString(e));
-        //            }
-        //            catch (JsonProcessingException ee)
-        //            {
-        //            }
-        //            return true;
-        //        });
-
         currentSelect = null;
-        //        System.out.println(QualifiedReferenceExpression.executionsByName);
-        //        QualifiedReferenceExpression.executionsByName.clear();
     }
 }

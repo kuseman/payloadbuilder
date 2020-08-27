@@ -1,6 +1,7 @@
 package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.kuse.payloadbuilder.core.utils.CollectionUtils.asSet;
@@ -14,6 +15,8 @@ import java.util.Set;
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.commons.lang3.tuple.Pair;
+import org.kuse.payloadbuilder.core.catalog.TableAlias;
+import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair.Type;
 import org.kuse.payloadbuilder.core.parser.AExpressionVisitor;
 import org.kuse.payloadbuilder.core.parser.ComparisonExpression;
 import org.kuse.payloadbuilder.core.parser.Expression;
@@ -21,6 +24,7 @@ import org.kuse.payloadbuilder.core.parser.InExpression;
 import org.kuse.payloadbuilder.core.parser.LiteralBooleanExpression;
 import org.kuse.payloadbuilder.core.parser.LogicalBinaryExpression;
 import org.kuse.payloadbuilder.core.parser.LogicalNotExpression;
+import org.kuse.payloadbuilder.core.parser.NullPredicateExpression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 
@@ -41,10 +45,13 @@ public class PredicateAnalyzer
     /**
      * Splits expression into items. Used by detection of hash join, merge join push down predicates.
      *
-     * @param condition Join condition to analyze
+     * @param predicate Join condition to analyze
+     * @param currentAlias Current alias in scope.
+     * @param availableAliases A map with available aliases as key and set of sub 
+     * aliases for the key alias. This to limit what types of expressions can be utilized as pushdown etc.
      * @return Analyze result of expression
      */
-    public static AnalyzeResult analyze(Expression predicate, Set<String> availableAliases)
+    public static AnalyzeResult analyze(Expression predicate, TableAlias tableAlias)
     {
         if (predicate == null)
         {
@@ -69,7 +76,7 @@ public class PredicateAnalyzer
                 }
             }
 
-            resultItems.add(AnalyzePair.of(e, availableAliases));
+            resultItems.add(AnalyzePair.of(tableAlias, e));
         }
 
         return new AnalyzeResult(resultItems);
@@ -98,6 +105,17 @@ public class PredicateAnalyzer
          */
         Pair<List<AnalyzePair>, AnalyzeResult> extractPushdownPairs(String alias)
         {
+            return extractPushdownPairs(alias, true);
+        }
+        
+        /**
+         * <pre>
+         * Extracts push down predicate for provided alias.
+         * @param isNullAllowed True if is null predicate is allowed or not
+         * </pre>
+         */
+        Pair<List<AnalyzePair>, AnalyzeResult> extractPushdownPairs(String alias, boolean isNullAllowed)
+        {
             if (pairs.isEmpty())
             {
                 return Pair.of(emptyList(), this);
@@ -109,7 +127,9 @@ public class PredicateAnalyzer
             for (int i = 0; i < size; i++)
             {
                 AnalyzePair pair = pairs.get(i);
-                if (pair.isPushdown(alias))
+                if (pair.isPushdown(alias) 
+                        && (isNullAllowed 
+                                || pair.getType() != Type.NULL))
                 {
                     pushdowns.add(pair);
                 }
@@ -178,6 +198,7 @@ public class PredicateAnalyzer
     /** Analyzed pair. A binary operator with left and right analyzed items */
     public static class AnalyzePair
     {
+        private static final Set<String> EMPTY_ALIASES = asSet("");
         private final Type type;
         private final ComparisonExpression.Type comparisonType;
         private final AnalyzeItem left;
@@ -229,6 +250,11 @@ public class PredicateAnalyzer
             {
                 return new ComparisonExpression(comparisonType, left.expression, right.expression);
             }
+            else if (type == Type.NOT_NULL || type == Type.NULL)
+            {
+                // Right expression contains the whole null predicate
+                return right.expression;
+            }
             else if (type == Type.IN)
             {
                 // Right expression contains the whole in expression
@@ -257,9 +283,10 @@ public class PredicateAnalyzer
 
             throw new IllegalArgumentException("No expressions could be found in this pair for alias " + alias);
         }
-        
-        /** Return qualified name for provided alias.
-         * Returns first match on either left or right side. */
+
+        /**
+         * Return qualified name for provided alias. Returns first match on either left or right side.
+         */
         public QualifiedName getQname(String alias)
         {
             if (left.qname != null && left.aliases.contains(alias))
@@ -278,7 +305,7 @@ public class PredicateAnalyzer
             {
                 return right.qname;
             }
-            
+
             return null;
         }
 
@@ -334,6 +361,22 @@ public class PredicateAnalyzer
          *    and a.active_flg                  <--- push down for alias 'a'
          *    and internet_flg                  <--- push down for all aliases, and thus true for 'a'
          *    and a.field > :var                <--- push down for a
+         *
+         *
+         * Ie. Disallowed sub aliases.
+         * A push down cannot be performed on a populating join that filters on a nested alias
+         * For alias aa, a1 is a disallowed sub alias
+         *
+         * from source s
+         * inner join
+         * [
+         *   article_attribute aa
+         *   inner join [attribute1] a1
+         *     on a1.attr1_id = aa.attr1_id
+         * ] aa
+         *   on aa.art_id = s.art_id
+         * where count(aa.a1) > 0               <--- this one cannot be pushed down onto article_attribute table.
+         *                                           Since it's referencing a sub alias which won't be loaded yet if pushed down
          * </pre>
          */
         boolean isPushdown(String alias)
@@ -343,15 +386,16 @@ public class PredicateAnalyzer
                     || right.isSingleAlias(alias, true, true));
         }
 
-        /** Checks if this pair is a EQUI pair for provided alias
-         * 
+        /**
+         * Checks if this pair is a EQUI pair for provided alias
+         *
          * <pre>
          *  A EQUI pair is a pair with type EQUAL
          *  and have provided alias referenced on one AND ONLY one side
          *  and that alias is not referenced on the other side.
-         *  
+         *
          *  Ie
-         *  
+         *
          *   a.art_id = 10                                ok
          *   10 = a.art_id                                ok
          *   a.art_id = a.id                              not ok
@@ -359,8 +403,7 @@ public class PredicateAnalyzer
          *   a.art_id = s.art_id                          ok
          *   func(a.art_id) = func(s.art_id + s.id)       ok
          *   a.art_id > 10                                not ok
-         *   a.art_id = other_id                          not ok           
-         *   
+         *   a.art_id = other_id                          not ok
          * </pre>
          */
         boolean isEqui(String alias)
@@ -409,18 +452,14 @@ public class PredicateAnalyzer
         }
 
         /** Construct a pair from provided expression */
-        static AnalyzePair of(Expression expression, Set<String> availableAliases)
+        static AnalyzePair of(TableAlias tableAlias, Expression expression)
         {
             if (expression instanceof ComparisonExpression)
             {
                 ComparisonExpression ce = (ComparisonExpression) expression;
 
-                // TODO: Might add support for more complex comparison expressions
-                // eligable for hash join.
-                // ie. func(a.art_id) = func2(s.id)
-
-                AnalyzeItem leftItem = getQualifiedItem(ce.getLeft(), availableAliases);
-                AnalyzeItem rightItem = getQualifiedItem(ce.getRight(), availableAliases);
+                AnalyzeItem leftItem = getQualifiedItem(tableAlias, ce.getLeft());
+                AnalyzeItem rightItem = getQualifiedItem(tableAlias, ce.getRight());
 
                 boolean sameAlias = !leftItem.aliases.isEmpty() && Objects.equals(leftItem.aliases, rightItem.aliases);
 
@@ -429,18 +468,28 @@ public class PredicateAnalyzer
                     return new AnalyzePair(Type.COMPARISION, ce.getType(), leftItem, rightItem);
                 }
             }
+            else if (expression instanceof NullPredicateExpression)
+            {
+                NullPredicateExpression npe = (NullPredicateExpression) expression;
+                if (npe.getExpression() instanceof QualifiedReferenceExpression)
+                {
+                    AnalyzeItem leftItem = getQualifiedItem(tableAlias, npe.getExpression());
+                    AnalyzeItem rightItem = new AnalyzeItem(npe, emptySet(), null);
+                    return new AnalyzePair(npe.isNot() ? Type.NOT_NULL : Type.NULL, leftItem, rightItem);
+                }
+            }
             else if (expression instanceof InExpression)
             {
                 InExpression ie = (InExpression) expression;
                 if (ie.getExpression() instanceof QualifiedReferenceExpression)
                 {
-                    AnalyzeItem leftItem = getQualifiedItem(ie.getExpression(), availableAliases);
+                    AnalyzeItem leftItem = getQualifiedItem(tableAlias, ie.getExpression());
 
                     // Fetch all aliases from arguments
                     Set<String> aliases = new HashSet<>();
                     for (Expression arg : ie.getArguments())
                     {
-                        QualifiedReferenceVisitor.getAliases(arg, aliases, availableAliases);
+                        QualifiedReferenceVisitor.getAliases(tableAlias, arg, aliases);
                     }
 
                     AnalyzeItem rightItem = new AnalyzeItem(ie, aliases, null);
@@ -452,50 +501,63 @@ public class PredicateAnalyzer
                 // A single qualified expression in a predicate is a boolean expression
                 // Turn this into a comparison expression
                 // ie. active_flg = true
-                
-                return AnalyzePair.of(new ComparisonExpression(ComparisonExpression.Type.EQUAL, expression, LiteralBooleanExpression.TRUE_LITERAL), availableAliases);
+
+                return AnalyzePair.of(tableAlias, new ComparisonExpression(ComparisonExpression.Type.EQUAL, expression, LiteralBooleanExpression.TRUE_LITERAL));
             }
             else if (expression instanceof LogicalNotExpression && ((LogicalNotExpression) expression).getExpression() instanceof QualifiedReferenceExpression)
             {
                 // A single qualified expression in a predicate is a boolean expression
                 // Turn this into a comparison expression
                 // ie. not active_flg
-                return AnalyzePair.of(new ComparisonExpression(ComparisonExpression.Type.EQUAL, ((LogicalNotExpression) expression).getExpression(), LiteralBooleanExpression.FALSE_LITERAL), availableAliases);
+                return AnalyzePair.of(tableAlias, new ComparisonExpression(ComparisonExpression.Type.EQUAL, ((LogicalNotExpression) expression).getExpression(), LiteralBooleanExpression.FALSE_LITERAL));
             }
-            
+
             Set<String> aliases = new HashSet<>();
-            QualifiedReferenceVisitor.getAliases(expression, aliases, availableAliases);
+            QualifiedReferenceVisitor.getAliases(tableAlias, expression, aliases);
             return new AnalyzePair(Type.UNDEFINED, new AnalyzeItem(expression, aliases, null), null);
         }
 
-        private static final Set<String> EMPTY_ALIASES = asSet("");
-        
-        private static AnalyzeItem getQualifiedItem(Expression expression, Set<String> availableAliases)
+        private static AnalyzeItem getQualifiedItem(TableAlias tableAlias, Expression expression)
         {
             if (expression instanceof QualifiedReferenceExpression)
             {
                 QualifiedReferenceExpression qre = (QualifiedReferenceExpression) expression;
                 QualifiedName qname = qre.getQname();
-                String alias = qname.getAlias();
+                
                 Set<String> aliases;
-                if (availableAliases.contains(alias))
+                Pair<String, String> pair = QualifiedReferenceVisitor.getAlias(tableAlias, qname);
+                
+                if (pair.getKey() != null)
                 {
+                    int extractFrom = 1;
+                    String alias = pair.getKey();
+                    if (pair.getValue() != null)
+                    {
+                        extractFrom = 2;
+                        alias += "." + pair.getValue();
+                    }
+                    
                     aliases = asSet(alias);
-                    qname = qname.extract(1);
+                    
+                    if (qname.getParts().size() > extractFrom)
+                    {
+                        qname = qname.extract(extractFrom);
+                    }
+                    else
+                    {
+                        qname = null;
+                    }
                 }
                 else
                 {
                     aliases = EMPTY_ALIASES;
                 }
-                
-//                List<String> parts = qre.getQname().getParts();
-//                String alias = parts.size() > 1 ? parts.get(0) : "";
-//                QualifiedName qname = qre.getQname().extract(parts.size() > 1 ? 1 : 0);
+
                 return new AnalyzeItem(expression, aliases, qname);
             }
 
             Set<String> aliases = new HashSet<>();
-            QualifiedReferenceVisitor.getAliases(expression, aliases, availableAliases);
+            QualifiedReferenceVisitor.getAliases(tableAlias, expression, aliases);
             return new AnalyzeItem(expression, aliases, null);
         }
 
@@ -506,6 +568,13 @@ public class PredicateAnalyzer
             COMPARISION,
             /** In pair. {@link InExpression} is used */
             IN,
+            
+            /** Null predicate.  */
+            NULL,
+            
+            /** Not null predicate. */
+            NOT_NULL,
+            
             /** Undefined type. No analyze could be made for this item. Full expression is accessed via {@link AnalyzePair#getLeft()} */
             UNDEFINED
         }
@@ -516,8 +585,9 @@ public class PredicateAnalyzer
     {
         /** Expression representing this item */
         private final Expression expression;
-        /** Aliases (if any) referenced by this item */
+        /** Aliases (if any) referenced by this item. */
         final Set<String> aliases;
+        
         /**
          * Qualified name (if any) referenced by this item If set then {@link #alias} is omitted from qname.
          **/
@@ -532,7 +602,7 @@ public class PredicateAnalyzer
             this.aliases = requireNonNull(aliases, "aliases");
             this.qname = qname;
         }
-        
+
         public QualifiedName getQname()
         {
             return qname;
@@ -542,7 +612,7 @@ public class PredicateAnalyzer
         {
             return expression;
         }
-        
+
         /**
          * Checks if this item is a single alias. Ie. no alias or empty alias or provided alias
          */
@@ -600,34 +670,138 @@ public class PredicateAnalyzer
     private static class QualifiedReferenceVisitor extends AExpressionVisitor<Void, QualifiedReferenceVisitor.Context>
     {
         private static final QualifiedReferenceVisitor QR_VISITOR = new QualifiedReferenceVisitor();
+        private static final Pair<String, String> EMPTY_PAIR = Pair.of(null, null);
 
         private static class Context
         {
+            TableAlias tableAlias;
             Set<String> result;
-            Set<String> availableAliases;
         }
-        
+
         /**
          * Get aliases for provided expression
          *
          * @param aliases
          */
-        static Set<String> getAliases(Expression expression, Set<String> result, Set<String> availableAliases)
+        static void getAliases(
+                TableAlias tableAlias,
+                Expression expression,
+                Set<String> result)
         {
             Context context = new Context();
+            context.tableAlias = tableAlias;
             context.result = result;
-            context.availableAliases = availableAliases;
             expression.accept(QR_VISITOR, context);
-            return context.result;
         }
-
+        
+        /** Returns alias for provided qname and sub alias if exists */
+        static Pair<String, String> getAlias(TableAlias tableAlias, QualifiedName qname)
+        {
+            List<String> parts = qname.getParts();
+            String alias;
+            String subAlias = null;
+            
+            // First part is the current alias
+            if (tableAlias.getAlias().equals(parts.get(0)))
+            {
+                alias = parts.get(0);
+                if (parts.size() > 1)
+                {
+                    TableAlias temp = tableAlias.getChildAlias(parts.get(1));
+                    if (temp != null)
+                    {
+                        return Pair.of(alias, parts.get(1));
+                    }
+                }
+                // Alias access, not allowed as a predicate
+                else if (parts.size() == 1)
+                {
+                    subAlias = alias;
+                    alias = "##";
+                }
+                
+                return Pair.of(alias, subAlias);
+            }
+            // Try child alias
+            TableAlias temp = tableAlias.getChildAlias(parts.get(0));
+            if (temp != null)
+            {
+                alias = parts.get(0);
+                if (parts.size() > 1)
+                {
+                    temp = temp.getChildAlias(parts.get(1));
+                    if (temp != null)
+                    {
+                        subAlias = alias;
+                        alias = "##";
+//                        return Pair.of(alias, parts.get(1));
+                    }
+                }
+                // Child alias access and only one part => combine with parent
+                // since this alias is not a valid predicate to push down etc.
+                else if (parts.size() == 1)
+                {
+                    subAlias = alias;
+                    alias = "##";
+                }
+                
+                return Pair.of(alias, subAlias);
+            }
+            
+            // Try parents
+            temp = tableAlias.getParent();
+            while (temp != null)
+            {
+                if (temp.getAlias().equals(parts.get(0)))
+                {
+                    alias = parts.get(0);
+                    // Parent alias access and only one part => combine with parent
+                    // since this alias is not a valid predicate to push down etc.
+                    if (parts.size() == 1)
+                    {
+                        subAlias = alias;
+                        alias = "##";//temp.getParent().getAlias();
+                    }
+    //                if (parts.size() > 1)
+    //                {
+    //                    temp = tableAlias.getChildAlias(parts.get(1));
+    //                    if (temp != null)
+    //                    {
+    //                        return Pair.of(alias, parts.get(1));
+    //                    }
+    //                }
+                    
+                    return Pair.of(alias, subAlias);
+                }
+                TableAlias temp1 = temp.getChildAlias(parts.get(0));
+                if (temp1 != null)
+                {
+                    alias = parts.get(0);
+                    return Pair.of(alias, subAlias);
+                }
+                
+                temp = temp.getParent();
+            }
+            
+            return EMPTY_PAIR;
+        }
+        
         @Override
         public Void visit(QualifiedReferenceExpression expression, Context context)
         {
-            String alias = expression.getQname().getAlias();
-            if (context.availableAliases.contains(alias))
+            Pair<String, String> pair = getAlias(context.tableAlias, expression.getQname());
+            if (pair.getKey() != null)
             {
-                context.result.add(alias);
+                // If there was a sub alias match, add a combined alias
+                // This to avoid getting a single alias hit of first part when detecting push down etc.
+                if (pair.getValue() != null)
+                {
+                    context.result.add(pair.getKey() + "." + pair.getValue());
+                }
+                else
+                {
+                    context.result.add(pair.getKey());
+                }
             }
             return null;
         }

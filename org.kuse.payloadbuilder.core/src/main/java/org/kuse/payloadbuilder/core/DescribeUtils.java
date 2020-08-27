@@ -126,7 +126,7 @@ public class DescribeUtils
 
         // Create a select over all columns in table
 
-        TableAlias describeAlias = new TableAlias(null, QualifiedName.of("describe"), "d", new String[] {"Name", "Type", "Description"});
+        TableAlias describeAlias = new TableAlias(null, QualifiedName.of("describe"), "d", new String[] {"Name", "Type", "Description"}, null);
         List<Row> describeRows = new ArrayList<>(columnCount + indices.size());
         int pos = 0;
         // Add column rows
@@ -195,7 +195,7 @@ public class DescribeUtils
 
         // Insert first columns
         describeColumns.addAll(0, asList("NodeId", "Name"));
-        TableAlias alias = new TableAlias(null, QualifiedName.of("describe"), "d", describeColumns.toArray(EMPTY_STRING_ARRAY));
+        TableAlias alias = new TableAlias(null, QualifiedName.of("describe"), "d", describeColumns.toArray(EMPTY_STRING_ARRAY), null);
 
         // Result set rows
         List<Row> rows = new ArrayList<>(describeRows.size());

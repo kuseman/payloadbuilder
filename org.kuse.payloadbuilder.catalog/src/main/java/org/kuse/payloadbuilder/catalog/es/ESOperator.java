@@ -34,11 +34,14 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.CountingInputStream;
 import org.apache.commons.io.output.CountingOutputStream;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpHeaders;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpUriRequest;
@@ -93,9 +96,18 @@ class ESOperator extends AOperator
     private static final PoolingHttpClientConnectionManager CONNECTION_MANAGER = new PoolingHttpClientConnectionManager();
     static final CloseableHttpClient CLIENT = HttpClientBuilder
             .create()
+            .setDefaultHeaders(asList(
+                    new BasicHeader(HttpHeaders.ACCEPT, "application/json"),
+                    new BasicHeader(HttpHeaders.CONTENT_TYPE, "application/json")))
             .setConnectionManager(CONNECTION_MANAGER)
             .disableCookieManagement()
             .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+            .setDefaultRequestConfig(RequestConfig
+                    .custom()
+                    .setContentCompressionEnabled(true)
+                    .setConnectTimeout(500)
+                    .setSocketTimeout(15000)
+                    .build())
             .build();
 
     private final TableAlias tableAlias;
@@ -160,11 +172,13 @@ class ESOperator extends AOperator
 
         if (index instanceof IdIndex)
         {
+            boolean isSingleAlias = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(esType.type);
             String mgetUrl = getUrl(
-                    String.format("%s/%s/%s/_mget?", esType.endpoint, esType.index, esType.type),
+                    String.format("%s/%s%s/_mget?", esType.endpoint, esType.index, isSingleAlias ? "" : esType.type + "/"),
                     "docs",
                     tableAlias,
-                    index);
+                    index,
+                    isSingleAlias);
 
             // TODO: thread up all ids in executor and join
             DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getOperatorContext(), sentBytes);
@@ -187,6 +201,7 @@ class ESOperator extends AOperator
                     });
         }
 
+        final boolean isSingleType = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(esType.type);
         final String searchUrl = getSearchUrl(
                 esType.endpoint,
                 esType.index,
@@ -197,6 +212,7 @@ class ESOperator extends AOperator
                 index);
         final String scrollUrl = getScrollUrl(
                 esType.endpoint,
+                esType.type,
                 2,
                 tableAlias,
                 index);
@@ -219,10 +235,10 @@ class ESOperator extends AOperator
         }
         else
         {
-            body = getSearchBody(context);
+            body = getSearchBody(isSingleType, context);
         }
 
-        String actualBody = body;
+        final String actualBody = body;
         return getIterator(
                 context,
                 tableAlias,
@@ -242,7 +258,15 @@ class ESOperator extends AOperator
                         String id = scrollId.getValue();
                         scrollId.setValue(null);
                         HttpPost post = new HttpPost(scrollUrl);
-                        post.setEntity(new StringEntity(id, UTF_8));
+                        if (isSingleType)
+                        {
+                            post.setEntity(new StringEntity("{\"scroll_id\":\"" + id + "\" }", UTF_8));
+                        }
+                        else
+                        {
+                            post.removeHeaders(HttpHeaders.CONTENT_TYPE);
+                            post.setEntity(new StringEntity(id, UTF_8));
+                        }
                         return post;
                     }
                 });
@@ -257,13 +281,14 @@ class ESOperator extends AOperator
             TableAlias alias,
             Index operatorIndex)
     {
+        boolean isSingleType = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(type);
         ObjectUtils.requireNonBlank(endpoint, "endpoint is required");
         return getUrl(String.format("%s/%s/%s_search?%s%s",
                 endpoint,
                 isBlank(index) ? "*" : index,
-                isBlank(type) ? "" : type + "/",
+                isBlank(type) || isSingleType ? "" : type + "/",
                 scrollMinutes != null ? ("scroll=" + scrollMinutes + "m") : "",
-                size != null ? ("&size=" + size) : ""), "hits.hits", alias, operatorIndex);
+                size != null ? ("&size=" + size) : ""), "hits.hits", alias, operatorIndex, isSingleType);
     }
     
     static String getSearchTemplateUrl(
@@ -275,36 +300,41 @@ class ESOperator extends AOperator
             TableAlias alias,
             Index operatorIndex)
     {
+        boolean isSingleType = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(type);
         ObjectUtils.requireNonBlank(endpoint, "endpoint is required");
         return getUrl(String.format("%s/%s/%s_search/template?%s",
                 endpoint,
                 isBlank(index) ? "*" : index,
-                isBlank(type) ? "" : type + "/",
+                isBlank(type) || isSingleType ? "" : type + "/",
                 scrollMinutes != null ? ("scroll=" + scrollMinutes + "m") : "",
-                size != null ? ("&size=" + size) : ""), "hits.hits", alias, operatorIndex);
+                size != null ? ("&size=" + size) : ""), "hits.hits", alias, operatorIndex, isSingleType);
     }
 
     static String getScrollUrl(
             String endpoint,
+            String type,
             int scrollMinutes,
             TableAlias alias,
             Index operatorIndex)
     {
+        boolean isSingleType = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(type);
         ObjectUtils.requireNonBlank(endpoint, "endpoint is required");
         return getUrl(String.format("%s/_search/scroll?scroll=%dm",
                 endpoint,
-                scrollMinutes), "hits.hits", alias, operatorIndex);
+                scrollMinutes), "hits.hits", alias, operatorIndex, isSingleType);
     }
 
     private static String getUrl(
             String prefix,
             String filterPathPrefix,
             TableAlias alias,
-            Index operatorIndex)
+            Index operatorIndex,
+            boolean isSingleType)
     {
-        boolean includeParent = alias.isAsteriskColumns()
+        boolean includeParent = !isSingleType
+                && (alias.isAsteriskColumns()
             || indexOf(alias.getColumns(), PARENTID) != -1
-            || operatorIndex instanceof ParentIndex;
+            || operatorIndex instanceof ParentIndex);
         boolean includeIndex = alias.isAsteriskColumns()
             || indexOf(alias.getColumns(), INDEX) != -1;
         boolean includeType = alias.isAsteriskColumns()
@@ -361,7 +391,7 @@ class ESOperator extends AOperator
     {
         return new Iterator<Row>()
         {
-            Set<String> columns = new HashSet<>(tableAlias.isAsteriskColumns() ? emptyList() : asList(tableAlias.getColumns()));
+            Set<String> columns = new HashSet<>(tableAlias.isAsteriskColumns() ? emptyList() : asList(org.apache.commons.lang3.ObjectUtils.defaultIfNull(tableAlias.getColumns(), ArrayUtils.EMPTY_STRING_ARRAY)));
             Set<String> addedColumns;
             int rowPos = 0;
             MutableObject<String> scrollId = new MutableObject<>();
@@ -496,7 +526,7 @@ class ESOperator extends AOperator
         };
     }
 
-    private String getSearchBody(ExecutionContext context)
+    private String getSearchBody(boolean isSingleType, ExecutionContext context)
     {
         StringBuilder sb = new StringBuilder("{");
         appendSortItems(sb);
@@ -504,7 +534,7 @@ class ESOperator extends AOperator
         {
             sb.append(",");
         }
-        appendPropertyPredicates(sb, context);
+        appendPropertyPredicates(isSingleType, sb, context);
         if (sb.charAt(sb.length() - 1) == ',')
         {
             sb.deleteCharAt(sb.length() - 1);
@@ -513,13 +543,21 @@ class ESOperator extends AOperator
         return sb.toString();
     }
 
-    private void appendPropertyPredicates(StringBuilder sb, ExecutionContext context)
+    private void appendPropertyPredicates(boolean isSIngleType, StringBuilder sb, ExecutionContext context)
     {
         if (propertyPredicates.isEmpty())
         {
             return;
         }
-        sb.append("\"filter\":{\"bool\":{\"must\":[");
+        
+        if (isSIngleType)
+        {
+            sb.append("\"query\":{\"bool\":{\"filter\":[");
+        }
+        else
+        {
+            sb.append("\"filter\":{\"bool\":{\"must\":[");
+        }
         for (PropertyPredicate predicate : propertyPredicates)
         {
             predicate.appendBooleanClause(sb, context);
@@ -537,12 +575,13 @@ class ESOperator extends AOperator
 
     private void appendSortItems(StringBuilder sb)
     {
+        sb.append("\"sort\":[");
         if (sortItems.isEmpty())
         {
+            sb.append("\"_doc\"]");
             return;
         }
 
-        sb.append("\"sort\":[");
         for (Pair<String, String> sortItem : sortItems)
         {
             // { "field": { "order": "desc" } }
@@ -659,7 +698,7 @@ class ESOperator extends AOperator
 
         EsType(String endpoint, String index, String type)
         {
-            this.endpoint = endpoint;
+            this.endpoint = StringUtils.stripEnd(endpoint, "/");
             this.index = index;
             this.type = type;
         }

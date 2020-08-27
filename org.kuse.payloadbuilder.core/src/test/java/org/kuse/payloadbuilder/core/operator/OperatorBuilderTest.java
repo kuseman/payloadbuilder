@@ -13,6 +13,7 @@ import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.parser.Expression;
+import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.SortItem;
 import org.kuse.payloadbuilder.core.parser.SortItem.NullOrder;
@@ -29,9 +30,9 @@ public class OperatorBuilderTest extends AOperatorTest
             getQueryResult("select a from tableA a inner join tableB a on a.id = a.id ");
             fail("Alias already exists in parent hierarchy");
         }
-        catch (IllegalArgumentException e)
+        catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage().contains("defined multiple times for parent"));
+            assertTrue(e.getMessage(), e.getMessage().contains("Alias a already exists in scope."));
         }
 
         try
@@ -39,9 +40,9 @@ public class OperatorBuilderTest extends AOperatorTest
             getQueryResult("select a from tableA a inner join [tableB] b on b.id = a.id inner join [tableC] b on b.id = a.id");
             fail("defined multiple times for parent");
         }
-        catch (IllegalArgumentException e)
+        catch (ParseException e)
         {
-            assertTrue(e.getMessage(), e.getMessage().contains("defined multiple times for parent"));
+            assertTrue(e.getMessage(), e.getMessage().contains("Alias b already exists in scope."));
         }
     }
 
@@ -129,6 +130,84 @@ public class OperatorBuilderTest extends AOperatorTest
     }
 
     @Test
+    public void test_no_push_down_from_where_to_join_when_accessing_nested_alias()
+    {
+        String query = "select * from source s inner join [article a inner join [articleBrand] ab on ab.art_id = a.art_id] a on a.art_id = s.art_id where a.ab.active_flg";
+        QueryResult queryResult = getQueryResult(query);
+
+        Operator expected = new FilterOperator(
+                5,
+                new HashJoin(
+                        4,
+                        "INNER JOIN",
+                        queryResult.tableOperators.get(0),
+                        new HashJoin(
+                                3,
+                                "INNER JOIN",
+                                queryResult.tableOperators.get(1),
+                                queryResult.tableOperators.get(2),
+                                new ExpressionHashFunction(asList(e("a.art_id"))),
+                                new ExpressionHashFunction(asList(e("ab.art_id"))),
+                                new ExpressionPredicate(e("ab.art_id = a.art_id")),
+                                DefaultRowMerger.DEFAULT,
+                                true,
+                                false),
+                        new ExpressionHashFunction(asList(e("s.art_id"))),
+                        new ExpressionHashFunction(asList(e("a.art_id"))),
+                        new ExpressionPredicate(e("a.art_id = s.art_id")),
+                        DefaultRowMerger.DEFAULT,
+                        true,
+                        false),
+                new ExpressionPredicate(e("a.ab.active_flg = true")));
+
+//        System.out.println(queryResult.operator.toString(1));
+//        System.err.println(expected.toString(1));
+
+        assertEquals(expected, queryResult.operator);
+    }
+    
+    @Test
+    public void test_no_push_down_from_left_join_on_predicate_accessing_previous_alias()
+    {
+        String query = "select aa.sku_id "
+                + "from source s "
+                + "inner join article a "
+                + "  on a.art_id = s.art_id "
+                + "left join related_article raa "
+                + "  on raa.art_id = a.art_id "
+                + "  and a.articleType = 'type'";
+        
+        QueryResult queryResult = getQueryResult(query);
+
+        Operator expected = new HashJoin(
+                        4,
+                        "LEFT JOIN",
+                        new HashJoin(
+                                2,
+                                "INNER JOIN",
+                                queryResult.tableOperators.get(0),
+                                queryResult.tableOperators.get(1),
+                                new ExpressionHashFunction(asList(e("s.art_id"))),
+                                new ExpressionHashFunction(asList(e("a.art_id"))),
+                                new ExpressionPredicate(e("a.art_id = s.art_id")),
+                                DefaultRowMerger.DEFAULT,
+                                false,
+                                false),
+                        queryResult.tableOperators.get(2),
+                        new ExpressionHashFunction(asList(e("a.art_id"))),
+                        new ExpressionHashFunction(asList(e("raa.art_id"))),
+                        new ExpressionPredicate(e("raa.art_id = a.art_id AND a.articleType = 'type'")),
+                        DefaultRowMerger.DEFAULT,
+                        false,
+                        true);
+
+//        System.out.println(queryResult.operator.toString(1));
+//        System.err.println(expected.toString(1));
+
+        assertEquals(expected, queryResult.operator);
+    }
+
+    @Test
     public void test_push_down_from_where_to_join()
     {
         String query = "select * from source s inner join article a on a.art_id = s.art_id where a.active_flg";
@@ -153,28 +232,25 @@ public class OperatorBuilderTest extends AOperatorTest
     }
 
     @Test
-    public void test_not_push_down_from_where_to_join_when_left()
+    public void test_push_down_from_where_to_join_when_left()
     {
         String query = "select * from source s left join article a on a.art_id = s.art_id where a.active_flg";
         QueryResult queryResult = getQueryResult(query);
 
-        Operator expected = new FilterOperator(
+        Operator expected = new HashJoin(
                 3,
-                new HashJoin(
-                        2,
-                        "LEFT JOIN",
-                        queryResult.tableOperators.get(0),
-                        queryResult.tableOperators.get(1),
-                        new ExpressionHashFunction(asList(e("s.art_id"))),
-                        new ExpressionHashFunction(asList(e("a.art_id"))),
-                        new ExpressionPredicate(e("a.art_id = s.art_id")),
-                        DefaultRowMerger.DEFAULT,
-                        false,
-                        true),
-                new ExpressionPredicate(e("a.active_flg = true")));
+                "LEFT JOIN",
+                queryResult.tableOperators.get(0),
+                new FilterOperator(2, queryResult.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg = true"))),
+                new ExpressionHashFunction(asList(e("s.art_id"))),
+                new ExpressionHashFunction(asList(e("a.art_id"))),
+                new ExpressionPredicate(e("a.art_id = s.art_id")),
+                DefaultRowMerger.DEFAULT,
+                false,
+                true);
 
-        //        System.out.println(queryResult.operator.toString(1));
-        //        System.err.println(expected.toString(1));
+        //                System.out.println(queryResult.operator.toString(1));
+        //                System.err.println(expected.toString(1));
 
         assertEquals(expected, queryResult.operator);
     }
@@ -186,21 +262,20 @@ public class OperatorBuilderTest extends AOperatorTest
         QueryResult queryResult = getQueryResult(query);
 
         TableFunctionInfo range = (TableFunctionInfo) session.getCatalogRegistry().getBuiltin().getFunction("range");
-        QualifiedName rangeQname = QualifiedName.of(range.getCatalog().getName(), "range");
 
-        TableAlias r = TableAlias.of(null, rangeQname, "r");
+        TableAlias r = TableAlias.of(null, "range", "r");
         r.setColumns(new String[] {"Value"});
-        TableAlias r1 = TableAlias.of(r, rangeQname, "r1");
+        TableAlias r1 = TableAlias.of(r, "range", "r1");
         r1.setColumns(new String[] {"Value"});
-        TableAlias r2 = TableAlias.of(r, rangeQname, "r2");
+        TableAlias r2 = TableAlias.of(r, "range", "r2");
         r2.setColumns(new String[] {"Value"});
 
         Operator expected = new HashJoin(
                 5,
-                "",
+                "INNER JOIN",
                 new NestedLoopJoin(
                         3,
-                        "",
+                        "INNER JOIN",
                         new TableFunctionOperator(0, "", r, range, asList(
                                 e("randomInt(100)"),
                                 e("randomInt(100) + 100"))),
@@ -220,8 +295,8 @@ public class OperatorBuilderTest extends AOperatorTest
                 false,
                 false);
 
-        //                                        System.err.println(expected.toString(1));
-        //                                        System.out.println(queryResult.operator.toString(1));
+//                                                System.err.println(expected.toString(1));
+//                                                System.out.println(queryResult.operator.toString(1));
 
         assertEquals(expected, queryResult.operator);
 
@@ -274,8 +349,8 @@ public class OperatorBuilderTest extends AOperatorTest
         new TableAlias(articleAttribute, of("articlePrice"), "ap", new String[] {"price_sales", "sku_id"});
         new TableAlias(articleAttribute, of("attribute1"), "a1", new String[] {"attr1_id"});
 
-//                                        System.out.println(source.printHierarchy(0));
-//                                        System.out.println(queryResult.alias.printHierarchy(0));
+//                                                System.out.println(source.printHierarchy(0));
+//                                                System.out.println(queryResult.alias.printHierarchy(0));
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(queryResult.alias));
 
@@ -321,8 +396,8 @@ public class OperatorBuilderTest extends AOperatorTest
                 true,
                 false);
 
-//                                System.err.println(expected.toString(1));
-//                                System.out.println(queryResult.operator.toString(1));
+//                                        System.err.println(expected.toString(1));
+//                                        System.out.println(queryResult.operator.toString(1));
 
         assertEquals(expected, queryResult.operator);
 
@@ -429,11 +504,11 @@ public class OperatorBuilderTest extends AOperatorTest
         new TableAlias(articleAttribute, of("attribute2"), "a2", new String[] {"attr2_code", "lang_id", "attr2_no", "attr2_id"});
         new TableAlias(articleAttribute, of("attribute3"), "a3", new String[] {"lang_id", "attr3_id"});
         new TableAlias(article, of("articleProperty"), "ap", new String[] {"propertykey_id", "art_id"});
-        TableAlias range = new TableAlias(article, of(session.getCatalogRegistry().getBuiltin().getName(), "range"), "r", new String[] {"Value"});
+        TableAlias range = new TableAlias(article, of("range"), "r", new String[] {"Value"});
         new TableAlias(range, of("attribute1"), "a1", new String[] {"someId", "attr1_code"});
 
-        //                                        System.out.println(article.printHierarchy(1));
-        //                                        System.out.println(result.alias.printHierarchy(1));
+//                                                System.out.println(article.printHierarchy(1));
+//                                                System.out.println(result.alias.printHierarchy(1));
 
         assertTrue("Alias hierarchy should be equal", article.isEqual(result.alias));
     }
@@ -564,16 +639,16 @@ public class OperatorBuilderTest extends AOperatorTest
                 4,
                 "INNER JOIN",
                 new FilterOperator(1, result.tableOperators.get(0), new ExpressionPredicate(e("s.id3 > 0"))),
-                new FilterOperator(3, result.tableOperators.get(1), new ExpressionPredicate(e("note_id > 0"))),
+                new FilterOperator(3, result.tableOperators.get(1), new ExpressionPredicate(e("note_id > 0 and a.active_flg = true"))),
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
-                new ExpressionPredicate(e("a.art_id = s.art_id and a.active_flg = true")),
+                new ExpressionPredicate(e("a.art_id = s.art_id")),
                 DefaultRowMerger.DEFAULT,
                 true,
                 false);
 
-        //                                System.out.println(expected.toString(1));
-        //                                System.err.println(result.operator.toString(1));
+        //                                        System.out.println(expected.toString(1));
+        //                                        System.err.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
 
@@ -638,8 +713,8 @@ public class OperatorBuilderTest extends AOperatorTest
                         true,
                         false);
 
-        //                                System.err.println(expected.toString(1));
-        //                                System.out.println(result.operator.toString(1));
+//                                        System.err.println(expected.toString(1));
+//                                        System.out.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
 
@@ -647,30 +722,5 @@ public class OperatorBuilderTest extends AOperatorTest
                 new ObjectProjection(asList("art_id"),
                         asList(new ExpressionProjection(e("s.art_id")))),
                 result.projection);
-    }
-    
-    @Test
-    public void test1()
-    {
-        String query = "" +
-            "    select * " +    
-            "    from article_attribute aa\r\n" + 
-            "    inner join [campaign] c\r\n" + 
-            "        on \r\n" + 
-            "        (\r\n" + 
-            "            c.apply_to_articles = 1\r\n" + 
-            "            or (c.includeArtIds in (aa.art_id) or c.includeSkuIds in (aa.sku_id))\r\n" + 
-            "        )\r\n" + 
-            "        and not(c.excludeArtIds in (aa.art_id) or c.excludeSkuIds in (aa.sku_id))\r\n" + 
-            "        and\r\n" + 
-            "        (\r\n" + 
-            "            c.apply_to_price_setting = 0\r\n" + 
-            "            or (c.apply_to_price_setting = 1 and aa.ap.price_sales >= aa.ap.price_org)\r\n" + 
-            "            or (c.apply_to_price_setting = 2 and aa.ap.price_sales < aa.ap.price_org)\r\n" + 
-            "        ) and c.active_flg\r\n";
-            
-        QueryResult result = getQueryResult(query);
-
-            System.out.println(result.operator.toString(1));
     }
 }

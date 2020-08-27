@@ -5,19 +5,20 @@ import static java.util.Objects.requireNonNull;
 import java.util.List;
 
 import org.antlr.v4.runtime.Token;
+import org.kuse.payloadbuilder.core.catalog.TableAlias;
 
 /** A table */
 public class Table extends TableSource
 {
     private final String catalogAlias;
-    private final QualifiedName table;
+//    private final QualifiedName table;
     private final List<Option> options;
 
-    public Table(String catalogAlias, QualifiedName table, String alias, List<Option> options, Token token)
+    public Table(String catalogAlias, TableAlias tableAlias/*, QualifiedName table, String alias*/, List<Option> options, Token token)
     {
-        super(alias, token);
+        super(tableAlias/*, alias*/, token);
         this.catalogAlias = catalogAlias;
-        this.table = requireNonNull(table, "table");
+//        this.table = requireNonNull(table, "table");
         this.options = requireNonNull(options, "options");
     }
     
@@ -36,7 +37,7 @@ public class Table extends TableSource
     @Override
     public QualifiedName getTable()
     {
-        return table;
+        return tableAlias.getTable();
     }
     
     @Override
@@ -48,6 +49,6 @@ public class Table extends TableSource
     @Override
     public String toString()
     {
-        return table + " " + alias;
+        return tableAlias.toString();
     }
 }

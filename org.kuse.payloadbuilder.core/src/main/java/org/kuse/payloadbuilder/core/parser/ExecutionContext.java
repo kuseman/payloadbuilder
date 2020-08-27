@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.operator.OperatorContext;
@@ -24,6 +25,10 @@ public class ExecutionContext
     private Map<String, Object> variables; 
     private final ZonedDateTime now = ZonedDateTime.now();
     private final OperatorContext operatorContext = new OperatorContext();
+    
+    public AtomicLong queryTime = new AtomicLong();
+    public AtomicLong evalTime = new AtomicLong();
+    public AtomicLong joinTime = new AtomicLong();
     
     /** <pre>
      * Arbitrary cache that can be utilized per statement.

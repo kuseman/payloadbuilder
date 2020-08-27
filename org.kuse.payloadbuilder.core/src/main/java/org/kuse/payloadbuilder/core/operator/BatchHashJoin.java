@@ -22,11 +22,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiPredicate;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
+import org.apache.commons.lang3.time.DurationFormatUtils;
+import org.apache.commons.lang3.time.StopWatch;
 import org.kuse.payloadbuilder.core.catalog.Index;
+import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Option;
 
@@ -119,10 +123,24 @@ class BatchHashJoin extends AOperator
                 entry(OUTER_VALUES, outerValuesExtractor),
                 entry(INNER_VALUES, innerValuesExtractor));
     }
+    
+    class Data extends NodeData
+    {
+        AtomicLong time = new AtomicLong();
+        long innerHashTime;
+        long outerHashTime;
+        
+        @Override
+        public String toString()
+        {
+            return "Time (" + innerIndex.toString() + ", innerTime: " + innerHashTime + ", outerTime: " + outerHashTime + "): " + DurationFormatUtils.formatDurationHMS(time.get());
+        }
+    }
 
     @Override
     public Iterator<Row> open(ExecutionContext context)
     {
+        Data data = context.getOperatorContext().getNodeData(nodeId, () -> new Data());
         executionCount++;
         final Iterator<Row> outerIt = outer.open(context);
         int temp = innerIndex.getBatchSize();
@@ -135,6 +153,7 @@ class BatchHashJoin extends AOperator
             }
             temp = (int) obj;
         }
+        final StopWatch sw = new StopWatch();
         final int batchSize = temp;
         final Row contextParent = context.getRow();
         return new Iterator<Row>()
@@ -171,6 +190,10 @@ class BatchHashJoin extends AOperator
             @Override
             public boolean hasNext()
             {
+                if (sw.isStopped())
+                {
+                    sw.start();
+                }
                 return setNext();
             }
 
@@ -191,10 +214,15 @@ class BatchHashJoin extends AOperator
                         if (outerRows.isEmpty())
                         {
                             verifyOuterValuesIterator();
+                            sw.stop();
+                            data.time.addAndGet(sw.getTime());
+                            sw.reset();
+                            
                             return false;
                         }
 
                         hashInnerBatch();
+                        
                         // Start probing
                         continue;
                     }
@@ -250,9 +278,16 @@ class BatchHashJoin extends AOperator
                     outerRow.setPredicateParent(contextParent);
                     innerRow.setPredicateParent(outerRow);
 
+                    
                     if (predicate.test(context, innerRow))
                     {
+                        sw1.start();
+                        
                         next = rowMerger.merge(outerRow, innerRow, populating);
+                        sw1.stop();
+                        data.innerHashTime += sw1.getTime();
+                        sw1.reset();
+                        
                         if (populating)
                         {
                             outerRow.match = true;
@@ -266,6 +301,9 @@ class BatchHashJoin extends AOperator
                 return true;
             }
 
+            StopWatch sw1 = new StopWatch();
+            
+            
             /** Batch outer rows and generate outer keys */
             private void batchOuterRows()
             {
@@ -290,7 +328,7 @@ class BatchHashJoin extends AOperator
                     }
                 }
             }
-
+            
             private void hashInnerBatch()
             {
                 outerValuesIterator = outerValuesIterator(context);
@@ -318,6 +356,7 @@ class BatchHashJoin extends AOperator
 
                 verifyOuterValuesIterator();
                 context.getOperatorContext().setOuterIndexValues(null);
+                
             }
 
             private void emitOuterRows()
@@ -369,7 +408,7 @@ class BatchHashJoin extends AOperator
                 {
                     private int outerRowsIndex = 0;
                     private Object[] nextArray;
-
+                    
                     @Override
                     public boolean hasNext()
                     {
@@ -421,7 +460,7 @@ class BatchHashJoin extends AOperator
 
                             nextArray = keyValues;
                         }
-
+                        
                         return true;
                     }
                 };

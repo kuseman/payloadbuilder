@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
@@ -30,6 +31,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -111,32 +113,31 @@ class ESCatalogExtension implements ICatalogExtension
     @Override
     public void update(String catalogAlias, QuerySession querySession)
     {
-        String endointToSet = null;
         String endpoint = (String) querySession.getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY);
-        int count = quickPropertiesPanel.endpoints.getItemCount();
-        for (int i = 0; i < count; i++)
+        String index = (String) querySession.getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY);
+        String endointToSet = null;
+        String indexToSet = null;
+        for (Entry<String, List<String>> e : indicesByEndpoint.entrySet())
         {
-            String uiEndpoint = quickPropertiesPanel.endpoints.getItemAt(i);
-            if (StringUtils.equalsIgnoreCase(endpoint, uiEndpoint))
+            if (StringUtils.equalsIgnoreCase(endpoint, e.getKey()))
             {
-                endointToSet = uiEndpoint;
-                break;
+                endointToSet = e.getKey();
+                for (String idx : e.getValue())
+                {
+                    if (StringUtils.equalsIgnoreCase(index, idx))
+                    {
+                        indexToSet = idx;
+                        break;
+                    }
+                }
+                
+                if (indexToSet != null)
+                {
+                    break;
+                }
             }
         }
         
-        String index = (String) querySession.getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY);
-        String indexToSet = null;
-        count = quickPropertiesPanel.indices.getItemCount();
-        for (int i = 0; i < count; i++)
-        {
-            String uiIndex = quickPropertiesPanel.indices.getItemAt(i);
-            if (StringUtils.equalsIgnoreCase(index, uiIndex))
-            {
-                indexToSet = uiIndex;
-                break;
-            }
-        }
-
         if (SwingUtilities.isEventDispatchThread())
         {
             quickPropertiesPanel.endpoints.getModel().setSelectedItem(endointToSet);
@@ -190,11 +191,14 @@ class ESCatalogExtension implements ICatalogExtension
             {
                 List<String> indices = new ArrayList<>();
                 indicesByEndpoint.put(endpoint, indices);
-                HttpGet getIndices = new HttpGet(endpoint + "/*/_aliases");
+                HttpGet getIndices = new HttpGet(endpoint + "/_aliases");
                 try (CloseableHttpResponse response = CLIENT.execute(getIndices))
                 {
+                    if (response.getStatusLine().getStatusCode() != 200)
+                    {
+                        throw new RuntimeException("Error query Elastic. " + IOUtils.toString(response.getEntity().getContent()));
+                    }
                     indices.addAll(MAPPER.readValue(response.getEntity().getContent(), Map.class).keySet());
-
                 }
                 catch (IOException e)
                 {

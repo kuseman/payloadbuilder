@@ -47,7 +47,11 @@ class ExpressionOperator extends AOperator
             @Override
             public Object transform(Object input)
             {
-                if (input instanceof Row)
+                if (input == null)
+                {
+                    return null;
+                }
+                else if (input instanceof Row)
                 {
                     return input;
                 }

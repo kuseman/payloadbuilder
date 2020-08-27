@@ -12,19 +12,12 @@ public class Payloadbuilder
     /*
      * TODO:
      * BACKEND
-     *   - Pushdown is possible when LEFT JOIN on the inner table ONLY
-     *       
-     *   - WHERE count(a.aam) > 0 is pushed down which is wrong QRE with alias access cannot be pushed
-     *     - Push down can be made to populating where but not to table level
-     *     - Fix in PredicateAnalyzer
      *   - PredicateAnalyzer
      *       "@timestamp" > cast('2020-08-09T07:00:09.086', datetime) 
      *         This one is UNDEFINED, and shouldn't, it's because of function arguments has a QRE which is a 
      *         fake QRE only used for toString of Qname to determine datatype
-     *       Add types for NULL predicate IS NULL, IS NOT NULL, for easier building of predicates in Catalogs
-     *   - QueryParser
-     *     Build TableAlias at parse time and calculate path to destination for QRE at that time (might be problematic 
-     *      for complex select items)
+     *       QualifiedVisitor
+     *         Clean up code. Make a better method for finding an alias from a TableAlias, code is a mess now
      *   - QualifiedReferenceExpression
      *      Cache lookup path
      *   - Return a compiled query that clients can cache and reuse
@@ -46,12 +39,7 @@ public class Payloadbuilder
      *   - Analyze select
      *      Perform select and measure stuff like catalog times, execution count
      *      Let catalogs provide data, like bytes fetched etc.
-     *   - Long running queries not returning any rows, aren't ending when aborted
-     *      Need to inside operators check for abort in ExecutionContext
      *   - Join hint (HashJoin, hash_inner = true)
-     *   - Remove concept parameters (:params) and instead only use variables
-     *     Then one can use expressions like "set @lang_id = isnull(@lang_id, 3)
-     *     to fallback on missing input parameters
      *   - Catalog   
      *      Send in ExecutionContext when fetching indcies, to let catalog store information
      *      that will be used later on then operators are created
@@ -75,13 +63,8 @@ public class Payloadbuilder
      *      to change to a child first class loader so extensions can embed their own versions
      *      This is a security issue but think it's no problem.
      * ESCatalog
-     *   - UI: Split endpoint/index selection dropdowns
      *   - All non_analyzed fields are potential index-columns
-     *   - Add functions 
-     *        search(index, body)
-     *          - Search index with body (index empty/null search all)
-     *        searchTemplate(index, template, params)
-     *          - Search index with template (index empty/null search all)
+     *   - Fetch ES version to apply correct URLS in all places (7.5.2 doesn't have tables, add a dummy table data or similar)
      * EtmArticleCategoryESCatalog
      *   - UI: Split endpoint/index selection dropdowns
      *   - Refactor and reuse stuff from ESCatalog if possible

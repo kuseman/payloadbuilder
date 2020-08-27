@@ -9,8 +9,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.IntStream;
 
+import org.antlr.v4.runtime.Token;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Domain of a table alias */
@@ -32,7 +34,16 @@ public class TableAlias
             QualifiedName table,
             String alias)
     {
-        this(parent, table, alias, null);
+        this(parent, table, alias, null, null);
+    }
+
+    public TableAlias(
+            TableAlias parent,
+            QualifiedName table,
+            String alias,
+            Token token)
+    {
+        this(parent, table, alias, null, token);
     }
 
     public TableAlias(
@@ -41,6 +52,16 @@ public class TableAlias
             String alias,
             String[] columns)
     {
+        this(parent, table, alias, columns, null);
+    }
+
+    public TableAlias(
+            TableAlias parent,
+            QualifiedName table,
+            String alias,
+            String[] columns,
+            Token token)
+    {
         this.parent = parent;
         this.table = requireNonNull(table, "table");
         this.alias = requireNonNull(alias, "alias");
@@ -48,6 +69,20 @@ public class TableAlias
 
         if (parent != null)
         {
+            TableAlias temp = parent;
+            while (temp != null)
+            {
+                if (alias.equals(temp.alias))
+                {
+                    throw new ParseException("Alias " + alias + " already exists in scope.", token);
+                }
+                if (temp.getChildAlias(alias) != null)
+                {
+                    throw new ParseException("Alias " + alias + " already exists in scope.", token);
+                }
+                temp = temp.parent;
+            }
+
             parent.childAliases.add(this);
             parentIndex = parent.childAliases.size() - 1;
         }
@@ -209,6 +244,12 @@ public class TableAlias
     /** Construct a table alias from provided table name */
     public static TableAlias of(TableAlias parent, QualifiedName table, String alias)
     {
-        return new TableAlias(parent, table, alias);
+        return new TableAlias(parent, table, alias, null, null);
+    }
+
+    /** Construct a table alias from provided table name */
+    public static TableAlias of(TableAlias parent, QualifiedName table, String alias, Token token)
+    {
+        return new TableAlias(parent, table, alias, token);
     }
 }

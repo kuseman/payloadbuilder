@@ -264,7 +264,7 @@ class PayloadbuilderService
         {
             // Adjust columns
             PairList pairList = (PairList) parent.peek();
-            if (pairList.size() > 0 && resultModel.getColumnCount() != (pairList.size() + 1))
+            if (resultModel.getColumnCount() < (pairList.size() + 1))
             {
                 List<String> columns = new ArrayList<>(pairList.size() + 1);
                 // Row id column

@@ -1,5 +1,7 @@
 package org.kuse.payloadbuilder.catalog.fs;
 
+import static java.util.Collections.emptyIterator;
+
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -67,7 +69,12 @@ class FilesystemCatalog extends Catalog
         public Iterator<Row> open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
         {
             tableAlias.setColumns(COLUMNS);
-            String path = String.valueOf(arguments.get(0).eval(context));
+            Object obj = arguments.get(0).eval(context);
+            if (obj == null)
+            {
+                return emptyIterator();
+            }
+            String path = String.valueOf(obj);
             boolean recursive = false;
             if (arguments.size() > 1)
             {
