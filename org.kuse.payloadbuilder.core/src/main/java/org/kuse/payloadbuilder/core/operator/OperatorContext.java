@@ -3,16 +3,14 @@ package org.kuse.payloadbuilder.core.operator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
-
-import gnu.trove.map.TIntObjectMap;
-import gnu.trove.map.hash.TIntObjectHashMap;
 
 /** Context used during selection of operator tree */
 public class OperatorContext
 {
     /** Stores node unique data by node's unique id */
-    private final TIntObjectMap<NodeData> nodeDataById = new TIntObjectHashMap<>();
+    private final Map<Integer, NodeData> nodeDataById = new ConcurrentHashMap<>();
     
     /** Iterator of outer row values used when having an indexed inner operator in Batched operators */
     private Iterator<Object[]> outerIndexValues;
@@ -33,7 +31,7 @@ public class OperatorContext
         nodeDataById.clear();       
     }
     
-    public TIntObjectMap<? extends NodeData> getNodeData()
+    public Map<Integer, ? extends NodeData> getNodeData()
     {
         return nodeDataById;
     }
@@ -49,15 +47,15 @@ public class OperatorContext
     @SuppressWarnings("unchecked")
     public <T extends NodeData> T getNodeData(int nodeId, Supplier<T> creator)
     {
-        T data = (T) nodeDataById.get(nodeId);
-        if (data == null)
+        return (T) nodeDataById.compute(nodeId, (k, v) -> 
         {
-            data = creator.get();
-            nodeDataById.put(nodeId, data);
-        }
-        
-        data.executionCount++;
-        return data;
+            if (v == null)
+            {
+                v = creator.get();
+            }
+            v.executionCount++;
+            return v;
+        });
     }
     
     /** Base class for node data. */

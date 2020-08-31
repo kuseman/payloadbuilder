@@ -50,6 +50,11 @@ class BatchRepeatOperator extends AOperator
     @Override
     public Iterator<Row> open(ExecutionContext context)
     {
+        // TODO: parallellism
+        // Split up into tasks that put rows into queue
+        // return an iterator that return rows from the queue
+        // poll from queue and before each poll check if all tasks iterators are complete
+        
         return new Iterator<Row>()
         {
             private Iterator<Row> it;

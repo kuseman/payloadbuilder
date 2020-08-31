@@ -17,6 +17,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.Temporal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -894,6 +899,15 @@ class ESOperator extends AOperator
                 return "null";
             }
 
+            if (value instanceof ZonedDateTime)
+            {
+                value = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format((Temporal) value);
+            }
+            else if (value instanceof LocalDateTime)
+            {
+                value = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(((LocalDateTime) value).atZone(ZoneId.systemDefault()));
+            }
+            
             String stringValue = String.valueOf(value);
             if (!(value instanceof Number || value instanceof Boolean))
             {
