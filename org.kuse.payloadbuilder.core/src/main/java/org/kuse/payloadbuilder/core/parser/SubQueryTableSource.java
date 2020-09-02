@@ -7,25 +7,24 @@ import java.util.List;
 import org.antlr.v4.runtime.Token;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
 
-/** Populating join type. Does not produce
- * tuples but instead populates outer rows with join rows */
-public class PopulateTableSource extends TableSource
+/** Sub query table source */
+public class SubQueryTableSource extends TableSource
 {
     private final TableSourceJoined tableSourceJoined;
     private final Expression where;
     private final List<Expression> groupBy;
     private final List<SortItem> orderBy;
     
-    public PopulateTableSource(
+    public SubQueryTableSource(
             TableAlias tableAlias,
-//            String alias,
+            List<Option> options,
             TableSourceJoined tableSourceJoined,
             Expression where,
             List<Expression> groupBy,
             List<SortItem> orderBy,
             Token token)
     {
-        super(tableAlias/*, alias*/, token);
+        super(tableAlias, options, token);
         this.tableSourceJoined = requireNonNull(tableSourceJoined, "tableSourceJoined");
         this.orderBy = requireNonNull(orderBy, "orderBy");
         this.groupBy = requireNonNull(groupBy, "groupBy");
@@ -53,12 +52,6 @@ public class PopulateTableSource extends TableSource
     public QualifiedName getTable()
     {
         return tableSourceJoined.getTableSource().getTable();
-    }
-    
-    @Override
-    public List<Option> getOptions()
-    {
-        return tableSourceJoined.getTableSource().getOptions();
     }
     
     public List<SortItem> getOrderBy()

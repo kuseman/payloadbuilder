@@ -6,9 +6,11 @@ import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Iterator;
 import java.util.List;
 
+import org.apache.commons.collections.iterators.SingletonIterator;
 import org.apache.commons.io.FileUtils;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
@@ -21,19 +23,51 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 /** Catalog providing file system functionality */
 class FilesystemCatalog extends Catalog
 {
-    private static final String[] COLUMNS = new String[] {"name", "path", "size", "isDirectory", "_path"};
+    private static final String[] COLUMNS = new String[] {
+            "name",
+            "path",
+            "size",
+            "exists",
+            "creationTime",
+            "lastAccessTime",
+            "lastModifiedTime",
+            "isDirectory"};
 
     FilesystemCatalog()
     {
         super("Filesystem");
         registerFunction(new ListFunction(this));
+        registerFunction(new FileFunction(this));
         registerFunction(new ContentsFunction(this));
     }
-
+    
+    private static class FileFunction extends TableFunctionInfo
+    {
+        FileFunction(Catalog catalog)
+        {
+            super(catalog, "file");
+        }
+        
+        @SuppressWarnings("unchecked")
+        @Override
+        public Iterator<Row> open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
+        {
+            tableAlias.setColumns(COLUMNS);
+            Object obj = arguments.get(0).eval(context);
+            if (obj == null)
+            {
+                return emptyIterator();
+            }
+            String strPath = String.valueOf(obj);
+            Path path = FileSystems.getDefault().getPath(strPath);
+            return new SingletonIterator(ListFunction.fromPath(tableAlias, 0, path));
+        }
+    }
+    
     /** Contents function, outputs path contents as string */
     private static class ContentsFunction extends ScalarFunctionInfo
     {
-        public ContentsFunction(Catalog catalog)
+        ContentsFunction(Catalog catalog)
         {
             super(catalog, "contents");
         }
@@ -82,22 +116,15 @@ class FilesystemCatalog extends Catalog
             }
 
             final Iterator<Path> it = getIterator(path, recursive);
-            return new Iterator<Row>()
+            return new Iterator<>()
             {
-                private int pos = 0;
+                private final int pos = 0;
 
                 @Override
                 public Row next()
                 {
                     Path p = it.next();
-                    Object[] values = new Object[] {
-                            p.getFileName(),
-                            p.getParent().toString(),
-                            getSize(p),
-                            Files.isDirectory(p),
-                            p
-                    };
-                    return Row.of(tableAlias, pos++, values);
+                    return fromPath(tableAlias, pos, p);
                 }
 
                 @Override
@@ -117,18 +144,40 @@ class FilesystemCatalog extends Catalog
             };
         }
 
-        private long getSize(Path path)
+        static Row fromPath(TableAlias alias, int pos, Path path)
         {
+            long creationTime = 0;
+            long lastAccessTime = 0;
+            long lastModifiedTime = 0;
+            boolean isDirectory = false;
+            long size = 0;
             try
             {
-                return Files.size(path);
+                BasicFileAttributes attr =
+                        Files.readAttributes(path, BasicFileAttributes.class);
+                creationTime = attr.creationTime().toMillis();
+                lastAccessTime = attr.lastAccessTime().toMillis();
+                lastModifiedTime = attr.lastModifiedTime().toMillis();
+                isDirectory = attr.isDirectory();
+                size = attr.size();
             }
             catch (IOException e)
             {
             }
-            return 0;
+            
+            Object[] values = new Object[] {
+                    path.getFileName(),
+                    path.getParent() != null ? path.getParent().toString() : null,
+                    size,
+                    Files.exists(path),
+                    creationTime,
+                    lastAccessTime,
+                    lastModifiedTime,
+                    isDirectory
+            };
+            return Row.of(alias, pos++, values);
         }
-
+        
         private Iterator<Path> getIterator(String strPath, boolean recursive)
         {
             try

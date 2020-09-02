@@ -49,7 +49,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
     @Test
     public void test_hash_join_populate()
     {
-        String query = "select s.id1, a.id2 from source s inner join [article] a on a.art_id = s.art_id";
+        String query = "select s.id1, a.id2 from source s inner join article a with(populate=true) on a.art_id = s.art_id";
         QueryResult result = getQueryResult(query);
 
         // Assert aliaes
@@ -163,7 +163,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
     @Test
     public void test_left_hash_join_with_populate()
     {
-        String query = "select s.id1, a.id2 from source s left join [article] a on s.art_id = a.art_id";
+        String query = "select s.id1, a.id2 from source s left join article a with(populate=true) on s.art_id = a.art_id";
         QueryResult result = getQueryResult(query);
 
         // Assert aliaes
@@ -197,7 +197,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
     @Test
     public void test_inner_hash_join_with_filter()
     {
-        String query = "select s.id1, a.id2 from source s inner join [article where note_id > 0] a on a.art_id = s.art_id and a.active_flg where s.id3 > 0 and a.id2 = 10";
+        String query = "select s.id1, a.id2 from source s inner join (from article where note_id > 0) a with (populate=true) on a.art_id = s.art_id and a.active_flg where s.id3 > 0 and a.id2 = 10";
         QueryResult result = getQueryResult(query);
 
         // Assert aliaes

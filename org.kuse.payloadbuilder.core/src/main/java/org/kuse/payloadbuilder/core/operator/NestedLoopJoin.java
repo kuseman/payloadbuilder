@@ -76,7 +76,7 @@ class NestedLoopJoin extends AOperator
         final Row contextParent = context.getRow();
         final Iterator<Row> it = outer.open(context);
         executionCount++;
-        return new Iterator<Row>()
+        return new Iterator<>()
         {
             Row next;
             Row currentOuter;
@@ -97,13 +97,12 @@ class NestedLoopJoin extends AOperator
                 return setNext();
             }
 
-            boolean setNext()
+            private boolean setNext()
             {
                 while (next == null)
                 {
                     if (ii == null && !it.hasNext())
                     {
-//                        context.setRow(contextParent);
                         return false;
                     }
 

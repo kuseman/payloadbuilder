@@ -44,7 +44,7 @@ public class OperatorBuilderApplyTest extends AOperatorTest
     @Test
     public void test_cross_apply_with_populate()
     {
-        String query = "select s.id1, a.id2 from source s cross apply [article] a";
+        String query = "select s.id1, a.id2 from source s cross apply article a with(populate=true)";
         QueryResult result = getQueryResult(query);
 
         // Assert aliaes
@@ -194,7 +194,7 @@ public class OperatorBuilderApplyTest extends AOperatorTest
     @Test
     public void test_outer_apply_with_populate()
     {
-        String query = "select s.id1, a.id2 from source s outer apply [article] a";
+        String query = "select s.id1, a.id2 from source s outer apply article a with (populate=true)";
         QueryResult result = getQueryResult(query);
 
         // Assert aliaes

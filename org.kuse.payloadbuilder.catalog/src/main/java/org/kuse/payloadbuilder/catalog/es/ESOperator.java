@@ -179,13 +179,12 @@ class ESOperator extends AOperator
         {
             boolean isSingleAlias = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(esType.type);
             String mgetUrl = getUrl(
-                    String.format("%s/%s%s/_mget?", esType.endpoint, esType.index, isSingleAlias ? "" : esType.type + "/"),
+                    String.format("%s/%s%s/_mget?", esType.endpoint, esType.index, isSingleAlias ? "" : "/" + esType.type),
                     "docs",
                     tableAlias,
                     index,
                     isSingleAlias);
 
-            // TODO: thread up all ids in executor and join
             DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getOperatorContext(), sentBytes);
             MutableBoolean doRequest = new MutableBoolean(true);
             return getIterator(
@@ -394,7 +393,7 @@ class ESOperator extends AOperator
             AtomicLong receivedBytes,
             Function<MutableObject<String>, HttpUriRequest> requestSupplier)
     {
-        return new Iterator<Row>()
+        return new Iterator<>()
         {
             Set<String> columns = new HashSet<>(tableAlias.isAsteriskColumns() ? emptyList() : asList(org.apache.commons.lang3.ObjectUtils.defaultIfNull(tableAlias.getColumns(), ArrayUtils.EMPTY_STRING_ARRAY)));
             Set<String> addedColumns;

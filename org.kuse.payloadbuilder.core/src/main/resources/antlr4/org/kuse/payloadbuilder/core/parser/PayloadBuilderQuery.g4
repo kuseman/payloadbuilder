@@ -117,7 +117,7 @@ tableSourceJoined
 tableSource
  : tableName			identifier? tableSourceOptions?
  | functionCall			identifier? tableSourceOptions?
- | populateQuery		identifier?
+ | subQuery				identifier? tableSourceOptions?
  ;
 
 tableSourceOptions
@@ -137,13 +137,14 @@ joinPart
  | (CROSS | OUTER) APPLY tableSource
 ;
 
-populateQuery
- : '['
-   tableSourceJoined
+subQuery
+ : '('
+//   (SELECT (TOP topCount)? selectItem (',' selectItem)*)? TODO: build a custom select with items
+   FROM tableSourceJoined
    (WHERE where=expression)?
    (GROUPBY groupBy+=expression (',' groupBy+=expression)*)?
    (ORDERBY sortItem (',' sortItem)*)?
-   ']'
+   ')'
  ;
 
 sortItem

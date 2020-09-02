@@ -13,5 +13,5 @@ public interface SelectVisitor<TR, TC>
     TR visit(TableFunction tableFunction, TC context);
     TR visit(Join join, TC context);
     TR visit(Apply apply, TC context);
-    TR visit(PopulateTableSource populatingJoin, TC context);
+    TR visit(SubQueryTableSource populatingJoin, TC context);
 }

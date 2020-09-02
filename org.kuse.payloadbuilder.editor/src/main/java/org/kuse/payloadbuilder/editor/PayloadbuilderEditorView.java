@@ -147,10 +147,10 @@ class PayloadbuilderEditorView extends JFrame
         JMenu menu = new JMenu("File");
         openItem = new JMenuItem(openAction);
         openItem.setText("Open");
-        openItem.setAccelerator(KeyStroke.getKeyStroke('O', Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
+        openItem.setAccelerator(KeyStroke.getKeyStroke('O', Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()));
         saveItem = new JMenuItem(saveAction);
         saveItem.setText("Save");
-        saveItem.setAccelerator(KeyStroke.getKeyStroke('S', Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
+        saveItem.setAccelerator(KeyStroke.getKeyStroke('S', Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()));
         saveAsItem = new JMenuItem(saveAsAction);
         saveAsItem.setText("Save As ...");
         exitItem = new JMenuItem(exitAction);
@@ -271,7 +271,7 @@ class PayloadbuilderEditorView extends JFrame
             int modifiers = accelerator.getModifiers();
             if (modifiers > 0)
             {
-                acceleratorText = KeyEvent.getKeyModifiersText(modifiers);
+                acceleratorText = InputEvent.getModifiersExText(modifiers);
                 acceleratorText += "+";
             }
             acceleratorText += KeyEvent.getKeyText(accelerator.getKeyCode());

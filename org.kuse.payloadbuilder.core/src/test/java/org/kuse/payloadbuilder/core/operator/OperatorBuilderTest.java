@@ -37,7 +37,7 @@ public class OperatorBuilderTest extends AOperatorTest
 
         try
         {
-            getQueryResult("select a from tableA a inner join [tableB] b on b.id = a.id inner join [tableC] b on b.id = a.id");
+            getQueryResult("select a from tableA a inner join tableB b on b.id = a.id inner join tableC b on b.id = a.id");
             fail("defined multiple times for parent");
         }
         catch (ParseException e)
@@ -132,7 +132,7 @@ public class OperatorBuilderTest extends AOperatorTest
     @Test
     public void test_no_push_down_from_where_to_join_when_accessing_nested_alias()
     {
-        String query = "select * from source s inner join [article a inner join [articleBrand] ab on ab.art_id = a.art_id] a on a.art_id = s.art_id where a.ab.active_flg";
+        String query = "select * from source s inner join (from article a inner join articleBrand ab with(populate=true) on ab.art_id = a.art_id) a with(populate=true) on a.art_id = s.art_id where a.ab.active_flg";
         QueryResult queryResult = getQueryResult(query);
 
         Operator expected = new FilterOperator(
@@ -258,7 +258,7 @@ public class OperatorBuilderTest extends AOperatorTest
     @Test
     public void test_table_function()
     {
-        String query = "select r.Value * r1.Value * r2.Value mul, r.Value r, r1.filter(x -> x.Value > 10).map(x -> x.Value) r1, r2.Value r2, array(Value from r1) r1A from range(randomInt(100), randomInt(100) + 100) r inner join [range(randomInt(100))] r1 on r1.Value <= r.Value inner join range(randomInt(100), randomInt(100) + 100) r2 on r2.Value = r.Value";
+        String query = "select r.Value * r1.Value * r2.Value mul, r.Value r, r1.filter(x -> x.Value > 10).map(x -> x.Value) r1, r2.Value r2, array(Value from r1) r1A from range(randomInt(100), randomInt(100) + 100) r inner join range(randomInt(100)) r1 with (populate=true) on r1.Value <= r.Value inner join range(randomInt(100), randomInt(100) + 100) r2 on r2.Value = r.Value";
         QueryResult queryResult = getQueryResult(query);
 
         TableFunctionInfo range = (TableFunctionInfo) session.getCatalogRegistry().getBuiltin().getFunction("range");
@@ -319,24 +319,18 @@ public class OperatorBuilderTest extends AOperatorTest
     {
         String query = "select aa.sku_id "
             + "from source s "
-            + "inner join "
-            + "["
-            + "  article "
-            + "] a "
+            + "inner join article a with(populate=true) "
             + "  on a.art_id = s.art_id "
             + "inner join "
-            + "["
-            + "  articleAttribute aa"
+            + "("
+            + "  from articleAttribute aa"
             + "  inner join articlePrice ap"
             + "    on ap.sku_id = aa.sku_id"
-            + "  inner join "
-            + "  ["
-            + "    attribute1 "
-            + "  ] a1 "
+            + "  inner join attribute1 a1 with(populate=true) "
             + "    on a1.attr1_id = aa.attr1_id "
             + "  where active_flg "
             + "  and ap.price_sales > 0 "
-            + "] aa "
+            + ") aa with(populate=true)"
             + "  on aa.art_id = s.art_id"
             + "   "
             + "";
@@ -443,53 +437,38 @@ public class OperatorBuilderTest extends AOperatorTest
             + "  ) arr2 "
             + "from article a "
             + "inner join "
-            + "["
-            + "  articleAttribute aa "
-            + "  inner join "
-            + "  ["
-            + "    articlePrice "
-            + "  ] ap "
+            + "("
+            + "  from articleAttribute aa "
+            + "  inner join articlePrice ap with(populate=true) "
             + "    on ap.sku_id = aa.sku_id "
             + "    and ap.price_sales > 0 "
-            + "  inner join "
-            + "  ["
-            + "    attribute1 "
-            + "  ] a1 "
+            + "  inner join attribute1 a1 with(populate=true) "
             + "    on a1.attr1_id = aa.attr1_id "
             + "    and a1.lang_id = 1 "
-            + "  inner join "
-            + "  ["
-            + "    attribute2 "
-            + "  ] a2 "
+            + "  inner join attribute2 a2 with(populate=true) "
             + "    on a2.attr2_id = aa.attr2_id "
             + "    and a2.lang_id = 1 "
-            + "  inner join "
-            + "  ["
-            + "    attribute3 "
-            + "  ] a3 "
+            + "  inner join attribute3 a3 with(populate=true) "
             + "    on a3.attr3_id = aa.attr3_id "
             + "    and a3.lang_id = 1 "
             + "  where ap.price_org > 0"
             + "  order by a2.attr2_no "
-            + "] aa "
+            + ") aa with(populate=true)"
             + "  on aa.art_id = a.art_id "
             + "  and aa.active_flg "
             + "  and aa.internet_flg "
             + "inner join "
-            + "["
-            + "  articleProperty "
+            + "("
+            + "  from articleProperty "
             + "  group by propertykey_id "
-            + "] ap "
+            + ") ap with(populate=true) "
             + "  on ap.art_id = a.art_id "
             + "cross apply "
-            + "["
-            + "  range(10) r "
-            + "  inner join "
-            + "  ["
-            + "    attribute1 "
-            + "  ] a1 "
+            + "("
+            + "  from range(10) r "
+            + "  inner join attribute1 a1 with(populate=true)"
             + "      on a1.someId = r.Value "
-            + "] r "
+            + ") r with(populate=true) "
             + "where not a.add_on_flg and a.articleType = 'regular' "
             + "group by a.note_id "
             + "order by a.stamp_dat_cr";
@@ -626,7 +605,7 @@ public class OperatorBuilderTest extends AOperatorTest
     @Test
     public void test_select_item_with_filter()
     {
-        String query = "select object(s.id1, a.id2 from s where s.id4 > 0) arr from source s inner join [article where note_id > 0] a on a.art_id = s.art_id and a.active_flg where s.id3 > 0";
+        String query = "select object(s.id1, a.id2 from s where s.id4 > 0) arr from source s inner join (from article where note_id > 0) a with(populate=true) on a.art_id = s.art_id and a.active_flg where s.id3 > 0";
         QueryResult result = getQueryResult(query);
 
         // Assert aliaes
@@ -671,12 +650,12 @@ public class OperatorBuilderTest extends AOperatorTest
         String query = "SELECT s.art_id "
             + "FROM source s "
             + "INNER JOIN "
-            + "["
-            + "  article a"
-            + "  INNER JOIN [articleAttribute] aa"
+            + "("
+            + "  from article a"
+            + "  INNER JOIN articleAttribute aa with(populate=true)"
             + "    ON aa.art_id = a.art_id "
             + "    AND s.id "
-            + "] a"
+            + ") a with(populate=true)"
             + "  ON a.art_id = s.art_id";
 
         QueryResult result = getQueryResult(query);

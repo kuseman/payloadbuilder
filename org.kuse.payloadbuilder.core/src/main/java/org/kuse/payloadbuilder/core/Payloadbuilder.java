@@ -10,6 +10,9 @@ public class Payloadbuilder
     private static final QueryParser PARSER = new QueryParser();
 
     /*
+     * 
+     * 
+     * 
      * TODO:
      * BACKEND
      *   - PredicateAnalyzer
@@ -26,6 +29,8 @@ public class Payloadbuilder
      *      Override parts of query and/remove/alter
      *      Merge two queries?
      *      Hook to process query at AST level
+     *   - Thread up batch hash join
+     *      Each batch could be sent to a executor. Parallelism could be provided to set concurrency level
      *   - Insert into temptable
      *      Needed for campaigns etc. Eventual stockhouse
      *      WITH cache option
@@ -40,6 +45,8 @@ public class Payloadbuilder
      *      Perform select and measure stuff like catalog times, execution count
      *      Let catalogs provide data, like bytes fetched etc.
      *   - Join hint (HashJoin, hash_inner = true)
+     *   - Add support for catalog to provide stats for tables
+     *      - Estimated number of rows
      *   - Catalog   
      *      Send in ExecutionContext when fetching indcies, to let catalog store information
      *      that will be used later on then operators are created
@@ -48,6 +55,7 @@ public class Payloadbuilder
      *      Random (one or more random columns)
      *      Left (one or more sequential columns from left)
      *   - Write SQL server catalog
+     *   - Insert / update /delete
      *   - Operators
      *      Union
      *      Except
@@ -64,9 +72,11 @@ public class Payloadbuilder
      *      This is a security issue but think it's no problem.
      * ESCatalog
      *   - All non_analyzed fields are potential index-columns
+     *   - Clear scroll
      *   - Fetch ES version to apply correct URLS in all places (7.5.2 doesn't have tables, add a dummy table data or similar)
      * EtmArticleCategoryESCatalog
      *   - UI: Split endpoint/index selection dropdowns
+     *   - Clear scroll
      *   - Refactor and reuse stuff from ESCatalog if possible
      *   - Implement predicate support for index-column
      *   

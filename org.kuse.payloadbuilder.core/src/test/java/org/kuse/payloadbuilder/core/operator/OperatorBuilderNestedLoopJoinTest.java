@@ -44,7 +44,7 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorTest
     @Test
     public void test_nested_loop_with_populate_and_pushdown()
     {
-        String query = "select s.id1, a.id2 from source s inner join [ article a where a.internet_flg ] a on a.active_flg and (a.art_id = s.art_id or s.id1 > 0)";
+        String query = "select s.id1, a.id2 from source s inner join (from article a where a.internet_flg ) a with(populate=true) on a.active_flg and (a.art_id = s.art_id or s.id1 > 0)";
         QueryResult result = getQueryResult(query);
 
         TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});

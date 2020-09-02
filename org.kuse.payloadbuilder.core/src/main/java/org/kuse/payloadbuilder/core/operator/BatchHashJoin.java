@@ -156,7 +156,7 @@ class BatchHashJoin extends AOperator
         final StopWatch sw = new StopWatch();
         final int batchSize = temp;
         final Row contextParent = context.getRow();
-        return new Iterator<Row>()
+        return new Iterator<>()
         {
             /** Batched rows */
             private List<Row> outerRows;
@@ -404,7 +404,7 @@ class BatchHashJoin extends AOperator
 
             private Iterator<Object[]> outerValuesIterator(ExecutionContext context)
             {
-                return new Iterator<Object[]>()
+                return new Iterator<>()
                 {
                     private int outerRowsIndex = 0;
                     private Object[] nextArray;

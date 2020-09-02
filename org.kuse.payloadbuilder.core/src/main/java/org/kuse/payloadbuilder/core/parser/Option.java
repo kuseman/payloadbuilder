@@ -44,4 +44,9 @@ public class Option
         return false;
     }
     
+    @Override
+    public String toString()
+    {
+        return option + "=" + valueExpression;
+    }
 }

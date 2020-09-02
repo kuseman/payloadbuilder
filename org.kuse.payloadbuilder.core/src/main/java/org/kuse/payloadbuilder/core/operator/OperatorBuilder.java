@@ -43,12 +43,12 @@ import org.kuse.payloadbuilder.core.parser.NestedSelectItem;
 import org.kuse.payloadbuilder.core.parser.NestedSelectItem.Type;
 import org.kuse.payloadbuilder.core.parser.Option;
 import org.kuse.payloadbuilder.core.parser.ParseException;
-import org.kuse.payloadbuilder.core.parser.PopulateTableSource;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 import org.kuse.payloadbuilder.core.parser.Select;
 import org.kuse.payloadbuilder.core.parser.SelectItem;
 import org.kuse.payloadbuilder.core.parser.SelectStatement;
 import org.kuse.payloadbuilder.core.parser.SortItem;
+import org.kuse.payloadbuilder.core.parser.SubQueryTableSource;
 import org.kuse.payloadbuilder.core.parser.Table;
 import org.kuse.payloadbuilder.core.parser.TableFunction;
 import org.kuse.payloadbuilder.core.parser.TableSource;
@@ -63,6 +63,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 {
     private static final String BATCH_LIMIT = "batch_limit";
     private static final String BATCH_SIZE = "batch_size";
+    private static final String POPULATE = "populate";
+    
     //    private static final String HASH_INNER = "hash_inner";
     private static final OperatorBuilder VISITOR = new OperatorBuilder();
 
@@ -409,7 +411,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     }
 
     @Override
-    public Void visit(PopulateTableSource tableSource, Context context)
+    public Void visit(SubQueryTableSource tableSource, Context context)
     {
         TableSourceJoined tsj = tableSource.getTableSourceJoined();
         TableSource ts = tsj.getTableSource();
@@ -574,7 +576,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             boolean isCorrelated)
     {
         String innerAlias = innerTableSource.getTableAlias().getAlias();
-        boolean populating = innerTableSource instanceof PopulateTableSource;
+        boolean populating = getOption(innerTableSource, POPULATE) != null;
         List<Index> indices = emptyList();
         if (innerTableSource.getTable() != null)
         {
@@ -933,7 +935,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
      */
     private class CorrelatedDetector extends AStatementVisitor<Void, Set<String>>
     {
-        private final AExpressionVisitor<Void, Set<String>> expressionVisitor = new AExpressionVisitor<Void, Set<String>>()
+        private final AExpressionVisitor<Void, Set<String>> expressionVisitor = new AExpressionVisitor<>()
         {
             @Override
             public Void visit(QualifiedReferenceExpression expression, Set<String> aliases)

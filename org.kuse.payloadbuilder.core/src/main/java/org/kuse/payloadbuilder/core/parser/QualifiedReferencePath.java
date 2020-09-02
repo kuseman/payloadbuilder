@@ -1,8 +1,5 @@
 package org.kuse.payloadbuilder.core.parser;
 
-import java.util.List;
-import java.util.Objects;
-
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
 
 /** Traversal path for a {@link QualifiedReferenceExpression}. */
@@ -38,15 +35,16 @@ class QualifiedReferencePath
      * From: table alias 
      * To: qname
      **/
+    @SuppressWarnings("unused")
     static QualifiedReferencePath calculatePath(TableAlias tableAlias, QualifiedName qname)
     {
-        TableAlias current = tableAlias;
-        int partIndex = 0;
+//        TableAlias current = tableAlias;
+//        int partIndex = 0;
 //        Row resultRow = row;
 //        
-        List<String> parts = qname.getParts();
-        int parentSteps = 0;
-        int childAliasIndex = -1;
+//        List<String> parts = qname.getParts();
+//        int parentSteps = 0;
+//        int childAliasIndex = -1;
         
         // aa.obj
         // 
@@ -67,42 +65,42 @@ class QualifiedReferencePath
          *   parent-collection
          */
         
-        while (partIndex < parts.size() - 1)
-        {
-            String part = parts.get(partIndex);
-
-            // 1. Alias match, move on
-            if (Objects.equals(part, current.getAlias()))
-            {
-                partIndex ++;
-                continue;
-            }
-
-            // 2. Child alias
-            TableAlias alias = current.getChildAlias(part);
-            if (alias != null)
-            {
-                partIndex ++;
-                current = alias;
-                childAliasIndex = current.getParentIndex();
-//                List<Row> childAlias = resultRow.getChildRows(alias.getParentIndex());
-//                resultRow = !childAlias.isEmpty() ? (Row) CollectionUtils.get(childAlias, 0) : null;
-                continue;
-            }
-
-            if (current.getParent() == null)
-            {
-                break;
-            }
-            
-            // TODO: access parent collection
-            
-            
-            // 3. Parent alias match upwards
-//            resultRow = resultRow.getParent();
-            current = current.getParent();// resultRow != null ? resultRow.getTableAlias() : null;
-            parentSteps ++;
-        }
+//        while (partIndex < parts.size() - 1)
+//        {
+//            String part = parts.get(partIndex);
+//
+//            // 1. Alias match, move on
+//            if (Objects.equals(part, current.getAlias()))
+//            {
+//                partIndex ++;
+//                continue;
+//            }
+//
+//            // 2. Child alias
+//            TableAlias alias = current.getChildAlias(part);
+//            if (alias != null)
+//            {
+//                partIndex ++;
+//                current = alias;
+//                childAliasIndex = current.getParentIndex();
+////                List<Row> childAlias = resultRow.getChildRows(alias.getParentIndex());
+////                resultRow = !childAlias.isEmpty() ? (Row) CollectionUtils.get(childAlias, 0) : null;
+//                continue;
+//            }
+//
+//            if (current.getParent() == null)
+//            {
+//                break;
+//            }
+//            
+//            // TODO: access parent collection
+//            
+//            
+//            // 3. Parent alias match upwards
+////            resultRow = resultRow.getParent();
+//            current = current.getParent();// resultRow != null ? resultRow.getTableAlias() : null;
+//            parentSteps ++;
+//        }
 //
 //        if (resultRow == null)
 //        {

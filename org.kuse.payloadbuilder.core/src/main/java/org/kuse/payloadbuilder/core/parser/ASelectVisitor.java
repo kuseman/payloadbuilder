@@ -79,7 +79,7 @@ public abstract class ASelectVisitor<TR, TC> implements SelectVisitor<TR, TC>
     }
 
     @Override
-    public TR visit(PopulateTableSource populatingJoin, TC context)
+    public TR visit(SubQueryTableSource populatingJoin, TC context)
     {
         populatingJoin.getTableSourceJoined().accept(this, context);
         if (populatingJoin.getWhere() != null)

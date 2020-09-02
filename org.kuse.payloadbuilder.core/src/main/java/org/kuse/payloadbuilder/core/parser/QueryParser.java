@@ -49,7 +49,6 @@ import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.LogicalBina
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.LogicalNotContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.NestedExpressionContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.NullPredicateContext;
-import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.PopulateQueryContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.PrintStatementContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.QnameContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.QueryContext;
@@ -58,6 +57,7 @@ import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SelectState
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SetStatementContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ShowStatementContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SortItemContext;
+import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SubQueryContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SubscriptContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceJoinedContext;
@@ -223,7 +223,7 @@ public class QueryParser
 
             TableSourceJoined joinedTableSource = ctx.tableSourceJoined() != null ? (TableSourceJoined) visit(ctx.tableSourceJoined()) : null;
             Expression topExpression = ctx.topCount() != null ? (Expression) visit(ctx.topCount()) : null;
-            if (joinedTableSource != null && joinedTableSource.getTableSource() instanceof PopulateTableSource)
+            if (joinedTableSource != null && joinedTableSource.getTableSource() instanceof SubQueryTableSource)
             {
                 throw new ParseException("Top table source cannot be a populating table source.", ctx.tableSourceJoined().start);
             }
@@ -404,7 +404,7 @@ public class QueryParser
 
         private TableAlias getParentTableAlias()
         {
-            return parentTableAlias;//.size() > 0 ? parentTableAlias.peek() : null;
+            return parentTableAlias;
         }
         
         @Override
@@ -412,42 +412,41 @@ public class QueryParser
         {
             String alias = getIdentifier(ctx.identifier());
             
-            List<Option> tableOptions = ctx.tableSourceOptions() != null ? ctx.tableSourceOptions().options.stream().map(to -> (Option) visit(to)).collect(toList()) : emptyList();
+            List<Option> options = ctx.tableSourceOptions() != null ? ctx.tableSourceOptions().options.stream().map(to -> (Option) visit(to)).collect(toList()) : emptyList();
             if (ctx.functionCall() != null)
             {
-//                System.out.println("Visit func: " + alias);
                 FunctionCallInfo functionCallInfo = (FunctionCallInfo) visit(ctx.functionCall());
                 currentTableAlias = TableAlias.of(getParentTableAlias(), QualifiedName.of(functionCallInfo.function), defaultIfNull(parentAlias, defaultIfNull(alias, "")), ctx.functionCall().start);
-                return new TableFunction(functionCallInfo.catalog, currentTableAlias, functionCallInfo.function, functionCallInfo.arguments/*, defaultIfNull(alias, "")*/, tableOptions, functionCallInfo.functionId, ctx.functionCall().start);
+                return new TableFunction(functionCallInfo.catalog, currentTableAlias, functionCallInfo.function, functionCallInfo.arguments/*, defaultIfNull(alias, "")*/, options, functionCallInfo.functionId, ctx.functionCall().start);
             }
-            else if (ctx.populateQuery() != null)
+            else if (ctx.subQuery() != null)
             {
                 if (isBlank(alias))
                 {
-                    throw new ParseException("Populate query must have an alias", ctx.populateQuery().start);
+                    throw new ParseException("Sub query must have an alias", ctx.subQuery().start);
                 }
 
-                PopulateQueryContext populateQueryCtx = ctx.populateQuery();
+                SubQueryContext subQueryCtx = ctx.subQuery();
 
-                TableSourceJoined tableSourceJoined = (TableSourceJoined) visit(populateQueryCtx.tableSourceJoined());
+                TableSourceJoined tableSourceJoined = (TableSourceJoined) visit(subQueryCtx.tableSourceJoined());
                 
-                if (tableSourceJoined.getTableSource() instanceof PopulateTableSource)
+                if (tableSourceJoined.getTableSource() instanceof SubQueryTableSource)
                 {
-                    throw new ParseException("Table source in populate query cannot be a populate table source", populateQueryCtx.start);
+                    throw new ParseException("Table source in populate query cannot be a populate table source", subQueryCtx.start);
                 }
 
-                Expression where = populateQueryCtx.where != null ? getExpression(populateQueryCtx.where) : null;
-                List<Expression> groupBy = populateQueryCtx.groupBy != null ? populateQueryCtx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
-                List<SortItem> orderBy = populateQueryCtx.sortItem() != null ? populateQueryCtx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
+                Expression where = subQueryCtx.where != null ? getExpression(subQueryCtx.where) : null;
+                List<Expression> groupBy = subQueryCtx.groupBy != null ? subQueryCtx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
+                List<SortItem> orderBy = subQueryCtx.sortItem() != null ? subQueryCtx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
 
-                return new PopulateTableSource(currentTableAlias/*, alias*/, tableSourceJoined, where, groupBy, orderBy, ctx.populateQuery().start);
+                return new SubQueryTableSource(currentTableAlias, options, tableSourceJoined, where, groupBy, orderBy, ctx.subQuery().start);
             }
 
             QualifiedName table = getQualifiedName(ctx.tableName().qname());
             
             currentTableAlias = TableAlias.of(getParentTableAlias(), table, defaultIfNull(parentAlias, defaultIfNull(alias, "")), ctx.tableName().start);
             String catalog = ctx.tableName().catalog != null ? ctx.tableName().catalog.getText() : null;
-            return new Table(catalog, currentTableAlias/*, table, defaultIfNull(alias, "")*/, tableOptions, ctx.tableName().start);
+            return new Table(catalog, currentTableAlias, options, ctx.tableName().start);
         }
 
         @Override
