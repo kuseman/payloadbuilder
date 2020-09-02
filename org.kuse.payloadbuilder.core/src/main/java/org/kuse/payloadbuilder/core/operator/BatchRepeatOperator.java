@@ -55,7 +55,7 @@ class BatchRepeatOperator extends AOperator
         // return an iterator that return rows from the queue
         // poll from queue and before each poll check if all tasks iterators are complete
         
-        return new Iterator<Row>()
+        return new Iterator<>()
         {
             private Iterator<Row> it;
             private Row next;

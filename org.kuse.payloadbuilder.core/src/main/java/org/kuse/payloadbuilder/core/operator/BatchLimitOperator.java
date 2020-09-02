@@ -70,7 +70,7 @@ class BatchLimitOperator extends AOperator
             data.count.setValue(0);
         }
         Iterator<Row> it = data.iterator;
-        return new Iterator<Row>()
+        return new Iterator<>()
         {
             @Override
             public Row next()

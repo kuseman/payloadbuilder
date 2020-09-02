@@ -20,15 +20,13 @@ public class TableFunction extends TableSource
     private final String function;
     private final List<Expression> arguments;
     private final int functionId;
-    private final List<Option> tableOptions;
 
-    public TableFunction(String catalogAlias, TableAlias tableAlias, String function, List<Expression> arguments/*, String alias*/, List<Option> tableOptions, int functionId, Token token)
+    public TableFunction(String catalogAlias, TableAlias tableAlias, String function, List<Expression> arguments, List<Option> options, int functionId, Token token)
     {
-        super(tableAlias/*, alias*/, token);
+        super(tableAlias, options, token);
         this.catalogAlias = catalogAlias;
         this.function = requireNonNull(function, "function");
         this.arguments = requireNonNull(arguments, "arguments");
-        this.tableOptions = requireNonNull(tableOptions, "tableOptions");
         this.functionId = functionId;
     }
     
@@ -41,12 +39,6 @@ public class TableFunction extends TableSource
     public String getFunction()
     {
         return function;
-    }
-    
-    @Override
-    public List<Option> getOptions()
-    {
-        return tableOptions;
     }
     
     public TableFunctionInfo getFunctionInfo(QuerySession session)

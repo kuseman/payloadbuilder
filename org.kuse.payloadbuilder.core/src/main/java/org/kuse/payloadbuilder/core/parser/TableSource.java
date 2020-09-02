@@ -1,6 +1,5 @@
 package org.kuse.payloadbuilder.core.parser;
 
-import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 import java.util.List;
@@ -12,14 +11,14 @@ import org.kuse.payloadbuilder.core.catalog.TableAlias;
 /** Base class for table sources */
 public abstract class TableSource extends ASelectNode
 {
-//    protected final String alias;
-    protected final Token token;
     protected final TableAlias tableAlias;
+    protected final Token token;
+    protected final List<Option> options;
     
-    public TableSource(TableAlias tableAlias/*, String alias*/, Token token)
+    public TableSource(TableAlias tableAlias, List<Option> options, Token token)
     {
         this.tableAlias = requireNonNull(tableAlias, "tableAlias");
-//        this.alias = requireNonNull(alias, "alias");
+        this.options = requireNonNull(options, "options");
         this.token = requireNonNull(token, "token");
     }
     
@@ -28,15 +27,10 @@ public abstract class TableSource extends ASelectNode
         return tableAlias;
     }
     
-//    public String getAlias()
-//    {
-//        return alias;
-//    }
-    
     /** Get table options (if applicable) */
     public List<Option> getOptions()
     {
-        return emptyList();
+        return options;
     }
     
     /** Return catalog (if applicable) for this table source */

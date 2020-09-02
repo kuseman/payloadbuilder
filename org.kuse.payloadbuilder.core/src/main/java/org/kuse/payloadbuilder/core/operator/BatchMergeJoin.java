@@ -101,7 +101,7 @@ class BatchMergeJoin extends AOperator
     public Iterator<Row> open(ExecutionContext context)
     {
         final Iterator<Row> outerIt = outer.open(context);
-        return new Iterator<Row>()
+        return new Iterator<>()
         {
             /** Batched rows */
             private List<Row> outerRows;
@@ -413,7 +413,7 @@ class BatchMergeJoin extends AOperator
 
             private Iterator<Object[]> outerValuesIterator()
             {
-                return new Iterator<Object[]>()
+                return new Iterator<>()
                 {
                     private int outerRowsIndex = 0;
                     private Object[] nextArray;

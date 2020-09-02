@@ -52,7 +52,7 @@ class TopOperator extends AOperator
         }
         final int top = ((Integer) obj).intValue();
         final Iterator<Row> it = target.open(context);
-        return new Iterator<Row>()
+        return new Iterator<>()
         {
             private int count;
 

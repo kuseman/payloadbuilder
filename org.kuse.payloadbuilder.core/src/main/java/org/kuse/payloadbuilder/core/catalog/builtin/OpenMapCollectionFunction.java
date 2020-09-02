@@ -59,7 +59,7 @@ class OpenMapCollectionFunction extends TableFunctionInfo
     {
         final Object value = arguments.get(0).eval(context);
         final Iterator<Object> it = IteratorUtils.getIterator(value);
-        return new Iterator<Row>()
+        return new Iterator<>()
         {
             private Set<String> addedColumns;
             private int pos = 0;
@@ -79,7 +79,7 @@ class OpenMapCollectionFunction extends TableFunctionInfo
                 return r;
             }
 
-            boolean setNext()
+            private boolean setNext()
             {
                 while (next == null)
                 {

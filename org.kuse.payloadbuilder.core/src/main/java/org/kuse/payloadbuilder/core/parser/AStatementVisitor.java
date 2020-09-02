@@ -183,7 +183,7 @@ public class AStatementVisitor<TR, TC> implements StatementVisitor<TR, TC>, Sele
     }
 
     @Override
-    public TR visit(PopulateTableSource populatingJoin, TC context)
+    public TR visit(SubQueryTableSource populatingJoin, TC context)
     {
         populatingJoin.getTableSourceJoined().accept(this, context);
         populatingJoin.getOptions().forEach(to -> visitExpression(context, to.getValueExpression()));

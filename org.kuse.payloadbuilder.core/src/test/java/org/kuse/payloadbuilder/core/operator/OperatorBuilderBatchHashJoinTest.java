@@ -29,12 +29,12 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         String queryString = "SELECT s.art_id "
             + "FROM source s "
             + "INNER JOIN "
-            + "["
-            + "  article a"
-            + "  INNER JOIN [articleAttribute] aa"
+            + "("
+            + "  from article a"
+            + "  INNER JOIN articleAttribute aa with(populate=true)"
             + "    ON aa.art_id = a.art_id "
             + "    AND s.id "
-            + "] a"
+            + ") a with(populate=true) "
             + "  ON a.art_id = s.art_id";
 
         List<Operator> operators = new ArrayList<>();
@@ -81,12 +81,12 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         String queryString = "SELECT a.art_id " +
             "FROM source s " +
             "INNER JOIN " +
-            "[" +
-            "  article a " +
+            "(" +
+            "  from article a " +
             "  INNER JOIN article_attribute aa " +
             "    ON aa.art_id = a.art_id " +
             "    AND aa.active_flg " +
-            "] a " +
+            ") a with (populate=true)" +
             "  ON a.art_id = s.art_id " +
             "  AND a.club_id = 1337 + 123 " +
             "  AND a.country_id = 0 " +
@@ -188,7 +188,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
     {
         String queryString = "SELECT a.art_id " +
             "FROM source s " +
-            "INNER JOIN [article where internet_flg = 1] a " +
+            "INNER JOIN (from article where internet_flg = 1) a with(populate=true)" +
             "  ON a.art_id = s.art_id " +
             "  AND a.club_id = 1337 + 123 " +
             "  AND a.country_id = 0 " +
@@ -232,7 +232,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
     {
         String queryString = "SELECT a.art_id " +
             "FROM source s " +
-            "LEFT JOIN [article where internet_flg = 1] a " +
+            "LEFT JOIN (from article where internet_flg = 1) a with (populate=true)" +
             "  ON a.art_id = s.art_id " +
             "  AND a.club_id = 1337 + 123 " +
             "  AND a.country_id = 0 " +

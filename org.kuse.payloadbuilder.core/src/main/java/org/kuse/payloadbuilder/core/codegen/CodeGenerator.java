@@ -75,7 +75,7 @@ public class CodeGenerator
         {
             cbe.cook(code);
             Class<?> clazz = cbe.getClazz();
-            return (T) clazz.newInstance();
+            return (T) clazz.getConstructors()[0].newInstance();
         }
         catch (Exception e)
         {

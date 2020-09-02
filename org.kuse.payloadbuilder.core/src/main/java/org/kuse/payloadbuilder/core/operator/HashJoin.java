@@ -174,7 +174,7 @@ class HashJoin extends AOperator
             boolean markOuterRows)
     {
         final Iterator<Row> ii = inner.open(context);
-        return new Iterator<Row>()
+        return new Iterator<>()
         {
             Row next;
             Row currentInner;
@@ -196,7 +196,7 @@ class HashJoin extends AOperator
                 return r;
             }
 
-            boolean setNext()
+            private boolean setNext()
             {
                 while (next == null)
                 {
@@ -255,7 +255,7 @@ class HashJoin extends AOperator
             TableIteratorType type)
     {
         final Iterator<List<Row>> tableIt = table.values().iterator();
-        return new Iterator<Row>()
+        return new Iterator<>()
         {
             private Row next;
             private List<Row> list;
@@ -275,7 +275,7 @@ class HashJoin extends AOperator
                 return result;
             }
 
-            boolean setNext()
+            private boolean setNext()
             {
                 while (next == null)
                 {
