@@ -4,15 +4,15 @@ package org.kuse.payloadbuilder.core.parser;
 public abstract class ASelectVisitor<TR, TC> implements SelectVisitor<TR, TC>
 {
     /**
-     * Visit expression.
-     * Override this method to visit any expression found in tree components
+     * Visit expression. Override this method to visit any expression found in tree components
+     *
      * @param expression Expression to visit
      * @param context Context for visitor
-     *  */
+     */
     protected void visit(Expression expression, TC context)
     {
     }
-    
+
     @Override
     public TR visit(Select select, TC context)
     {
@@ -70,7 +70,7 @@ public abstract class ASelectVisitor<TR, TC> implements SelectVisitor<TR, TC>
     {
         return null;
     }
-    
+
     @Override
     public TR visit(TableFunction tableFunction, TC context)
     {
@@ -90,7 +90,7 @@ public abstract class ASelectVisitor<TR, TC> implements SelectVisitor<TR, TC>
         populatingJoin.getOrderBy().forEach(o -> o.accept(this, context));
         return null;
     }
-    
+
     @Override
     public TR visit(Join join, TC context)
     {
@@ -98,7 +98,7 @@ public abstract class ASelectVisitor<TR, TC> implements SelectVisitor<TR, TC>
         visit(join.getCondition(), context);
         return null;
     }
-    
+
     @Override
     public TR visit(Apply apply, TC context)
     {

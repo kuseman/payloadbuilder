@@ -14,7 +14,7 @@ public class LiteralStringExpression extends LiteralExpression
         super(value);
         this.value = requireNonNull(value);
     }
-    
+
     @Override
     public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
     {
@@ -24,7 +24,7 @@ public class LiteralStringExpression extends LiteralExpression
         code.setCode(String.format(template, code.getResVar(), value, code.getIsNull()));
         return code;
     }
-    
+
     @Override
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {

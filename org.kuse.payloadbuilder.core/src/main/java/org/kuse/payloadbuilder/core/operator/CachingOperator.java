@@ -5,7 +5,6 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.repeat;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
@@ -24,13 +23,13 @@ class CachingOperator extends AOperator
         super(nodeId);
         this.operator = requireNonNull(target, "operator");
     }
-    
+
     @Override
     public List<Operator> getChildOperators()
     {
         return asList(operator);
     }
-    
+
     @Override
     public String getName()
     {
@@ -38,7 +37,7 @@ class CachingOperator extends AOperator
     }
 
     @Override
-    public Iterator<Row> open(ExecutionContext context)
+    public RowIterator open(ExecutionContext context)
     {
         executionCount++;
 
@@ -47,13 +46,14 @@ class CachingOperator extends AOperator
         if (data.cache == null)
         {
             data.cache = new ArrayList<>();
-            Iterator<Row> it = operator.open(context);
+            RowIterator it = operator.open(context);
             while (it.hasNext())
             {
                 data.cache.add(it.next());
             }
+            it.close();
         }
-        return data.cache.iterator();
+        return RowIterator.wrap(data.cache.iterator());
     }
 
     @Override

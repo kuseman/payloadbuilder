@@ -5,7 +5,6 @@ import static java.util.Objects.requireNonNull;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -52,7 +51,7 @@ class BatchLimitOperator extends AOperator
     }
 
     @Override
-    public Iterator<Row> open(ExecutionContext context)
+    public RowIterator open(ExecutionContext context)
     {
         Data data = context.getOperatorContext().getNodeData(nodeId, Data::new);
         if (data.iterator == null)
@@ -69,8 +68,8 @@ class BatchLimitOperator extends AOperator
         {
             data.count.setValue(0);
         }
-        Iterator<Row> it = data.iterator;
-        return new Iterator<>()
+        RowIterator it = data.iterator;
+        return new RowIterator()
         {
             @Override
             public Row next()
@@ -78,6 +77,12 @@ class BatchLimitOperator extends AOperator
                 data.count.increment();
                 Row row = it.next();
                 return row;
+            }
+
+            @Override
+            public void close()
+            {
+                it.close();
             }
 
             @Override
@@ -123,7 +128,7 @@ class BatchLimitOperator extends AOperator
     /** Data for this operator */
     private static class Data extends NodeData implements BatchLimitData
     {
-        Iterator<Row> iterator;
+        RowIterator iterator;
         MutableInt count = new MutableInt();
         int limit;
 

@@ -15,37 +15,37 @@ class RegexpLikeFunction extends ScalarFunctionInfo
     {
         super(catalog, "regexp_like");
     }
-    
+
     @Override
     public Class<?> getDataType()
     {
         return Boolean.class;
     }
-    
+
     @Override
     public String getDescription()
     {
         return "Matches first argument to regex provided in second argument." + System.lineSeparator() +
-                "Ex. regexp_like(expression, stringExpression)." + System.lineSeparator() +
-                "Returns a boolean value.";
+            "Ex. regexp_like(expression, stringExpression)." + System.lineSeparator() +
+            "Returns a boolean value.";
     }
-    
+
     @Override
     public Object eval(ExecutionContext context, List<Expression> arguments)
     {
         Object obj = arguments.get(0).eval(context);
-        
+
         if (obj == null)
         {
             return null;
         }
-        
+
         Object patternObj = arguments.get(1).eval(context);
         if (!(patternObj instanceof String))
         {
             throw new IllegalArgumentException("Expected a String pattern for function " + getName() + " but got " + patternObj);
         }
-        
+
         String value = String.valueOf(obj);
         Pattern pattern = Pattern.compile((String) patternObj);
 

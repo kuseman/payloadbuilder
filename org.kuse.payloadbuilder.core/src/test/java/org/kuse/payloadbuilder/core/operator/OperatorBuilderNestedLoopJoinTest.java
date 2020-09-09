@@ -61,8 +61,8 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorTest
                 true,
                 false);
 
-//                System.out.println(expected.toString(1));
-//                System.err.println( result.operator.toString(1));
+        //                System.out.println(expected.toString(1));
+        //                System.err.println( result.operator.toString(1));
 
         assertEquals(expected, result.operator);
 

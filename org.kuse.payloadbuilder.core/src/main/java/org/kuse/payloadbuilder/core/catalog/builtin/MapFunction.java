@@ -28,14 +28,14 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
     {
         super(catalog, "map");
     }
-    
+
     @Override
     public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Expression> arguments, Function<Expression, Set<TableAlias>> aliasResolver)
     {
         // Map function has resulting alias as the mapping lambda
         return aliasResolver.apply(arguments.get(1));
     }
-    
+
     @Override
     public List<Pair<Expression, LambdaExpression>> getLambdaBindings(List<Expression> arguments)
     {
@@ -47,13 +47,13 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
     {
         return Iterator.class;
     }
-    
+
     @Override
     public List<Class<? extends Expression>> getInputTypes()
     {
         return asList(Expression.class, LambdaExpression.class);
     }
-    
+
     @Override
     public Object eval(ExecutionContext context, List<Expression> arguments)
     {
@@ -64,13 +64,13 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
         }
         LambdaExpression le = (LambdaExpression) arguments.get(1);
         int lambdaId = le.getLambdaIds()[0];
-        return new TransformIterator(IteratorUtils.getIterator(argResult), input -> 
+        return new TransformIterator(IteratorUtils.getIterator(argResult), input ->
         {
             context.setLambdaValue(lambdaId, input);
             return le.getExpression().eval(context);
         });
     }
-    
+
     @Override
     public ExpressionCode generateCode(
             CodeGeneratorContext context,
@@ -83,31 +83,30 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
         code.addImport("java.util.Iterator");
         code.addImport("org.apache.commons.collections.iterators.TransformIterator");
         code.addImport("org.apache.commons.collections.Transformer");
-        
+
         LambdaExpression le = (LambdaExpression) arguments.get(1);
-        
+
         context.addLambdaParameters(le.getIdentifiers());
         ExpressionCode lambdaCode = le.getExpression().generateCode(context, parentCode);
         context.removeLambdaParameters(le.getIdentifiers());
-        
-        String template = 
-                "%s"
-              + "boolean %s = true;\n"
-              + "Iterator %s = null;\n"
-              + "if (!%s)\n"
-              + "{\n"
-              + "  %s = new TransformIterator(IteratorUtils.getIterator(%s), new Transformer()\n"
-              + "  {\n"
-              + "    public Object transform(Object object)\n"
-              + "    {\n"
-              + "      Object %s = object;\n"
-              + "      %s"
-              + "      return %s;\n"
-              + "    }\n"
-              + "  });\n"
-              + "  %s = false;\n"
-              + "}\n";
-        
+
+        String template = "%s"
+            + "boolean %s = true;\n"
+            + "Iterator %s = null;\n"
+            + "if (!%s)\n"
+            + "{\n"
+            + "  %s = new TransformIterator(IteratorUtils.getIterator(%s), new Transformer()\n"
+            + "  {\n"
+            + "    public Object transform(Object object)\n"
+            + "    {\n"
+            + "      Object %s = object;\n"
+            + "      %s"
+            + "      return %s;\n"
+            + "    }\n"
+            + "  });\n"
+            + "  %s = false;\n"
+            + "}\n";
+
         code.setCode(String.format(template,
                 inputCode.getCode(),
                 code.getIsNull(),
@@ -118,7 +117,7 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
                 lambdaCode.getCode(),
                 lambdaCode.getResVar(),
                 code.getIsNull()));
-        
+
         return code;
     }
 }

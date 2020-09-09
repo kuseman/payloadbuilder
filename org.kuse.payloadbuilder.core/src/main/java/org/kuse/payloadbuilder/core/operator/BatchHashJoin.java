@@ -123,13 +123,13 @@ class BatchHashJoin extends AOperator
                 entry(OUTER_VALUES, outerValuesExtractor),
                 entry(INNER_VALUES, innerValuesExtractor));
     }
-    
+
     class Data extends NodeData
     {
         AtomicLong time = new AtomicLong();
         long innerHashTime;
         long outerHashTime;
-        
+
         @Override
         public String toString()
         {
@@ -138,11 +138,11 @@ class BatchHashJoin extends AOperator
     }
 
     @Override
-    public Iterator<Row> open(ExecutionContext context)
+    public RowIterator open(ExecutionContext context)
     {
         Data data = context.getOperatorContext().getNodeData(nodeId, () -> new Data());
         executionCount++;
-        final Iterator<Row> outerIt = outer.open(context);
+        final RowIterator outerIt = outer.open(context);
         int temp = innerIndex.getBatchSize();
         if (batchSizeOption != null)
         {
@@ -156,7 +156,7 @@ class BatchHashJoin extends AOperator
         final StopWatch sw = new StopWatch();
         final int batchSize = temp;
         final Row contextParent = context.getRow();
-        return new Iterator<>()
+        return new RowIterator()
         {
             /** Batched rows */
             private List<Row> outerRows;
@@ -197,6 +197,12 @@ class BatchHashJoin extends AOperator
                 return setNext();
             }
 
+            @Override
+            public void close()
+            {
+                outerIt.close();
+            };
+
             private boolean setNext()
             {
                 while (next == null)
@@ -217,12 +223,12 @@ class BatchHashJoin extends AOperator
                             sw.stop();
                             data.time.addAndGet(sw.getTime());
                             sw.reset();
-                            
+
                             return false;
                         }
 
                         hashInnerBatch();
-                        
+
                         // Start probing
                         continue;
                     }
@@ -278,16 +284,15 @@ class BatchHashJoin extends AOperator
                     outerRow.setPredicateParent(contextParent);
                     innerRow.setPredicateParent(outerRow);
 
-                    
                     if (predicate.test(context, innerRow))
                     {
                         sw1.start();
-                        
+
                         next = rowMerger.merge(outerRow, innerRow, populating);
                         sw1.stop();
                         data.innerHashTime += sw1.getTime();
                         sw1.reset();
-                        
+
                         if (populating)
                         {
                             outerRow.match = true;
@@ -302,8 +307,7 @@ class BatchHashJoin extends AOperator
             }
 
             StopWatch sw1 = new StopWatch();
-            
-            
+
             /** Batch outer rows and generate outer keys */
             private void batchOuterRows()
             {
@@ -328,7 +332,7 @@ class BatchHashJoin extends AOperator
                     }
                 }
             }
-            
+
             private void hashInnerBatch()
             {
                 outerValuesIterator = outerValuesIterator(context);
@@ -336,9 +340,9 @@ class BatchHashJoin extends AOperator
                 {
                     return;
                 }
-                
+
                 context.getOperatorContext().setOuterIndexValues(outerValuesIterator);
-                Iterator<Row> it = inner.open(context);
+                RowIterator it = inner.open(context);
 
                 // Hash batch
                 while (it.hasNext())
@@ -353,10 +357,11 @@ class BatchHashJoin extends AOperator
                     }
                     tableValue.addRow(row);
                 }
+                it.close();
 
                 verifyOuterValuesIterator();
                 context.getOperatorContext().setOuterIndexValues(null);
-                
+
             }
 
             private void emitOuterRows()
@@ -408,7 +413,7 @@ class BatchHashJoin extends AOperator
                 {
                     private int outerRowsIndex = 0;
                     private Object[] nextArray;
-                    
+
                     @Override
                     public boolean hasNext()
                     {
@@ -460,7 +465,7 @@ class BatchHashJoin extends AOperator
 
                             nextArray = keyValues;
                         }
-                        
+
                         return true;
                     }
                 };
@@ -476,7 +481,7 @@ class BatchHashJoin extends AOperator
         for (int i = 0; i < length; i++)
         {
             Object value = values[i];
-            
+
             // If value is string and is digits, use the intvalue as
             // hash instead of string to be able to compare ints and strings
             // on left/right side of join
@@ -484,7 +489,7 @@ class BatchHashJoin extends AOperator
             {
                 value = Integer.parseInt((String) value);
             }
-            
+
             result = 31 * result + (value == null ? 0 : value.hashCode());
         }
         return result;
@@ -578,7 +583,7 @@ class BatchHashJoin extends AOperator
 
         /**
          * Add inner values array
-         * 
+         *
          * @return True if array was added
          */
         boolean addInnterValues(Object[] keyValues)

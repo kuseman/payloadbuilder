@@ -1,7 +1,6 @@
 package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Arrays.asList;
-import static java.util.Collections.emptyIterator;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.kuse.payloadbuilder.core.DescribeUtils.INNER_VALUES;
@@ -65,7 +64,7 @@ class HashJoin extends AOperator
         this.populating = populating;
         this.emitEmptyOuterRows = emitEmptyOuterRows;
     }
-    
+
     @Override
     public String getName()
     {
@@ -77,7 +76,7 @@ class HashJoin extends AOperator
     {
         return asList(outer, inner);
     }
-    
+
     @Override
     public Map<String, Object> getDescribeProperties()
     {
@@ -88,32 +87,32 @@ class HashJoin extends AOperator
                 entry(OUTER_VALUES, outerHashFunction),
                 entry(INNER_VALUES, innerHashFunction));
     }
-    
+
     class Data extends NodeData
     {
         AtomicLong time = new AtomicLong();
         long innerHashTime;
         long outerHashTime;
-        
+
         @Override
         public String toString()
         {
             return "Timings. innerTime: " + innerHashTime + ", outerTime: " + outerHashTime + "): " + DurationFormatUtils.formatDurationHMS(time.get());
         }
     }
-    
+
     @SuppressWarnings("unchecked")
     @Override
-    public Iterator<Row> open(ExecutionContext context)
+    public RowIterator open(ExecutionContext context)
     {
         Map<IntKey, List<Row>> table = hash(context);
         if (table.isEmpty())
         {
-            return emptyIterator();
+            return RowIterator.EMPTY;
         }
 
         boolean markOuterRows = populating || emitEmptyOuterRows;
-        Iterator<Row> probeIterator = probeIterator(context.getRow(), table, context, markOuterRows);
+        RowIterator probeIterator = probeIterator(context.getRow(), table, context, markOuterRows);
 
         if (populating)
         {
@@ -134,16 +133,16 @@ class HashJoin extends AOperator
         // Left join
         // 1. Probe matched rows
         // 2. Probe non matched rows from table
-        return new IteratorChain(
+        return RowIterator.wrap(new IteratorChain(
                 probeIterator,
-                tableIterator(table, TableIteratorType.NON_MATCHED));
+                tableIterator(table, TableIteratorType.NON_MATCHED)));
     };
 
     private Map<IntKey, List<Row>> hash(ExecutionContext context)
     {
         IntKey key = new IntKey();
         Map<IntKey, List<Row>> table = new LinkedHashMap<>();
-        Iterator<Row> oi = outer.open(context);
+        RowIterator oi = outer.open(context);
         while (oi.hasNext())
         {
             Row row = oi.next();
@@ -164,17 +163,18 @@ class HashJoin extends AOperator
             }
             list.add(row);
         }
+        oi.close();
         return table;
     }
 
-    private Iterator<Row> probeIterator(
+    private RowIterator probeIterator(
             Row contextParent,
             Map<IntKey, List<Row>> table,
             ExecutionContext context,
             boolean markOuterRows)
     {
-        final Iterator<Row> ii = inner.open(context);
-        return new Iterator<>()
+        final RowIterator ii = inner.open(context);
+        return new RowIterator()
         {
             Row next;
             Row currentInner;
@@ -194,6 +194,12 @@ class HashJoin extends AOperator
                 Row r = next;
                 next = null;
                 return r;
+            }
+
+            @Override
+            public void close()
+            {
+                ii.close();
             }
 
             private boolean setNext()
@@ -250,12 +256,12 @@ class HashJoin extends AOperator
         };
     }
 
-    private Iterator<Row> tableIterator(
+    private RowIterator tableIterator(
             Map<IntKey, List<Row>> table,
             TableIteratorType type)
     {
         final Iterator<List<Row>> tableIt = table.values().iterator();
-        return new Iterator<>()
+        return new RowIterator()
         {
             private Row next;
             private List<Row> list;

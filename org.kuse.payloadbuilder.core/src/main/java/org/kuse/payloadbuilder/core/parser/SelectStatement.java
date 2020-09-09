@@ -6,6 +6,7 @@ import static java.util.Objects.requireNonNull;
 public class SelectStatement extends Statement
 {
     private final Select select;
+
     SelectStatement(Select select)
     {
         this.select = requireNonNull(select, "select");
@@ -15,7 +16,7 @@ public class SelectStatement extends Statement
     {
         return select;
     }
-    
+
     @Override
     public <TR, TC> TR accept(StatementVisitor<TR, TC> visitor, TC context)
     {

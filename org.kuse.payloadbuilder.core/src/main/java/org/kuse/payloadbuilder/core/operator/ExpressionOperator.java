@@ -1,6 +1,5 @@
 package org.kuse.payloadbuilder.core.operator;
 
-import static java.util.Collections.emptyIterator;
 import static java.util.Objects.requireNonNull;
 
 import java.util.Iterator;
@@ -8,8 +7,6 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.collections.Transformer;
-import org.apache.commons.collections.iterators.TransformIterator;
 import org.apache.commons.lang3.ArrayUtils;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
@@ -29,23 +26,35 @@ class ExpressionOperator extends AOperator
 
     @SuppressWarnings("unchecked")
     @Override
-    public Iterator<Row> open(ExecutionContext context)
+    public RowIterator open(ExecutionContext context)
     {
         Object result = expression.eval(context);
         if (result == null)
         {
-            return emptyIterator();
+            return RowIterator.EMPTY;
         }
 
         // Transformer that supports Map's beyond rows
-        return new TransformIterator(IteratorUtils.getIterator(result), new Transformer()
+        Iterator<Object> iterator = IteratorUtils.getIterator(result);
+        return new RowIterator()
         {
             private TableAlias alias;
             private Set<String> columns;
             private int pos;
 
             @Override
-            public Object transform(Object input)
+            public boolean hasNext()
+            {
+                return iterator.hasNext();
+            };
+
+            @Override
+            public Row next()
+            {
+                return transform(iterator.next());
+            };
+
+            private Row transform(Object input)
             {
                 if (input == null)
                 {
@@ -53,7 +62,7 @@ class ExpressionOperator extends AOperator
                 }
                 else if (input instanceof Row)
                 {
-                    return input;
+                    return (Row) input;
                 }
                 else if (input instanceof Map)
                 {
@@ -81,7 +90,7 @@ class ExpressionOperator extends AOperator
 
                 throw new IllegalArgumentException("Cannot iterate over " + input);
             }
-        });
+        };
     }
 
     @Override

@@ -16,21 +16,21 @@ class IsNullFunction extends ScalarFunctionInfo
     {
         super(catalog, "isnull");
     }
-    
+
     @Override
     public String getDescription()
     {
         return "Returns first non null value of provided arguments. " + System.lineSeparator() +
-                "Ex. isnull(expression, expression)"  + System.lineSeparator() +
-                "If both arguments yield null, null is returned.";
+            "Ex. isnull(expression, expression)" + System.lineSeparator() +
+            "If both arguments yield null, null is returned.";
     }
-    
+
     @Override
     public List<Class<? extends Expression>> getInputTypes()
     {
         return asList(Expression.class, Expression.class);
     }
-    
+
     @Override
     public Object eval(ExecutionContext context, List<Expression> arguments)
     {
@@ -39,7 +39,7 @@ class IsNullFunction extends ScalarFunctionInfo
         {
             return obj;
         }
-        
+
         return arguments.get(1).eval(context);
     }
 }

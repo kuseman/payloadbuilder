@@ -57,6 +57,7 @@ import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SelectState
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SetStatementContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ShowStatementContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SortItemContext;
+import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.StatementContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SubQueryContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SubscriptContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceContext;
@@ -133,11 +134,12 @@ public class QueryParser
     /** Builds tree */
     private static class AstBuilder extends PayloadBuilderQueryBaseVisitor<Object>
     {
-        /** Function identifier counter. Ticks up for each unique catalog/function name combo.
-         * This to be able to cache function lookup by id */
+        /**
+         * Function identifier counter. Ticks up for each unique catalog/function name combo. This to be able to cache function lookup by id
+         */
         private int functionId;
         private final Map<Pair<String, String>, Integer> functionIdByName = new HashMap<>();
-        
+
         /** Lambda parameters and slot id in current scope */
         private final Map<String, Integer> lambdaParameters = new HashMap<>();
         private Expression leftDereference;
@@ -145,7 +147,21 @@ public class QueryParser
         private String parentAlias;
         private TableAlias parentTableAlias;
         private TableAlias currentTableAlias;
-        
+
+        private void clear()
+        {
+            parentAlias = null;
+            parentTableAlias = null;
+            currentTableAlias = null;
+        }
+
+        @Override
+        public Object visitStatement(StatementContext ctx)
+        {
+            clear();
+            return super.visitStatement(ctx);
+        }
+
         @Override
         public Object visitIfStatement(IfStatementContext ctx)
         {
@@ -189,7 +205,7 @@ public class QueryParser
             }
             return new UseStatement(qname, expression);
         }
-        
+
         @Override
         public Object visitDescribeStatement(DescribeStatementContext ctx)
         {
@@ -198,10 +214,10 @@ public class QueryParser
                 String catalog = lowerCase(ctx.tableName().catalog != null ? ctx.tableName().catalog.getText() : null);
                 return new DescribeTableStatement(catalog, getQualifiedName(ctx.tableName().qname()));
             }
-            
+
             return new DescribeSelectStatement((SelectStatement) visit(ctx.selectStatement()));
         }
-        
+
         @Override
         public Object visitShowStatement(ShowStatementContext ctx)
         {
@@ -209,7 +225,7 @@ public class QueryParser
             ShowStatement.Type type = ShowStatement.Type.valueOf(upperCase(ctx.getChild(ctx.getChildCount() - 1).getText()));
             return new ShowStatement(type, catalog, ctx.start);
         }
-        
+
         @Override
         public Object visitTopSelect(TopSelectContext ctx)
         {
@@ -253,7 +269,7 @@ public class QueryParser
             Select select = new Select(selectItems, joinedTableSource, topExpression, where, groupBy, orderBy);
             return new SelectStatement(select);
         }
-        
+
         @Override
         public Object visitTopCount(TopCountContext ctx)
         {
@@ -349,7 +365,7 @@ public class QueryParser
                 {
                     alias = getIdentifier(ctx.alias);
                 }
-                
+
                 return new AsteriskSelectItem(alias);
             }
 
@@ -359,30 +375,28 @@ public class QueryParser
         @Override
         public Object visitTableSourceJoined(TableSourceJoinedContext ctx)
         {
-//            String prevAlias = parentAlias;
+            //            String prevAlias = parentAlias;
             TableAlias prevParent = parentTableAlias;
-            
 
             TableSource tableSource = (TableSource) visit(ctx.tableSource());
-            
-//            parentAlias = tableSource.alias;
+
+            //            parentAlias = tableSource.alias;
             parentTableAlias = currentTableAlias;
-            
-            
+
             List<AJoin> joins = ctx
                     .joinPart()
                     .stream()
                     .map(j ->
-                    { 
+                    {
                         parentAlias = getIdentifier(j.tableSource().identifier());
-//                        AJoin join = (AJoin) visit(j);
+                        //                        AJoin join = (AJoin) visit(j);
                         return (AJoin) visit(j);
                     })
                     .collect(toList());
-            
+
             parentTableAlias = prevParent;
-//            parentAlias = prevAlias;
-            
+            //            parentAlias = prevAlias;
+
             return new TableSourceJoined(tableSource, joins);
         }
 
@@ -406,18 +420,19 @@ public class QueryParser
         {
             return parentTableAlias;
         }
-        
+
         @Override
         public Object visitTableSource(TableSourceContext ctx)
         {
             String alias = getIdentifier(ctx.identifier());
-            
+
             List<Option> options = ctx.tableSourceOptions() != null ? ctx.tableSourceOptions().options.stream().map(to -> (Option) visit(to)).collect(toList()) : emptyList();
             if (ctx.functionCall() != null)
             {
                 FunctionCallInfo functionCallInfo = (FunctionCallInfo) visit(ctx.functionCall());
                 currentTableAlias = TableAlias.of(getParentTableAlias(), QualifiedName.of(functionCallInfo.function), defaultIfNull(parentAlias, defaultIfNull(alias, "")), ctx.functionCall().start);
-                return new TableFunction(functionCallInfo.catalog, currentTableAlias, functionCallInfo.function, functionCallInfo.arguments/*, defaultIfNull(alias, "")*/, options, functionCallInfo.functionId, ctx.functionCall().start);
+                return new TableFunction(functionCallInfo.catalog, currentTableAlias, functionCallInfo.function, functionCallInfo.arguments/*, defaultIfNull(alias, "")*/, options,
+                        functionCallInfo.functionId, ctx.functionCall().start);
             }
             else if (ctx.subQuery() != null)
             {
@@ -429,7 +444,7 @@ public class QueryParser
                 SubQueryContext subQueryCtx = ctx.subQuery();
 
                 TableSourceJoined tableSourceJoined = (TableSourceJoined) visit(subQueryCtx.tableSourceJoined());
-                
+
                 if (tableSourceJoined.getTableSource() instanceof SubQueryTableSource)
                 {
                     throw new ParseException("Table source in populate query cannot be a populate table source", subQueryCtx.start);
@@ -443,7 +458,7 @@ public class QueryParser
             }
 
             QualifiedName table = getQualifiedName(ctx.tableName().qname());
-            
+
             currentTableAlias = TableAlias.of(getParentTableAlias(), table, defaultIfNull(parentAlias, defaultIfNull(alias, "")), ctx.tableName().start);
             String catalog = ctx.tableName().catalog != null ? ctx.tableName().catalog.getText() : null;
             return new Table(catalog, currentTableAlias, options, ctx.tableName().start);
@@ -456,7 +471,7 @@ public class QueryParser
             Expression valueExpression = getExpression(ctx.expression());
             return new Option(option, valueExpression);
         }
-        
+
         @Override
         public Object visitColumnReference(ColumnReferenceContext ctx)
         {
@@ -470,14 +485,14 @@ public class QueryParser
         {
             return new VariableExpression(getQualifiedName(ctx.variable().qname()));
         }
-        
+
         @Override
         public Object visitFunctionCallExpression(FunctionCallExpressionContext ctx)
         {
             FunctionCallInfo functionCallInfo = (FunctionCallInfo) visit(ctx.functionCall());
             return new QualifiedFunctionCallExpression(functionCallInfo.catalog, functionCallInfo.function, functionCallInfo.arguments, functionCallInfo.functionId, ctx.functionCall().start);
         }
-        
+
         @Override
         public Object visitSubscript(SubscriptContext ctx)
         {
@@ -494,7 +509,7 @@ public class QueryParser
             leftDereference = null;
             String catalog = lowerCase(ctx.functionName().catalog != null ? ctx.functionName().catalog.getText() : null);
             String function = getIdentifier(ctx.functionName().function);
-            
+
             List<Expression> arguments = ctx.arguments.stream().map(a -> getExpression(a)).collect(toList());
             int id = functionIdByName.computeIfAbsent(Pair.of(catalog, function), key -> functionId++);
             /* Wrap argument in a dereference expression if we are inside a dereference
@@ -513,10 +528,10 @@ public class QueryParser
             {
                 arguments.add(0, prevLeftDereference);
             }
-            
+
             return new FunctionCallInfo(id, catalog, function, arguments);
         }
-        
+
         @Override
         public Object visitFunctionArgument(FunctionArgumentContext ctx)
         {
@@ -596,7 +611,7 @@ public class QueryParser
         @Override
         public Object visitDereference(DereferenceContext ctx)
         {
-//            Expression prevLeftDereference = leftDereference;
+            //            Expression prevLeftDereference = leftDereference;
             Expression left = getExpression(ctx.left);
             leftDereference = left;
 

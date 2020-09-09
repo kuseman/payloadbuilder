@@ -5,7 +5,9 @@ import java.util.List;
 /** Visitor adapter for expression visitors */
 public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR, TC>
 {
-    /** Default result 
+    /**
+     * Default result
+     *
      * @param context Context for visitor
      **/
     protected TR defaultResult(TC context)
@@ -19,7 +21,7 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
     {
         return nextResult;
     }
-    
+
     @Override
     public TR visit(LiteralNullExpression expression, TC context)
     {
@@ -37,7 +39,7 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
     {
         return defaultResult(context);
     }
-    
+
     @Override
     public TR visit(LiteralLongExpression expression, TC context)
     {
@@ -49,7 +51,7 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
     {
         return defaultResult(context);
     }
-    
+
     @Override
     public TR visit(LiteralDoubleExpression expression, TC context)
     {
@@ -61,13 +63,13 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
     {
         return defaultResult(context);
     }
-    
+
     @Override
     public TR visit(VariableExpression expression, TC context)
     {
         return defaultResult(context);
     }
-    
+
     @Override
     public TR visit(ComparisonExpression expression, TC context)
     {
@@ -139,19 +141,19 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
     {
         return visitChildren(context, expression.getValue(), expression.getSubscript());
     }
-    
+
     @Override
     public TR visit(LambdaExpression expression, TC context)
     {
         return visitChildren(context, expression.getExpression());
     }
-    
-    private TR visitChildren(TC context, Expression ... args)
+
+    private TR visitChildren(TC context, Expression... args)
     {
         return visitChildren(context, null, args);
     }
-    
-    protected TR visitChildren(TC context, List<Expression> expressions, Expression ... args)
+
+    protected TR visitChildren(TC context, List<Expression> expressions, Expression... args)
     {
         TR result = defaultResult(context);
         if (expressions != null)
@@ -162,7 +164,7 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
                 result = aggregate(result, value);
             }
         }
-        
+
         if (args != null)
         {
             for (Expression e : args)

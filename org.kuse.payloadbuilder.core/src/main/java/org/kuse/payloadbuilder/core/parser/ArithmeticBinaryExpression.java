@@ -52,7 +52,7 @@ public class ArithmeticBinaryExpression extends Expression
         {
             return NULL_LITERAL;
         }
-        
+
         boolean ll = left instanceof LiteralExpression;
         boolean rl = right instanceof LiteralExpression;
 

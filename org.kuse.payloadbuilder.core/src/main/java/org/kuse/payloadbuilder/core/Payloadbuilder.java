@@ -10,14 +10,18 @@ public class Payloadbuilder
     private static final QueryParser PARSER = new QueryParser();
 
     /*
-     * 
-     * 
-     * 
+     *
+     *
+     *
      * TODO:
      * BACKEND
+     *   - TableAlias hierarchy isn't working correctly when having sub query and navigating
+     *     to siblings
+     *   - TableAlias columns must be unmutable else a query cannot be cached and reused.
+     *      Add columns property on row and if tableAlias is asterisk then the rows columns should be used
      *   - PredicateAnalyzer
-     *       "@timestamp" > cast('2020-08-09T07:00:09.086', datetime) 
-     *         This one is UNDEFINED, and shouldn't, it's because of function arguments has a QRE which is a 
+     *       "@timestamp" > cast('2020-08-09T07:00:09.086', datetime)
+     *         This one is UNDEFINED, and shouldn't, it's because of function arguments has a QRE which is a
      *         fake QRE only used for toString of Qname to determine datatype
      *       QualifiedVisitor
      *         Clean up code. Make a better method for finding an alias from a TableAlias, code is a mess now
@@ -47,7 +51,7 @@ public class Payloadbuilder
      *   - Join hint (HashJoin, hash_inner = true)
      *   - Add support for catalog to provide stats for tables
      *      - Estimated number of rows
-     *   - Catalog   
+     *   - Catalog
      *      Send in ExecutionContext when fetching indcies, to let catalog store information
      *      that will be used later on then operators are created
      *   - Index types
@@ -79,13 +83,13 @@ public class Payloadbuilder
      *   - Clear scroll
      *   - Refactor and reuse stuff from ESCatalog if possible
      *   - Implement predicate support for index-column
-     *   
+     *
      * EDITOR:
      *   - Bug in service when columns are gathered
      *     select array(*)  <-- should yield a no column name but gets the last column from the array values
-     *     from article_category 
+     *     from article_category
      */
-    
+
     private Payloadbuilder()
     {
     }
@@ -95,7 +99,7 @@ public class Payloadbuilder
     {
         return query(new QuerySession(new CatalogRegistry()), queryString);
     }
-    
+
     /** Perform query with provided session and query string */
     public static QueryResult query(QuerySession session, String queryString)
     {

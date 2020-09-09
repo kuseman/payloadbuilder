@@ -42,7 +42,7 @@ public class CatalogRegistry
     {
         return isBlank(alias) ? builtinCatalog : catalogByAlias.get(alias);
     }
-    
+
     /** Clears registered catalogs */
     public void clearCatalogs()
     {

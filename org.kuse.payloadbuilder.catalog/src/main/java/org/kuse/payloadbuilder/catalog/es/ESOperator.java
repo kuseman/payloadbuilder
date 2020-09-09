@@ -16,7 +16,9 @@ import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.URI;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -48,6 +50,7 @@ import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.conn.ssl.NoopHostnameVerifier;
@@ -165,7 +168,7 @@ class ESOperator extends AOperator
     }
 
     @Override
-    public Iterator<Row> open(ExecutionContext context)
+    public RowIterator open(ExecutionContext context)
     {
         EsType esType = EsType.of(context.getSession(), catalogAlias, tableAlias.getTable());
 
@@ -190,6 +193,8 @@ class ESOperator extends AOperator
             return getIterator(
                     context,
                     tableAlias,
+                    esType.endpoint,
+                    ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(esType.type),
                     receivedBytes,
                     scrollId ->
                     {
@@ -246,6 +251,8 @@ class ESOperator extends AOperator
         return getIterator(
                 context,
                 tableAlias,
+                esType.endpoint,
+                isSingleType,
                 receivedBytes,
                 scrollId ->
                 {
@@ -294,7 +301,7 @@ class ESOperator extends AOperator
                 scrollMinutes != null ? ("scroll=" + scrollMinutes + "m") : "",
                 size != null ? ("&size=" + size) : ""), "hits.hits", alias, operatorIndex, isSingleType);
     }
-    
+
     static String getSearchTemplateUrl(
             String endpoint,
             String index,
@@ -336,9 +343,9 @@ class ESOperator extends AOperator
             boolean isSingleType)
     {
         boolean includeParent = !isSingleType
-                && (alias.isAsteriskColumns()
-            || indexOf(alias.getColumns(), PARENTID) != -1
-            || operatorIndex instanceof ParentIndex);
+            && (alias.isAsteriskColumns()
+                || indexOf(alias.getColumns(), PARENTID) != -1
+                || operatorIndex instanceof ParentIndex);
         boolean includeIndex = alias.isAsteriskColumns()
             || indexOf(alias.getColumns(), INDEX) != -1;
         boolean includeType = alias.isAsteriskColumns()
@@ -386,26 +393,29 @@ class ESOperator extends AOperator
         return sb.toString();
     }
 
-    // TODO: clean scroll
-    static Iterator<Row> getIterator(
+    static RowIterator getIterator(
             ExecutionContext context,
             TableAlias tableAlias,
+            String endpoint,
+            boolean isSingleType,
             AtomicLong receivedBytes,
             Function<MutableObject<String>, HttpUriRequest> requestSupplier)
     {
-        return new Iterator<>()
+        return new RowIterator()
         {
-            Set<String> columns = new HashSet<>(tableAlias.isAsteriskColumns() ? emptyList() : asList(org.apache.commons.lang3.ObjectUtils.defaultIfNull(tableAlias.getColumns(), ArrayUtils.EMPTY_STRING_ARRAY)));
-            Set<String> addedColumns;
-            int rowPos = 0;
-            MutableObject<String> scrollId = new MutableObject<>();
-            Iterator<Doc> docIt;
-            Row next;
+            private final Set<String> columns = new HashSet<>(
+                    tableAlias.isAsteriskColumns() ? emptyList() : asList(org.apache.commons.lang3.ObjectUtils.defaultIfNull(tableAlias.getColumns(), ArrayUtils.EMPTY_STRING_ARRAY)));
+            private Set<String> addedColumns;
+            private int rowPos = 0;
+            private final MutableObject<String> scrollId = new MutableObject<>();
+            private Iterator<Doc> docIt;
+            private Row next;
+            private boolean closed;
 
             @Override
             public boolean hasNext()
             {
-                return setNext();
+                return !closed && setNext();
             }
 
             @Override
@@ -414,6 +424,38 @@ class ESOperator extends AOperator
                 Row result = next;
                 next = null;
                 return result;
+            }
+
+            @Override
+            public void close()
+            {
+                if (!isBlank(scrollId.getValue()))
+                {
+                    closed = true;
+                    HttpDeleteWithBody delete = new HttpDeleteWithBody(endpoint + "/_search/scroll");
+                    if (isSingleType)
+                    {
+                        delete.setEntity(new StringEntity("{\"scroll_id\":\"" + scrollId.getValue() + "\"}", StandardCharsets.UTF_8));
+                    }
+                    else
+                    {
+                        delete.setEntity(new StringEntity(scrollId.getValue(), StandardCharsets.UTF_8));
+                    }
+
+                    try (CloseableHttpResponse response = CLIENT.execute(delete))
+                    {
+                        int status = response.getStatusLine().getStatusCode();
+                        if (!(status == 200 || status == 404))
+                        {
+                            String body = IOUtils.toString(response.getEntity().getContent());
+                            throw new RuntimeException("Error clearing scroll: " + body);
+                        }
+                    }
+                    catch (IOException e)
+                    {
+                        throw new RuntimeException("Error deleting scroll", e);
+                    }
+                }
             }
 
             private boolean setNext()
@@ -553,7 +595,7 @@ class ESOperator extends AOperator
         {
             return;
         }
-        
+
         if (isSIngleType)
         {
             sb.append("\"query\":{\"bool\":{\"filter\":[");
@@ -716,7 +758,7 @@ class ESOperator extends AOperator
             }
             return endpoint;
         }
-        
+
         static String getIndex(QuerySession session, String catalogAlias)
         {
             String index = (String) session.getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY);
@@ -760,7 +802,7 @@ class ESOperator extends AOperator
                 }
                 else
                 {
-                    indexName = getIndex(session, catalogAlias);                            
+                    indexName = getIndex(session, catalogAlias);
                     type = parts.get(0);
                 }
             }
@@ -906,13 +948,31 @@ class ESOperator extends AOperator
             {
                 value = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(((LocalDateTime) value).atZone(ZoneId.systemDefault()));
             }
-            
+
             String stringValue = String.valueOf(value);
             if (!(value instanceof Number || value instanceof Boolean))
             {
                 return "\"" + stringValue + "\"";
             }
             return stringValue;
+        }
+    }
+
+    /** Entity support for DELETE */
+    private static class HttpDeleteWithBody extends HttpEntityEnclosingRequestBase
+    {
+        public static final String METHOD_NAME = "DELETE";
+
+        @Override
+        public String getMethod()
+        {
+            return METHOD_NAME;
+        }
+
+        public HttpDeleteWithBody(final String uri)
+        {
+            super();
+            setURI(URI.create(uri));
         }
     }
 

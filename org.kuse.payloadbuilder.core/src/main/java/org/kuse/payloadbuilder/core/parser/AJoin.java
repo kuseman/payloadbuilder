@@ -7,17 +7,17 @@ import org.apache.commons.lang3.NotImplementedException;
 public abstract class AJoin extends ASelectNode
 {
     private final TableSource tableSource;
-    
+
     public AJoin(TableSource tableSource)
     {
         this.tableSource = requireNonNull(tableSource, "tableSource");
     }
-    
+
     public TableSource getTableSource()
     {
         return tableSource;
     }
-    
+
     @Override
     public String toString()
     {

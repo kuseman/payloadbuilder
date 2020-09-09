@@ -87,7 +87,7 @@ class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsVisitor.
      **/
     public static Set<TableAlias> getColumnsByAlias(
             QuerySession session,
-            Map<TableAlias, Set<String>> map, 
+            Map<TableAlias, Set<String>> map,
             TableAlias alias,
             Expression expression)
     {
@@ -99,7 +99,7 @@ class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsVisitor.
         Set<TableAlias> result = expression.accept(VISITOR, ctx);
         return result.isEmpty() ? ctx.parentAliases : result;
     }
-    
+
     @Override
     protected Set<TableAlias> defaultResult(Context context)
     {
@@ -117,13 +117,13 @@ class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsVisitor.
         if (expression.getLambdaId() >= 0)
         {
             tableAliases = context.lambdaAliasById.get(expression.getLambdaId());
-            
+
             // No alias connected to this lambda, return columns are unknown
             if (tableAliases == null)
             {
                 return null;
             }
-            
+
             // Remove first part since it's resolved to an alias due to lambda
             parts.remove(0);
         }
@@ -133,7 +133,7 @@ class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsVisitor.
         {
             return null;
         }
-        
+
         Set<TableAlias> output = new THashSet<>();
         for (TableAlias alias : tableAliases)
         {
@@ -150,7 +150,7 @@ class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsVisitor.
             String column = tempParts.get(0);
             columns.add(column);
         }
-        
+
         return output;
     }
 
@@ -159,11 +159,11 @@ class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsVisitor.
     {
         /*  map(flatmap(aa, x -> x.ap), x -> x.price_sales)
              Lambda binding of map = arg0 => arg1
-             Visit 
+             Visit
         */
-        
+
         ScalarFunctionInfo functionInfo = expression.getFunctionInfo(context.session);
-        
+
         // Store parent aliases before resolving this function call
         Set<TableAlias> parentAliases = context.parentAliases;
         // Bind lambda parameters
@@ -179,7 +179,7 @@ class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsVisitor.
                 {
                     continue;
                 }
-                
+
                 for (int id : pair.getRight().getLambdaIds())
                 {
                     context.lambdaAliasById.put(id, lambdaAliases);
@@ -189,26 +189,26 @@ class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsVisitor.
 
         // Visit non visited arguments
         arguments.forEach(a -> a.accept(this, context));
-        
+
         // Resolve alias from function
         Set<TableAlias> result = functionInfo.resolveAlias(parentAliases, expression.getArguments(), e -> e.accept(this, context));
         if (isEmpty(result))
         {
             result = parentAliases;
         }
-            
+
         context.parentAliases = result;
         return result;
     }
 
-    /** Find relative alias to provided according to parts.
-     * Note! Removes found parts from list 
+    /**
+     * Find relative alias to provided according to parts. Note! Removes found parts from list
      **/
     private TableAlias getFromQualifiedName(TableAlias parent, List<String> parts)
     {
         TableAlias result = parent;
         TableAlias current = parent;
-        
+
         while (current != null && parts.size() > 0)
         {
             String part = parts.get(0);

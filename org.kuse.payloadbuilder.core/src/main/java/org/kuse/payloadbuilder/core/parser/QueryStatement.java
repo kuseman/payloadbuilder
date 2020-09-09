@@ -8,12 +8,12 @@ import java.util.List;
 public class QueryStatement
 {
     private final List<Statement> statements;
-    
+
     QueryStatement(List<Statement> statements)
     {
         this.statements = requireNonNull(statements, "statements");
     }
-    
+
     public List<Statement> getStatements()
     {
         return statements;

@@ -15,11 +15,12 @@ import com.fasterxml.jackson.databind.ObjectReader;
 class JsonValueFunction extends ScalarFunctionInfo
 {
     private static final ObjectReader READER = new ObjectMapper().readerFor(Object.class);
+
     JsonValueFunction(Catalog catalog)
     {
         super(catalog, "json_value");
     }
-    
+
     @Override
     public Object eval(ExecutionContext context, List<Expression> arguments)
     {
@@ -28,7 +29,7 @@ class JsonValueFunction extends ScalarFunctionInfo
         {
             return null;
         }
-        
+
         try
         {
             return READER.readValue(String.valueOf(arg));

@@ -5,7 +5,6 @@ import static java.util.Objects.requireNonNull;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -28,19 +27,19 @@ class OuterValuesOperator extends AOperator
         this.operator = requireNonNull(operator, "operator");
         this.valueExpressions = requireNonNull(valueExpressions, "valueExpressions");
     }
-    
+
     @Override
     public String getName()
     {
         return "Outer values";
     }
-    
+
     @Override
     public Map<String, Object> getDescribeProperties()
     {
         return ofEntries(entry("Values", valueExpressions.toString()));
     }
-    
+
     @Override
     public List<Operator> getChildOperators()
     {
@@ -49,7 +48,7 @@ class OuterValuesOperator extends AOperator
 
     @SuppressWarnings("unchecked")
     @Override
-    public Iterator<Row> open(ExecutionContext context)
+    public RowIterator open(ExecutionContext context)
     {
         int size = valueExpressions.size();
         Object[] outerValues = new Object[size];

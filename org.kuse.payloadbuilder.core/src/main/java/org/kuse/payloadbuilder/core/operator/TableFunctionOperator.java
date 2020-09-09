@@ -7,7 +7,6 @@ import static org.kuse.payloadbuilder.core.DescribeUtils.CATALOG;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -53,7 +52,7 @@ class TableFunctionOperator extends AOperator
     }
 
     @Override
-    public Iterator<Row> open(ExecutionContext context)
+    public RowIterator open(ExecutionContext context)
     {
         return functionInfo.open(context, catalogAlias, tableAlias, arguments);
     }

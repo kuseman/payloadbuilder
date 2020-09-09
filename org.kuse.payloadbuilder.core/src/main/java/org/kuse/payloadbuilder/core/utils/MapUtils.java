@@ -46,12 +46,12 @@ public class MapUtils
     {
         return traverse(map, 0, parts);
     }
-    
+
     /**
      * <pre>
-     * Traverses a map by keys provided.
-     * Assumes map type all the way down to parts.size - 1, if not null is returned
+     * Traverses a map by keys provided. Assumes map type all the way down to parts.size - 1, if not null is returned
      * </p>
+     *
      * @param map Map to traverse
      * @param startIndex Index to start traverse from in #parts
      * @param parts Parts to traverse

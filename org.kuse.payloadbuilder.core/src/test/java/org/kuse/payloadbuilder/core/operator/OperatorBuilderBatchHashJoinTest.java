@@ -1,7 +1,6 @@
 package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Arrays.asList;
-import static java.util.Collections.emptyIterator;
 import static java.util.Collections.emptyList;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
@@ -263,8 +262,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         Operator actual = pair.getKey();
 
-//        System.out.println(actual.toString(1));
-//        System.err.println(expected.toString(1));
+        //        System.out.println(actual.toString(1));
+        //        System.err.println(expected.toString(1));
 
         assertEquals(expected, actual);
 
@@ -365,13 +364,13 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         }
 
         @Override
-        public Iterator<Row> open(ExecutionContext context)
+        public RowIterator open(ExecutionContext context)
         {
             if (keysByTable.containsKey(name))
             {
                 assertNotNull(context.getOperatorContext().getOuterIndexValues());
             }
-            return emptyIterator();
+            return RowIterator.EMPTY;
         }
 
         @Override

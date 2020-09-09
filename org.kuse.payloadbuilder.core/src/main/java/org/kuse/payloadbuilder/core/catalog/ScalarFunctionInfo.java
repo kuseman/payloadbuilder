@@ -20,16 +20,18 @@ public abstract class ScalarFunctionInfo extends FunctionInfo
 
     /**
      * Resolves resulting aliases for this function for provided parent aliases.
+     *
      * <pre>
      * Example:
      * "concat(aa, aa.ap)"
      * This has source as parent alias and will resolve both arguments as resulting aliases
      * [aa, ap]
-     * 
+     *
      * Example:
      * "aa.filter(aa, x -> x.sku_id > 0)"
      * Resulting alias of a filter is the first arg alias ie. [aa]
      * </pre>
+     *
      * @param parentAliases Parent aliases in context to this function
      * @param arguments Argument expressions to this function
      * @param aliasResolver Resolver for resolving arguments aliases
@@ -38,16 +40,18 @@ public abstract class ScalarFunctionInfo extends FunctionInfo
     {
         return parentAliases;
     }
-    
+
     /** Evaluate this function */
     @SuppressWarnings("unused")
     public Object eval(ExecutionContext context, List<Expression> arguments)
     {
         throw new NotImplementedException("eval: " + getClass().getSimpleName());
     }
-    
-    /** Generate code for this function. Default is fallback to eval. 
-     * @param context Context used during evaluation 
+
+    /**
+     * Generate code for this function. Default is fallback to eval.
+     *
+     * @param context Context used during evaluation
      * @param parentCode Expression code from parent node
      * @param arguments Arguments to function
      **/

@@ -2,13 +2,13 @@ package org.kuse.payloadbuilder.core.catalog.builtin;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.Iterator;
 import java.util.List;
 import java.util.stream.IntStream;
 
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
+import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
@@ -30,7 +30,7 @@ class Range extends TableFunctionInfo
     }
 
     @Override
-    public Iterator<Row> open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
+    public RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
     {
         int from = 0;
         int to = -1;
@@ -45,6 +45,6 @@ class Range extends TableFunctionInfo
             from = ((Number) requireNonNull(arguments.get(0).eval(context), "From argument to range cannot be null.")).intValue();
             to = ((Number) requireNonNull(arguments.get(1).eval(context), "To argument to range cannot be null.")).intValue();
         }
-        return IntStream.range(from, to).mapToObj(i -> Row.of(tableAlias, i, new Object[] {i})).iterator();
+        return RowIterator.wrap(IntStream.range(from, to).mapToObj(i -> Row.of(tableAlias, i, new Object[] {i})).iterator());
     }
 }

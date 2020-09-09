@@ -5,35 +5,34 @@ import static java.util.Objects.requireNonNull;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 
-/** Operator that executes downstream operator in batches.
- * Continues to open down stream multiple times until end is reached after opening
- * Is used in conjunction with {@link BatchLimitOperator} 
+/**
+ * Operator that executes downstream operator in batches. Continues to open down stream multiple times until end is reached after opening Is used in
+ * conjunction with {@link BatchLimitOperator}
  **/
 class BatchRepeatOperator extends AOperator
 {
     private final Operator operator;
     private final int targetNodeId;
-    
+
     BatchRepeatOperator(int nodeId, int targetNodeId, Operator operator)
     {
         super(nodeId);
         this.targetNodeId = targetNodeId;
         this.operator = requireNonNull(operator, "operator");
     }
-    
+
     @Override
     public List<Operator> getChildOperators()
     {
         return asList(operator);
     }
-    
+
     @Override
     public String getName()
     {
@@ -46,20 +45,20 @@ class BatchRepeatOperator extends AOperator
         return ofEntries(true,
                 entry("Target nodeId", targetNodeId));
     }
-    
+
     @Override
-    public Iterator<Row> open(ExecutionContext context)
+    public RowIterator open(ExecutionContext context)
     {
         // TODO: parallellism
         // Split up into tasks that put rows into queue
         // return an iterator that return rows from the queue
         // poll from queue and before each poll check if all tasks iterators are complete
-        
-        return new Iterator<>()
+
+        return new RowIterator()
         {
-            private Iterator<Row> it;
+            private RowIterator it;
             private Row next;
-            
+
             @Override
             public Row next()
             {
@@ -67,13 +66,19 @@ class BatchRepeatOperator extends AOperator
                 next = null;
                 return result;
             }
-            
+
             @Override
             public boolean hasNext()
             {
                 return setNext();
             }
-            
+
+            @Override
+            public void close()
+            {
+                it.close();
+            }
+
             private boolean setNext()
             {
                 while (next == null)
@@ -90,30 +95,30 @@ class BatchRepeatOperator extends AOperator
                         {
                             throw new OperatorException("Missing node data for target node id: " + targetNodeId);
                         }
-                        
+
                         if (batchLimitData.isComplete())
                         {
                             return false;
                         }
-                        
+
                         it = null;
                         continue;
                     }
-                    
+
                     next = it.next();
                 }
-                
+
                 return true;
             }
         };
     }
-    
+
     @Override
     public int hashCode()
     {
         return operator.hashCode();
     }
-    
+
     @Override
     public boolean equals(Object obj)
     {
@@ -121,11 +126,11 @@ class BatchRepeatOperator extends AOperator
         {
             BatchRepeatOperator that = (BatchRepeatOperator) obj;
             return operator.equals(that.operator)
-                    && targetNodeId == that.targetNodeId;
+                && targetNodeId == that.targetNodeId;
         }
         return false;
     }
-    
+
     @Override
     public String toString(int indent)
     {
@@ -134,10 +139,11 @@ class BatchRepeatOperator extends AOperator
         return desc + System.lineSeparator()
             +
             indentString + operator.toString(indent + 1);
-    }  
-    
-    /** Definition of batch limit data. Provided by {@link BatchLimitOperator} and read
-     * by {@link BatchRepeatOperator} */
+    }
+
+    /**
+     * Definition of batch limit data. Provided by {@link BatchLimitOperator} and read by {@link BatchRepeatOperator}
+     */
     interface BatchLimitData
     {
         /** Returns true if the the limit operator complete */

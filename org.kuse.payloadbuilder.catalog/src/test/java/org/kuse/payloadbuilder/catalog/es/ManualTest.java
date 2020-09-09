@@ -17,12 +17,12 @@ public class ManualTest extends Assert
         session.setPrintStream(System.out);
         session.getCatalogRegistry().registerCatalog("es", new ESCatalog());
         session.setDefaultCatalog("es");
-        
+
         session.setCatalogProperty("es", "endpoint", "http://elasticsearch.viskanint.local");
         session.setCatalogProperty("es", "index", "ramossportshopentestcust_c0_store");
-        
+
         String query = "print 'hello world' select * from EtmPurchaseCreate";
-        
+
         QueryResult queryResult = Payloadbuilder.query(session, query);
         JsonStringWriter writer = new JsonStringWriter();
         while (queryResult.hasMoreResults())

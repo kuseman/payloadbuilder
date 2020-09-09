@@ -17,7 +17,7 @@ public class NamedExpression extends Expression
         this.name = StringUtils.lowerCase(name);
         this.expression = requireNonNull(expression, "expression");
     }
-    
+
     public String getName()
     {
         return name;
@@ -27,31 +27,31 @@ public class NamedExpression extends Expression
     {
         return expression;
     }
-    
+
     @Override
     public boolean isNullable()
     {
         return expression.isNullable();
     }
-    
+
     @Override
     public boolean isConstant()
     {
         return expression.isConstant();
     }
-    
+
     @Override
     public Class<?> getDataType()
     {
         return expression.getDataType();
     }
-    
+
     @Override
     public Object eval(ExecutionContext context)
     {
         return expression.eval(context);
     }
-    
+
     @Override
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {
@@ -75,7 +75,7 @@ public class NamedExpression extends Expression
         }
         return false;
     }
-    
+
     @Override
     public String toString()
     {

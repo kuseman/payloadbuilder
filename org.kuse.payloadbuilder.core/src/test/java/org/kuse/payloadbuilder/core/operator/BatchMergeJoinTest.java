@@ -12,10 +12,6 @@ import org.apache.commons.lang3.mutable.MutableInt;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
-import org.kuse.payloadbuilder.core.operator.BatchMergeJoin;
-import org.kuse.payloadbuilder.core.operator.DefaultRowMerger;
-import org.kuse.payloadbuilder.core.operator.Operator;
-import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
@@ -98,7 +94,7 @@ public class BatchMergeJoinTest extends AOperatorTest
 
         op.open(new ExecutionContext(session)).hasNext();
     }
-    
+
     @Test(expected = NoSuchElementException.class)
     public void test_bad_implementation_of_inner_operator_3()
     {
@@ -548,7 +544,7 @@ public class BatchMergeJoinTest extends AOperatorTest
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         MutableInt batchCount = new MutableInt();
-        
+
         Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
                 .stream()
                 .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
@@ -580,17 +576,16 @@ public class BatchMergeJoinTest extends AOperatorTest
                 index,
                 3);
 
-
         int[] expectedOuterPositions = new int[] {
-                12, 13, 12, 13, 14, 15, 14, 15,     
-                16, 17, 16, 17, 18, 19, 18, 19, 
-                20, 21, 20, 21                      
+                12, 13, 12, 13, 14, 15, 14, 15,
+                16, 17, 16, 17, 18, 19, 18, 19,
+                20, 21, 20, 21
         };
 
         int[] expectedInnerPositions = new int[] {
-                0, 0, 1, 1, 2, 2, 3, 3, 
+                0, 0, 1, 1, 2, 2, 3, 3,
                 4, 4, 5, 5, 6, 6, 7, 7,
-                8, 8, 9, 9                  
+                8, 8, 9, 9
         };
 
         Iterator<Row> it = op.open(new ExecutionContext(session));
@@ -599,7 +594,7 @@ public class BatchMergeJoinTest extends AOperatorTest
         {
             Row row = it.next();
             assertRowJoinValues(row);
-//                                    System.out.println(row + " " + row.getChildRows(0));
+            //                                    System.out.println(row + " " + row.getChildRows(0));
             assertEquals(expectedOuterPositions[count], row.getPos());
             assertEquals(expectedInnerPositions[count], row.getChildRows(0).get(0).getPos());
             count++;
@@ -1113,97 +1108,97 @@ public class BatchMergeJoinTest extends AOperatorTest
         assertEquals(0, row.hash);
     }
 
-//    @Ignore
-//    @Test
-//    public void test_inner_join_large()
-//    {
-//        Random rnd = new Random();
-//        TableAlias a = TableAlias.of(null, "tableA", "a");
-//        TableAlias b = TableAlias.of(a, "tableB", "b");
-//        TableAlias c = TableAlias.of(b, "tableC", "c");
-//        MutableInt bPos = new MutableInt();
-//        MutableInt cPos = new MutableInt();
-//
-//        Operator tableA = op(context -> IntStream.range(1, 400000).mapToObj(i -> Row.of(a, i, new Object[] {i, rnd.nextBoolean()})).iterator());
-//        Operator tableB = op(context ->
-//        {
-//            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-//            return StreamSupport.stream(it.spliterator(), false)
-//                    .map(ar -> (Integer) ar[0])
-//                    .flatMap(val -> asList(
-//                            new Object[] {val, 1, rnd.nextBoolean()},
-//                            new Object[] {val, 2, rnd.nextBoolean()},
-//                            new Object[] {val, 3, rnd.nextBoolean()},
-//                            new Object[] {val, 4, rnd.nextBoolean()}).stream())
-//                    .map(ar2 -> Row.of(b, bPos.getAndIncrement(), ar2))
-//                    .iterator();
-//        });
-//        Operator tableC = op(context ->
-//        {
-//            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-//
-//            return StreamSupport.stream(it.spliterator(), false)
-//                    .map(ar -> (Integer) ar[0])
-//                    .flatMap(val -> asList(
-//                            new Object[] {val, 1, "Val" + val},
-//                            new Object[] {val, 4, rnd.nextBoolean()}).stream())
-//                    .map(ar -> Row.of(c, cPos.getAndIncrement(), ar))
-//                    .iterator();
-//        });
-//
-//        /**
-//         * from tableA a inner join [ tableB b inner join [tableC] c on c.id = b.id ] b on b.id = a.id
-//         */
-//
-//        BatchMergeJoin op = new BatchMergeJoin(
-//                0, "",
-//                tableA,
-//                new BatchMergeJoin(
-//                        0, "",
-//                        tableB,
-//                        tableC,
-//                        (ctx, row, values) -> values[0] = row.getObject(0),
-//                        (ctx, row, values) -> values[0] = row.getObject(0),
-//                        (ctx, row) ->
-//                        {
-//                            return (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0);
-//                        },
-//                        DefaultRowMerger.DEFAULT,
-//                        false,
-//                        false,
-//                        index,
-//                        250),
-//                (ctx, row, values) -> values[0] = row.getObject(0),
-//                (ctx, row, values) -> values[0] = row.getObject(0),
-//                (ctx, row) ->
-//                {
-//                    return (Boolean) row.getObject(2)
-//                        && (Boolean) row.getParent().getObject(1)
-//                        && (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0);
-//                },
-//                DefaultRowMerger.DEFAULT,
-//                false,
-//                false,
-//                index,
-//                250);
-//
-//        for (int i = 0; i < 150; i++)
-//        {
-//            StopWatch sw = new StopWatch();
-//            sw.start();
-//            Iterator<Row> it = op.open(new ExecutionContext(session));
-//            int count = 0;
-//            while (it.hasNext())
-//            {
-//                Row row = it.next();
-//                //                assertEquals(4, row.getChildRows(0).size());
-//                //                System.out.println(row + " " + row.getChildRows(0).stream().map(r -> r.toString() + " " + r.getChildRows(0)).collect(joining(", ")) );
-//                //            assertEquals("Val" + row.getObject(0), row.getChildRows(0).get(0).getObject(1));
-//                count++;
-//            }
-//            sw.stop();
-//            long mem = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-//            System.out.println("Time: " + sw.toString() + " rows: " + count + " mem: " + FileUtils.byteCountToDisplaySize(mem));
-//        }
-//    }
+    //    @Ignore
+    //    @Test
+    //    public void test_inner_join_large()
+    //    {
+    //        Random rnd = new Random();
+    //        TableAlias a = TableAlias.of(null, "tableA", "a");
+    //        TableAlias b = TableAlias.of(a, "tableB", "b");
+    //        TableAlias c = TableAlias.of(b, "tableC", "c");
+    //        MutableInt bPos = new MutableInt();
+    //        MutableInt cPos = new MutableInt();
+    //
+    //        Operator tableA = op(context -> IntStream.range(1, 400000).mapToObj(i -> Row.of(a, i, new Object[] {i, rnd.nextBoolean()})).iterator());
+    //        Operator tableB = op(context ->
+    //        {
+    //            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+    //            return StreamSupport.stream(it.spliterator(), false)
+    //                    .map(ar -> (Integer) ar[0])
+    //                    .flatMap(val -> asList(
+    //                            new Object[] {val, 1, rnd.nextBoolean()},
+    //                            new Object[] {val, 2, rnd.nextBoolean()},
+    //                            new Object[] {val, 3, rnd.nextBoolean()},
+    //                            new Object[] {val, 4, rnd.nextBoolean()}).stream())
+    //                    .map(ar2 -> Row.of(b, bPos.getAndIncrement(), ar2))
+    //                    .iterator();
+    //        });
+    //        Operator tableC = op(context ->
+    //        {
+    //            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+    //
+    //            return StreamSupport.stream(it.spliterator(), false)
+    //                    .map(ar -> (Integer) ar[0])
+    //                    .flatMap(val -> asList(
+    //                            new Object[] {val, 1, "Val" + val},
+    //                            new Object[] {val, 4, rnd.nextBoolean()}).stream())
+    //                    .map(ar -> Row.of(c, cPos.getAndIncrement(), ar))
+    //                    .iterator();
+    //        });
+    //
+    //        /**
+    //         * from tableA a inner join [ tableB b inner join [tableC] c on c.id = b.id ] b on b.id = a.id
+    //         */
+    //
+    //        BatchMergeJoin op = new BatchMergeJoin(
+    //                0, "",
+    //                tableA,
+    //                new BatchMergeJoin(
+    //                        0, "",
+    //                        tableB,
+    //                        tableC,
+    //                        (ctx, row, values) -> values[0] = row.getObject(0),
+    //                        (ctx, row, values) -> values[0] = row.getObject(0),
+    //                        (ctx, row) ->
+    //                        {
+    //                            return (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0);
+    //                        },
+    //                        DefaultRowMerger.DEFAULT,
+    //                        false,
+    //                        false,
+    //                        index,
+    //                        250),
+    //                (ctx, row, values) -> values[0] = row.getObject(0),
+    //                (ctx, row, values) -> values[0] = row.getObject(0),
+    //                (ctx, row) ->
+    //                {
+    //                    return (Boolean) row.getObject(2)
+    //                        && (Boolean) row.getParent().getObject(1)
+    //                        && (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0);
+    //                },
+    //                DefaultRowMerger.DEFAULT,
+    //                false,
+    //                false,
+    //                index,
+    //                250);
+    //
+    //        for (int i = 0; i < 150; i++)
+    //        {
+    //            StopWatch sw = new StopWatch();
+    //            sw.start();
+    //            Iterator<Row> it = op.open(new ExecutionContext(session));
+    //            int count = 0;
+    //            while (it.hasNext())
+    //            {
+    //                Row row = it.next();
+    //                //                assertEquals(4, row.getChildRows(0).size());
+    //                //                System.out.println(row + " " + row.getChildRows(0).stream().map(r -> r.toString() + " " + r.getChildRows(0)).collect(joining(", ")) );
+    //                //            assertEquals("Val" + row.getObject(0), row.getChildRows(0).get(0).getObject(1));
+    //                count++;
+    //            }
+    //            sw.stop();
+    //            long mem = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+    //            System.out.println("Time: " + sw.toString() + " rows: " + count + " mem: " + FileUtils.byteCountToDisplaySize(mem));
+    //        }
+    //    }
 }

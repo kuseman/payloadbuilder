@@ -29,32 +29,32 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
     {
         super(catalog, "flatmap");
     }
-    
+
     @Override
     public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Expression> arguments, Function<Expression, Set<TableAlias>> aliasResolver)
     {
         // Result of flat map is the result of the lambda
         return aliasResolver.apply(arguments.get(1));
     }
-    
+
     @Override
     public List<Pair<Expression, LambdaExpression>> getLambdaBindings(List<Expression> arguments)
     {
         return singletonList(Pair.of(arguments.get(0), (LambdaExpression) arguments.get(1)));
     }
-    
+
     @Override
     public Class<?> getDataType()
     {
         return Iterator.class;
     }
-    
+
     @Override
     public List<Class<? extends Expression>> getInputTypes()
     {
         return asList(Expression.class, LambdaExpression.class);
     }
-    
+
     @Override
     public Object eval(ExecutionContext context, List<Expression> arguments)
     {
@@ -68,7 +68,7 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
         return new ObjectGraphIterator(IteratorUtils.getIterator(argResult), new Transformer()
         {
             Iterator<Object> it;
-            
+
             @Override
             public Object transform(Object input)
             {
@@ -90,9 +90,9 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
                 }
                 return input;
             }
-        }); 
+        });
     }
-    
+
     @Override
     public ExpressionCode generateCode(
             CodeGeneratorContext context,
@@ -105,41 +105,40 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
         code.addImport("java.util.Iterator");
         code.addImport("org.apache.commons.collections.iterators.ObjectGraphIterator");
         code.addImport("org.apache.commons.collections.Transformer");
-        
+
         LambdaExpression le = (LambdaExpression) arguments.get(1);
-        
+
         context.addLambdaParameters(le.getIdentifiers());
         ExpressionCode lambdaCode = le.getExpression().generateCode(context, parentCode);
         context.removeLambdaParameters(le.getIdentifiers());
-        
-        String template = 
-                "%s"
-              + "boolean %s = true;\n"
-              + "Iterator %s = null;\n"
-              + "if (!%s)\n"
-              + "{\n"
-              + "  %s = new ObjectGraphIterator(IteratorUtils.getIterator(%s), new Transformer()\n"
-              + "  {\n"
-              + "    Iterator<Object> it;\n"
-              + "    public Object transform(Object input)\n"
-              + "    {\n"
-              + "      if (it == null)\n"
-              + "      {\n"
-              + "        Object %s = input;\n"
-              + "        %s"
-              + "        it = IteratorUtils.getIterator(%s);\n"
-              + "        return it;\n"
-              + "      }\n"
-              + "      else if (!it.hasNext())\n"
-              + "      {\n"
-              + "        it=null;\n"
-              + "      }\n"
-              + "      return input;\n"
-              + "    }\n"
-              + "  });\n"
-              + "  %s = false;\n"
-              + "}\n";
-        
+
+        String template = "%s"
+            + "boolean %s = true;\n"
+            + "Iterator %s = null;\n"
+            + "if (!%s)\n"
+            + "{\n"
+            + "  %s = new ObjectGraphIterator(IteratorUtils.getIterator(%s), new Transformer()\n"
+            + "  {\n"
+            + "    Iterator<Object> it;\n"
+            + "    public Object transform(Object input)\n"
+            + "    {\n"
+            + "      if (it == null)\n"
+            + "      {\n"
+            + "        Object %s = input;\n"
+            + "        %s"
+            + "        it = IteratorUtils.getIterator(%s);\n"
+            + "        return it;\n"
+            + "      }\n"
+            + "      else if (!it.hasNext())\n"
+            + "      {\n"
+            + "        it=null;\n"
+            + "      }\n"
+            + "      return input;\n"
+            + "    }\n"
+            + "  });\n"
+            + "  %s = false;\n"
+            + "}\n";
+
         code.setCode(String.format(template,
                 inputCode.getCode(),
                 code.getIsNull(),
@@ -150,7 +149,7 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
                 lambdaCode.getCode(),
                 lambdaCode.getResVar(),
                 code.getIsNull()));
-        
-        return code;    
+
+        return code;
     }
 }

@@ -8,11 +8,12 @@ import java.util.Set;
 public final class CollectionUtils
 {
     private CollectionUtils()
-    {}
-    
+    {
+    }
+
     /** Create set from provided items */
     @SafeVarargs
-    public static <T> Set<T> asSet(T ...items)
+    public static <T> Set<T> asSet(T... items)
     {
         return new HashSet<>(asList(items));
     }

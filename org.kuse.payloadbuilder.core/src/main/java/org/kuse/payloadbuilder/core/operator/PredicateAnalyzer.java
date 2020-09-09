@@ -47,8 +47,8 @@ public class PredicateAnalyzer
      *
      * @param predicate Join condition to analyze
      * @param currentAlias Current alias in scope.
-     * @param availableAliases A map with available aliases as key and set of sub 
-     * aliases for the key alias. This to limit what types of expressions can be utilized as pushdown etc.
+     * @param availableAliases A map with available aliases as key and set of sub aliases for the key alias. This to limit what types of expressions
+     *            can be utilized as pushdown etc.
      * @return Analyze result of expression
      */
     public static AnalyzeResult analyze(Expression predicate, TableAlias tableAlias)
@@ -107,11 +107,11 @@ public class PredicateAnalyzer
         {
             return extractPushdownPairs(alias, true);
         }
-        
+
         /**
          * <pre>
          * Extracts push down predicate for provided alias.
-         * @param isNullAllowed True if is null predicate is allowed or not
+         * &#64;param isNullAllowed True if is null predicate is allowed or not
          * </pre>
          */
         Pair<List<AnalyzePair>, AnalyzeResult> extractPushdownPairs(String alias, boolean isNullAllowed)
@@ -127,9 +127,9 @@ public class PredicateAnalyzer
             for (int i = 0; i < size; i++)
             {
                 AnalyzePair pair = pairs.get(i);
-                if (pair.isPushdown(alias) 
-                        && (isNullAllowed 
-                                || pair.getType() != Type.NULL))
+                if (pair.isPushdown(alias)
+                    && (isNullAllowed
+                        || pair.getType() != Type.NULL))
                 {
                     pushdowns.add(pair);
                 }
@@ -509,7 +509,8 @@ public class PredicateAnalyzer
                 // A single qualified expression in a predicate is a boolean expression
                 // Turn this into a comparison expression
                 // ie. not active_flg
-                return AnalyzePair.of(tableAlias, new ComparisonExpression(ComparisonExpression.Type.EQUAL, ((LogicalNotExpression) expression).getExpression(), LiteralBooleanExpression.FALSE_LITERAL));
+                return AnalyzePair.of(tableAlias,
+                        new ComparisonExpression(ComparisonExpression.Type.EQUAL, ((LogicalNotExpression) expression).getExpression(), LiteralBooleanExpression.FALSE_LITERAL));
             }
 
             Set<String> aliases = new HashSet<>();
@@ -523,10 +524,10 @@ public class PredicateAnalyzer
             {
                 QualifiedReferenceExpression qre = (QualifiedReferenceExpression) expression;
                 QualifiedName qname = qre.getQname();
-                
+
                 Set<String> aliases;
                 Pair<String, String> pair = QualifiedReferenceVisitor.getAlias(tableAlias, qname);
-                
+
                 if (pair.getKey() != null)
                 {
                     int extractFrom = 1;
@@ -536,9 +537,9 @@ public class PredicateAnalyzer
                         extractFrom = 2;
                         alias += "." + pair.getValue();
                     }
-                    
+
                     aliases = asSet(alias);
-                    
+
                     if (qname.getParts().size() > extractFrom)
                     {
                         qname = qname.extract(extractFrom);
@@ -568,13 +569,13 @@ public class PredicateAnalyzer
             COMPARISION,
             /** In pair. {@link InExpression} is used */
             IN,
-            
-            /** Null predicate.  */
+
+            /** Null predicate. */
             NULL,
-            
+
             /** Not null predicate. */
             NOT_NULL,
-            
+
             /** Undefined type. No analyze could be made for this item. Full expression is accessed via {@link AnalyzePair#getLeft()} */
             UNDEFINED
         }
@@ -587,7 +588,7 @@ public class PredicateAnalyzer
         private final Expression expression;
         /** Aliases (if any) referenced by this item. */
         final Set<String> aliases;
-        
+
         /**
          * Qualified name (if any) referenced by this item If set then {@link #alias} is omitted from qname.
          **/
@@ -693,14 +694,14 @@ public class PredicateAnalyzer
             context.result = result;
             expression.accept(QR_VISITOR, context);
         }
-        
+
         /** Returns alias for provided qname and sub alias if exists */
         static Pair<String, String> getAlias(TableAlias tableAlias, QualifiedName qname)
         {
             List<String> parts = qname.getParts();
             String alias;
             String subAlias = null;
-            
+
             // First part is the current alias
             if (tableAlias.getAlias().equals(parts.get(0)))
             {
@@ -719,7 +720,7 @@ public class PredicateAnalyzer
                     subAlias = alias;
                     alias = "##";
                 }
-                
+
                 return Pair.of(alias, subAlias);
             }
             // Try child alias
@@ -734,7 +735,7 @@ public class PredicateAnalyzer
                     {
                         subAlias = alias;
                         alias = "##";
-//                        return Pair.of(alias, parts.get(1));
+                        //                        return Pair.of(alias, parts.get(1));
                     }
                 }
                 // Child alias access and only one part => combine with parent
@@ -744,10 +745,10 @@ public class PredicateAnalyzer
                     subAlias = alias;
                     alias = "##";
                 }
-                
+
                 return Pair.of(alias, subAlias);
             }
-            
+
             // Try parents
             temp = tableAlias.getParent();
             while (temp != null)
@@ -762,15 +763,15 @@ public class PredicateAnalyzer
                         subAlias = alias;
                         alias = "##";//temp.getParent().getAlias();
                     }
-    //                if (parts.size() > 1)
-    //                {
-    //                    temp = tableAlias.getChildAlias(parts.get(1));
-    //                    if (temp != null)
-    //                    {
-    //                        return Pair.of(alias, parts.get(1));
-    //                    }
-    //                }
-                    
+                    //                if (parts.size() > 1)
+                    //                {
+                    //                    temp = tableAlias.getChildAlias(parts.get(1));
+                    //                    if (temp != null)
+                    //                    {
+                    //                        return Pair.of(alias, parts.get(1));
+                    //                    }
+                    //                }
+
                     return Pair.of(alias, subAlias);
                 }
                 TableAlias temp1 = temp.getChildAlias(parts.get(0));
@@ -779,13 +780,13 @@ public class PredicateAnalyzer
                     alias = parts.get(0);
                     return Pair.of(alias, subAlias);
                 }
-                
+
                 temp = temp.getParent();
             }
-            
+
             return EMPTY_PAIR;
         }
-        
+
         @Override
         public Void visit(QualifiedReferenceExpression expression, Context context)
         {

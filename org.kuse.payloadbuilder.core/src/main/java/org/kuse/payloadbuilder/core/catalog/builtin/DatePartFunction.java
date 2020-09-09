@@ -145,7 +145,7 @@ class DatePartFunction extends ScalarFunctionInfo
         {
             this.chronoField = chronoField;
         }
-        
+
         ChronoField getChronoField()
         {
             return chronoField != null ? chronoField : abbreviationFor.chronoField;

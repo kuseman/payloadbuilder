@@ -36,7 +36,7 @@ public class ColumnsVisitorTest extends Assert
         Set<TableAlias> actual;
         Expression e;
         Map<TableAlias, Set<String>> columnsByAlias = new HashMap<>();
-        
+
         e = e("a.col");
         actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
         assertEquals(asSet(source), actual);
@@ -65,7 +65,7 @@ public class ColumnsVisitorTest extends Assert
         actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
         assertEquals(asSet(articlePrice), actual);
         assertEquals(emptyMap(), columnsByAlias);
-        
+
         columnsByAlias.clear();
         e = e("aa.map(x -> x.ap.price_sales)");
         actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
@@ -160,7 +160,7 @@ public class ColumnsVisitorTest extends Assert
         actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
         assertEquals(asSet(source), actual);
         assertEquals(ofEntries(entry(articleAttribute, asSet("field"))), columnsByAlias);
-        
+
         columnsByAlias.clear();
         e = e("aa.filter(aa -> aa.sku_id > 0)");
         actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
@@ -185,14 +185,14 @@ public class ColumnsVisitorTest extends Assert
         actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, articleBrand, e);
         assertEquals(asSet(articleBrand), actual);
         assertEquals(ofEntries(entry(articleBrand, asSet("articleBrandId")), entry(article, asSet("articleBrandId"))), columnsByAlias);
-        
+
         columnsByAlias.clear();
         e = e("aa.flatMap(x -> x.ap).map(x -> x.price_sales)");
         actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
         assertEquals(asSet(source), actual);
         assertEquals(ofEntries(entry(articlePrice, asSet("price_sales"))), columnsByAlias);
     }
-    
+
     private Expression e(String expression)
     {
         return parser.parseExpression(expression);

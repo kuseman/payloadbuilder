@@ -7,8 +7,10 @@ import java.util.Iterator;
 import java.util.Objects;
 import java.util.stream.IntStream;
 
+import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
+import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 
 /** Test {@link HashJoin} */
@@ -30,17 +32,20 @@ public class HashJoinTest extends AOperatorTest
         Iterator<Row> it = op.open(new ExecutionContext(session));
         assertFalse(it.hasNext());
     }
-        
+
     @Test
     public void test_inner_join_no_populate()
     {
         TableAlias a = TableAlias.of(null, "table", "t");
         TableAlias r = TableAlias.of(a, "range", "r");
-        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator());
+        MutableBoolean leftClose = new MutableBoolean();
+        MutableBoolean rightClose = new MutableBoolean();
+        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator(), () -> leftClose.setTrue());
+        Operator right = op(ctx -> new TableFunctionOperator(0, "", r, new NestedLoopJoinTest.Range(5), emptyList()).open(ctx), () -> rightClose.setTrue());
         HashJoin op = new HashJoin(0,
                 "",
                 left,
-                new TableFunctionOperator(0, "", r, new NestedLoopJoinTest.Range(5), emptyList()),
+                right,
                 (c, row) -> (Integer) row.getObject(0),
                 (c, row) -> (Integer) row.getObject(0),
                 (ctx, row) -> (int) row.getObject(0) == (int) row.getParent().getObject(0),
@@ -48,7 +53,7 @@ public class HashJoinTest extends AOperatorTest
                 false,
                 false);
 
-        Iterator<Row> it = op.open(new ExecutionContext(session));
+        RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {
@@ -56,10 +61,13 @@ public class HashJoinTest extends AOperatorTest
             assertEquals(count + 1, row.getChildRows(0).get(0).getObject(0));
             count++;
         }
+        it.close();
         assertFalse(it.hasNext());
         assertEquals(5, count);
+        assertTrue(leftClose.booleanValue());
+        assertTrue(rightClose.booleanValue());
     }
-    
+
     @Test
     public void test_correlated()
     {
@@ -125,7 +133,7 @@ public class HashJoinTest extends AOperatorTest
             count++;
         }
     }
-    
+
     @Test
     public void test_inner_join_populate()
     {
@@ -161,7 +169,7 @@ public class HashJoinTest extends AOperatorTest
 
         assertEquals(9, count);
     }
-    
+
     @Test
     public void test_outer_join_no_populate()
     {
@@ -169,7 +177,7 @@ public class HashJoinTest extends AOperatorTest
         TableAlias b = TableAlias.of(a, "table", "b");
         Operator left = op(context -> IntStream.range(0, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
         Operator right = op(context -> IntStream.range(5, 15).mapToObj(i -> Row.of(b, i - 1, new Object[] {i})).iterator());
-        
+
         HashJoin op = new HashJoin(0,
                 "",
                 left,
@@ -180,7 +188,7 @@ public class HashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 false,
                 true);
-        
+
         Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
@@ -199,7 +207,7 @@ public class HashJoinTest extends AOperatorTest
 
         assertEquals(10, count);
     }
-    
+
     @Test
     public void test_outer_join_populate()
     {
@@ -207,7 +215,7 @@ public class HashJoinTest extends AOperatorTest
         TableAlias b = TableAlias.of(a, "table", "b");
         Operator left = op(context -> IntStream.range(0, 5).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
         Operator right = op(context -> IntStream.range(5, 15).mapToObj(i -> Row.of(b, i - 1, new Object[] {i % 5 + 2})).iterator());
-        
+
         HashJoin op = new HashJoin(0,
                 "",
                 left,
@@ -218,7 +226,7 @@ public class HashJoinTest extends AOperatorTest
                 DefaultRowMerger.DEFAULT,
                 true,
                 true);
-        
+
         Iterator<Row> it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())

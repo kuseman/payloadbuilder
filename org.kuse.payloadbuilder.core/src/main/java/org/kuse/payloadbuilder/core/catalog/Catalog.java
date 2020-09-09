@@ -49,24 +49,25 @@ public abstract class Catalog
     {
         return emptyList();
     }
-    
+
     /**
-     * Return registered functions in this Catalog 
+     * Return registered functions in this Catalog
      **/
     public Collection<FunctionInfo> getFunctions()
     {
         return functionByName.values();
     }
-    
-    /** 
+
+    /**
      * <pre>
      * Get tables for current session.
      * Implementations can choose to implement this method
      * to allow "SHOW tables" for list current tables
      * </pre>
+     *
      * @param session Current query session
      * @param catalogAlias Alias used for this catalog in the query
-     * */
+     */
     public List<String> getTables(
             QuerySession session,
             String catalogAlias)
@@ -75,9 +76,8 @@ public abstract class Catalog
     }
 
     /**
-     * Get operator for provided alias
-     * NOTE! In main loop of operator add check of {@link QuerySession#abortQuery()}
-     * to not hang a thread in execution state.
+     * Get operator for provided alias NOTE! In main loop of operator add check of {@link QuerySession#abortQuery()} to not hang a thread in execution
+     * state.
      */
     public Operator getScanOperator(OperatorData data)
     {
@@ -86,9 +86,9 @@ public abstract class Catalog
 
     /**
      * Get operator for provided alias
-     * @param index Index to use
-     * NOTE! In main loop of operator add check of {@link QuerySession#abortQuery()}
-     * to not hang a thread in execution state.
+     *
+     * @param index Index to use NOTE! In main loop of operator add check of {@link QuerySession#abortQuery()} to not hang a thread in execution
+     *            state.
      */
     public Operator getIndexOperator(OperatorData data, Index index)
     {
@@ -159,18 +159,18 @@ public abstract class Catalog
          * <pre>
          * Table alias to retrieve operator for.
          * If {@link TableAlias#isAsteriskColumns()} is set to true then the operator
-         *  <b>MUST</b> set all available columns on alias using {@link TableAlias#setColumns(String[])} 
+         *  <b>MUST</b> set all available columns on alias using {@link TableAlias#setColumns(String[])}
          * </pre>
-         */ 
+         */
         public TableAlias getTableAlias()
         {
             return tableAlias;
         }
-        
+
         /**
          * <pre>
-         * Predicate pairs for a table if any. 
-         * Is sent to catalog by framework to let catalogs that supports 
+         * Predicate pairs for a table if any.
+         * Is sent to catalog by framework to let catalogs that supports
          * predicate extract supported predicate pairs and return left over ones.
          *
          * Example

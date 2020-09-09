@@ -22,20 +22,20 @@ class DistinctFunction extends ScalarFunctionInfo
     {
         super(catalog, "distinct");
     }
-    
+
     // Aliases equals the input arguments aliases
     @Override
     public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Expression> arguments, Function<Expression, Set<TableAlias>> aliasResolver)
     {
         return aliasResolver.apply(arguments.get(0));
     }
-    
+
     @Override
     public List<Class<? extends Expression>> getInputTypes()
     {
         return asList(Expression.class);
     }
-    
+
     @SuppressWarnings({"unchecked"})
     @Override
     public Object eval(ExecutionContext context, List<Expression> arguments)
@@ -59,7 +59,7 @@ class DistinctFunction extends ScalarFunctionInfo
         {
             result = new HashSet<>((Collection<Object>) obj);
         }
-        
+
         return result;
     }
 }

@@ -5,8 +5,6 @@ import static org.kuse.payloadbuilder.core.parser.LiteralBooleanExpression.TRUE_
 import static org.kuse.payloadbuilder.core.parser.LiteralNullExpression.NULL_LITERAL;
 
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.parser.ComparisonExpression;
-import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Unit test of {@link ComparisonExpression} */
 public class ComparisonExpressionTest extends AParserTest
@@ -15,7 +13,7 @@ public class ComparisonExpressionTest extends AParserTest
     public void test_fold()
     {
         Expression e;
-        
+
         e = e("1=1");
         assertTrue(e.isConstant());
         assertEquals(TRUE_LITERAL, e);
@@ -27,7 +25,7 @@ public class ComparisonExpressionTest extends AParserTest
         e = e("a=1");
         assertEquals(e("a=1"), e);
         assertFalse(e.isConstant());
-        
+
         e = e("null=1");
         assertEquals(NULL_LITERAL, e);
         e = e("1=null");

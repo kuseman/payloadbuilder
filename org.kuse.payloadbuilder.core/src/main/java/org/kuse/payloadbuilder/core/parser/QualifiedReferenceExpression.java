@@ -23,7 +23,7 @@ public class QualifiedReferenceExpression extends Expression
      * </pre>
      */
     private final int lambdaId;
-    
+
     public QualifiedReferenceExpression(QualifiedName qname, int lambdaId)
     {
         this.qname = requireNonNull(qname, "qname");
@@ -100,7 +100,7 @@ public class QualifiedReferenceExpression extends Expression
         int partIndex = 0;
         String part;
         // aliasA.aliasB.col2
-       
+
         // Traverse alias path
         while (resultRow != null && partIndex < size - 1)
         {
@@ -149,7 +149,7 @@ public class QualifiedReferenceExpression extends Expression
                         temp = childRows.isEmpty() ? null : childRows.get(0);
                         break;
                     }
-                    
+
                     temp = temp.getParent();
                 }
 
@@ -201,7 +201,7 @@ public class QualifiedReferenceExpression extends Expression
                 Map<Object, Object> map = (Map<Object, Object>) result;
                 return MapUtils.traverse(map, partIndex + 1, parts);
             }
-            
+
             throw new IllegalArgumentException("Cannot dereference value: " + result);
         }
 

@@ -20,19 +20,19 @@ class UnixTimeStampFunction extends ScalarFunctionInfo
     {
         super(catalog, "unix_timestamp");
     }
-    
+
     @Override
     public Class<?> getDataType()
     {
         return Long.class;
     }
-    
+
     @Override
     public List<Class<? extends Expression>> getInputTypes()
     {
         return asList(Expression.class);
     }
-    
+
     @Override
     public Object eval(ExecutionContext context, List<Expression> arguments)
     {
@@ -43,15 +43,15 @@ class UnixTimeStampFunction extends ScalarFunctionInfo
         }
         if (arg instanceof LocalDateTime)
         {
-            Instant instant = ((LocalDateTime) arg).atZone(ZoneId.systemDefault()).toInstant(); 
-            return instant.toEpochMilli(); 
+            Instant instant = ((LocalDateTime) arg).atZone(ZoneId.systemDefault()).toInstant();
+            return instant.toEpochMilli();
         }
         else if (arg instanceof ZonedDateTime)
         {
             ZonedDateTime zonedDateTime = (ZonedDateTime) arg;
             return zonedDateTime.toInstant().toEpochMilli();
         }
-        
+
         throw new IllegalArgumentException("Expected a Date to " + getName() + " but got: " + arg);
     }
 }

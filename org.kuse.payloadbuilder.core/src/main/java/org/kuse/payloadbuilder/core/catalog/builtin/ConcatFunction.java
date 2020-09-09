@@ -24,14 +24,14 @@ class ConcatFunction extends ScalarFunctionInfo
     {
         super(catalog, "concat");
     }
-    
+
     @Override
     public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Expression> arguments, Function<Expression, Set<TableAlias>> aliasResolver)
     {
         // Result of a concat is the result of all arguments aliases
         return arguments.stream().flatMap(a -> aliasResolver.apply(a).stream()).collect(toSet());
     }
-    
+
     @Override
     public Object eval(ExecutionContext context, List<Expression> arguments)
     {
@@ -40,16 +40,16 @@ class ConcatFunction extends ScalarFunctionInfo
         {
             return null;
         }
-        
+
         Object[] args = new Object[size];
-        for (int i=0;i<size;i++)
+        for (int i = 0; i < size; i++)
         {
             args[i] = arguments.get(i).eval(context);
         }
-        
+
         return ObjectUtils.concat(args);
     }
-    
+
     @Override
     public ExpressionCode generateCode(
             CodeGeneratorContext context,
@@ -58,7 +58,7 @@ class ConcatFunction extends ScalarFunctionInfo
     {
         ExpressionCode code = ExpressionCode.code(context);
         code.addImport("com.viskan.payloadbuilder.utils.ObjectUtils");
-        
+
         List<String> argsResVars = new ArrayList<>(arguments.size());
         StringBuilder sb = new StringBuilder();
         for (Expression arg : arguments)
@@ -68,14 +68,13 @@ class ConcatFunction extends ScalarFunctionInfo
             argsResVars.add(argCode.getResVar());
             sb.append(argCode.getCode());
         }
-        
+
         // TODO: Fix iterator concating even if arguments are object
-        
-        String template =
-                "%s"
-              + "boolean %s = false;\n"
-              + "Object  %s = ObjectUtils.concat(%s);\n";
-        
+
+        String template = "%s"
+            + "boolean %s = false;\n"
+            + "Object  %s = ObjectUtils.concat(%s);\n";
+
         code.setCode(String.format(template,
                 sb.toString(),
                 code.getIsNull(),

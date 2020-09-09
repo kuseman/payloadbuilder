@@ -12,17 +12,18 @@ import org.kuse.payloadbuilder.core.operator.Row;
 public class AsteriskSelectItem extends SelectItem implements Projection
 {
     private final String alias;
+
     AsteriskSelectItem(String alias)
     {
         super(null, false);
         this.alias = alias;
     }
-    
+
     public String getAlias()
     {
         return alias;
     }
-    
+
     @Override
     public <TR, TC> TR accept(SelectVisitor<TR, TC> visitor, TC context)
     {
@@ -52,7 +53,7 @@ public class AsteriskSelectItem extends SelectItem implements Projection
             // The alias for the row itself
             if (alias.equals(row.getTableAlias().getAlias()))
             {
-                writeRow(row, writer); 
+                writeRow(row, writer);
                 return;
             }
             TableAlias childAlias = row.getTableAlias().getChildAlias(alias);

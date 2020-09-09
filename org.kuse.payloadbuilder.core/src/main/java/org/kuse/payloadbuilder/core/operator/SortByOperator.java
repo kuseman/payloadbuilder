@@ -7,7 +7,6 @@ import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -47,16 +46,17 @@ class SortByOperator extends AOperator
     }
 
     @Override
-    public Iterator<Row> open(ExecutionContext context)
+    public RowIterator open(ExecutionContext context)
     {
         List<Row> rows = new ArrayList<>();
-        Iterator<Row> it = target.open(context);
+        RowIterator it = target.open(context);
         while (it.hasNext())
         {
             rows.add(it.next());
         }
+        it.close();
         Collections.sort(rows, (rowA, rowB) -> comparator.compare(context, rowA, rowB));
-        return rows.iterator();
+        return RowIterator.wrap(rows.iterator());
     }
 
     @Override

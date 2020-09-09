@@ -11,13 +11,13 @@ public class LiteralLongExpression extends LiteralExpression
     {
         this(Long.parseLong(value));
     }
-    
+
     LiteralLongExpression(long value)
     {
         super(value);
         this.value = value;
     }
-    
+
     public long getValue()
     {
         return value;
@@ -32,13 +32,13 @@ public class LiteralLongExpression extends LiteralExpression
         code.setCode(String.format(template, code.getResVar(), value, code.getIsNull()));
         return code;
     }
-    
+
     @Override
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
     }
-    
+
     @Override
     public String toString()
     {

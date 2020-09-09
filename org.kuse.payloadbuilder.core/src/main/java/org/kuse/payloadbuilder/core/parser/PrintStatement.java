@@ -6,7 +6,7 @@ import static java.util.Objects.requireNonNull;
 public class PrintStatement extends Statement
 {
     private final Expression expression;
-    
+
     PrintStatement(Expression expression)
     {
         this.expression = requireNonNull(expression, "expression");
@@ -16,7 +16,7 @@ public class PrintStatement extends Statement
     {
         return expression;
     }
-    
+
     @Override
     public <TR, TC> TR accept(StatementVisitor<TR, TC> visitor, TC context)
     {

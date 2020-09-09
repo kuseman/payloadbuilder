@@ -72,19 +72,19 @@ class ESCatalog extends Catalog
             {
                 throw new RuntimeException("Error query Elastic for mappings." + IOUtils.toString(response.getEntity().getContent()));
             }
-            
+
             Map<String, Object> map = MAPPER.readValue(response.getEntity().getContent(), Map.class);
             map = (Map<String, Object>) map.get(index);
             map = (Map<String, Object>) map.get("mappings");
-            
+
             Map<String, Object> properties = (Map<String, Object>) map.get("properties");
-            
+
             // Single type ES version, return dummy table_name
             if (properties != null && !properties.containsKey("properties"))
             {
                 return asList(SINGLE_TYPE_TABLE_NAME);
             }
-            
+
             return new ArrayList<>(map.keySet());
         }
         catch (IOException e)
@@ -190,7 +190,7 @@ class ESCatalog extends Catalog
                 it.remove();
             }
             // TODO: strings only support equals
-            else if(key != null)
+            else if (key != null)
             {
                 propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), defaultIfBlank(key, column), pair));
                 it.remove();
@@ -249,9 +249,9 @@ class ESCatalog extends Catalog
                 result.add(Pair.of("_id", sortItem.getOrder() == Order.ASC ? "asc" : "desc"));
                 continue;
             }
-            
+
             String key = analyzedProperties.get(column);
-            
+
             if (key == null)
             {
                 return emptyList();
@@ -338,7 +338,7 @@ class ESCatalog extends Catalog
 
             String index = (String) propertiesMap.get("index");
             String type = (String) propertiesMap.get("type");
-            
+
             @SuppressWarnings("unchecked")
             Map<String, Object> fields = (Map<String, Object>) propertiesMap.get("fields");
 

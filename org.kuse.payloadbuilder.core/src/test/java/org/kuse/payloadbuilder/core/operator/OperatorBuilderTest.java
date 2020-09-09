@@ -160,49 +160,49 @@ public class OperatorBuilderTest extends AOperatorTest
                         false),
                 new ExpressionPredicate(e("a.ab.active_flg = true")));
 
-//        System.out.println(queryResult.operator.toString(1));
-//        System.err.println(expected.toString(1));
+        //        System.out.println(queryResult.operator.toString(1));
+        //        System.err.println(expected.toString(1));
 
         assertEquals(expected, queryResult.operator);
     }
-    
+
     @Test
     public void test_no_push_down_from_left_join_on_predicate_accessing_previous_alias()
     {
         String query = "select aa.sku_id "
-                + "from source s "
-                + "inner join article a "
-                + "  on a.art_id = s.art_id "
-                + "left join related_article raa "
-                + "  on raa.art_id = a.art_id "
-                + "  and a.articleType = 'type'";
-        
+            + "from source s "
+            + "inner join article a "
+            + "  on a.art_id = s.art_id "
+            + "left join related_article raa "
+            + "  on raa.art_id = a.art_id "
+            + "  and a.articleType = 'type'";
+
         QueryResult queryResult = getQueryResult(query);
 
         Operator expected = new HashJoin(
-                        4,
-                        "LEFT JOIN",
-                        new HashJoin(
-                                2,
-                                "INNER JOIN",
-                                queryResult.tableOperators.get(0),
-                                queryResult.tableOperators.get(1),
-                                new ExpressionHashFunction(asList(e("s.art_id"))),
-                                new ExpressionHashFunction(asList(e("a.art_id"))),
-                                new ExpressionPredicate(e("a.art_id = s.art_id")),
-                                DefaultRowMerger.DEFAULT,
-                                false,
-                                false),
-                        queryResult.tableOperators.get(2),
+                4,
+                "LEFT JOIN",
+                new HashJoin(
+                        2,
+                        "INNER JOIN",
+                        queryResult.tableOperators.get(0),
+                        queryResult.tableOperators.get(1),
+                        new ExpressionHashFunction(asList(e("s.art_id"))),
                         new ExpressionHashFunction(asList(e("a.art_id"))),
-                        new ExpressionHashFunction(asList(e("raa.art_id"))),
-                        new ExpressionPredicate(e("raa.art_id = a.art_id AND a.articleType = 'type'")),
+                        new ExpressionPredicate(e("a.art_id = s.art_id")),
                         DefaultRowMerger.DEFAULT,
                         false,
-                        true);
+                        false),
+                queryResult.tableOperators.get(2),
+                new ExpressionHashFunction(asList(e("a.art_id"))),
+                new ExpressionHashFunction(asList(e("raa.art_id"))),
+                new ExpressionPredicate(e("raa.art_id = a.art_id AND a.articleType = 'type'")),
+                DefaultRowMerger.DEFAULT,
+                false,
+                true);
 
-//        System.out.println(queryResult.operator.toString(1));
-//        System.err.println(expected.toString(1));
+        //        System.out.println(queryResult.operator.toString(1));
+        //        System.err.println(expected.toString(1));
 
         assertEquals(expected, queryResult.operator);
     }
@@ -295,8 +295,8 @@ public class OperatorBuilderTest extends AOperatorTest
                 false,
                 false);
 
-//                                                System.err.println(expected.toString(1));
-//                                                System.out.println(queryResult.operator.toString(1));
+        //                                                System.err.println(expected.toString(1));
+        //                                                System.out.println(queryResult.operator.toString(1));
 
         assertEquals(expected, queryResult.operator);
 
@@ -343,8 +343,8 @@ public class OperatorBuilderTest extends AOperatorTest
         new TableAlias(articleAttribute, of("articlePrice"), "ap", new String[] {"price_sales", "sku_id"});
         new TableAlias(articleAttribute, of("attribute1"), "a1", new String[] {"attr1_id"});
 
-//                                                System.out.println(source.printHierarchy(0));
-//                                                System.out.println(queryResult.alias.printHierarchy(0));
+        //                                                System.out.println(source.printHierarchy(0));
+        //                                                System.out.println(queryResult.alias.printHierarchy(0));
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(queryResult.alias));
 
@@ -390,8 +390,8 @@ public class OperatorBuilderTest extends AOperatorTest
                 true,
                 false);
 
-//                                        System.err.println(expected.toString(1));
-//                                        System.out.println(queryResult.operator.toString(1));
+        //                                        System.err.println(expected.toString(1));
+        //                                        System.out.println(queryResult.operator.toString(1));
 
         assertEquals(expected, queryResult.operator);
 
@@ -486,8 +486,8 @@ public class OperatorBuilderTest extends AOperatorTest
         TableAlias range = new TableAlias(article, of("range"), "r", new String[] {"Value"});
         new TableAlias(range, of("attribute1"), "a1", new String[] {"someId", "attr1_code"});
 
-//                                                System.out.println(article.printHierarchy(1));
-//                                                System.out.println(result.alias.printHierarchy(1));
+        //                                                System.out.println(article.printHierarchy(1));
+        //                                                System.out.println(result.alias.printHierarchy(1));
 
         assertTrue("Alias hierarchy should be equal", article.isEqual(result.alias));
     }
@@ -692,8 +692,8 @@ public class OperatorBuilderTest extends AOperatorTest
                         true,
                         false);
 
-//                                        System.err.println(expected.toString(1));
-//                                        System.out.println(result.operator.toString(1));
+        //                                        System.err.println(expected.toString(1));
+        //                                        System.out.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
 

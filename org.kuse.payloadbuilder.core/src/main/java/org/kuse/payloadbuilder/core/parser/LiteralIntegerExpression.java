@@ -11,13 +11,13 @@ public class LiteralIntegerExpression extends LiteralExpression
     {
         this(Integer.parseInt(value));
     }
-    
+
     LiteralIntegerExpression(int value)
     {
         super(value);
         this.value = value;
     }
-    
+
     public int getValue()
     {
         return value;
@@ -32,13 +32,13 @@ public class LiteralIntegerExpression extends LiteralExpression
         code.setCode(String.format(template, code.getResVar(), value, code.getIsNull()));
         return code;
     }
-    
+
     @Override
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
     }
-    
+
     @Override
     public String toString()
     {

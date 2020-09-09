@@ -7,8 +7,7 @@ import java.util.List;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /**
- * A table index. Defines columns that can be utilized in batching operators
- * for quicker access to rows.
+ * A table index. Defines columns that can be utilized in batching operators for quicker access to rows.
  **/
 public class Index
 {
@@ -27,7 +26,7 @@ public class Index
     {
         return table;
     }
-    
+
     public List<String> getColumns()
     {
         return columns;

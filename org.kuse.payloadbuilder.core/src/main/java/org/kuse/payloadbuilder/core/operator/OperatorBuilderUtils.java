@@ -12,7 +12,7 @@ class OperatorBuilderUtils
 
     /**
      * Creates a group by operator for provided expressions
-     * 
+     *
      * @param nodeId Unique node id for operator
      * @param alias Alias of the belonging table source
      * @param groupBys Group by expressions

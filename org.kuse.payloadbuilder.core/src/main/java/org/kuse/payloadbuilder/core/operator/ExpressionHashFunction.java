@@ -14,12 +14,12 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 class ExpressionHashFunction implements ToIntBiFunction<ExecutionContext, Row>
 {
     private final List<Expression> expressions;
-    
+
     ExpressionHashFunction(List<Expression> expressions)
     {
         this.expressions = requireNonNull(expressions, "expressions");
     }
-    
+
     @Override
     public int applyAsInt(ExecutionContext context, Row row)
     {
@@ -28,7 +28,7 @@ class ExpressionHashFunction implements ToIntBiFunction<ExecutionContext, Row>
         for (Expression expression : expressions)
         {
             Object result = expression.eval(context);
-            
+
             // If value is string and is digits, use the intvalue as
             // hash instead of string to be able to compare ints and strings
             // on left/right side of join
@@ -40,13 +40,13 @@ class ExpressionHashFunction implements ToIntBiFunction<ExecutionContext, Row>
         }
         return hash;
     }
-    
+
     @Override
     public int hashCode()
     {
         return expressions.hashCode();
     }
-    
+
     @Override
     public boolean equals(Object obj)
     {
@@ -56,7 +56,7 @@ class ExpressionHashFunction implements ToIntBiFunction<ExecutionContext, Row>
         }
         return false;
     }
-    
+
     @Override
     public String toString()
     {

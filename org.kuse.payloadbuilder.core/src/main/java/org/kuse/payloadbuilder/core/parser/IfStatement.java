@@ -22,17 +22,17 @@ public class IfStatement extends Statement
     {
         return condition;
     }
-    
+
     public List<Statement> getStatements()
     {
         return statements;
     }
-    
+
     public List<Statement> getElseStatements()
     {
         return elseStatements;
     }
-    
+
     @Override
     public <TR, TC> TR accept(StatementVisitor<TR, TC> visitor, TC context)
     {

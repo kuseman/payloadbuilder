@@ -13,14 +13,18 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
+import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
-/** Table value function that extracts row from a collection of maps in target expression
- * <pre> 
+/**
+ * Table value function that extracts row from a collection of maps in target expression
+ *
+ * <pre>
+ *  
  * Example
- * 
+ *
  * SELECT field
  * FROM source s
  * OUTER APPLY
@@ -30,36 +34,35 @@ import org.kuse.payloadbuilder.core.parser.Expression;
  *     ON a1.attr1_id == a1Buckets.key
  *   ORDER BY a1.attr1_code
  * ] attribute1
- * 
  * </pre>
- * */
+ */
 class OpenMapCollectionFunction extends TableFunctionInfo
 {
     OpenMapCollectionFunction(Catalog catalog)
     {
         super(catalog, "open_map_collection");
     }
-    
+
     @Override
     public String getDescription()
     {
         return "Table valued function that opens a row set from a collection of maps." + System.lineSeparator() + System.lineSeparator() +
-                "Ex. " + System.lineSeparator() + 
-                "set @rows = '[ { \"key\": 123 }, { \"key\": 456 } ]'" + System.lineSeparator() +
-                "select * from " + getName() + "(json_value(@rows)) " + System.lineSeparator() + System.lineSeparator() + 
-                "Will yield a row set like: " + System.lineSeparator() + System.lineSeparator() +
-                "key" + System.lineSeparator() +
-                "---" + System.lineSeparator() +
-                "123" + System.lineSeparator() +
-                "456";
+            "Ex. " + System.lineSeparator() +
+            "set @rows = '[ { \"key\": 123 }, { \"key\": 456 } ]'" + System.lineSeparator() +
+            "select * from " + getName() + "(json_value(@rows)) " + System.lineSeparator() + System.lineSeparator() +
+            "Will yield a row set like: " + System.lineSeparator() + System.lineSeparator() +
+            "key" + System.lineSeparator() +
+            "---" + System.lineSeparator() +
+            "123" + System.lineSeparator() +
+            "456";
     }
-    
+
     @Override
-    public Iterator<Row> open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
+    public RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
     {
         final Object value = arguments.get(0).eval(context);
         final Iterator<Object> it = IteratorUtils.getIterator(value);
-        return new Iterator<>()
+        return new RowIterator()
         {
             private Set<String> addedColumns;
             private int pos = 0;
@@ -87,10 +90,10 @@ class OpenMapCollectionFunction extends TableFunctionInfo
                     {
                         return false;
                     }
-                        
+
                     @SuppressWarnings("unchecked")
                     Map<String, Object> item = (Map<String, Object>) it.next();
-                    
+
                     if (tableAlias.isAsteriskColumns())
                     {
                         if (addedColumns == null)
@@ -103,7 +106,7 @@ class OpenMapCollectionFunction extends TableFunctionInfo
                             tableAlias.setColumns(addedColumns.toArray(EMPTY_STRING_ARRAY));
                         }
                     }
-                    
+
                     int length = ArrayUtils.getLength(tableAlias.getColumns());
                     Object[] values = new Object[length];
                     for (int i = 0; i < length; i++)

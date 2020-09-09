@@ -130,14 +130,14 @@ class ESCatalogExtension implements ICatalogExtension
                         break;
                     }
                 }
-                
+
                 if (indexToSet != null)
                 {
                     break;
                 }
             }
         }
-        
+
         if (SwingUtilities.isEventDispatchThread())
         {
             quickPropertiesPanel.endpoints.getModel().setSelectedItem(endointToSet);
@@ -147,8 +147,8 @@ class ESCatalogExtension implements ICatalogExtension
         {
             final String tempA = endointToSet;
             final String tempB = indexToSet;
-            
-            SwingUtilities.invokeLater(() -> 
+
+            SwingUtilities.invokeLater(() ->
             {
                 quickPropertiesPanel.endpoints.getModel().setSelectedItem(tempA);
                 quickPropertiesPanel.indices.getModel().setSelectedItem(tempB);
@@ -181,7 +181,7 @@ class ESCatalogExtension implements ICatalogExtension
         Thread thread = new Thread(() ->
         {
             indicesByEndpoint.clear();
-            
+
             Object selectedEndpoint = quickPropertiesPanel.endpoints.getSelectedItem();
             Object selectedIndex = quickPropertiesPanel.indices.getSelectedItem();
 
@@ -211,7 +211,7 @@ class ESCatalogExtension implements ICatalogExtension
             endpoints.forEach(endpoint -> quickPropertiesPanel.endpointsModel.addElement(endpoint));
             quickPropertiesPanel.endpoints.setSelectedItem(selectedEndpoint);
             quickPropertiesPanel.indices.setSelectedItem(selectedIndex);
-            
+
             if (!errors.isEmpty())
             {
                 // TODO: Central logging panel/window

@@ -19,7 +19,7 @@ class ExpressionValuesExtractor implements ValuesExtractor
         this.expressions = requireNonNull(expressions, "expressions");
         this.size = expressions.size();
     }
-    
+
     StopWatch sw = new StopWatch();
 
     @Override

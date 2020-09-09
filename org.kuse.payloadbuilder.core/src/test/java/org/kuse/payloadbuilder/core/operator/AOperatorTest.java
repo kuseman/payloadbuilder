@@ -1,7 +1,5 @@
 package org.kuse.payloadbuilder.core.operator;
 
-import static java.util.Collections.emptyIterator;
-
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -31,18 +29,45 @@ public class AOperatorTest extends Assert
     {
         return parser.parseExpression(expression);
     }
-    
+
     protected Operator op(final Function<ExecutionContext, Iterator<Row>> it)
+    {
+        return op(it, null);
+    }
+
+    protected Operator op(final Function<ExecutionContext, Iterator<Row>> itFunc, Runnable closeAction)
     {
         return new Operator()
         {
-            
             @Override
-            public Iterator<Row> open(ExecutionContext context)
+            public RowIterator open(ExecutionContext context)
             {
-                return it.apply(context);
+                final Iterator<Row> it = itFunc.apply(context);
+                return new RowIterator()
+                {
+                    @Override
+                    public Row next()
+                    {
+                        return it.next();
+                    }
+
+                    @Override
+                    public void close()
+                    {
+                        if (closeAction != null)
+                        {
+                            closeAction.run();
+                        }
+                    }
+
+                    @Override
+                    public boolean hasNext()
+                    {
+                        return it.hasNext();
+                    }
+                };
             }
-            
+
             @Override
             public int getNodeId()
             {
@@ -50,11 +75,12 @@ public class AOperatorTest extends Assert
             }
         };
     }
+
     protected QueryResult getQueryResult(String query)
     {
         return getQueryResult(query, null, null);
     }
-    
+
     protected QueryResult getQueryResult(String query, Consumer<List<AnalyzePair>> predicateConsumer, Consumer<List<SortItem>> sortItemsConsumer)
     {
         List<Operator> tableOperators = new ArrayList<>();
@@ -68,12 +94,12 @@ public class AOperatorTest extends Assert
                 {
                     predicateConsumer.accept(data.getPredicatePairs());
                 }
-                
+
                 if (sortItemsConsumer != null)
                 {
                     sortItemsConsumer.accept(data.getSortItems());
                 }
-                
+
                 if (mAlias.getValue() == null)
                 {
                     mAlias.setValue(data.getTableAlias());
@@ -85,11 +111,11 @@ public class AOperatorTest extends Assert
                     {
                         return 0;
                     }
-                    
+
                     @Override
-                    public Iterator<Row> open(ExecutionContext context)
+                    public RowIterator open(ExecutionContext context)
                     {
-                        return emptyIterator();
+                        return RowIterator.EMPTY;
                     }
 
                     @Override

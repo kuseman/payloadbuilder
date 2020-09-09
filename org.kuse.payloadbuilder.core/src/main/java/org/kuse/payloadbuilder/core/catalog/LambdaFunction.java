@@ -9,9 +9,11 @@ import org.kuse.payloadbuilder.core.parser.LambdaExpression;
 /** Interface marking a function as a lambda function */
 public interface LambdaFunction
 {
-    /** Returns lambda bindings pairs.
-     * Left expression binds to right lambda expression 
-     * @param arguments Argument expression to function */
+    /**
+     * Returns lambda bindings pairs. Left expression binds to right lambda expression
+     *
+     * @param arguments Argument expression to function
+     */
     List<Pair<Expression, LambdaExpression>> getLambdaBindings(List<Expression> arguments);
-    
+
 }

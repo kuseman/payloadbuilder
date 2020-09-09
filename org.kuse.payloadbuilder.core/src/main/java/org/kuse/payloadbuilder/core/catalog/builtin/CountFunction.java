@@ -17,7 +17,7 @@ class CountFunction extends ScalarFunctionInfo
     {
         super(catalog, "count");
     }
-    
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     @Override
     public Object eval(ExecutionContext context, List<Expression> arguments)

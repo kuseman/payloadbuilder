@@ -37,7 +37,7 @@ public class DereferenceExpression extends Expression
         {
             return null;
         }
-        
+
         if (leftResult instanceof Row)
         {
             context.setRow((Row) leftResult);

@@ -63,8 +63,7 @@ public class QualifiedFunctionCallExpression extends Expression
     {
         return arguments;
     }
-    
-    
+
     /** Resolves function this expression based on provided session */
     public ScalarFunctionInfo getFunctionInfo(QuerySession session)
     {

@@ -11,7 +11,7 @@ public class VariableExpression extends Expression
     {
         this.name = join(qname.getParts(), ".");
     }
-    
+
     public String getName()
     {
         return name;
@@ -28,19 +28,19 @@ public class VariableExpression extends Expression
     {
         return true;
     }
-    
+
     @Override
     public Object eval(ExecutionContext context)
     {
         return context.getVariableValue(name);
     }
-    
+
     @Override
     public int hashCode()
     {
         return name.hashCode();
     }
- 
+
     @Override
     public boolean equals(Object obj)
     {
@@ -51,7 +51,7 @@ public class VariableExpression extends Expression
         }
         return false;
     }
-    
+
     @Override
     public String toString()
     {

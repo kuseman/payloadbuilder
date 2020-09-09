@@ -20,7 +20,7 @@ class HashFunction extends ScalarFunctionInfo
     {
         super(catalog, "hash");
     }
-    
+
     @Override
     public Class<?> getDataType()
     {

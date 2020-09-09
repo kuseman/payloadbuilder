@@ -15,25 +15,25 @@ public class Table extends TableSource
         super(tableAlias, options, token);
         this.catalogAlias = catalogAlias;
     }
-    
+
     @Override
     public String getCatalogAlias()
     {
         return catalogAlias;
     }
-    
+
     @Override
     public QualifiedName getTable()
     {
         return tableAlias.getTable();
     }
-    
+
     @Override
     public <TR, TC> TR accept(SelectVisitor<TR, TC> visitor, TC context)
     {
-        return visitor.visit(this, context);                
+        return visitor.visit(this, context);
     }
-    
+
     @Override
     public String toString()
     {

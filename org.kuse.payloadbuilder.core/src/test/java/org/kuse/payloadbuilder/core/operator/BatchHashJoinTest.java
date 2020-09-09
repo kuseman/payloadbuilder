@@ -1,7 +1,6 @@
 package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Arrays.asList;
-import static java.util.Collections.emptyIterator;
 import static java.util.stream.Collectors.toList;
 import static org.kuse.payloadbuilder.core.operator.BatchMergeJoinTest.assertRowJoinValues;
 
@@ -13,10 +12,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 
+import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
+import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
@@ -27,8 +28,8 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_inner_join_empty_outer()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 1);
-        Operator left = op(ctx -> emptyIterator());
-        Operator right = op(ctx -> emptyIterator());
+        Operator left = op(ctx -> RowIterator.EMPTY);
+        Operator right = op(ctx -> RowIterator.EMPTY);
 
         BatchHashJoin op = new BatchHashJoin(
                 0,
@@ -59,7 +60,7 @@ public class BatchHashJoinTest extends AOperatorTest
             {
                 context.getOperatorContext().getOuterIndexValues().next();
             }
-            return emptyIterator();
+            return RowIterator.EMPTY;
         });
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
@@ -83,7 +84,7 @@ public class BatchHashJoinTest extends AOperatorTest
         Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
         TableAlias a = TableAlias.of(null, "table", "a");
         Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
-        Operator right = op(context -> emptyIterator());
+        Operator right = op(context -> RowIterator.EMPTY);
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
@@ -143,7 +144,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 context.getOperatorContext().getOuterIndexValues().next();
             }
             context.getOperatorContext().getOuterIndexValues().next();
-            return emptyIterator();
+            return RowIterator.EMPTY;
         });
 
         BatchHashJoin op = new BatchHashJoin(0,
@@ -242,7 +243,7 @@ public class BatchHashJoinTest extends AOperatorTest
             count++;
         }
     }
-    
+
     @Test
     public void test_inner_join_one_to_one()
     {
@@ -251,10 +252,12 @@ public class BatchHashJoinTest extends AOperatorTest
         TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
+        MutableBoolean leftClose = new MutableBoolean();
+        MutableInt rightClose = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
                 .stream()
                 .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator());
+                .iterator(), () -> leftClose.setTrue());
         Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
@@ -266,7 +269,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .collect(toList());
 
             return inner.iterator();
-        });
+        }, () -> rightClose.increment());
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
@@ -281,7 +284,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 index,
                 null);
 
-        Iterator<Row> it = op.open(new ExecutionContext(session));
+        RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -306,8 +309,11 @@ public class BatchHashJoinTest extends AOperatorTest
             assertEquals("Val" + row.getObject(0), row.getChildRows(0).get(0).getObject(1));
             count++;
         }
+        it.close();
 
         assertEquals(5, count);
+        assertTrue(leftClose.booleanValue());
+        assertEquals(5, rightClose.intValue());
     }
 
     @Test

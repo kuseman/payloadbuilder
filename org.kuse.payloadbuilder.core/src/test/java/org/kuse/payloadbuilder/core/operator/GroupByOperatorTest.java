@@ -4,16 +4,14 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.stream.IntStream;
 
 import org.apache.commons.collections.IteratorUtils;
+import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
-import org.kuse.payloadbuilder.core.operator.GroupByOperator;
-import org.kuse.payloadbuilder.core.operator.Operator;
-import org.kuse.payloadbuilder.core.operator.Row;
+import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
@@ -24,7 +22,8 @@ public class GroupByOperatorTest extends AOperatorTest
     public void test()
     {
         TableAlias alias = TableAlias.of(null, QualifiedName.of("a"), "a");
-        Operator op = op(ctx -> IntStream.range(0, 10).mapToObj(i -> Row.of(alias, i, new Object[] {i, i % 2})).iterator());
+        MutableBoolean close = new MutableBoolean();
+        Operator op = op(ctx -> IntStream.range(0, 10).mapToObj(i -> Row.of(alias, i, new Object[] {i, i % 2})).iterator(), () -> close.setTrue());
 
         GroupByOperator gop = new GroupByOperator(
                 0,
@@ -33,7 +32,7 @@ public class GroupByOperatorTest extends AOperatorTest
                 (ctx, row, values) -> values[0] = row.getObject(1),
                 1);
 
-        Iterator<Row> it = gop.open(new ExecutionContext(session));
+        RowIterator it = gop.open(new ExecutionContext(session));
 
         List<Object> expected = asList(
                 asList(0, 2, 4, 6, 8),
@@ -50,7 +49,9 @@ public class GroupByOperatorTest extends AOperatorTest
             actual.add(IteratorUtils.toList(IteratorUtils.getIterator(row.getObject(0))));
             actual.add(IteratorUtils.toList(IteratorUtils.getIterator(row.getObject(1))));
         }
+        it.close();
 
         assertEquals(expected, actual);
+        assertTrue(close.booleanValue());
     }
 }

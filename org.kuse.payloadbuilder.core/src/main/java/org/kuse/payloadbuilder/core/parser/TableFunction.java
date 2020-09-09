@@ -29,22 +29,22 @@ public class TableFunction extends TableSource
         this.arguments = requireNonNull(arguments, "arguments");
         this.functionId = functionId;
     }
-    
+
     @Override
     public String getCatalogAlias()
     {
         return catalogAlias;
     }
-    
+
     public String getFunction()
     {
         return function;
     }
-    
+
     public TableFunctionInfo getFunctionInfo(QuerySession session)
     {
         FunctionInfo functionInfo = session.resolveFunctionInfo(catalogAlias, function, functionId);
-        
+
         if (functionInfo == null)
         {
             throw new ParseException("No function found with name " + function, token);
@@ -53,28 +53,28 @@ public class TableFunction extends TableSource
         {
             throw new ParseException("Expected a table valued function but got " + functionInfo, token);
         }
-        
+
         validate(functionInfo, arguments, token);
-        
+
         return (TableFunctionInfo) functionInfo;
     }
-    
+
     public List<Expression> getArguments()
     {
         return arguments;
     }
-    
+
     @Override
     public <TR, TC> TR accept(SelectVisitor<TR, TC> visitor, TC context)
     {
-        return visitor.visit(this, context);                
+        return visitor.visit(this, context);
     }
-    
+
     @Override
     public String toString()
     {
         return (catalogAlias != null ? catalogAlias : BuiltinCatalog.NAME) + "#"
-                + function
-                + "(" + arguments.stream().map(a -> a.toString()).collect(joining(", ")) + ") " + tableAlias.getAlias();
+            + function
+            + "(" + arguments.stream().map(a -> a.toString()).collect(joining(", ")) + ") " + tableAlias.getAlias();
     }
 }

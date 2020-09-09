@@ -10,18 +10,18 @@ public abstract class LiteralExpression extends Expression
     {
         this.objectValue = value;
     }
-    
+
     public Object getObjectValue()
     {
         return objectValue;
     }
-    
+
     @Override
     public boolean isConstant()
     {
         return true;
     }
-    
+
     @Override
     public Object eval(ExecutionContext context)
     {
@@ -33,20 +33,20 @@ public abstract class LiteralExpression extends Expression
     {
         return objectValue == null;
     }
-    
+
     @Override
     public Class<?> getDataType()
     {
         return objectValue != null ? objectValue.getClass() : super.getDataType();
     }
-    
+
     @Override
     public int hashCode()
     {
-        return 17 + 
-                37 * (objectValue != null ? objectValue.hashCode() : 0);
+        return 17 +
+            37 * (objectValue != null ? objectValue.hashCode() : 0);
     }
-    
+
     @Override
     public boolean equals(Object obj)
     {
@@ -56,7 +56,7 @@ public abstract class LiteralExpression extends Expression
         }
         return false;
     }
-    
+
     /** Create a liteal expression from provided value */
     public static LiteralExpression create(Object value)
     {
@@ -88,10 +88,10 @@ public abstract class LiteralExpression extends Expression
         {
             return new LiteralIntegerExpression(((Number) value).intValue());
         }
-        
+
         throw new IllegalArgumentException("Cannot create a literal expression from value " + value);
     }
-    
+
     /** Create a literal numeric expression from provided string */
     public static LiteralExpression createLiteralNumericExpression(String value)
     {
@@ -116,7 +116,7 @@ public abstract class LiteralExpression extends Expression
             }
         }
     }
-    
+
     /** Create a literal decimal expression from provided string */
     public static LiteralExpression createLiteralDecimalExpression(String value)
     {

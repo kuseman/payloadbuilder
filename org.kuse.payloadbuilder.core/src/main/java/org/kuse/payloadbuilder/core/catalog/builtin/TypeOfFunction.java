@@ -16,21 +16,21 @@ class TypeOfFunction extends ScalarFunctionInfo
     {
         super(catalog, "typeof");
     }
-    
+
     @Override
     public String getDescription()
     {
         return "Returns type string of provided argument. " + System.lineSeparator() +
-                "Ex. typeof(expression)"  + System.lineSeparator() +
-                "Mainly used when debugging values.";
+            "Ex. typeof(expression)" + System.lineSeparator() +
+            "Mainly used when debugging values.";
     }
-    
+
     @Override
     public List<Class<? extends Expression>> getInputTypes()
     {
         return asList(Expression.class);
     }
-    
+
     @Override
     public Object eval(ExecutionContext context, List<Expression> arguments)
     {

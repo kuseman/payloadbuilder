@@ -15,13 +15,13 @@ public class JsonStringWriter implements OutputWriter
     {
         sb.append(string);
     }
-    
+
     @Override
     public void endRow()
     {
         sb.append(System.lineSeparator());
     }
-    
+
     public String getAndReset()
     {
         if (sb.length() > 0 && sb.charAt(sb.length() - 1) == ',')
@@ -32,7 +32,7 @@ public class JsonStringWriter implements OutputWriter
         sb = new StringBuilder();
         return result;
     }
-    
+
     @Override
     public void writeFieldName(String name)
     {
@@ -55,7 +55,7 @@ public class JsonStringWriter implements OutputWriter
             endArray();
             return;
         }
-        
+
         if (value instanceof String)
         {
             sb.append("\"");
@@ -73,7 +73,7 @@ public class JsonStringWriter implements OutputWriter
         {
             sb.append("\"");
         }
-        
+
         sb.append(",");
     }
 

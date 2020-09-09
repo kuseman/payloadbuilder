@@ -31,13 +31,13 @@ public class ObjectProjection implements Projection
         {
             throw new IllegalArgumentException("Projection aliases and projections differ in size");
         }
-        
+
         this.projections = requireNonNull(projections, "projections");
         this.columns = projectionAliases.toArray(ArrayUtils.EMPTY_STRING_ARRAY);
         this.length = columns.length;
         this.selection = selection;
     }
-    
+
     public String[] getColumns()
     {
         return columns;
@@ -52,7 +52,7 @@ public class ObjectProjection implements Projection
         {
             Iterator<Row> it = selection.open(context);
             rowToUse = it.hasNext() ? it.next() : null;
-            
+
             if (rowToUse == null)
             {
                 writer.writeValue(null);
@@ -68,7 +68,7 @@ public class ObjectProjection implements Projection
             projections.get(i).writeValue(writer, context);
         }
         writer.endObject();
-        
+
         context.setRow(prevParentRow);
     }
 

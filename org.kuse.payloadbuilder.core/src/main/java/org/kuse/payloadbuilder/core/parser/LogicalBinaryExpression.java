@@ -276,12 +276,12 @@ public class LogicalBinaryExpression extends Expression
     {
         return visitor.visit(this, context);
     }
-    
+
     private boolean isTrue(Expression expression)
     {
         return TRUE_LITERAL.equals(expression);
     }
-    
+
     private boolean isFalse(Expression expression)
     {
         return FALSE_LITERAL.equals(expression);

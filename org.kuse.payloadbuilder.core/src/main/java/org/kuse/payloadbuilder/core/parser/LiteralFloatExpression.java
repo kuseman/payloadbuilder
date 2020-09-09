@@ -11,18 +11,18 @@ public class LiteralFloatExpression extends LiteralExpression
     {
         this(Float.parseFloat(value));
     }
-    
+
     LiteralFloatExpression(float value)
     {
         super(value);
         this.value = value;
     }
-    
+
     public float getValue()
     {
         return value;
     }
-    
+
     @Override
     public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
     {
@@ -32,13 +32,13 @@ public class LiteralFloatExpression extends LiteralExpression
         code.setCode(String.format(template, code.getResVar(), value, code.getIsNull()));
         return code;
     }
-    
+
     @Override
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
     }
-    
+
     @Override
     public String toString()
     {

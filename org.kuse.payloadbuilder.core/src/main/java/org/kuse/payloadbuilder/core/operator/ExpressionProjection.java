@@ -18,7 +18,7 @@ class ExpressionProjection implements Projection
     }
 
     StopWatch sw = new StopWatch();
-    
+
     @Override
     public void writeValue(OutputWriter writer, ExecutionContext context)
     {

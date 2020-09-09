@@ -13,14 +13,14 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 class ExpressionPredicate implements BiPredicate<ExecutionContext, Row>
 {
     private final Expression predicate;
-    
+
     ExpressionPredicate(Expression predicate)
     {
         this.predicate = requireNonNull(predicate, "predicate");
     }
-    
+
     StopWatch sw = new StopWatch();
-    
+
     @Override
     public boolean test(ExecutionContext context, Row row)
     {
@@ -30,16 +30,16 @@ class ExpressionPredicate implements BiPredicate<ExecutionContext, Row>
         sw.stop();
         context.evalTime.addAndGet(sw.getTime());
         sw.reset();
-        
+
         return result;
     }
-    
+
     @Override
     public int hashCode()
     {
         return predicate.hashCode();
     }
-    
+
     @Override
     public boolean equals(Object obj)
     {
@@ -49,7 +49,7 @@ class ExpressionPredicate implements BiPredicate<ExecutionContext, Row>
         }
         return false;
     }
-    
+
     @Override
     public String toString()
     {

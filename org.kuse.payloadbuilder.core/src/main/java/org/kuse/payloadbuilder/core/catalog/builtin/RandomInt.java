@@ -22,13 +22,13 @@ class RandomInt extends ScalarFunctionInfo
         super(catalog, "randomInt");
         this.random = new Random();
     }
-    
+
     @Override
     public List<Class<? extends Expression>> getInputTypes()
     {
         return asList(Expression.class);
     }
-    
+
     @Override
     public Object eval(ExecutionContext context, List<Expression> arguments)
     {
@@ -40,31 +40,31 @@ class RandomInt extends ScalarFunctionInfo
         int bound = ((Number) boundObj).intValue();
         return random.nextInt(bound);
     }
-    
+
     @Override
     public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode, List<Expression> arguments)
     {
         ExpressionCode code = ExpressionCode.code(context);
         code.addImport("java.util.Random");
-        
+
         ExpressionCode argCode = arguments.get(0).generateCode(context, parentCode);
-        
+
         code.setCode(String.format(
-              "%s"
-            + "boolean %s = true;\n"
-            + "int %s = 0;\n"
-            + "if (!%s)\n"
-            + "{\n"
-            + "  %s = false;\n"
-            + "  %s = new java.util.Random().nextInt(((Number) %s).intValue());\n"
-            + "}\n",
-            argCode.getCode(),
-            code.getIsNull(),
-            code.getResVar(),
-            argCode.getIsNull(),
-            code.getIsNull(),
-            code.getResVar(),
-            argCode.getResVar()));
+                "%s"
+                    + "boolean %s = true;\n"
+                    + "int %s = 0;\n"
+                    + "if (!%s)\n"
+                    + "{\n"
+                    + "  %s = false;\n"
+                    + "  %s = new java.util.Random().nextInt(((Number) %s).intValue());\n"
+                    + "}\n",
+                argCode.getCode(),
+                code.getIsNull(),
+                code.getResVar(),
+                argCode.getIsNull(),
+                code.getIsNull(),
+                code.getResVar(),
+                argCode.getResVar()));
         return code;
     }
 }

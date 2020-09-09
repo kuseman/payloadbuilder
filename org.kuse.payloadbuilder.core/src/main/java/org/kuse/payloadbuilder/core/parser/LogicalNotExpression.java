@@ -11,23 +11,23 @@ import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 public class LogicalNotExpression extends Expression
 {
     private final Expression expression;
-    
+
     public LogicalNotExpression(Expression expression)
     {
         this.expression = requireNonNull(expression, "expression");
     }
-    
+
     public Expression getExpression()
     {
         return expression;
     }
-    
+
     @Override
     public boolean isConstant()
     {
         return expression.isConstant();
     }
-    
+
     @Override
     public Expression fold()
     {
@@ -43,26 +43,26 @@ public class LogicalNotExpression extends Expression
 
         return this;
     }
-    
+
     @Override
     public boolean isNullable()
     {
         return expression.isNullable();
     }
-    
+
     @Override
     public Class<?> getDataType()
     {
         return expression.getDataType();
     }
-    
+
     @Override
     public Object eval(ExecutionContext context)
     {
         Object result = expression.eval(context);
         return result != null ? !(Boolean) result : null;
     }
-    
+
     @Override
     public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
     {
@@ -94,21 +94,21 @@ public class LogicalNotExpression extends Expression
         }
 
         childCode.setCode("// NOT\n" + childCode.getCode());
-        return childCode;    
+        return childCode;
     }
-    
+
     @Override
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
     }
-    
+
     @Override
     public int hashCode()
     {
         return expression.hashCode();
     }
-    
+
     @Override
     public boolean equals(Object obj)
     {
@@ -118,7 +118,7 @@ public class LogicalNotExpression extends Expression
         }
         return false;
     }
-    
+
     @Override
     public String toString()
     {

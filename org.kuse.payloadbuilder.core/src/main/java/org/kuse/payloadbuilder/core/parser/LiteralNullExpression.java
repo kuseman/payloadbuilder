@@ -6,12 +6,12 @@ import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 public class LiteralNullExpression extends LiteralExpression
 {
     public static final LiteralNullExpression NULL_LITERAL = new LiteralNullExpression();
-    
+
     private LiteralNullExpression()
     {
         super(null);
     }
-    
+
     @Override
     public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
     {
@@ -21,7 +21,7 @@ public class LiteralNullExpression extends LiteralExpression
         code.setCode(String.format(template, code.getResVar(), code.getIsNull()));
         return code;
     }
-    
+
     @Override
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {

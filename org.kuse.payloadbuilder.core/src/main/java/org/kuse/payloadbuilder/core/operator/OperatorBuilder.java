@@ -64,7 +64,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     private static final String BATCH_LIMIT = "batch_limit";
     private static final String BATCH_SIZE = "batch_size";
     private static final String POPULATE = "populate";
-    
+
     //    private static final String HASH_INNER = "hash_inner";
     private static final OperatorBuilder VISITOR = new OperatorBuilder();
 
@@ -149,15 +149,13 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             /* Push down predicates for joins */
             for (AJoin join : tsj.getJoins())
             {
-//                            left        inner       cross       outer
-//                is null     X           PUSH DOWN   PUSH DOWN   X
-//                is not null PUSH DOWN   PUSH DOWN   PUSH DOWN   PUSH DOWN
+                //                            left        inner       cross       outer
+                //                is null     X           PUSH DOWN   PUSH DOWN   X
+                //                is not null PUSH DOWN   PUSH DOWN   PUSH DOWN   PUSH DOWN
 
-                boolean isNullAllowed = !(
-                        (join instanceof Join && ((Join) join).getType() == JoinType.LEFT)
-                        ||
-                        (join instanceof Apply && ((Apply) join).getType() == ApplyType.OUTER)
-                        );
+                boolean isNullAllowed = !((join instanceof Join && ((Join) join).getType() == JoinType.LEFT)
+                    ||
+                    (join instanceof Apply && ((Apply) join).getType() == ApplyType.OUTER));
 
                 String joinAlias = join.getTableSource().getTableAlias().getAlias();
                 Pair<List<AnalyzePair>, AnalyzeResult> p = analyzeResult.extractPushdownPairs(joinAlias, isNullAllowed);
@@ -595,7 +593,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         context.parentTableAlias = innerTableSource.getTableAlias();
         visit(condition, context);
-        
+
         /* No equi items in condition or a correlated query => NestedLoop */
         if (isCorrelated || !foundation.isEqui())
         {

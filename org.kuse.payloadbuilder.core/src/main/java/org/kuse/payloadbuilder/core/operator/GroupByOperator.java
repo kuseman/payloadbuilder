@@ -12,8 +12,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.collections.Transformer;
-import org.apache.commons.collections.iterators.TransformIterator;
 import org.apache.commons.lang3.StringUtils;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 
@@ -44,47 +42,53 @@ class GroupByOperator extends AOperator
     {
         return asList(operator);
     }
-    
+
     @Override
     public String getName()
     {
         return "Group by";
     }
-    
+
     @Override
     public Map<String, Object> getDescribeProperties()
     {
         return ofEntries(true,
-                entry("Values", valuesExtractor.toString())
-                );
+                entry("Values", valuesExtractor.toString()));
     }
-    
-    @SuppressWarnings("unchecked")
+
     @Override
-    public Iterator<Row> open(ExecutionContext context)
+    public RowIterator open(ExecutionContext context)
     {
         ArrayKey key = new ArrayKey();
         key.key = new Object[size];
 
         Map<ArrayKey, List<Row>> table = new LinkedHashMap<>();
-        Iterator<Row> it = operator.open(context);
+        RowIterator it = operator.open(context);
         while (it.hasNext())
         {
             Row row = it.next();
             valuesExtractor.extract(context, row, key.key);
             table.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
         }
+        it.close();
 
-        return new TransformIterator(table.values().iterator(), new Transformer()
+        Iterator<List<Row>> iterator = table.values().iterator();
+        return new RowIterator()
         {
             private int position = 0;
 
             @Override
-            public Object transform(Object input)
+            public Row next()
             {
-                return new GroupedRow((List<Row>) input, position++, columnReferences);
+                return new GroupedRow(iterator.next(), position++, columnReferences);
             }
-        });
+
+            @Override
+            public boolean hasNext()
+            {
+                return iterator.hasNext();
+            }
+        };
     }
 
     @Override

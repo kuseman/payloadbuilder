@@ -18,9 +18,9 @@ public final class ObjectUtils
     {
         return IteratorUtils.chainedIterator(iterators);
     }
-    
+
     /** Checks that provided string is not blank, throws exception otherwise */
-    public static String requireNonBlank(String string, String message) 
+    public static String requireNonBlank(String string, String message)
     {
         if (StringUtils.isBlank(string))
         {

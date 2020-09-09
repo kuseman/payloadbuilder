@@ -9,7 +9,7 @@ public class AStatementVisitor<TR, TC> implements StatementVisitor<TR, TC>, Sele
 
     /**
      * Default result
-     * 
+     *
      * @param context Context for visitor
      **/
     protected TR defaultResult(TC context)
@@ -19,7 +19,7 @@ public class AStatementVisitor<TR, TC> implements StatementVisitor<TR, TC>, Sele
 
     /**
      * Visit expression contained in a statement
-     * 
+     *
      * @param context Context
      * @param expression Expression
      **/
@@ -145,7 +145,7 @@ public class AStatementVisitor<TR, TC> implements StatementVisitor<TR, TC>, Sele
         nestedSelectItem.getOrderBy().forEach(o -> o.accept(this, context));
         return null;
     }
-    
+
     @Override
     public TR visit(AsteriskSelectItem selectItem, TC context)
     {

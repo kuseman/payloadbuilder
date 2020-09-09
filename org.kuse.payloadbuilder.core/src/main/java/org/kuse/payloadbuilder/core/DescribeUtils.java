@@ -46,11 +46,10 @@ public class DescribeUtils
     private DescribeUtils()
     {
     }
-    
-    /** Builds a describe table select
-     * TODO: this needs to be changed and delegated to catalog.
-     * For example Elastic there are alot of different objects in a type
-     * and since we are fetching the 10 first rows the result will be wrong
+
+    /**
+     * Builds a describe table select TODO: this needs to be changed and delegated to catalog. For example Elastic there are alot of different objects
+     * in a type and since we are fetching the 10 first rows the result will be wrong
      **/
     static Pair<Operator, Projection> getDescribeTable(ExecutionContext context, DescribeTableStatement statement)
     {
@@ -135,7 +134,7 @@ public class DescribeUtils
             Class<?> type = typeByColumn.get(i);
             describeRows.add(Row.of(describeAlias, pos++, new Object[] {tableAlias.getColumns()[i], "Column", type == null ? "Unknown" : type.getSimpleName()}));
         }
-        describeRows.add(Row.of(describeAlias, pos++, new Object[] { "", "", "" }));
+        describeRows.add(Row.of(describeAlias, pos++, new Object[] {"", "", ""}));
         // Add indices
         int i = 1;
         for (Index index : indices)
@@ -146,9 +145,9 @@ public class DescribeUtils
         Operator describeOperator = new Operator()
         {
             @Override
-            public Iterator<Row> open(ExecutionContext context)
+            public RowIterator open(ExecutionContext context)
             {
-                return describeRows.iterator();
+                return RowIterator.wrap(describeRows.iterator());
             }
 
             @Override
@@ -160,7 +159,7 @@ public class DescribeUtils
 
         return Pair.of(describeOperator, getIndexProjection(asList(describeAlias.getColumns())));
     }
-    
+
     /** Build describe select from provided select */
     static Pair<Operator, Projection> getDescribeSelect(QuerySession session, Select select)
     {
@@ -218,9 +217,9 @@ public class DescribeUtils
         Operator describeOperator = new Operator()
         {
             @Override
-            public Iterator<Row> open(ExecutionContext context)
+            public RowIterator open(ExecutionContext context)
             {
-                return rows.iterator();
+                return RowIterator.wrap(rows.iterator());
             }
 
             @Override
@@ -232,7 +231,7 @@ public class DescribeUtils
 
         return Pair.of(describeOperator, getIndexProjection(describeColumns));
     }
-    
+
     /** Get an object projection over column array */
     static Projection getIndexProjection(List<String> columns)
     {

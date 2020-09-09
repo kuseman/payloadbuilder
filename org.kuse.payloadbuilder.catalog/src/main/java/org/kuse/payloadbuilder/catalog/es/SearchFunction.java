@@ -5,7 +5,6 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.kuse.payloadbuilder.catalog.es.ESOperator.UTF_8;
 
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -17,7 +16,7 @@ import org.kuse.payloadbuilder.catalog.es.ESOperator.EsType;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
-import org.kuse.payloadbuilder.core.operator.Row;
+import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.NamedExpression;
@@ -37,7 +36,7 @@ class SearchFunction extends TableFunctionInfo
     }
 
     @Override
-    public Iterator<Row> open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
+    public RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
     {
         String endpoint = null;
         String index = null;
@@ -139,6 +138,8 @@ class SearchFunction extends TableFunctionInfo
         return ESOperator.getIterator(
                 context,
                 tableAlias,
+                endpoint,
+                ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(type),
                 new AtomicLong(),
                 scrollId ->
                 {

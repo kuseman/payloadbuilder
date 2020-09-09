@@ -8,10 +8,11 @@ import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
+import org.kuse.payloadbuilder.core.parser.LiteralExpression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
-/** Test of {@link SortByOperator} */
-public class SortByOperatorTest extends AOperatorTest
+/** Test of {@link TopOperator} */
+public class TopOperatorTest extends AOperatorTest
 {
     @Test
     public void test()
@@ -20,25 +21,20 @@ public class SortByOperatorTest extends AOperatorTest
         TableAlias alias = TableAlias.of(null, QualifiedName.of("table"), "a");
         MutableBoolean close = new MutableBoolean();
         Operator target = op(ctx -> IntStream.range(0, 100).mapToObj(i -> Row.of(alias, i, new Object[] {rnd.nextInt(100)})).iterator(), () -> close.setTrue());
-        SortByOperator operator = new SortByOperator(
+        TopOperator operator = new TopOperator(
                 0,
                 target,
-                (c, rowA, rowB) -> (int) rowA.getObject(0) - (int) rowB.getObject(0));
+                LiteralExpression.createLiteralNumericExpression("4"));
 
         RowIterator it = operator.open(new ExecutionContext(session));
-        int prev = -1;
+        int count = 0;
         while (it.hasNext())
         {
-            Row row = it.next();
-            int val = (int) row.getObject(0);
-            if (prev != -1)
-            {
-                assertTrue(prev <= val);
-            }
-
-            prev = val;
+            it.next();
+            count++;
         }
         it.close();
+        assertEquals(4, count);
         assertTrue(close.booleanValue());
     }
 }

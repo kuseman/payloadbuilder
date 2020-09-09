@@ -98,10 +98,10 @@ class BatchMergeJoin extends AOperator
     }
 
     @Override
-    public Iterator<Row> open(ExecutionContext context)
+    public RowIterator open(ExecutionContext context)
     {
         final Iterator<Row> outerIt = outer.open(context);
-        return new Iterator<>()
+        return new RowIterator()
         {
             /** Batched rows */
             private List<Row> outerRows;

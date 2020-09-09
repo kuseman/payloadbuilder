@@ -14,6 +14,7 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 class TrimFunction extends ScalarFunctionInfo
 {
     private final Type type;
+
     TrimFunction(Catalog catalog, Type type)
     {
         super(catalog, type.name);
@@ -24,7 +25,7 @@ class TrimFunction extends ScalarFunctionInfo
     public String getDescription()
     {
         return "Returns " + type.descriptiveName + " string value of provided argument." + System.lineSeparator() +
-                "If argument is non String the argument is returned as is.";
+            "If argument is non String the argument is returned as is.";
     }
 
     @Override
@@ -41,7 +42,7 @@ class TrimFunction extends ScalarFunctionInfo
         {
             return null;
         }
-        
+
         String value = String.valueOf(obj);
         switch (type)
         {
@@ -52,18 +53,19 @@ class TrimFunction extends ScalarFunctionInfo
             case RIGHT:
                 return StringUtils.stripEnd(value, null);
         }
-        
+
         return null;
     }
-    
+
     enum Type
     {
         BOTH("trim", "trimmed"),
         LEFT("ltrim", "left trimmed"),
         RIGHT("rtrim", "right trimmed");
-        
+
         String name;
         String descriptiveName;
+
         Type(String name, String descriptiveName)
         {
             this.name = name;

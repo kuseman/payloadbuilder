@@ -147,8 +147,8 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
                         true),
                 new ExpressionPredicate(e("a.value is null")));
 
-//                        System.err.println(expected.toString(1));
-//                        System.out.println(result.operator.toString(1));
+        //                        System.err.println(expected.toString(1));
+        //                        System.out.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
 

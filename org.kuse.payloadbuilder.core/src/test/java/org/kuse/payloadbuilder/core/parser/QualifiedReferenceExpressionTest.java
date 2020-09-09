@@ -51,7 +51,7 @@ public class QualifiedReferenceExpressionTest extends AParserTest
             aRow.getChildRows(0).add(bRow);
             bRow.addParent(aRow);
         }
-        
+
         aRow.getChildRows(2).add(Row.of(e, 0, new Object[] {"e0"}));
         aRow.getChildRows(2).get(0).addParent(aRow);
     }
@@ -82,17 +82,16 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         // Parent + child traversal
         // From e TO b
         assertReference("b0", aRow.getChildRows(2).get(0), -1, null, "b", "col1");
-        
+
         // Parent access with column
         assertReference(1337, aRow.getChildRows(0).get(0).getChildRows(0).get(0), -1, null, "a", "col1");
-        // Parent access 
+        // Parent access
         assertReference(asList(aRow), aRow.getChildRows(0).get(0).getChildRows(0).get(0), -1, null, "a");
         // Parent access with child rows
         assertReference(aRow.getChildRows(0), aRow.getChildRows(0).get(0).getChildRows(0).get(0), -1, null, "a", "b");
-        
+
         //
-        
-        
+
         // Invalid dereference
         try
         {
@@ -115,7 +114,7 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         assertReference(1337, aRow, 0, aRow, "x", "col1");
         // Map access
         assertReference("value", aRow, 0, ofEntries(entry("key", "value")), "x", "key");
-        
+
         // Invalid dereference
         try
         {
@@ -128,7 +127,7 @@ public class QualifiedReferenceExpressionTest extends AParserTest
             assertTrue("Message should contain " + message + " but was " + e.getMessage(), e.getMessage().contains(message));
         }
     }
-    
+
     private void assertReference(Object expected, String... parts)
     {
         assertReference(expected, aRow, -1, null, parts);

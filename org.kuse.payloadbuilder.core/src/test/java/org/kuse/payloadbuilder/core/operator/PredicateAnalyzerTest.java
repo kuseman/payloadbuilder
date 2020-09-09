@@ -27,13 +27,13 @@ import org.kuse.payloadbuilder.core.utils.CollectionUtils;
 public class PredicateAnalyzerTest extends Assert
 {
     private final QueryParser parser = new QueryParser();
-    
+
     @Test
     public void test_AnalyzeResult()
     {
         TableAlias alias = TableAlias.of(null, "tableA", "a");
         TableAlias.of(alias, "tableS", "s");
-        
+
         Pair<List<AnalyzePair>, AnalyzeResult> pair;
         AnalyzeResult result;
         result = PredicateAnalyzer.analyze(null, alias);
@@ -42,7 +42,7 @@ public class PredicateAnalyzerTest extends Assert
         pair = result.extractPushdownPairs("a");
         assertEquals(emptyList(), pair.getLeft());
         assertEquals(AnalyzeResult.EMPTY, pair.getValue());
-        
+
         result = PredicateAnalyzer.analyze(e("(a.flag)"), alias);
         assertEquals(
                 result(
@@ -51,8 +51,7 @@ public class PredicateAnalyzerTest extends Assert
         assertEquals(e("(a.flag = true)"), result.getPredicate());
         pair = result.extractPushdownPairs("a");
         assertEquals(asList(
-                pair(Type.COMPARISION, ComparisonExpression.Type.EQUAL, e("a.flag"), asSet("a"), of("flag"), e("true"), emptySet(), null)
-                ),
+                pair(Type.COMPARISION, ComparisonExpression.Type.EQUAL, e("a.flag"), asSet("a"), of("flag"), e("true"), emptySet(), null)),
                 pair.getLeft());
         assertEquals(AnalyzeResult.EMPTY, pair.getValue());
 
@@ -74,8 +73,7 @@ public class PredicateAnalyzerTest extends Assert
         assertEquals(e("a.art_id is null"), result.getPredicate());
         pair = result.extractPushdownPairs("a");
         assertEquals(asList(
-                pair(Type.NULL, null, e("a.art_id"), asSet("a"), of("art_id"), e("a.art_id is null"), asSet(), null)
-                ), pair.getLeft());
+                pair(Type.NULL, null, e("a.art_id"), asSet("a"), of("art_id"), e("a.art_id is null"), asSet(), null)), pair.getLeft());
         assertEquals(AnalyzeResult.EMPTY, pair.getValue());
         pair = result.extractPushdownPairs("a", false);
         assertEquals(emptyList(), pair.getLeft());
@@ -89,15 +87,13 @@ public class PredicateAnalyzerTest extends Assert
         assertEquals(e("a.art_id is not null"), result.getPredicate());
         pair = result.extractPushdownPairs("a");
         assertEquals(asList(
-                pair(Type.NOT_NULL, null, e("a.art_id"), asSet("a"), of("art_id"), e("a.art_id is not null"), asSet(), null)
-                ), pair.getLeft());
+                pair(Type.NOT_NULL, null, e("a.art_id"), asSet("a"), of("art_id"), e("a.art_id is not null"), asSet(), null)), pair.getLeft());
         assertEquals(AnalyzeResult.EMPTY, pair.getValue());
         pair = result.extractPushdownPairs("a", false);
         assertEquals(asList(
-                pair(Type.NOT_NULL, null, e("a.art_id"), asSet("a"), of("art_id"), e("a.art_id is not null"), asSet(), null)
-                ), pair.getLeft());
+                pair(Type.NOT_NULL, null, e("a.art_id"), asSet("a"), of("art_id"), e("a.art_id is not null"), asSet(), null)), pair.getLeft());
         assertEquals(AnalyzeResult.EMPTY, pair.getValue());
-        
+
         result = PredicateAnalyzer.analyze(e("a.art_id = s.art_id and sku_id = s.sku_id and active_flg and not a.internet_flg and a.value > 100"), alias);
 
         assertEquals(
@@ -112,15 +108,13 @@ public class PredicateAnalyzerTest extends Assert
                 pair(Type.COMPARISION, ComparisonExpression.Type.EQUAL, e("a.internet_flg"), asSet("a"), of("internet_flg"), e("false"), asSet(), null),
                 pair(Type.COMPARISION, ComparisonExpression.Type.EQUAL, e("active_flg"), asSet(""), of("active_flg"), e("true"), asSet(), null),
                 pair(Type.COMPARISION, ComparisonExpression.Type.EQUAL, e("sku_id"), asSet(""), of("sku_id"), e("s.sku_id"), asSet("s"), of("sku_id")),
-                pair(Type.COMPARISION, ComparisonExpression.Type.EQUAL, e("a.art_id"), asSet("a"), of("art_id"), e("s.art_id"), asSet("s"), of("art_id"))
-                ), result.getEquiPairs("a"));
+                pair(Type.COMPARISION, ComparisonExpression.Type.EQUAL, e("a.art_id"), asSet("a"), of("art_id"), e("s.art_id"), asSet("s"), of("art_id"))), result.getEquiPairs("a"));
         assertEquals(e("a.art_id = s.art_id and sku_id = s.sku_id and active_flg = true and a.internet_flg = false and a.value > 100"), result.getPredicate());
         pair = result.extractPushdownPairs("a");
         assertEquals(asList(
                 pair(Type.COMPARISION, ComparisonExpression.Type.GREATER_THAN, e("a.value"), asSet("a"), of("value"), e("100"), asSet(), null),
                 pair(Type.COMPARISION, ComparisonExpression.Type.EQUAL, e("a.internet_flg"), asSet("a"), of("internet_flg"), e("false"), asSet(), null),
-                pair(Type.COMPARISION, ComparisonExpression.Type.EQUAL, e("active_flg"), asSet(""), of("active_flg"), e("true"), asSet(), null)
-                ),
+                pair(Type.COMPARISION, ComparisonExpression.Type.EQUAL, e("active_flg"), asSet(""), of("active_flg"), e("true"), asSet(), null)),
                 pair.getLeft());
         assertEquals(
                 result(
@@ -128,7 +122,7 @@ public class PredicateAnalyzerTest extends Assert
                         pair(Type.COMPARISION, ComparisonExpression.Type.EQUAL, e("a.art_id"), asSet("a"), of("art_id"), e("s.art_id"), asSet("s"), of("art_id"))),
                 pair.getValue());
         assertEquals(e("a.art_id = s.art_id and sku_id = s.sku_id"), pair.getValue().getPredicate());
-        
+
         result = PredicateAnalyzer.analyze(e("a.art_id = s.art_id or (sku_id = s.sku_id and active_flg and not a.internet_flg and a.value > 100)"), alias);
 
         assertEquals(
@@ -195,7 +189,7 @@ public class PredicateAnalyzerTest extends Assert
          *    - Get all pairs that only references (on both sides) provided alias. (getSingleAlias on pair.)
          *
          */
-        
+
         TableAlias alias = TableAlias.of(null, "tableA", "aa");
         TableAlias.of(alias, "tableS", "a1");
 
@@ -210,7 +204,7 @@ public class PredicateAnalyzerTest extends Assert
         assertTrue(p.isPushdown("aa"));
         assertFalse(p.isPushdown("b"));
         assertFalse(p.isEqui("s"));
-        
+
         p = PredicateAnalyzer.AnalyzePair.of(alias, e("count(aa.a1) > 0"));
         assertEquals(Type.COMPARISION, p.getType());
         assertEquals(ComparisonExpression.Type.GREATER_THAN, p.getComparisonType());
@@ -220,7 +214,7 @@ public class PredicateAnalyzerTest extends Assert
         assertFalse(p.isPushdown("aa"));
         assertFalse(p.isPushdown("b"));
         assertFalse(p.isEqui("s"));
-        
+
         p = PredicateAnalyzer.AnalyzePair.of(alias, e("aa.a1 > 0"));
         assertEquals(Type.COMPARISION, p.getType());
         assertEquals(ComparisonExpression.Type.GREATER_THAN, p.getComparisonType());
@@ -230,7 +224,7 @@ public class PredicateAnalyzerTest extends Assert
         assertFalse(p.isPushdown("aa"));
         assertFalse(p.isPushdown("b"));
         assertFalse(p.isEqui("s"));
-        
+
         alias = TableAlias.of(null, "tableS", "s");
         TableAlias.of(alias, "tableA", "a");
         TableAlias.of(alias.getChildAlias("a"), "tableA_A", "a_a");
@@ -247,7 +241,7 @@ public class PredicateAnalyzerTest extends Assert
         assertFalse(p.isPushdown("s"));
         assertFalse(p.isPushdown("b"));
         assertFalse(p.isEqui("s"));
-        
+
         // Child access
         p = PredicateAnalyzer.AnalyzePair.of(alias, e("a"));
         assertEquals(Type.COMPARISION, p.getType());
@@ -258,7 +252,7 @@ public class PredicateAnalyzerTest extends Assert
         assertFalse(p.isPushdown("s"));
         assertFalse(p.isPushdown("b"));
         assertFalse(p.isEqui("s"));
-        
+
         // Child access
         p = PredicateAnalyzer.AnalyzePair.of(alias, e("a.a_a.col"));
         assertEquals(Type.COMPARISION, p.getType());
@@ -269,7 +263,7 @@ public class PredicateAnalyzerTest extends Assert
         assertFalse(p.isPushdown("s"));
         assertFalse(p.isPushdown("b"));
         assertFalse(p.isEqui("s"));
-        
+
         p = PredicateAnalyzer.AnalyzePair.of(alias, e("@val > s.art_id"));
         assertEquals(Type.COMPARISION, p.getType());
         assertEquals(ComparisonExpression.Type.GREATER_THAN, p.getComparisonType());

@@ -17,12 +17,12 @@ public class Join extends AJoin
         this.type = requireNonNull(type, "type");
         this.condition = requireNonNull(condition, "condition");
     }
-    
+
     public JoinType getType()
     {
         return type;
     }
-    
+
     public Expression getCondition()
     {
         return condition;
@@ -33,11 +33,11 @@ public class Join extends AJoin
     {
         return visitor.visit(this, context);
     }
-    
+
     @Override
     public String toString()
     {
-        return type + " JOIN " + getTableSource() + "\tON " +  condition;
+        return type + " JOIN " + getTableSource() + "\tON " + condition;
     }
 
     public enum JoinType

@@ -35,25 +35,25 @@ class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
         // Resulting alias is the result of argument 0
         return aliasResolver.apply(arguments.get(0));
     }
-    
+
     @Override
     public List<Pair<Expression, LambdaExpression>> getLambdaBindings(List<Expression> arguments)
     {
         return singletonList(Pair.of(arguments.get(0), (LambdaExpression) arguments.get(1)));
     }
-    
+
     @Override
     public Class<?> getDataType()
     {
         return Iterator.class;
     }
-    
+
     @Override
     public List<Class<? extends Expression>> getInputTypes()
     {
         return asList(Expression.class, LambdaExpression.class);
     }
-    
+
     @Override
     public Object eval(ExecutionContext context, List<Expression> arguments)
     {
@@ -71,7 +71,7 @@ class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
             return result != null && result.booleanValue();
         });
     }
-    
+
     @Override
     public ExpressionCode generateCode(
             CodeGeneratorContext context,
@@ -84,31 +84,30 @@ class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
         code.addImport("java.util.Iterator");
         code.addImport("org.apache.commons.collections.iterators.FilterIterator");
         code.addImport("org.apache.commons.collections.Predicate");
-        
+
         LambdaExpression le = (LambdaExpression) arguments.get(1);
-        
+
         context.addLambdaParameters(le.getIdentifiers());
         ExpressionCode lambdaCode = le.getExpression().generateCode(context, parentCode);
         context.removeLambdaParameters(le.getIdentifiers());
-        
-        String template = 
-                "%s"
-              + "boolean %s = true;\n"
-              + "Iterator %s = null;\n"
-              + "if (!%s)\n"
-              + "{\n"
-              + "  %s = new FilterIterator(IteratorUtils.getIterator(%s), new Predicate()\n"
-              + "  {\n"
-              + "    public boolean evaluate(Object object)\n"
-              + "    {\n"
-              + "      Object %s = object;\n"
-              + "      %s"
-              + "      return %s;\n"
-              + "    }\n"
-              + "  });\n"
-              + "  %s = false;\n"
-              + "}\n";
-        
+
+        String template = "%s"
+            + "boolean %s = true;\n"
+            + "Iterator %s = null;\n"
+            + "if (!%s)\n"
+            + "{\n"
+            + "  %s = new FilterIterator(IteratorUtils.getIterator(%s), new Predicate()\n"
+            + "  {\n"
+            + "    public boolean evaluate(Object object)\n"
+            + "    {\n"
+            + "      Object %s = object;\n"
+            + "      %s"
+            + "      return %s;\n"
+            + "    }\n"
+            + "  });\n"
+            + "  %s = false;\n"
+            + "}\n";
+
         code.setCode(String.format(template,
                 inputCode.getCode(),
                 code.getIsNull(),
@@ -119,7 +118,7 @@ class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
                 lambdaCode.getCode(),
                 lambdaCode.getResVar(),
                 code.getIsNull()));
-        
+
         return code;
     }
 }

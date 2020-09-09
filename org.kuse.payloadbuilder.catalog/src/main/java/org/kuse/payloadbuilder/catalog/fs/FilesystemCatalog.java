@@ -1,7 +1,5 @@
 package org.kuse.payloadbuilder.catalog.fs;
 
-import static java.util.Collections.emptyIterator;
-
 import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -16,6 +14,7 @@ import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
+import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
@@ -40,30 +39,30 @@ class FilesystemCatalog extends Catalog
         registerFunction(new FileFunction(this));
         registerFunction(new ContentsFunction(this));
     }
-    
+
     private static class FileFunction extends TableFunctionInfo
     {
         FileFunction(Catalog catalog)
         {
             super(catalog, "file");
         }
-        
+
         @SuppressWarnings("unchecked")
         @Override
-        public Iterator<Row> open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
+        public RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
         {
             tableAlias.setColumns(COLUMNS);
             Object obj = arguments.get(0).eval(context);
             if (obj == null)
             {
-                return emptyIterator();
+                return RowIterator.EMPTY;
             }
             String strPath = String.valueOf(obj);
             Path path = FileSystems.getDefault().getPath(strPath);
-            return new SingletonIterator(ListFunction.fromPath(tableAlias, 0, path));
+            return RowIterator.wrap(new SingletonIterator(ListFunction.fromPath(tableAlias, 0, path)));
         }
     }
-    
+
     /** Contents function, outputs path contents as string */
     private static class ContentsFunction extends ScalarFunctionInfo
     {
@@ -100,13 +99,13 @@ class FilesystemCatalog extends Catalog
         }
 
         @Override
-        public Iterator<Row> open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
+        public RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
         {
             tableAlias.setColumns(COLUMNS);
             Object obj = arguments.get(0).eval(context);
             if (obj == null)
             {
-                return emptyIterator();
+                return RowIterator.EMPTY;
             }
             String path = String.valueOf(obj);
             boolean recursive = false;
@@ -116,7 +115,7 @@ class FilesystemCatalog extends Catalog
             }
 
             final Iterator<Path> it = getIterator(path, recursive);
-            return new Iterator<>()
+            return new RowIterator()
             {
                 private final int pos = 0;
 
@@ -153,8 +152,7 @@ class FilesystemCatalog extends Catalog
             long size = 0;
             try
             {
-                BasicFileAttributes attr =
-                        Files.readAttributes(path, BasicFileAttributes.class);
+                BasicFileAttributes attr = Files.readAttributes(path, BasicFileAttributes.class);
                 creationTime = attr.creationTime().toMillis();
                 lastAccessTime = attr.lastAccessTime().toMillis();
                 lastModifiedTime = attr.lastModifiedTime().toMillis();
@@ -164,7 +162,7 @@ class FilesystemCatalog extends Catalog
             catch (IOException e)
             {
             }
-            
+
             Object[] values = new Object[] {
                     path.getFileName(),
                     path.getParent() != null ? path.getParent().toString() : null,
@@ -177,7 +175,7 @@ class FilesystemCatalog extends Catalog
             };
             return Row.of(alias, pos++, values);
         }
-        
+
         private Iterator<Path> getIterator(String strPath, boolean recursive)
         {
             try

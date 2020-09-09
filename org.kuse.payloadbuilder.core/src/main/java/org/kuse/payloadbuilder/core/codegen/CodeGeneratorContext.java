@@ -16,31 +16,31 @@ public class CodeGeneratorContext
     // Generating a bi predicate
     // Row associations are outer and inner else row
     // TableAlias should reference inner relation
-//    public boolean biPredicate;
+    //    public boolean biPredicate;
     public TableAlias tableAlias;
-//    boolean pretty;
+    //    boolean pretty;
     private final long now = System.currentTimeMillis();
     private final String rowVarName = "row";
     // Current lambda parameters in scope
     private final Set<String> lambdaParameters = new HashSet<>();
-    
+
     public long getNow()
     {
         return now;
     }
-    
+
     public String getRowVarName()
     {
         return rowVarName;
     }
-    
+
     /** Allocate a new unique variable name */
     public String newVar(String prefix)
     {
         AtomicInteger count = varCountByPreix.computeIfAbsent(prefix, key -> new AtomicInteger());
         return prefix + "_" + count.getAndIncrement();
     }
-    
+
     /** Adds provided identifiers to lambda scope */
     public void addLambdaParameters(List<String> identifiers)
     {
@@ -52,7 +52,7 @@ public class CodeGeneratorContext
     {
         lambdaParameters.removeAll(identifiers);
     }
-    
+
     /** Checks if provided identifier is a lambda parameter */
     public boolean containsLambda(String identifier)
     {

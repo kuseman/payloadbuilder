@@ -138,7 +138,8 @@ public class QueryParserTest extends AParserTest
 
         // Nested
         assertQuery("select art_id from article a inner join (from articleAttribute aa  inner join articlePrice ap on ap.sku_id = aa.sku_id) aa with (populate=true) on aa.art_id = a.art_id ");
-        assertQuery("select art_id from article a inner join (from articleAttribute aa  left join articlePrice ap with (populate=true) on ap.sku_id = aa.sku_id) aa with (populate=true) on aa.art_id = a.art_id ");
+        assertQuery(
+                "select art_id from article a inner join (from articleAttribute aa  left join articlePrice ap with (populate=true) on ap.sku_id = aa.sku_id) aa with (populate=true) on aa.art_id = a.art_id ");
 
         // TODO: more parser tests, where, orderby, group by
     }

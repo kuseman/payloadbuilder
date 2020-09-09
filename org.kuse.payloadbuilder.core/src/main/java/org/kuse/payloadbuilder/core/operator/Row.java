@@ -167,7 +167,7 @@ public class Row
 
         return null;
     }
-    
+
     /** Add provided row as parent to this row */
     public void addParent(Row row)
     {

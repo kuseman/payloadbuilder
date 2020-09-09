@@ -30,7 +30,7 @@ class GroupedRow extends Row
         this.columnOrdinals = getColumnOrdinals(columnReferences);
         super.tableAlias = rows.get(0).getTableAlias();
     }
-    
+
     private TIntSet getColumnOrdinals(List<String> columnReferences)
     {
         TableAlias alias = rows.get(0).getTableAlias();
@@ -42,7 +42,7 @@ class GroupedRow extends Row
         }
         return result;
     }
-    
+
     @Override
     public Object getObject(int ordinal)
     {
@@ -52,7 +52,7 @@ class GroupedRow extends Row
         }
         return new TransformIterator(rows.iterator(), row -> ((Row) row).getObject(ordinal));
     }
-    
+
     @SuppressWarnings("unchecked")
     @Override
     public List<Row> getChildRows(int index)
@@ -78,19 +78,19 @@ class GroupedRow extends Row
                     rows.addAll(childRows);
                 }
             }
-            
+
             childRows[index] = rows;
         }
 
         return rows;
     }
-    
+
     @Override
     public int hashCode()
     {
         return 17 + (pos * 37);
     }
-    
+
     @Override
     public boolean equals(Object obj)
     {

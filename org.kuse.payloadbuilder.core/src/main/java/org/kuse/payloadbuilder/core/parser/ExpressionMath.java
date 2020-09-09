@@ -268,7 +268,7 @@ public final class ExpressionMath
 
         return ((Comparable<Object>) left).compareTo(right);
     }
-    
+
     @SuppressWarnings("unchecked")
     public static boolean eq(Object left, Object right, boolean throwIfNotComparable)
     {
@@ -393,7 +393,7 @@ public final class ExpressionMath
         {
             return left.doubleValue() + right.doubleValue();
         }
-        else if (left instanceof Float || right instanceof Float) 
+        else if (left instanceof Float || right instanceof Float)
         {
             return left.floatValue() + right.floatValue();
         }
@@ -488,7 +488,7 @@ public final class ExpressionMath
         {
             return left.doubleValue() - right.doubleValue();
         }
-        else if (left instanceof Float || right instanceof Float) 
+        else if (left instanceof Float || right instanceof Float)
         {
             return left.floatValue() - right.floatValue();
         }
@@ -496,7 +496,7 @@ public final class ExpressionMath
         {
             return left.longValue() - right.longValue();
         }
-        
+
         return left.intValue() - right.intValue();
     }
 
@@ -583,7 +583,7 @@ public final class ExpressionMath
         {
             return left.doubleValue() * right.doubleValue();
         }
-        else if (left instanceof Float || right instanceof Float) 
+        else if (left instanceof Float || right instanceof Float)
         {
             return left.floatValue() * right.floatValue();
         }
@@ -678,7 +678,7 @@ public final class ExpressionMath
         {
             return left.doubleValue() / right.doubleValue();
         }
-        else if (left instanceof Float || right instanceof Float) 
+        else if (left instanceof Float || right instanceof Float)
         {
             return left.floatValue() / right.floatValue();
         }
@@ -773,7 +773,7 @@ public final class ExpressionMath
         {
             return left.doubleValue() % right.doubleValue();
         }
-        else if (left instanceof Float || right instanceof Float) 
+        else if (left instanceof Float || right instanceof Float)
         {
             return left.floatValue() % right.floatValue();
         }
@@ -894,7 +894,7 @@ public final class ExpressionMath
         {
             return (Boolean) other ? 1 : 0;
         }
-        
+
         if (!(other instanceof String))
         {
             return null;
@@ -940,7 +940,7 @@ public final class ExpressionMath
             {
                 return true;
             }
-            
+
         }
         else if (value instanceof Collection)
         {

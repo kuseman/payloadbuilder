@@ -13,12 +13,12 @@ public class DescribeTableStatement extends Statement
         this.catalog = catalog;
         this.tableName = requireNonNull(tableName, "tableName");
     }
-    
+
     public String getCatalog()
     {
         return catalog;
     }
-    
+
     public QualifiedName getTableName()
     {
         return tableName;

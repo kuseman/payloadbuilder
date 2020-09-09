@@ -9,29 +9,29 @@ public class TableSourceJoined extends ASelectNode
 {
     private final TableSource tableSource;
     private final List<AJoin> joins;
-    
+
     public TableSourceJoined(TableSource tableSource, List<AJoin> joins)
     {
         this.tableSource = requireNonNull(tableSource, "tableSource");
         this.joins = requireNonNull(joins, "joins");
     }
-    
+
     public TableSource getTableSource()
     {
         return tableSource;
     }
-    
+
     public List<AJoin> getJoins()
     {
         return joins;
     }
-    
+
     @Override
     public <TR, TC> TR accept(SelectVisitor<TR, TC> visitor, TC context)
     {
-        return visitor.visit(this, context);                
+        return visitor.visit(this, context);
     }
-    
+
     @Override
     public String toString()
     {

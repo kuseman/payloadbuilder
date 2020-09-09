@@ -9,7 +9,6 @@ import static org.apache.commons.lang3.StringUtils.join;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -21,6 +20,7 @@ import org.kuse.payloadbuilder.core.catalog.FunctionInfo;
 import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.operator.ObjectProjection;
 import org.kuse.payloadbuilder.core.operator.Operator;
+import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.operator.OperatorBuilder;
 import org.kuse.payloadbuilder.core.operator.Projection;
 import org.kuse.payloadbuilder.core.operator.Row;
@@ -65,7 +65,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         this.context = new ExecutionContext(session);
         queue.addAll(query.getStatements());
     }
-    
+
     @Override
     public void reset()
     {
@@ -148,13 +148,13 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             operator = new Operator()
             {
                 @Override
-                public Iterator<Row> open(ExecutionContext context)
+                public RowIterator open(ExecutionContext context)
                 {
-                    return variables
+                    return RowIterator.wrap(variables
                             .entrySet()
                             .stream()
                             .map(e -> Row.of(SHOW_VARIABLES_ALIAS, pos.incrementAndGet(), new Object[] {e.getKey(), e.getValue()}))
-                            .iterator();
+                            .iterator());
                 }
 
                 @Override
@@ -182,12 +182,12 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             operator = new Operator()
             {
                 @Override
-                public Iterator<Row> open(ExecutionContext context)
+                public RowIterator open(ExecutionContext context)
                 {
-                    return tables
+                    return RowIterator.wrap(tables
                             .stream()
                             .map(table -> Row.of(SHOW_TABLES_ALIAS, pos.incrementAndGet(), new Object[] {table}))
-                            .iterator();
+                            .iterator());
                 }
 
                 @Override
@@ -205,20 +205,20 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             {
                 throw new ParseException("No catalog found with alias: " + statement.getCatalog(), statement.getToken());
             }
-            
+
             Catalog builtIn = session.getCatalogRegistry().getBuiltin();
             Collection<FunctionInfo> functions = catalog != null ? catalog.getFunctions() : emptyList();
             columns = SHOW_FUNCTIONS_ALIAS.getColumns();
             operator = new Operator()
             {
                 @Override
-                public Iterator<Row> open(ExecutionContext context)
+                public RowIterator open(ExecutionContext context)
                 {
-                    return Stream.concat(
+                    return RowIterator.wrap(Stream.concat(
                             functions
                                     .stream()
                                     .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName()))
-                                    .map(function -> Row.of(SHOW_TABLES_ALIAS, pos.incrementAndGet(), new Object[] {function.getName(), function.getType(), function.getDescription() })),
+                                    .map(function -> Row.of(SHOW_TABLES_ALIAS, pos.incrementAndGet(), new Object[] {function.getName(), function.getType(), function.getDescription()})),
                             Stream.concat(
                                     functions.size() > 0
                                         ? Stream.of(Row.of(SHOW_FUNCTIONS_ALIAS, pos.incrementAndGet(), new Object[] {"-- Built in --", "", ""}))
@@ -227,7 +227,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                                             .stream()
                                             .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName()))
                                             .map(function -> Row.of(SHOW_TABLES_ALIAS, pos.incrementAndGet(), new Object[] {function.getName(), function.getType(), function.getDescription()}))))
-                            .iterator();
+                            .iterator());
                 }
 
                 @Override
@@ -287,7 +287,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         {
             throw new IllegalArgumentException("No more results");
         }
-        
+
         Operator operator = currentSelect.getKey();
         Projection projection = currentSelect.getValue();
 
@@ -301,7 +301,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         context.clear();
         if (operator != null)
         {
-            Iterator<Row> iterator = operator.open(context);
+            RowIterator iterator = operator.open(context);
             while (iterator.hasNext())
             {
                 if (session.abortQuery())
@@ -314,6 +314,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                 projection.writeValue(writer, context);
                 writer.endRow();
             }
+            iterator.close();
         }
         else
         {

@@ -14,7 +14,7 @@ public class Select extends ASelectNode
     private final Expression where;
     private final List<Expression> groupBy;
     private final List<SortItem> orderBy;
-    
+
     Select(List<SelectItem> selectItems,
             TableSourceJoined from,
             Expression topExpression,
@@ -29,47 +29,47 @@ public class Select extends ASelectNode
         this.groupBy = requireNonNull(groupBy, "groupBy");
         this.orderBy = requireNonNull(orderBy, "orderBy");
     }
-    
+
     public List<SelectItem> getSelectItems()
     {
         return selectItems;
     }
-    
+
     public TableSourceJoined getFrom()
     {
         return from;
     }
-    
+
     public Expression getTopExpression()
     {
         return topExpression;
     }
-    
+
     public Expression getWhere()
     {
         return where;
     }
-    
+
     public List<Expression> getGroupBy()
     {
         return groupBy;
     }
-    
+
     public List<SortItem> getOrderBy()
     {
         return orderBy;
     }
-    
+
     @Override
     public <TR, TC> TR accept(SelectVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
     }
-    
+
     @Override
     public String toString()
     {
-        StringBuilder sb = new StringBuilder();  
+        StringBuilder sb = new StringBuilder();
         sb.append("SELECT");
         sb.append(System.lineSeparator());
         sb.append(selectItems.stream().map(s -> s.toString()).collect(joining("," + System.lineSeparator(), "", System.lineSeparator())));
@@ -79,7 +79,7 @@ public class Select extends ASelectNode
             sb.append(System.lineSeparator());
             sb.append("WHERE ").append(where);
         }
-        
+
         if (!orderBy.isEmpty())
         {
             sb.append(System.lineSeparator());

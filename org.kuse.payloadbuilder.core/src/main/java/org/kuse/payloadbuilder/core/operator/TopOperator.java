@@ -3,7 +3,6 @@ package org.kuse.payloadbuilder.core.operator;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -43,7 +42,7 @@ class TopOperator extends AOperator
     }
 
     @Override
-    public Iterator<Row> open(ExecutionContext context)
+    public RowIterator open(ExecutionContext context)
     {
         Object obj = topExpression.eval(context);
         if (!(obj instanceof Integer) || (Integer) obj < 0)
@@ -51,8 +50,8 @@ class TopOperator extends AOperator
             throw new OperatorException("Top expression " + topExpression + " should return a zero or positive Integer. Got: " + obj);
         }
         final int top = ((Integer) obj).intValue();
-        final Iterator<Row> it = target.open(context);
-        return new Iterator<>()
+        final RowIterator it = target.open(context);
+        return new RowIterator()
         {
             private int count;
 
@@ -67,6 +66,12 @@ class TopOperator extends AOperator
             public boolean hasNext()
             {
                 return count < top && it.hasNext();
+            }
+
+            @Override
+            public void close()
+            {
+                it.close();
             }
         };
     }

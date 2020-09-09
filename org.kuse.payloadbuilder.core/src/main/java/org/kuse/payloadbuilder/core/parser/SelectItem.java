@@ -11,17 +11,17 @@ public abstract class SelectItem extends ASelectNode
         this.identifier = identifier;
         this.explicitIdentifier = explicitIdentifier;
     }
-    
+
     public boolean isExplicitIdentifier()
     {
         return explicitIdentifier;
     }
-    
+
     public String getIdentifier()
     {
         return identifier;
     }
-    
+
     @Override
     public String toString()
     {

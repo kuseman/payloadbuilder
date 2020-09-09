@@ -69,7 +69,7 @@ public class QuerySession
     {
         return isBlank(defaultCatalogAlias) ? null : catalogRegistry.getCatalog(defaultCatalogAlias);
     }
-    
+
     /** Return default catalog alias */
     public String getDefaultCatalogAlias()
     {
@@ -78,7 +78,7 @@ public class QuerySession
 
     /**
      * Get default catalog for this session
-     * 
+     *
      * @param alias Alias of the catalog to set as default
      **/
     public void setDefaultCatalog(String alias)
@@ -100,7 +100,7 @@ public class QuerySession
             printStream.println(value);
         }
     }
-    
+
     /** Set catalog property */
     public void setCatalogProperty(String alias, String key, Object value)
     {
@@ -113,7 +113,7 @@ public class QuerySession
                 .computeIfAbsent(alias, k -> new HashMap<>())
                 .put(key, value);
     }
-    
+
     /** Get catalog property */
     public Object getCatalogProperty(String alias, String key)
     {
@@ -121,13 +121,13 @@ public class QuerySession
         {
             return null;
         }
-        
+
         return catalogProperties.getOrDefault(alias, emptyMap()).get(key);
     }
 
     /**
      * Resolves function info from provided
-     * 
+     *
      * @param functionId Unique function id to cache a lookup
      */
     public FunctionInfo resolveFunctionInfo(String catalogAlias, String function, int functionId)

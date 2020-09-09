@@ -5,7 +5,6 @@ import static java.util.Objects.requireNonNull;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -55,13 +54,13 @@ class NestedLoopJoin extends AOperator
     {
         return asList(outer, inner);
     }
-    
+
     @Override
     public String getName()
     {
         return "Nested loop";
     }
-    
+
     @Override
     public Map<String, Object> getDescribeProperties()
     {
@@ -69,19 +68,19 @@ class NestedLoopJoin extends AOperator
                 entry(DescribeUtils.PREDICATE, predicate == null ? "" : predicate.toString()),
                 entry(DescribeUtils.POPULATING, populating));
     }
-    
+
     @Override
-    public Iterator<Row> open(ExecutionContext context)
+    public RowIterator open(ExecutionContext context)
     {
         final Row contextParent = context.getRow();
-        final Iterator<Row> it = outer.open(context);
+        final RowIterator it = outer.open(context);
         executionCount++;
-        return new Iterator<>()
+        return new RowIterator()
         {
-            Row next;
-            Row currentOuter;
-            Iterator<Row> ii;
-            boolean hit;
+            private Row next;
+            private Row currentOuter;
+            private RowIterator ii;
+            private boolean hit;
 
             @Override
             public Row next()
@@ -95,6 +94,12 @@ class NestedLoopJoin extends AOperator
             public boolean hasNext()
             {
                 return setNext();
+            }
+
+            @Override
+            public void close()
+            {
+                it.close();
             }
 
             private boolean setNext()
@@ -127,6 +132,7 @@ class NestedLoopJoin extends AOperator
                             next = currentOuter;
                         }
 
+                        ii.close();
                         ii = null;
 
                         currentOuter = null;

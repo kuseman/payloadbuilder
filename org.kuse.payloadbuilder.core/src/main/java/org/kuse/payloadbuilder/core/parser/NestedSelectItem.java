@@ -31,37 +31,37 @@ public class NestedSelectItem extends SelectItem
         this.groupBy = requireNonNull(groupBy, "groupBy");
         this.orderBy = requireNonNull(orderBy, "orderBy");
     }
-    
+
     public Expression getFrom()
     {
         return from;
     }
-    
+
     public List<SelectItem> getSelectItems()
     {
         return selectItems;
     }
-    
+
     public Expression getWhere()
     {
         return where;
     }
-    
+
     public List<Expression> getGroupBy()
     {
         return groupBy;
     }
-    
+
     public List<SortItem> getOrderBy()
     {
         return orderBy;
     }
-    
+
     public Type getType()
     {
         return type;
     }
-    
+
     @Override
     public <TR, TC> TR accept(SelectVisitor<TR, TC> visitor, TC context)
     {
@@ -88,7 +88,7 @@ public class NestedSelectItem extends SelectItem
         sb.append(super.toString());
         return sb.toString();
     }
-    
+
     public enum Type
     {
         OBJECT,

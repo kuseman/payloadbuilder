@@ -6,6 +6,7 @@ import static java.util.Objects.requireNonNull;
 public class DescribeSelectStatement extends Statement
 {
     private final SelectStatement selectStatement;
+
     DescribeSelectStatement(SelectStatement selectStatement)
     {
         this.selectStatement = requireNonNull(selectStatement, "selectStatement");

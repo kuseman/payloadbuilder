@@ -178,8 +178,8 @@ public class OperatorBuilderApplyTest extends AOperatorTest
                         true),
                 new ExpressionPredicate(e("a.value is null")));
 
-//        System.out.println(expected.toString(1));
-//        System.err.println(result.operator.toString(1));
+        //        System.out.println(expected.toString(1));
+        //        System.err.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
 
