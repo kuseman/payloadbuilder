@@ -16,7 +16,6 @@ import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.Index;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -24,6 +23,9 @@ import org.kuse.payloadbuilder.core.parser.QualifiedName;
 /** Test {@link BatchHashJoin} */
 public class BatchHashJoinTest extends AOperatorTest
 {
+    private final TableAlias a = TableAlias.of(null, QualifiedName.of("table"), "a");
+    private final TableAlias b = TableAlias.of(a, QualifiedName.of("tableB"), "b");
+    
     @Test
     public void test_inner_join_empty_outer()
     {
@@ -52,7 +54,6 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_inner_join_empty_inner()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 1);
-        TableAlias a = TableAlias.of(null, "table", "a");
         Operator left = op(contet -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
         Operator right = op(context ->
         {
@@ -82,7 +83,6 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_bad_implementation_of_inner_operator()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
-        TableAlias a = TableAlias.of(null, "table", "a");
         Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
         Operator right = op(context -> RowIterator.EMPTY);
 
@@ -106,7 +106,6 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_bad_implementation_of_inner_operator_2()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
-        TableAlias a = TableAlias.of(null, "table", "a");
         Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
         Operator right = op(context ->
         {
@@ -135,7 +134,6 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_bad_implementation_of_inner_operator_3()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
-        TableAlias a = TableAlias.of(null, "table", "a");
         Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
         Operator right = op(context ->
         {
@@ -170,9 +168,7 @@ public class BatchHashJoinTest extends AOperatorTest
         // uses the context row into consideration when joining
 
         Index index = new Index(QualifiedName.of("tableA"), asList("col"), 3);
-        TableAlias a = TableAlias.of(null, "tableA", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
-        TableAlias c = TableAlias.of(b, "tableC", "c");
+        TableAlias c = TableAlias.of(b, QualifiedName.of("tableC"), "c");
 
         /**
          * <pre>
@@ -248,8 +244,6 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_inner_join_one_to_one()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         MutableBoolean leftClose = new MutableBoolean();
@@ -320,8 +314,6 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_outer_join_one_to_one()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
@@ -394,8 +386,6 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_inner_join_one_to_many()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
@@ -455,8 +445,6 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_outer_join_one_to_many()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
@@ -525,8 +513,6 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_inner_join_many_to_one()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 5);
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
@@ -591,8 +577,6 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_outer_join_many_to_one()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
@@ -669,8 +653,6 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_inner_join_many_to_many()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
@@ -738,8 +720,6 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_outer_join_many_to_many()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
@@ -820,8 +800,6 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_inner_join_one_to_one_populating()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
@@ -884,8 +862,6 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_outer_join_one_to_one_populating()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
@@ -958,8 +934,6 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_inner_join_one_to_many_populating()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
@@ -1020,8 +994,6 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_outer_join_one_to_many_populating()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
@@ -1093,8 +1065,6 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_inner_join_many_to_many_populating()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
@@ -1161,8 +1131,6 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_outer_join_many_to_many_populating()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)

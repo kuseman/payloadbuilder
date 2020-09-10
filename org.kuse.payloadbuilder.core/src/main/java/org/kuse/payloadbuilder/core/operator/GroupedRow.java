@@ -7,7 +7,6 @@ import java.util.List;
 
 import org.apache.commons.collections.iterators.TransformIterator;
 import org.apache.commons.lang3.ArrayUtils;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
@@ -33,11 +32,11 @@ class GroupedRow extends Row
 
     private TIntSet getColumnOrdinals(List<String> columnReferences)
     {
-        TableAlias alias = rows.get(0).getTableAlias();
+        Row row = rows.get(0);
         TIntSet result = new TIntHashSet(columnReferences.size());
         for (String column : columnReferences)
         {
-            int index = ArrayUtils.indexOf(alias.getColumns(), column);
+            int index = ArrayUtils.indexOf(row.getColumns(), column);
             result.add(index);
         }
         return result;

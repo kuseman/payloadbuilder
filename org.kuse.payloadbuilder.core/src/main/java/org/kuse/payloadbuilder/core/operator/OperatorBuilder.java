@@ -24,7 +24,6 @@ import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.Catalog.OperatorData;
 import org.kuse.payloadbuilder.core.catalog.Index;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzeResult;
@@ -122,7 +121,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         select.accept(VISITOR, context);
         context.columnsByAlias.entrySet().forEach(e ->
         {
-            if (e.getKey() != null && e.getKey().getColumns() == null)
+            if (e.getKey() != null && e.getKey().getColumns().length == 0)
             {
                 e.getKey().setColumns(e.getValue().toArray(EMPTY_STRING_ARRAY));
             }
@@ -933,7 +932,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
      */
     private class CorrelatedDetector extends AStatementVisitor<Void, Set<String>>
     {
-        private final AExpressionVisitor<Void, Set<String>> expressionVisitor = new AExpressionVisitor<>()
+        private final AExpressionVisitor<Void, Set<String>> expressionVisitor = new AExpressionVisitor<Void, Set<String>>()
         {
             @Override
             public Void visit(QualifiedReferenceExpression expression, Set<String> aliases)

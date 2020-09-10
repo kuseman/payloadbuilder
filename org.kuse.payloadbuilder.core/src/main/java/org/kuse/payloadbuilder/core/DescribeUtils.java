@@ -1,33 +1,26 @@
 package org.kuse.payloadbuilder.core;
 
 import static java.util.Arrays.asList;
-import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
-import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
 
+import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.tuple.Pair;
-import org.kuse.payloadbuilder.core.catalog.Catalog;
-import org.kuse.payloadbuilder.core.catalog.Catalog.OperatorData;
-import org.kuse.payloadbuilder.core.catalog.Index;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.operator.ObjectProjection;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.OperatorBuilder;
 import org.kuse.payloadbuilder.core.operator.Projection;
 import org.kuse.payloadbuilder.core.operator.Row;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.DescribeTableStatement;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
-import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.Select;
 
@@ -53,111 +46,111 @@ public class DescribeUtils
      **/
     static Pair<Operator, Projection> getDescribeTable(ExecutionContext context, DescribeTableStatement statement)
     {
-        QuerySession session = context.getSession();
-        String catalogAlias = statement.getCatalog();
-        QualifiedName tableName = statement.getTableName();
-        Catalog catalog;
-        if (isBlank(catalogAlias))
-        {
-            catalog = context.getSession().getDefaultCatalog();
-            catalogAlias = context.getSession().getDefaultCatalogAlias();
-        }
-        else
-        {
-            catalog = session.getCatalogRegistry().getCatalog(catalogAlias);
-        }
-
-        if (catalog == null)
-        {
-            throw new ParseException("Could not find catalog with alias " + catalogAlias, 0, 0);
-        }
-
-        TableAlias tableAlias = TableAlias.of(null, tableName, "");
-        tableAlias.setAsteriskColumns();
-        Operator operator = catalog.getScanOperator(new OperatorData(context.getSession(), 0, catalogAlias, tableAlias, emptyList(), emptyList(), emptyList()));
-
-        context.clear();
-        // Get first row from scan operator
-        Iterator<Row> iterator = operator.open(context);
-        List<Class<?>> typeByColumn = null;
-
-        // Fetch ten first rows from operator
-        // This to minimize the risk of getting null in one column
-        // and don't be able to get data type, it's type less/reflective system :)
-        int count = 10;
-        int columnCount = -1;
-        while (count > 0 && iterator.hasNext())
-        {
-            if (columnCount == -1 && tableAlias.getColumns() != null)
-            {
-                columnCount = tableAlias.getColumns().length;
-                if (columnCount <= 0)
-                {
-                    break;
-                }
-                typeByColumn = new ArrayList<>(Collections.nCopies(columnCount, null));
-            }
-
-            Row row = iterator.next();
-            count--;
-
-            for (int i = 0; i < columnCount; i++)
-            {
-                if (typeByColumn.get(i) == null)
-                {
-                    Object value = row.getObject(i);
-                    typeByColumn.set(i, value != null ? value.getClass() : null);
-                }
-            }
-
-        }
-
-        if (typeByColumn == null)
-        {
-            return null;
-        }
-
-        List<Index> indices = catalog.getIndices(context.getSession(), catalogAlias, tableName);
-
-        // Name,    Type,   Description
-        // art_id,  Column, String
-        // index1   Index   [art_id]
-
-        // Create a select over all columns in table
-
-        TableAlias describeAlias = new TableAlias(null, QualifiedName.of("describe"), "d", new String[] {"Name", "Type", "Description"}, null);
-        List<Row> describeRows = new ArrayList<>(columnCount + indices.size());
-        int pos = 0;
-        // Add column rows
-        for (int i = 0; i < columnCount; i++)
-        {
-            Class<?> type = typeByColumn.get(i);
-            describeRows.add(Row.of(describeAlias, pos++, new Object[] {tableAlias.getColumns()[i], "Column", type == null ? "Unknown" : type.getSimpleName()}));
-        }
-        describeRows.add(Row.of(describeAlias, pos++, new Object[] {"", "", ""}));
-        // Add indices
-        int i = 1;
-        for (Index index : indices)
-        {
-            describeRows.add(Row.of(describeAlias, pos++, new Object[] {"Index_" + (i++), "Index", index.getColumns() + " (Batch size: " + index.getBatchSize() + ")"}));
-        }
-
-        Operator describeOperator = new Operator()
-        {
-            @Override
-            public RowIterator open(ExecutionContext context)
-            {
-                return RowIterator.wrap(describeRows.iterator());
-            }
-
-            @Override
-            public int getNodeId()
-            {
-                return 0;
-            }
-        };
-
-        return Pair.of(describeOperator, getIndexProjection(asList(describeAlias.getColumns())));
+        throw new NotImplementedException("Not implemented");
+//        QuerySession session = context.getSession();
+//        String catalogAlias = statement.getCatalog();
+//        QualifiedName tableName = statement.getTableName();
+//        Catalog catalog;
+//        if (isBlank(catalogAlias))
+//        {
+//            catalog = context.getSession().getDefaultCatalog();
+//            catalogAlias = context.getSession().getDefaultCatalogAlias();
+//        }
+//        else
+//        {
+//            catalog = session.getCatalogRegistry().getCatalog(catalogAlias);
+//        }
+//
+//        if (catalog == null)
+//        {
+//            throw new ParseException("Could not find catalog with alias " + catalogAlias, 0, 0);
+//        }
+//
+//        TableAlias tableAlias = TableAlias.of(null, tableName, "");
+//        Operator operator = catalog.getScanOperator(new OperatorData(context.getSession(), 0, catalogAlias, tableAlias, emptyList(), emptyList(), emptyList()));
+//
+//        context.clear();
+//        // Get first row from scan operator
+//        Iterator<Row> iterator = operator.open(context);
+//        List<Class<?>> typeByColumn = null;
+//
+//        // Fetch ten first rows from operator
+//        // This to minimize the risk of getting null in one column
+//        // and don't be able to get data type, it's type less/reflective system :)
+//        int count = 10;
+//        int columnCount = -1;
+//        while (count > 0 && iterator.hasNext())
+//        {
+//            if (columnCount == -1 && tableAlias.getColumns() != null)
+//            {
+//                columnCount = tableAlias.getColumns().length;
+//                if (columnCount <= 0)
+//                {
+//                    break;
+//                }
+//                typeByColumn = new ArrayList<>(Collections.nCopies(columnCount, null));
+//            }
+//
+//            Row row = iterator.next();
+//            count--;
+//
+//            for (int i = 0; i < columnCount; i++)
+//            {
+//                if (typeByColumn.get(i) == null)
+//                {
+//                    Object value = row.getObject(i);
+//                    typeByColumn.set(i, value != null ? value.getClass() : null);
+//                }
+//            }
+//
+//        }
+//
+//        if (typeByColumn == null)
+//        {
+//            return null;
+//        }
+//
+//        List<Index> indices = catalog.getIndices(context.getSession(), catalogAlias, tableName);
+//
+//        // Name,    Type,   Description
+//        // art_id,  Column, String
+//        // index1   Index   [art_id]
+//
+//        // Create a select over all columns in table
+//
+//        TableAlias describeAlias = TableAlias.of(null, QualifiedName.of("describe"), "d", new String[] {"Name", "Type", "Description"});
+//        List<Row> describeRows = new ArrayList<>(columnCount + indices.size());
+//        int pos = 0;
+//        // Add column rows
+//        for (int i = 0; i < columnCount; i++)
+//        {
+//            Class<?> type = typeByColumn.get(i);
+//            describeRows.add(Row.of(describeAlias, pos++, new Object[] {tableAlias.getColumns()[i], "Column", type == null ? "Unknown" : type.getSimpleName()}));
+//        }
+//        describeRows.add(Row.of(describeAlias, pos++, new Object[] {"", "", ""}));
+//        // Add indices
+//        int i = 1;
+//        for (Index index : indices)
+//        {
+//            describeRows.add(Row.of(describeAlias, pos++, new Object[] {"Index_" + (i++), "Index", index.getColumns() + " (Batch size: " + index.getBatchSize() + ")"}));
+//        }
+//
+//        Operator describeOperator = new Operator()
+//        {
+//            @Override
+//            public RowIterator open(ExecutionContext context)
+//            {
+//                return RowIterator.wrap(describeRows.iterator());
+//            }
+//
+//            @Override
+//            public int getNodeId()
+//            {
+//                return 0;
+//            }
+//        };
+//
+//        return Pair.of(describeOperator, getIndexProjection(asList(describeAlias.getColumns())));
     }
 
     /** Build describe select from provided select */
@@ -194,7 +187,7 @@ public class DescribeUtils
 
         // Insert first columns
         describeColumns.addAll(0, asList("NodeId", "Name"));
-        TableAlias alias = new TableAlias(null, QualifiedName.of("describe"), "d", describeColumns.toArray(EMPTY_STRING_ARRAY), null);
+        TableAlias alias = TableAlias.of(null, QualifiedName.of("describe"), "d", describeColumns.toArray(EMPTY_STRING_ARRAY));
 
         // Result set rows
         List<Row> rows = new ArrayList<>(describeRows.size());

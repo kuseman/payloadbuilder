@@ -14,11 +14,12 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.codegen.CodeGenerator;
 import org.kuse.payloadbuilder.core.operator.Row;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
+import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QueryParser;
 
 /** Tests functions etc. in built in catalog */
@@ -28,6 +29,8 @@ public class BuiltinCatalogTest extends Assert
     private final QueryParser parser = new QueryParser();
     private final QuerySession session = new QuerySession(new CatalogRegistry());
 
+    private final TableAlias alias = TableAlias.of(null, QualifiedName.of("table"), "t", new String[] {"a", "b", "c"});
+    
     @Test
     public void test_function_hash()
     {
@@ -54,8 +57,6 @@ public class BuiltinCatalogTest extends Assert
     @Test
     public void test_function_filter()
     {
-        TableAlias alias = TableAlias.of(null, "table", "t");
-        alias.setColumns(new String[] {"a", "b"});
         Row row = Row.of(alias, 0, new Object[] {asList(-1, -2, -3, 0, 1, 2, 3), null});
         assertFunction(asList(1, 2, 3), row, "a.filter(a -> a > 0)");
         assertFunction(null, row, "b.filter(a -> a > 0)");
@@ -66,8 +67,6 @@ public class BuiltinCatalogTest extends Assert
     @Test
     public void test_function_concat()
     {
-        TableAlias alias = TableAlias.of(null, "table", "t");
-        alias.setColumns(new String[] {"a", "b"});
         Row row = Row.of(alias, 0, new Object[] {asList(-1, -2, -3, 0, 1, 2, 3), null});
         assertFunction("110.1", row, "concat(null,1,10.1)");
         assertFunction("", row, "concat(null,null)");
@@ -78,8 +77,6 @@ public class BuiltinCatalogTest extends Assert
     @Test
     public void test_function_map()
     {
-        TableAlias alias = TableAlias.of(null, "table", "t");
-        alias.setColumns(new String[] {"a", "b"});
         Row row = Row.of(alias, 0, new Object[] {asList(-1, -2, -3, 0, 1, 2, 3), null});
         assertFunction(null, row, "b.map(a -> a * 2)");
         assertFunction(asList(-2, -4, -6, 0, 2, 4, 6), row, "a.map(a -> a * 2)");
@@ -89,8 +86,6 @@ public class BuiltinCatalogTest extends Assert
     @Test
     public void test_function_match()
     {
-        TableAlias alias = TableAlias.of(null, "article", "a");
-        alias.setColumns(new String[] {"a", "b", "c"});
         Row row = Row.of(alias, 0, new Object[] {asList(), null, asList(1, 2)});
         
         // Empty 
@@ -118,8 +113,6 @@ public class BuiltinCatalogTest extends Assert
     @Test
     public void test_function_flatMap()
     {
-        TableAlias alias = TableAlias.of(null, "table", "t");
-        alias.setColumns(new String[] {"a", "b"});
         Row row = Row.of(alias, 0, new Object[] {asList(-1, -2, 3, null), null});
         assertFunction(asList(-1, -2, 3, null), row, "a.flatMap(a -> a)");
         assertFunction(null, row, "b.flatMap(a -> a)");
@@ -193,7 +186,6 @@ public class BuiltinCatalogTest extends Assert
     @SuppressWarnings("unchecked")
     private void assertFunction(Object expected, Row row, String expression)
     {
-        TableAlias alias = row == null ? TableAlias.of(null, "table", "t") : row.getTableAlias();
         row = row != null ? row : Row.of(alias, 0, new Object[0]);
         Expression e = parser.parseExpression(expression);
         Object actual = null;

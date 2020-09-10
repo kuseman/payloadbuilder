@@ -9,12 +9,11 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.collections.IteratorUtils;
-import org.apache.commons.lang3.ArrayUtils;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.operator.Row;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
@@ -28,12 +27,12 @@ import org.kuse.payloadbuilder.core.parser.Expression;
  * SELECT field
  * FROM source s
  * OUTER APPLY
- * [
- *   mapToRow(s.article_attribute.attribute1.buckets) a1Buckets
- *   INNER JOIN [attribute1] a1
+ * (
+ *   open_map_collection(s.article_attribute.attribute1.buckets) a1Buckets
+ *   INNER JOIN attribute1 a1
  *     ON a1.attr1_id == a1Buckets.key
  *   ORDER BY a1.attr1_code
- * ] attribute1
+ * ) attribute1
  * </pre>
  */
 class OpenMapCollectionFunction extends TableFunctionInfo
@@ -65,6 +64,7 @@ class OpenMapCollectionFunction extends TableFunctionInfo
         return new RowIterator()
         {
             private Set<String> addedColumns;
+            private String[] columns = tableAlias.isAsteriskColumns() ? null : tableAlias.getColumns();
             private int pos = 0;
             private Row next;
 
@@ -99,22 +99,22 @@ class OpenMapCollectionFunction extends TableFunctionInfo
                         if (addedColumns == null)
                         {
                             addedColumns = new LinkedHashSet<>(item.keySet());
-                            tableAlias.setColumns(addedColumns.toArray(EMPTY_STRING_ARRAY));
+                            columns = addedColumns.toArray(EMPTY_STRING_ARRAY);
                         }
                         else if (addedColumns.addAll(item.keySet()))
                         {
-                            tableAlias.setColumns(addedColumns.toArray(EMPTY_STRING_ARRAY));
+                            columns = addedColumns.toArray(EMPTY_STRING_ARRAY);
                         }
                     }
 
-                    int length = ArrayUtils.getLength(tableAlias.getColumns());
+                    int length = columns.length;
                     Object[] values = new Object[length];
                     for (int i = 0; i < length; i++)
                     {
-                        values[i] = item.get(tableAlias.getColumns()[i]);
+                        values[i] = item.get(columns[i]);
                     }
 
-                    next = Row.of(tableAlias, pos++, values);
+                    next = Row.of(tableAlias, pos++, columns, values);
                 }
 
                 return next != null;

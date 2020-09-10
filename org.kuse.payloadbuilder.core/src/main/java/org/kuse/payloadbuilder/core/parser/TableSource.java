@@ -6,7 +6,7 @@ import java.util.List;
 
 import org.antlr.v4.runtime.Token;
 import org.apache.commons.lang3.NotImplementedException;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 
 /** Base class for table sources */
 public abstract class TableSource extends ASelectNode

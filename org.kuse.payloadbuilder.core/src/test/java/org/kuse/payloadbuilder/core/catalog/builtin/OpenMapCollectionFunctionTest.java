@@ -11,8 +11,8 @@ import org.junit.Test;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Row;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -21,22 +21,22 @@ import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 /** Test {@link OpenMapCollectionFunction} */
 public class OpenMapCollectionFunctionTest extends Assert
 {
-    private final OpenMapCollectionFunction f = new OpenMapCollectionFunction(new Catalog("test") {});
+    private final OpenMapCollectionFunction f = new OpenMapCollectionFunction(new Catalog("test")
+    {
+    });
 
     @Test
     public void test()
     {
-        TableAlias a = TableAlias.of(null, "article", "a");
-        a.setColumns(new String[] {"article_attribute"});
+        TableAlias a = TableAlias.of(null, QualifiedName.of("article"), "a", new String[] {"article_attribute"});
         Row row = Row.of(a, 0, new Object[] {
                 ofEntries(entry("attribute1", ofEntries(
                         entry("buckets", asList(
                                 ofEntries(true, entry("key", 10), entry("count", 20)),
-                                ofEntries(true, entry("key", 11), entry("count", 15)))))))
+                                ofEntries(true, entry("key", 11), entry("count", 15), entry("id", "value")))))))
         });
-        TableAlias func = TableAlias.of(a, "func", "f");
-        func.setColumns(new String[] { "key", "count" });
-        
+        TableAlias func = TableAlias.of(a, QualifiedName.of("func"), "f", true);
+
         ExecutionContext context = new ExecutionContext(new QuerySession(new CatalogRegistry()));
         context.setRow(row);
         Expression arg = new QualifiedReferenceExpression(new QualifiedName(asList("a", "article_attribute", "attribute1", "buckets")), -1);
@@ -51,8 +51,10 @@ public class OpenMapCollectionFunctionTest extends Assert
             }
             else
             {
+                assertArrayEquals(r.getColumns(), new String[] {"key", "count", "id"});
                 assertEquals(11, r.getObject(0));
                 assertEquals(15, r.getObject(1));
+                assertEquals("value", r.getObject(2));
             }
         }
     }

@@ -3,21 +3,20 @@ package org.kuse.payloadbuilder.core.operator;
 import static java.util.Arrays.asList;
 
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Test of {@link OperatorBuilder} building applys */
 public class OperatorBuilderApplyTest extends AOperatorTest
 {
+    private final TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"id1"});
+    @SuppressWarnings("unused")
+    private final TableAlias article = TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"id2"});
+
     @Test
     public void test_cross_apply()
     {
         String query = "select s.id1, a.id2 from source s cross apply article a";
         QueryResult result = getQueryResult(query);
-
-        // Assert aliaes
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"id1"});
-        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"id2"});
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
@@ -46,10 +45,6 @@ public class OperatorBuilderApplyTest extends AOperatorTest
     {
         String query = "select s.id1, a.id2 from source s cross apply article a with(populate=true)";
         QueryResult result = getQueryResult(query);
-
-        // Assert aliaes
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"id1"});
-        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"id2"});
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
@@ -82,10 +77,6 @@ public class OperatorBuilderApplyTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s outer apply article a";
         QueryResult result = getQueryResult(query);
 
-        // Assert aliaes
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"id1"});
-        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"id2"});
-
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
         Operator expected = new NestedLoopJoin(
@@ -114,9 +105,8 @@ public class OperatorBuilderApplyTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s outer apply article a where a.active_flg";
         QueryResult result = getQueryResult(query);
 
-        // Assert aliaes
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"id1"});
-        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"active_flg", "id2"});
+        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"id1"});
+        TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"active_flg", "id2"});
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
@@ -154,10 +144,9 @@ public class OperatorBuilderApplyTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s outer apply article a where a.active_flg and a.value is null";
         QueryResult result = getQueryResult(query);
 
-        // Assert aliaes
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"id1"});
-        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"active_flg", "value", "id2"});
-
+        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"id1"});
+        TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"active_flg", "value", "id2"});
+        
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
         Operator expected = new FilterOperator(
@@ -196,10 +185,6 @@ public class OperatorBuilderApplyTest extends AOperatorTest
     {
         String query = "select s.id1, a.id2 from source s outer apply article a with (populate=true)";
         QueryResult result = getQueryResult(query);
-
-        // Assert aliaes
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"id1"});
-        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"id2"});
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 

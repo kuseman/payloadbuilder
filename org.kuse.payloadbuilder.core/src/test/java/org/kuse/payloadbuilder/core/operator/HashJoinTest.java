@@ -9,13 +9,16 @@ import java.util.stream.IntStream;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
+import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Test {@link HashJoin} */
 public class HashJoinTest extends AOperatorTest
 {
+    private final TableAlias a = TableAlias.of(null, QualifiedName.of("table"), "a");
+    private final TableAlias b = TableAlias.of(a, QualifiedName.of("tableB"), "b");
+
     @Test
     public void test_inner_join_no_populate_empty()
     {
@@ -36,12 +39,10 @@ public class HashJoinTest extends AOperatorTest
     @Test
     public void test_inner_join_no_populate()
     {
-        TableAlias a = TableAlias.of(null, "table", "t");
-        TableAlias r = TableAlias.of(a, "range", "r");
         MutableBoolean leftClose = new MutableBoolean();
         MutableBoolean rightClose = new MutableBoolean();
         Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator(), () -> leftClose.setTrue());
-        Operator right = op(ctx -> new TableFunctionOperator(0, "", r, new NestedLoopJoinTest.Range(5), emptyList()).open(ctx), () -> rightClose.setTrue());
+        Operator right = op(ctx -> new TableFunctionOperator(0, "", b, new NestedLoopJoinTest.Range(5), emptyList()).open(ctx), () -> rightClose.setTrue());
         HashJoin op = new HashJoin(0,
                 "",
                 left,
@@ -74,9 +75,7 @@ public class HashJoinTest extends AOperatorTest
         // Test that a correlated query with a batch hash join
         // uses the context row into consideration when joining
 
-        TableAlias a = TableAlias.of(null, "tableA", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
-        TableAlias c = TableAlias.of(b, "tableC", "c");
+        TableAlias c = TableAlias.of(b, QualifiedName.of("tableC"), "c");
 
         /**
          * <pre>
@@ -137,10 +136,8 @@ public class HashJoinTest extends AOperatorTest
     @Test
     public void test_inner_join_populate()
     {
-        TableAlias t = TableAlias.of(null, "table", "t");
-        TableAlias t2 = TableAlias.of(t, "table2", "t2");
-        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(t, i - 1, new Object[] {i})).iterator());
-        Operator right = op(context -> IntStream.range(1, 20).mapToObj(i -> Row.of(t2, i - 1, new Object[] {i % 10})).iterator());
+        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator());
+        Operator right = op(context -> IntStream.range(1, 20).mapToObj(i -> Row.of(b, i - 1, new Object[] {i % 10})).iterator());
         HashJoin op = new HashJoin(0,
                 "",
                 left,
@@ -173,8 +170,6 @@ public class HashJoinTest extends AOperatorTest
     @Test
     public void test_outer_join_no_populate()
     {
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "table", "b");
         Operator left = op(context -> IntStream.range(0, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
         Operator right = op(context -> IntStream.range(5, 15).mapToObj(i -> Row.of(b, i - 1, new Object[] {i})).iterator());
 
@@ -211,8 +206,6 @@ public class HashJoinTest extends AOperatorTest
     @Test
     public void test_outer_join_populate()
     {
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "table", "b");
         Operator left = op(context -> IntStream.range(0, 5).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
         Operator right = op(context -> IntStream.range(5, 15).mapToObj(i -> Row.of(b, i - 1, new Object[] {i % 5 + 2})).iterator());
 

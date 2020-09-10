@@ -10,7 +10,6 @@ import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 import java.util.List;
 import java.util.Map;
 
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;

@@ -9,9 +9,9 @@ import java.util.List;
 import org.antlr.v4.runtime.Token;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.FunctionInfo;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.catalog.builtin.BuiltinCatalog;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 
 /** Table function */
 public class TableFunction extends TableSource

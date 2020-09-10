@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.SortItem;
@@ -19,7 +18,7 @@ public class ExpressionRowComparatorTest extends AOperatorTest
     @Test
     public void test()
     {
-        TableAlias alias = new TableAlias(null, QualifiedName.of("table"), "a", new String[] {"col1"});
+        TableAlias alias = TableAlias.of(null, QualifiedName.of("table"), "a", new String[] {"col1"});
         Row a, b;
 
         a = Row.of(alias, 0, new Object[] {1});

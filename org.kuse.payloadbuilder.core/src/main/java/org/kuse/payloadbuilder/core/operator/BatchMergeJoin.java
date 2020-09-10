@@ -413,7 +413,7 @@ class BatchMergeJoin extends AOperator
 
             private Iterator<Object[]> outerValuesIterator()
             {
-                return new Iterator<>()
+                return new Iterator<Object[]>()
                 {
                     private int outerRowsIndex = 0;
                     private Object[] nextArray;

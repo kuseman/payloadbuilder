@@ -9,7 +9,6 @@ import java.util.List;
 
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.parser.Expression;
@@ -76,6 +75,13 @@ public class OperatorBuilderTest extends AOperatorTest
         assertEquals(expected, queryResult.operator);
     }
 
+    @Test
+    public void test_asterisk_select()
+    {
+        String query = "select * from article";
+
+    }
+    
     @Test
     public void test_sortBy()
     {
@@ -263,12 +269,9 @@ public class OperatorBuilderTest extends AOperatorTest
 
         TableFunctionInfo range = (TableFunctionInfo) session.getCatalogRegistry().getBuiltin().getFunction("range");
 
-        TableAlias r = TableAlias.of(null, "range", "r");
-        r.setColumns(new String[] {"Value"});
-        TableAlias r1 = TableAlias.of(r, "range", "r1");
-        r1.setColumns(new String[] {"Value"});
-        TableAlias r2 = TableAlias.of(r, "range", "r2");
-        r2.setColumns(new String[] {"Value"});
+        TableAlias r = TableAlias.of(null, QualifiedName.of("range"), "r", new String[] {"Value"});
+        TableAlias r1 = TableAlias.of(r, QualifiedName.of("range"), "r1", new String[] {"Value"});
+        TableAlias r2 = TableAlias.of(r, QualifiedName.of("range"), "r2", new String[] {"Value"});
 
         Operator expected = new HashJoin(
                 5,
@@ -337,11 +340,11 @@ public class OperatorBuilderTest extends AOperatorTest
 
         QueryResult queryResult = getQueryResult(query);
 
-        TableAlias source = new TableAlias(null, of("source"), "s", new String[] {"art_id"});
-        new TableAlias(source, of("article"), "a", new String[] {"art_id"});
-        TableAlias articleAttribute = new TableAlias(source, of("articleAttribute"), "aa", new String[] {"sku_id", "attr1_id", "art_id", "active_flg"});
-        new TableAlias(articleAttribute, of("articlePrice"), "ap", new String[] {"price_sales", "sku_id"});
-        new TableAlias(articleAttribute, of("attribute1"), "a1", new String[] {"attr1_id"});
+        TableAlias source = TableAlias.of(null, of("source"), "s", new String[] {"art_id"});
+        TableAlias.of(source, of("article"), "a", new String[] {"art_id"});
+        TableAlias articleAttribute = TableAlias.of(source, of("articleAttribute"), "aa", new String[] {"sku_id", "attr1_id", "art_id", "active_flg"});
+        TableAlias.of(articleAttribute, of("articlePrice"), "ap", new String[] {"price_sales", "sku_id"});
+        TableAlias.of(articleAttribute, of("attribute1"), "a1", new String[] {"attr1_id"});
 
         //                                                System.out.println(source.printHierarchy(0));
         //                                                System.out.println(queryResult.alias.printHierarchy(0));
@@ -475,16 +478,16 @@ public class OperatorBuilderTest extends AOperatorTest
 
         QueryResult result = getQueryResult(query);
 
-        TableAlias article = new TableAlias(null, of("article"), "a", new String[] {"stamp_dat_cr", "art_id", "add_on_flg", "articleType", "note_id", "idx_id"});
-        TableAlias articleAttribute = new TableAlias(article, of("articleAttribute"), "aa",
+        TableAlias article = TableAlias.of(null, of("article"), "a", new String[] {"stamp_dat_cr", "art_id", "add_on_flg", "articleType", "note_id", "idx_id"});
+        TableAlias articleAttribute = TableAlias.of(article, of("articleAttribute"), "aa",
                 new String[] {"internet_flg", "internet_date_start", "sku_id", "attr1_id", "art_id", "pluno", "active_flg", "ean13", "attr3_id", "note_id", "attr2_id"});
-        new TableAlias(articleAttribute, of("articlePrice"), "ap", new String[] {"price_sales", "sku_id", "art_id", "price_org", "note_id"});
-        new TableAlias(articleAttribute, of("attribute1"), "a1", new String[] {"colorGroup", "attr1_id", "rgb_code", "lang_id", "group_flg"});
-        new TableAlias(articleAttribute, of("attribute2"), "a2", new String[] {"attr2_code", "lang_id", "attr2_no", "attr2_id"});
-        new TableAlias(articleAttribute, of("attribute3"), "a3", new String[] {"lang_id", "attr3_id"});
-        new TableAlias(article, of("articleProperty"), "ap", new String[] {"propertykey_id", "art_id"});
-        TableAlias range = new TableAlias(article, of("range"), "r", new String[] {"Value"});
-        new TableAlias(range, of("attribute1"), "a1", new String[] {"someId", "attr1_code"});
+        TableAlias.of(articleAttribute, of("articlePrice"), "ap", new String[] {"price_sales", "sku_id", "art_id", "price_org", "note_id"});
+        TableAlias.of(articleAttribute, of("attribute1"), "a1", new String[] {"colorGroup", "attr1_id", "rgb_code", "lang_id", "group_flg"});
+        TableAlias.of(articleAttribute, of("attribute2"), "a2", new String[] {"attr2_code", "lang_id", "attr2_no", "attr2_id"});
+        TableAlias.of(articleAttribute, of("attribute3"), "a3", new String[] {"lang_id", "attr3_id"});
+        TableAlias.of(article, of("articleProperty"), "ap", new String[] {"propertykey_id", "art_id"});
+        TableAlias range = TableAlias.of(article, of("range"), "r", new String[] {"Value"});
+        TableAlias.of(range, of("attribute1"), "a1", new String[] {"someId", "attr1_code"});
 
         //                                                System.out.println(article.printHierarchy(1));
         //                                                System.out.println(result.alias.printHierarchy(1));
@@ -498,7 +501,7 @@ public class OperatorBuilderTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s";
         QueryResult result = getQueryResult(query);
 
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"a", "id1"});
+        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"a", "id1"});
         assertTrue(source.isEqual(result.alias));
 
         assertEquals(result.tableOperators.get(0), result.operator);
@@ -533,7 +536,7 @@ public class OperatorBuilderTest extends AOperatorTest
 
         assertEquals(e("s.flag1 = true"), catalogPredicate.getValue());
 
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"flag2", "flag1", "id1"});
+        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"flag2", "flag1", "id1"});
         assertTrue(source.isEqual(result.alias));
 
         Operator expected = new FilterOperator(
@@ -568,7 +571,7 @@ public class OperatorBuilderTest extends AOperatorTest
         List<SortItem> expectedSortItems = asList(new SortItem(e("s.id1"), Order.ASC, NullOrder.UNDEFINED));
         assertEquals(expectedSortItems, catalogOrderBy.getValue());
 
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"flag1", "id1"});
+        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"flag1", "id1"});
         assertTrue(source.isEqual(result.alias));
 
         Operator expected = result.tableOperators.get(0);
@@ -609,9 +612,9 @@ public class OperatorBuilderTest extends AOperatorTest
         QueryResult result = getQueryResult(query);
 
         // Assert aliaes
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id4", "id3", "id1"});
-        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"art_id", "active_flg", "id2", "note_id"});
-
+        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id4", "id3", "id1"});
+        TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"art_id", "active_flg", "id2", "note_id"});
+        
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
         Operator expected = new HashJoin(
@@ -661,9 +664,9 @@ public class OperatorBuilderTest extends AOperatorTest
         QueryResult result = getQueryResult(query);
 
         // Assert aliaes
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"id", "art_id"});
-        TableAlias article = new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"art_id"});
-        new TableAlias(article, QualifiedName.of("articleAttribute"), "aa", new String[] {"art_id"});
+        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"id", "art_id"});
+        TableAlias article = TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"art_id"});
+        TableAlias.of(article, QualifiedName.of("articleAttribute"), "aa", new String[] {"art_id"});
 
         //                System.out.println(source.printHierarchy(1));
         //                System.out.println(result.aliases.get(0).printHierarchy(1));

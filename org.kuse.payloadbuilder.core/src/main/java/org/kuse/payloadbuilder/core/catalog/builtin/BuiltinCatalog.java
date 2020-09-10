@@ -52,7 +52,7 @@ public class BuiltinCatalog
         catalog.registerFunction(new UnixTimeStampFunction(catalog));
 
         // Table functions
-        catalog.registerFunction(new Range(catalog));
+        catalog.registerFunction(new RangeFunction(catalog));
         catalog.registerFunction(new OpenMapCollectionFunction(catalog));
 
         return catalog;

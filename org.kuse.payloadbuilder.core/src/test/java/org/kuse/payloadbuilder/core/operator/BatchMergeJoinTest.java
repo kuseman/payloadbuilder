@@ -11,7 +11,6 @@ import java.util.stream.StreamSupport;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.Index;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
@@ -19,6 +18,8 @@ import org.kuse.payloadbuilder.core.parser.QualifiedName;
 public class BatchMergeJoinTest extends AOperatorTest
 {
     private final Index index = new Index(QualifiedName.of("table"), asList("col"), 10);
+    private final TableAlias a = TableAlias.of(null, QualifiedName.of("table"), "a");
+    private final TableAlias b = TableAlias.of(a, QualifiedName.of("tableB"), "b");
 
     @Test
     public void test_inner_join_empty_outer()
@@ -45,7 +46,6 @@ public class BatchMergeJoinTest extends AOperatorTest
     @Test
     public void test_inner_join_empty_inner()
     {
-        TableAlias a = TableAlias.of(null, "table", "a");
         Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
         Operator right = op(context ->
         {
@@ -75,7 +75,6 @@ public class BatchMergeJoinTest extends AOperatorTest
     @Test(expected = IllegalArgumentException.class)
     public void test_bad_implementation_of_inner_operator()
     {
-        TableAlias a = TableAlias.of(null, "table", "a");
         Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
         Operator right = op(context -> emptyIterator());
 
@@ -98,7 +97,6 @@ public class BatchMergeJoinTest extends AOperatorTest
     @Test(expected = NoSuchElementException.class)
     public void test_bad_implementation_of_inner_operator_3()
     {
-        TableAlias a = TableAlias.of(null, "table", "a");
         Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
         Operator right = op(context ->
         {
@@ -129,8 +127,6 @@ public class BatchMergeJoinTest extends AOperatorTest
     @Test
     public void test_inner_join_one_to_one()
     {
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
@@ -193,8 +189,6 @@ public class BatchMergeJoinTest extends AOperatorTest
     @Test
     public void test_outer_join_one_to_one()
     {
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
@@ -265,8 +259,6 @@ public class BatchMergeJoinTest extends AOperatorTest
     @Test
     public void test_inner_join_one_to_many()
     {
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
@@ -326,8 +318,6 @@ public class BatchMergeJoinTest extends AOperatorTest
     @Test
     public void test_outer_join_one_to_many()
     {
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
@@ -396,8 +386,6 @@ public class BatchMergeJoinTest extends AOperatorTest
     @Test
     public void test_inner_join_many_to_one()
     {
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         MutableInt batchCount = new MutableInt();
@@ -462,8 +450,6 @@ public class BatchMergeJoinTest extends AOperatorTest
     @Test
     public void test_outer_join_many_to_one()
     {
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         MutableInt batchCount = new MutableInt();
@@ -539,8 +525,6 @@ public class BatchMergeJoinTest extends AOperatorTest
     @Test
     public void test_inner_join_many_to_many()
     {
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         MutableInt batchCount = new MutableInt();
@@ -607,8 +591,6 @@ public class BatchMergeJoinTest extends AOperatorTest
     @Test
     public void test_outer_join_many_to_many()
     {
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         MutableInt batchCount = new MutableInt();
@@ -688,8 +670,6 @@ public class BatchMergeJoinTest extends AOperatorTest
     @Test
     public void test_inner_join_one_to_one_populating()
     {
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
@@ -750,8 +730,6 @@ public class BatchMergeJoinTest extends AOperatorTest
     @Test
     public void test_outer_join_one_to_one_populating()
     {
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
@@ -822,8 +800,6 @@ public class BatchMergeJoinTest extends AOperatorTest
     @Test
     public void test_inner_join_one_to_many_populating()
     {
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
@@ -884,8 +860,6 @@ public class BatchMergeJoinTest extends AOperatorTest
     @Test
     public void test_outer_join_one_to_many_populating()
     {
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
@@ -957,8 +931,6 @@ public class BatchMergeJoinTest extends AOperatorTest
     @Test
     public void test_inner_join_many_to_many_populating()
     {
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         MutableInt batchCount = new MutableInt();
@@ -1025,8 +997,6 @@ public class BatchMergeJoinTest extends AOperatorTest
     @Test
     public void test_outer_join_many_to_many_populating()
     {
-        TableAlias a = TableAlias.of(null, "table", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
         MutableInt batchCount = new MutableInt();

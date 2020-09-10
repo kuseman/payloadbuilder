@@ -12,10 +12,10 @@ import org.apache.commons.collections.iterators.SingletonIterator;
 import org.apache.commons.io.FileUtils;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.operator.Row;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
@@ -46,12 +46,17 @@ class FilesystemCatalog extends Catalog
         {
             super(catalog, "file");
         }
+        
+        @Override
+        public String[] getColumns()
+        {
+            return COLUMNS;
+        }
 
         @SuppressWarnings("unchecked")
         @Override
         public RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
         {
-            tableAlias.setColumns(COLUMNS);
             Object obj = arguments.get(0).eval(context);
             if (obj == null)
             {
@@ -97,11 +102,16 @@ class FilesystemCatalog extends Catalog
         {
             super(catalog, "list");
         }
+        
+        @Override
+        public String[] getColumns()
+        {
+            return COLUMNS;
+        }
 
         @Override
         public RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
         {
-            tableAlias.setColumns(COLUMNS);
             Object obj = arguments.get(0).eval(context);
             if (obj == null)
             {
@@ -173,7 +183,7 @@ class FilesystemCatalog extends Catalog
                     lastModifiedTime,
                     isDirectory
             };
-            return Row.of(alias, pos++, values);
+            return Row.of(alias, pos++, COLUMNS, values);
         }
 
         private Iterator<Path> getIterator(String strPath, boolean recursive)

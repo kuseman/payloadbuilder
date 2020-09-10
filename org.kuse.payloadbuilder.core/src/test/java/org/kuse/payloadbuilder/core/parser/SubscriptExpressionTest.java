@@ -5,18 +5,17 @@ import static java.util.Arrays.asList;
 import java.util.stream.IntStream;
 
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Row;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
 
 /** Test {@link SubscriptExpression} */
 public class SubscriptExpressionTest extends AParserTest
 {
+    TableAlias t = TableAlias.of(null, QualifiedName.of("table"), "t", new String[] {"a", "b", "c", "d"});
     @Test
     public void test()
     {
-        TableAlias t = TableAlias.of(null, "table", "t");
-        t.setColumns(new String[] {"a", "b", "c", "d"});
         Row row = Row.of(t, 0, new Object[] {asList(1, 2, 3), IntStream.range(1, 4).iterator(), new int[] {1, 2, 3}, MapUtils.ofEntries(MapUtils.entry("key", "value"))});
         context.setRow(row);
 
@@ -48,8 +47,6 @@ public class SubscriptExpressionTest extends AParserTest
     @Test(expected = IllegalArgumentException.class)
     public void test_invalid_subscript_int()
     {
-        TableAlias t = TableAlias.of(null, "table", "t");
-        t.setColumns(new String[] {"a", "b", "c", "d"});
         Row row = Row.of(t, 0, new Object[] {asList(1, 2, 3), IntStream.range(1, 4).iterator(), new int[] {1, 2, 3}, MapUtils.ofEntries(MapUtils.entry("key", "value"))});
         context.setRow(row);
         e("a['string']").eval(context);
@@ -58,8 +55,6 @@ public class SubscriptExpressionTest extends AParserTest
     @Test(expected = IllegalArgumentException.class)
     public void test_invalid_subscript_string()
     {
-        TableAlias t = TableAlias.of(null, "table", "t");
-        t.setColumns(new String[] {"a", "b", "c", "d"});
         Row row = Row.of(t, 0, new Object[] {asList(1, 2, 3), IntStream.range(1, 4).iterator(), new int[] {1, 2, 3}, MapUtils.ofEntries(MapUtils.entry("key", "value"))});
         context.setRow(row);
         e("d[123]").eval(context);

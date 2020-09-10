@@ -27,7 +27,7 @@ import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.atn.PredictionMode;
 import org.antlr.v4.runtime.misc.ParseCancellationException;
 import org.apache.commons.lang3.tuple.Pair;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.Apply.ApplyType;
 import org.kuse.payloadbuilder.core.parser.ComparisonExpression.Type;
 import org.kuse.payloadbuilder.core.parser.Join.JoinType;

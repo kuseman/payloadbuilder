@@ -3,6 +3,7 @@ package org.kuse.payloadbuilder.catalog.es;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
@@ -40,7 +41,6 @@ import java.util.function.Function;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.CountingInputStream;
 import org.apache.commons.io.output.CountingOutputStream;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.commons.lang3.mutable.MutableObject;
@@ -63,13 +63,13 @@ import org.kuse.payloadbuilder.catalog.es.ESCatalog.IdIndex;
 import org.kuse.payloadbuilder.catalog.es.ESCatalog.ParentIndex;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Index;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.operator.AOperator;
 import org.kuse.payloadbuilder.core.operator.OperatorContext;
 import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair.Type;
 import org.kuse.payloadbuilder.core.operator.Row;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.ComparisonExpression;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
@@ -403,9 +403,9 @@ class ESOperator extends AOperator
     {
         return new RowIterator()
         {
-            private final Set<String> columns = new HashSet<>(
-                    tableAlias.isAsteriskColumns() ? emptyList() : asList(org.apache.commons.lang3.ObjectUtils.defaultIfNull(tableAlias.getColumns(), ArrayUtils.EMPTY_STRING_ARRAY)));
+            private final Set<String> columns = tableAlias.isAsteriskColumns() ? emptySet() : new HashSet<>(asList(tableAlias.getColumns()));
             private Set<String> addedColumns;
+            private String[] rowColumns = tableAlias.isAsteriskColumns() ? null : tableAlias.getColumns();
             private int rowPos = 0;
             private final MutableObject<String> scrollId = new MutableObject<>();
             private Iterator<Doc> docIt;
@@ -517,55 +517,50 @@ class ESOperator extends AOperator
                     {
                         if (addedColumns == null)
                         {
-                            addedColumns = new LinkedHashSet<>(doc.source.keySet().size() + 3);
+                            addedColumns = new LinkedHashSet<>(doc.source.keySet().size() + 4);
                             addedColumns.add(INDEX);
                             addedColumns.add(TYPE);
                             addedColumns.add(DOCID);
                             addedColumns.add(PARENTID);
                             addedColumns.addAll(doc.source.keySet());
-                            tableAlias.setColumns(addedColumns.toArray(EMPTY_STRING_ARRAY));
+                            rowColumns = addedColumns.toArray(EMPTY_STRING_ARRAY);
                         }
                         else if (addedColumns.addAll(doc.source.keySet()))
                         {
-                            tableAlias.setColumns(addedColumns.toArray(EMPTY_STRING_ARRAY));
+                            rowColumns = addedColumns.toArray(EMPTY_STRING_ARRAY);
                         }
                     }
 
                     Object[] data;
-                    if (tableAlias.getColumns() != null)
+                    int length = rowColumns.length;
+                    data = new Object[length];
+                    int index = 0;
+                    for (int i = 0; i < length; i++)
                     {
-                        data = new Object[tableAlias.getColumns().length];
-                        int index = 0;
-                        for (String column : tableAlias.getColumns())
+                        String column = rowColumns[i];
+                        if (INDEX.equals(column))
                         {
-                            if (INDEX.equals(column))
-                            {
-                                data[index++] = doc.index;
-                            }
-                            else if (TYPE.equals(column))
-                            {
-                                data[index++] = doc.type;
-                            }
-                            else if (DOCID.equals(column))
-                            {
-                                data[index++] = doc.docId;
-                            }
-                            else if (PARENTID.equals(column))
-                            {
-                                data[index++] = doc.fields != null ? doc.fields.get("_parent") : null;
-                            }
-                            else
-                            {
-                                data[index++] = doc.source.get(column);
-                            }
+                            data[index++] = doc.index;
+                        }
+                        else if (TYPE.equals(column))
+                        {
+                            data[index++] = doc.type;
+                        }
+                        else if (DOCID.equals(column))
+                        {
+                            data[index++] = doc.docId;
+                        }
+                        else if (PARENTID.equals(column))
+                        {
+                            data[index++] = doc.fields != null ? doc.fields.get("_parent") : null;
+                        }
+                        else
+                        {
+                            data[index++] = doc.source.get(column);
                         }
                     }
-                    else
-                    {
-                        data = ArrayUtils.EMPTY_OBJECT_ARRAY;
-                    }
 
-                    next = Row.of(tableAlias, rowPos++, data);
+                    next = Row.of(tableAlias, rowPos++, rowColumns, data);
                 }
                 return true;
             }

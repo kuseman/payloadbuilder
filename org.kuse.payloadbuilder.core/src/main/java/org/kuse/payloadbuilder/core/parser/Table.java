@@ -3,7 +3,7 @@ package org.kuse.payloadbuilder.core.parser;
 import java.util.List;
 
 import org.antlr.v4.runtime.Token;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 
 /** A table */
 public class Table extends TableSource

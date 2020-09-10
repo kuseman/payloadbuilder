@@ -147,10 +147,10 @@ class PayloadbuilderEditorView extends JFrame
         JMenu menu = new JMenu("File");
         openItem = new JMenuItem(openAction);
         openItem.setText("Open");
-        openItem.setAccelerator(KeyStroke.getKeyStroke('O', Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()));
+        openItem.setAccelerator(KeyStroke.getKeyStroke('O', Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
         saveItem = new JMenuItem(saveAction);
         saveItem.setText("Save");
-        saveItem.setAccelerator(KeyStroke.getKeyStroke('S', Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()));
+        saveItem.setAccelerator(KeyStroke.getKeyStroke('S', Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
         saveAsItem = new JMenuItem(saveAsAction);
         saveAsItem.setText("Save As ...");
         exitItem = new JMenuItem(exitAction);

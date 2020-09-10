@@ -8,7 +8,6 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.lang3.ArrayUtils;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 
 /** Row */
 public class Row
@@ -17,6 +16,7 @@ public class Row
     // If this is a tuple row then subPos is the other rows position
     private int subPos;
     protected TableAlias tableAlias;
+    private String[] columns;
 
     /** Collection of parents that this row belongs to */
     private List<Row> parents;
@@ -36,7 +36,7 @@ public class Row
     {
     }
 
-    public Row(Row source, int subPos)
+    Row(Row source, int subPos)
     {
         this.pos = source.pos;
         this.subPos = subPos;
@@ -44,6 +44,7 @@ public class Row
         this.values = source.values;
         this.childRows = copyChildRows(source);
         this.parents = source.parents;
+        this.columns = source.columns;
     }
 
     private List<Row>[] copyChildRows(Row source)
@@ -64,9 +65,15 @@ public class Row
         return copy;
     }
 
+    /** Return columns for this row */
+    public String[] getColumns()
+    {
+        return columns != null ? columns : tableAlias.getColumns();
+    }
+    
     public int getColumnCount()
     {
-        return tableAlias.getColumns() != null ? tableAlias.getColumns().length : 0;
+        return getColumns().length;                
     }
 
     /** Extracts values into an object array */
@@ -95,30 +102,8 @@ public class Row
 
     public Object getObject(String column)
     {
-        int ordinal = ArrayUtils.indexOf(tableAlias.getColumns(), column);
+        int ordinal = ArrayUtils.indexOf(getColumns(), column);
         return getObject(ordinal);
-    }
-
-    public Number getNumber(String column)
-    {
-        Object obj = getObject(column);
-        if (obj instanceof Number)
-        {
-            return (Number) obj;
-        }
-
-        return null;
-    }
-
-    public Boolean getBoolean(String column)
-    {
-        Object obj = getObject(column);
-        if (obj instanceof Boolean)
-        {
-            return (Boolean) obj;
-        }
-
-        return null;
     }
 
     public List<Row> getChildRows(int index)
@@ -169,7 +154,7 @@ public class Row
     }
 
     /** Add provided row as parent to this row */
-    public void addParent(Row row)
+    void addParent(Row row)
     {
         if (parents == null)
         {
@@ -183,33 +168,64 @@ public class Row
         return defaultIfNull(parents, emptyList());
     }
 
-    public void setPredicateParent(Row parent)
+    void setPredicateParent(Row parent)
     {
         predicateParent = parent;
     }
 
-    public void clearPredicateParent()
+    void clearPredicateParent()
     {
         predicateParent = null;
     }
 
-    /** Construct a row with provided meta values and position */
-    public static Row of(TableAlias table, int pos, Object... values)
+    /** Construct a row with provided alias, values and position */
+    public static Row of(TableAlias alias, int pos, Object... values)
     {
-        Row t = new Row();
-        t.pos = pos;
-        t.tableAlias = table;
-        t.values = new ObjectValues(values);
-        return t;
+        return of(alias , pos, alias.getColumns(), values);
     }
 
-    /** Construct a row with provided meta values and position */
-    public static Row of(TableAlias table, int pos, Values values)
+    /** Construct a row with provided parent, alias, values and position */
+    public static Row of(Row parent, TableAlias alias, int pos, Object... values)
+    {
+        return of(parent, alias, pos, alias.getColumns(), values);
+    }
+
+    /** Construct a row with provided alias, columns, values and position */
+    public static Row of(TableAlias alias, int pos, String[] columns, Object... values)
+    {
+        return of(alias, pos, columns, new ObjectValues(values));
+    }
+
+    /** Construct a row with provided parent, alias, columns, values and position */
+    public static Row of(Row parent, TableAlias alias, int pos, String[] columns, Object... values)
+    {
+        return of(parent, alias, pos, columns, new ObjectValues(values));
+    }
+
+    /** Construct a row with provided alias, values and position */
+    public static Row of(TableAlias alias, int pos, Values values)
+    {
+        return of(alias, pos, alias.getColumns(), values);
+    }
+    
+    /** Construct a row with provided alias, columns, values and position */
+    public static Row of(TableAlias alias, int pos, String[] columns, Values values)
+    {
+        return of(null, alias,pos, columns, values);
+    }
+    
+    /** Construct a row with provided parent, alias, columns, values and position */
+    private static Row of(Row parent, TableAlias alias, int pos, String[] columns, Values values)
     {
         Row t = new Row();
         t.pos = pos;
-        t.tableAlias = table;
+        t.tableAlias = alias;
+        t.columns = columns;
         t.values = values;
+        if (parent != null)
+        {
+            t.addParent(parent);
+        }
         return t;
     }
 
@@ -247,6 +263,7 @@ public class Row
         Object get(int ordinal);
     }
 
+    /** Object array implementation of {@link Values} */
     private static class ObjectValues implements Values
     {
         private final Object[] values;

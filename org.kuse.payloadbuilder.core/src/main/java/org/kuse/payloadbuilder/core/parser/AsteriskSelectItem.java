@@ -4,9 +4,9 @@ import java.util.List;
 import java.util.Objects;
 
 import org.kuse.payloadbuilder.core.OutputWriter;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Projection;
 import org.kuse.payloadbuilder.core.operator.Row;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 
 /** Projection for wildcards. With or without alias */
 public class AsteriskSelectItem extends SelectItem implements Projection
@@ -70,7 +70,7 @@ public class AsteriskSelectItem extends SelectItem implements Projection
 
     private void writeRow(Row row, OutputWriter writer)
     {
-        String[] columns = row.getTableAlias().getColumns();
+        String[] columns = row.getColumns();
         if (columns == null)
         {
             return;

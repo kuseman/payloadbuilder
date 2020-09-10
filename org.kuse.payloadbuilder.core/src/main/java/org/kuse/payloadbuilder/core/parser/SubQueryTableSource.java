@@ -5,7 +5,7 @@ import static java.util.Objects.requireNonNull;
 import java.util.List;
 
 import org.antlr.v4.runtime.Token;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 
 /** Sub query table source */
 public class SubQueryTableSource extends TableSource

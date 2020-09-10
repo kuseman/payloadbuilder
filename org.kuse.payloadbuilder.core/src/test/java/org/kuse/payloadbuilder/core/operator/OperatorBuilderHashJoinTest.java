@@ -3,7 +3,6 @@ package org.kuse.payloadbuilder.core.operator;
 import static java.util.Arrays.asList;
 
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Test of {@link OperatorBuilder} building hash match (joins) */
@@ -15,9 +14,8 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s inner join article a on s.art_id = a.art_id";
         QueryResult result = getQueryResult(query);
 
-        // Assert aliaes
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
-        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"art_id", "id2"});
+        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
+        TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"art_id", "id2"});
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
@@ -52,9 +50,8 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s inner join article a with(populate=true) on a.art_id = s.art_id";
         QueryResult result = getQueryResult(query);
 
-        // Assert aliaes
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
-        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"art_id", "id2"});
+        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
+        TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"art_id", "id2"});
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
@@ -89,9 +86,8 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s left join article a on s.art_id = a.art_id";
         QueryResult result = getQueryResult(query);
 
-        // Assert aliaes
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
-        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"art_id", "id2"});
+        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
+        TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"art_id", "id2"});
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
@@ -126,9 +122,8 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s left join article a on s.art_id = a.art_id where a.value is null";
         QueryResult result = getQueryResult(query);
 
-        // Assert aliaes
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
-        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"art_id", "value", "id2"});
+        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
+        TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"art_id", "value", "id2"});
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
@@ -166,9 +161,8 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s left join article a with(populate=true) on s.art_id = a.art_id";
         QueryResult result = getQueryResult(query);
 
-        // Assert aliaes
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
-        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"art_id", "id2"});
+        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
+        TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"art_id", "id2"});
 
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
@@ -199,11 +193,10 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
     {
         String query = "select s.id1, a.id2 from source s inner join (from article where note_id > 0) a with (populate=true) on a.art_id = s.art_id and a.active_flg where s.id3 > 0 and a.id2 = 10";
         QueryResult result = getQueryResult(query);
-
-        // Assert aliaes
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id3", "id1"});
-        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"art_id", "active_flg", "id2", "note_id"});
-
+        
+        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id3", "id1"});
+        TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"art_id", "active_flg", "id2", "note_id"});
+        
         assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
         Operator expected = new HashJoin(

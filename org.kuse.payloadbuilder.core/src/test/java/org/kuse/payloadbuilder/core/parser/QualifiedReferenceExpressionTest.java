@@ -8,13 +8,13 @@ import java.util.Date;
 
 import org.junit.Before;
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Row;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 
 /** Test of {@link QualifiedReferenceExpression} */
 public class QualifiedReferenceExpressionTest extends AParserTest
 {
-    private TableAlias a, b, c, d, e;
+    private TableAlias a, b, c, e;
     private Row aRow;
 
     @Before
@@ -26,34 +26,26 @@ public class QualifiedReferenceExpressionTest extends AParserTest
          *     c
          *   d
          */
-        a = TableAlias.of(null, "tableA", "a");
-        a.setColumns(new String[] {"col1", "mapCol"});
-        b = TableAlias.of(a, "tableB", "b");
-        b.setColumns(new String[] {"col1", "col2"});
-        c = TableAlias.of(b, "tableC", "c");
-        c.setColumns(new String[] {"col1", "mapCol"});
-        d = TableAlias.of(a, "tableD", "d");
-        d.setColumns(new String[] {"col1", "mapCol"});
-        e = TableAlias.of(a, "tableE", "e");
-        e.setColumns(new String[] {"col1"});
+        a = TableAlias.of(null, QualifiedName.of("tableA"), "a", new String[] {"col1", "mapCol"});
+        b = TableAlias.of(a, QualifiedName.of("tableB"), "b", new String[] {"col1", "col2"});
+        c = TableAlias.of(b, QualifiedName.of("tableC"), "c", new String[] {"col1", "mapCol"});
+        TableAlias.of(a, QualifiedName.of("tableD"), "d", new String[] {"col1", "mapCol"});
+        e = TableAlias.of(a, QualifiedName.of("tableE"), "e", new String[] {"col1"});
 
         aRow = Row.of(a, 0, new Object[] {1337, ofEntries(entry("key", "value"))});
 
         for (int i = 0; i < 10; i++)
         {
-            Row bRow = Row.of(b, i, new Object[] {"b" + i, new Date()});
+            Row bRow = Row.of(aRow, b, i, new Object[] {"b" + i, new Date()});
             for (int j = 0; j < 10; j++)
             {
-                Row cRow = Row.of(c, j, new Object[] {"c" + i, ofEntries(entry("key", "cValue"), entry("key2", ofEntries(entry("subKey", "subValue"))))});
+                Row cRow = Row.of(bRow, c, j, new Object[] {"c" + i, ofEntries(entry("key", "cValue"), entry("key2", ofEntries(entry("subKey", "subValue"))))});
                 bRow.getChildRows(0).add(cRow);
-                cRow.addParent(bRow);
             }
             aRow.getChildRows(0).add(bRow);
-            bRow.addParent(aRow);
         }
 
-        aRow.getChildRows(2).add(Row.of(e, 0, new Object[] {"e0"}));
-        aRow.getChildRows(2).get(0).addParent(aRow);
+        aRow.getChildRows(2).add(Row.of(aRow, e, 0, new Object[] {"e0"}));
     }
 
     @Test

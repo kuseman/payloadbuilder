@@ -8,7 +8,7 @@ import java.util.Set;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.codehaus.janino.ClassBodyEvaluator;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Code generator */

@@ -14,11 +14,12 @@ import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Row;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.ParseException;
+import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QueryParser;
 
 /** Test of {@link CodeGenerator} */
@@ -28,12 +29,12 @@ public class CodeGeneratorTest extends Assert
     private final QueryParser parser = new QueryParser();
     private final CodeGenerator codeGenerator = new CodeGenerator();
     
+    private final TableAlias alias = TableAlias.of(null, QualifiedName.of("article"), "a", new String[] {"a", "b", "c", "d", "e", "f", "g"});
+
     @Ignore
     @Test
     public void test_dereference() throws Exception
     {
-        TableAlias alias = TableAlias.of(null, "article", "a");
-        alias.setColumns(new String[] {"a"});
         Row row = Row.of(alias, 0, new Object[] { asList(
                 Row.of(alias, 0, new Object[] { 1 }),
                 Row.of(alias, 1, new Object[] { 2 }),
@@ -81,8 +82,6 @@ public class CodeGeneratorTest extends Assert
     @Test
     public void test_1() throws Exception
     {
-        TableAlias alias = TableAlias.of(null, "article", "a");
-        alias.setColumns(new String[] {"a", "b", "c", "d" , "e", "f"});
         Row row = Row.of(alias, 0, new Object[] {true, false, false, false, false, null });
 
         assertExpression(true, row, "1 + 1 > 10 - 9");
@@ -154,8 +153,6 @@ public class CodeGeneratorTest extends Assert
     @Test
     public void test_and() throws Exception
     {
-        TableAlias alias = TableAlias.of(null, "article", "a");
-        alias.setColumns(new String[] {"a", "b", "c", "d" , "e"});
         Row row = Row.of(alias, 0, new Object[] {true, false, false, false, false });
 
         assertExpression(true, row, "true and true");
@@ -169,8 +166,6 @@ public class CodeGeneratorTest extends Assert
     @Test
     public void test_literal() throws Exception
     {
-        TableAlias alias = TableAlias.of(null, "article", "a");
-        alias.setColumns(new String[] {"a", "b", "c", "d" , "e"});
         Row row = Row.of(alias, 0, new Object[] {true, false, false, false, false });
 
         assertExpression(1, row, "1");
@@ -186,8 +181,6 @@ public class CodeGeneratorTest extends Assert
     @Test
     public void test_in_expression() throws Exception
     {
-        TableAlias alias = TableAlias.of(null, "article", "a");
-        alias.setColumns(new String[] {"a", "b", "c", "d", "e", "f", "g"});
         Row row = Row.of(alias, 0, new Object[] {1, null, asList(1, 2)});
 
         assertExpression(false, row, "(1+2+3+4) > 123 and (1.0 <20)");
@@ -216,8 +209,6 @@ public class CodeGeneratorTest extends Assert
     @Test
     public void test_qualifiednames() throws Exception
     {
-        TableAlias alias = TableAlias.of(null, "article", "a");
-        alias.setColumns(new String[] {"a", "b", "c", "d", "e", "f", "g"});
         Row row = Row.of(alias, 0, new Object[] {1, null, true, 1.1, 1.0, "string", "string2"});
         assertExpression(false, row, "a > 10");
         assertExpression(null, row, "b > 10");
@@ -322,8 +313,6 @@ public class CodeGeneratorTest extends Assert
                 null, null,
         };
 
-        TableAlias alias = TableAlias.of(null, "article", "a");
-        alias.setColumns(new String[] {"a", "b", "c", "d"});
         Row row = Row.of(alias, 0, new Object[] {true, false, null, 10});
 
         int index = 0;
@@ -431,8 +420,6 @@ public class CodeGeneratorTest extends Assert
                 null, null, null, null, null
         };
 
-        TableAlias alias = TableAlias.of(null, "article", "a");
-        alias.setColumns(new String[] {"a", "b", "c"});
         Row row = Row.of(alias, 0, new Object[] {1, 1.0f, null});
 
         int index = 0;
@@ -544,8 +531,6 @@ public class CodeGeneratorTest extends Assert
                 null, null, null, null, null, null,
         };
 
-        TableAlias alias = TableAlias.of(null, "article", "a");
-        alias.setColumns(new String[] {"a", "b", "c"});
         Row row = Row.of(alias, 0, new Object[] {1, 1.0, null});
 
         int index = 0;

@@ -8,9 +8,9 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang3.ArrayUtils;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
+import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.utils.IteratorUtils;
 
 /** Operator that operates over an expression (that returns rows) */
@@ -70,7 +70,8 @@ class ExpressionOperator extends AOperator
                     if (alias == null)
                     {
                         columns = new LinkedHashSet<>(map.keySet());
-                        alias = TableAlias.of(null, "", "");
+                        alias = TableAlias.of(null, QualifiedName.of(""), "");
+                        alias.setAsteriskColumns();
                         alias.setColumns(columns.toArray(ArrayUtils.EMPTY_STRING_ARRAY));
                     }
                     else if (columns.addAll(map.keySet()))

@@ -6,19 +6,19 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 import org.kuse.payloadbuilder.core.catalog.Catalog;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.operator.Row;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Range table valued function that emits row in range */
-class Range extends TableFunctionInfo
+class RangeFunction extends TableFunctionInfo
 {
     private static final String[] COLUMNS = new String[] {"Value"};
 
-    Range(Catalog catalog)
+    RangeFunction(Catalog catalog)
     {
         super(catalog, "range");
     }

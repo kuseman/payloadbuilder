@@ -17,13 +17,13 @@ import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.FunctionInfo;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.operator.ObjectProjection;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.operator.OperatorBuilder;
 import org.kuse.payloadbuilder.core.operator.Projection;
 import org.kuse.payloadbuilder.core.operator.Row;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.DescribeSelectStatement;
 import org.kuse.payloadbuilder.core.parser.DescribeTableStatement;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
@@ -45,10 +45,10 @@ import org.kuse.payloadbuilder.core.parser.UseStatement;
  */
 class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
 {
-    private static final Row DUMMY_ROW = Row.of(TableAlias.of(null, "dummy", "d"), 0, EMPTY_OBJECT_ARRAY);
-    private static final TableAlias SHOW_VARIABLES_ALIAS = new TableAlias(null, QualifiedName.of("variables"), "v", new String[] {"Name", "Value"});
-    private static final TableAlias SHOW_TABLES_ALIAS = new TableAlias(null, QualifiedName.of("tables"), "t", new String[] {"Name"});
-    private static final TableAlias SHOW_FUNCTIONS_ALIAS = new TableAlias(null, QualifiedName.of("functions"), "f", new String[] {"Name", "Type", "Description"});
+    private static final Row DUMMY_ROW = Row.of(TableAlias.of(null, QualifiedName.of("dummy"), "d"), 0, EMPTY_OBJECT_ARRAY);
+    private static final TableAlias SHOW_VARIABLES_ALIAS = TableAlias.of(null, QualifiedName.of("variables"), "v", new String[] {"Name", "Value"});
+    private static final TableAlias SHOW_TABLES_ALIAS = TableAlias.of(null, QualifiedName.of("tables"), "t", new String[] {"Name"});
+    private static final TableAlias SHOW_FUNCTIONS_ALIAS = TableAlias.of(null, QualifiedName.of("functions"), "f", new String[] {"Name", "Type", "Description"});
 
     private final QuerySession session;
     private ExecutionContext context;

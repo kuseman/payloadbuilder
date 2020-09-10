@@ -1,6 +1,6 @@
 package org.kuse.payloadbuilder.core.parser;
 
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 
 /** Traversal path for a {@link QualifiedReferenceExpression}. */
 class QualifiedReferencePath

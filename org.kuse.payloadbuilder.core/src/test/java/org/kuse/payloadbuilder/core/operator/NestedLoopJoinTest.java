@@ -10,24 +10,25 @@ import java.util.stream.IntStream;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
+import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Test {@link NestedLoopJoin} */
 public class NestedLoopJoinTest extends AOperatorTest
 {
+    private final TableAlias a = TableAlias.of(null, QualifiedName.of("table"), "a");
+    private final TableAlias b = TableAlias.of(a, QualifiedName.of("tableB"), "b");
+
     @Test
     public void test_correlated()
     {
-        // Test that a correlated query with a batch hash join
+        // Test that a correlated query with a nestedloop
         // uses the context row into consideration when joining
 
-        TableAlias a = TableAlias.of(null, "tableA", "a");
-        TableAlias b = TableAlias.of(a, "tableB", "b");
-        TableAlias c = TableAlias.of(b, "tableC", "c");
+        TableAlias c = TableAlias.of(b, QualifiedName.of("tableC"), "c");
 
         /**
          * <pre>
@@ -85,12 +86,10 @@ public class NestedLoopJoinTest extends AOperatorTest
     @Test
     public void test_cross_join_no_populate()
     {
-        TableAlias a = TableAlias.of(null, "table", "t");
-        TableAlias r = TableAlias.of(a, "range", "r");
         MutableBoolean leftClose = new MutableBoolean();
         MutableBoolean rightClose = new MutableBoolean();
         Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator(), () -> leftClose.setTrue());
-        Operator right = op(ctx -> new TableFunctionOperator(0, "", r, new Range(2), emptyList()).open(ctx), () -> rightClose.setTrue());
+        Operator right = op(ctx -> new TableFunctionOperator(0, "", b, new Range(2), emptyList()).open(ctx), () -> rightClose.setTrue());
         NestedLoopJoin op = new NestedLoopJoin(
                 0,
                 "",
@@ -119,15 +118,13 @@ public class NestedLoopJoinTest extends AOperatorTest
     @Test
     public void test_cross_join_populate()
     {
-        TableAlias a = TableAlias.of(null, "table", "t");
-        TableAlias r = TableAlias.of(a, "range", "r");
         Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator());
 
         NestedLoopJoin op = new NestedLoopJoin(
                 0,
                 "",
                 left,
-                new TableFunctionOperator(0, "", r, new Range(2), emptyList()),
+                new TableFunctionOperator(0, "", b, new Range(2), emptyList()),
                 null,   // Null predicate => cross
                 DefaultRowMerger.DEFAULT,
                 true,
@@ -149,15 +146,13 @@ public class NestedLoopJoinTest extends AOperatorTest
     @Test
     public void test_outer_join()
     {
-        TableAlias a = TableAlias.of(null, "table", "t");
-        TableAlias r = TableAlias.of(a, "range", "r");
         Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator());
 
         NestedLoopJoin op = new NestedLoopJoin(
                 0,
                 "",
                 left,
-                new TableFunctionOperator(0, "", r, new Range(0), emptyList()),
+                new TableFunctionOperator(0, "", b, new Range(0), emptyList()),
                 null,   // Null predicate => cross
                 DefaultRowMerger.DEFAULT,
                 false,
@@ -179,15 +174,13 @@ public class NestedLoopJoinTest extends AOperatorTest
     @Test
     public void test_outer_join_with_predicate_no_populate()
     {
-        TableAlias a = TableAlias.of(null, "table", "t");
-        TableAlias r = TableAlias.of(a, "range", "r");
         Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator());
 
         NestedLoopJoin op = new NestedLoopJoin(
                 0,
                 "",
                 left,
-                new TableFunctionOperator(0, "", r, new Range(2), emptyList()),
+                new TableFunctionOperator(0, "", b, new Range(2), emptyList()),
                 // Even parent rows are joined
                 (ctx, row) -> row.getParent().getPos() % 2 == 0,
                 DefaultRowMerger.DEFAULT,
@@ -223,15 +216,13 @@ public class NestedLoopJoinTest extends AOperatorTest
     @Test
     public void test_outer_join_with_predicate_populate()
     {
-        TableAlias a = TableAlias.of(null, "table", "t");
-        TableAlias r = TableAlias.of(a, "range", "r");
         Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator());
 
         NestedLoopJoin op = new NestedLoopJoin(
                 0,
                 "",
                 left,
-                new TableFunctionOperator(0, "", r, new Range(2), emptyList()),
+                new TableFunctionOperator(0, "", b, new Range(2), emptyList()),
                 // Even parent rows are joined
                 (ctx, row) -> row.getParent().getPos() % 2 == 0,
                 DefaultRowMerger.DEFAULT,

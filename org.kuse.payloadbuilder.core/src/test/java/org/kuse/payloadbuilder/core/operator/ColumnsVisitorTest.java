@@ -13,8 +13,8 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.parser.Expression;
+import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QueryParser;
 
 /** Test {@link ColumnsVisitor} */
@@ -26,12 +26,12 @@ public class ColumnsVisitorTest extends Assert
     @Test
     public void test()
     {
-        TableAlias source = TableAlias.of(null, "source", "s");
-        TableAlias article = TableAlias.of(source, "article", "a");
-        TableAlias articleAttribute = TableAlias.of(source, "articleAttribute", "aa");
-        TableAlias articlePrice = TableAlias.of(articleAttribute, "ariclePrice", "ap");
-        TableAlias.of(articleAttribute, "aricleBalance", "ab");
-        TableAlias articleBrand = TableAlias.of(source, "aricleBrand", "aBrand");
+        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s");
+        TableAlias article = TableAlias.of(source, QualifiedName.of("article"), "a");
+        TableAlias articleAttribute = TableAlias.of(source, QualifiedName.of("articleAttribute"), "aa");
+        TableAlias articlePrice = TableAlias.of(articleAttribute, QualifiedName.of("ariclePrice"), "ap");
+        TableAlias.of(articleAttribute, QualifiedName.of("aricleBalance"), "ab");
+        TableAlias articleBrand = TableAlias.of(source, QualifiedName.of("aricleBrand"), "aBrand");
 
         Set<TableAlias> actual;
         Expression e;

@@ -1,7 +1,7 @@
-package org.kuse.payloadbuilder.core.catalog;
+package org.kuse.payloadbuilder.core.operator;
 
-import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -18,55 +18,60 @@ import org.kuse.payloadbuilder.core.parser.QualifiedName;
 /** Domain of a table alias */
 public class TableAlias
 {
+    private static final String[] NOT_SET = ArrayUtils.EMPTY_STRING_ARRAY;
+    
     private final TableAlias parent;
     private final QualifiedName table;
     private final String alias;
     private final List<TableAlias> childAliases = new ArrayList<>();
-    private String[] columns = ArrayUtils.EMPTY_STRING_ARRAY;
+    /** Index of this alias in parent child aliases */
+    private final int parentIndex;
+    private String[] columns = NOT_SET;
     /** Is all columns wanted for this table alias. */
     private boolean asteriskColumns;
     private String rootPath;
-    // Index of rows of this type in parent row
-    private int parentIndex;
 
-    public TableAlias(
-            TableAlias parent,
-            QualifiedName table,
-            String alias)
-    {
-        this(parent, table, alias, null, null);
-    }
+//    TableAlias(
+//            TableAlias parent,
+//            QualifiedName table,
+//            String alias)
+//    {
+//        this(parent, table, alias, NOT_SET, null);
+//    }
+//
+//    TableAlias(
+//            TableAlias parent,
+//            QualifiedName table,
+//            String alias,
+//            Token token)
+//    {
+//        this(parent, table, alias, NOT_SET, token);
+//    }
+//
+//    TableAlias(
+//            TableAlias parent,
+//            QualifiedName table,
+//            String alias,
+//            String[] columns)
+//    {
+//        this(parent, table, alias, columns, null);
+//    }
 
-    public TableAlias(
-            TableAlias parent,
-            QualifiedName table,
-            String alias,
-            Token token)
-    {
-        this(parent, table, alias, null, token);
-    }
-
-    public TableAlias(
-            TableAlias parent,
-            QualifiedName table,
-            String alias,
-            String[] columns)
-    {
-        this(parent, table, alias, columns, null);
-    }
-
-    public TableAlias(
+    TableAlias(
             TableAlias parent,
             QualifiedName table,
             String alias,
             String[] columns,
+            boolean asteriskColumns,
             Token token)
     {
         this.parent = parent;
         this.table = requireNonNull(table, "table");
         this.alias = requireNonNull(alias, "alias");
-        this.columns = columns;
-
+        this.columns = requireNonNull(columns, "columns");
+        this.asteriskColumns = asteriskColumns;
+        
+        int parentIndex = -1;
         if (parent != null)
         {
             TableAlias temp = parent;
@@ -86,6 +91,7 @@ public class TableAlias
             parent.childAliases.add(this);
             parentIndex = parent.childAliases.size() - 1;
         }
+        this.parentIndex = parentIndex;
     }
 
     public QualifiedName getTable()
@@ -172,9 +178,13 @@ public class TableAlias
         return columns;
     }
 
-    public void setColumns(String[] columns)
+    void setColumns(String[] columns)
     {
-        this.columns = columns;
+        if (this.columns != NOT_SET)
+        {
+            throw new IllegalArgumentException("Cannot modify coulumns when set.");
+        }
+        this.columns = defaultIfNull(columns, ArrayUtils.EMPTY_STRING_ARRAY);
     }
 
     public boolean isAsteriskColumns()
@@ -182,7 +192,7 @@ public class TableAlias
         return asteriskColumns;
     }
 
-    public void setAsteriskColumns()
+    void setAsteriskColumns()
     {
         this.asteriskColumns = true;
     }
@@ -236,20 +246,27 @@ public class TableAlias
             IntStream.range(0, childAliases.size()).allMatch(i -> childAliases.get(i).isEqual(other.childAliases.get(i)));
     }
 
-    public static TableAlias of(TableAlias parent, String table, String alias)
-    {
-        return TableAlias.of(parent, new QualifiedName(asList(table)), alias);
-    }
-
     /** Construct a table alias from provided table name */
     public static TableAlias of(TableAlias parent, QualifiedName table, String alias)
     {
-        return new TableAlias(parent, table, alias, null, null);
+        return new TableAlias(parent, table, alias, NOT_SET, false, null);
+    }
+    
+    /** Construct a table alias from provided table name */
+    public static TableAlias of(TableAlias parent, QualifiedName table, String alias, boolean asteriskColumns)
+    {
+        return new TableAlias(parent, table, alias, NOT_SET, asteriskColumns, null);
+    }
+
+    /** Construct a table alias from provided table name */
+    public static TableAlias of(TableAlias parent, QualifiedName table, String alias, String[] columns)
+    {
+        return new TableAlias(parent, table, alias, columns, false, null);
     }
 
     /** Construct a table alias from provided table name */
     public static TableAlias of(TableAlias parent, QualifiedName table, String alias, Token token)
     {
-        return new TableAlias(parent, table, alias, token);
+        return new TableAlias(parent, table, alias, NOT_SET, false, token);
     }
 }

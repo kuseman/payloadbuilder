@@ -3,7 +3,6 @@ package org.kuse.payloadbuilder.core.operator;
 import static java.util.Arrays.asList;
 
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Test building of nested loops */
@@ -15,8 +14,9 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s inner join article a on a.active_flg and (a.art_id = s.art_id or s.id1 > 0)";
         QueryResult result = getQueryResult(query);
 
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
-        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"art_id", "active_flg", "id2"});
+        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
+        TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"art_id", "active_flg", "id2"});
+        
         assertTrue(source.isEqual(result.alias));
 
         Operator expected = new NestedLoopJoin(
@@ -47,8 +47,9 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s inner join (from article a where a.internet_flg ) a with(populate=true) on a.active_flg and (a.art_id = s.art_id or s.id1 > 0)";
         QueryResult result = getQueryResult(query);
 
-        TableAlias source = new TableAlias(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
-        new TableAlias(source, QualifiedName.of("article"), "a", new String[] {"internet_flg", "art_id", "active_flg", "id2"});
+        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
+        TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"internet_flg", "art_id", "active_flg", "id2"});
+        
         assertTrue(source.isEqual(result.alias));
 
         Operator expected = new NestedLoopJoin(

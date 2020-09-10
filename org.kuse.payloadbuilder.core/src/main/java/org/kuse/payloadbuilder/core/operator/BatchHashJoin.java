@@ -409,7 +409,7 @@ class BatchHashJoin extends AOperator
 
             private Iterator<Object[]> outerValuesIterator(ExecutionContext context)
             {
-                return new Iterator<>()
+                return new Iterator<Object[]>()
                 {
                     private int outerRowsIndex = 0;
                     private Object[] nextArray;

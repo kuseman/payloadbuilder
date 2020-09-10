@@ -58,9 +58,9 @@ import org.fife.ui.rsyntaxtextarea.TextEditorPane;
 import org.fife.ui.rtextarea.RTextScrollPane;
 import org.kordamp.ikonli.fontawesome.FontAwesome;
 import org.kordamp.ikonli.swing.FontIcon;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.Row.ChildRows;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.editor.QueryFileModel.State;
 
 /** Content of a query editor. Text editor and a result panel separated with a split panel */
@@ -492,7 +492,7 @@ class QueryFileView extends JPanel
             TableAlias alias = pbRow.getTableAlias();
             value = ofEntries(
                     entry("table", alias.getTable().toString()),
-                    entry("columns", alias.getColumns()),
+                    entry("columns", pbRow.getColumns()),
                     entry("values", pbRow.getValues()));
         }
         else if (value instanceof ChildRows)
@@ -501,10 +501,11 @@ class QueryFileView extends JPanel
             value = emptyList();
             if (childRows.size() > 0)
             {
+                Row pbRow = childRows.get(0);
                 TableAlias alias = childRows.get(0).getTableAlias();
                 value = ofEntries(
                         entry("table", alias.getTable().toString()),
-                        entry("columns", alias.getColumns()),
+                        entry("columns", pbRow.getColumns()),
                         entry("rows", childRows.stream().map(r -> r.getValues()).collect(toList())));
             }
         }

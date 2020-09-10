@@ -12,7 +12,6 @@ import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Assert;
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.catalog.TableAlias;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzeItem;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair.Type;
@@ -31,8 +30,8 @@ public class PredicateAnalyzerTest extends Assert
     @Test
     public void test_AnalyzeResult()
     {
-        TableAlias alias = TableAlias.of(null, "tableA", "a");
-        TableAlias.of(alias, "tableS", "s");
+        TableAlias alias = TableAlias.of(null, QualifiedName.of("tableA"), "a");
+        TableAlias.of(alias, QualifiedName.of("tableS"), "s");
 
         Pair<List<AnalyzePair>, AnalyzeResult> pair;
         AnalyzeResult result;
@@ -190,8 +189,8 @@ public class PredicateAnalyzerTest extends Assert
          *
          */
 
-        TableAlias alias = TableAlias.of(null, "tableA", "aa");
-        TableAlias.of(alias, "tableS", "a1");
+        TableAlias alias = TableAlias.of(null, QualifiedName.of("tableA"), "aa");
+        TableAlias.of(alias, QualifiedName.of("tableS"), "a1");
 
         AnalyzePair p;
 
@@ -225,11 +224,11 @@ public class PredicateAnalyzerTest extends Assert
         assertFalse(p.isPushdown("b"));
         assertFalse(p.isEqui("s"));
 
-        alias = TableAlias.of(null, "tableS", "s");
-        TableAlias.of(alias, "tableA", "a");
-        TableAlias.of(alias.getChildAlias("a"), "tableA_A", "a_a");
-        TableAlias.of(alias, "tableB", "b");
-        TableAlias.of(alias, "tableC", "c");
+        alias = TableAlias.of(null, QualifiedName.of("tableS"), "s");
+        TableAlias.of(alias, QualifiedName.of("tableA"), "a");
+        TableAlias.of(alias.getChildAlias("a"), QualifiedName.of("tableA_A"), "a_a");
+        TableAlias.of(alias, QualifiedName.of("tableB"), "b");
+        TableAlias.of(alias, QualifiedName.of("tableC"), "c");
 
         // Alias access
         p = PredicateAnalyzer.AnalyzePair.of(alias, e("s"));
