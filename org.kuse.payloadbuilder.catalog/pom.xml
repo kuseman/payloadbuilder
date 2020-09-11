@@ -10,6 +10,10 @@
     <artifactId>org.kuse.payloadbuilder.catalog</artifactId>
     <name>Payloadbuilder Catalogs</name>
 
+    <properties>
+        <license.dir>${project.parent.basedir}</license.dir>
+    </properties>
+
     <dependencies>
          <!-- Internal -->
         <dependency>

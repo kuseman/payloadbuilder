@@ -1,3 +1,20 @@
+/**
+ *
+ *  Copyright (c) Marcus Henriksson <kuseman80@gmail.com>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ */
 package org.kuse.payloadbuilder.core;
 
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
@@ -17,8 +34,6 @@ public class Payloadbuilder
      * BACKEND
      *   - TableAlias hierarchy isn't working correctly when having sub query and navigating
      *     to siblings
-     *   - TableAlias columns must be unmutable else a query cannot be cached and reused.
-     *      Add columns property on row and if tableAlias is asterisk then the rows columns should be used
      *   - PredicateAnalyzer
      *       "@timestamp" > cast('2020-08-09T07:00:09.086', datetime)
      *         This one is UNDEFINED, and shouldn't, it's because of function arguments has a QRE which is a
@@ -76,15 +91,14 @@ public class Payloadbuilder
      *      This is a security issue but think it's no problem.
      * ESCatalog
      *   - All non_analyzed fields are potential index-columns
-     *   - Clear scroll
      *   - Fetch ES version to apply correct URLS in all places (7.5.2 doesn't have tables, add a dummy table data or similar)
      * EtmArticleCategoryESCatalog
      *   - UI: Split endpoint/index selection dropdowns
-     *   - Clear scroll
      *   - Refactor and reuse stuff from ESCatalog if possible
-     *   - Implement predicate support for index-column
      *
      * EDITOR:
+     *   - Always start with a blank file
+     *   - Open multi files
      *   - Bug in service when columns are gathered
      *     select array(*)  <-- should yield a no column name but gets the last column from the array values
      *     from article_category
