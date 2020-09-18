@@ -17,20 +17,19 @@
  */
 package org.kuse.payloadbuilder.core.parser;
 
-import java.util.List;
+import java.util.Iterator;
 import java.util.Objects;
 
 import org.kuse.payloadbuilder.core.OutputWriter;
 import org.kuse.payloadbuilder.core.operator.Projection;
-import org.kuse.payloadbuilder.core.operator.Row;
-import org.kuse.payloadbuilder.core.operator.TableAlias;
+import org.kuse.payloadbuilder.core.operator.Tuple;
 
 /** Projection for wildcards. With or without alias */
 public class AsteriskSelectItem extends SelectItem implements Projection
 {
     private final String alias;
 
-    AsteriskSelectItem(String alias)
+    public AsteriskSelectItem(String alias)
     {
         super(null, false);
         this.alias = alias;
@@ -50,54 +49,67 @@ public class AsteriskSelectItem extends SelectItem implements Projection
     @Override
     public void writeValue(OutputWriter writer, ExecutionContext context)
     {
-        Row row = context.getRow();
-        if (alias == null)
-        {
-            writeRow(row, writer);
-            for (TableAlias childAlias : row.getTableAlias().getChildAliases())
-            {
-                List<Row> childRows = row.getChildRows(childAlias.getParentIndex());
-                if (childRows.isEmpty())
-                {
-                    continue;
-                }
+        Tuple tuple = context.getTuple();
 
-                writeRow(childRows.get(0), writer);
-            }
-        }
-        else
+        Iterator<QualifiedName> it = tuple.getQualifiedNames();
+        while (it.hasNext())
         {
-            // The alias for the row itself
-            if (alias.equals(row.getTableAlias().getAlias()))
+            QualifiedName qname = it.next();
+            if (alias == null
+                || (qname.getParts().size() >= 2 && alias.equalsIgnoreCase(qname.getParts().get(0))))
             {
-                writeRow(row, writer);
-                return;
-            }
-            TableAlias childAlias = row.getTableAlias().getChildAlias(alias);
-            if (childAlias != null)
-            {
-                List<Row> childRows = row.getChildRows(childAlias.getParentIndex());
-                if (!childRows.isEmpty())
-                {
-                    writeRow(childRows.get(0), writer);
-                }
+                String column = qname.getLast();
+                writer.writeFieldName(column);
+                writer.writeValue(tuple.getValue(qname, 0));
             }
         }
+        //        if (alias == null)
+        //        {
+        //            writeTuple(tuple, writer);
+        ////            for (TableAlias childAlias : row.getTableAlias().getChildAliases())
+        ////            {
+        ////                List<Row> childRows = row.getChildRows(childAlias);
+        ////                if (childRows.isEmpty())
+        ////                {
+        ////                    continue;
+        ////                }
+        ////
+        ////                writeRow(childRows.get(0), writer);
+        ////            }
+        //        }
+        //        else
+        //        {
+        //            // The alias for the row itself
+        //            if (alias.equals(row.getTableAlias().getAlias()))
+        //            {
+        //                writeTuple(row, writer);
+        //                return;
+        //            }
+        //            TableAlias childAlias = row.getTableAlias().getChildAlias(alias);
+        //            if (childAlias != null)
+        //            {
+        //                List<Row> childRows = row.getChildRows(childAlias);
+        //                if (!childRows.isEmpty())
+        //                {
+        //                    writeTuple(childRows.get(0), writer);
+        //                }
+        //            }
+        //        }
     }
 
-    private void writeRow(Row row, OutputWriter writer)
-    {
-        String[] columns = row.getColumns();
-        if (columns == null)
-        {
-            return;
-        }
-        for (int i = 0; i < columns.length; i++)
-        {
-            writer.writeFieldName(columns[i]);
-            writer.writeValue(row.getObject(i));
-        }
-    }
+    //    private void writeTuple(Tuple tuple, OutputWriter writer)
+    //    {
+    //        String[] columns = row.getColumns();
+    //        if (columns == null)
+    //        {
+    //            return;
+    //        }
+    //        for (int i = 0; i < columns.length; i++)
+    //        {
+    //            writer.writeFieldName(columns[i]);
+    //            writer.writeValue(row.getObject(i));
+    //        }
+    //    }
 
     @Override
     public int hashCode()

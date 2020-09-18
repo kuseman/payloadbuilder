@@ -28,7 +28,6 @@ import static org.kuse.payloadbuilder.core.DescribeUtils.LOGICAL_OPERATOR;
 import static org.kuse.payloadbuilder.core.DescribeUtils.OUTER_VALUES;
 import static org.kuse.payloadbuilder.core.DescribeUtils.POPULATING;
 import static org.kuse.payloadbuilder.core.DescribeUtils.PREDICATE;
-import static org.kuse.payloadbuilder.core.operator.BatchMergeJoin.clearJoinData;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
@@ -76,8 +75,8 @@ class BatchHashJoin extends AOperator
     private final Operator inner;
     private final ValuesExtractor outerValuesExtractor;
     private final ValuesExtractor innerValuesExtractor;
-    private final BiPredicate<ExecutionContext, Row> predicate;
-    private final RowMerger rowMerger;
+    private final BiPredicate<ExecutionContext, Tuple> predicate;
+    private final TupleMerger rowMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
     private final Index innerIndex;
@@ -94,8 +93,8 @@ class BatchHashJoin extends AOperator
             Operator inner,
             ValuesExtractor outerValuesExtractor,
             ValuesExtractor innerValuesExtractor,
-            BiPredicate<ExecutionContext, Row> predicate,
-            RowMerger rowMerger,
+            BiPredicate<ExecutionContext, Tuple> predicate,
+            TupleMerger rowMerger,
             boolean populating,
             boolean emitEmptyOuterRows,
             Index innerIndex,
@@ -157,6 +156,9 @@ class BatchHashJoin extends AOperator
     @Override
     public RowIterator open(ExecutionContext context)
     {
+        final Tuple contextOuter = context.getTuple();
+        final JoinTuple joinTuple = new JoinTuple();
+        joinTuple.setContextOuter(contextOuter);
         Data data = context.getOperatorContext().getNodeData(nodeId, () -> new Data());
         executionCount++;
         final RowIterator outerIt = outer.open(context);
@@ -172,13 +174,12 @@ class BatchHashJoin extends AOperator
         }
         final StopWatch sw = new StopWatch();
         final int batchSize = temp;
-        final Row contextParent = context.getRow();
         return new RowIterator()
         {
             /** Batched rows */
-            private List<Row> outerRows;
-            private int outerRowIndex;
-            private List<Row> innerRows;
+            private List<TupleHolder> outerTuples;
+            private int outerTupleIndex;
+            private List<Tuple> innerTuples;
             private int innerRowIndex;
 
             /** Reference to outer values iterator to verify that implementations of Operator fully uses the index if specified */
@@ -187,8 +188,8 @@ class BatchHashJoin extends AOperator
             /** Table use for hashed inner values */
             private final TIntObjectMap<TableValue> table = new TIntObjectHashMap<>((int) (batchSize * 1.5));
 
-            private Row next;
-            private Row outerRow;
+            private Tuple next;
+            private TupleHolder outerTuple;
 
             private final Object[] keyValues = new Object[valuesSize];
 
@@ -196,10 +197,9 @@ class BatchHashJoin extends AOperator
             private boolean emitOuterRows;
 
             @Override
-            public Row next()
+            public Tuple next()
             {
-                Row result = next;
-                clearJoinData(result);
+                Tuple result = next;
                 next = null;
                 return result;
             }
@@ -231,10 +231,10 @@ class BatchHashJoin extends AOperator
                         continue;
                     }
 
-                    if (outerRows == null)
+                    if (outerTuples == null)
                     {
                         batchOuterRows();
-                        if (outerRows.isEmpty())
+                        if (outerTuples.isEmpty())
                         {
                             verifyOuterValuesIterator();
                             sw.stop();
@@ -249,16 +249,16 @@ class BatchHashJoin extends AOperator
                         // Start probing
                         continue;
                     }
-                    // Probe current outer row
-                    else if (innerRows == null)
+                    // Probe current outer tuple
+                    else if (innerTuples == null)
                     {
                         // We're done
-                        if (outerRowIndex >= outerRows.size())
+                        if (outerTupleIndex >= outerTuples.size())
                         {
                             // Populating mode, emit outer rows
                             if (populating)
                             {
-                                outerRowIndex = 0;
+                                outerTupleIndex = 0;
                                 emitOuterRows = true;
                             }
                             else
@@ -268,57 +268,55 @@ class BatchHashJoin extends AOperator
                             continue;
                         }
 
-                        outerRow = outerRows.get(outerRowIndex);
-                        TableValue tableValue = table.get(outerRow.hash);
+                        outerTuple = outerTuples.get(outerTupleIndex);
+                        TableValue tableValue = table.get(outerTuple.hash);
                         if (tableValue == null)
                         {
-                            outerRowIndex++;
+                            outerTupleIndex++;
                             continue;
                         }
 
-                        innerRows = tableValue.getRows();
-                        if (innerRows.isEmpty())
+                        innerTuples = tableValue.getRows();
+                        if (innerTuples.isEmpty())
                         {
                             if (!populating && emitEmptyOuterRows)
                             {
-                                next = outerRow;
+                                next = outerTuple.tuple;
                             }
 
-                            innerRows = null;
-                            outerRowIndex++;
+                            innerTuples = null;
+                            outerTupleIndex++;
                             continue;
                         }
+                        joinTuple.setOuter(outerTuple.tuple);
                     }
-                    else if (innerRowIndex >= innerRows.size())
+                    else if (innerRowIndex >= innerTuples.size())
                     {
-                        outerRowIndex++;
-                        innerRows = null;
+                        outerTupleIndex++;
+                        innerTuples = null;
                         innerRowIndex = 0;
                         continue;
                     }
 
-                    Row innerRow = innerRows.get(innerRowIndex++);
-                    outerRow.setPredicateParent(contextParent);
-                    innerRow.setPredicateParent(outerRow);
+                    Tuple innerRow = innerTuples.get(innerRowIndex++);
+                    joinTuple.setInner(innerRow);
 
-                    if (predicate.test(context, innerRow))
+                    if (predicate.test(context, joinTuple))
                     {
                         sw1.start();
 
-                        next = rowMerger.merge(outerRow, innerRow, populating);
+                        next = rowMerger.merge(outerTuple.tuple, innerRow, populating, nodeId);
                         sw1.stop();
                         data.innerHashTime += sw1.getTime();
                         sw1.reset();
 
                         if (populating)
                         {
-                            outerRow.match = true;
+                            outerTuple.tuple = next;
+                            outerTuple.match = true;
                             next = null;
                         }
                     }
-
-                    innerRow.clearPredicateParent();
-                    outerRow.clearPredicateParent();
                 }
                 return true;
             }
@@ -331,17 +329,17 @@ class BatchHashJoin extends AOperator
                 // Stop early to avoid allocation of lists
                 if (!outerIt.hasNext())
                 {
-                    outerRows = emptyList();
+                    outerTuples = emptyList();
                     return;
                 }
 
                 int count = 0;
                 int size = batchSize > 0 ? batchSize : 100;
-                outerRows = new ArrayList<>(size);
+                outerTuples = new ArrayList<>(size);
                 while (outerIt.hasNext())
                 {
-                    Row row = outerIt.next();
-                    outerRows.add(row);
+                    Tuple tuple = outerIt.next();
+                    outerTuples.add(new TupleHolder(tuple));
                     count++;
                     if (batchSize > 0 && count >= batchSize)
                     {
@@ -364,39 +362,38 @@ class BatchHashJoin extends AOperator
                 // Hash batch
                 while (it.hasNext())
                 {
-                    Row row = it.next();
-                    int hash = populateKeyValues(innerValuesExtractor, context, row);
+                    Tuple tuple = it.next();
+                    int hash = populateKeyValues(innerValuesExtractor, context, tuple);
                     TableValue tableValue = table.get(hash);
                     if (tableValue == null)
                     {
                         // No outer row exists for this inner rows hash, no need to add it
                         continue;
                     }
-                    tableValue.addRow(row);
+                    tableValue.addRow(tuple);
                 }
                 it.close();
 
                 verifyOuterValuesIterator();
                 context.getOperatorContext().setOuterIndexValues(null);
-
             }
 
             private void emitOuterRows()
             {
                 // Complete
-                if (outerRowIndex > outerRows.size() - 1)
+                if (outerTupleIndex > outerTuples.size() - 1)
                 {
                     clearOuterRows();
                     return;
                 }
 
-                Row row = outerRows.get(outerRowIndex);
-                if (row.match || emitEmptyOuterRows)
+                TupleHolder holder = outerTuples.get(outerTupleIndex);
+                if (holder.match || emitEmptyOuterRows)
                 {
-                    next = row;
+                    next = holder.tuple;
                 }
 
-                outerRowIndex++;
+                outerTupleIndex++;
             }
 
             private void verifyOuterValuesIterator()
@@ -409,18 +406,18 @@ class BatchHashJoin extends AOperator
 
             private void clearOuterRows()
             {
-                outerRow = null;
-                outerRows = null;
-                outerRowIndex = 0;
+                outerTuple = null;
+                outerTuples = null;
+                outerTupleIndex = 0;
                 emitOuterRows = false;
             }
 
             private int populateKeyValues(
                     ValuesExtractor valueExtractor,
                     ExecutionContext context,
-                    Row row)
+                    Tuple tuple)
             {
-                valueExtractor.extract(context, row, keyValues);
+                valueExtractor.extract(context, tuple, keyValues);
                 return hash(keyValues);
             }
 
@@ -454,24 +451,24 @@ class BatchHashJoin extends AOperator
                     {
                         while (nextArray == null)
                         {
-                            if (outerRowsIndex >= outerRows.size())
+                            if (outerRowsIndex >= outerTuples.size())
                             {
                                 return false;
                             }
 
-                            Row row = outerRows.get(outerRowsIndex++);
-                            int hash = populateKeyValues(outerValuesExtractor, context, row);
+                            TupleHolder holder = outerTuples.get(outerRowsIndex++);
+                            int hash = populateKeyValues(outerValuesExtractor, context, holder.tuple);
                             // Cannot be null values in keys
                             if (contains(keyValues, null))
                             {
                                 continue;
                             }
-                            row.hash = hash;
-                            TableValue tableValue = table.get(row.hash);
+                            holder.hash = hash;
+                            TableValue tableValue = table.get(holder.hash);
                             if (tableValue == null)
                             {
                                 tableValue = new TableValue();
-                                table.put(row.hash, tableValue);
+                                table.put(holder.hash, tableValue);
                             }
 
                             if (!tableValue.addInnterValues(keyValues))
@@ -563,10 +560,22 @@ class BatchHashJoin extends AOperator
             + indentString + inner.toString(indent + 1);
     }
 
+    private static class TupleHolder
+    {
+        private Tuple tuple;
+        private int hash;
+        private boolean match;
+
+        TupleHolder(Tuple tuple)
+        {
+            this.tuple = tuple;
+        }
+    }
+
     /** Value used in table */
     private static class TableValue
     {
-        private List<Row> rows;
+        private List<Tuple> tuples;
         private List<Object[]> values;
 
         /** Check if provided key exists in values */
@@ -583,19 +592,19 @@ class BatchHashJoin extends AOperator
             return false;
         }
 
-        public void addRow(Row row)
+        public void addRow(Tuple tuple)
         {
-            if (rows == null)
+            if (tuples == null)
             {
-                rows = new ArrayList<>();
+                tuples = new ArrayList<>();
             }
 
-            rows.add(row);
+            tuples.add(tuple);
         }
 
-        public List<Row> getRows()
+        public List<Tuple> getRows()
         {
-            return rows != null ? rows : emptyList();
+            return tuples != null ? tuples : emptyList();
         }
 
         /**

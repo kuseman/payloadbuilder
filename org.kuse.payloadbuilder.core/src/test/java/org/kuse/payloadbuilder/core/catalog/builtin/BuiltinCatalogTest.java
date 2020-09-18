@@ -34,6 +34,7 @@ import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.codegen.CodeGenerator;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
+import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -46,8 +47,8 @@ public class BuiltinCatalogTest extends Assert
     private final QueryParser parser = new QueryParser();
     private final QuerySession session = new QuerySession(new CatalogRegistry());
 
-    private final TableAlias alias = TableAlias.of(null, QualifiedName.of("table"), "t", new String[] {"a", "b", "c"});
-    
+    private final TableAlias alias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("table"), "t").columns(new String[] {"a", "b", "c"}).build();
+
     @Test
     public void test_function_hash()
     {
@@ -63,7 +64,7 @@ public class BuiltinCatalogTest extends Assert
         assertFunction(10, null, "coalesce(null, null, 10)");
         assertFunction("str", null, "coalesce('str', null, 10)");
     }
-    
+
     @Test
     public void test_randomInt()
     {
@@ -104,17 +105,17 @@ public class BuiltinCatalogTest extends Assert
     public void test_function_match()
     {
         Row row = Row.of(alias, 0, new Object[] {asList(), null, asList(1, 2)});
-        
-        // Empty 
+
+        // Empty
         assertFunction(false, row, "a.any(x -> x > 0)");
         assertFunction(true, row, "a.all(x -> x > 0)");
         assertFunction(true, row, "a.none(x -> x > 0)");
 
-        // Null 
+        // Null
         assertFunction(null, row, "b.any(x -> x > 0)");
         assertFunction(null, row, "b.all(x -> x > 0)");
         assertFunction(null, row, "b.none(x -> x > 0)");
-        
+
         // Values
         assertFunction(true, row, "c.any(x -> x > 0)");
         assertFunction(true, row, "c.all(x -> x > 0)");
@@ -123,7 +124,7 @@ public class BuiltinCatalogTest extends Assert
         assertFunction(false, row, "c.any(x -> x < 0)");
         assertFunction(false, row, "c.all(x -> x < 0)");
         assertFunction(true, row, "c.none(x -> x < 0)");
-        
+
         assertFail(IllegalArgumentException.class, "Expected boolean result but got: 2", row, "c.any(x -> x+1)");
     }
 
@@ -145,7 +146,7 @@ public class BuiltinCatalogTest extends Assert
         assertFunction(emptyMap(), null, "json_value('{}')");
         assertFunction(emptyList(), null, "json_value('[]')");
     }
-    
+
     @Test
     public void test_function_isnull()
     {
@@ -153,7 +154,7 @@ public class BuiltinCatalogTest extends Assert
         assertFunction(1, null, "isnull(null, 1)");
         assertFunction(1, null, "isnull(1, null)");
     }
-    
+
     @Test
     public void test_function_isblank()
     {
@@ -161,7 +162,7 @@ public class BuiltinCatalogTest extends Assert
         assertFunction(1, null, "isblank('', 1)");
         assertFunction("str", null, "isblank('str', null)");
     }
-    
+
     @Test
     public void test_function_cast()
     {
@@ -177,7 +178,7 @@ public class BuiltinCatalogTest extends Assert
         assertFunction(1l, null, "cast('1', long)");
         assertFunction(1.0f, null, "cast('1', float)");
         assertFunction(1.0d, null, "cast('1', double)");
-        
+
         assertFunction("1.0", null, "cast(1.0, string)");
         assertFunction("1.0", null, "cast(1.0, 'string')");
 
@@ -192,7 +193,7 @@ public class BuiltinCatalogTest extends Assert
         assertFunction(LocalDateTime.parse("2000-10-10T10:10:00"), null, "cast('2000-10-10 10:10', 'datetime')");
         assertFunction(LocalDateTime.parse("2000-10-10T12:10:00"), null, "cast('2000-10-10 10:10Z', 'datetime')");
         assertFunction(LocalDateTime.parse("2000-10-10T12:10:10.123"), null, "cast('2000-10-10 10:10:10.123Z', 'datetime')");
-        
+
         assertFail(DateTimeParseException.class, "Text 'jibberish' could not", null, "cast('jibberish', 'datetime')");
         assertFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, integer)");
         assertFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, long)");
@@ -206,7 +207,7 @@ public class BuiltinCatalogTest extends Assert
         row = row != null ? row : Row.of(alias, 0, new Object[0]);
         Expression e = parser.parseExpression(expression);
         Object actual = null;
-        
+
         try
         {
             actual = codeGenerator.generateFunction(alias, e).apply(row);
@@ -220,10 +221,9 @@ public class BuiltinCatalogTest extends Assert
         {
             System.out.println("Missing implementation: " + ee.getMessage());
         }
-        
 
         ExecutionContext context = new ExecutionContext(session);
-        context.setRow(row);
+        context.setTuple(row);
         actual = e.eval(context);
         if (actual instanceof Iterator)
         {
@@ -232,7 +232,7 @@ public class BuiltinCatalogTest extends Assert
 
         assertEquals("Eval", expected, actual);
     }
-    
+
     private void assertFail(Class<? extends Exception> e, String messageContains, Row row, String expression)
     {
         Expression expr = null;
@@ -251,16 +251,16 @@ public class BuiltinCatalogTest extends Assert
             assertEquals(e, ee.getClass());
             assertTrue("Expected expcetion message to contain " + messageContains + " but was: " + ee.getMessage(), ee.getMessage().contains(messageContains));
         }
-        
+
         if (expr == null)
         {
             return;
         }
-        
+
         try
         {
             ExecutionContext context = new ExecutionContext(session);
-            context.setRow(row);
+            context.setTuple(row);
             expr.eval(context);
             fail(expression + " should fail.");
         }

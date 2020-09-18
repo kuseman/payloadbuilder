@@ -37,8 +37,8 @@ class NestedLoopJoin extends AOperator
     private final String logicalOperator;
     private final Operator outer;
     private final Operator inner;
-    private final BiPredicate<ExecutionContext, Row> predicate;
-    private final RowMerger rowMerger;
+    private final BiPredicate<ExecutionContext, Tuple> predicate;
+    private final TupleMerger rowMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
 
@@ -51,8 +51,8 @@ class NestedLoopJoin extends AOperator
             String logicalOperator,
             Operator outer,
             Operator inner,
-            BiPredicate<ExecutionContext, Row> predicate,
-            RowMerger rowMerger,
+            BiPredicate<ExecutionContext, Tuple> predicate,
+            TupleMerger rowMerger,
             boolean populating,
             boolean emitEmptyOuterRows)
     {
@@ -89,22 +89,33 @@ class NestedLoopJoin extends AOperator
     @Override
     public RowIterator open(ExecutionContext context)
     {
-        final Row contextParent = context.getRow();
+        /*
+         * a
+         *   b
+         *     c
+         *
+         */
+
+        final Tuple contextParent = context.getTuple();
+        final JoinTuple joinTuple = new JoinTuple();
+        joinTuple.setContextOuter(contextParent);
+
         final RowIterator it = outer.open(context);
         executionCount++;
         return new RowIterator()
         {
-            private Row next;
-            private Row currentOuter;
+            /** Single instance to avoid allocations */
+            private Tuple next;
+            private Tuple currentOuter;
             private RowIterator ii;
             private boolean hit;
 
             @Override
-            public Row next()
+            public Tuple next()
             {
-                Row r = next;
+                Tuple t = next;
                 next = null;
-                return r;
+                return t;
             }
 
             @Override
@@ -131,12 +142,13 @@ class NestedLoopJoin extends AOperator
                     if (currentOuter == null)
                     {
                         currentOuter = it.next();
-                        context.setRow(currentOuter);
+                        joinTuple.setOuter(currentOuter);
                         hit = false;
                     }
 
                     if (ii == null)
                     {
+                        context.setTuple(currentOuter);
                         ii = inner.open(context);
                     }
 
@@ -156,22 +168,18 @@ class NestedLoopJoin extends AOperator
                         continue;
                     }
 
-                    currentOuter.setPredicateParent(contextParent);
-                    Row currentInner = ii.next();
-                    currentInner.setPredicateParent(currentOuter);
-
-                    if (predicate == null || predicate.test(context, currentInner))
+                    Tuple currentInner = ii.next();
+                    joinTuple.setInner(currentInner);
+                    if (predicate == null || predicate.test(context, joinTuple))
                     {
-                        next = rowMerger.merge(currentOuter, currentInner, populating);
+                        next = rowMerger.merge(currentOuter, currentInner, populating, nodeId);
                         if (populating)
                         {
+                            currentOuter = next;
                             next = null;
                         }
                         hit = true;
                     }
-
-                    currentInner.clearPredicateParent();
-                    currentOuter.clearPredicateParent();
                 }
 
                 return true;

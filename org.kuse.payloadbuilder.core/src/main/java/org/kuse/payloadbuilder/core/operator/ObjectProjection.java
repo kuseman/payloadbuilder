@@ -63,14 +63,14 @@ public class ObjectProjection implements Projection
     @Override
     public void writeValue(OutputWriter writer, ExecutionContext context)
     {
-        Row rowToUse = context.getRow();
-        Row prevParentRow = rowToUse;
+        Tuple tupleToUse = context.getTuple();
+        Tuple prevParentTuple = tupleToUse;
         if (selection != null)
         {
-            Iterator<Row> it = selection.open(context);
-            rowToUse = it.hasNext() ? it.next() : null;
+            Iterator<Tuple> it = selection.open(context);
+            tupleToUse = it.hasNext() ? it.next() : null;
 
-            if (rowToUse == null)
+            if (tupleToUse == null)
             {
                 writer.writeValue(null);
                 return;
@@ -80,13 +80,13 @@ public class ObjectProjection implements Projection
         writer.startObject();
         for (int i = 0; i < length; i++)
         {
-            context.setRow(rowToUse);
+            context.setTuple(tupleToUse);
             writer.writeFieldName(columns[i]);
             projections.get(i).writeValue(writer, context);
         }
         writer.endObject();
 
-        context.setRow(prevParentRow);
+        context.setTuple(prevParentTuple);
     }
 
     @Override

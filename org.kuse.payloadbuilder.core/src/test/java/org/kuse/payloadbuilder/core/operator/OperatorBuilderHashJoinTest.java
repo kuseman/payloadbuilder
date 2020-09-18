@@ -20,7 +20,6 @@ package org.kuse.payloadbuilder.core.operator;
 import static java.util.Arrays.asList;
 
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Test of {@link OperatorBuilder} building hash match (joins) */
 public class OperatorBuilderHashJoinTest extends AOperatorTest
@@ -31,11 +30,6 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s inner join article a on s.art_id = a.art_id";
         QueryResult result = getQueryResult(query);
 
-        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
-        TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"art_id", "id2"});
-
-        assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
-
         Operator expected = new HashJoin(
                 2,
                 "",
@@ -44,7 +38,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("s.art_id = a.art_id")),
-                DefaultRowMerger.DEFAULT,
+                DefaultTupleMerger.DEFAULT,
                 false,
                 false);
 
@@ -67,11 +61,6 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s inner join article a with(populate=true) on a.art_id = s.art_id";
         QueryResult result = getQueryResult(query);
 
-        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
-        TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"art_id", "id2"});
-
-        assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
-
         Operator expected = new HashJoin(
                 2,
                 "",
@@ -80,7 +69,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
-                DefaultRowMerger.DEFAULT,
+                DefaultTupleMerger.DEFAULT,
                 true,
                 false);
 
@@ -103,11 +92,6 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s left join article a on s.art_id = a.art_id";
         QueryResult result = getQueryResult(query);
 
-        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
-        TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"art_id", "id2"});
-
-        assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
-
         Operator expected = new HashJoin(
                 2,
                 "",
@@ -116,7 +100,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("s.art_id = a.art_id")),
-                DefaultRowMerger.DEFAULT,
+                DefaultTupleMerger.DEFAULT,
                 false,
                 true);
 
@@ -139,11 +123,6 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s left join article a on s.art_id = a.art_id where a.value is null";
         QueryResult result = getQueryResult(query);
 
-        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
-        TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"art_id", "value", "id2"});
-
-        assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
-
         Operator expected = new FilterOperator(
                 3,
                 new HashJoin(
@@ -154,7 +133,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
                         new ExpressionHashFunction(asList(e("s.art_id"))),
                         new ExpressionHashFunction(asList(e("a.art_id"))),
                         new ExpressionPredicate(e("s.art_id = a.art_id")),
-                        DefaultRowMerger.DEFAULT,
+                        DefaultTupleMerger.DEFAULT,
                         false,
                         true),
                 new ExpressionPredicate(e("a.value is null")));
@@ -178,11 +157,6 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s left join article a with(populate=true) on s.art_id = a.art_id";
         QueryResult result = getQueryResult(query);
 
-        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id1"});
-        TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"art_id", "id2"});
-
-        assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
-
         Operator expected = new HashJoin(
                 2,
                 "",
@@ -191,7 +165,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("s.art_id = a.art_id")),
-                DefaultRowMerger.DEFAULT,
+                DefaultTupleMerger.DEFAULT,
                 true,
                 true);
 
@@ -210,11 +184,6 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
     {
         String query = "select s.id1, a.id2 from source s inner join (from article where note_id > 0) a with (populate=true) on a.art_id = s.art_id and a.active_flg where s.id3 > 0 and a.id2 = 10";
         QueryResult result = getQueryResult(query);
-        
-        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id3", "id1"});
-        TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"art_id", "active_flg", "id2", "note_id"});
-        
-        assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
         Operator expected = new HashJoin(
                 4,
@@ -224,12 +193,12 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id ")),
-                DefaultRowMerger.DEFAULT,
+                DefaultTupleMerger.DEFAULT,
                 true,
                 false);
 
-        //        System.err.println(expected.toString(1));
-        //        System.out.println(result.operator.toString(1));
+        //                System.err.println(expected.toString(1));
+        //                System.out.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
 

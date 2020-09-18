@@ -19,12 +19,10 @@ package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.toList;
-import static org.kuse.payloadbuilder.core.operator.BatchMergeJoinTest.assertRowJoinValues;
 
-import java.util.Iterator;
+import java.util.Collection;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
@@ -34,15 +32,25 @@ import org.apache.commons.lang3.mutable.MutableInt;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Test {@link BatchHashJoin} */
 public class BatchHashJoinTest extends AOperatorTest
 {
-    private final TableAlias a = TableAlias.of(null, QualifiedName.of("table"), "a");
-    private final TableAlias b = TableAlias.of(a, QualifiedName.of("tableB"), "b");
-    
+    private final TableAlias a = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("table"), "a")
+            .columns(new String[] {"col1", "col2"})
+            .children(asList(
+                    TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableB"), "b")
+                            .columns(new String[] {"col1", "col2"})
+                            .children(asList(
+                                    TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableC"), "c")
+                                            .columns(new String[] {"col1", "col2"})))))
+            .build();
+    private final TableAlias b = a.getChildAliases().get(0);
+    private final TableAlias c = b.getChildAliases().get(0);
+
     @Test
     public void test_inner_join_empty_outer()
     {
@@ -55,10 +63,10 @@ public class BatchHashJoinTest extends AOperatorTest
                 "",
                 left,
                 right,
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row) -> (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
+                new ExpressionValuesExtractor(asList(e("a.col1"))),
+                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionPredicate(e("b.col1 = a.col1")),
+                DefaultTupleMerger.DEFAULT,
                 false,
                 false,
                 index,
@@ -71,7 +79,7 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_inner_join_empty_inner()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 1);
-        Operator left = op(contet -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
+        Operator left = op(contet -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator());
         Operator right = op(context ->
         {
             while (context.getOperatorContext().getOuterIndexValues().hasNext())
@@ -84,10 +92,10 @@ public class BatchHashJoinTest extends AOperatorTest
                 "",
                 left,
                 right,
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row) -> (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
+                new ExpressionValuesExtractor(asList(e("a.col1"))),
+                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionPredicate(e("b.col1 = a.col1")),
+                DefaultTupleMerger.DEFAULT,
                 false,
                 false,
                 index,
@@ -100,17 +108,17 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_bad_implementation_of_inner_operator()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
-        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
+        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator());
         Operator right = op(context -> RowIterator.EMPTY);
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
                 right,
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row) -> (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
+                new ExpressionValuesExtractor(asList(e("a.col1"))),
+                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionPredicate(e("b.col1 = a.col1")),
+                DefaultTupleMerger.DEFAULT,
                 false,
                 false,
                 index,
@@ -123,22 +131,22 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_bad_implementation_of_inner_operator_2()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
-        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
+        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator());
         Operator right = op(context ->
         {
             context.getOperatorContext().getOuterIndexValues().hasNext();
             Object[] ar = context.getOperatorContext().getOuterIndexValues().next();
-            return asList(Row.of(a, 0, ar)).iterator();
+            return asList((Tuple) Row.of(a, 0, ar)).iterator();
         });
 
         BatchHashJoin op = new BatchHashJoin(0,
                 "",
                 left,
                 right,
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row) -> (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
+                new ExpressionValuesExtractor(asList(e("a.col1"))),
+                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionPredicate(e("b.col1 = a.col1")),
+                DefaultTupleMerger.DEFAULT,
                 false,
                 false,
                 index,
@@ -151,7 +159,7 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_bad_implementation_of_inner_operator_3()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
-        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i, new Object[] {i})).iterator());
+        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator());
         Operator right = op(context ->
         {
             while (context.getOperatorContext().getOuterIndexValues().hasNext())
@@ -166,10 +174,10 @@ public class BatchHashJoinTest extends AOperatorTest
                 "",
                 left,
                 right,
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row) -> (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
+                new ExpressionValuesExtractor(asList(e("a.col1"))),
+                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionPredicate(e("b.col1 = a.col1")),
+                DefaultTupleMerger.DEFAULT,
                 false,
                 false,
                 index,
@@ -185,7 +193,6 @@ public class BatchHashJoinTest extends AOperatorTest
         // uses the context row into consideration when joining
 
         Index index = new Index(QualifiedName.of("tableA"), asList("col"), 3);
-        TableAlias c = TableAlias.of(b, QualifiedName.of("tableC"), "c");
 
         /**
          * <pre>
@@ -201,16 +208,16 @@ public class BatchHashJoinTest extends AOperatorTest
          * </pre>
          */
 
-        Operator opA = op(ctx -> IntStream.of(1, 2, 3, 4, 5).mapToObj(i -> Row.of(a, i, new Object[] {i, "val" + i})).iterator());
-        Operator opB = op(ctx -> IntStream.of(4, 5, 6, 7).mapToObj(i -> Row.of(b, i, new Object[] {i})).iterator());
+        Operator opA = op(ctx -> IntStream.of(1, 2, 3, 4, 5).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i, "val" + i})).iterator());
+        Operator opB = op(ctx -> IntStream.of(4, 5, 6, 7).mapToObj(i -> (Tuple) Row.of(b, 10 * i, new Object[] {i})).iterator());
 
         AtomicInteger posC = new AtomicInteger();
         Operator opC = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            List<Row> inner = StreamSupport.stream(it.spliterator(), false)
+            List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
-                    .map(val -> Row.of(c, posC.getAndIncrement(), new Object[] {val, "val" + val}))
+                    .map(val -> (Tuple) Row.of(c, posC.getAndIncrement(), new Object[] {val, "val" + val}))
                     .collect(toList());
 
             return inner.iterator();
@@ -225,36 +232,35 @@ public class BatchHashJoinTest extends AOperatorTest
                         "",
                         opB,
                         opC,
-                        (ctx, row, values) -> values[0] = row.getObject(0),
-                        (ctx, row, values) -> values[0] = row.getObject(0),
-                        (ctx, row) -> (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0)
-                            && Objects.equals(row.getObject(1), row.getParent().getParent().getObject(1)),
-                        DefaultRowMerger.DEFAULT,
-                        true,
+                        new ExpressionValuesExtractor(asList(e("b.col1"))),
+                        new ExpressionValuesExtractor(asList(e("c.col1"))),
+                        new ExpressionPredicate(e("c.col1 = b.col1 and c.col2 = a.col2")),
+                        DefaultTupleMerger.DEFAULT,
+                        false,
                         false,
                         index,
                         null),
-                (ctx, row) -> (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
-                true,
+                new ExpressionPredicate(e("b.col1 = a.col1")),
+                DefaultTupleMerger.DEFAULT,
+                false,
                 false);
 
         int[] tableAPos = new int[] {4, 5};
-        int[] tableBPos = new int[] {4, 5};
+        int[] tableBPos = new int[] {40, 50};
         int[] tableCPos = new int[] {12, 17};
 
         int count = 0;
-        Iterator<Row> it = op.open(new ExecutionContext(session));
+        RowIterator it = op.open(new ExecutionContext(session));
         while (it.hasNext())
         {
-            Row row = it.next();
-
-            assertEquals(row.getPos(), tableAPos[count]);
-            assertEquals(row.getChildRows(0).get(0).getPos(), tableBPos[count]);
-            assertEquals(row.getChildRows(0).get(0).getChildRows(0).get(0).getPos(), tableCPos[count]);
-
+            Tuple tuple = it.next();
+            assertEquals(tableAPos[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals(tableBPos[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
+            assertEquals(tableCPos[count], tuple.getValue(QualifiedName.of("c", "__pos"), 0));
             count++;
         }
+
+        assertEquals(2, count);
     }
 
     @Test
@@ -267,12 +273,12 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt rightClose = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
                 .stream()
-                .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
                 .iterator(), () -> leftClose.setTrue());
         Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            List<Row> inner = StreamSupport.stream(it.spliterator(), false)
+            List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
@@ -286,17 +292,16 @@ public class BatchHashJoinTest extends AOperatorTest
                 "",
                 left,
                 right,
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row) -> (Integer) row.getParent().getObject(0) > 0 && (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
+                new ExpressionValuesExtractor(asList(e("a.col1"))),
+                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
+                DefaultTupleMerger.DEFAULT,
                 false,
                 false,
                 index,
                 null);
 
         RowIterator it = op.open(new ExecutionContext(session));
-        int count = 0;
 
         int[] expectedOuterPositions = new int[] {
                 7,          // Batch 1
@@ -310,14 +315,12 @@ public class BatchHashJoinTest extends AOperatorTest
                 4           // Batch 3
         };
 
+        int count = 0;
         while (it.hasNext())
         {
-            Row row = it.next();
-            assertRowJoinValues(row);
-            //                        System.out.println(row + " " + row.getChildRows(0));
-            assertEquals(expectedOuterPositions[count], row.getPos());
-            assertEquals(expectedInnerPositions[count], row.getChildRows(0).get(0).getPos());
-            assertEquals("Val" + row.getObject(0), row.getChildRows(0).get(0).getObject(1));
+            Tuple tuple = it.next();
+            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals(expectedInnerPositions[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
             count++;
         }
         it.close();
@@ -335,12 +338,12 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
                 .stream()
-                .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
                 .iterator());
         Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            List<Row> inner = StreamSupport.stream(it.spliterator(), false)
+            List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
@@ -354,45 +357,36 @@ public class BatchHashJoinTest extends AOperatorTest
                 "",
                 left,
                 right,
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row) -> (Integer) row.getParent().getObject(0) > 0 && (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
+                new ExpressionValuesExtractor(asList(e("a.col1"))),
+                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
+                DefaultTupleMerger.DEFAULT,
                 false,
                 true,
                 index, null);
 
-        Iterator<Row> it = op.open(new ExecutionContext(session));
-        int count = 0;
+        RowIterator it = op.open(new ExecutionContext(session));
 
         int[] expectedOuterPositions = new int[] {
                 0, 1, 2,    // Batch 1
                 3, 4, 5,    // Batch 2
                 6, 7, 8,    // Batch 3
-                9, 10, 11,  // Batch 3
+                9, 10, 11,  // Batch 4
         };
 
-        int[] expectedInnerPositions = new int[] {
-                0,          // Batch 1
-                1, 2, 3,    // Batch 2
-                4           // Batch 3
+        Integer[] expectedInnerPositions = new Integer[] {
+                null, null, null,   // Batch 1
+                null, null, 0,      // Batch 2
+                1, 2, 3,            // Batch 3
+                4, null, null       // Batch 4
         };
 
+        int count = 0;
         while (it.hasNext())
         {
-            Row row = it.next();
-            assertRowJoinValues(row);
-            //                                    System.out.println(row + " " + row.getChildRows(0));
-            assertEquals(expectedOuterPositions[count], row.getPos());
-            if ((int) row.getObject(0) >= 5 && (int) row.getObject(0) <= 9)
-            {
-                assertEquals(expectedInnerPositions[count - 5], row.getChildRows(0).get(0).getPos());
-                assertEquals("Val" + row.getObject(0), row.getChildRows(0).get(0).getObject(1));
-            }
-            else
-            {
-                assertEquals(0, row.getChildRows(0).size());
-            }
+            Tuple tuple = it.next();
+            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals(expectedInnerPositions[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
             count++;
         }
 
@@ -405,7 +399,7 @@ public class BatchHashJoinTest extends AOperatorTest
         Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
+        Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
         Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
@@ -414,7 +408,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}, new Object[] {-666, 3}).stream())
-                    .map(ar -> Row.of(b, posRight.getAndIncrement(), ar))
+                    .map(ar -> (Tuple) Row.of(b, posRight.getAndIncrement(), ar))
                     .iterator();
         });
 
@@ -422,20 +416,22 @@ public class BatchHashJoinTest extends AOperatorTest
                 "",
                 left,
                 right,
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row) -> (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
+                new ExpressionValuesExtractor(asList(e("a.col1"))),
+                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionPredicate(e("b.col1 = a.col1")),
+                DefaultTupleMerger.DEFAULT,
                 false,
                 false,
                 index, null);
 
-        Iterator<Row> it = op.open(new ExecutionContext(session));
+        RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
-                7, 7, 8, 8,
-                9, 9, 10, 10,
+                7, 7,
+                8, 8,
+                9, 9,
+                10, 10,
                 11, 11
         };
 
@@ -447,11 +443,9 @@ public class BatchHashJoinTest extends AOperatorTest
 
         while (it.hasNext())
         {
-            Row row = it.next();
-            assertRowJoinValues(row);
-            //                        System.out.println(row + " " + row.getChildRows(0));
-            assertEquals(expectedOuterPositions[count], row.getPos());
-            assertEquals(expectedInnerPositions[count], row.getChildRows(0).get(0).getPos());
+            Tuple tuple = it.next();
+            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals(expectedInnerPositions[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
             count++;
         }
 
@@ -464,7 +458,7 @@ public class BatchHashJoinTest extends AOperatorTest
         Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
+        Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
         Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
@@ -473,7 +467,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
-                    .map(ar -> Row.of(b, posRight.getAndIncrement(), ar))
+                    .map(ar -> (Tuple) Row.of(b, posRight.getAndIncrement(), ar))
                     .iterator();
         });
 
@@ -481,15 +475,15 @@ public class BatchHashJoinTest extends AOperatorTest
                 "",
                 left,
                 right,
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row) -> (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
+                new ExpressionValuesExtractor(asList(e("a.col1"))),
+                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionPredicate(e("b.col1 = a.col1")),
+                DefaultTupleMerger.DEFAULT,
                 false,
                 true,
                 index, null);
 
-        Iterator<Row> it = op.open(new ExecutionContext(session));
+        RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -500,26 +494,19 @@ public class BatchHashJoinTest extends AOperatorTest
                 12, 13                  // Batch 5
         };
 
-        int[] expectedInnerPositions = new int[] {
-                0, 1, 2, 3,         // Batch 1
-                4, 5, 6, 7, 8, 9    // Batch 2
+        Integer[] expectedInnerPositions = new Integer[] {
+                null, null, null,   // Batch 1
+                null, null, null,   // Batch 2
+                null, 0, 1, 2, 3,   // Batch 3
+                4, 5, 6, 7, 8, 9,   // Batch 4
+                null, null          // Batch 5
         };
 
         while (it.hasNext())
         {
-            Row row = it.next();
-            assertRowJoinValues(row);
-            //            System.out.println(row + " " + row.getChildRows(0));
-            assertEquals(expectedOuterPositions[count], row.getPos());
-            if ((int) row.getObject(0) >= 5 && (int) row.getObject(0) <= 9)
-            {
-                assertEquals(expectedInnerPositions[count - 7], row.getChildRows(0).get(0).getPos());
-
-            }
-            else
-            {
-                assertEquals(0, row.getChildRows(0).size());
-            }
+            Tuple tuple = it.next();
+            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals(expectedInnerPositions[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
             count++;
         }
 
@@ -534,16 +521,16 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
                 .stream()
-                .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
                 .iterator());
         Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            List<Row> rows = StreamSupport.stream(it.spliterator(), false)
+            List<Tuple> rows = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
-                    .map(val -> Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
+                    .map(val -> (Tuple) Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
                     .collect(toList());
 
             return rows.iterator();
@@ -553,15 +540,15 @@ public class BatchHashJoinTest extends AOperatorTest
                 "",
                 left,
                 right,
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row) -> (Integer) row.getParent().getObject(0) > 0 && (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
+                new ExpressionValuesExtractor(asList(e("a.col1"))),
+                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
+                DefaultTupleMerger.DEFAULT,
                 false,
                 false,
                 index, null);
 
-        Iterator<Row> it = op.open(new ExecutionContext(session));
+        RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -578,12 +565,9 @@ public class BatchHashJoinTest extends AOperatorTest
 
         while (it.hasNext())
         {
-            Row row = it.next();
-            assertRowJoinValues(row);
-            //                                                System.out.println(row + " " + row.getChildRows(0));
-            assertEquals(expectedOuterPositions[count], row.getPos());
-            assertEquals(expectedInnerPositions[count], row.getChildRows(0).get(0).getPos());
-            assertEquals("Val" + row.getObject(0), row.getChildRows(0).get(0).getObject(1));
+            Tuple tuple = it.next();
+            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals(expectedInnerPositions[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
             count++;
         }
 
@@ -598,16 +582,16 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
                 .stream()
-                .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
                 .iterator());
         Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            List<Row> inner = StreamSupport.stream(it.spliterator(), false)
+            List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
-                    .map(val -> Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
+                    .map(val -> (Tuple) Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
                     .collect(toList());
 
             return inner.iterator();
@@ -617,15 +601,15 @@ public class BatchHashJoinTest extends AOperatorTest
                 "",
                 left,
                 right,
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row) -> (Integer) row.getParent().getObject(0) > 0 && (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
+                new ExpressionValuesExtractor(asList(e("a.col1"))),
+                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
+                DefaultTupleMerger.DEFAULT,
                 false,
                 true,
                 index, null);
 
-        Iterator<Row> it = op.open(new ExecutionContext(session));
+        RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -639,27 +623,22 @@ public class BatchHashJoinTest extends AOperatorTest
                 21, 22, 23
         };
 
-        int[] expectedInnerPositions = new int[] {
+        Integer[] expectedInnerPositions = new Integer[] {
+                null, null, null,
+                null, null, null,
+                null, null, null,
+                null, null, null,
                 0, 0, 1,        // Batch 1
                 1, 2, 2,        // Batch 2      
                 3, 3, 4,        // Batch 2
-                4
+                4, null, null
         };
 
         while (it.hasNext())
         {
-            Row row = it.next();
-            assertRowJoinValues(row);
-            //                        System.out.println(row + " " + row.getChildRows(0));
-            assertEquals(expectedOuterPositions[count], row.getPos());
-            if ((int) row.getObject(0) >= 5 && (int) row.getObject(0) <= 9)
-            {
-                assertEquals(expectedInnerPositions[count - 12], row.getChildRows(0).get(0).getPos());
-            }
-            else
-            {
-                assertEquals(0, row.getChildRows(0).size());
-            }
+            Tuple tuple = it.next();
+            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals(expectedInnerPositions[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
             count++;
         }
 
@@ -674,13 +653,13 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
                 .stream()
-                .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
                 .iterator());
         Operator right = op(context ->
         {
             // Create 2 rows for each input row
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            List<Row> inner = StreamSupport.stream(it.spliterator(), false)
+            List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
@@ -695,15 +674,15 @@ public class BatchHashJoinTest extends AOperatorTest
                 "",
                 left,
                 right,
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row) -> (Integer) row.getParent().getObject(0) > 0 && (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
+                new ExpressionValuesExtractor(asList(e("a.col1"))),
+                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
+                DefaultTupleMerger.DEFAULT,
                 false,
                 false,
                 index, null);
 
-        Iterator<Row> it = op.open(new ExecutionContext(session));
+        RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -722,11 +701,9 @@ public class BatchHashJoinTest extends AOperatorTest
 
         while (it.hasNext())
         {
-            Row row = it.next();
-            assertRowJoinValues(row);
-            //                                    System.out.println(row + " " + row.getChildRows(0));
-            assertEquals(expectedOuterPositions[count], row.getPos());
-            assertEquals(expectedInnerPositions[count], row.getChildRows(0).get(0).getPos());
+            Tuple tuple = it.next();
+            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals(expectedInnerPositions[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
             count++;
         }
 
@@ -741,13 +718,13 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
                 .stream()
-                .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
                 .iterator());
         Operator right = op(context ->
         {
             // Create 2 rows for each input row
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            List<Row> inner = StreamSupport.stream(it.spliterator(), false)
+            List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
@@ -762,12 +739,10 @@ public class BatchHashJoinTest extends AOperatorTest
                 "",
                 left,
                 right,
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row) -> (Integer) row.getParent().getObject(0) > 0
-                    && (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0)
-                    && (Integer) row.getObject(1) < 3,
-                DefaultRowMerger.DEFAULT,
+                new ExpressionValuesExtractor(asList(e("a.col1"))),
+                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1 and b.col2 < 3")),
+                DefaultTupleMerger.DEFAULT,
                 false,
                 true,
                 index, null);
@@ -783,30 +758,24 @@ public class BatchHashJoinTest extends AOperatorTest
                 21, 21, 22, 23
         };
 
-        int[] expectedInnerPositions = new int[] {
+        Integer[] expectedInnerPositions = new Integer[] {
+                null, null, null,
+                null, null, null,
+                null, null, null,
+                null, null, null,
                 0, 1, 0, 1, 3, 4,
                 3, 4, 6, 7, 6, 7,
                 9, 10, 9, 10, 12, 13,
-                12, 13
+                12, 13, null, null
         };
 
-        Iterator<Row> it = op.open(new ExecutionContext(session));
+        RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {
-            Row row = it.next();
-            assertRowJoinValues(row);
-            //                                                System.out.println(row + " " + row.getChildRows(0));
-            assertEquals(expectedOuterPositions[count], row.getPos());
-            if ((int) row.getObject(0) >= 5 && (int) row.getObject(0) <= 9)
-            {
-                assertEquals(expectedInnerPositions[count - 12], row.getChildRows(0).get(0).getPos());
-            }
-            else
-            {
-                assertEquals(0, row.getChildRows(0).size());
-            }
-
+            Tuple tuple = it.next();
+            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals(expectedInnerPositions[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
             count++;
         }
 
@@ -821,12 +790,12 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
                 .stream()
-                .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
                 .iterator());
         Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            List<Row> inner = StreamSupport.stream(it.spliterator(), false)
+            List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
@@ -840,15 +809,15 @@ public class BatchHashJoinTest extends AOperatorTest
                 "",
                 left,
                 right,
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row) -> (Integer) row.getParent().getObject(0) > 0 && (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
+                new ExpressionValuesExtractor(asList(e("a.col1"))),
+                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
+                DefaultTupleMerger.DEFAULT,
                 true,
                 false,
                 index, null);
 
-        Iterator<Row> it = op.open(new ExecutionContext(session));
+        RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -863,12 +832,12 @@ public class BatchHashJoinTest extends AOperatorTest
 
         while (it.hasNext())
         {
-            Row row = it.next();
-            assertRowJoinValues(row);
-            //                                                System.out.println(row + " " + row.getChildRows(0));
-            assertEquals(expectedOuterPositions[count], row.getPos());
-            assertEquals(expectedInnerPositions[count], row.getChildRows(0).get(0).getPos());
-            assertEquals("Val" + row.getObject(0), row.getChildRows(0).get(0).getObject(1));
+            Tuple tuple = it.next();
+            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+
+            @SuppressWarnings("unchecked")
+            Collection<Tuple> col = (Collection<Tuple>) tuple.getValue(QualifiedName.of("b"), 0);
+            assertArrayEquals(new int[] {expectedInnerPositions[count]}, col.stream().mapToInt(t -> (int) t.getValue(QualifiedName.of("__pos"), 0)).toArray());
             count++;
         }
 
@@ -883,12 +852,12 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
                 .stream()
-                .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
                 .iterator());
         Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            List<Row> inner = StreamSupport.stream(it.spliterator(), false)
+            List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
                     .map(ar -> (Integer) ar[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
@@ -902,15 +871,15 @@ public class BatchHashJoinTest extends AOperatorTest
                 "",
                 left,
                 right,
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row) -> (Integer) row.getParent().getObject(0) > 0 && (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
+                new ExpressionValuesExtractor(asList(e("a.col1"))),
+                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
+                DefaultTupleMerger.DEFAULT,
                 true,
                 true,
                 index, null);
 
-        Iterator<Row> it = op.open(new ExecutionContext(session));
+        RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -921,26 +890,22 @@ public class BatchHashJoinTest extends AOperatorTest
                 12, 13
         };
 
-        int[] expectedInnerPositions = new int[] {
-                0, 1,
-                2, 3, 4
-        };
+        List<List<Integer>> expectedInnerPositions = asList(
+                null, null, null,
+                null, null, null,
+                null, asList(0), asList(1),
+                asList(2), asList(3), asList(4),
+                null, null);
 
         while (it.hasNext())
         {
-            Row row = it.next();
-            assertRowJoinValues(row);
-            //                                                            System.out.println(row + " " + row.getChildRows(0));
-            assertEquals(expectedOuterPositions[count], row.getPos());
-            if ((int) row.getObject(0) >= 5 && (int) row.getObject(0) <= 9)
-            {
-                assertEquals(expectedInnerPositions[count - 7], row.getChildRows(0).get(0).getPos());
-                assertEquals("Val" + row.getObject(0), row.getChildRows(0).get(0).getObject(1));
-            }
-            else
-            {
-                assertEquals(0, row.getChildRows(0).size());
-            }
+            Tuple tuple = it.next();
+            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+
+            @SuppressWarnings("unchecked")
+            Collection<Tuple> col = (Collection<Tuple>) tuple.getValue(QualifiedName.of("b"), 0);
+
+            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue(QualifiedName.of("__pos"), 0)).collect(toList()) : null);
             count++;
         }
 
@@ -953,7 +918,7 @@ public class BatchHashJoinTest extends AOperatorTest
         Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
+        Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
         Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
@@ -962,7 +927,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
-                    .map(ar -> Row.of(b, posRight.getAndIncrement(), ar))
+                    .map(ar -> (Tuple) Row.of(b, posRight.getAndIncrement(), ar))
                     .iterator();
         });
 
@@ -970,15 +935,15 @@ public class BatchHashJoinTest extends AOperatorTest
                 "",
                 left,
                 right,
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row) -> (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
+                new ExpressionValuesExtractor(asList(e("a.col1"))),
+                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionPredicate(e("b.col1 = a.col1")),
+                DefaultTupleMerger.DEFAULT,
                 true,
                 false,
                 index, null);
 
-        Iterator<Row> it = op.open(new ExecutionContext(session));
+        RowIterator it = op.open(new ExecutionContext(session));
 
         int[] expectedOuterPositions = new int[] {
                 7,
@@ -986,21 +951,24 @@ public class BatchHashJoinTest extends AOperatorTest
                 10, 11
         };
 
-        int[] expectedInnerPositions = new int[] {
-                0, 1,       // Batch 1
-                2, 3, 4, 5, // Batch 2
-                6, 7, 8, 9  // Batch 3
+        int[][] expectedInnerPositions = new int[][] {
+                new int[] {0, 1},
+                new int[] {2, 3},
+                new int[] {4, 5},
+                new int[] {6, 7},
+                new int[] {8, 9}
         };
 
         int count = 0;
         while (it.hasNext())
         {
-            Row row = it.next();
-            assertRowJoinValues(row);
-            //                                    System.out.println(row + " " + row.getChildRows(0));
-            assertEquals(expectedOuterPositions[count], row.getPos());
-            assertEquals(expectedInnerPositions[count * 2], row.getChildRows(0).get(0).getPos());
-            assertEquals(expectedInnerPositions[(count * 2) + 1], row.getChildRows(0).get(1).getPos());
+            Tuple tuple = it.next();
+            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+
+            @SuppressWarnings("unchecked")
+            Collection<Tuple> col = (Collection<Tuple>) tuple.getValue(QualifiedName.of("b"), 0);
+
+            assertArrayEquals("" + count, expectedInnerPositions[count], col.stream().mapToInt(t -> (int) t.getValue(QualifiedName.of("__pos"), 0)).toArray());
             count++;
         }
 
@@ -1013,7 +981,7 @@ public class BatchHashJoinTest extends AOperatorTest
         Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
+        Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
         Operator right = op(context ->
         {
             Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
@@ -1022,7 +990,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
-                    .map(ar -> Row.of(b, posRight.getAndIncrement(), ar))
+                    .map(ar -> (Tuple) Row.of(b, posRight.getAndIncrement(), ar))
                     .iterator();
         });
 
@@ -1030,15 +998,15 @@ public class BatchHashJoinTest extends AOperatorTest
                 "",
                 left,
                 right,
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row) -> (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
+                new ExpressionValuesExtractor(asList(e("a.col1"))),
+                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionPredicate(e("b.col1 = a.col1")),
+                DefaultTupleMerger.DEFAULT,
                 true,
                 true,
                 index, null);
 
-        Iterator<Row> it = op.open(new ExecutionContext(session));
+        RowIterator it = op.open(new ExecutionContext(session));
 
         int[] expectedOuterPositions = new int[] {
                 0, 1,
@@ -1050,28 +1018,30 @@ public class BatchHashJoinTest extends AOperatorTest
                 12, 13
         };
 
-        int[] expectedInnerPositions = new int[] {
-                0, 1,
-                2, 3, 4, 5,
-                6, 7, 8, 9
-        };
+        List<List<Integer>> expectedInnerPositions = asList(
+                null, null,
+                null, null,
+                null, null,
+                null,
+
+                asList(0, 1),
+                asList(2, 3),
+                asList(4, 5),
+                asList(6, 7),
+                asList(8, 9),
+
+                null, null);
 
         int count = 0;
         while (it.hasNext())
         {
-            Row row = it.next();
-            assertRowJoinValues(row);
-            //            System.out.println(row + " " + row.getChildRows(0));
-            assertEquals(expectedOuterPositions[count], row.getPos());
-            if ((int) row.getObject(0) >= 5 && (int) row.getObject(0) <= 9)
-            {
-                assertEquals(expectedInnerPositions[(count - 7) * 2], row.getChildRows(0).get(0).getPos());
-                assertEquals(expectedInnerPositions[((count - 7) * 2) + 1], row.getChildRows(0).get(1).getPos());
-            }
-            else
-            {
-                assertEquals(0, row.getChildRows(0).size());
-            }
+            Tuple tuple = it.next();
+            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+
+            @SuppressWarnings("unchecked")
+            Collection<Tuple> col = (Collection<Tuple>) tuple.getValue(QualifiedName.of("b"), 0);
+
+            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue(QualifiedName.of("__pos"), 0)).collect(toList()) : null);
             count++;
         }
 
@@ -1086,7 +1056,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
                 .stream()
-                .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
                 .iterator());
         Operator right = op(context ->
         {
@@ -1097,7 +1067,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
-                    .map(ar -> Row.of(b, posRight.getAndIncrement(), ar))
+                    .map(ar -> (Tuple) Row.of(b, posRight.getAndIncrement(), ar))
                     .iterator();
         });
 
@@ -1105,15 +1075,15 @@ public class BatchHashJoinTest extends AOperatorTest
                 "",
                 left,
                 right,
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row) -> (Integer) row.getParent().getObject(0) > 0 && (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
+                new ExpressionValuesExtractor(asList(e("a.col1"))),
+                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
+                DefaultTupleMerger.DEFAULT,
                 true,
                 false,
                 index, null);
 
-        Iterator<Row> it = op.open(new ExecutionContext(session));
+        RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -1123,21 +1093,22 @@ public class BatchHashJoinTest extends AOperatorTest
                 21,
         };
 
-        int[] expectedInnerPositions = new int[] {
-                0, 1, 0, 1, 2, 3,
-                2, 3, 4, 5, 4, 5,
-                6, 7, 6, 7, 8, 9,
-                8, 9
+        int[][] expectedInnerPositions = new int[][] {
+                new int[] {0, 1}, new int[] {0, 1}, new int[] {2, 3},
+                new int[] {2, 3}, new int[] {4, 5}, new int[] {4, 5},
+                new int[] {6, 7}, new int[] {6, 7}, new int[] {8, 9},
+                new int[] {8, 9}
         };
 
         while (it.hasNext())
         {
-            Row row = it.next();
-            assertRowJoinValues(row);
-            //                                                System.out.println(row + " " + row.getChildRows(0));
-            assertEquals(expectedOuterPositions[count], row.getPos());
-            assertEquals(expectedInnerPositions[count * 2], row.getChildRows(0).get(0).getPos());
-            assertEquals(expectedInnerPositions[(count * 2) + 1], row.getChildRows(0).get(1).getPos());
+            Tuple tuple = it.next();
+            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+
+            @SuppressWarnings("unchecked")
+            Collection<Tuple> col = (Collection<Tuple>) tuple.getValue(QualifiedName.of("b"), 0);
+
+            assertArrayEquals("" + count, expectedInnerPositions[count], col.stream().mapToInt(t -> (int) t.getValue(QualifiedName.of("__pos"), 0)).toArray());
             count++;
         }
 
@@ -1152,7 +1123,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posRight = new MutableInt();
         Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
                 .stream()
-                .map(i -> Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
                 .iterator());
         Operator right = op(context ->
         {
@@ -1163,7 +1134,7 @@ public class BatchHashJoinTest extends AOperatorTest
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
-                    .map(ar -> Row.of(b, posRight.getAndIncrement(), ar))
+                    .map(ar -> (Tuple) Row.of(b, posRight.getAndIncrement(), ar))
                     .iterator();
         });
 
@@ -1171,15 +1142,18 @@ public class BatchHashJoinTest extends AOperatorTest
                 "",
                 left,
                 right,
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row, values) -> values[0] = row.getObject(0),
-                (ctx, row) -> (Integer) row.getParent().getObject(0) > 0 && (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
+                new ExpressionValuesExtractor(asList(e("a.col1"))),
+                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
+                //                (ctx, row, values) -> values[0] = row.getObject(0),
+                //                (ctx, row, values) -> values[0] = row.getObject(0),
+                //                (ctx, row) -> (Integer) row.getParent().getObject(0) > 0 && (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
+                DefaultTupleMerger.DEFAULT,
                 true,
                 true,
                 index, null);
 
-        Iterator<Row> it = op.open(new ExecutionContext(session));
+        RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -1193,28 +1167,25 @@ public class BatchHashJoinTest extends AOperatorTest
                 21, 22, 23
         };
 
-        int[] expectedInnerPositions = new int[] {
-                0, 1, 0, 1, 2, 3,
-                2, 3, 4, 5, 4, 5,
-                6, 7, 6, 7, 8, 9,
-                8, 9
-        };
+        List<List<Integer>> expectedInnerPositions = asList(
+                null, null, null,
+                null, null, null,
+                null, null, null,
+                null, null, null,
+                asList(0, 1), asList(0, 1), asList(2, 3),
+                asList(2, 3), asList(4, 5), asList(4, 5),
+                asList(6, 7), asList(6, 7), asList(8, 9),
+                asList(8, 9), null, null);
 
         while (it.hasNext())
         {
-            Row row = it.next();
-            assertRowJoinValues(row);
-            //            System.out.println(row + " " + row.getChildRows(0));
-            assertEquals(expectedOuterPositions[count], row.getPos());
-            if ((int) row.getObject(0) >= 5 && (int) row.getObject(0) <= 9)
-            {
-                assertEquals(expectedInnerPositions[(count - 12) * 2], row.getChildRows(0).get(0).getPos());
-                assertEquals(expectedInnerPositions[((count - 12) * 2) + 1], row.getChildRows(0).get(1).getPos());
-            }
-            else
-            {
-                assertEquals(0, row.getChildRows(0).size());
-            }
+            Tuple tuple = it.next();
+            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+
+            @SuppressWarnings("unchecked")
+            Collection<Tuple> col = (Collection<Tuple>) tuple.getValue(QualifiedName.of("b"), 0);
+
+            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue(QualifiedName.of("__pos"), 0)).collect(toList()) : null);
             count++;
         }
 

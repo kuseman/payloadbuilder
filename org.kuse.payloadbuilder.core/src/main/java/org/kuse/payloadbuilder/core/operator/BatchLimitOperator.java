@@ -89,11 +89,11 @@ class BatchLimitOperator extends AOperator
         return new RowIterator()
         {
             @Override
-            public Row next()
+            public Tuple next()
             {
                 data.count.increment();
-                Row row = it.next();
-                return row;
+                Tuple tuple = it.next();
+                return tuple;
             }
 
             @Override

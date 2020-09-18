@@ -35,10 +35,38 @@ public class ManualTest extends Assert
         session.getCatalogRegistry().registerCatalog("es", new ESCatalog());
         session.setDefaultCatalog("es");
 
-        session.setCatalogProperty("es", "endpoint", "http://elasticsearch.viskanint.local");
-        session.setCatalogProperty("es", "index", "ramossportshopentestcust_c0_store");
+      session.setCatalogProperty("es", "endpoint", "http://elasticsearch3x.viskans.loc");
+//        session.setCatalogProperty("es", "endpoint", "http://elasticsearch.viskanint.local");
+//        session.setCatalogProperty("es", "index", "ramossportshopentestcust_c0_store");
 
-        String query = "print 'hello world' select * from EtmPurchaseCreate";
+        String query = "select concat('curl -X DELETE http://10.66.6.118:9200/', __index, '/', __type, '/', __id)\r\n" + 
+            "from es#search(\r\n" + 
+            "  index: 'ramossportshopenprod_c0_v3',\r\n" + 
+            "  body: '\r\n" + 
+            "  {\r\n" + 
+            "  \"size\": 100,\r\n" + 
+            "  \"filter\": {\r\n" + 
+            "    \"bool\": {\r\n" + 
+            "      \"must\": [\r\n" + 
+            "        {\r\n" + 
+            "          \"term\": {\r\n" + 
+            "            \"_docType\": \"EtmArticle\"\r\n" + 
+            "          }\r\n" + 
+            "        }\r\n" + 
+            "      ],\r\n" + 
+            "      \"must_not\": [\r\n" + 
+            "        {\r\n" + 
+            "          \"term\": {\r\n" + 
+            "            \"_subType\": \"search\"\r\n" + 
+            "          }\r\n" + 
+            "        }\r\n" + 
+            "      ]\r\n" + 
+            "    }\r\n" + 
+            "  }\r\n" + 
+            "}\r\n" + 
+            "  '\r\n" + 
+            "\r\n" + 
+            ")";
 
         QueryResult queryResult = Payloadbuilder.query(session, query);
         JsonStringWriter writer = new JsonStringWriter();

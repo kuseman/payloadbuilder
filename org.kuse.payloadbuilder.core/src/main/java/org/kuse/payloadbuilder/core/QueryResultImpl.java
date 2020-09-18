@@ -41,6 +41,8 @@ import org.kuse.payloadbuilder.core.operator.OperatorBuilder;
 import org.kuse.payloadbuilder.core.operator.Projection;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
+import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
+import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.DescribeSelectStatement;
 import org.kuse.payloadbuilder.core.parser.DescribeTableStatement;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
@@ -62,10 +64,12 @@ import org.kuse.payloadbuilder.core.parser.UseStatement;
  */
 class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
 {
-    private static final Row DUMMY_ROW = Row.of(TableAlias.of(null, QualifiedName.of("dummy"), "d"), 0, EMPTY_OBJECT_ARRAY);
-    private static final TableAlias SHOW_VARIABLES_ALIAS = TableAlias.of(null, QualifiedName.of("variables"), "v", new String[] {"Name", "Value"});
-    private static final TableAlias SHOW_TABLES_ALIAS = TableAlias.of(null, QualifiedName.of("tables"), "t", new String[] {"Name"});
-    private static final TableAlias SHOW_FUNCTIONS_ALIAS = TableAlias.of(null, QualifiedName.of("functions"), "f", new String[] {"Name", "Type", "Description"});
+    private static final Row DUMMY_ROW = Row.of(TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("dummy"), "d").build(), 0, EMPTY_OBJECT_ARRAY);
+    private static final TableAlias SHOW_VARIABLES_ALIAS = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("variables"), "v").columns(new String[] {"Name", "Value"}).build();
+    private static final TableAlias SHOW_TABLES_ALIAS = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tables"), "t").columns(new String[] {"Name"}).build();
+    private static final TableAlias SHOW_FUNCTIONS_ALIAS = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("functions"), "f")
+            .columns(new String[] {"Name", "Type", "Description"})
+            .build();
 
     private final QuerySession session;
     private ExecutionContext context;
@@ -170,7 +174,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                     return RowIterator.wrap(variables
                             .entrySet()
                             .stream()
-                            .map(e -> Row.of(SHOW_VARIABLES_ALIAS, pos.incrementAndGet(), new Object[] {e.getKey(), e.getValue()}))
+                            .map(e -> (Tuple) Row.of(SHOW_VARIABLES_ALIAS, pos.incrementAndGet(), new Object[] {e.getKey(), e.getValue()}))
                             .iterator());
                 }
 
@@ -203,7 +207,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                 {
                     return RowIterator.wrap(tables
                             .stream()
-                            .map(table -> Row.of(SHOW_TABLES_ALIAS, pos.incrementAndGet(), new Object[] {table}))
+                            .map(table -> (Tuple) Row.of(SHOW_TABLES_ALIAS, pos.incrementAndGet(), new Object[] {table}))
                             .iterator());
                 }
 
@@ -235,7 +239,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                             functions
                                     .stream()
                                     .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName()))
-                                    .map(function -> Row.of(SHOW_TABLES_ALIAS, pos.incrementAndGet(), new Object[] {function.getName(), function.getType(), function.getDescription()})),
+                                    .map(function -> (Tuple) Row.of(SHOW_FUNCTIONS_ALIAS, pos.incrementAndGet(), new Object[] {function.getName(), function.getType(), function.getDescription()})),
                             Stream.concat(
                                     functions.size() > 0
                                         ? Stream.of(Row.of(SHOW_FUNCTIONS_ALIAS, pos.incrementAndGet(), new Object[] {"-- Built in --", "", ""}))
@@ -243,7 +247,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                                     builtIn.getFunctions()
                                             .stream()
                                             .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName()))
-                                            .map(function -> Row.of(SHOW_TABLES_ALIAS, pos.incrementAndGet(), new Object[] {function.getName(), function.getType(), function.getDescription()}))))
+                                            .map(function -> Row.of(SHOW_FUNCTIONS_ALIAS, pos.incrementAndGet(), new Object[] {function.getName(), function.getType(), function.getDescription()}))))
                             .iterator());
                 }
 
@@ -326,8 +330,8 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                     break;
                 }
                 writer.startRow();
-                Row row = iterator.next();
-                context.setRow(row);
+                Tuple tuple = iterator.next();
+                context.setTuple(tuple);
                 projection.writeValue(writer, context);
                 writer.endRow();
             }
@@ -336,7 +340,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         else
         {
             writer.startRow();
-            context.setRow(DUMMY_ROW);
+            context.setTuple(DUMMY_ROW);
             projection.writeValue(writer, context);
             writer.endRow();
         }

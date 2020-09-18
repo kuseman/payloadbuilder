@@ -86,17 +86,17 @@ public interface Operator
         return toString();
     }
 
-    /** Definition of a iterator that stream {@link Row}'s */
-    public interface RowIterator extends Iterator<Row>
+    /** Definition of a iterator that stream {@link Tuple}'s */
+    public interface RowIterator extends Iterator<Tuple>
     {
         public static RowIterator EMPTY = wrap(emptyIterator());
 
-        public static RowIterator wrap(Iterator<Row> iterator)
+        public static RowIterator wrap(Iterator<Tuple> iterator)
         {
             return new RowIterator()
             {
                 @Override
-                public Row next()
+                public Tuple next()
                 {
                     return iterator.next();
                 }

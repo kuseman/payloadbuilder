@@ -34,9 +34,9 @@ import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 class SortByOperator extends AOperator
 {
     private final Operator target;
-    private final RowComparator comparator;
+    private final TupleComparator comparator;
 
-    SortByOperator(int nodeId, Operator target, RowComparator comparator)
+    SortByOperator(int nodeId, Operator target, TupleComparator comparator)
     {
         super(nodeId);
         this.target = requireNonNull(target, "target");
@@ -65,15 +65,15 @@ class SortByOperator extends AOperator
     @Override
     public RowIterator open(ExecutionContext context)
     {
-        List<Row> rows = new ArrayList<>();
+        List<Tuple> tuples = new ArrayList<>();
         RowIterator it = target.open(context);
         while (it.hasNext())
         {
-            rows.add(it.next());
+            tuples.add(it.next());
         }
         it.close();
-        Collections.sort(rows, (rowA, rowB) -> comparator.compare(context, rowA, rowB));
-        return RowIterator.wrap(rows.iterator());
+        Collections.sort(tuples, (a, b) -> comparator.compare(context, a, b));
+        return RowIterator.wrap(tuples.iterator());
     }
 
     @Override

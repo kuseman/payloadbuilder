@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -33,6 +34,7 @@ import org.kuse.payloadbuilder.core.utils.IteratorUtils;
 /** Operator that operates over an expression (that returns rows) */
 class ExpressionOperator extends AOperator
 {
+    private final TableAlias MAP_ALIAS = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of(""), "").asteriskColumns().build();
     private final Expression expression;
 
     ExpressionOperator(int nodeId, Expression expression)
@@ -55,8 +57,8 @@ class ExpressionOperator extends AOperator
         Iterator<Object> iterator = IteratorUtils.getIterator(result);
         return new RowIterator()
         {
-            private TableAlias alias;
             private Set<String> columns;
+            private String[] rowColumns;
             private int pos;
 
             @Override
@@ -84,26 +86,24 @@ class ExpressionOperator extends AOperator
                 else if (input instanceof Map)
                 {
                     Map<String, Object> map = (Map<String, Object>) input;
-                    if (alias == null)
+                    if (columns == null)
                     {
                         columns = new LinkedHashSet<>(map.keySet());
-                        alias = TableAlias.of(null, QualifiedName.of(""), "");
-                        alias.setAsteriskColumns();
-                        alias.setColumns(columns.toArray(ArrayUtils.EMPTY_STRING_ARRAY));
+                        rowColumns = columns.toArray(ArrayUtils.EMPTY_STRING_ARRAY);
                     }
                     else if (columns.addAll(map.keySet()))
                     {
-                        alias.setColumns(columns.toArray(ArrayUtils.EMPTY_STRING_ARRAY));
+                        rowColumns = columns.toArray(ArrayUtils.EMPTY_STRING_ARRAY);
                     }
 
-                    Object[] values = new Object[columns.size()];
-                    int index = 0;
-                    for (String column : columns)
+                    int length = rowColumns.length;
+                    Object[] values = new Object[length];
+                    for (int i = 0; i < length; i++)
                     {
-                        values[index++] = map.get(column);
+                        values[i] = map.get(rowColumns[i]);
                     }
 
-                    return Row.of(alias, pos++, values);
+                    return Row.of(MAP_ALIAS, pos++, rowColumns, values);
                 }
 
                 throw new IllegalArgumentException("Cannot iterate over " + input);

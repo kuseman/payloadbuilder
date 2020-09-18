@@ -23,19 +23,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.Test;
+import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.SortItem;
 import org.kuse.payloadbuilder.core.parser.SortItem.NullOrder;
 import org.kuse.payloadbuilder.core.parser.SortItem.Order;
 
-/** Test of {@link ExpressionRowComparator} */
-public class ExpressionRowComparatorTest extends AOperatorTest
+/** Test of {@link ExpressionTupleComparator} */
+public class ExpressionTupleComparatorTest extends AOperatorTest
 {
     @Test
     public void test()
     {
-        TableAlias alias = TableAlias.of(null, QualifiedName.of("table"), "a", new String[] {"col1"});
+        TableAlias alias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("table"), "a").columns(new String[] {"col1"}).build();
         Row a, b;
 
         a = Row.of(alias, 0, new Object[] {1});
@@ -45,7 +46,7 @@ public class ExpressionRowComparatorTest extends AOperatorTest
                 new SortItem(e("col1"), Order.ASC, NullOrder.UNDEFINED)));
 
         ExecutionContext context = new ExecutionContext(session);
-        ExpressionRowComparator comparator = new ExpressionRowComparator(items);
+        ExpressionTupleComparator comparator = new ExpressionTupleComparator(items);
         assertEquals(-1, comparator.compare(context, a, b));
 
         items.clear();

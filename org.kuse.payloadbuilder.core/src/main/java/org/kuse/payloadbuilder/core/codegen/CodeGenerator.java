@@ -75,13 +75,13 @@ public class CodeGenerator
     private <T> T compile(Set<String> imports, String code, Class<T> baseClass, String name)
     {
         ClassBodyEvaluator cbe = new ClassBodyEvaluator();
-        cbe.setClassName("com.viskan.payloaduilder.codegen.Generated" + name);
+        cbe.setClassName("org.kuse.payloaduilder.codegen.Generated" + name);
         cbe.setExtendedClass(baseClass);
 
         List<String> usedImports = new ArrayList<>();
         usedImports.addAll(asList(
-                "com.viskan.payloadbuilder.operator.Row",
-                "com.viskan.payloadbuilder.parser.ExpressionMath"));
+                "org.kuse.payloadbuilder.operator.Row",
+                "org.kuse.payloadbuilder.parser.ExpressionMath"));
         usedImports.addAll(imports);
 
         cbe.setDefaultImports(usedImports.toArray(ArrayUtils.EMPTY_STRING_ARRAY));

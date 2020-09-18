@@ -29,6 +29,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.LambdaFunction;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
+import org.kuse.payloadbuilder.core.operator.TableAlias.Type;
 import org.kuse.payloadbuilder.core.parser.AExpressionVisitor;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.LambdaExpression;
@@ -160,6 +161,12 @@ class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsVisitor.
             {
                 output.add(tempAlias);
                 continue;
+            }
+
+            // Push sub query columns into first child
+            if (tempAlias.getType() == Type.SUBQUERY && tempAlias.getChildAliases().size() > 0)
+            {
+                tempAlias = tempAlias.getChildAliases().get(0);
             }
 
             Set<String> columns = context.columnsByAlias.computeIfAbsent(tempAlias, key -> new THashSet<>());

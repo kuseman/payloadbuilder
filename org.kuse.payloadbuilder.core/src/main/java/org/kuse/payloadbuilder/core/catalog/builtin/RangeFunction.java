@@ -27,6 +27,7 @@ import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
+import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
@@ -62,6 +63,6 @@ class RangeFunction extends TableFunctionInfo
             from = ((Number) requireNonNull(arguments.get(0).eval(context), "From argument to range cannot be null.")).intValue();
             to = ((Number) requireNonNull(arguments.get(1).eval(context), "To argument to range cannot be null.")).intValue();
         }
-        return RowIterator.wrap(IntStream.range(from, to).mapToObj(i -> Row.of(tableAlias, i, new Object[] {i})).iterator());
+        return RowIterator.wrap(IntStream.range(from, to).mapToObj(i -> (Tuple) Row.of(tableAlias, i, new Object[] {i})).iterator());
     }
 }

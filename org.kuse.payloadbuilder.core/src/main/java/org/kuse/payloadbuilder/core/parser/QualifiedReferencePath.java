@@ -58,13 +58,13 @@ class QualifiedReferencePath
         //        TableAlias current = tableAlias;
         //        int partIndex = 0;
         //        Row resultRow = row;
-        //        
+        //
         //        List<String> parts = qname.getParts();
         //        int parentSteps = 0;
         //        int childAliasIndex = -1;
 
         // aa.obj
-        // 
+        //
 
         /*
          * 1: (val)
@@ -109,10 +109,10 @@ class QualifiedReferencePath
         //            {
         //                break;
         //            }
-        //            
+        //
         //            // TODO: access parent collection
-        //            
-        //            
+        //
+        //
         //            // 3. Parent alias match upwards
         ////            resultRow = resultRow.getParent();
         //            current = current.getParent();// resultRow != null ? resultRow.getTableAlias() : null;

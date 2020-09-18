@@ -17,6 +17,7 @@
  */
 package org.kuse.payloadbuilder.core.operator;
 
+import static java.util.Arrays.asList;
 import static java.util.Collections.emptyMap;
 import static org.kuse.payloadbuilder.core.utils.CollectionUtils.asSet;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
@@ -30,6 +31,7 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
+import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QueryParser;
@@ -43,12 +45,26 @@ public class ColumnsVisitorTest extends Assert
     @Test
     public void test()
     {
-        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s");
-        TableAlias article = TableAlias.of(source, QualifiedName.of("article"), "a");
-        TableAlias articleAttribute = TableAlias.of(source, QualifiedName.of("articleAttribute"), "aa");
-        TableAlias articlePrice = TableAlias.of(articleAttribute, QualifiedName.of("ariclePrice"), "ap");
-        TableAlias.of(articleAttribute, QualifiedName.of("aricleBalance"), "ab");
-        TableAlias articleBrand = TableAlias.of(source, QualifiedName.of("aricleBrand"), "aBrand");
+        TableAlias root = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
+                .children(asList(
+                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("source"), "s"),
+                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("article"), "a"),
+                        TableAliasBuilder.of(TableAlias.Type.SUBQUERY, QualifiedName.of("SubQuery"), "aa")
+                                .children(asList(
+                                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("articleAttribute"), "aa"),
+                                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("articlePrice"), "ap"),
+                                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("articleBalance"), "ab")
+
+                                )),
+                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("aricleBrand"), "aBrand")))
+                .build();
+
+        TableAlias source = root.getChildAliases().get(0);
+        TableAlias article = root.getChildAliases().get(1);
+        TableAlias subArticleAttribute = root.getChildAliases().get(2);
+        TableAlias articleAttribute = subArticleAttribute.getChildAliases().get(0);
+        TableAlias articlePrice = subArticleAttribute.getChildAliases().get(1);
+        TableAlias articleBrand = root.getChildAliases().get(3);
 
         Set<TableAlias> actual;
         Expression e;
@@ -68,7 +84,7 @@ public class ColumnsVisitorTest extends Assert
         columnsByAlias.clear();
         e = e("aa");
         actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
-        assertEquals(asSet(articleAttribute), actual);
+        assertEquals(asSet(subArticleAttribute), actual);
         assertEquals(emptyMap(), columnsByAlias);
 
         columnsByAlias.clear();
@@ -98,7 +114,7 @@ public class ColumnsVisitorTest extends Assert
         columnsByAlias.clear();
         e = e("concat(aa, aa.ap)");
         actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
-        assertEquals(asSet(articleAttribute, articlePrice), actual);
+        assertEquals(asSet(subArticleAttribute, articlePrice), actual);
         assertEquals(emptyMap(), columnsByAlias);
 
         // Traverse down and then up to root again
@@ -181,13 +197,13 @@ public class ColumnsVisitorTest extends Assert
         columnsByAlias.clear();
         e = e("aa.filter(aa -> aa.sku_id > 0)");
         actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
-        assertEquals(asSet(articleAttribute), actual);
+        assertEquals(asSet(subArticleAttribute), actual);
         assertEquals(ofEntries(entry(articleAttribute, asSet("sku_id"))), columnsByAlias);
 
         columnsByAlias.clear();
         e = e("filter(aa.filter(aa -> aa.sku_id > 0), aa -> aa.attr1_id > 0)");
         actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
-        assertEquals(asSet(articleAttribute), actual);
+        assertEquals(asSet(subArticleAttribute), actual);
         assertEquals(ofEntries(entry(articleAttribute, asSet("sku_id", "attr1_id"))), columnsByAlias);
 
         columnsByAlias.clear();

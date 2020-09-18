@@ -23,6 +23,6 @@ import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 /** Definition of a projection */
 public interface Projection
 {
-    /** Return value for provided row */
+    /** Write value for provided writer and current execution context */
     void writeValue(OutputWriter writer, ExecutionContext context);
 }

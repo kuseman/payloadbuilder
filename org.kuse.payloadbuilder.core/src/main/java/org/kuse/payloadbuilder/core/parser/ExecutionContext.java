@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.operator.OperatorContext;
-import org.kuse.payloadbuilder.core.operator.Row;
+import org.kuse.payloadbuilder.core.operator.Tuple;
 
 /** Context used during execution of a query */
 public class ExecutionContext
@@ -51,15 +51,15 @@ public class ExecutionContext
      * <pre>
       * Arbitrary cache that can be utilized per statement.
       * Is cleared between statements.
-      * 
+      *
       * Ie. caching of {@link QualifiedReferenceExpression} lookup path
       * which is performed alot of times during a select
      * </pre>
      */
     //    private Map<String, Object> statementCache;
 
-    /** Reference to row. Used in projections, correlated sub queries */
-    private Row row;
+    /** Reference to tuple. Used in projections, correlated sub queries */
+    private Tuple tuple;
 
     public ExecutionContext(QuerySession session)
     {
@@ -68,16 +68,16 @@ public class ExecutionContext
         this.variables = session.getVariables() != null ? new HashMap<>(session.getVariables()) : null;
     }
 
-    /** Get current row */
-    public Row getRow()
+    /** Get current tuple */
+    public Tuple getTuple()
     {
-        return row;
+        return tuple;
     }
 
-    /** Set current row */
-    public void setRow(Row row)
+    /** Set current tuple */
+    public void setTuple(Tuple tuple)
     {
-        this.row = row;
+        this.tuple = tuple;
     }
 
     /** Return session */
@@ -155,7 +155,7 @@ public class ExecutionContext
     //        {
     //            return null;
     //        }
-    //        
+    //
     //        return (T) statementCache.get(key);
     //    }
 
@@ -166,12 +166,12 @@ public class ExecutionContext
     //        {
     //            statementCache = new THashMap<>();
     //        }
-    //        
+    //
     //        statementCache.put(key, value);
     //    }
-    //    
+    //
     //    /** Clear statement cache */
-    //    public void clearStatementCache() 
+    //    public void clearStatementCache()
     //    {
     //        if (statementCache == null)
     //        {

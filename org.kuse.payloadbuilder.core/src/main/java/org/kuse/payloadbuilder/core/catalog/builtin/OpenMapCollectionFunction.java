@@ -38,7 +38,7 @@ import org.kuse.payloadbuilder.core.parser.Expression;
  * Table value function that extracts row from a collection of maps in target expression
  *
  * <pre>
- *  
+ *
  * Example
  *
  * SELECT field

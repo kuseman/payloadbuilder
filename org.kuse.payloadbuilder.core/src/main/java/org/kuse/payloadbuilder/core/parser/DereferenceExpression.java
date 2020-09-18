@@ -21,8 +21,7 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.Map;
 
-import org.kuse.payloadbuilder.core.operator.Row;
-import org.kuse.payloadbuilder.core.operator.Row.ChildRows;
+import org.kuse.payloadbuilder.core.operator.Tuple;
 
 public class DereferenceExpression extends Expression
 {
@@ -55,9 +54,9 @@ public class DereferenceExpression extends Expression
             return null;
         }
 
-        if (leftResult instanceof Row)
+        if (leftResult instanceof Tuple)
         {
-            context.setRow((Row) leftResult);
+            context.setTuple((Tuple) leftResult);
             return right.eval(context);
         }
         else if (leftResult instanceof Map)
@@ -66,12 +65,6 @@ public class DereferenceExpression extends Expression
             Map<Object, Object> map = (Map<Object, Object>) leftResult;
             // A dereference only has one part so pick first and use as key
             return map.get(right.getQname().getFirst());
-        }
-        // Child rows de-reference, extract first row
-        else if (leftResult instanceof ChildRows && ((ChildRows) leftResult).size() > 0)
-        {
-            context.setRow(((ChildRows) leftResult).get(0));
-            return right.eval(context);
         }
 
         throw new IllegalArgumentException("Cannot dereference " + leftResult.getClass().getSimpleName() + " value: " + leftResult);

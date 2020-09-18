@@ -26,6 +26,7 @@ import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
+import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 
 /** Test {@link DereferenceExpression} */
 public class DereferenceExpressionTest extends AParserTest
@@ -35,14 +36,14 @@ public class DereferenceExpressionTest extends AParserTest
     {
         ExecutionContext ctx = new ExecutionContext(new QuerySession(new CatalogRegistry()));
 
-        TableAlias t = TableAlias.of(null, QualifiedName.of("table"), "t", new String[] {"a"});
+        TableAlias t = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("table"), "t").columns(new String[] {"a"}).build();
         Row row = Row.of(t, 0, new Object[] {asList(
                 ofEntries(entry("id", -1), entry("c", -10)),
                 ofEntries(entry("id", 0), entry("c", 0)),
                 ofEntries(entry("id", 1), entry("c", 10), entry("d", ofEntries(entry("key", "value")))),
                 ofEntries(entry("id", 2), entry("c", 20)))
         });
-        ctx.setRow(row);
+        ctx.setTuple(row);
 
         Expression e;
 
@@ -67,19 +68,24 @@ public class DereferenceExpressionTest extends AParserTest
     }
 
     @Test
-    public void test_dereference_row()
+    public void test_dereference_tuple()
     {
         ExecutionContext ctx = new ExecutionContext(new QuerySession(new CatalogRegistry()));
 
-        TableAlias t = TableAlias.of(null, QualifiedName.of("table"), "t", new String[] {"a"});
-        TableAlias child = TableAlias.of(t, QualifiedName.of("child"), "c", new String[] {"elite"});
+        TableAlias t = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("table"), "t")
+                .columns(new String[] {"a"})
+                .children(asList(
+                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("child"), "c")
+                                .columns(new String[] {"elite"})))
+                .build();
 
-        Row row = Row.of(t, 0, new Object[] {10});
-        row.getChildRows(0).add(Row.of(child, 0, new Object[] {1337}));
+        TableAlias child = t.getChildAliases().get(0);
 
-        ctx.setRow(row);
+        Row row = Row.of(t, 0, new Object[] {Row.of(child, 0, new Object[] {1337})});
 
-        Expression e = e("c.filter(x -> true)[0].elite");
+        ctx.setTuple(row);
+
+        Expression e = e("a.map(x -> x)[0].elite");
         assertEquals(1337, e.eval(ctx));
     }
 

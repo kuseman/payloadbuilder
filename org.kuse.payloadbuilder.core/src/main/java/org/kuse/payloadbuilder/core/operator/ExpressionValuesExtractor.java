@@ -40,10 +40,10 @@ class ExpressionValuesExtractor implements ValuesExtractor
     StopWatch sw = new StopWatch();
 
     @Override
-    public void extract(ExecutionContext context, Row row, Object[] values)
+    public void extract(ExecutionContext context, Tuple tuple, Object[] values)
     {
         sw.start();
-        context.setRow(row);
+        context.setTuple(tuple);
         for (int i = 0; i < size; i++)
         {
             values[i] = expressions.get(i).eval(context);

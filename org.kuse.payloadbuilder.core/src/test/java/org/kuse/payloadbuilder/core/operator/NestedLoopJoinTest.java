@@ -17,11 +17,11 @@
  */
 package org.kuse.payloadbuilder.core.operator;
 
+import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 
-import java.util.Iterator;
+import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.IntStream;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
@@ -29,6 +29,7 @@ import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -36,16 +37,24 @@ import org.kuse.payloadbuilder.core.parser.QualifiedName;
 /** Test {@link NestedLoopJoin} */
 public class NestedLoopJoinTest extends AOperatorTest
 {
-    private final TableAlias a = TableAlias.of(null, QualifiedName.of("table"), "a");
-    private final TableAlias b = TableAlias.of(a, QualifiedName.of("tableB"), "b");
+    private final TableAlias a = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableA"), "a")
+            .columns(new String[] {"col1", "col2"})
+            .children(asList(
+                    TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableB"), "b")
+                            .columns(new String[] {"col1", "col2"})
+                            .children(asList(
+                                    TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableC"), "c")
+                                            .columns(new String[] {"col1", "col2"})))))
+
+            .build();
+    private final TableAlias b = a.getChildAliases().get(0);
+    private final TableAlias c = b.getChildAliases().get(0);
 
     @Test
     public void test_correlated()
     {
         // Test that a correlated query with a nestedloop
         // uses the context row into consideration when joining
-
-        TableAlias c = TableAlias.of(b, QualifiedName.of("tableC"), "c");
 
         /**
          * <pre>
@@ -61,9 +70,9 @@ public class NestedLoopJoinTest extends AOperatorTest
          * </pre>
          */
 
-        Operator opA = op(ctx -> IntStream.of(1, 2, 3, 4, 5).mapToObj(i -> Row.of(a, i, new Object[] {i, "val" + i})).iterator());
-        Operator opB = op(ctx -> IntStream.of(4, 5, 6, 7).mapToObj(i -> Row.of(b, i, new Object[] {i})).iterator());
-        Operator opC = op(ctx -> IntStream.of(1, 2, 3, 4, 5, 6, 7).mapToObj(i -> Row.of(c, i, new Object[] {i, "val" + i})).iterator());
+        Operator opA = op(ctx -> IntStream.of(1, 2, 3, 4, 5).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i, "val" + i})).iterator());
+        Operator opB = op(ctx -> IntStream.of(4, 5, 6, 7).mapToObj(i -> (Tuple) Row.of(b, 10 * i, new Object[] {i})).iterator());
+        Operator opC = op(ctx -> IntStream.of(1, 2, 3, 4, 5, 6, 7).mapToObj(i -> (Tuple) Row.of(c, 100 * i, new Object[] {i, "val" + i})).iterator());
 
         Operator op = new NestedLoopJoin(
                 0,
@@ -74,30 +83,31 @@ public class NestedLoopJoinTest extends AOperatorTest
                         "",
                         opB,
                         opC,
-                        (ctx, row) -> Objects.equals(row.getObject(1), row.getParent().getParent().getObject(1))
-                            || (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                        DefaultRowMerger.DEFAULT,
-                        true,
+                        new ExpressionPredicate(e("col2 = a.col2 or c.col1 = b.col1")),
+                        DefaultTupleMerger.DEFAULT,
+                        false,
                         false),
-                (ctx, row) -> (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultRowMerger.DEFAULT,
-                true,
+                new ExpressionPredicate(e("b.col1 = a.col1")),
+                DefaultTupleMerger.DEFAULT,
+                false,
                 false);
 
         int[] tableAPos = new int[] {4, 5};
-        int[] tableBPos = new int[] {4, 5};
-        int[] tableCPos = new int[] {4, 5};
+        int[] tableBPos = new int[] {40, 50};
+        int[] tableCPos = new int[] {400, 500};
 
         int count = 0;
-        Iterator<Row> it = op.open(new ExecutionContext(session));
+        RowIterator it = op.open(new ExecutionContext(session));
         while (it.hasNext())
         {
-            Row row = it.next();
-            assertEquals(row.getPos(), tableAPos[count]);
-            assertEquals(row.getChildRows(0).get(0).getPos(), tableBPos[count]);
-            assertEquals(row.getChildRows(0).get(0).getChildRows(0).get(0).getPos(), tableCPos[count]);
+            Tuple tuple = it.next();
+            assertEquals(tableAPos[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals(tableBPos[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
+            assertEquals(tableCPos[count], tuple.getValue(QualifiedName.of("c", "__pos"), 0));
             count++;
         }
+
+        assertEquals(2, count);
     }
 
     @Test
@@ -105,7 +115,7 @@ public class NestedLoopJoinTest extends AOperatorTest
     {
         MutableBoolean leftClose = new MutableBoolean();
         MutableBoolean rightClose = new MutableBoolean();
-        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator(), () -> leftClose.setTrue());
+        Operator left = op(context -> IntStream.range(1, 5).mapToObj(i -> (Tuple) Row.of(a, i - 1, new Object[] {i})).iterator(), () -> leftClose.setTrue());
         Operator right = op(ctx -> new TableFunctionOperator(0, "", b, new Range(2), emptyList()).open(ctx), () -> rightClose.setTrue());
         NestedLoopJoin op = new NestedLoopJoin(
                 0,
@@ -113,21 +123,26 @@ public class NestedLoopJoinTest extends AOperatorTest
                 left,
                 right,
                 null,   // Null predicate => cross
-                DefaultRowMerger.DEFAULT,
+                DefaultTupleMerger.DEFAULT,
                 false,
                 false);
 
         RowIterator it = op.open(new ExecutionContext(session));
+
+        int[] tableAPos = new int[] {0, 0, 1, 1, 2, 2, 3, 3};
+        int[] tableBPos = new int[] {0, 1, 0, 1, 0, 1, 0, 1};
+
         int count = 0;
         while (it.hasNext())
         {
-            Row row = it.next();
-            assertEquals((count % 2) + 1, row.getChildRows(0).get(0).getObject(0));
+            Tuple tuple = it.next();
+            assertEquals(tableAPos[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals(tableBPos[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
             count++;
         }
         it.close();
         assertFalse(it.hasNext());
-        assertEquals(18, count);
+        assertEquals(8, count);
         assertTrue(leftClose.booleanValue());
         assertTrue(rightClose.booleanValue());
     }
@@ -135,7 +150,7 @@ public class NestedLoopJoinTest extends AOperatorTest
     @Test
     public void test_cross_join_populate()
     {
-        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator());
+        Operator left = op(context -> IntStream.range(1, 5).mapToObj(i -> (Tuple) Row.of(a, i - 1, new Object[] {i})).iterator());
 
         NestedLoopJoin op = new NestedLoopJoin(
                 0,
@@ -143,27 +158,30 @@ public class NestedLoopJoinTest extends AOperatorTest
                 left,
                 new TableFunctionOperator(0, "", b, new Range(2), emptyList()),
                 null,   // Null predicate => cross
-                DefaultRowMerger.DEFAULT,
+                DefaultTupleMerger.DEFAULT,
                 true,
                 false);
 
-        Iterator<Row> it = op.open(new ExecutionContext(session));
+        RowIterator it = op.open(new ExecutionContext(session));
+
         int count = 0;
         while (it.hasNext())
         {
-            Row row = it.next();
-            assertEquals(1, row.getChildRows(0).get(0).getObject(0));
-            assertEquals(2, row.getChildRows(0).get(1).getObject(0));
+            Tuple tuple = it.next();
+            assertEquals(count, tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            @SuppressWarnings("unchecked")
+            Collection<Tuple> col = (Collection<Tuple>) tuple.getValue(QualifiedName.of("b"), 0);
+            assertArrayEquals(new int[] {0, 1}, col.stream().mapToInt(t -> (int) t.getValue(QualifiedName.of("__pos"), 0)).toArray());
             count++;
         }
 
-        assertEquals(9, count);
+        assertEquals(4, count);
     }
 
     @Test
     public void test_outer_join()
     {
-        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator());
+        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i - 1, new Object[] {i})).iterator());
 
         NestedLoopJoin op = new NestedLoopJoin(
                 0,
@@ -171,17 +189,19 @@ public class NestedLoopJoinTest extends AOperatorTest
                 left,
                 new TableFunctionOperator(0, "", b, new Range(0), emptyList()),
                 null,   // Null predicate => cross
-                DefaultRowMerger.DEFAULT,
+                DefaultTupleMerger.DEFAULT,
                 false,
                 true);
 
-        Iterator<Row> it = op.open(new ExecutionContext(session));
+        RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {
-            Row row = it.next();
-            // Outer apply, child rows should be empty
-            assertEquals(emptyList(), row.getChildRows(0));
+            Tuple tuple = it.next();
+
+            assertEquals(count, tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            // Outer apply, no b rows should be present
+            assertNull(tuple.getValue(QualifiedName.of("b", "__pos"), 0));
             count++;
         }
 
@@ -191,7 +211,7 @@ public class NestedLoopJoinTest extends AOperatorTest
     @Test
     public void test_outer_join_with_predicate_no_populate()
     {
-        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator());
+        Operator left = op(context -> IntStream.range(1, 5).mapToObj(i -> (Tuple) Row.of(a, i - 1, new Object[] {i})).iterator());
 
         NestedLoopJoin op = new NestedLoopJoin(
                 0,
@@ -199,41 +219,33 @@ public class NestedLoopJoinTest extends AOperatorTest
                 left,
                 new TableFunctionOperator(0, "", b, new Range(2), emptyList()),
                 // Even parent rows are joined
-                (ctx, row) -> row.getParent().getPos() % 2 == 0,
-                DefaultRowMerger.DEFAULT,
+                (ctx, tuple) -> (int) tuple.getValue(QualifiedName.of("a", "__pos"), 0) % 2 == 0,
+                DefaultTupleMerger.DEFAULT,
                 false,
                 true);
 
-        Iterator<Row> it = op.open(new ExecutionContext(session));
+        RowIterator it = op.open(new ExecutionContext(session));
+
+        Integer[] tableAPos = new Integer[] {0, 0, 1, 2, 2, 3};
+        Integer[] tableBPos = new Integer[] {0, 1, null, 0, 1, null};
+
         int count = 0;
-        int subCount = 1;
         while (it.hasNext())
         {
-            Row row = it.next();
-            if (row.getPos() % 2 == 0)
-            {
-                assertEquals(subCount++, row.getChildRows(0).get(0).getObject(0));
-                if (subCount >= 3)
-                {
-                    subCount = 1;
-                }
-            }
-            else
-            {
-                assertEquals(emptyList(), row.getChildRows(0));
-            }
-
+            Tuple tuple = it.next();
+            assertEquals(tableAPos[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals(tableBPos[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
             count++;
         }
 
-        // 9 joined rows and 5 non joined
-        assertEquals(14, count);
+        // 4 joined rows and 2 non joined
+        assertEquals(6, count);
     }
 
     @Test
     public void test_outer_join_with_predicate_populate()
     {
-        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> Row.of(a, i - 1, new Object[] {i})).iterator());
+        Operator left = op(context -> IntStream.range(1, 5).mapToObj(i -> (Tuple) Row.of(a, i - 1, new Object[] {i})).iterator());
 
         NestedLoopJoin op = new NestedLoopJoin(
                 0,
@@ -241,30 +253,33 @@ public class NestedLoopJoinTest extends AOperatorTest
                 left,
                 new TableFunctionOperator(0, "", b, new Range(2), emptyList()),
                 // Even parent rows are joined
-                (ctx, row) -> row.getParent().getPos() % 2 == 0,
-                DefaultRowMerger.DEFAULT,
+                (ctx, tuple) -> (int) tuple.getValue(QualifiedName.of("a", "__pos"), 0) % 2 == 0,
+                DefaultTupleMerger.DEFAULT,
                 true,
                 true);
 
-        Iterator<Row> it = op.open(new ExecutionContext(session));
+        RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {
-            Row row = it.next();
-            if (row.getPos() % 2 == 0)
+            Tuple tuple = it.next();
+            int pos = (int) tuple.getValue(QualifiedName.of("a", "__pos"), 0);
+            assertEquals(count, pos);
+            @SuppressWarnings("unchecked")
+            Collection<Tuple> col = (Collection<Tuple>) tuple.getValue(QualifiedName.of("b"), 0);
+            if (pos % 2 == 0)
             {
-                assertEquals(1, row.getChildRows(0).get(0).getObject(0));
-                assertEquals(2, row.getChildRows(0).get(1).getObject(0));
+                assertArrayEquals(new int[] {0, 1}, col.stream().mapToInt(t -> (int) t.getValue(QualifiedName.of("__pos"), 0)).toArray());
             }
             else
             {
-                assertEquals(emptyList(), row.getChildRows(0));
+                assertNull(col);
             }
 
             count++;
         }
 
-        assertEquals(9, count);
+        assertEquals(4, count);
     }
 
     static class Range extends TableFunctionInfo
@@ -286,7 +301,7 @@ public class NestedLoopJoinTest extends AOperatorTest
             {
                 tableAlias.setColumns(new String[] {"Value"});
             }
-            return RowIterator.wrap(IntStream.range(0, to).mapToObj(i -> Row.of(tableAlias, i, new Object[] {i + 1})).iterator());
+            return RowIterator.wrap(IntStream.range(0, to).mapToObj(i -> (Tuple) Row.of(tableAlias, i, new Object[] {i + 1})).iterator());
         }
     }
 }

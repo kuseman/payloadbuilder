@@ -28,9 +28,11 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
+import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Operator that groups by a bucket function */
 class GroupByOperator extends AOperator
@@ -38,12 +40,12 @@ class GroupByOperator extends AOperator
     private final Operator operator;
     private final ValuesExtractor valuesExtractor;
     private final int size;
-    private final List<String> columnReferences;
+    private final Set<QualifiedName> columnReferences;
 
     GroupByOperator(
             int nodeId,
             Operator operator,
-            List<String> columnReferences,
+            Set<QualifiedName> columnReferences,
             ValuesExtractor valuesExtractor,
             int size)
     {
@@ -79,25 +81,23 @@ class GroupByOperator extends AOperator
         ArrayKey key = new ArrayKey();
         key.key = new Object[size];
 
-        Map<ArrayKey, List<Row>> table = new LinkedHashMap<>();
+        Map<ArrayKey, List<Tuple>> table = new LinkedHashMap<>();
         RowIterator it = operator.open(context);
         while (it.hasNext())
         {
-            Row row = it.next();
-            valuesExtractor.extract(context, row, key.key);
-            table.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
+            Tuple tuple = it.next();
+            valuesExtractor.extract(context, tuple, key.key);
+            table.computeIfAbsent(key, k -> new ArrayList<>()).add(tuple);
         }
         it.close();
 
-        Iterator<List<Row>> iterator = table.values().iterator();
+        Iterator<List<Tuple>> iterator = table.values().iterator();
         return new RowIterator()
         {
-            private int position = 0;
-
             @Override
-            public Row next()
+            public Tuple next()
             {
-                return new GroupedRow(iterator.next(), position++, columnReferences);
+                return new GroupedRow(iterator.next(), columnReferences);
             }
 
             @Override

@@ -59,6 +59,7 @@ import org.kuse.payloadbuilder.core.parser.NestedSelectItem;
 import org.kuse.payloadbuilder.core.parser.NestedSelectItem.Type;
 import org.kuse.payloadbuilder.core.parser.Option;
 import org.kuse.payloadbuilder.core.parser.ParseException;
+import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 import org.kuse.payloadbuilder.core.parser.Select;
 import org.kuse.payloadbuilder.core.parser.SelectItem;
@@ -93,7 +94,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         private int nodeId;
 
         private QuerySession session;
-        private TableAlias parentTableAlias;
+        private TableAlias currentTableAlias;
         Map<TableAlias, Set<String>> columnsByAlias = new THashMap<>();
 
         /** Resulting operator */
@@ -202,7 +203,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             {
                 Expression predicate = new AnalyzeResult(pairs).getPredicate();
                 // Gather columns from remaining predicate
-                context.parentTableAlias = tsj.getTableSource().getTableAlias();
+                //                context.currentTableAlias = tsj.getTableSource().getTableAlias();
                 visit(predicate, context);
                 if (predicate != null)
                 {
@@ -232,7 +233,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         if (!select.getGroupBy().isEmpty())
         {
             groupBys.forEach(e -> visit(e, context));
-            context.operator = createGroupBy(context.acquireNodeId(), tsj.getTableSource().getTableAlias().getAlias(), groupBys, context.operator);
+            context.operator = createGroupBy(context.acquireNodeId(), groupBys, context.operator);
         }
 
         if (batchLimitOption != null)
@@ -243,7 +244,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         if (!context.sortItems.isEmpty())
         {
             context.sortItems.forEach(si -> si.accept(this, context));
-            context.operator = new SortByOperator(context.acquireNodeId(), context.operator, new ExpressionRowComparator(context.sortItems));
+            context.operator = new SortByOperator(context.acquireNodeId(), context.operator, new ExpressionTupleComparator(context.sortItems));
         }
 
         if (select.getTopExpression() != null)
@@ -252,7 +253,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             context.operator = new TopOperator(context.acquireNodeId(), context.operator, select.getTopExpression());
         }
 
-        context.parentTableAlias = tsj != null ? tsj.getTableSource().getTableAlias() : null;
+        context.currentTableAlias = tsj != null ? tsj.getTableSource().getTableAlias() : null;
         List<String> projectionAliases = new ArrayList<>();
         List<Projection> projections = new ArrayList<>();
         select.getSelectItems().forEach(s ->
@@ -269,13 +270,13 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     @Override
     public Void visit(NestedSelectItem nestedSelectItem, Context context)
     {
-        Set<TableAlias> aliases = asSet(context.parentTableAlias);
+        Set<TableAlias> aliases = asSet(context.currentTableAlias);
         Operator fromOperator = null;
         Expression from = nestedSelectItem.getFrom();
         if (from != null)
         {
             fromOperator = new ExpressionOperator(context.acquireNodeId(), from);
-            aliases = ColumnsVisitor.getColumnsByAlias(context.session, context.columnsByAlias, context.parentTableAlias, from);
+            aliases = ColumnsVisitor.getColumnsByAlias(context.session, context.columnsByAlias, context.currentTableAlias, from);
         }
 
         List<String> projectionAliases = new ArrayList<>();
@@ -283,10 +284,10 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         boolean projectionsAdded = false;
 
         // Use found aliases and traverse select items, order, groupBy and where
-        TableAlias parent = context.parentTableAlias;
+        TableAlias parent = context.currentTableAlias;
         for (TableAlias alias : aliases)
         {
-            context.parentTableAlias = alias;
+            context.currentTableAlias = alias;
             for (SelectItem s : nestedSelectItem.getSelectItems())
             {
                 s.accept(this, context);
@@ -322,12 +323,12 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         if (!nestedSelectItem.getGroupBy().isEmpty())
         {
-            fromOperator = createGroupBy(context.acquireNodeId(), parent.getAlias(), nestedSelectItem.getGroupBy(), fromOperator);
+            fromOperator = createGroupBy(context.acquireNodeId(), nestedSelectItem.getGroupBy(), fromOperator);
         }
 
         if (!nestedSelectItem.getOrderBy().isEmpty())
         {
-            fromOperator = new SortByOperator(context.acquireNodeId(), fromOperator, new ExpressionRowComparator(nestedSelectItem.getOrderBy()));
+            fromOperator = new SortByOperator(context.acquireNodeId(), fromOperator, new ExpressionTupleComparator(nestedSelectItem.getOrderBy()));
         }
 
         if (nestedSelectItem.getType() == Type.ARRAY)
@@ -338,7 +339,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         {
             context.projection = new ObjectProjection(projectionAliases, projections, fromOperator);
         }
-        context.parentTableAlias = parent;
+        context.currentTableAlias = parent;
         return null;
     }
 
@@ -358,21 +359,25 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     @Override
     public Void visit(AsteriskSelectItem selectItem, Context context)
     {
-        if (context.parentTableAlias == null)
+        if (context.currentTableAlias == null)
         {
             context.projection = NO_OP_PROJECTION;
             return null;
         }
+
+        TableAlias alias = context.currentTableAlias.getParent();
+
         // Set asterisk columns on aliases
         if (selectItem.getAlias() != null)
         {
-            if (context.parentTableAlias.getAlias().equals(selectItem.getAlias()))
+            if (alias.getAlias().equalsIgnoreCase(selectItem.getAlias()))
             {
-                context.parentTableAlias.setAsteriskColumns();
+                alias.setAsteriskColumns();
             }
             else
             {
-                TableAlias childAlias = context.parentTableAlias.getChildAlias(selectItem.getAlias());
+                // Try parents children
+                TableAlias childAlias = alias.getChildAlias(selectItem.getAlias());
                 if (childAlias != null)
                 {
                     childAlias.setAsteriskColumns();
@@ -381,10 +386,10 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         }
         else
         {
-            context.parentTableAlias.setAsteriskColumns();
-            for (TableAlias alias : context.parentTableAlias.getChildAliases())
+            alias.setAsteriskColumns();
+            for (TableAlias childAlias : alias.getChildAliases())
             {
-                alias.setAsteriskColumns();
+                childAlias.setAsteriskColumns();
             }
         }
         context.projection = selectItem;
@@ -399,7 +404,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             return;
         }
         // Resolve columns
-        ColumnsVisitor.getColumnsByAlias(context.session, context.columnsByAlias, context.parentTableAlias, expression);
+        ColumnsVisitor.getColumnsByAlias(context.session, context.columnsByAlias, context.currentTableAlias, expression);
     }
 
     @Override
@@ -429,7 +434,10 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     {
         TableSourceJoined tsj = tableSource.getTableSourceJoined();
         TableSource ts = tsj.getTableSource();
-        String alias = ts.getTableAlias().getAlias();
+        TableAlias tableAlias = ts.getTableAlias();
+        String alias = tableAlias.getAlias();
+
+        TableAlias prevCurrentTableAlias = context.currentTableAlias;
 
         Expression where = tableSource.getWhere();
         if (where != null)
@@ -461,7 +469,6 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         if (pairs != null)
         {
             Expression predicate = new AnalyzeResult(pairs).getPredicate();
-            context.parentTableAlias = ts.getTableAlias();
             visit(predicate, context);
             context.operator = new FilterOperator(context.acquireNodeId(), context.operator, new ExpressionPredicate(predicate));
         }
@@ -479,14 +486,50 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         if (!groupBys.isEmpty())
         {
             groupBys.forEach(e -> visit(e, context));
-            context.operator = createGroupBy(context.acquireNodeId(), alias, groupBys, context.operator);
+            context.operator = createGroupBy(context.acquireNodeId(), groupBys, context.operator);
         }
         List<SortItem> sortBys = tableSource.getOrderBy();
         if (!sortBys.isEmpty())
         {
             sortBys.forEach(si -> si.accept(this, context));
-            context.operator = new SortByOperator(context.acquireNodeId(), context.operator, new ExpressionRowComparator(sortBys));
+            context.operator = new SortByOperator(context.acquireNodeId(), context.operator, new ExpressionTupleComparator(sortBys));
         }
+
+        //        final Operator operator = context.operator;
+        //        // Change alias on rows so they will be accessible by the outer alias
+        //        context.operator = new Operator()
+        //        {
+        //            @Override
+        //            public RowIterator open(ExecutionContext context)
+        //            {
+        //                RowIterator iterator = operator.open(context);
+        //                return new RowIterator()
+        //                {
+        //                    @Override
+        //                    public Row next()
+        //                    {
+        //                        Row row = iterator.next();
+        //                        row.getTableAlias().setAlias(tableAlias.getParent().getAlias());
+        //                        return row;
+        //                    }
+        //                    
+        //                    @Override
+        //                    public boolean hasNext()
+        //                    {
+        //                        return iterator.hasNext();
+        //                    }
+        //                };
+        //            }
+        //            
+        //            @Override
+        //            public int getNodeId()
+        //            {
+        //                return operator.getNodeId();
+        //            }
+        //        };
+
+        // Restore prev alias
+        context.currentTableAlias = prevCurrentTableAlias;
 
         return null;
     }
@@ -496,6 +539,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     {
         Pair<String, Catalog> pair = getCatalog(context, table.getCatalogAlias(), table.getToken());
         int nodeId = context.acquireNodeId();
+        context.currentTableAlias = table.getTableAlias();
         String alias = table.getTableAlias().getAlias();
         List<AnalyzePair> predicatePairs = ObjectUtils.defaultIfNull(context.pushDownPredicateByAlias.get(alias), emptyList());
         if (context.index != null)
@@ -537,8 +581,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     public Void visit(TableFunction tableFunction, Context context)
     {
         TableFunctionInfo functionInfo = tableFunction.getFunctionInfo(context.session);
-        context.parentTableAlias = tableFunction.getTableAlias();
-        context.parentTableAlias.setColumns(functionInfo.getColumns());
+        context.currentTableAlias = tableFunction.getTableAlias();
+        context.currentTableAlias.setColumns(functionInfo.getColumns());
         tableFunction.getArguments().forEach(a -> visit(a, context));
         context.operator = new TableFunctionOperator(context.acquireNodeId(), tableFunction.getCatalogAlias(), tableFunction.getTableAlias(), functionInfo, tableFunction.getArguments());
         return null;
@@ -567,7 +611,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         Operator outer = context.operator;
         context.operator = null;
 
-        boolean isCorrelated = correlatedDetector.isCorrelated(join);
+        boolean isCorrelated = correlatedDetector.isCorrelated(context, join);
 
         Operator joinOperator = createJoin(
                 context,
@@ -591,11 +635,22 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     {
         String innerAlias = innerTableSource.getTableAlias().getAlias();
         boolean populating = getOption(innerTableSource, POPULATE) != null;
+        String catalogAlias = innerTableSource.getCatalogAlias();
+        QualifiedName table = innerTableSource.getTable();
         List<Index> indices = emptyList();
-        if (innerTableSource.getTable() != null)
+
+        // Sub query, use the inner table sources table and catalog when resolving indices
+        if (innerTableSource instanceof SubQueryTableSource)
         {
-            Pair<String, Catalog> pair = getCatalog(context, innerTableSource.getCatalogAlias(), innerTableSource.getToken());
-            indices = pair.getValue().getIndices(context.session, pair.getKey(), innerTableSource.getTable());
+            SubQueryTableSource subQuery = (SubQueryTableSource) innerTableSource;
+            catalogAlias = subQuery.getTableSourceJoined().getTableSource().getCatalogAlias();
+            table = subQuery.getTableSourceJoined().getTableSource().getTable();
+        }
+
+        if (table != null)
+        {
+            Pair<String, Catalog> pair = getCatalog(context, catalogAlias, innerTableSource.getToken());
+            indices = pair.getValue().getIndices(context.session, pair.getKey(), table);
         }
         // TODO: If outer is ordered and no inner indices
         // then the inner could be created and after, check it's order for a potential
@@ -605,9 +660,23 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         IndexOperatorFoundation foundation = new IndexOperatorFoundation(innerAlias, indices, analyzeResult);
         Index index = foundation.index;
         Expression condition = foundation.condition.getPredicate();
-        context.appendPushDownPredicate(innerAlias, foundation.pushDownPairs);
+        // This is a sub query => assign push down to inner table source alias
+        // else the inner table source won't pick up the pushdown and we end up
+        // with 2 nested filter operators
+        if (innerTableSource instanceof SubQueryTableSource)
+        {
+            String alias = ((SubQueryTableSource) innerTableSource).getTableSourceJoined().getTableSource().getTableAlias().getAlias();
 
-        context.parentTableAlias = innerTableSource.getTableAlias();
+            // Move any previous push downs from sub query alias to inner table alias
+            List<AnalyzePair> pairs = context.pushDownPredicateByAlias.remove(innerAlias);
+            context.appendPushDownPredicate(alias, pairs);
+            context.appendPushDownPredicate(alias, foundation.pushDownPairs);
+        }
+        else
+        {
+            context.appendPushDownPredicate(innerAlias, foundation.pushDownPairs);
+        }
+        context.currentTableAlias = innerTableSource.getTableAlias();
         visit(condition, context);
 
         /* No equi items in condition or a correlated query => NestedLoop */
@@ -642,7 +711,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                     outer,
                     inner,
                     condition != null ? new ExpressionPredicate(condition) : null,
-                    DefaultRowMerger.DEFAULT,
+                    DefaultTupleMerger.DEFAULT,
                     populating,
                     emitEmptyOuterRows);
         }
@@ -664,7 +733,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                     // Collect inner hash expression
                     new ExpressionHashFunction(foundation.innerValueExpressions),
                     new ExpressionPredicate(condition),
-                    DefaultRowMerger.DEFAULT,
+                    DefaultTupleMerger.DEFAULT,
                     populating,
                     emitEmptyOuterRows);
         }
@@ -692,7 +761,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 outerValuesExtractor,
                 innerValuesExtractor,
                 condition != null ? new ExpressionPredicate(condition) : (ctx, row) -> true,
-                DefaultRowMerger.DEFAULT,
+                DefaultTupleMerger.DEFAULT,
                 populating,
                 emitEmptyOuterRows,
                 index,
@@ -793,7 +862,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         if (pushDownPairs != null)
         {
             Expression pushDownPredicate = new AnalyzeResult(pushDownPairs).getPredicate();
-            context.parentTableAlias = tableAlias;
+            context.currentTableAlias = tableAlias;
             visit(pushDownPredicate, context);
             return new FilterOperator(context.acquireNodeId(), operator, new ExpressionPredicate(pushDownPredicate));
         }
@@ -969,18 +1038,25 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             expression.accept(expressionVisitor, context);
         }
 
-        boolean isCorrelated(AJoin join)
+        boolean isCorrelated(Context context, AJoin join)
         {
-            TableAlias current = join.getTableSource().getTableAlias().getParent();
+            if (join.getTableSource().getTableAlias().getType() != TableAlias.Type.SUBQUERY)
+            {
+                return false;
+            }
+            TableAlias current = context.currentTableAlias;
             Set<String> aliases = new HashSet<>();
             // Collect all current aliases
-            // Including parents and parents child aliases
+            // Including parents
             while (current != null)
             {
-                aliases.add(current.getAlias());
+                // Don't collect ROOT
+                if (current.getParent() != null)
+                {
+                    aliases.add(current.getAlias());
+                }
                 current = current.getParent();
             }
-
             // If any of these are referenced in provided join then we have a
             // correlated query
             Set<String> joinAliases = new HashSet<>();

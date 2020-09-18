@@ -27,42 +27,22 @@ import org.junit.Before;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
+import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 
 /** Test of {@link QualifiedReferenceExpression} */
 public class QualifiedReferenceExpressionTest extends AParserTest
 {
-    private TableAlias a, b, c, e;
+    private TableAlias a;
     private Row aRow;
 
     @Before
     public void setup()
     {
-        /*
-         * a
-         *   b
-         *     c
-         *   d
-         */
-        a = TableAlias.of(null, QualifiedName.of("tableA"), "a", new String[] {"col1", "mapCol"});
-        b = TableAlias.of(a, QualifiedName.of("tableB"), "b", new String[] {"col1", "col2"});
-        c = TableAlias.of(b, QualifiedName.of("tableC"), "c", new String[] {"col1", "mapCol"});
-        TableAlias.of(a, QualifiedName.of("tableD"), "d", new String[] {"col1", "mapCol"});
-        e = TableAlias.of(a, QualifiedName.of("tableE"), "e", new String[] {"col1"});
+        a = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableA"), "a")
+                .columns(new String[] {"col1", "mapCol"})
+                .build();
 
         aRow = Row.of(a, 0, new Object[] {1337, ofEntries(entry("key", "value"))});
-
-        for (int i = 0; i < 10; i++)
-        {
-            Row bRow = Row.of(aRow, b, i, new Object[] {"b" + i, new Date()});
-            for (int j = 0; j < 10; j++)
-            {
-                Row cRow = Row.of(bRow, c, j, new Object[] {"c" + i, ofEntries(entry("key", "cValue"), entry("key2", ofEntries(entry("subKey", "subValue"))))});
-                bRow.getChildRows(0).add(cRow);
-            }
-            aRow.getChildRows(0).add(bRow);
-        }
-
-        aRow.getChildRows(2).add(Row.of(aRow, e, 0, new Object[] {"e0"}));
     }
 
     @Test
@@ -76,35 +56,15 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         // Column ref
         assertReference(1337, "col1");
         assertReference(1337, "a", "col1");
-        // Child rows
-        assertReference(aRow.getChildRows(0), "b");
-        // Child rows column (row 0 is chosen)
-        assertReference("b0", "b", "col1");
-        assertReference("c0", "b", "c", "col1");
         assertReference(null, "d", "col1");
         // Map access
         assertReference("value", "mapCol", "key");
         assertReference(ofEntries(entry("key", "value")), "mapCol");
-        assertReference("cValue", "b", "c", "mapCol", "key");
-        assertReference("subValue", "b", "c", "mapCol", "key2", "subKey");
-
-        // Parent + child traversal
-        // From e TO b
-        assertReference("b0", aRow.getChildRows(2).get(0), -1, null, "b", "col1");
-
-        // Parent access with column
-        assertReference(1337, aRow.getChildRows(0).get(0).getChildRows(0).get(0), -1, null, "a", "col1");
-        // Parent access
-        assertReference(asList(aRow), aRow.getChildRows(0).get(0).getChildRows(0).get(0), -1, null, "a");
-        // Parent access with child rows
-        assertReference(aRow.getChildRows(0), aRow.getChildRows(0).get(0).getChildRows(0).get(0), -1, null, "a", "b");
-
-        //
 
         // Invalid dereference
         try
         {
-            assertReference("value", aRow, -1, new Date(), "b", "col2", "col3");
+            assertReference("value", aRow, 0, new Date(), "b", "col2", "col3");
             fail();
         }
         catch (IllegalArgumentException e)
@@ -117,6 +77,9 @@ public class QualifiedReferenceExpressionTest extends AParserTest
     @Test
     public void test_evaluation_lambda()
     {
+        // Lambda value in context is null
+        assertReference(null, aRow, 0, null, "x", "col1");
+        
         // Single lambda value
         assertReference(666, aRow, 0, 666, "x");
         // Row access
@@ -149,7 +112,7 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         {
             context.setLambdaValue(lambdaId, lambdaValue);
         }
-        context.setRow(row);
+        context.setTuple(row);
         assertEquals("Error value for " + e, expected, e.eval(context));
     }
 }

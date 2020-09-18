@@ -74,8 +74,8 @@ class BatchMergeJoin extends AOperator
     private final Operator inner;
     private final ValuesExtractor outerValuesExtractor;
     private final ValuesExtractor innerValuesExtractor;
-    private final BiPredicate<ExecutionContext, Row> predicate;
-    private final RowMerger rowMerger;
+    private final BiPredicate<ExecutionContext, Tuple> predicate;
+    private final TupleMerger rowMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
     private final Index innerIndex;
@@ -92,8 +92,8 @@ class BatchMergeJoin extends AOperator
             Operator inner,
             ValuesExtractor outerValuesExtractor,
             ValuesExtractor innerValuesExtractor,
-            BiPredicate<ExecutionContext, Row> predicate,
-            RowMerger rowMerger,
+            BiPredicate<ExecutionContext, Tuple> predicate,
+            TupleMerger rowMerger,
             boolean populating,
             boolean emitEmptyOuterRows,
             Index innerIndex,
@@ -117,23 +117,25 @@ class BatchMergeJoin extends AOperator
     @Override
     public RowIterator open(ExecutionContext context)
     {
-        final Iterator<Row> outerIt = outer.open(context);
+        final RowIterator outerIt = outer.open(context);
+        final JoinTuple joinTuple = new JoinTuple();
+        joinTuple.setContextOuter(context.getTuple());
         return new RowIterator()
         {
             /** Batched rows */
-            private List<Row> outerRows;
+            private List<TupleHolder> outerRows;
             private int outerIndex = 0;
-            private Row batchedLeftOverRow;
-            private Iterator<Row> innerIt;
+            private TupleHolder batchedLeftOverRow;
+            private Iterator<Tuple> innerIt;
 
             /** Reference to outer values iterator to verify that implementations of Operator fully uses the index if specified */
             private Iterator<Object[]> outerValuesIterator;
 
-            private Row next;
+            private Tuple next;
             /** Current process outer row */
-            private Row outerRow;
+            private TupleHolder outerRow;
             /** Current process inner row */
-            private Row innerRow;
+            private Tuple innerRow;
 
             private final Object[] keyValues = new Object[valuesSize];
 
@@ -151,10 +153,9 @@ class BatchMergeJoin extends AOperator
             private boolean emitOuterRows;
 
             @Override
-            public Row next()
+            public Tuple next()
             {
-                Row result = next;
-                clearJoinData(result);
+                Tuple result = next;
                 next = null;
                 return result;
             }
@@ -264,7 +265,7 @@ class BatchMergeJoin extends AOperator
                         {
                             if (!populating && emitEmptyOuterRows)
                             {
-                                next = outerRow;
+                                next = outerRow.tuple;
                             }
                             outerIndex++;
                         }
@@ -272,17 +273,19 @@ class BatchMergeJoin extends AOperator
                         continue;
                     }
 
-                    innerRow.setPredicateParent(outerRow);
-                    if (predicate.test(context, innerRow))
+                    joinTuple.setOuter(outerRow.tuple);
+                    joinTuple.setInner(innerRow);
+
+                    if (predicate.test(context, joinTuple))
                     {
-                        next = rowMerger.merge(outerRow, innerRow, populating);
+                        next = rowMerger.merge(outerRow.tuple, innerRow, populating, nodeId);
                         outerRow.match = true;
                         if (populating)
                         {
+                            outerRow.tuple = next;
                             next = null;
                         }
                     }
-                    innerRow.clearPredicateParent();
 
                     outerIndex++;
                     outerRow = null;
@@ -313,7 +316,7 @@ class BatchMergeJoin extends AOperator
                 return true;
             }
 
-            private int compare(ExecutionContext context, Row outerRow, Row innerRow)
+            private int compare(ExecutionContext context, TupleHolder outerRow, Tuple innerRow)
             {
                 Object[] outerValues = outerRow.extractedValues;
                 populateKeyValues(innerValuesExtractor, context, innerRow);
@@ -352,13 +355,13 @@ class BatchMergeJoin extends AOperator
                     return;
                 }
 
-                Row row = outerRows.get(outerIndex);
+                TupleHolder tuple = outerRows.get(outerIndex);
                 // Populating and row is a match of empty outer rows should be emitted
                 // Or non populating and no match
-                if ((populating && (row.match || emitEmptyOuterRows))
-                    || (!populating && !row.match))
+                if ((populating && (tuple.match || emitEmptyOuterRows))
+                    || (!populating && !tuple.match))
                 {
-                    next = row;
+                    next = tuple.tuple;
                 }
 
                 outerIndex++;
@@ -377,9 +380,9 @@ class BatchMergeJoin extends AOperator
             private void populateKeyValues(
                     ValuesExtractor valueExtractor,
                     ExecutionContext context,
-                    Row row)
+                    Tuple tuple)
             {
-                valueExtractor.extract(context, row, keyValues);
+                valueExtractor.extract(context, tuple, keyValues);
             }
 
             /** Batch outer rows and generate outer keys */
@@ -406,9 +409,11 @@ class BatchMergeJoin extends AOperator
 
                 while (outerIt.hasNext())
                 {
-                    Row row = outerIt.next();
-                    populateKeyValues(outerValuesExtractor, context, row);
-                    row.extractedValues = Arrays.copyOf(keyValues, keyValues.length);
+                    Tuple tuple = outerIt.next();
+                    populateKeyValues(outerValuesExtractor, context, tuple);
+
+                    TupleHolder holder = new TupleHolder(tuple);
+                    holder.extractedValues = Arrays.copyOf(keyValues, keyValues.length);
 
                     if (batchSize > 0 && count >= batchSize)
                     {
@@ -417,14 +422,14 @@ class BatchMergeJoin extends AOperator
                         if (count > batchSize && !Arrays.equals(prevKeyValues, keyValues))
                         {
                             // Save row for next iteration
-                            batchedLeftOverRow = row;
+                            batchedLeftOverRow = holder;
                             break;
                         }
                     }
-                    outerRows.add(row);
+                    outerRows.add(holder);
                     count++;
 
-                    prevKeyValues = row.extractedValues;
+                    prevKeyValues = holder.extractedValues;
                 }
             }
 
@@ -464,15 +469,15 @@ class BatchMergeJoin extends AOperator
                                 return false;
                             }
 
-                            Row row = outerRows.get(outerRowsIndex++);
+                            TupleHolder tuple = outerRows.get(outerRowsIndex++);
 
                             // Skip already batched array
-                            if (prevArray != null && Arrays.equals(prevArray, row.extractedValues))
+                            if (prevArray != null && Arrays.equals(prevArray, tuple.extractedValues))
                             {
                                 continue;
                             }
 
-                            nextArray = row.extractedValues;
+                            nextArray = tuple.extractedValues;
                             prevArray = nextArray;
                         }
 
@@ -481,13 +486,6 @@ class BatchMergeJoin extends AOperator
                 };
             }
         };
-    }
-
-    static void clearJoinData(Row row)
-    {
-        row.hash = 0;
-        row.extractedValues = null;
-        row.match = false;
     }
 
     @Override
@@ -532,5 +530,18 @@ class BatchMergeJoin extends AOperator
             indentString + outer.toString(indent + 1) + System.lineSeparator()
             +
             indentString + inner.toString(indent + 1);
+    }
+
+    /** Temporary holder for tuples during join */
+    static class TupleHolder
+    {
+        private Tuple tuple;
+        private Object[] extractedValues;
+        private boolean match;
+
+        TupleHolder(Tuple tuple)
+        {
+            this.tuple = tuple;
+        }
     }
 }

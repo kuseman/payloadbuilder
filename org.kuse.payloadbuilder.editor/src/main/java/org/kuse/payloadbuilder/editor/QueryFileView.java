@@ -17,8 +17,6 @@
  */
 package org.kuse.payloadbuilder.editor;
 
-import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
@@ -76,7 +74,6 @@ import org.fife.ui.rtextarea.RTextScrollPane;
 import org.kordamp.ikonli.fontawesome.FontAwesome;
 import org.kordamp.ikonli.swing.FontIcon;
 import org.kuse.payloadbuilder.core.operator.Row;
-import org.kuse.payloadbuilder.core.operator.Row.ChildRows;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.editor.QueryFileModel.State;
 
@@ -392,17 +389,17 @@ class QueryFileView extends JPanel
                     value = ofEntries(
                             entry("table", alias.getTable().toString()));
                 }
-                else if (value instanceof ChildRows)
-                {
-                    ChildRows childRows = (ChildRows) value;
-                    value = emptyList();
-                    if (childRows.size() > 0)
-                    {
-                        TableAlias alias = childRows.get(0).getTableAlias();
-                        value = ofEntries(
-                                entry("table", alias.getTable().toString()));
-                    }
-                }
+//                else if (value instanceof ChildRows)
+//                {
+//                    ChildRows childRows = (ChildRows) value;
+//                    value = emptyList();
+//                    if (childRows.size() > 0)
+//                    {
+//                        TableAlias alias = childRows.get(0).getTableAlias();
+//                        value = ofEntries(
+//                                entry("table", alias.getTable().toString()));
+//                    }
+//                }
 
                 if (value == null)
                 {
@@ -512,20 +509,20 @@ class QueryFileView extends JPanel
                     entry("columns", pbRow.getColumns()),
                     entry("values", pbRow.getValues()));
         }
-        else if (value instanceof ChildRows)
-        {
-            ChildRows childRows = (ChildRows) value;
-            value = emptyList();
-            if (childRows.size() > 0)
-            {
-                Row pbRow = childRows.get(0);
-                TableAlias alias = childRows.get(0).getTableAlias();
-                value = ofEntries(
-                        entry("table", alias.getTable().toString()),
-                        entry("columns", pbRow.getColumns()),
-                        entry("rows", childRows.stream().map(r -> r.getValues()).collect(toList())));
-            }
-        }
+//        else if (value instanceof ChildRows)
+//        {
+//            ChildRows childRows = (ChildRows) value;
+//            value = emptyList();
+//            if (childRows.size() > 0)
+//            {
+//                Row pbRow = childRows.get(0);
+//                TableAlias alias = childRows.get(0).getTableAlias();
+//                value = ofEntries(
+//                        entry("table", alias.getTable().toString()),
+//                        entry("columns", pbRow.getColumns()),
+//                        entry("rows", childRows.stream().map(r -> r.getValues()).collect(toList())));
+//            }
+//        }
 
         JFrame frame = new JFrame("Json viewer - " + resultTable.getColumnName(col) + " (Row: " + (row + 1) + ")");
         frame.setIconImages(PayloadbuilderEditorView.APPLICATION_ICONS);

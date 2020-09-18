@@ -19,102 +19,120 @@ package org.kuse.payloadbuilder.core.operator;
 
 import static org.apache.commons.collections.CollectionUtils.isEmpty;
 
-import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.collections.iterators.TransformIterator;
-import org.apache.commons.lang3.ArrayUtils;
+import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
-import gnu.trove.set.TIntSet;
-import gnu.trove.set.hash.TIntHashSet;
-
-/** Grouped row */
-class GroupedRow extends Row
+/** Grouped row. Result of a {@link GroupByOperator} */
+class GroupedRow implements Tuple
 {
-    private final List<Row> rows;
-    /** Set of column ordinals in group expressions, these ordinals should not return an aggregated value */
-    private final TIntSet columnOrdinals;
+    private final List<Tuple> tuples;
+    /** Set of columns in group expressions, these columns should not return an aggregated value */
+    private final Set<QualifiedName> columnReferences;
 
-    GroupedRow(List<Row> rows, int pos, List<String> columnReferences)
+    GroupedRow(List<Tuple> tuples, Set<QualifiedName> columnReferences)
     {
-        if (isEmpty(rows))
+        if (isEmpty(tuples))
         {
             throw new RuntimeException("Rows cannot be empty.");
         }
-        this.rows = rows;
-        this.pos = pos;
-        this.columnOrdinals = getColumnOrdinals(columnReferences);
-        super.tableAlias = rows.get(0).getTableAlias();
+        this.tuples = tuples;
+        //        this.pos = pos;
+        this.columnReferences = columnReferences;
+        // TODO: Combine columns from all group rows since we might have other columns further "down"
+        //        this.columns = tuples.get(0).columns;
+        //        super.tableAlias = tuples.get(0).getTableAlias();
     }
 
-    private TIntSet getColumnOrdinals(List<String> columnReferences)
+    //    private TIntSet getColumnOrdinals(List<String> columnReferences)
+    //    {
+    //        Tuple tuple = tuples.get(0);
+    //        TIntSet result = new TIntHashSet(columnReferences.size());
+    ////        for (String column : columnReferences)
+    ////        {
+    ////            int index = ArrayUtils.indexOf(row.getColumns(), column);
+    ////            result.add(index);
+    ////        }
+    //        return result;
+    //    }
+
+    @Override
+    public boolean containsAlias(String alias)
     {
-        Row row = rows.get(0);
-        TIntSet result = new TIntHashSet(columnReferences.size());
-        for (String column : columnReferences)
-        {
-            int index = ArrayUtils.indexOf(row.getColumns(), column);
-            result.add(index);
-        }
-        return result;
+        return tuples.get(0).containsAlias(alias);
     }
 
     @Override
-    public Object getObject(int ordinal)
+    public Object getValue(QualifiedName qname, int partIndex)
     {
-        if (columnOrdinals.contains(ordinal))
+        if (columnReferences.contains(qname))
         {
-            return rows.get(0).getObject(ordinal);
-        }
-        return new TransformIterator(rows.iterator(), row -> ((Row) row).getObject(ordinal));
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public List<Row> getChildRows(int index)
-    {
-        if (childRows == null)
-        {
-            childRows = new List[tableAlias.getChildAliases().size()];
+            return tuples.get(0).getValue(qname, partIndex);
         }
 
-        ArrayList<Row> rows = (ArrayList<Row>) childRows[index];
-        if (rows == null)
-        {
-            for (Row groupRow : this.rows)
-            {
-                List<Row> childRows = groupRow.getChildRows(index);
-                if (rows == null)
-                {
-                    rows = new ArrayList<>(childRows);
-                }
-                else
-                {
-                    rows.ensureCapacity(rows.size() + childRows.size());
-                    rows.addAll(childRows);
-                }
-            }
-
-            childRows[index] = rows;
-        }
-
-        return rows;
+        return new TransformIterator(tuples.iterator(), tuple -> ((Tuple) tuple).getValue(qname, partIndex));
     }
 
     @Override
-    public int hashCode()
+    public Iterator<QualifiedName> getQualifiedNames()
     {
-        return 17 + (pos * 37);
+        // Use first row here.
+        // TODO: Might need to distinct all grouped rows qnames since there might be different ones further down
+        return tuples.get(0).getQualifiedNames();
     }
 
-    @Override
-    public boolean equals(Object obj)
-    {
-        if (obj instanceof GroupedRow)
-        {
-            // Assume grouped row
-            return ((GroupedRow) obj).pos == pos;
-        }
-        return false;
-    }
+    //    @Override
+    //    public void writeColumns(OutputWriter writer, String alias)
+    //    {
+    //        
+    //    }
+
+    //    @Override
+    //    public Object getObject(int ordinal)
+    //    {
+    //        if (columnOrdinals.contains(ordinal))
+    //        {
+    //            return rows.get(0).getObject(ordinal);
+    //        }
+    //        return new TransformIterator(rows.iterator(), row -> ((Row) row).getObject(ordinal));
+    //    }
+    //
+    //    @Override
+    //    public List<Row> getChildRows(TableAlias alias)
+    //    {
+    //        ChildRows childRows = (ChildRows) super.getChildRows(alias);
+    //
+    //        if (!childRows.populated)
+    //        {
+    //            for (Row groupRow : this.rows)
+    //            {
+    //                List<Row> rows = groupRow.getChildRows(alias);
+    //                childRows.ensureCapacity(rows.size() + childRows.size());
+    //                childRows.addAll(childRows);
+    //            }
+    //            childRows.populated = true;
+    //        }
+    //
+    //        return childRows;
+    //    }
+
+    //    @Override
+    //    public int hashCode()
+    //    {
+    //        return 17 + (pos * 37);
+    //    }
+    //
+    //    @Override
+    //    public boolean equals(Object obj)
+    //    {
+    //        if (obj instanceof GroupedRow)
+    //        {
+    //            // Assume grouped row
+    //            return ((GroupedRow) obj).pos == pos;
+    //        }
+    //        return false;
+    //    }
 }

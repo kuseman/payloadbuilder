@@ -103,6 +103,6 @@ class CachingOperator extends AOperator
     /** Context data for this operator */
     static class Data extends NodeData
     {
-        List<Row> cache;
+        List<Tuple> cache;
     }
 }

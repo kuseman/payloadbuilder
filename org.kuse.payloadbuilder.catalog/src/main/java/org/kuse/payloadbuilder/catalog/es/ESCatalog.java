@@ -45,9 +45,9 @@ import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.Operator;
-import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair.Type;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.ComparisonExpression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
@@ -113,6 +113,12 @@ class ESCatalog extends Catalog
     @Override
     public List<Index> getIndices(QuerySession session, String catalogAlias, QualifiedName table)
     {
+        // No index support on multi index queries
+        String indexString = table.toString();
+        if (indexString.contains(",") || indexString.contains("*"))
+        {
+            return emptyList();
+        }
         // All tables have a doc id index
         return asList(new IdIndex(table), new ParentIndex(table));
     }

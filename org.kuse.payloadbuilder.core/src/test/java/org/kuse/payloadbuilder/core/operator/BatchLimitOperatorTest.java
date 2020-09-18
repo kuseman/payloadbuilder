@@ -22,6 +22,7 @@ import java.util.stream.IntStream;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.LiteralExpression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -32,9 +33,9 @@ public class BatchLimitOperatorTest extends AOperatorTest
     @Test
     public void test()
     {
-        TableAlias alias = TableAlias.of(null, QualifiedName.of("a"), "a");
+        TableAlias alias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("a"), "a").build();
         MutableBoolean close = new MutableBoolean();
-        Operator op = op(ctx -> IntStream.range(0, 10).mapToObj(i -> Row.of(alias, i, new Object[] {i})).iterator(), () -> close.setTrue());
+        Operator op = op(ctx -> IntStream.range(0, 10).mapToObj(i -> (Tuple) Row.of(alias, i, new Object[] {i})).iterator(), () -> close.setTrue());
         Operator limitOp = new BatchLimitOperator(0, op, LiteralExpression.create(5));
 
         ExecutionContext ctx = new ExecutionContext(session);
@@ -43,8 +44,9 @@ public class BatchLimitOperatorTest extends AOperatorTest
         int count = 0;
         while (it.hasNext())
         {
-            Row row = it.next();
-            assertEquals(count, row.getPos());
+            Tuple tuple = it.next();
+            int pos = (int) tuple.getValue(QualifiedName.of("a", "__pos"), 0);
+            assertEquals(count, pos);
             count++;
         }
 
@@ -56,8 +58,9 @@ public class BatchLimitOperatorTest extends AOperatorTest
 
         while (it.hasNext())
         {
-            Row row = it.next();
-            assertEquals(count, row.getPos());
+            Tuple tuple = it.next();
+            int pos = (int) tuple.getValue(QualifiedName.of("a", "__pos"), 0);
+            assertEquals(count, pos);
             count++;
         }
 

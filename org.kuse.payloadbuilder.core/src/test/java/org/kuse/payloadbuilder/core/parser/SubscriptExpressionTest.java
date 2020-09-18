@@ -24,17 +24,19 @@ import java.util.stream.IntStream;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
+import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
 
 /** Test {@link SubscriptExpression} */
 public class SubscriptExpressionTest extends AParserTest
 {
-    TableAlias t = TableAlias.of(null, QualifiedName.of("table"), "t", new String[] {"a", "b", "c", "d"});
+    private final TableAlias t = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("table"), "t").columns(new String[] {"a", "b", "c", "d"}).build();
+
     @Test
     public void test()
     {
         Row row = Row.of(t, 0, new Object[] {asList(1, 2, 3), IntStream.range(1, 4).iterator(), new int[] {1, 2, 3}, MapUtils.ofEntries(MapUtils.entry("key", "value"))});
-        context.setRow(row);
+        context.setTuple(row);
 
         assertNull(e("null[10]").eval(context));
         assertNull(e("a[null]").eval(context));
@@ -65,7 +67,7 @@ public class SubscriptExpressionTest extends AParserTest
     public void test_invalid_subscript_int()
     {
         Row row = Row.of(t, 0, new Object[] {asList(1, 2, 3), IntStream.range(1, 4).iterator(), new int[] {1, 2, 3}, MapUtils.ofEntries(MapUtils.entry("key", "value"))});
-        context.setRow(row);
+        context.setTuple(row);
         e("a['string']").eval(context);
     }
 
@@ -73,7 +75,7 @@ public class SubscriptExpressionTest extends AParserTest
     public void test_invalid_subscript_string()
     {
         Row row = Row.of(t, 0, new Object[] {asList(1, 2, 3), IntStream.range(1, 4).iterator(), new int[] {1, 2, 3}, MapUtils.ofEntries(MapUtils.entry("key", "value"))});
-        context.setRow(row);
+        context.setTuple(row);
         e("d[123]").eval(context);
     }
 }

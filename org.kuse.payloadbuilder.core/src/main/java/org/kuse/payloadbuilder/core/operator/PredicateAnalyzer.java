@@ -541,8 +541,20 @@ public class PredicateAnalyzer
                 QualifiedReferenceExpression qre = (QualifiedReferenceExpression) expression;
                 QualifiedName qname = qre.getQname();
 
-                Set<String> aliases;
+                Set<String> aliases = EMPTY_ALIASES;
                 Pair<String, String> pair = QualifiedReferenceVisitor.getAlias(tableAlias, qname);
+
+                // Gather all qnames
+                /*
+                 * Alias hierarchy
+                 *  a
+                 *    - b
+                 *
+                 * a.col        <-- Ok alias reference
+                 * a.b.col      <-- Not ok reference since b is a child
+                 * a.c.col      <-- Ok since c is not a child alias
+                 *
+                 */
 
                 if (pair.getKey() != null)
                 {
@@ -564,10 +576,6 @@ public class PredicateAnalyzer
                     {
                         qname = null;
                     }
-                }
-                else
-                {
-                    aliases = EMPTY_ALIASES;
                 }
 
                 return new AnalyzeItem(expression, aliases, qname);
@@ -714,10 +722,24 @@ public class PredicateAnalyzer
         /** Returns alias for provided qname and sub alias if exists */
         static Pair<String, String> getAlias(TableAlias tableAlias, QualifiedName qname)
         {
+            Pair<String, String> result = find(tableAlias, qname);
+            
+            TableAlias current = tableAlias.getParent();
+            while (current != null && result == EMPTY_PAIR)
+            {
+                // Try parents
+                result = find(current, qname);
+                current = current.getParent();
+            }
+            
+            return result;
+        }
+        
+        private static Pair<String, String> find(TableAlias tableAlias, QualifiedName qname)
+        {
             List<String> parts = qname.getParts();
             String alias;
             String subAlias = null;
-
             // First part is the current alias
             if (tableAlias.getAlias().equals(parts.get(0)))
             {
@@ -730,15 +752,15 @@ public class PredicateAnalyzer
                         return Pair.of(alias, parts.get(1));
                     }
                 }
-                // Alias access, not allowed as a predicate
+                // Alias access, not allowed as a predicate, return a non existent alias
                 else if (parts.size() == 1)
                 {
                     subAlias = alias;
                     alias = "##";
                 }
-
-                return Pair.of(alias, subAlias);
+                return Pair.of(alias, null);
             }
+
             // Try child alias
             TableAlias temp = tableAlias.getChildAlias(parts.get(0));
             if (temp != null)
@@ -751,7 +773,6 @@ public class PredicateAnalyzer
                     {
                         subAlias = alias;
                         alias = "##";
-                        //                        return Pair.of(alias, parts.get(1));
                     }
                 }
                 // Child alias access and only one part => combine with parent
@@ -764,43 +785,9 @@ public class PredicateAnalyzer
 
                 return Pair.of(alias, subAlias);
             }
-
-            // Try parents
-            temp = tableAlias.getParent();
-            while (temp != null)
-            {
-                if (temp.getAlias().equals(parts.get(0)))
-                {
-                    alias = parts.get(0);
-                    // Parent alias access and only one part => combine with parent
-                    // since this alias is not a valid predicate to push down etc.
-                    if (parts.size() == 1)
-                    {
-                        subAlias = alias;
-                        alias = "##";//temp.getParent().getAlias();
-                    }
-                    //                if (parts.size() > 1)
-                    //                {
-                    //                    temp = tableAlias.getChildAlias(parts.get(1));
-                    //                    if (temp != null)
-                    //                    {
-                    //                        return Pair.of(alias, parts.get(1));
-                    //                    }
-                    //                }
-
-                    return Pair.of(alias, subAlias);
-                }
-                TableAlias temp1 = temp.getChildAlias(parts.get(0));
-                if (temp1 != null)
-                {
-                    alias = parts.get(0);
-                    return Pair.of(alias, subAlias);
-                }
-
-                temp = temp.getParent();
-            }
-
+            
             return EMPTY_PAIR;
+            
         }
 
         @Override

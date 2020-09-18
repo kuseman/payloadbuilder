@@ -46,23 +46,23 @@ public class AOperatorTest extends Assert
         return parser.parseExpression(expression);
     }
 
-    protected Operator op(final Function<ExecutionContext, Iterator<Row>> it)
+    protected Operator op(final Function<ExecutionContext, Iterator<Tuple>> it)
     {
         return op(it, null);
     }
 
-    protected Operator op(final Function<ExecutionContext, Iterator<Row>> itFunc, Runnable closeAction)
+    protected Operator op(final Function<ExecutionContext, Iterator<Tuple>> itFunc, Runnable closeAction)
     {
         return new Operator()
         {
             @Override
             public RowIterator open(ExecutionContext context)
             {
-                final Iterator<Row> it = itFunc.apply(context);
+                final Iterator<Tuple> it = itFunc.apply(context);
                 return new RowIterator()
                 {
                     @Override
-                    public Row next()
+                    public Tuple next()
                     {
                         return it.next();
                     }

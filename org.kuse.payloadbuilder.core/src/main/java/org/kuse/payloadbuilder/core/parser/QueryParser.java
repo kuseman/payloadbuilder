@@ -20,6 +20,7 @@ package org.kuse.payloadbuilder.core.parser;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
+import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
 import static org.apache.commons.lang3.StringUtils.upperCase;
@@ -45,6 +46,7 @@ import org.antlr.v4.runtime.atn.PredictionMode;
 import org.antlr.v4.runtime.misc.ParseCancellationException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
+import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.Apply.ApplyType;
 import org.kuse.payloadbuilder.core.parser.ComparisonExpression.Type;
 import org.kuse.payloadbuilder.core.parser.Join.JoinType;
@@ -161,15 +163,13 @@ public class QueryParser
         private final Map<String, Integer> lambdaParameters = new HashMap<>();
         private Expression leftDereference;
 
-        private String parentAlias;
-        private TableAlias parentTableAlias;
-        private TableAlias currentTableAlias;
+        //        private String parentAlias;
+        private TableAlias parentTableAlias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT").build();
 
         private void clear()
         {
-            parentAlias = null;
-            parentTableAlias = null;
-            currentTableAlias = null;
+            //            parentAlias = null;
+            parentTableAlias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT").build();
         }
 
         @Override
@@ -393,25 +393,25 @@ public class QueryParser
         public Object visitTableSourceJoined(TableSourceJoinedContext ctx)
         {
             //            String prevAlias = parentAlias;
-            TableAlias prevParent = parentTableAlias;
+            //            TableAlias prevParent = parentTableAlias;
 
             TableSource tableSource = (TableSource) visit(ctx.tableSource());
 
             //            parentAlias = tableSource.alias;
-            parentTableAlias = currentTableAlias;
+            //            parentTableAlias = currentTableAlias;
 
             List<AJoin> joins = ctx
                     .joinPart()
                     .stream()
                     .map(j ->
                     {
-                        parentAlias = getIdentifier(j.tableSource().identifier());
+                        //                        parentAlias = getIdentifier(j.tableSource().identifier());
                         //                        AJoin join = (AJoin) visit(j);
                         return (AJoin) visit(j);
                     })
                     .collect(toList());
 
-            parentTableAlias = prevParent;
+            //            parentTableAlias = prevParent;
             //            parentAlias = prevAlias;
 
             return new TableSourceJoined(tableSource, joins);
@@ -447,8 +447,11 @@ public class QueryParser
             if (ctx.functionCall() != null)
             {
                 FunctionCallInfo functionCallInfo = (FunctionCallInfo) visit(ctx.functionCall());
-                currentTableAlias = TableAlias.of(getParentTableAlias(), QualifiedName.of(functionCallInfo.function), defaultIfNull(parentAlias, defaultIfNull(alias, "")), ctx.functionCall().start);
-                return new TableFunction(functionCallInfo.catalog, currentTableAlias, functionCallInfo.function, functionCallInfo.arguments/*, defaultIfNull(alias, "")*/, options,
+                TableAlias tableAlias = TableAliasBuilder
+                        .of(TableAlias.Type.FUNCTION, QualifiedName.of(functionCallInfo.function), defaultIfNull(alias, ""), ctx.functionCall().start)
+                        .parent(getParentTableAlias())
+                        .build();
+                return new TableFunction(functionCallInfo.catalog, tableAlias, functionCallInfo.function, functionCallInfo.arguments/*, defaultIfNull(alias, "")*/, options,
                         functionCallInfo.functionId, ctx.functionCall().start);
             }
             else if (ctx.subQuery() != null)
@@ -460,7 +463,16 @@ public class QueryParser
 
                 SubQueryContext subQueryCtx = ctx.subQuery();
 
+                TableAlias prevParent = parentTableAlias;
+                TableAlias tableAlias = TableAliasBuilder
+                        .of(TableAlias.Type.SUBQUERY, QualifiedName.of("SubQuery"), alias, subQueryCtx.start)
+                        .parent(getParentTableAlias())
+                        .build();
+                parentTableAlias = tableAlias;
+
                 TableSourceJoined tableSourceJoined = (TableSourceJoined) visit(subQueryCtx.tableSourceJoined());
+
+                parentTableAlias = prevParent;
 
                 if (tableSourceJoined.getTableSource() instanceof SubQueryTableSource)
                 {
@@ -471,14 +483,18 @@ public class QueryParser
                 List<Expression> groupBy = subQueryCtx.groupBy != null ? subQueryCtx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
                 List<SortItem> orderBy = subQueryCtx.sortItem() != null ? subQueryCtx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
 
-                return new SubQueryTableSource(currentTableAlias, options, tableSourceJoined, where, groupBy, orderBy, ctx.subQuery().start);
+                return new SubQueryTableSource(tableAlias, options, tableSourceJoined, where, groupBy, orderBy, ctx.subQuery().start);
             }
 
             QualifiedName table = getQualifiedName(ctx.tableName().qname());
 
-            currentTableAlias = TableAlias.of(getParentTableAlias(), table, defaultIfNull(parentAlias, defaultIfNull(alias, "")), ctx.tableName().start);
+            TableAlias tableAlias = TableAliasBuilder
+                    .of(TableAlias.Type.TABLE, table, defaultIfBlank(alias, ""), ctx.tableName().start)
+                    .parent(getParentTableAlias())
+                    .build();
+
             String catalog = ctx.tableName().catalog != null ? ctx.tableName().catalog.getText() : null;
-            return new Table(catalog, currentTableAlias, options, ctx.tableName().start);
+            return new Table(catalog, tableAlias, options, ctx.tableName().start);
         }
 
         @Override

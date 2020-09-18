@@ -21,10 +21,8 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
-import org.kuse.payloadbuilder.core.operator.Row;
-import org.kuse.payloadbuilder.core.operator.TableAlias;
+import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
 
 /**
@@ -64,14 +62,18 @@ public class QualifiedReferenceExpression extends Expression
         if (lambdaId >= 0)
         {
             Object value = context.getLambdaValue(lambdaId);
-
-            List<String> parts = qname.getParts();
-            if (value != null && parts.size() > 1)
+            if (value == null)
             {
-                if (value instanceof Row)
+                return null;
+            }
+            
+            List<String> parts = qname.getParts();
+            if (parts.size() > 1)
+            {
+                if (value instanceof Tuple)
                 {
-                    parts = parts.subList(1, parts.size());
-                    return getValue((Row) value, parts);
+                    // Skip first part here since that is the lambda part
+                    return ((Tuple) value).getValue(qname, 1);
                 }
                 else if (value instanceof Map)
                 {
@@ -86,14 +88,16 @@ public class QualifiedReferenceExpression extends Expression
             return value;
         }
 
-        Row row = context.getRow();
-        // No row set in context
-        if (row == null)
+        Tuple tuple = context.getTuple();
+        // No tuple set in context
+        if (tuple == null)
         {
             return null;
         }
 
-        return getValue(row, qname.getParts());
+        return tuple.getValue(qname, 0);
+        //
+        //        return getValue(row, qname.getParts());
     }
 
     @Override
@@ -108,122 +112,122 @@ public class QualifiedReferenceExpression extends Expression
         return true;
     }
 
-    /** Get value for provided row and parts */
-    private Object getValue(Row row, List<String> parts)
-    {
-        TableAlias current = row.getTableAlias();
-        Row resultRow = row;
-        int size = parts.size();
-        int partIndex = 0;
-        String part;
-        // aliasA.aliasB.col2
-
-        // Traverse alias path
-        while (resultRow != null && partIndex < size - 1)
-        {
-            part = parts.get(partIndex);
-
-            // 1. Alias match, move on
-            if (Objects.equals(part, current.getAlias()))
-            {
-                partIndex++;
-                continue;
-            }
-
-            // 2. Child alias, extract first row from child collection
-            TableAlias alias = current.getChildAlias(part);
-            if (alias != null)
-            {
-                partIndex++;
-                current = alias;
-                List<Row> childRows = resultRow.getChildRows(alias.getParentIndex());
-                resultRow = !childRows.isEmpty()
-                    ? childRows.get(0)
-                    : null;
-                continue;
-            }
-
-            // 3. Parent alias match upwards
-            // Parent traversal is only possible on first part of qname
-            if (partIndex == 0)
-            {
-                // NOTE! getParent is used here and not getParents
-                // since we are inside a multipart qname then we use
-                // the singular method since that one includes a predicate parent
-                // used in joins to avoid adding/indexing into lists too much.
-                Row temp = resultRow.getParent();
-                while (temp != null)
-                {
-                    if (Objects.equals(part, temp.getTableAlias().getAlias()))
-                    {
-                        break;
-                    }
-                    // Child access on parent
-                    alias = temp.getTableAlias().getChildAlias(part);
-                    if (alias != null)
-                    {
-                        List<Row> childRows = temp.getChildRows(alias.getParentIndex());
-                        temp = childRows.isEmpty() ? null : childRows.get(0);
-                        break;
-                    }
-
-                    temp = temp.getParent();
-                }
-
-                // A parent was found
-                if (temp != null)
-                {
-                    resultRow = temp;
-                    current = resultRow.getTableAlias();
-                    partIndex++;
-                    continue;
-                }
-            }
-
-            // If we came here, there cannot be any more alias traversal matches
-            break;
-        }
-
-        if (resultRow == null)
-        {
-            return null;
-        }
-
-        part = parts.get(partIndex);
-        current = resultRow.getTableAlias().getChildAlias(part);
-        if (current != null)
-        {
-            return resultRow.getChildRows(current.getParentIndex());
-        }
-
-        List<Row> tempRows = resultRow.getParents();
-        TableAlias temp = resultRow.getTableAlias().getParent();
-        while (temp != null && !tempRows.isEmpty())
-        {
-            if (Objects.equals(part, temp.getAlias()))
-            {
-                return tempRows;
-            }
-
-            temp = temp.getParent();
-            tempRows = tempRows.get(0).getParents();
-        }
-
-        Object result = resultRow.getObject(part);
-        if (result != null && partIndex < size - 1)
-        {
-            if (result instanceof Map)
-            {
-                @SuppressWarnings("unchecked")
-                Map<Object, Object> map = (Map<Object, Object>) result;
-                return MapUtils.traverse(map, partIndex + 1, parts);
-            }
-
-            throw new IllegalArgumentException("Cannot dereference value: " + result);
-        }
-
-        return result;
-    }
+//    /** Get value for provided row and parts */
+//    private Object getValue(Row row, List<String> parts)
+//    {
+//        TableAlias current = row.getTableAlias();
+//        Row resultRow = row;
+//        int size = parts.size();
+//        int partIndex = 0;
+//        String part;
+//        // aliasA.aliasB.col2
+//
+//        // Traverse alias path
+//        while (resultRow != null && partIndex < size - 1)
+//        {
+//            part = parts.get(partIndex);
+//
+//            // 1. Alias match, move on
+//            if (Objects.equals(part, current.getAlias()))
+//            {
+//                partIndex++;
+//                continue;
+//            }
+//
+//            // 2. Child alias, extract first row from child collection
+//            TableAlias alias = current.getChildAlias(part);
+//            if (alias != null)
+//            {
+//                partIndex++;
+//                current = alias;
+//                List<Row> childRows = resultRow.getChildRows(alias);
+//                resultRow = !childRows.isEmpty()
+//                    ? childRows.get(0)
+//                    : null;
+//                continue;
+//            }
+//
+//            // 3. Parent alias match upwards
+//            // Parent traversal is only possible on first part of qname
+//            if (partIndex == 0)
+//            {
+//                // NOTE! getParent is used here and not getParents
+//                // since we are inside a multipart qname then we use
+//                // the singular method since that one includes a predicate parent
+//                // used in joins to avoid adding/indexing into lists too much.
+//                Row temp = resultRow.getParent();
+//                while (temp != null)
+//                {
+//                    if (Objects.equals(part, temp.getTableAlias().getAlias()))
+//                    {
+//                        break;
+//                    }
+//                    // Child access on parent
+//                    alias = temp.getTableAlias().getChildAlias(part);
+//                    if (alias != null)
+//                    {
+//                        List<Row> childRows = temp.getChildRows(alias);
+//                        temp = childRows.isEmpty() ? null : childRows.get(0);
+//                        break;
+//                    }
+//
+//                    temp = temp.getParent();
+//                }
+//
+//                // A parent was found
+//                if (temp != null)
+//                {
+//                    resultRow = temp;
+//                    current = resultRow.getTableAlias();
+//                    partIndex++;
+//                    continue;
+//                }
+//            }
+//
+//            // If we came here, there cannot be any more alias traversal matches
+//            break;
+//        }
+//
+//        if (resultRow == null)
+//        {
+//            return null;
+//        }
+//
+//        part = parts.get(partIndex);
+//        current = resultRow.getTableAlias().getChildAlias(part);
+//        if (current != null)
+//        {
+//            return resultRow.getChildRows(current);
+//        }
+//
+//        List<Row> tempRows = resultRow.getParents();
+//        TableAlias temp = resultRow.getTableAlias().getParent();
+//        while (temp != null && !tempRows.isEmpty())
+//        {
+//            if (Objects.equals(part, temp.getAlias()))
+//            {
+//                return tempRows;
+//            }
+//
+//            temp = temp.getParent();
+//            tempRows = tempRows.get(0).getParents();
+//        }
+//
+//        Object result = resultRow.getObject(part);
+//        if (result != null && partIndex < size - 1)
+//        {
+//            if (result instanceof Map)
+//            {
+//                @SuppressWarnings("unchecked")
+//                Map<Object, Object> map = (Map<Object, Object>) result;
+//                return MapUtils.traverse(map, partIndex + 1, parts);
+//            }
+//
+//            throw new IllegalArgumentException("Cannot dereference value: " + result);
+//        }
+//
+//        return result;
+//    }
 
     @Override
     public int hashCode()

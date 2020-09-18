@@ -48,28 +48,28 @@ public class SubQueryTableSource extends TableSource
         this.where = where;
     }
 
-    @Override
-    public TableAlias getTableAlias()
-    {
-        return tableSourceJoined.getTableSource().getTableAlias();
-    }
+    //    @Override
+    //    public TableAlias getTableAlias()
+    //    {
+    //        return tableSourceJoined.getTableSource().getTableAlias();
+    //    }
 
     public TableSourceJoined getTableSourceJoined()
     {
         return tableSourceJoined;
     }
 
-    @Override
-    public String getCatalogAlias()
-    {
-        return tableSourceJoined.getTableSource().getCatalogAlias();
-    }
-
-    @Override
-    public QualifiedName getTable()
-    {
-        return tableSourceJoined.getTableSource().getTable();
-    }
+    //    @Override
+    //    public String getCatalogAlias()
+    //    {
+    //        return tableSourceJoined.getTableSource().getCatalogAlias();
+    //    }
+    //
+    //    @Override
+    //    public QualifiedName getTable()
+    //    {
+    //        return tableSourceJoined.getTableSource().getTable();
+    //    }
 
     public List<SortItem> getOrderBy()
     {
@@ -96,9 +96,9 @@ public class SubQueryTableSource extends TableSource
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
-        sb.append("[").append(System.lineSeparator());
+        sb.append("(").append(System.lineSeparator());
         sb.append(tableSourceJoined).append(System.lineSeparator());
-        sb.append("]").append(System.lineSeparator());
+        sb.append(") ").append(tableAlias.getAlias()).append(System.lineSeparator());
         return sb.toString();
     }
 }

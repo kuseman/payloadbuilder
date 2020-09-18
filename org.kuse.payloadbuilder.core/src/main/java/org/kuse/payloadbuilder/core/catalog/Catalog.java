@@ -27,8 +27,8 @@ import java.util.Map;
 
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.operator.Operator;
-import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.Option;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.SortItem;
@@ -176,8 +176,6 @@ public abstract class Catalog
         /**
          * <pre>
          * Table alias to retrieve operator for.
-         * If {@link TableAlias#isAsteriskColumns()} is set to true then the operator
-         *  <b>MUST</b> set all available columns on alias using {@link TableAlias#setColumns(String[])}
          * </pre>
          */
         public TableAlias getTableAlias()

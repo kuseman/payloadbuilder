@@ -697,7 +697,7 @@ class ESOperator extends AOperator
     {
         @JsonDeserialize(using = SourceDeserializer.class)
         @JsonProperty("_source")
-        Map<String, Object> source;
+        Map<String, Object> source = emptyMap();
         @JsonProperty("fields")
         Map<String, Object> fields = emptyMap();
         @JsonProperty("_index")
@@ -706,10 +706,12 @@ class ESOperator extends AOperator
         String type;
         @JsonProperty("_id")
         String docId;
+        @JsonProperty("found")
+        boolean found;
 
         public boolean isValid()
         {
-            return source != null;
+            return source != null && found;
         }
     }
 

@@ -45,18 +45,18 @@ class ArrayProjection implements Projection
         writer.startArray();
         if (selection != null)
         {
-            Row prevRow = context.getRow();
-            Iterator<Row> it = selection.open(context);
+            Tuple prevTuple = context.getTuple();
+            Iterator<Tuple> it = selection.open(context);
             while (it.hasNext())
             {
-                Row row = it.next();
+                Tuple tuple = it.next();
                 for (int i = 0; i < size; i++)
                 {
-                    context.setRow(row);
+                    context.setTuple(tuple);
                     projections.get(i).writeValue(writer, context);
                 }
             }
-            context.setRow(prevRow);
+            context.setTuple(prevTuple);
         }
         else
         {

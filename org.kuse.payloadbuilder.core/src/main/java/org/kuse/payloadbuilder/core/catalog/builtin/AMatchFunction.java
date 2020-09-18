@@ -113,14 +113,14 @@ class MatchFunction extends ScalarFunctionInfo implements LambdaFunction
     //        code.addImport("java.util.Iterator");
     //        code.addImport("org.apache.commons.collections.iterators.TransformIterator");
     //        code.addImport("org.apache.commons.collections.Transformer");
-    //        
+    //
     //        LambdaExpression le = (LambdaExpression) arguments.get(1);
-    //        
+    //
     //        context.addLambdaParameters(le.getIdentifiers());
     //        ExpressionCode lambdaCode = le.getExpression().generateCode(context, parentCode);
     //        context.removeLambdaParameters(le.getIdentifiers());
-    //        
-    //        String template = 
+    //
+    //        String template =
     //                "%s"
     //              + "boolean %s = true;\n"
     //              + "Iterator %s = null;\n"
@@ -137,7 +137,7 @@ class MatchFunction extends ScalarFunctionInfo implements LambdaFunction
     //              + "  });\n"
     //              + "  %s = false;\n"
     //              + "}\n";
-    //        
+    //
     //        code.setCode(String.format(template,
     //                inputCode.getCode(),
     //                code.getIsNull(),
@@ -148,7 +148,7 @@ class MatchFunction extends ScalarFunctionInfo implements LambdaFunction
     //                lambdaCode.getCode(),
     //                lambdaCode.getResVar(),
     //                code.getIsNull()));
-    //        
+    //
     //        return code;
     //    }
 

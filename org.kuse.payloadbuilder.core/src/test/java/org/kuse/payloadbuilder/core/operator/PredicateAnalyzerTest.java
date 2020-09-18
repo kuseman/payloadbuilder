@@ -33,6 +33,7 @@ import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzeItem;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair.Type;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzeResult;
+import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.ComparisonExpression;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -47,9 +48,19 @@ public class PredicateAnalyzerTest extends Assert
     @Test
     public void test_AnalyzeResult()
     {
-        TableAlias alias = TableAlias.of(null, QualifiedName.of("tableA"), "a");
-        TableAlias.of(alias, QualifiedName.of("tableS"), "s");
+        TableAlias root = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
+                .children(asList(
+                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableA"), "a"),
+                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableS"), "s")))
+                .build();
+        //
+        //        TableAlias alias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableA"), "a")
+        //                .children(asList(
+        //                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableS"), "s")))
+        //                .build();
 
+        TableAlias alias = root.getChildAliases().get(0);
+        
         Pair<List<AnalyzePair>, AnalyzeResult> pair;
         AnalyzeResult result;
         result = PredicateAnalyzer.analyze(null, alias);
@@ -146,69 +157,46 @@ public class PredicateAnalyzerTest extends Assert
                         pair(Type.UNDEFINED, null, e("a.art_id = s.art_id or (sku_id = s.sku_id and active_flg and not a.internet_flg and a.value > 100)"), asSet("a", "s"), null)),
                 result);
     }
+    
+    @Test
+    public void test_nested_reference()
+    {
+        TableAlias alias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
+                .children(asList(
+                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("source"), "s"),
+                        TableAliasBuilder.of(TableAlias.Type.SUBQUERY, QualifiedName.of("source"), "a")
+                                .children(asList(
+                                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("article"), "a"),
+                                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("articleBrand"), "ab")))))
+                .build();
+        
+        AnalyzePair p;
+
+        // Start from source and analyze a where, a nested reference cannot be pushed down
+        p = PredicateAnalyzer.AnalyzePair.of(alias.getChildAliases().get(0), e("a.ab.active_flg"));
+        assertEquals(Type.COMPARISION, p.getType());
+        assertEquals(ComparisonExpression.Type.EQUAL, p.getComparisonType());
+        assertEquals(e("a.ab.active_flg = true"), p.getPredicate());
+        assertNull(p.getColumn("b"));
+        assertNull(p.getColumn("s"));
+        assertFalse(p.isPushdown("a"));
+        assertFalse(p.isPushdown("b"));
+        assertFalse(p.isEqui("s"));
+    }
 
     @Test
     public void test_AnalyzePair()
     {
-        /*
-         *
-         * - Index: only supported is equals operator
-         * - Pairs separated with AND
-         *   Pair
-         *     - Type (comparison-enum, in-expression, undefined)
-         *     - Left-item
-         *     - Right-item (null if undefined)
-         *   Item
-         *     - Alias (set if this item only references a single alias)
-         *     - QualifiedName (set if this item references a qualified name, without Alias)
-         *     - Expression (expression for this item)
-         *
-         *  a.art_id = s.art_id
-         *      Pair (Type: EQUALS)
-         *      Left (Alias: a, QualifiedName: art_id, Expression: a.art_id)
-         *      Right (Alias: s, QualifiedName: art_id, Expression: s.art_id)
-         *
-         *  @timestamp > '......'
-         *      Pair (Type: GREATER_THAN)
-         *      Left (Alias: '', QualifiedName: @timestamp, Expression: @timestamp)
-         *      Right (Alias: null, QualifiedName: null, Expression: '......')
-         *
-         *  !(a.art_id = s.art_id)
-         *      Pair (Type: undefined)
-         *      Left (Alias: null, QualifiedName: null, Expression: !(a.art_id = s.art_id))
-         *      Right null
-         *
-         *  severity in (200, 300)
-         *      Pair (Type: IN)
-         *      Left (Alias: '', QualifiedName: severity, Expression: severity)
-         *      Right (Alias: null, QualifiedName: null, Expression: severity in (200, 300))
-         *
-         *  a.art_id in (s.art_id, -1)
-         *      Pair (Type: IN)
-         *      Left (Alias: a, QualifiedName: art_id, Expression: a.art_id)
-         *      Right (Alias: null, QualifiedName: null, Expression: a.art_id in (s.art_id, -1))
-         *
-         *  Use case: utilizing index in join
-         *    - Get all pairs where type == EQUALS
-         *    - See if all columns from index is present (getColumn on pair, default search on '' alias, only single qualified names)
-         *
-         *  Use case: utilizing index in where
-         *    - Same as for join
-         *    - Find a single IN-pair referencing an index with that column, alias cannot be present in arguments
-         *      Might be able in the future to find mix of IN,EQUALS and generate a cartesian list of values
-         *
-         *  Use case: utilizing hash-join
-         *    - Get all pairs where type == EQUALS
-         *      and references inner alias (or empty) on one of the sides AND that alias is not present on opposite side
-         *
-         *  Use case: push down predicate
-         *    - Get all pairs that only references (on both sides) provided alias. (getSingleAlias on pair.)
-         *
-         */
-
-        TableAlias alias = TableAlias.of(null, QualifiedName.of("tableA"), "aa");
-        TableAlias.of(alias, QualifiedName.of("tableS"), "a1");
-
+        TableAlias root = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
+                .children(asList(
+                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("SubQuery"), "aa")
+                                .children(asList(
+                                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableA"), "articleAttribute"),
+                                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableS"), "a1")))))
+                .build();
+    
+        TableAlias alias = root.getChildAliases().get(0);
+        
         AnalyzePair p;
 
         p = PredicateAnalyzer.AnalyzePair.of(alias, e("aa.art_id is null"));
@@ -241,12 +229,33 @@ public class PredicateAnalyzerTest extends Assert
         assertFalse(p.isPushdown("b"));
         assertFalse(p.isEqui("s"));
 
-        alias = TableAlias.of(null, QualifiedName.of("tableS"), "s");
-        TableAlias.of(alias, QualifiedName.of("tableA"), "a");
-        TableAlias.of(alias.getChildAlias("a"), QualifiedName.of("tableA_A"), "a_a");
-        TableAlias.of(alias, QualifiedName.of("tableB"), "b");
-        TableAlias.of(alias, QualifiedName.of("tableC"), "c");
+        root = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
+                .children(asList(
+                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableS"), "s"),
+                        TableAliasBuilder.of(TableAlias.Type.SUBQUERY, QualifiedName.of("tableA"), "a")
+                                .children(asList(
+                                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableA_A"), "a_a"))),
+                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableB"), "b"),
+                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableC"), "c")
 
+                ))
+                .build();
+
+        // Start from a_a and traverse up to parent
+        alias = root.getChildAliases().get(1).getChildAliases().get(0);
+        p = PredicateAnalyzer.AnalyzePair.of(alias, e("s.id"));
+        assertEquals(Type.COMPARISION, p.getType());
+        assertEquals(ComparisonExpression.Type.EQUAL, p.getComparisonType());
+        assertEquals(e("s.id = true"), p.getPredicate());
+        assertNull(p.getColumn("b"));
+        assertEquals("id", p.getColumn("s"));
+        assertTrue(p.isPushdown("s"));
+        assertFalse(p.isPushdown("a_a"));
+        assertFalse(p.isPushdown("b"));
+        assertTrue(p.isEqui("s"));
+        
+        alias = root.getChildAliases().get(0);
+        
         // Alias access
         p = PredicateAnalyzer.AnalyzePair.of(alias, e("s"));
         assertEquals(Type.COMPARISION, p.getType());

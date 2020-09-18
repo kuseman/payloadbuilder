@@ -74,12 +74,12 @@ class BatchRepeatOperator extends AOperator
         return new RowIterator()
         {
             private RowIterator it;
-            private Row next;
+            private Tuple next;
 
             @Override
-            public Row next()
+            public Tuple next()
             {
-                Row result = next;
+                Tuple result = next;
                 next = null;
                 return result;
             }

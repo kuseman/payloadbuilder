@@ -29,17 +29,17 @@ import org.kuse.payloadbuilder.core.parser.SortItem.NullOrder;
 import org.kuse.payloadbuilder.core.parser.SortItem.Order;
 
 /** Interpreter based row comparator */
-class ExpressionRowComparator implements RowComparator
+class ExpressionTupleComparator implements TupleComparator
 {
     private final List<SortItem> items;
 
-    ExpressionRowComparator(List<SortItem> items)
+    ExpressionTupleComparator(List<SortItem> items)
     {
         this.items = requireNonNull(items);
     }
 
     @Override
-    public int compare(ExecutionContext context, Row a, Row b)
+    public int compare(ExecutionContext context, Tuple a, Tuple b)
     {
         int size = items.size();
 
@@ -50,9 +50,9 @@ class ExpressionRowComparator implements RowComparator
             Order order = item.getOrder();
             Expression e = item.getExpression();
 
-            context.setRow(a);
+            context.setTuple(a);
             Object aValue = e.eval(context);
-            context.setRow(b);
+            context.setTuple(b);
             Object bValue = e.eval(context);
 
             if (aValue == null && bValue == null)
@@ -91,9 +91,9 @@ class ExpressionRowComparator implements RowComparator
     @Override
     public boolean equals(Object obj)
     {
-        if (obj instanceof ExpressionRowComparator)
+        if (obj instanceof ExpressionTupleComparator)
         {
-            ExpressionRowComparator that = (ExpressionRowComparator) obj;
+            ExpressionTupleComparator that = (ExpressionTupleComparator) obj;
             return items.equals(that.items);
         }
         return false;

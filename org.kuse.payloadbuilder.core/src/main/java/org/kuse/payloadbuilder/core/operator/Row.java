@@ -17,80 +17,82 @@
  */
 package org.kuse.payloadbuilder.core.operator;
 
-import static java.util.Collections.emptyList;
-import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
+import static org.apache.commons.lang3.StringUtils.equalsAnyIgnoreCase;
+import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
+import java.util.Iterator;
+import java.util.Map;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.kuse.payloadbuilder.core.parser.QualifiedName;
+import org.kuse.payloadbuilder.core.utils.MapUtils;
 
 /** Row */
-public class Row
+public class Row implements Tuple
 {
     protected int pos;
     // If this is a tuple row then subPos is the other rows position
-    private int subPos;
+    //    private int subPos;
     protected TableAlias tableAlias;
-    private String[] columns;
+    protected String[] columns;
 
-    /** Collection of parents that this row belongs to */
-    private List<Row> parents;
-
-    /** Temporary parent that is set during predicate evaluations (ie. join conditions) */
-    private Row predicateParent;
+    //    /** Collection of parents that this row belongs to */
+    //    private List<Row> parents;
+    //
+    //    /** Temporary parent that is set during predicate evaluations (ie. join conditions) */
+    //    private Row predicateParent;
 
     private Values values;
-    protected List<Row>[] childRows;
+    //    protected List<ChildRows> childRowsCollection;
 
     /** Temporary fields used by physical operators during join */
-    public boolean match;
-    public int hash;
-    public Object[] extractedValues;
+    //    boolean match;
+    //    int hash;
+    //    Object[] extractedValues;
 
     Row()
     {
     }
 
-    Row(Row source, int subPos)
-    {
-        this.pos = source.pos;
-        this.subPos = subPos;
-        this.tableAlias = source.tableAlias;
-        this.values = source.values;
-        this.childRows = copyChildRows(source);
-        this.parents = source.parents;
-        this.columns = source.columns;
-    }
+    //    Row(Row source, int subPos)
+    //    {
+    //        this.pos = source.pos;
+    //        this.subPos = subPos;
+    //        this.tableAlias = source.tableAlias;
+    //        this.values = source.values;
+    ////        this.childRowsCollection = copyChildRows(source);
+    ////        this.parents = source.parents;
+    //        this.columns = source.columns;
+    //    }
 
-    private List<Row>[] copyChildRows(Row source)
-    {
-        if (source.childRows == null)
-        {
-            return null;
-        }
-
-        @SuppressWarnings("unchecked")
-        List<Row>[] copy = new List[source.childRows.length];
-        int index = 0;
-        for (List<Row> rows : source.childRows)
-        {
-            copy[index++] = rows != null ? new ArrayList<>(rows) : null;
-        }
-
-        return copy;
-    }
+    //    private List<ChildRows> copyChildRows(Row source)
+    //    {
+    //        if (source.childRowsCollection == null)
+    //        {
+    //            return null;
+    //        }
+    //
+    //        int size = source.childRowsCollection.size();
+    //        List<ChildRows> copy = new ArrayList<>(size);
+    //        for (int i = 0; i < size; i++)
+    //        {
+    //            copy.add(new ChildRows(source.childRowsCollection.get(i)));
+    //        }
+    //
+    //        return copy;
+    //    }
 
     /** Return columns for this row */
     public String[] getColumns()
     {
         return columns != null ? columns : tableAlias.getColumns();
     }
-    
-    public int getColumnCount()
+
+    private int getColumnCount()
     {
-        return getColumns().length;                
+        return getColumns().length;
     }
 
     /** Extracts values into an object array */
@@ -108,6 +110,72 @@ public class Row
         return values;
     }
 
+    @Override
+    public Object getValue(QualifiedName qname, int partIndex)
+    {
+        int size = qname.getParts().size();
+        //        for (int i=partIndex;i<size;i++)
+        //        {
+        //
+        //        }
+
+        // First part is pointing to this alias, step up one part
+        int index = partIndex;
+        if (size - 1 > index && equalsAnyIgnoreCase(qname.getParts().get(index), tableAlias.getAlias()))
+        {
+            index++;
+        }
+
+        Object result = getObject(qname.getParts().get(index));
+
+        if (result == null)
+        {
+            return null;
+        }
+
+        if (index < size - 1)
+        {
+            if (result instanceof Map)
+            {
+                @SuppressWarnings("unchecked")
+                Map<Object, Object> map = (Map<Object, Object>) result;
+                return MapUtils.traverse(map, qname.getParts().subList(index + 1, size));
+            }
+
+            throw new IllegalArgumentException("Cannot dereference value " + result);
+        }
+
+        return result;
+    }
+
+    @Override
+    public boolean containsAlias(String alias)
+    {
+        return equalsIgnoreCase(alias, tableAlias.getAlias());
+    }
+
+    @Override
+    public Iterator<QualifiedName> getQualifiedNames()
+    {
+        String[] columns = getColumns();
+        String alias = tableAlias.getAlias();
+        return Arrays.stream(columns)
+                .map(c -> isNotBlank(alias) ? QualifiedName.of(alias, c) : QualifiedName.of(c))
+                .iterator();
+    }
+
+    //    @Override
+    //    public void writeColumns(OutputWriter writer, String alias)
+    //    {
+    //        String[] columns = getColumns();
+    //        int length = columns.length;
+    //        for (int i = 0; i < length; i++)
+    //        {
+    //            writer.writeFieldName(columns[i]);
+    //            writer.writeValue(values.get(i));
+    //        }
+    //    }
+
     public Object getObject(int ordinal)
     {
         if (ordinal < 0)
@@ -117,38 +185,50 @@ public class Row
         return values.get(ordinal);
     }
 
+    private static final String POS = "__pos";
+
     public Object getObject(String column)
     {
+        if (POS.equals(column))
+        {
+            return pos;
+        }
         int ordinal = ArrayUtils.indexOf(getColumns(), column);
         return getObject(ordinal);
     }
 
-    public List<Row> getChildRows(int index)
-    {
-        if (childRows == null)
-        {
-            childRows = new ChildRows[tableAlias.getChildAliases().size()];
-        }
-
-        List<Row> rows = childRows[index];
-        if (rows == null)
-        {
-            rows = new ChildRows();
-            childRows[index] = rows;
-        }
-
-        return rows;
-    }
-
-    public int getPos()
-    {
-        return pos;
-    }
-
-    public int getSubPos()
-    {
-        return subPos;
-    }
+    //    public List<Row> getChildRows(TableAlias alias)
+    //    {
+    //        if (childRowsCollection == null)
+    //        {
+    //            childRowsCollection = new ArrayList<>();
+    //        }
+    //
+    //        int size = childRowsCollection.size();
+    //        for (int i = 0; i < size; i++)
+    //        {
+    //            ChildRows childRows = childRowsCollection.get(i);
+    //            if (childRows.alias == alias)
+    //            {
+    //                return childRows;
+    //            }
+    //        }
+    //
+    //        ChildRows childRows = new ChildRows(alias);
+    //        childRowsCollection.add(childRows);
+    //
+    //        return childRows;
+    //    }
+    //
+    //    public int getPos()
+    //    {
+    //        return pos;
+    //    }
+    //
+    //    public int getSubPos()
+    //    {
+    //        return subPos;
+    //    }
 
     public TableAlias getTableAlias()
     {
@@ -156,55 +236,49 @@ public class Row
     }
 
     /** Get single parent. Either returns temporary predicate parent or first connected parent */
-    public Row getParent()
-    {
-        if (predicateParent != null)
-        {
-            return predicateParent;
-        }
-        else if (parents != null && parents.size() > 0)
-        {
-            return parents.get(0);
-        }
+    //    public Row getParent()
+    //    {
+    //        if (predicateParent != null)
+    //        {
+    //            return predicateParent;
+    //        }
+    //        else if (parents != null && parents.size() > 0)
+    //        {
+    //            return parents.get(0);
+    //        }
+    //
+    //        return null;
+    //    }
+    //
+    //    /** Add provided row as parent to this row */
+    //    void addParent(Row row)
+    //    {
+    //        if (parents == null)
+    //        {
+    //            parents = new ArrayList<>();
+    //        }
+    //        parents.add(row);
+    //    }
+    //
+    //    public List<Row> getParents()
+    //    {
+    //        return defaultIfNull(parents, emptyList());
+    //    }
+    //
+    //    void setPredicateParent(Row parent)
+    //    {
+    //        predicateParent = parent;
+    //    }
+    //
+    //    void clearPredicateParent()
+    //    {
+    //        predicateParent = null;
+    //    }
 
-        return null;
-    }
-
-    /** Add provided row as parent to this row */
-    void addParent(Row row)
-    {
-        if (parents == null)
-        {
-            parents = new ArrayList<>();
-        }
-        parents.add(row);
-    }
-
-    public List<Row> getParents()
-    {
-        return defaultIfNull(parents, emptyList());
-    }
-
-    void setPredicateParent(Row parent)
-    {
-        predicateParent = parent;
-    }
-
-    void clearPredicateParent()
-    {
-        predicateParent = null;
-    }
-
-    /** Construct a row with provided alias, values and position */
     public static Row of(TableAlias alias, int pos, Object... values)
+    /** Construct a row with provided alias, values and position */
     {
-        return of(alias , pos, alias.getColumns(), values);
-    }
-
-    /** Construct a row with provided parent, alias, values and position */
-    public static Row of(Row parent, TableAlias alias, int pos, Object... values)
-    {
-        return of(parent, alias, pos, alias.getColumns(), values);
+        return of(alias, pos, alias.getColumns(), values);
     }
 
     /** Construct a row with provided alias, columns, values and position */
@@ -213,43 +287,27 @@ public class Row
         return of(alias, pos, columns, new ObjectValues(values));
     }
 
-    /** Construct a row with provided parent, alias, columns, values and position */
-    public static Row of(Row parent, TableAlias alias, int pos, String[] columns, Object... values)
-    {
-        return of(parent, alias, pos, columns, new ObjectValues(values));
-    }
-
     /** Construct a row with provided alias, values and position */
     public static Row of(TableAlias alias, int pos, Values values)
     {
         return of(alias, pos, alias.getColumns(), values);
     }
-    
-    /** Construct a row with provided alias, columns, values and position */
-    public static Row of(TableAlias alias, int pos, String[] columns, Values values)
-    {
-        return of(null, alias,pos, columns, values);
-    }
-    
+
     /** Construct a row with provided parent, alias, columns, values and position */
-    private static Row of(Row parent, TableAlias alias, int pos, String[] columns, Values values)
+    private static Row of(TableAlias alias, int pos, String[] columns, Values values)
     {
         Row t = new Row();
         t.pos = pos;
         t.tableAlias = alias;
         t.columns = columns;
         t.values = values;
-        if (parent != null)
-        {
-            t.addParent(parent);
-        }
         return t;
     }
 
     @Override
     public int hashCode()
     {
-        return 17 + (pos * 37) + (subPos * 37);
+        return 17 + (pos * 37);
     }
 
     @Override
@@ -257,8 +315,9 @@ public class Row
     {
         if (obj instanceof Row)
         {
-            // Assumes the same table
-            return ((Row) obj).pos == pos && ((Row) obj).subPos == subPos;
+            Row that = (Row) obj;
+            return pos == that.pos
+                && tableAlias == that.tableAlias;
         }
         return false;
     }
@@ -269,10 +328,25 @@ public class Row
         return tableAlias.getTable() + " (" + pos + ") " + values;
     }
 
-    /** Child rows list. For easier instanceof etc. to detect if a value is child rows */
-    public static class ChildRows extends ArrayList<Row>
-    {
-    }
+    //    /** Child rows list. List of rows with a specific table alias */
+    //    public static class ChildRows extends ArrayList<Row>
+    //    {
+    //        private final TableAlias alias;
+    //        /** Flag used by {@link GroupedRow} to indicate if this collection is populted or not */
+    //        boolean populated;
+    //
+    //        ChildRows(TableAlias alias)
+    //        {
+    //            this.alias = alias;
+    //        }
+    //
+    //        ChildRows(ChildRows childRows)
+    //        {
+    //            this.alias = childRows.alias;
+    //            addAll(childRows);
+    //        }
+    //
+    //    }
 
     /** Values definition of a rows values */
     public interface Values

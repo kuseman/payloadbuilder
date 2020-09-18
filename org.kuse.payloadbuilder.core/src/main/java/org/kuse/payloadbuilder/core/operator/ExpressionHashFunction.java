@@ -28,7 +28,7 @@ import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Function that generates a hash from provided expressions */
-class ExpressionHashFunction implements ToIntBiFunction<ExecutionContext, Row>
+class ExpressionHashFunction implements ToIntBiFunction<ExecutionContext, Tuple>
 {
     private final List<Expression> expressions;
 
@@ -38,9 +38,9 @@ class ExpressionHashFunction implements ToIntBiFunction<ExecutionContext, Row>
     }
 
     @Override
-    public int applyAsInt(ExecutionContext context, Row row)
+    public int applyAsInt(ExecutionContext context, Tuple tuple)
     {
-        context.setRow(row);
+        context.setTuple(tuple);
         int hash = 37;
         for (Expression expression : expressions)
         {

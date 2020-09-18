@@ -73,7 +73,7 @@ class TopOperator extends AOperator
             private int count;
 
             @Override
-            public Row next()
+            public Tuple next()
             {
                 count++;
                 return it.next();

@@ -20,22 +20,15 @@ package org.kuse.payloadbuilder.core.operator;
 import static java.util.Arrays.asList;
 
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Test of {@link OperatorBuilder} building applys */
 public class OperatorBuilderApplyTest extends AOperatorTest
 {
-    private final TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"id1"});
-    @SuppressWarnings("unused")
-    private final TableAlias article = TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"id2"});
-
     @Test
     public void test_cross_apply()
     {
         String query = "select s.id1, a.id2 from source s cross apply article a";
         QueryResult result = getQueryResult(query);
-
-        assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
 
         Operator expected = new NestedLoopJoin(
                 3,
@@ -43,7 +36,7 @@ public class OperatorBuilderApplyTest extends AOperatorTest
                 result.tableOperators.get(0),
                 new CachingOperator(2, result.tableOperators.get(1)),
                 null,
-                DefaultRowMerger.DEFAULT,
+                DefaultTupleMerger.DEFAULT,
                 false,
                 false);
 
@@ -63,15 +56,13 @@ public class OperatorBuilderApplyTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s cross apply article a with(populate=true)";
         QueryResult result = getQueryResult(query);
 
-        assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
-
         Operator expected = new NestedLoopJoin(
                 3,
                 "",
                 result.tableOperators.get(0),
                 new CachingOperator(2, result.tableOperators.get(1)),
                 null,
-                DefaultRowMerger.DEFAULT,
+                DefaultTupleMerger.DEFAULT,
                 true,
                 false);
 
@@ -94,15 +85,13 @@ public class OperatorBuilderApplyTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s outer apply article a";
         QueryResult result = getQueryResult(query);
 
-        assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
-
         Operator expected = new NestedLoopJoin(
                 3,
                 "",
                 result.tableOperators.get(0),
                 new CachingOperator(2, result.tableOperators.get(1)),
                 null,
-                DefaultRowMerger.DEFAULT,
+                DefaultTupleMerger.DEFAULT,
                 false,
                 true);
 
@@ -122,11 +111,6 @@ public class OperatorBuilderApplyTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s outer apply article a where a.active_flg";
         QueryResult result = getQueryResult(query);
 
-        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"id1"});
-        TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"active_flg", "id2"});
-
-        assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
-
         Operator expected = new NestedLoopJoin(
                 4,
                 "OUTER APPLY",
@@ -138,7 +122,7 @@ public class OperatorBuilderApplyTest extends AOperatorTest
                                 result.tableOperators.get(1),
                                 new ExpressionPredicate(e("a.active_flg = true")))),
                 null,
-                DefaultRowMerger.DEFAULT,
+                DefaultTupleMerger.DEFAULT,
                 false,
                 true);
 
@@ -161,11 +145,6 @@ public class OperatorBuilderApplyTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s outer apply article a where a.active_flg and a.value is null";
         QueryResult result = getQueryResult(query);
 
-        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"id1"});
-        TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"active_flg", "value", "id2"});
-        
-        assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
-
         Operator expected = new FilterOperator(
                 5,
                 new NestedLoopJoin(
@@ -179,7 +158,7 @@ public class OperatorBuilderApplyTest extends AOperatorTest
                                         result.tableOperators.get(1),
                                         new ExpressionPredicate(e("a.active_flg = true")))),
                         null,
-                        DefaultRowMerger.DEFAULT,
+                        DefaultTupleMerger.DEFAULT,
                         false,
                         true),
                 new ExpressionPredicate(e("a.value is null")));
@@ -203,15 +182,13 @@ public class OperatorBuilderApplyTest extends AOperatorTest
         String query = "select s.id1, a.id2 from source s outer apply article a with (populate=true)";
         QueryResult result = getQueryResult(query);
 
-        assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
-
         Operator expected = new NestedLoopJoin(
                 3,
                 "",
                 result.tableOperators.get(0),
                 new CachingOperator(2, result.tableOperators.get(1)),
                 null,
-                DefaultRowMerger.DEFAULT,
+                DefaultTupleMerger.DEFAULT,
                 true,
                 true);
 

@@ -51,10 +51,10 @@ class HashJoin extends AOperator
     private final String logicalOperator;
     private final Operator outer;
     private final Operator inner;
-    private final ToIntBiFunction<ExecutionContext, Row> outerHashFunction;
-    private final ToIntBiFunction<ExecutionContext, Row> innerHashFunction;
-    private final BiPredicate<ExecutionContext, Row> predicate;
-    private final RowMerger rowMerger;
+    private final ToIntBiFunction<ExecutionContext, Tuple> outerHashFunction;
+    private final ToIntBiFunction<ExecutionContext, Tuple> innerHashFunction;
+    private final BiPredicate<ExecutionContext, Tuple> predicate;
+    private final TupleMerger rowMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
 
@@ -63,10 +63,10 @@ class HashJoin extends AOperator
             String logicalOperator,
             Operator outer,
             Operator inner,
-            ToIntBiFunction<ExecutionContext, Row> outerHashFunction,
-            ToIntBiFunction<ExecutionContext, Row> innerHashFunction,
-            BiPredicate<ExecutionContext, Row> predicate,
-            RowMerger rowMerger,
+            ToIntBiFunction<ExecutionContext, Tuple> outerHashFunction,
+            ToIntBiFunction<ExecutionContext, Tuple> innerHashFunction,
+            BiPredicate<ExecutionContext, Tuple> predicate,
+            TupleMerger rowMerger,
             boolean populating,
             boolean emitEmptyOuterRows)
     {
@@ -122,14 +122,15 @@ class HashJoin extends AOperator
     @Override
     public RowIterator open(ExecutionContext context)
     {
-        Map<IntKey, List<Row>> table = hash(context);
+        Tuple contextOuter = context.getTuple();
+        Map<IntKey, List<TupleHolder>> table = hash(context);
         if (table.isEmpty())
         {
             return RowIterator.EMPTY;
         }
 
         boolean markOuterRows = populating || emitEmptyOuterRows;
-        RowIterator probeIterator = probeIterator(context.getRow(), table, context, markOuterRows);
+        RowIterator probeIterator = probeIterator(contextOuter, table, context, markOuterRows);
 
         if (populating)
         {
@@ -155,20 +156,20 @@ class HashJoin extends AOperator
                 tableIterator(table, TableIteratorType.NON_MATCHED)));
     };
 
-    private Map<IntKey, List<Row>> hash(ExecutionContext context)
+    private Map<IntKey, List<TupleHolder>> hash(ExecutionContext context)
     {
         IntKey key = new IntKey();
-        Map<IntKey, List<Row>> table = new LinkedHashMap<>();
+        Map<IntKey, List<TupleHolder>> table = new LinkedHashMap<>();
         RowIterator oi = outer.open(context);
         while (oi.hasNext())
         {
-            Row row = oi.next();
-            key.key = outerHashFunction.applyAsInt(context, row);
-            List<Row> list = table.get(key);
+            Tuple tuple = oi.next();
+            key.key = outerHashFunction.applyAsInt(context, tuple);
+            List<TupleHolder> list = table.get(key);
             if (list == null)
             {
                 // Start with singleton list
-                list = singletonList(row);
+                list = singletonList(new TupleHolder(tuple));
                 table.put(key, list);
                 continue;
             }
@@ -178,26 +179,28 @@ class HashJoin extends AOperator
                 list = new ArrayList<>(list);
                 table.put(key, list);
             }
-            list.add(row);
+            list.add(new TupleHolder(tuple));
         }
         oi.close();
         return table;
     }
 
     private RowIterator probeIterator(
-            Row contextParent,
-            Map<IntKey, List<Row>> table,
+            Tuple contextOuter,
+            Map<IntKey, List<TupleHolder>> table,
             ExecutionContext context,
             boolean markOuterRows)
     {
         final RowIterator ii = inner.open(context);
+        final JoinTuple joinTuple = new JoinTuple();
+        joinTuple.setContextOuter(contextOuter);
         return new RowIterator()
         {
-            Row next;
-            Row currentInner;
-            List<Row> outerList;
-            int outerIndex;
-            IntKey key = new IntKey();
+            private Tuple next;
+            private Tuple currentInner;
+            private List<TupleHolder> outerList;
+            private int outerIndex;
+            private final IntKey key = new IntKey();
 
             @Override
             public boolean hasNext()
@@ -206,11 +209,11 @@ class HashJoin extends AOperator
             }
 
             @Override
-            public Row next()
+            public Tuple next()
             {
-                Row r = next;
+                Tuple tuple = next;
                 next = null;
-                return r;
+                return tuple;
             }
 
             @Override
@@ -231,9 +234,10 @@ class HashJoin extends AOperator
                         }
 
                         currentInner = ii.next();
+                        joinTuple.setInner(currentInner);
 
                         key.key = innerHashFunction.applyAsInt(context, currentInner);
-                        List<Row> list = table.get(key);
+                        List<TupleHolder> list = table.get(key);
                         if (list == null)
                         {
                             currentInner = null;
@@ -251,21 +255,20 @@ class HashJoin extends AOperator
                         continue;
                     }
 
-                    Row currentOuter = outerList.get(outerIndex++);
-                    currentOuter.setPredicateParent(contextParent);
-                    currentInner.setPredicateParent(currentOuter);
-
-                    if (predicate.test(context, currentInner))
+                    TupleHolder currentOuter = outerList.get(outerIndex++);
+                    joinTuple.setOuter(currentOuter.tuple);
+                    if (predicate.test(context, joinTuple))
                     {
-                        next = rowMerger.merge(currentOuter, currentInner, populating);
+                        next = rowMerger.merge(currentOuter.tuple, currentInner, populating, nodeId);
+                        if (populating)
+                        {
+                            currentOuter.tuple = next;
+                        }
                         if (markOuterRows)
                         {
                             currentOuter.match = true;
                         }
                     }
-
-                    currentInner.clearPredicateParent();
-                    currentOuter.clearPredicateParent();
                 }
 
                 return true;
@@ -274,14 +277,14 @@ class HashJoin extends AOperator
     }
 
     private RowIterator tableIterator(
-            Map<IntKey, List<Row>> table,
+            Map<IntKey, List<TupleHolder>> table,
             TableIteratorType type)
     {
-        final Iterator<List<Row>> tableIt = table.values().iterator();
+        final Iterator<List<TupleHolder>> tableIt = table.values().iterator();
         return new RowIterator()
         {
-            private Row next;
-            private List<Row> list;
+            private Tuple next;
+            private List<TupleHolder> list;
             private int index;
 
             @Override
@@ -291,9 +294,9 @@ class HashJoin extends AOperator
             }
 
             @Override
-            public Row next()
+            public Tuple next()
             {
-                Row result = next;
+                Tuple result = next;
                 next = null;
                 return result;
             }
@@ -319,20 +322,30 @@ class HashJoin extends AOperator
                         continue;
                     }
 
-                    Row row = list.get(index++);
-                    if ((type == TableIteratorType.MATCHED && row.match)
+                    TupleHolder holder = list.get(index++);
+                    if ((type == TableIteratorType.MATCHED && holder.match)
                         ||
-                        type == TableIteratorType.NON_MATCHED && !row.match
+                        type == TableIteratorType.NON_MATCHED && !holder.match
                         ||
                         type == TableIteratorType.BOTH)
                     {
-                        next = row;
+                        next = holder.tuple;
                     }
-                    row.match = false;
                 }
                 return true;
             }
         };
+    }
+
+    private static class TupleHolder
+    {
+        private Tuple tuple;
+        private boolean match;
+
+        TupleHolder(Tuple tuple)
+        {
+            this.tuple = tuple;
+        }
     }
 
     /**
@@ -356,6 +369,12 @@ class HashJoin extends AOperator
         public boolean equals(Object obj)
         {
             return true;
+        }
+
+        @Override
+        public String toString()
+        {
+            return String.valueOf(key);
         }
     }
 

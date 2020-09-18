@@ -34,9 +34,9 @@ import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 class FilterOperator extends AOperator
 {
     private final Operator operator;
-    private final BiPredicate<ExecutionContext, Row> predicate;
+    private final BiPredicate<ExecutionContext, Tuple> predicate;
 
-    FilterOperator(int nodeId, Operator operator, BiPredicate<ExecutionContext, Row> predicate)
+    FilterOperator(int nodeId, Operator operator, BiPredicate<ExecutionContext, Tuple> predicate)
     {
         super(nodeId);
         this.operator = requireNonNull(operator);
@@ -68,12 +68,12 @@ class FilterOperator extends AOperator
         RowIterator iterator = operator.open(context);
         return new RowIterator()
         {
-            private Row next;
+            private Tuple next;
 
             @Override
-            public Row next()
+            public Tuple next()
             {
-                Row result = next;
+                Tuple result = next;
                 next = null;
                 return result;
             }
@@ -99,10 +99,10 @@ class FilterOperator extends AOperator
                         return false;
                     }
 
-                    Row row = iterator.next();
-                    if (predicate.test(context, row))
+                    Tuple tuple = iterator.next();
+                    if (predicate.test(context, tuple))
                     {
-                        next = row;
+                        next = tuple;
                     }
                 }
                 return true;
