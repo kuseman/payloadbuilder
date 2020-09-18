@@ -121,7 +121,12 @@ class PayloadbuilderService
                 // Only set error messages if this is the latest query made
                 if (queryId == file.getQueryId())
                 {
-                    file.setError(e.getMessage());
+                    String message = e.getMessage();
+                    if (e.getCause() != null)
+                    {
+                        message += " (" + e.getCause().getClass().getSimpleName() + ")";
+                    }
+                    file.setError(message);
                     file.setState(State.ERROR);
                     if (System.getProperty("devEnv") != null)
                     {
