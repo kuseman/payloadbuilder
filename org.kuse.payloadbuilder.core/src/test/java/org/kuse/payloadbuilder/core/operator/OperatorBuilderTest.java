@@ -19,7 +19,8 @@ package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Arrays.asList;
 import static org.kuse.payloadbuilder.core.parser.QualifiedName.of;
-import static org.kuse.payloadbuilder.core.utils.CollectionUtils.asSet;
+import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
+import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -96,13 +97,6 @@ public class OperatorBuilderTest extends AOperatorTest
     }
 
     @Test
-    public void test_asterisk_select()
-    {
-        String query = "select * from article";
-
-    }
-
-    @Test
     public void test_sortBy()
     {
         String query = "select a.art_id from article a order by a.art_id";
@@ -145,7 +139,7 @@ public class OperatorBuilderTest extends AOperatorTest
         Operator expected = new GroupByOperator(
                 1,
                 queryResult.tableOperators.get(0),
-                asSet(QualifiedName.of("art_id"), QualifiedName.of("a", "art_id")),
+                ofEntries(entry("art_id", QualifiedName.of("a", "art_id"))),
                 new ExpressionValuesExtractor(asList(e("a.art_id"))),
                 1);
 
@@ -167,17 +161,19 @@ public class OperatorBuilderTest extends AOperatorTest
                         4,
                         "INNER JOIN",
                         queryResult.tableOperators.get(0),
-                        new HashJoin(
-                                3,
-                                "INNER JOIN",
-                                queryResult.tableOperators.get(1),
-                                queryResult.tableOperators.get(2),
-                                new ExpressionHashFunction(asList(e("a.art_id"))),
-                                new ExpressionHashFunction(asList(e("ab.art_id"))),
-                                new ExpressionPredicate(e("ab.art_id = a.art_id")),
-                                DefaultTupleMerger.DEFAULT,
-                                true,
-                                false),
+                        new SubQueryOperator(
+                                new HashJoin(
+                                        3,
+                                        "INNER JOIN",
+                                        queryResult.tableOperators.get(1),
+                                        queryResult.tableOperators.get(2),
+                                        new ExpressionHashFunction(asList(e("a.art_id"))),
+                                        new ExpressionHashFunction(asList(e("ab.art_id"))),
+                                        new ExpressionPredicate(e("ab.art_id = a.art_id")),
+                                        DefaultTupleMerger.DEFAULT,
+                                        true,
+                                        false),
+                                "a"),
                         new ExpressionHashFunction(asList(e("s.art_id"))),
                         new ExpressionHashFunction(asList(e("a.art_id"))),
                         new ExpressionPredicate(e("a.art_id = s.art_id")),
@@ -186,8 +182,8 @@ public class OperatorBuilderTest extends AOperatorTest
                         false),
                 new ExpressionPredicate(e("a.ab.active_flg = true")));
 
-                        System.out.println(queryResult.operator.toString(1));
-                        System.err.println(expected.toString(1));
+//        System.out.println(queryResult.operator.toString(1));
+//        System.err.println(expected.toString(1));
 
         assertEquals(expected, queryResult.operator);
     }
@@ -399,27 +395,29 @@ public class OperatorBuilderTest extends AOperatorTest
                         DefaultTupleMerger.DEFAULT,
                         true,
                         false),
-                new HashJoin(
-                        9,
-                        "INNER JOIN",
+                new SubQueryOperator(
                         new HashJoin(
-                                7,
+                                9,
                                 "INNER JOIN",
-                                new FilterOperator(4, queryResult.tableOperators.get(2), new ExpressionPredicate(e("active_flg = true"))),
-                                new FilterOperator(6, queryResult.tableOperators.get(3), new ExpressionPredicate(e("ap.price_sales > 0"))),
-                                new ExpressionHashFunction(asList(e("aa.sku_id"))),
-                                new ExpressionHashFunction(asList(e("ap.sku_id"))),
-                                new ExpressionPredicate(e("ap.sku_id = aa.sku_id")),
+                                new HashJoin(
+                                        7,
+                                        "INNER JOIN",
+                                        new FilterOperator(4, queryResult.tableOperators.get(2), new ExpressionPredicate(e("active_flg = true"))),
+                                        new FilterOperator(6, queryResult.tableOperators.get(3), new ExpressionPredicate(e("ap.price_sales > 0"))),
+                                        new ExpressionHashFunction(asList(e("aa.sku_id"))),
+                                        new ExpressionHashFunction(asList(e("ap.sku_id"))),
+                                        new ExpressionPredicate(e("ap.sku_id = aa.sku_id")),
+                                        DefaultTupleMerger.DEFAULT,
+                                        false,
+                                        false),
+                                queryResult.tableOperators.get(4),
+                                new ExpressionHashFunction(asList(e("aa.attr1_id"))),
+                                new ExpressionHashFunction(asList(e("a1.attr1_id"))),
+                                new ExpressionPredicate(e("a1.attr1_id = aa.attr1_id")),
                                 DefaultTupleMerger.DEFAULT,
-                                false,
+                                true,
                                 false),
-                        queryResult.tableOperators.get(4),
-                        new ExpressionHashFunction(asList(e("aa.attr1_id"))),
-                        new ExpressionHashFunction(asList(e("a1.attr1_id"))),
-                        new ExpressionPredicate(e("a1.attr1_id = aa.attr1_id")),
-                        DefaultTupleMerger.DEFAULT,
-                        true,
-                        false),
+                        "aa"),
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("aa.art_id"))),
                 new ExpressionPredicate(e("aa.art_id = s.art_id")),
@@ -659,17 +657,13 @@ public class OperatorBuilderTest extends AOperatorTest
         String query = "select object(s.id1, a.id2 from s where s.id4 > 0) arr from source s inner join (from article where note_id > 0) a with(populate=true) on a.art_id = s.art_id and a.active_flg where s.id3 > 0";
         QueryResult result = getQueryResult(query);
 
-        // Assert aliaes
-        //        TableAlias source = TableAlias.of(null, QualifiedName.of("source"), "s", new String[] {"art_id", "id4", "id3", "id1"});
-        //        TableAlias.of(source, QualifiedName.of("article"), "a", new String[] {"art_id", "active_flg", "id2", "note_id"});
-        //
-        //        assertTrue("Alias hierarchy should be equal", source.isEqual(result.alias));
-
         Operator expected = new HashJoin(
                 4,
                 "INNER JOIN",
                 new FilterOperator(1, result.tableOperators.get(0), new ExpressionPredicate(e("s.id3 > 0"))),
-                new FilterOperator(3, result.tableOperators.get(1), new ExpressionPredicate(e("note_id > 0 and a.active_flg = true"))),
+                new SubQueryOperator(
+                        new FilterOperator(3, result.tableOperators.get(1), new ExpressionPredicate(e("note_id > 0 and a.active_flg = true"))),
+                        "a"),
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
@@ -677,8 +671,8 @@ public class OperatorBuilderTest extends AOperatorTest
                 true,
                 false);
 
-        //                                                System.out.println(expected.toString(1));
-        //                                                System.err.println(result.operator.toString(1));
+        //        System.out.println(expected.toString(1));
+        //        System.err.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
 
@@ -717,24 +711,26 @@ public class OperatorBuilderTest extends AOperatorTest
                         4,
                         "INNER JOIN",
                         result.tableOperators.get(0),
-                        new HashJoin(
-                                3,
-                                "INNER JOIN",
-                                result.tableOperators.get(1),
-                                result.tableOperators.get(2),
-                                new ExpressionHashFunction(asList(e("a.art_id"))),
-                                new ExpressionHashFunction(asList(e("aa.art_id"))),
-                                new ExpressionPredicate(e("aa.art_id = a.art_id AND s.id = true")),
-                                DefaultTupleMerger.DEFAULT,
-                                true,
-                                false),
+                        new SubQueryOperator(
+                                new HashJoin(
+                                        3,
+                                        "INNER JOIN",
+                                        result.tableOperators.get(1),
+                                        result.tableOperators.get(2),
+                                        new ExpressionHashFunction(asList(e("a.art_id"))),
+                                        new ExpressionHashFunction(asList(e("aa.art_id"))),
+                                        new ExpressionPredicate(e("aa.art_id = a.art_id AND s.id = true")),
+                                        DefaultTupleMerger.DEFAULT,
+                                        true,
+                                        false),
+                                "a"),
                         new ExpressionPredicate(e("a.art_id = s.art_id")),
                         DefaultTupleMerger.DEFAULT,
                         true,
                         false);
 
-                                                System.err.println(expected.toString(1));
-                                                System.out.println(result.operator.toString(1));
+//        System.err.println(expected.toString(1));
+//        System.out.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
 

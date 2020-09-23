@@ -28,7 +28,6 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
@@ -40,12 +39,12 @@ class GroupByOperator extends AOperator
     private final Operator operator;
     private final ValuesExtractor valuesExtractor;
     private final int size;
-    private final Set<QualifiedName> columnReferences;
+    private final Map<String, QualifiedName> columnReferences;
 
     GroupByOperator(
             int nodeId,
             Operator operator,
-            Set<QualifiedName> columnReferences,
+            Map<String, QualifiedName> columnReferences,
             ValuesExtractor valuesExtractor,
             int size)
     {

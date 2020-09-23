@@ -256,11 +256,7 @@ public class QueryParser
 
             TableSourceJoined joinedTableSource = ctx.tableSourceJoined() != null ? (TableSourceJoined) visit(ctx.tableSourceJoined()) : null;
             Expression topExpression = ctx.topCount() != null ? (Expression) visit(ctx.topCount()) : null;
-            if (joinedTableSource != null && joinedTableSource.getTableSource() instanceof SubQueryTableSource)
-            {
-                throw new ParseException("Top table source cannot be a populating table source.", ctx.tableSourceJoined().start);
-            }
-            else if (joinedTableSource == null)
+            if (joinedTableSource == null)
             {
                 if (ctx.where != null)
                 {

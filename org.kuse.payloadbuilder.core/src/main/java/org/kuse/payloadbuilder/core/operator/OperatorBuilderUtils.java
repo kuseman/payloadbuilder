@@ -17,11 +17,10 @@
  */
 package org.kuse.payloadbuilder.core.operator;
 
-import static java.util.stream.Collectors.toSet;
-
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Stream;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -29,7 +28,6 @@ import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 
 class OperatorBuilderUtils
 {
-
     /**
      * Creates a group by operator for provided expressions
      *
@@ -45,23 +43,12 @@ class OperatorBuilderUtils
         // Extract column references
         // These will not return a aggregated result when queried
         // since they are the same of all rows in a group
-        Set<QualifiedName> columnReferences = groupBys.stream()
+        Map<String, QualifiedName> columnReferences = groupBys.stream()
                 .filter(e -> e instanceof QualifiedReferenceExpression)
                 .map(e -> (QualifiedReferenceExpression) e)
                 .filter(e -> e.getQname().getParts().size() <= 2)
                 .map(e -> e.getQname())
-                .flatMap(q ->
-                {
-                    // Split up 2 part qnames to full and column only
-                    // to be able to access grouped values be column only
-                    if (q.getParts().size() == 2)
-                    {
-                        return Stream.of(q, QualifiedName.of(q.getLast()));
-                    }
-
-                    return Stream.of(q);
-                })
-                .collect(toSet());
+                .collect(Collectors.toMap(key -> key.getLast(), Function.identity()));
 
         return new GroupByOperator(
                 nodeId,

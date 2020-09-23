@@ -63,20 +63,6 @@ public interface Operator
     }
 
     /**
-     * Returns a short analyze string of the operator. Used in analyze statement
-     */
-    default String getAnalyzeString()
-    {
-        return "";
-    }
-
-    /** Returns more detail properties of analyze statement if {@link #getAnalyzeString()} is not enough. */
-    default Map<String, Object> getAnalyzeProperties()
-    {
-        return emptyMap();
-    }
-
-    /**
      * To string with indent. Used when printing operator tree
      *
      * @param indent Indent count

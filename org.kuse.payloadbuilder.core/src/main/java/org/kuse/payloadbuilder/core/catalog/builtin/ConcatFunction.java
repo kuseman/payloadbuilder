@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
@@ -46,7 +47,14 @@ class ConcatFunction extends ScalarFunctionInfo
     public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Expression> arguments, Function<Expression, Set<TableAlias>> aliasResolver)
     {
         // Result of a concat is the result of all arguments aliases
-        return arguments.stream().flatMap(a -> aliasResolver.apply(a).stream()).collect(toSet());
+        return arguments
+                .stream()
+                .flatMap(a -> 
+                {
+                    Set<TableAlias> argAliases = aliasResolver.apply(a);
+                    return argAliases == null ? Stream.empty() : argAliases.stream();
+                })
+                .collect(toSet());
     }
 
     @Override

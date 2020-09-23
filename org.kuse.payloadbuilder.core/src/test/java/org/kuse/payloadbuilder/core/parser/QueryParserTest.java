@@ -204,41 +204,8 @@ public class QueryParserTest extends AParserTest
         // Reuse lambda parameter in sibling scope
         assertExpression("articleAttribute.map(aa -> aa.price.map(a -> a.price_sales) and aa.balance.map(a -> a.balance_disp))");
 
-        // Should not dereference non qualified expressions
-        //        assertExpressionFail(ParseException.class, "Can only dereference qualified references or functions", "'rere'.filter(a -> a.sku_id > 0)");
         // Lambda parameter already in use
         assertExpressionFail(ParseException.class, "Lambda identifier a is already defined in scope", "articleAttribute.map(a -> p.price.map(a -> a.price_sales))");
-    }
-
-    @Test
-    public void test_queries()
-    {
-        //        assertQuery("inner join article a ()");
-        //
-        //        assertQuery("inner join article a (inner join article b ())");
-        //
-        //        assertQuery(""
-        //            + "inner join article a ("
-        //            + "),"
-        //            + "left join article_attribute_media aam ("
-        //            + ")");
-        //
-        //        assertQuery(""
-        //                + "inner join article a ("
-        //                + "  inner join articleBrand ab ("
-        //                + "    on ab.artileBrandId == a.articleBrandId"
-        //                + "  )"
-        //                + "),"
-        //                + "left join article_attribute_media aam ("
-        //                + ")");
-        //
-        //        assertQuery(
-        //              "inner join article a ("
-        //            + "  on a.art_id == _source.art_id"
-        //            + ") "
-        //            + "where a.art_id == _source.art_id "
-        //            + "order by a.art_id"
-        //            );
     }
 
     private void assertExpression(String expression)

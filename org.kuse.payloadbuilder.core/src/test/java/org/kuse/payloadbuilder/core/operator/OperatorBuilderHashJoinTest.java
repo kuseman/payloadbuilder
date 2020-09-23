@@ -189,7 +189,9 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
                 4,
                 "INNER JOIN",
                 new FilterOperator(1, result.tableOperators.get(0), new ExpressionPredicate(e("s.id3 > 0"))),
-                new FilterOperator(3, result.tableOperators.get(1), new ExpressionPredicate(e("note_id > 0 AND a.active_flg = true AND a.id2 = 10"))),
+                new SubQueryOperator(
+                        new FilterOperator(3, result.tableOperators.get(1), new ExpressionPredicate(e("note_id > 0 AND a.active_flg = true AND a.id2 = 10"))),
+                        "a"),
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id ")),

@@ -18,13 +18,14 @@
 package org.kuse.payloadbuilder.catalog.es;
 
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.Payloadbuilder;
 import org.kuse.payloadbuilder.core.QueryResult;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
-import org.kuse.payloadbuilder.core.operator.JsonStringWriter;
 
+@Ignore
 public class ManualTest extends Assert
 {
     @Test
@@ -39,12 +40,12 @@ public class ManualTest extends Assert
 //        session.setCatalogProperty("es", "endpoint", "http://elasticsearch.viskanint.local");
 //        session.setCatalogProperty("es", "index", "ramossportshopentestcust_c0_store");
 
-        String query = "select concat('curl -X DELETE http://10.66.6.118:9200/', __index, '/', __type, '/', __id)\r\n" + 
+        String query = "select concat('{\"delete\":{\"_index\":\"', __index, '\",\"_type\":\"', __type, '\",\"_id\":\"', __id, '\"}}')\r\n" + 
             "from es#search(\r\n" + 
-            "  index: 'ramossportshopenprod_c0_v3',\r\n" + 
+            "  index: 'ramoslager157prod_c0_v3',\r\n" + 
             "  body: '\r\n" + 
+            "  scroll: true\r\n" +
             "  {\r\n" + 
-            "  \"size\": 100,\r\n" + 
             "  \"filter\": {\r\n" + 
             "    \"bool\": {\r\n" + 
             "      \"must\": [\r\n" + 
@@ -69,11 +70,13 @@ public class ManualTest extends Assert
             ")";
 
         QueryResult queryResult = Payloadbuilder.query(session, query);
-        JsonStringWriter writer = new JsonStringWriter();
+        
+//        FileOutputStream fis = new FileOutputStream(new File("c:/temp/clean_sportshopen_es.sh"));
+//        JsonStringWriter writer = new JsonStringWriter();
         while (queryResult.hasMoreResults())
         {
-            queryResult.writeResult(writer);
-            System.out.println(writer.getAndReset());
+//            queryResult.writeResult(writer);
+//            System.out.println(writer.getAndReset());
         }
     }
 }

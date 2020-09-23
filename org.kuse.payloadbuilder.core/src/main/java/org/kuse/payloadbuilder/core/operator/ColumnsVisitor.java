@@ -180,11 +180,6 @@ class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsVisitor.
     @Override
     public Set<TableAlias> visit(QualifiedFunctionCallExpression expression, Context context)
     {
-        /*  map(flatmap(aa, x -> x.ap), x -> x.price_sales)
-             Lambda binding of map = arg0 => arg1
-             Visit
-        */
-
         ScalarFunctionInfo functionInfo = expression.getFunctionInfo(context.session);
 
         // Store parent aliases before resolving this function call

@@ -21,7 +21,7 @@ import static org.apache.commons.collections.CollectionUtils.isEmpty;
 
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 
 import org.apache.commons.collections.iterators.TransformIterator;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -31,33 +31,17 @@ class GroupedRow implements Tuple
 {
     private final List<Tuple> tuples;
     /** Set of columns in group expressions, these columns should not return an aggregated value */
-    private final Set<QualifiedName> columnReferences;
+    private final Map<String, QualifiedName> columnReferences;
 
-    GroupedRow(List<Tuple> tuples, Set<QualifiedName> columnReferences)
+    GroupedRow(List<Tuple> tuples, Map<String, QualifiedName> columnReferences)
     {
         if (isEmpty(tuples))
         {
             throw new RuntimeException("Rows cannot be empty.");
         }
         this.tuples = tuples;
-        //        this.pos = pos;
         this.columnReferences = columnReferences;
-        // TODO: Combine columns from all group rows since we might have other columns further "down"
-        //        this.columns = tuples.get(0).columns;
-        //        super.tableAlias = tuples.get(0).getTableAlias();
     }
-
-    //    private TIntSet getColumnOrdinals(List<String> columnReferences)
-    //    {
-    //        Tuple tuple = tuples.get(0);
-    //        TIntSet result = new TIntHashSet(columnReferences.size());
-    ////        for (String column : columnReferences)
-    ////        {
-    ////            int index = ArrayUtils.indexOf(row.getColumns(), column);
-    ////            result.add(index);
-    ////        }
-    //        return result;
-    //    }
 
     @Override
     public boolean containsAlias(String alias)
@@ -68,9 +52,11 @@ class GroupedRow implements Tuple
     @Override
     public Object getValue(QualifiedName qname, int partIndex)
     {
-        if (columnReferences.contains(qname))
+        String column = qname.getLast();
+        QualifiedName columnRef = columnReferences.get(column);
+        if (columnRef != null)
         {
-            return tuples.get(0).getValue(qname, partIndex);
+            return tuples.get(0).getValue(columnRef, 0);
         }
 
         return new TransformIterator(tuples.iterator(), tuple -> ((Tuple) tuple).getValue(qname, partIndex));
@@ -83,56 +69,4 @@ class GroupedRow implements Tuple
         // TODO: Might need to distinct all grouped rows qnames since there might be different ones further down
         return tuples.get(0).getQualifiedNames();
     }
-
-    //    @Override
-    //    public void writeColumns(OutputWriter writer, String alias)
-    //    {
-    //        
-    //    }
-
-    //    @Override
-    //    public Object getObject(int ordinal)
-    //    {
-    //        if (columnOrdinals.contains(ordinal))
-    //        {
-    //            return rows.get(0).getObject(ordinal);
-    //        }
-    //        return new TransformIterator(rows.iterator(), row -> ((Row) row).getObject(ordinal));
-    //    }
-    //
-    //    @Override
-    //    public List<Row> getChildRows(TableAlias alias)
-    //    {
-    //        ChildRows childRows = (ChildRows) super.getChildRows(alias);
-    //
-    //        if (!childRows.populated)
-    //        {
-    //            for (Row groupRow : this.rows)
-    //            {
-    //                List<Row> rows = groupRow.getChildRows(alias);
-    //                childRows.ensureCapacity(rows.size() + childRows.size());
-    //                childRows.addAll(childRows);
-    //            }
-    //            childRows.populated = true;
-    //        }
-    //
-    //        return childRows;
-    //    }
-
-    //    @Override
-    //    public int hashCode()
-    //    {
-    //        return 17 + (pos * 37);
-    //    }
-    //
-    //    @Override
-    //    public boolean equals(Object obj)
-    //    {
-    //        if (obj instanceof GroupedRow)
-    //        {
-    //            // Assume grouped row
-    //            return ((GroupedRow) obj).pos == pos;
-    //        }
-    //        return false;
-    //    }
 }

@@ -70,6 +70,10 @@ class CompositeTuple extends ArrayList<Tuple> implements Tuple
     @Override
     public Object getValue(QualifiedName qname, int partIndex)
     {
+        if (partIndex >= qname.getParts().size())
+        {
+            System.err.println();
+        }
         String part = qname.getParts().get(partIndex);
 
         int size = size();

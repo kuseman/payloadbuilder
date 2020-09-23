@@ -495,38 +495,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             context.operator = new SortByOperator(context.acquireNodeId(), context.operator, new ExpressionTupleComparator(sortBys));
         }
 
-        //        final Operator operator = context.operator;
-        //        // Change alias on rows so they will be accessible by the outer alias
-        //        context.operator = new Operator()
-        //        {
-        //            @Override
-        //            public RowIterator open(ExecutionContext context)
-        //            {
-        //                RowIterator iterator = operator.open(context);
-        //                return new RowIterator()
-        //                {
-        //                    @Override
-        //                    public Row next()
-        //                    {
-        //                        Row row = iterator.next();
-        //                        row.getTableAlias().setAlias(tableAlias.getParent().getAlias());
-        //                        return row;
-        //                    }
-        //                    
-        //                    @Override
-        //                    public boolean hasNext()
-        //                    {
-        //                        return iterator.hasNext();
-        //                    }
-        //                };
-        //            }
-        //            
-        //            @Override
-        //            public int getNodeId()
-        //            {
-        //                return operator.getNodeId();
-        //            }
-        //        };
+        context.operator = new SubQueryOperator(context.operator, tableSource.getTableAlias().getAlias());
 
         // Restore prev alias
         context.currentTableAlias = prevCurrentTableAlias;
@@ -766,36 +735,6 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 emitEmptyOuterRows,
                 index,
                 batchSizeOption);
-
-        // If outer is sorted on index keys (fully or partly)
-        //
-        // Or of outer be sorted on index keys
-        //   => BatchMergeJoin
-
-        // BatchHashJoin
-
-        // We have an index
-        // BatchMergeJoin
-        //
-        // BatchHashMatch
-        //
-
-        //        1. visit source
-        //        create operator
-        //          2. visit join
-        //        - analyze condition
-        //        - check order of outer
-        //            - can we sort?
-        //        - check index of inner
-        //            -
-        //        - decide batch reader (hint in context)
-        //        - decide join type
-        //        - visit article
-        //            create operator check context for type
-        //        - check order of inner
-        //        - create join with outer and inner
-
-        //        throw new RuntimeException("No operator could be created for join");
     }
 
     /** Fetch index from provided equi pairs and indices list */
@@ -1040,10 +979,6 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         boolean isCorrelated(Context context, AJoin join)
         {
-            if (join.getTableSource().getTableAlias().getType() != TableAlias.Type.SUBQUERY)
-            {
-                return false;
-            }
             TableAlias current = context.currentTableAlias;
             Set<String> aliases = new HashSet<>();
             // Collect all current aliases

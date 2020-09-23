@@ -1,0 +1,136 @@
+{
+  "name": "BaseContructs",
+  "catalogs": [
+    {
+      "alias": "c",
+      "tables": [
+        {
+          "name": "source",
+          "columns": [ "col1", "col2" ],
+          "rows": [
+            [1, 2],
+            [3, 4],
+            [5, 6]
+          ]
+        },
+        {
+          "name": "data",
+          "columns": [ "id", "row_id", "data" ],
+          "rows": [
+            [1, 1, "1_1"],
+            [1, 2, "1_2"],
+            [2, 1, "2_1"],
+            [3, 1, "3_1"],
+            [3, 2, "3_2"],
+            [3, 3, "3_3"]
+          ]
+        }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "name": "Asterisk select",
+      "query": [
+        "select * from source"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }],
+          [{ "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }]
+        ]
+      ]
+    },
+    {
+      "name": "Order by",
+      "query": [
+        "select col1 from source order by col2 desc"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 5 }],
+          [{ "key": "col1", "value": 3 }],
+          [{ "key": "col1", "value": 1 }]
+        ]
+      ]
+    },
+    {
+      "name": "Where",
+      "query": [
+        "select col1 from source where col2 >=4 order by col2 desc"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 5 }],
+          [{ "key": "col1", "value": 3 }]
+        ]
+      ]
+    },
+    {
+      "name": "Top",
+      "query": [
+        "select top 1 * from source "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }]
+        ]
+      ]
+    },
+    {
+      "name": "Top with order by",
+      "query": [
+        "select top 1 * from source order by col2 desc"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }]
+        ]
+      ]
+    },
+    {
+      "name": "Group by",
+      "query": [
+        "select * from source group by col1"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": [2] }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": [4] }],
+          [{ "key": "col1", "value": 5 }, { "key": "col2", "value": [6] }]
+        ]
+      ]
+    },
+    {
+      "name": "Group by with aggs",
+      "query": [
+        "select id, count(row_id) count, sum(row_id) sum, data from data group by id"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 1 }, { "key": "count", "value": 2 }, { "key": "sum", "value": 3 }, { "key": "data", "value": ["1_1","1_2"] }],
+          [{ "key": "id", "value": 2 }, { "key": "count", "value": 1 }, { "key": "sum", "value": 1 }, { "key": "data", "value": ["2_1"] }],
+          [{ "key": "id", "value": 3 }, { "key": "count", "value": 3 }, { "key": "sum", "value": 6 }, { "key": "data", "value": ["3_1","3_2","3_3"] }]
+        ]
+      ]
+    },
+    {
+      "name": "Double results",
+      "query": [
+        "select * from source ",
+        "select * from source where col2 = 2"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }],
+          [{ "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }]
+        ],
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }]
+        ]
+      ]
+    }
+  ]
+}
