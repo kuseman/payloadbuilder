@@ -1,20 +1,3 @@
-/**
- *
- *  Copyright (c) Marcus Henriksson <kuseman80@gmail.com>
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- *
- */
 package org.kuse.payloadbuilder.core.catalog;
 
 import java.util.List;
@@ -41,12 +24,12 @@ public abstract class ScalarFunctionInfo extends FunctionInfo
      *
      * <pre>
      * Example:
-     * "concat(aa, aa.ap)"
+     * <b>concat(aa, aa.ap)</b>
      * This has source as parent alias and will resolve both arguments as resulting aliases
      * [aa, ap]
      *
      * Example:
-     * "aa.filter(aa, x -> x.sku_id > 0)"
+     * <b>aa.filter(aa, x -> x.sku_id > 0)</b>
      * Resulting alias of a filter is the first arg alias ie. [aa]
      * </pre>
      *

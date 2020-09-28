@@ -1,20 +1,3 @@
-/**
- *
- *  Copyright (c) Marcus Henriksson <kuseman80@gmail.com>
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- *
- */
 package org.kuse.payloadbuilder.core.catalog;
 
 import static java.util.Collections.emptyList;
@@ -34,7 +17,7 @@ import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.SortItem;
 
 /**
- * Catalog. Top schema type, which defines the hooking points for retrieving data, functions etc.
+ * Catalog. Defines the hooking points for retrieving data, functions etc.
  */
 public abstract class Catalog
 {
@@ -58,7 +41,7 @@ public abstract class Catalog
      *
      * @param session Current query session
      * @param catalogAlias Alias used for this catalog in the query
-     * @param table Table to retrieve index for
+     * @param table Table to retrieve indices for
      **/
     public List<Index> getIndices(
             QuerySession session,
@@ -80,7 +63,8 @@ public abstract class Catalog
      * <pre>
      * Get tables for current session.
      * Implementations can choose to implement this method
-     * to allow "SHOW tables" for list current tables
+     * to allow "SHOW tables" statement to list tables in
+     * current catalog.
      * </pre>
      *
      * @param session Current query session
@@ -94,8 +78,11 @@ public abstract class Catalog
     }
 
     /**
-     * Get operator for provided alias NOTE! In main loop of operator add check of {@link QuerySession#abortQuery()} to not hang a thread in execution
-     * state.
+     * Get operator for provided data 
+     * <pre>
+     * NOTE! In main loop of operator add check of {@link QuerySession#abortQuery()} to not hang a 
+     * thread in execution state.
+     * </pre>
      */
     public Operator getScanOperator(OperatorData data)
     {
@@ -104,9 +91,11 @@ public abstract class Catalog
 
     /**
      * Get operator for provided alias
-     *
-     * @param index Index to use NOTE! In main loop of operator add check of {@link QuerySession#abortQuery()} to not hang a thread in execution
-     *            state.
+     * <pre>
+     * NOTE! In main loop of operator add check of {@link QuerySession#abortQuery()} to not hang a 
+     * thread in execution state.
+     * </pre>
+     * @param index Index to use 
      */
     public Operator getIndexOperator(OperatorData data, Index index)
     {
