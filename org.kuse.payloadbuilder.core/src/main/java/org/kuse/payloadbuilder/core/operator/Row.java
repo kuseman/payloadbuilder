@@ -16,56 +16,9 @@ import org.kuse.payloadbuilder.core.utils.MapUtils;
 public class Row implements Tuple
 {
     protected int pos;
-    // If this is a tuple row then subPos is the other rows position
-    //    private int subPos;
     protected TableAlias tableAlias;
     protected String[] columns;
-
-    //    /** Collection of parents that this row belongs to */
-    //    private List<Row> parents;
-    //
-    //    /** Temporary parent that is set during predicate evaluations (ie. join conditions) */
-    //    private Row predicateParent;
-
     private Values values;
-    //    protected List<ChildRows> childRowsCollection;
-
-    /** Temporary fields used by physical operators during join */
-    //    boolean match;
-    //    int hash;
-    //    Object[] extractedValues;
-
-    Row()
-    {
-    }
-
-    //    Row(Row source, int subPos)
-    //    {
-    //        this.pos = source.pos;
-    //        this.subPos = subPos;
-    //        this.tableAlias = source.tableAlias;
-    //        this.values = source.values;
-    ////        this.childRowsCollection = copyChildRows(source);
-    ////        this.parents = source.parents;
-    //        this.columns = source.columns;
-    //    }
-
-    //    private List<ChildRows> copyChildRows(Row source)
-    //    {
-    //        if (source.childRowsCollection == null)
-    //        {
-    //            return null;
-    //        }
-    //
-    //        int size = source.childRowsCollection.size();
-    //        List<ChildRows> copy = new ArrayList<>(size);
-    //        for (int i = 0; i < size; i++)
-    //        {
-    //            copy.add(new ChildRows(source.childRowsCollection.get(i)));
-    //        }
-    //
-    //        return copy;
-    //    }
 
     /** Return columns for this row */
     public String[] getColumns()
@@ -97,10 +50,6 @@ public class Row implements Tuple
     public Object getValue(QualifiedName qname, int partIndex)
     {
         int size = qname.getParts().size();
-        //        for (int i=partIndex;i<size;i++)
-        //        {
-        //
-        //        }
 
         // First part is pointing to this alias, step up one part
         int index = partIndex;
@@ -147,18 +96,6 @@ public class Row implements Tuple
                 .iterator();
     }
 
-    //    @Override
-    //    public void writeColumns(OutputWriter writer, String alias)
-    //    {
-    //        String[] columns = getColumns();
-    //        int length = columns.length;
-    //        for (int i = 0; i < length; i++)
-    //        {
-    //            writer.writeFieldName(columns[i]);
-    //            writer.writeValue(values.get(i));
-    //        }
-    //    }
-
     public Object getObject(int ordinal)
     {
         if (ordinal < 0)
@@ -180,83 +117,10 @@ public class Row implements Tuple
         return getObject(ordinal);
     }
 
-    //    public List<Row> getChildRows(TableAlias alias)
-    //    {
-    //        if (childRowsCollection == null)
-    //        {
-    //            childRowsCollection = new ArrayList<>();
-    //        }
-    //
-    //        int size = childRowsCollection.size();
-    //        for (int i = 0; i < size; i++)
-    //        {
-    //            ChildRows childRows = childRowsCollection.get(i);
-    //            if (childRows.alias == alias)
-    //            {
-    //                return childRows;
-    //            }
-    //        }
-    //
-    //        ChildRows childRows = new ChildRows(alias);
-    //        childRowsCollection.add(childRows);
-    //
-    //        return childRows;
-    //    }
-    //
-    //    public int getPos()
-    //    {
-    //        return pos;
-    //    }
-    //
-    //    public int getSubPos()
-    //    {
-    //        return subPos;
-    //    }
-
     public TableAlias getTableAlias()
     {
         return tableAlias;
     }
-
-    /** Get single parent. Either returns temporary predicate parent or first connected parent */
-    //    public Row getParent()
-    //    {
-    //        if (predicateParent != null)
-    //        {
-    //            return predicateParent;
-    //        }
-    //        else if (parents != null && parents.size() > 0)
-    //        {
-    //            return parents.get(0);
-    //        }
-    //
-    //        return null;
-    //    }
-    //
-    //    /** Add provided row as parent to this row */
-    //    void addParent(Row row)
-    //    {
-    //        if (parents == null)
-    //        {
-    //            parents = new ArrayList<>();
-    //        }
-    //        parents.add(row);
-    //    }
-    //
-    //    public List<Row> getParents()
-    //    {
-    //        return defaultIfNull(parents, emptyList());
-    //    }
-    //
-    //    void setPredicateParent(Row parent)
-    //    {
-    //        predicateParent = parent;
-    //    }
-    //
-    //    void clearPredicateParent()
-    //    {
-    //        predicateParent = null;
-    //    }
 
     public static Row of(TableAlias alias, int pos, Object... values)
     /** Construct a row with provided alias, values and position */
@@ -310,26 +174,6 @@ public class Row implements Tuple
     {
         return tableAlias.getTable() + " (" + pos + ") " + values;
     }
-
-    //    /** Child rows list. List of rows with a specific table alias */
-    //    public static class ChildRows extends ArrayList<Row>
-    //    {
-    //        private final TableAlias alias;
-    //        /** Flag used by {@link GroupedRow} to indicate if this collection is populted or not */
-    //        boolean populated;
-    //
-    //        ChildRows(TableAlias alias)
-    //        {
-    //            this.alias = alias;
-    //        }
-    //
-    //        ChildRows(ChildRows childRows)
-    //        {
-    //            this.alias = childRows.alias;
-    //            addAll(childRows);
-    //        }
-    //
-    //    }
 
     /** Values definition of a rows values */
     public interface Values
