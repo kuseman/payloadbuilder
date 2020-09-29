@@ -1,3 +1,5 @@
+[![Actions Status](https://github.com/kuseman/payloadbuilder/workflows/Java%20CI%20with%20Maven/badge.svg)](https://github.com/kuseman/payloadbuilder/actions)
+
 # Payloadbuilder
 
 SQL query engine with plugable catalogs (data sources)
