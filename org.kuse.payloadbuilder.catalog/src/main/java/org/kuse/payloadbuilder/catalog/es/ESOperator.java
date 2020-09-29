@@ -182,7 +182,7 @@ class ESOperator extends AOperator
         {
             boolean isSingleAlias = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(esType.type);
             String mgetUrl = getUrl(
-                    String.format("%s/%s%s/_mget?", esType.endpoint, esType.index, isSingleAlias ? "" : "/" + esType.type),
+                    String.format("%s/%s/%s/_mget?", esType.endpoint, esType.index, esType.type),
                     "docs",
                     tableAlias,
                     index,
@@ -294,10 +294,10 @@ class ESOperator extends AOperator
     {
         boolean isSingleType = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(type);
         ObjectUtils.requireNonBlank(endpoint, "endpoint is required");
-        return getUrl(String.format("%s/%s/%s_search?%s%s",
+        return getUrl(String.format("%s/%s%s/_search?%s%s",
                 endpoint,
                 isBlank(index) ? "*" : index,
-                isBlank(type) || isSingleType ? "" : type + "/",
+                isBlank(type) ? "" : ("/"  + type),
                 scrollMinutes != null ? ("scroll=" + scrollMinutes + "m") : "",
                 size != null ? ("&size=" + size) : ""), "hits.hits", alias, operatorIndex, isSingleType);
     }
@@ -316,7 +316,7 @@ class ESOperator extends AOperator
         return getUrl(String.format("%s/%s/%s_search/template?%s",
                 endpoint,
                 isBlank(index) ? "*" : index,
-                isBlank(type) || isSingleType ? "" : type + "/",
+                isBlank(type) ? "" : (type + "/"),
                 scrollMinutes != null ? ("scroll=" + scrollMinutes + "m") : "",
                 size != null ? ("&size=" + size) : ""), "hits.hits", alias, operatorIndex, isSingleType);
     }

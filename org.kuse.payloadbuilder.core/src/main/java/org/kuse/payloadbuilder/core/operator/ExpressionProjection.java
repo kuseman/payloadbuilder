@@ -2,7 +2,6 @@ package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Objects.requireNonNull;
 
-import org.apache.commons.lang3.time.StopWatch;
 import org.kuse.payloadbuilder.core.OutputWriter;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
@@ -17,16 +16,10 @@ class ExpressionProjection implements Projection
         this.expression = requireNonNull(expression, "expression");
     }
 
-    StopWatch sw = new StopWatch();
-
     @Override
     public void writeValue(OutputWriter writer, ExecutionContext context)
     {
-        sw.start();
         Object value = expression.eval(context);
-        context.evalTime.addAndGet(sw.getTime());
-        sw.stop();
-        sw.reset();
         writer.writeValue(value);
     }
 

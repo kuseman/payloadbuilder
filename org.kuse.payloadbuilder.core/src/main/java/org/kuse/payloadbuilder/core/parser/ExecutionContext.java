@@ -10,7 +10,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.operator.OperatorContext;
@@ -25,21 +24,6 @@ public class ExecutionContext
     private Map<String, Object> variables;
     private final ZonedDateTime now = ZonedDateTime.now();
     private final OperatorContext operatorContext = new OperatorContext();
-
-    public AtomicLong queryTime = new AtomicLong();
-    public AtomicLong evalTime = new AtomicLong();
-    public AtomicLong joinTime = new AtomicLong();
-
-    /**
-     * <pre>
-      * Arbitrary cache that can be utilized per statement.
-      * Is cleared between statements.
-      *
-      * Ie. caching of {@link QualifiedReferenceExpression} lookup path
-      * which is performed alot of times during a select
-     * </pre>
-     */
-    //    private Map<String, Object> statementCache;
 
     /** Reference to tuple. Used in projections, correlated sub queries */
     private Tuple tuple;
@@ -129,39 +113,6 @@ public class ExecutionContext
     {
         return variables != null ? variables.get(name) : null;
     }
-
-    //    /** Get value from statement cache */
-    //    @SuppressWarnings("unchecked")
-    //    public <T> T getStatementCacheValue(String key)
-    //    {
-    //        if (statementCache == null)
-    //        {
-    //            return null;
-    //        }
-    //
-    //        return (T) statementCache.get(key);
-    //    }
-
-    /** Set statement cache value */
-    //    public void setStatementCacheValue(String key, Object value)
-    //    {
-    //        if (statementCache == null)
-    //        {
-    //            statementCache = new THashMap<>();
-    //        }
-    //
-    //        statementCache.put(key, value);
-    //    }
-    //
-    //    /** Clear statement cache */
-    //    public void clearStatementCache()
-    //    {
-    //        if (statementCache == null)
-    //        {
-    //            return;
-    //        }
-    //        statementCache.clear();
-    //    }
 
     private void ensureSize(List<?> list, int itemIndex)
     {

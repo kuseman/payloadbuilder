@@ -363,7 +363,14 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 TableAlias childAlias = alias.getChildAlias(selectItem.getAlias());
                 if (childAlias != null)
                 {
-                    childAlias.setAsteriskColumns();
+                    if (childAlias.getType() == TableAlias.Type.SUBQUERY)
+                    {
+                        childAlias.getChildAliases().get(0).setAsteriskColumns();
+                    }
+                    else
+                    {
+                        childAlias.setAsteriskColumns();
+                    }
                 }
             }
         }
@@ -372,7 +379,14 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             alias.setAsteriskColumns();
             for (TableAlias childAlias : alias.getChildAliases())
             {
-                childAlias.setAsteriskColumns();
+                if (childAlias.getType() == TableAlias.Type.SUBQUERY)
+                {
+                    childAlias.getChildAliases().get(0).setAsteriskColumns();
+                }
+                else
+                {
+                    childAlias.setAsteriskColumns();
+                }
             }
         }
         context.projection = selectItem;

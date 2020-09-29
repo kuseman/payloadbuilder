@@ -12,7 +12,7 @@ import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
-import org.kuse.payloadbuilder.core.utils.IteratorUtils;
+import org.kuse.payloadbuilder.core.utils.CollectionUtils;
 
 /** Operator that operates over an expression (that returns rows) */
 class ExpressionOperator extends AOperator
@@ -37,7 +37,7 @@ class ExpressionOperator extends AOperator
         }
 
         // Transformer that supports Map's beyond rows
-        Iterator<Object> iterator = IteratorUtils.getIterator(result);
+        Iterator<Object> iterator = CollectionUtils.getIterator(result);
         return new RowIterator()
         {
             private Set<String> columns;

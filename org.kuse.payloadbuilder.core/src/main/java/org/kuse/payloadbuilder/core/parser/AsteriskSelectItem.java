@@ -39,6 +39,7 @@ public class AsteriskSelectItem extends SelectItem implements Projection
         {
             QualifiedName qname = it.next();
             if (alias == null
+                || qname.getParts().size() == 1
                 || (qname.getParts().size() >= 2 && alias.equalsIgnoreCase(qname.getParts().get(0))))
             {
                 String column = qname.getLast();
@@ -46,53 +47,7 @@ public class AsteriskSelectItem extends SelectItem implements Projection
                 writer.writeValue(tuple.getValue(qname, 0));
             }
         }
-        //        if (alias == null)
-        //        {
-        //            writeTuple(tuple, writer);
-        ////            for (TableAlias childAlias : row.getTableAlias().getChildAliases())
-        ////            {
-        ////                List<Row> childRows = row.getChildRows(childAlias);
-        ////                if (childRows.isEmpty())
-        ////                {
-        ////                    continue;
-        ////                }
-        ////
-        ////                writeRow(childRows.get(0), writer);
-        ////            }
-        //        }
-        //        else
-        //        {
-        //            // The alias for the row itself
-        //            if (alias.equals(row.getTableAlias().getAlias()))
-        //            {
-        //                writeTuple(row, writer);
-        //                return;
-        //            }
-        //            TableAlias childAlias = row.getTableAlias().getChildAlias(alias);
-        //            if (childAlias != null)
-        //            {
-        //                List<Row> childRows = row.getChildRows(childAlias);
-        //                if (!childRows.isEmpty())
-        //                {
-        //                    writeTuple(childRows.get(0), writer);
-        //                }
-        //            }
-        //        }
     }
-
-    //    private void writeTuple(Tuple tuple, OutputWriter writer)
-    //    {
-    //        String[] columns = row.getColumns();
-    //        if (columns == null)
-    //        {
-    //            return;
-    //        }
-    //        for (int i = 0; i < columns.length; i++)
-    //        {
-    //            writer.writeFieldName(columns[i]);
-    //            writer.writeValue(row.getObject(i));
-    //        }
-    //    }
 
     @Override
     public int hashCode()

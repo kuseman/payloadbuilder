@@ -20,6 +20,9 @@ public class Row implements Tuple
     protected String[] columns;
     private Values values;
 
+    private Row()
+    {}
+    
     /** Return columns for this row */
     public String[] getColumns()
     {

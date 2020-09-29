@@ -190,37 +190,7 @@ public class TableAlias
         SUBQUERY;
     }
 
-    //    /** Construct a table alias from provided table name */
-    //    public static TableAlias of(TableAlias parent, QualifiedName table, String alias)
-    //    {
-    //        return new TableAlias(parent, table, alias, NOT_SET, false, Type.TABLE, null);
-    //    }
-    //
-    //    /** Construct a table alias from provided table name */
-    //    public static TableAlias of(TableAlias parent, QualifiedName table, String alias, boolean asteriskColumns)
-    //    {
-    //        return new TableAlias(parent, table, alias, NOT_SET, asteriskColumns, Type.TABLE, null);
-    //    }
-    //
-    //    /** Construct a table alias from provided table name */
-    //    public static TableAlias of(TableAlias parent, QualifiedName table, String alias, String[] columns)
-    //    {
-    //        return new TableAlias(parent, table, alias, columns, false, Type.TABLE, null);
-    //    }
-    //
-    //    /** Construct a table alias from provided parent, table and alias */
-    //    public static TableAlias of(TableAlias parent, QualifiedName table, String alias, Token token)
-    //    {
-    //        return new TableAlias(parent, table, alias, NOT_SET, false, Type.TABLE, token);
-    //    }
-    //
-    //    /** Construct */
-    //    public static TableAlias of(TableAlias parent, QualifiedName table, String alias, String[] columns, Type type, Token token)
-    //    {
-    //        return new TableAlias(parent, table, alias, defaultIfNull(columns, NOT_SET), false, type, token);
-    //    }
-    //
-    /** */
+    /** Builder for aliases */
     public static class TableAliasBuilder
     {
         private final Type type;

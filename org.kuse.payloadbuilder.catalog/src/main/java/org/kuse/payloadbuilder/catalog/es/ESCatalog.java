@@ -44,7 +44,7 @@ class ESCatalog extends Catalog
     public static final String NAME = "Elastic search";
     public static final String ENDPOINT_KEY = "endpoint";
     public static final String INDEX_KEY = "index";
-    static final String SINGLE_TYPE_TABLE_NAME = "__data__";
+    static final String SINGLE_TYPE_TABLE_NAME = "_doc";
 
     ESCatalog()
     {
@@ -335,14 +335,13 @@ class ESCatalog extends Catalog
             @SuppressWarnings("unchecked")
             Map<String, Object> subProperties = (Map<String, Object>) propertiesMap.get("properties");
 
-            // Collected nested properties one level down only
-            if (/*parentKey == null && */subProperties != null)
+            if (subProperties != null)
             {
                 populateAnalyzedFields(result, subProperties, (parentKey == null ? "" : parentKey + ".") + entry.getKey());
                 continue;
             }
 
-            String index = (String) propertiesMap.get("index");
+            Object index = propertiesMap.get("index");
             String type = (String) propertiesMap.get("type");
 
             @SuppressWarnings("unchecked")
@@ -372,9 +371,6 @@ class ESCatalog extends Catalog
                 }
             }
 
-            // - Type should no be nested/object
-            //   Not supported to filter on
-            // - index cannot be NO
             if ((index == null || "not_analyzed".equals(index)))
             {
                 result.put((parentKey != null ? parentKey + "." : "") + entry.getKey(), "");

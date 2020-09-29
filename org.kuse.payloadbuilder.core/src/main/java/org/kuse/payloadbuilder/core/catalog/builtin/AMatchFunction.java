@@ -6,7 +6,6 @@ import static java.util.Collections.singletonList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.commons.collections.IteratorUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.LambdaFunction;
@@ -14,6 +13,7 @@ import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.LambdaExpression;
+import org.kuse.payloadbuilder.core.utils.CollectionUtils;
 
 /** Any function. Check if any of inputs is true */
 class MatchFunction extends ScalarFunctionInfo implements LambdaFunction
@@ -55,7 +55,7 @@ class MatchFunction extends ScalarFunctionInfo implements LambdaFunction
         LambdaExpression le = (LambdaExpression) arguments.get(1);
         int lambdaId = le.getLambdaIds()[0];
 
-        Iterator<Object> it = IteratorUtils.getIterator(argResult);
+        Iterator<Object> it = CollectionUtils.getIterator(argResult);
         while (it.hasNext())
         {
             context.setLambdaValue(lambdaId, it.next());

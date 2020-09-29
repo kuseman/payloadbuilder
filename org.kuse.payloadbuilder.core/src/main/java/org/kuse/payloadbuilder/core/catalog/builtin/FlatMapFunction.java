@@ -20,7 +20,7 @@ import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.LambdaExpression;
-import org.kuse.payloadbuilder.core.utils.IteratorUtils;
+import org.kuse.payloadbuilder.core.utils.CollectionUtils;
 
 /** Flat map function. Flat maps input */
 class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
@@ -65,7 +65,7 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
         }
         LambdaExpression le = (LambdaExpression) arguments.get(1);
         int lambdaId = le.getLambdaIds()[0];
-        return new ObjectGraphIterator(IteratorUtils.getIterator(argResult), new Transformer()
+        return new ObjectGraphIterator(CollectionUtils.getIterator(argResult), new Transformer()
         {
             Iterator<Object> it;
 
@@ -76,7 +76,7 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
                 {
                     context.setLambdaValue(lambdaId, input);
                     Object value = le.getExpression().eval(context);
-                    it = IteratorUtils.getIterator(value);
+                    it = CollectionUtils.getIterator(value);
                     Object result = it;
                     if (!it.hasNext())
                     {

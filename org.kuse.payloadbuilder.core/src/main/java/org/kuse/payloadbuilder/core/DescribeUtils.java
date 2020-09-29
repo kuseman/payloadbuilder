@@ -43,117 +43,17 @@ public class DescribeUtils
     }
 
     /**
-     * Builds a describe table select TODO: this needs to be changed and delegated to catalog. For example Elastic there are alot of different objects
-     * in a type and since we are fetching the 10 first rows the result will be wrong
+     * Builds a describe table select 
+     * <pre>
+     * TODO: this needs to be changed and delegated to catalog. 
+     * For example Elastic there are alot of different documents
+     * in the same type
+     * </pre>
      **/
     @SuppressWarnings("unused")
     static Pair<Operator, Projection> getDescribeTable(ExecutionContext context, DescribeTableStatement statement)
     {
         throw new NotImplementedException("Not implemented");
-        //        QuerySession session = context.getSession();
-        //        String catalogAlias = statement.getCatalog();
-        //        QualifiedName tableName = statement.getTableName();
-        //        Catalog catalog;
-        //        if (isBlank(catalogAlias))
-        //        {
-        //            catalog = context.getSession().getDefaultCatalog();
-        //            catalogAlias = context.getSession().getDefaultCatalogAlias();
-        //        }
-        //        else
-        //        {
-        //            catalog = session.getCatalogRegistry().getCatalog(catalogAlias);
-        //        }
-        //
-        //        if (catalog == null)
-        //        {
-        //            throw new ParseException("Could not find catalog with alias " + catalogAlias, 0, 0);
-        //        }
-        //
-        //        TableAlias tableAlias = TableAlias.of(null, tableName, "");
-        //        Operator operator = catalog.getScanOperator(new OperatorData(context.getSession(), 0, catalogAlias, tableAlias, emptyList(), emptyList(), emptyList()));
-        //
-        //        context.clear();
-        //        // Get first row from scan operator
-        //        Iterator<Row> iterator = operator.open(context);
-        //        List<Class<?>> typeByColumn = null;
-        //
-        //        // Fetch ten first rows from operator
-        //        // This to minimize the risk of getting null in one column
-        //        // and don't be able to get data type, it's type less/reflective system :)
-        //        int count = 10;
-        //        int columnCount = -1;
-        //        while (count > 0 && iterator.hasNext())
-        //        {
-        //            if (columnCount == -1 && tableAlias.getColumns() != null)
-        //            {
-        //                columnCount = tableAlias.getColumns().length;
-        //                if (columnCount <= 0)
-        //                {
-        //                    break;
-        //                }
-        //                typeByColumn = new ArrayList<>(Collections.nCopies(columnCount, null));
-        //            }
-        //
-        //            Row row = iterator.next();
-        //            count--;
-        //
-        //            for (int i = 0; i < columnCount; i++)
-        //            {
-        //                if (typeByColumn.get(i) == null)
-        //                {
-        //                    Object value = row.getObject(i);
-        //                    typeByColumn.set(i, value != null ? value.getClass() : null);
-        //                }
-        //            }
-        //
-        //        }
-        //
-        //        if (typeByColumn == null)
-        //        {
-        //            return null;
-        //        }
-        //
-        //        List<Index> indices = catalog.getIndices(context.getSession(), catalogAlias, tableName);
-        //
-        //        // Name,    Type,   Description
-        //        // art_id,  Column, String
-        //        // index1   Index   [art_id]
-        //
-        //        // Create a select over all columns in table
-        //
-        //        TableAlias describeAlias = TableAlias.of(null, QualifiedName.of("describe"), "d", new String[] {"Name", "Type", "Description"});
-        //        List<Row> describeRows = new ArrayList<>(columnCount + indices.size());
-        //        int pos = 0;
-        //        // Add column rows
-        //        for (int i = 0; i < columnCount; i++)
-        //        {
-        //            Class<?> type = typeByColumn.get(i);
-        //            describeRows.add(Row.of(describeAlias, pos++, new Object[] {tableAlias.getColumns()[i], "Column", type == null ? "Unknown" : type.getSimpleName()}));
-        //        }
-        //        describeRows.add(Row.of(describeAlias, pos++, new Object[] {"", "", ""}));
-        //        // Add indices
-        //        int i = 1;
-        //        for (Index index : indices)
-        //        {
-        //            describeRows.add(Row.of(describeAlias, pos++, new Object[] {"Index_" + (i++), "Index", index.getColumns() + " (Batch size: " + index.getBatchSize() + ")"}));
-        //        }
-        //
-        //        Operator describeOperator = new Operator()
-        //        {
-        //            @Override
-        //            public RowIterator open(ExecutionContext context)
-        //            {
-        //                return RowIterator.wrap(describeRows.iterator());
-        //            }
-        //
-        //            @Override
-        //            public int getNodeId()
-        //            {
-        //                return 0;
-        //            }
-        //        };
-        //
-        //        return Pair.of(describeOperator, getIndexProjection(asList(describeAlias.getColumns())));
     }
 
     /** Build describe select from provided select */

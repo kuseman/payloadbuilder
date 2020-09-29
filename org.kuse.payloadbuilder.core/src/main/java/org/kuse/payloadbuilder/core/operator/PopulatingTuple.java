@@ -42,7 +42,9 @@ class PopulatingTuple extends ArrayList<Tuple> implements Tuple
     public Object getValue(QualifiedName qname, int partIndex)
     {
         // Getting a value from a populating tuple means
-        // delegating to the first tuple simply
+        // delegating to the first tuple simply since normally
+        // an expression would point to the tuple itself to access it as
+        // a collection
         return get(0).getValue(qname, partIndex);
     }
 

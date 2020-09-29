@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 
-import org.apache.commons.collections.IteratorUtils;
 import org.apache.commons.collections.iterators.TransformIterator;
 import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
@@ -20,6 +19,7 @@ import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.LambdaExpression;
+import org.kuse.payloadbuilder.core.utils.CollectionUtils;
 
 /** Map function. Maps input into another form */
 class MapFunction extends ScalarFunctionInfo implements LambdaFunction
@@ -64,7 +64,7 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
         }
         LambdaExpression le = (LambdaExpression) arguments.get(1);
         int lambdaId = le.getLambdaIds()[0];
-        return new TransformIterator(IteratorUtils.getIterator(argResult), input ->
+        return new TransformIterator(CollectionUtils.getIterator(argResult), input ->
         {
             context.setLambdaValue(lambdaId, input);
             return le.getExpression().eval(context);

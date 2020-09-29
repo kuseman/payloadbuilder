@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.commons.collections.IteratorUtils;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
@@ -16,6 +15,7 @@ import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
+import org.kuse.payloadbuilder.core.utils.CollectionUtils;
 
 /**
  * Table value function that extracts row from a collection of maps in target expression
@@ -60,7 +60,7 @@ class OpenMapCollectionFunction extends TableFunctionInfo
     public RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
     {
         final Object value = arguments.get(0).eval(context);
-        final Iterator<Object> it = IteratorUtils.getIterator(value);
+        final Iterator<Object> it = CollectionUtils.getIterator(value);
         return new RowIterator()
         {
             private Set<String> addedColumns;
