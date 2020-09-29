@@ -16,7 +16,7 @@ SQL query engine with plugable catalogs (data sources)
 
 ## About the project
 
-Query engine with SQL support, easy to extend with catalogs to allow for joining data sets from completly different data sources.
+Query engine with SQL support, easy to extend with catalogs to allow for joining data sets from completely different data sources.
 A simple analyzer that builds an operator tree from provided query for data retrieval.
 
 Supports:
@@ -69,6 +69,7 @@ while (queryResult.hasMoreResults())
 Alot :)
 * Insert/Update/Delete support
 * Merge join operator
+* More catalog implementations (JDBC, Mongo, Redis etc.)
 
 ## Contributing
 
