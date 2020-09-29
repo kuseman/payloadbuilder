@@ -60,7 +60,6 @@ class TabComponentView extends JPanel
         {
             int size = 17;
             setPreferredSize(new Dimension(size, size));
-            //            setToolTipText("close this tab");
             //Make the button looks the same for all Laf's
             setUI(new BasicButtonUI());
             //Make it transparent
@@ -73,19 +72,7 @@ class TabComponentView extends JPanel
             //we use the same listener for all buttons
             addMouseListener(buttonMouseListener);
             setRolloverEnabled(true);
-            //Close the proper tab by clicking the button
-            //            addActionListener(this);
         }
-
-        //        @Override
-        //        public void actionPerformed(ActionEvent e)
-        //        {
-        //            int i = pane.indexOfTabComponent(ButtonTabComponent.this);
-        //            if (i != -1)
-        //            {
-        //                pane.remove(i);
-        //            }
-        //        }
 
         //we don't want to update UI for this button
         @Override

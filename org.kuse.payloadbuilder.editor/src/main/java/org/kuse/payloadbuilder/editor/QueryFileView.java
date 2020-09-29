@@ -340,10 +340,6 @@ class QueryFileView extends JPanel
                 {
                     return true;
                 }
-                //                else if (super.isCellSelected(0, column))
-                //                {
-                //                    return true;
-                //                }
                 return super.isCellSelected(row, column);
             }
         };
@@ -372,17 +368,6 @@ class QueryFileView extends JPanel
                     value = ofEntries(
                             entry("table", alias.getTable().toString()));
                 }
-//                else if (value instanceof ChildRows)
-//                {
-//                    ChildRows childRows = (ChildRows) value;
-//                    value = emptyList();
-//                    if (childRows.size() > 0)
-//                    {
-//                        TableAlias alias = childRows.get(0).getTableAlias();
-//                        value = ofEntries(
-//                                entry("table", alias.getTable().toString()));
-//                    }
-//                }
 
                 if (value == null)
                 {
@@ -492,20 +477,6 @@ class QueryFileView extends JPanel
                     entry("columns", pbRow.getColumns()),
                     entry("values", pbRow.getValues()));
         }
-//        else if (value instanceof ChildRows)
-//        {
-//            ChildRows childRows = (ChildRows) value;
-//            value = emptyList();
-//            if (childRows.size() > 0)
-//            {
-//                Row pbRow = childRows.get(0);
-//                TableAlias alias = childRows.get(0).getTableAlias();
-//                value = ofEntries(
-//                        entry("table", alias.getTable().toString()),
-//                        entry("columns", pbRow.getColumns()),
-//                        entry("rows", childRows.stream().map(r -> r.getValues()).collect(toList())));
-//            }
-//        }
 
         JFrame frame = new JFrame("Json viewer - " + resultTable.getColumnName(col) + " (Row: " + (row + 1) + ")");
         frame.setIconImages(PayloadbuilderEditorView.APPLICATION_ICONS);

@@ -35,7 +35,7 @@ public class AutoCompletionComboBox extends PlainDocument
     KeyListener editorKeyListener;
     FocusListener editorFocusListener;
 
-    public AutoCompletionComboBox(final JComboBox<?> comboBox)
+    AutoCompletionComboBox(final JComboBox<?> comboBox)
     {
         this.comboBox = comboBox;
         model = comboBox.getModel();
