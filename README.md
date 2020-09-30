@@ -10,7 +10,9 @@ SQL query engine with plugable catalogs (data sources)
   * [Catalogs](#catalogs)
   * [Built With](#built-with)
 * [Usage](#usage)
-* [Roadmap(#roadmap)
+* [Getting Started](#getting-started)
+  * [Editor](#editor)
+* [Roadmap](#roadmap)
 * [Contributing](#contributing)
 * [License](#license)
 
@@ -42,31 +44,55 @@ data operators for tables.
 
 ## Usage
 
-Simple query using Elastic search Catalog:
+* mvn install
+* Add Reference 
+  * **org.kuse.payloadbuilder.core/target/org.kuse.payloadbuilder.core-{version}.jar**
+  * **org.kuse.payloadbuilder.catalog/target/org.kuse.payloadbuilder.catalog-{version}.jar**
+    * Contains bundeled Catalog implementations
+  * Release to Central is coming soon
+
+## Getting Started
+
+Simple query using multiple catalogs:
 
 ```java
-QuerySession session = new QuerySession(new CatalogRegistry());
-session.setPrintStream(System.out);
-session.getCatalogRegistry().registerCatalog("es", new ESCatalog());
-session.setDefaultCatalog("es");
+        QuerySession session = new QuerySession(new CatalogRegistry());
+        session.setPrintStream(System.out);
+        session.getCatalogRegistry().registerCatalog("es", new ESCatalog());
+        session.getCatalogRegistry().registerCatalog("fs", new FileSystemCatalog());
+        session.setDefaultCatalog("es");
 
-session.setCatalogProperty("es", "endpoint", "http://localhost:9200");
-session.setCatalogProperty("es", "index", "myindex");
+        session.setCatalogProperty("es", "endpoint", "http://localhost:9200");
+        session.setCatalogProperty("es", "index", "myindex");
 
-String query = "select * from _doc where _status = 10";
+        String query = "select top 10 " +
+            "        d.fileName " + 
+            ",       f.size " + 
+            ",       f.lastModifiedTime " + 
+            "from es#_doc d " + 
+            "cross apply fs#file(concat('/path/to/files/', d.fileName)) f " + 
+            "where d._docType = 'pdfFiles'";
 
-QueryResult queryResult = Payloadbuilder.query(session, query);
-JsonStringWriter writer = new JsonStringWriter();
-while (queryResult.hasMoreResults())
-{
-  queryResult.writeResult(writer);
-  System.out.println(writer.getAndReset());
-}
+        QueryResult queryResult = Payloadbuilder.query(session, query);
+        JsonStringWriter writer = new JsonStringWriter();
+        while (queryResult.hasMoreResults())
+        {
+          queryResult.writeResult(writer);
+          System.out.println(writer.getAndReset());
+        }
 ```
+
+### Editor
+
+Standalone Query Editor written in Swing
+
+[Editor](https://github.com/kuseman/payloadbuilder/tree/master/org.kuse.payloadbuilder.editor)
+![Editor](/documentation/editor.png?raw=true "Optional Title")
 
 ## Raodmap
 
 Alot :)
+* Documentation
 * Insert/Update/Delete support
 * Merge join operator
 * More catalog implementations (JDBC, Mongo, Redis etc.)
