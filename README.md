@@ -48,7 +48,7 @@ data operators for tables.
 * Add Reference 
   * **org.kuse.payloadbuilder.core/target/org.kuse.payloadbuilder.core-{version}.jar**
   * **org.kuse.payloadbuilder.catalog/target/org.kuse.payloadbuilder.catalog-{version}.jar**
-    * Contains bundeled Catalog implementations
+    * Contains bundled Catalog implementations
   * Release to Central is coming soon
 
 ## Getting Started
