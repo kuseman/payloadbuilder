@@ -36,11 +36,6 @@ public class PredicateAnalyzerTest extends Assert
                         TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableA"), "a"),
                         TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableS"), "s")))
                 .build();
-        //
-        //        TableAlias alias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableA"), "a")
-        //                .children(asList(
-        //                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableS"), "s")))
-        //                .build();
 
         TableAlias alias = root.getChildAliases().get(0);
         

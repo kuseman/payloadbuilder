@@ -125,14 +125,14 @@ public class Row implements Tuple
         return tableAlias;
     }
 
-    public static Row of(TableAlias alias, int pos, Object... values)
+    public static Row of(TableAlias alias, int pos, Object[] values)
     /** Construct a row with provided alias, values and position */
     {
         return of(alias, pos, alias.getColumns(), values);
     }
 
     /** Construct a row with provided alias, columns, values and position */
-    public static Row of(TableAlias alias, int pos, String[] columns, Object... values)
+    public static Row of(TableAlias alias, int pos, String[] columns, Object[] values)
     {
         return of(alias, pos, columns, new ObjectValues(values));
     }
@@ -144,7 +144,7 @@ public class Row implements Tuple
     }
 
     /** Construct a row with provided parent, alias, columns, values and position */
-    private static Row of(TableAlias alias, int pos, String[] columns, Values values)
+    public static Row of(TableAlias alias, int pos, String[] columns, Values values)
     {
         Row t = new Row();
         t.pos = pos;
