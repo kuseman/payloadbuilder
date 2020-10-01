@@ -94,7 +94,7 @@ Standalone Query Editor written in Swing
 Alot :)
 * Documentation
 * Insert/Update/Delete support
-* Merge join operator
+* More operators (Merge join, union, except, anti-join, semi-join etc.)
 * More catalog implementations (JDBC, Mongo, Redis etc.)
 
 ## Contributing
