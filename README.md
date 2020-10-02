@@ -31,11 +31,18 @@ Supports:
 * Multiple statements
 * Control-flow statements
 
+[Grammar](https://github.com/kuseman/payloadbuilder/blob/master/org.kuse.payloadbuilder.core/src/main/resources/antlr4/org/kuse/payloadbuilder/core/parser/PayloadBuilderQuery.g4)
+
 ### Catalogs
 
 Catalogs is the extension point where external data is provided.
 A catalog implementation can provide scalar functions, table valued functions,
 data operators for tables.
+
+Example of provided catalogs:
+
+* [ElasticSearch](https://github.com/kuseman/payloadbuilder/tree/master/org.kuse.payloadbuilder.catalog/src/main/java/org/kuse/payloadbuilder/catalog/es)
+* [FileSystem](https://github.com/kuseman/payloadbuilder/tree/master/org.kuse.payloadbuilder.catalog/src/main/java/org/kuse/payloadbuilder/catalog/fs)
 
 ### Built With
 
@@ -87,7 +94,7 @@ Simple query using multiple catalogs:
 Standalone Query Editor written in Swing
 
 [Editor](https://github.com/kuseman/payloadbuilder/tree/master/org.kuse.payloadbuilder.editor)
-![Editor](/documentation/editor.png?raw=true "Optional Title")
+![Editor](/documentation/editor.png?raw=true "Editor")
 
 ## Raodmap
 
