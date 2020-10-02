@@ -11,7 +11,11 @@ import org.codehaus.janino.ClassBodyEvaluator;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
-/** Code generator */
+/** Code generator 
+ *  
+ *  Concept inspired by Apache Spark 
+ *  https://github.com/apache/spark/blob/master/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/expressions/codegen/CodeGenerator.scala
+ **/
 public class CodeGenerator
 {
     private static final String PREDICATE = System.lineSeparator() +

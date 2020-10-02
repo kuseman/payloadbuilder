@@ -1,4 +1,4 @@
-package org.kuse.payloadbuilder.core.codegen;
+package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Arrays.asList;
 
@@ -6,44 +6,24 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.commons.lang3.NotImplementedException;
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
+import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
+import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
-import org.kuse.payloadbuilder.core.parser.Expression;
-import org.kuse.payloadbuilder.core.parser.ParseException;
-import org.kuse.payloadbuilder.core.parser.QualifiedName;
-import org.kuse.payloadbuilder.core.parser.QueryParser;
 
-/** Test of {@link CodeGenerator} */
-public class CodeGeneratorTest extends Assert
+/** Test of various expression evaluations */
+public class ExpressionTest extends Assert
 {
     private final CatalogRegistry catalogRegistry = new CatalogRegistry();
     private final QueryParser parser = new QueryParser();
-    private final CodeGenerator codeGenerator = new CodeGenerator();
-
     private final TableAlias alias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("article"), "a").columns(new String[] {"a", "b", "c", "d", "e", "f", "g"}).build();
-
-    @Ignore
-    @Test
-    public void test_dereference() throws Exception
-    {
-        Row row = Row.of(alias, 0, new Object[] {asList(
-                Row.of(alias, 0, new Object[] {1}),
-                Row.of(alias, 1, new Object[] {2}),
-                Row.of(alias, 2, new Object[] {3}),
-                Row.of(alias, 3, new Object[] {4}))});
-
-        assertExpression(true, row, "a.filter(a -> a.a = 2).a");
-    }
 
     @Test
     public void test_auto_cast_strings() throws Exception
@@ -330,10 +310,9 @@ public class CodeGeneratorTest extends Assert
         }
 
         assertExpression(false, row, "not (1 > 0)");
-
         // Test different types
-        //        assertFail(ClassCastException.class, "java.lang.Integer cannot be cast to java.lang.Boolean", row, "a and d");
-        //        assertFail(ClassCastException.class, "java.lang.Integer cannot be cast to java.lang.Boolean", row, "b or d");
+        assertFail(ClassCastException.class, "java.lang.Integer cannot be cast to java.lang.Boolean", row, "a and d");
+        assertFail(ClassCastException.class, "java.lang.Integer cannot be cast to java.lang.Boolean", row, "b or d");
     }
 
     @Test
@@ -577,30 +556,9 @@ public class CodeGeneratorTest extends Assert
 
     private void assertFail(Class<? extends Exception> e, String messageContains, Row row, String expression)
     {
-        Expression expr = null;
         try
         {
-            expr = parser.parseExpression(expression);
-            codeGenerator.generateFunction(null, expr).apply(row);
-            fail(expression + " should fail.");
-        }
-        catch (NotImplementedException ee)
-        {
-            System.out.println("Implement. " + ee.getMessage());
-        }
-        catch (Exception ee)
-        {
-            assertEquals(e, ee.getClass());
-            assertTrue("Expected expcetion message to contain " + messageContains + " but was: " + ee.getMessage(), ee.getMessage().contains(messageContains));
-        }
-
-        if (expr == null)
-        {
-            return;
-        }
-
-        try
-        {
+            Expression expr = parser.parseExpression(expression);
             ExecutionContext context = new ExecutionContext(new QuerySession(new CatalogRegistry()));
             context.setTuple(row);
             expr.eval(context);
@@ -615,21 +573,9 @@ public class CodeGeneratorTest extends Assert
 
     private void assertExpression(Object value, Row row, String expression) throws Exception
     {
-        //        TableAlias alias = row != null ? row.getTableAlias() : TableAlias.of(null, "article", "a");
-
         try
         {
             Expression expr = parser.parseExpression(expression);
-            //            try
-            //            {
-            //                BaseFunction function = codeGenerator.generateFunction(alias, expr);
-            //                assertEquals(expression, value, function.apply(row));
-            //            }
-            //            catch (NotImplementedException e)
-            //            {
-            //                System.out.println("Implement. " + e.getMessage());
-            //            }
-
             ExecutionContext context = new ExecutionContext(new QuerySession(catalogRegistry));
             context.setTuple(row);
             assertEquals("Eval: " + expression, value, expr.eval(context));

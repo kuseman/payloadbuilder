@@ -94,6 +94,11 @@ class OpenMapCollectionFunction extends TableFunctionInfo
                     @SuppressWarnings("unchecked")
                     Map<String, Object> item = (Map<String, Object>) it.next();
 
+                    if (item == null)
+                    {
+                        continue;
+                    }
+                    
                     if (tableAlias.isAsteriskColumns())
                     {
                         if (addedColumns == null)

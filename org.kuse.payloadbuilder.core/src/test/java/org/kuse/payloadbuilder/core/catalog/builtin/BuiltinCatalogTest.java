@@ -11,12 +11,10 @@ import java.time.format.DateTimeParseException;
 import java.util.Iterator;
 
 import org.apache.commons.collections.IteratorUtils;
-import org.apache.commons.lang3.NotImplementedException;
 import org.junit.Assert;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
-import org.kuse.payloadbuilder.core.codegen.CodeGenerator;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
@@ -28,10 +26,8 @@ import org.kuse.payloadbuilder.core.parser.QueryParser;
 /** Tests functions etc. in built in catalog */
 public class BuiltinCatalogTest extends Assert
 {
-    private final CodeGenerator codeGenerator = new CodeGenerator();
     private final QueryParser parser = new QueryParser();
     private final QuerySession session = new QuerySession(new CatalogRegistry());
-
     private final TableAlias alias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("table"), "t").columns(new String[] {"a", "b", "c"}).build();
 
     @Test
@@ -193,20 +189,6 @@ public class BuiltinCatalogTest extends Assert
         Expression e = parser.parseExpression(expression);
         Object actual = null;
 
-        try
-        {
-            actual = codeGenerator.generateFunction(alias, e).apply(row);
-            if (actual instanceof Iterator)
-            {
-                actual = IteratorUtils.toList((Iterator<Object>) actual);
-            }
-            assertEquals("Code gen", expected, actual);
-        }
-        catch (NotImplementedException ee)
-        {
-            System.out.println("Missing implementation: " + ee.getMessage());
-        }
-
         ExecutionContext context = new ExecutionContext(session);
         context.setTuple(row);
         actual = e.eval(context);
@@ -220,30 +202,9 @@ public class BuiltinCatalogTest extends Assert
 
     private void assertFail(Class<? extends Exception> e, String messageContains, Row row, String expression)
     {
-        Expression expr = null;
         try
         {
-            expr = parser.parseExpression(expression);
-            codeGenerator.generateFunction(null, expr).apply(row);
-            fail(expression + " should fail.");
-        }
-        catch (NotImplementedException ee)
-        {
-            System.out.println("Implement. " + ee.getMessage());
-        }
-        catch (Exception ee)
-        {
-            assertEquals(e, ee.getClass());
-            assertTrue("Expected expcetion message to contain " + messageContains + " but was: " + ee.getMessage(), ee.getMessage().contains(messageContains));
-        }
-
-        if (expr == null)
-        {
-            return;
-        }
-
-        try
-        {
+            Expression expr = parser.parseExpression(expression);
             ExecutionContext context = new ExecutionContext(session);
             context.setTuple(row);
             expr.eval(context);
