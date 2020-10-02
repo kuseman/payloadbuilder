@@ -1,0 +1,26 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.kuse</groupId>
+    <artifactId>org.kuse.payloadbuilder</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>Payloadbuilder</name>
+    <description>Query engine</description>
+
+    <properties>
+        <!-- Build -->
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <license.dir>${basedir}</license.dir>
+    </properties>
+
+    <modules>
+        <module>org.kuse.payloadbuilder.core</module>
+        <module>org.kuse.payloadbuilder.catalog</module>
+        <module>org.kuse.payloadbuilder.editor</module>
+    </modules>
+
+</project>

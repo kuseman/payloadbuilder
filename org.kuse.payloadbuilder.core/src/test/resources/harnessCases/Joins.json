@@ -1,0 +1,147 @@
+{
+  "name": "Joins",
+  "catalogs": [
+    {
+      "alias": "c",
+      "tables": [
+        {
+          "name": "source",
+          "columns": [ "col1", "col2" ],
+          "rows": [
+            [1, 2],
+            [3, 4],
+            [5, 6]
+          ]
+        },
+        {
+          "name": "article",
+          "columns": [ "col1", "col2", "col3" ],
+          "rows": [
+            [1, 2, "row1"],
+            [3, 4, "row2"],
+            [7, 8, "row3"]
+          ]
+        },
+        {
+          "name": "shopcart",
+          "columns": [ "index", "id", "stockhouses" ],
+          "rows": [
+            ["idx1", 101, [ { "sku_id": 1, "wareh_id": 1, "qty": 1 }, { "sku_id": 2, "wareh_id": 1, "qty": 2 } ]],
+            ["idx1", 201, [ { "sku_id": 2, "wareh_id": 2, "qty": 1 }, { "sku_id": 3, "wareh_id": 1, "qty": 1 } ]],
+            ["idx2", 301, [ { "sku_id": 1, "wareh_id": 1, "qty": 1 }, { "sku_id": 3, "wareh_id": 2, "qty": 2 } ]],
+            ["idx1", 401, [ { "sku_id": 1, "wareh_id": 1, "qty": 1 }, { "sku_id": 3, "wareh_id": 1, "qty": 2 } ]]
+          ]
+        },
+        {
+          "name": "reservation",
+          "columns": [ "index", "id", "stockhouses" ],
+          "rows": [
+            ["idx1", 1, [ { "wareh_id": 1, "qty": 1 } ]],
+            ["idx2", 2, [ { "wareh_id": 2, "qty": 1 } ]]
+          ]
+        }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "name": "Inner join, asterisk select",
+      "query": [
+        "select * from source s inner join article a on a.col1 = s.col1"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col3", "value": "row1" }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col3", "value": "row2" }]
+        ]
+      ]
+    },
+    {
+      "name": "Left join, asterisk select",
+      "query": [
+        "select * from source s left join article a on a.col1 = s.col1"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col3", "value": "row1" }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col3", "value": "row2" }],
+          [{ "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }]
+        ]
+      ]
+    },
+    {
+      "name": "Open_map_collection",
+      "query": [
+        "select s.id, sh.sku_id, sh.wareh_id, sh.qty from shopcart s cross apply open_map_collection(s.stockhouses) sh where s.id <= 301 "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 101 }, { "key": "sku_id", "value": 1 }, { "key": "wareh_id", "value": 1 }, { "key": "qty", "value": 1 }],
+          [{ "key": "id", "value": 101 }, { "key": "sku_id", "value": 2 }, { "key": "wareh_id", "value": 1 }, { "key": "qty", "value": 2 }],
+          [{ "key": "id", "value": 201 }, { "key": "sku_id", "value": 2 }, { "key": "wareh_id", "value": 2 }, { "key": "qty", "value": 1 }],
+          [{ "key": "id", "value": 201 }, { "key": "sku_id", "value": 3 }, { "key": "wareh_id", "value": 1 }, { "key": "qty", "value": 1 }],
+          [{ "key": "id", "value": 301 }, { "key": "sku_id", "value": 1 }, { "key": "wareh_id", "value": 1 }, { "key": "qty", "value": 1 }],
+          [{ "key": "id", "value": 301 }, { "key": "sku_id", "value": 3 }, { "key": "wareh_id", "value": 2 }, { "key": "qty", "value": 2 }]
+        ]
+      ]
+    },
+    {
+      "name": "Subquery",
+      "query": [
+        "select reservation.index, reservation.id, reservation.wareh_id ",
+        "from ",
+        "( ",
+        "  from reservation rs ",
+        "  cross apply open_map_collection(rs.stockhouses) sh",
+        "  group by rs.index, rs.id, sh.wareh_id ",
+        ") reservation "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "index", "value": "idx1" },{ "key": "id", "value": 1 },{ "key": "wareh_id", "value": 1 }],
+          [{ "key": "index", "value": "idx2" },{ "key": "id", "value": 2 },{ "key": "wareh_id", "value": 2 }]
+        ]
+      ]
+    },
+    {
+      "name": "Subquery with same inner and outer alias",
+      "query": [
+        "select s.id, s.index, s.sh.wareh_id, s.sh.qty ",
+        "from ",
+        "( ",
+        "  from shopcart s ",
+        "  cross apply open_map_collection(s.stockhouses) sh ",
+        "  where s.id = 101 ",
+        ") s "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 101 },{ "key": "index", "value": "idx1" },{ "key": "wareh_id", "value": 1 },{ "key": "qty", "value": 1 }],
+          [{ "key": "id", "value": 101 },{ "key": "index", "value": "idx1" },{ "key": "wareh_id", "value": 1 },{ "key": "qty", "value": 2 }]
+        ]
+      ]
+    },
+    {
+      "name": "Subquery 2",
+      "query": [
+        "select shopcart.index, shopcart.sku_id, shopcart.wareh_id, sum(shopcart.sh.qty) qty ",
+        "from ",
+        "( ",
+        "  from shopcart s ",
+        "  cross apply open_map_collection(s.stockhouses) sh",
+        "  group by s.index, sh.sku_id, sh.wareh_id ",
+        ") shopcart "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "index", "value": "idx1" },{ "key": "sku_id", "value": 1 },{ "key": "wareh_id", "value": 1 },{ "key": "qty", "value": 2 }],
+          [{ "key": "index", "value": "idx1" },{ "key": "sku_id", "value": 2 },{ "key": "wareh_id", "value": 1 },{ "key": "qty", "value": 2 }],
+          [{ "key": "index", "value": "idx1" },{ "key": "sku_id", "value": 2 },{ "key": "wareh_id", "value": 2 },{ "key": "qty", "value": 1 }],
+          [{ "key": "index", "value": "idx1" },{ "key": "sku_id", "value": 3 },{ "key": "wareh_id", "value": 1 },{ "key": "qty", "value": 3 }],
+          [{ "key": "index", "value": "idx2" },{ "key": "sku_id", "value": 1 },{ "key": "wareh_id", "value": 1 },{ "key": "qty", "value": 1 }],
+          [{ "key": "index", "value": "idx2" },{ "key": "sku_id", "value": 3 },{ "key": "wareh_id", "value": 2 },{ "key": "qty", "value": 2 }]
+        ]
+      ]
+    }
+  ]
+}

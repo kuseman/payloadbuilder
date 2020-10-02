@@ -1,0 +1,52 @@
+{
+  "name": "BuiltInFunctions",
+  "catalogs": [
+    {
+      "alias": "c",
+      "tables": [
+        {
+          "name": "source",
+          "columns": [ "col1", "col2" ],
+          "rows": [
+            [1, 2],
+            [3, 4],
+            [5, 6]
+          ]
+        }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "name": "String functions",
+      "query": [
+        "select trim(' A ') trim, ltrim(' A ') ltrim, rtrim(' A ') rtrim ",
+        "select leftpad('A', 4) leftpad1, leftpad('A', 4, '#') leftpad2, rightpad('A', 4) rightpad1, rightpad('A', 4, '#') rightpad2"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "trim", "value": "A" }, { "key": "ltrim", "value": "A " }, { "key": "rtrim", "value": " A" }]
+        ],
+        [
+          [{ "key": "leftpad1", "value": "   A" }, { "key": "leftpad2", "value": "###A" },{ "key": "rightpad1", "value": "A   " }, { "key": "rightpad2", "value": "A###" }]
+        ]
+      ]
+    },
+    {
+      "name": "Date functions",
+      "query": [
+        "set @date = cast('2000-01-01T10:00:00', 'datetime') ",
+        "select cast(dateadd('day', 1, @date), 'string') tomorrow, cast(dateadd('day', -1, @date), 'string') yesterday ",
+        "select datepart('year', @date) year, datepart('month', @date) month, datepart('day', @date) day, datepart('hour', @date) hour, datepart('minute', @date) minute "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "tomorrow", "value": "2000-01-02T10:00" }, { "key": "yesterday", "value": "1999-12-31T10:00" }]
+        ],
+        [
+          [{ "key": "year", "value": 2000 }, { "key": "month", "value": 1 }, { "key": "day", "value": 1 }, { "key": "hour", "value": 10 }, { "key": "minute", "value": 0 }]
+        ]
+      ]
+    }
+  ]
+}

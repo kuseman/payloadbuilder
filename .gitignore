@@ -1,0 +1,8 @@
+/.project
+/.classpath
+/.settings/
+/target/
+/bin/
+config.json
+/org.kuse.payloadbuilder.core/src/main/resources/antlr4/org/kuse/payloadbuilder/core/parser/*.interp
+.todo
