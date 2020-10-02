@@ -37,4 +37,4 @@
 ## Developing
 
 Adding UI extension for Catalog implementations is a matter of implementing [ICatalogExtension](https://github.com/kuseman/payloadbuilder/blob/master/org.kuse.payloadbuilder.editor/src/main/java/org/kuse/payloadbuilder/editor/ICatalogExtension.java)
-and referencing it in **config.json**
+and referencing that class in **config.json**
