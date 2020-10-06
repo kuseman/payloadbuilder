@@ -150,23 +150,22 @@ public class BuiltinCatalogTest extends Assert
         assertFunction(null, null, "cast(null, integer)");
         assertFunction(null, null, "cast(1, null)");
 
-        assertFunction(1, null, "cast(1, integer)");
-        assertFunction(1l, null, "cast(1, long)");
-        assertFunction(1.0f, null, "cast(1, float)");
-        assertFunction(1.0d, null, "cast(1, double)");
+        assertFunction(1, null, "cast(1, 'integer')");
+        assertFunction(1l, null, "cast(1, 'long')");
+        assertFunction(1.0f, null, "cast(1, 'float')");
+        assertFunction(1.0d, null, "cast(1, 'double')");
 
-        assertFunction(1, null, "cast('1', integer)");
-        assertFunction(1l, null, "cast('1', long)");
-        assertFunction(1.0f, null, "cast('1', float)");
-        assertFunction(1.0d, null, "cast('1', double)");
+        assertFunction(1, null, "cast('1', 'integer')");
+        assertFunction(1l, null, "cast('1', 'long')");
+        assertFunction(1.0f, null, "cast('1', 'float')");
+        assertFunction(1.0d, null, "cast('1', 'double')");
 
-        assertFunction("1.0", null, "cast(1.0, string)");
         assertFunction("1.0", null, "cast(1.0, 'string')");
 
-        assertFunction(true, null, "cast(1, boolean)");
-        assertFunction(true, null, "cast(1.20, boolean)");
+        assertFunction(true, null, "cast(1, 'boolean')");
+        assertFunction(true, null, "cast(1.20, 'boolean')");
         assertFunction(false, null, "cast(0, 'boolean')");
-        assertFunction(true, null, "cast('TRUE', boolean)");
+        assertFunction(true, null, "cast('TRUE', 'boolean')");
         assertFunction(false, null, "cast('false', 'boolean')");
         assertFunction(false, null, "cast('hello', 'boolean')");
 
@@ -176,10 +175,10 @@ public class BuiltinCatalogTest extends Assert
         assertFunction(ZonedDateTime.parse("2000-10-10T10:10:10.123Z").withZoneSameInstant(ZoneId.systemDefault()).toLocalDateTime(), null, "cast('2000-10-10 10:10:10.123Z', 'datetime')");
 
         assertFail(DateTimeParseException.class, "Text 'jibberish' could not", null, "cast('jibberish', 'datetime')");
-        assertFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, integer)");
-        assertFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, long)");
-        assertFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, float)");
-        assertFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, double)");
+        assertFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, 'integer')");
+        assertFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, 'long')");
+        assertFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, 'float')");
+        assertFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, 'double')");
     }
 
     @SuppressWarnings("unchecked")

@@ -14,7 +14,6 @@ import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
-import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 
 /** Cast and convert function */
 class CastFunction extends ScalarFunctionInfo
@@ -34,22 +33,12 @@ class CastFunction extends ScalarFunctionInfo
         {
             return null;
         }
-        String dataTypeString;
-        Expression dataTypeExpression = arguments.get(1);
-        if (dataTypeExpression instanceof QualifiedReferenceExpression)
+        Object obj = arguments.get(1).eval(context);
+        if (obj == null)
         {
-            dataTypeString = ((QualifiedReferenceExpression) dataTypeExpression).getQname().toString();
+            return null;
         }
-        else
-        {
-            Object obj = dataTypeExpression.eval(context);
-            if (obj == null)
-            {
-                return null;
-            }
-            dataTypeString = String.valueOf(obj);
-        }
-
+        String dataTypeString = String.valueOf(obj);
         DataType dataType = DataType.valueOf(dataTypeString.toUpperCase());
 
         if (dataType.type.isAssignableFrom(source.getClass()))

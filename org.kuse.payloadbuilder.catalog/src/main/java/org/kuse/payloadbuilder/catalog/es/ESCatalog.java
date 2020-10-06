@@ -39,14 +39,14 @@ import org.kuse.payloadbuilder.core.parser.SortItem.NullOrder;
 import org.kuse.payloadbuilder.core.parser.SortItem.Order;
 
 /** Catalog for querying elastic search */
-class ESCatalog extends Catalog
+public class ESCatalog extends Catalog
 {
     public static final String NAME = "Elastic search";
     public static final String ENDPOINT_KEY = "endpoint";
     public static final String INDEX_KEY = "index";
     static final String SINGLE_TYPE_TABLE_NAME = "_doc";
 
-    ESCatalog()
+    public ESCatalog()
     {
         super("EsCatalog");
         registerFunction(new MustacheCompileFunction(this));

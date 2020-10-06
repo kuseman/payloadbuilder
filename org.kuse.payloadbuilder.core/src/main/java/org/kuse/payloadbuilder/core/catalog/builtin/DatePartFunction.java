@@ -13,7 +13,6 @@ import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
-import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 
 /** Returns date part from input */
 class DatePartFunction extends ScalarFunctionInfo
@@ -61,22 +60,12 @@ class DatePartFunction extends ScalarFunctionInfo
             return null;
         }
 
-        String partString;
-        Expression partExpression = arguments.get(0);
-        if (partExpression instanceof QualifiedReferenceExpression)
+        Object obj = arguments.get(0).eval(context);
+        if (obj == null)
         {
-            partString = ((QualifiedReferenceExpression) partExpression).getQname().toString();
+            return null;
         }
-        else
-        {
-            Object obj = partExpression.eval(context);
-            if (obj == null)
-            {
-                return null;
-            }
-            partString = String.valueOf(obj);
-        }
-
+        String partString = String.valueOf(obj);
         if (!(value instanceof TemporalAccessor))
         {
             throw new IllegalArgumentException("Expected a valid datetime value for " + getName() + " but got: " + value);

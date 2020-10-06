@@ -20,7 +20,7 @@ import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Catalog providing file system functionality */
-class FilesystemCatalog extends Catalog
+public class FilesystemCatalog extends Catalog
 {
     private static final String[] COLUMNS = new String[] {
             "name",
@@ -32,7 +32,7 @@ class FilesystemCatalog extends Catalog
             "lastModifiedTime",
             "isDirectory"};
 
-    FilesystemCatalog()
+    public FilesystemCatalog()
     {
         super("Filesystem");
         registerFunction(new ListFunction(this));

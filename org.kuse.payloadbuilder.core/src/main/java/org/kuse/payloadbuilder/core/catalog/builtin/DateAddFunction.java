@@ -12,7 +12,6 @@ import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
-import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 
 /** DateAdd */
 class DateAddFunction extends ScalarFunctionInfo
@@ -60,22 +59,12 @@ class DateAddFunction extends ScalarFunctionInfo
             return null;
         }
 
-        String partString;
-        Expression partExpression = arguments.get(0);
-        if (partExpression instanceof QualifiedReferenceExpression)
+        Object obj = arguments.get(0).eval(context);
+        if (obj == null)
         {
-            partString = ((QualifiedReferenceExpression) partExpression).getQname().toString();
+            return null;
         }
-        else
-        {
-            Object obj = partExpression.eval(context);
-            if (obj == null)
-            {
-                return null;
-            }
-            partString = String.valueOf(obj);
-        }
-
+        String partString = String.valueOf(obj);
         Object numberObj = arguments.get(1).eval(context);
         if (!(numberObj instanceof Integer))
         {
