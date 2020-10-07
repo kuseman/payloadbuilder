@@ -46,7 +46,7 @@ public class FilesystemCatalog extends Catalog
         {
             super(catalog, "file");
         }
-        
+
         @Override
         public String[] getColumns()
         {
@@ -80,17 +80,19 @@ public class FilesystemCatalog extends Catalog
         public Object eval(ExecutionContext context, List<Expression> arguments)
         {
             Object p = arguments.get(0).eval(context);
-            if (!(p instanceof Path) || Files.isDirectory((Path) p))
+            if (p == null)
             {
                 return null;
             }
+            String strPath = String.valueOf(p);
             try
             {
-                return FileUtils.readFileToString(((Path) p).toFile());
+                Path path = FileSystems.getDefault().getPath(strPath);
+                return FileUtils.readFileToString(path.toFile());
             }
             catch (IOException e)
             {
-                return null;
+                throw new RuntimeException("Error reading contents from: " + strPath, e);
             }
         }
     }
@@ -102,7 +104,7 @@ public class FilesystemCatalog extends Catalog
         {
             super(catalog, "list");
         }
-        
+
         @Override
         public String[] getColumns()
         {

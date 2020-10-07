@@ -36,6 +36,8 @@ import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.PrintStatement;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QueryStatement;
+import org.kuse.payloadbuilder.core.parser.Select;
+import org.kuse.payloadbuilder.core.parser.SelectItem;
 import org.kuse.payloadbuilder.core.parser.SelectStatement;
 import org.kuse.payloadbuilder.core.parser.SetStatement;
 import org.kuse.payloadbuilder.core.parser.ShowStatement;
@@ -260,9 +262,59 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     @Override
     public Void visit(SelectStatement statement, Void ctx)
     {
-        //        context.clearStatementCache();
-        currentSelect = OperatorBuilder.create(session, statement.getSelect());
+        if (statement.isAssignmentSelect())
+        {
+            applyAssignmentSelect(statement.getSelect());
+        }
+        else
+        {
+            currentSelect = OperatorBuilder.create(session, statement.getSelect());
+        }
         return null;
+    }
+
+    private void applyAssignmentSelect(Select select)
+    {
+        Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
+
+        Operator operator = pair.getKey();
+        int size = select.getSelectItems().size();
+
+        if (operator != null)
+        {
+            RowIterator iterator = operator.open(context);
+            Tuple tuple = null;
+            while (iterator.hasNext())
+            {
+                if (session.abortQuery())
+                {
+                    break;
+                }
+                tuple = iterator.next();
+                context.setTuple(tuple);
+
+                for (int i = 0; i < size; i++)
+                {
+                    SelectItem item = select.getSelectItems().get(i);
+                    Object value = item.getAssignmentValue(context);
+                    context.setVariable(item.getAssignmentName(), value);
+                }
+
+            }
+            iterator.close();
+        }
+        else
+        {
+            context.setTuple(DUMMY_ROW);
+
+            for (int i = 0; i < size; i++)
+            {
+                SelectItem item = select.getSelectItems().get(i);
+                Object value = item.getAssignmentValue(context);
+                context.setVariable(item.getAssignmentName(), value);
+            }
+        }
+
     }
 
     private boolean setNext()

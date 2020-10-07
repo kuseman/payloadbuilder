@@ -97,7 +97,7 @@ selectItem
  	ASTERISK
  |  alias=identifier '.' ASTERISK
  |  (OBJECT | ARRAY) nestedSelectItem (AS? identifier)?
- |  expression 						  (AS? identifier)?
+ |  (variable EQUALS)? expression 	  (AS? identifier)?
  ;
  
 nestedSelectItem

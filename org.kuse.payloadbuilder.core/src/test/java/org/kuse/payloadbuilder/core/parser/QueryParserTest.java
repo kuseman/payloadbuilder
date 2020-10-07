@@ -14,12 +14,18 @@ public class QueryParserTest extends AParserTest
     public void test_selectItems_failures()
     {
         assertQueryFail(ParseException.class, "Select items inside an ARRAY", "select array(10 col1, 20 col2 from s) col from source s");
-        assertQueryFail(ParseException.class, "Select items inside an OBJECT", "select object(10) col from source s");
-        assertQueryFail(ParseException.class, "Select items on ROOT level", "select 'value' from source s");
         assertQueryFail(ParseException.class, "Cannot have a WHERE clause without a FROM clause", "select object(s.id where false) from source s");
         assertQueryFail(ParseException.class, "Cannot have an ORDER BY clause without a FROM clause", "select object(s.id order by 1) from source s");
     }
 
+    @Test
+    public void test_selectItems_assignment()
+    {
+        assertQuery("select @var = 10");
+        assertQuery("select @var = a.col from table a");
+        assertQueryFail(ParseException.class, "Cannot combine variable assignment items with data retrieval items", "select @var = a.col, a.col2 from table a");
+    }
+    
     @Test
     public void test_selectItems()
     {
@@ -222,6 +228,7 @@ public class QueryParserTest extends AParserTest
         try
         {
             q(query);
+            fail("Query should fail with " + expected + " containing message: " + messageContains);
         }
         catch (Exception e)
         {

@@ -6,10 +6,12 @@ import static java.util.Objects.requireNonNull;
 public class SelectStatement extends Statement
 {
     private final Select select;
+    private final boolean assignmentSelect;
 
-    SelectStatement(Select select)
+    SelectStatement(Select select, boolean assignmentSelect)
     {
         this.select = requireNonNull(select, "select");
+        this.assignmentSelect = assignmentSelect;
     }
 
     public Select getSelect()
@@ -17,6 +19,11 @@ public class SelectStatement extends Statement
         return select;
     }
 
+    public boolean isAssignmentSelect()
+    {
+        return assignmentSelect;
+    }
+    
     @Override
     public <TR, TC> TR accept(StatementVisitor<TR, TC> visitor, TC context)
     {

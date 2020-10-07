@@ -146,7 +146,7 @@ public class QueryParser
 
         private TableAlias parentTableAlias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT").build();
         private final CatalogRegistry registry;
-        
+
         AstBuilder(CatalogRegistry registry)
         {
             this.registry = registry;
@@ -239,6 +239,17 @@ public class QueryParser
         {
             List<SelectItem> selectItems = ctx.selectItem().stream().map(s -> (SelectItem) visit(s)).collect(toList());
 
+            boolean assignmentSelect = false;
+            /** Verify/determine assignment select */
+            if (selectItems.stream().anyMatch(s -> s.getAssignmentName() != null))
+            {
+                if (selectItems.stream().anyMatch(s -> s.getAssignmentName() == null))
+                {
+                    throw new ParseException("Cannot combine variable assignment items with data retrieval items", ctx.start);
+                }
+                assignmentSelect = true;
+            }
+
             TableSourceJoined joinedTableSource = ctx.tableSourceJoined() != null ? (TableSourceJoined) visit(ctx.tableSourceJoined()) : null;
             Expression topExpression = ctx.topCount() != null ? (Expression) visit(ctx.topCount()) : null;
             if (joinedTableSource == null)
@@ -265,7 +276,7 @@ public class QueryParser
             List<Expression> groupBy = ctx.groupBy != null ? ctx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
             List<SortItem> orderBy = ctx.sortItem() != null ? ctx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
             Select select = new Select(selectItems, joinedTableSource, topExpression, where, groupBy, orderBy);
-            return new SelectStatement(select);
+            return new SelectStatement(select, assignmentSelect);
         }
 
         @Override
@@ -291,8 +302,9 @@ public class QueryParser
             // Expression select item
             if (ctx.expression() != null)
             {
+                QualifiedName assignmentQname = ctx.variable() != null ? getQualifiedName(ctx.variable().qname()) : null;
                 Expression expression = getExpression(ctx.expression());
-                return new ExpressionSelectItem(expression, identifier);
+                return new ExpressionSelectItem(expression, identifier, assignmentQname);
             }
             // Nested select item
             else if (ctx.nestedSelectItem() != null)
@@ -323,17 +335,6 @@ public class QueryParser
                         int index = selectItems.indexOf(item.get());
                         SelectItemContext itemCtx = ctx.nestedSelectItem().selectItem(index);
                         throw new ParseException("Select items inside an ARRAY select cannot have aliaes. Item: " + item.get(), itemCtx.start);
-                    }
-                }
-                else
-                {
-                    Optional<SelectItem> item = selectItems.stream().filter(si -> isBlank(si.getIdentifier())).findAny();
-
-                    if (item.isPresent())
-                    {
-                        int index = selectItems.indexOf(item.get());
-                        SelectItemContext itemCtx = ctx.nestedSelectItem().selectItem(index);
-                        throw new ParseException("Select items inside an OBJECT select must have aliaes. Item: " + item.get(), itemCtx.start);
                     }
                 }
 
@@ -543,7 +544,7 @@ public class QueryParser
             }
             validateFunction(functionInfo, arguments, ctx.start);
             arguments = functionInfo.foldArguments(arguments);
-            
+
             return new FunctionCallInfo(catalog, functionInfo, arguments);
         }
 
@@ -762,7 +763,7 @@ public class QueryParser
             text = text.replaceAll("''", "'");
             return new LiteralStringExpression(text);
         }
-        
+
         private void validateFunction(FunctionInfo functionInfo, List<Expression> arguments, Token token)
         {
             if (functionInfo.getInputTypes() != null)

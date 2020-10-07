@@ -116,7 +116,7 @@
       ]
     },
     {
-      "name": "Double results",
+      "name": "Double result sets",
       "query": [
         "select * from source ",
         "select * from source where col2 = 2"
@@ -129,6 +129,20 @@
         ],
         [
           [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }]
+        ]
+      ]
+    },
+    {
+      "name": "Assignment select",
+      "query": [
+        "set @var3 = 0 ",
+        "select @var1 = 10 + 20 ",
+        "select @var2 = col1 + col2, @var3 = @var3 + 1 from source ",
+        "select @var1 Var1, @var2 Var2, @var3 Var3"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "Var1", "value": 30 }, { "key": "Var2", "value": 11 }, { "key": "Var3", "value": 3 }]
         ]
       ]
     }
