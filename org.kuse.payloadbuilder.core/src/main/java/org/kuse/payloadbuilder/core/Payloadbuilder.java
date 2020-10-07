@@ -22,7 +22,7 @@ public class Payloadbuilder
     /** Perform query with provided session and query string */
     public static QueryResult query(QuerySession session, String queryString)
     {
-        QueryStatement query = PARSER.parseQuery(queryString);
+        QueryStatement query = PARSER.parseQuery(session.getCatalogRegistry(), queryString);
         return new QueryResultImpl(session, query);
     }
 }

@@ -9,10 +9,13 @@ import java.time.temporal.TemporalAccessor;
 import java.util.Arrays;
 import java.util.List;
 
+import org.apache.commons.lang3.EnumUtils;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
+import org.kuse.payloadbuilder.core.parser.LiteralStringExpression;
+import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 
 /** Returns date part from input */
 class DatePartFunction extends ScalarFunctionInfo
@@ -49,6 +52,26 @@ class DatePartFunction extends ScalarFunctionInfo
     public List<Class<? extends Expression>> getInputTypes()
     {
         return asList(Expression.class, Expression.class);
+    }
+
+    /** Convert Part argument from QRES to Strings if they match DateType enum */
+    @Override
+    public List<Expression> foldArguments(List<Expression> arguments)
+    {
+        if (arguments.get(0) instanceof QualifiedReferenceExpression)
+        {
+            QualifiedReferenceExpression qre = (QualifiedReferenceExpression) arguments.get(0);
+            if (qre.getLambdaId() >= 0)
+            {
+                return arguments;
+            }
+            Part part = EnumUtils.getEnumIgnoreCase(Part.class, qre.getQname().toString().toUpperCase());
+            if (part != null)
+            {
+                arguments.set(0, new LiteralStringExpression(part.name()));
+            }
+        }
+        return arguments;
     }
 
     @Override

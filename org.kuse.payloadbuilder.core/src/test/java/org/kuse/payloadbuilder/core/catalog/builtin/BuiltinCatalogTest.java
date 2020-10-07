@@ -185,7 +185,7 @@ public class BuiltinCatalogTest extends Assert
     private void assertFunction(Object expected, Row row, String expression)
     {
         row = row != null ? row : Row.of(alias, 0, new Object[0]);
-        Expression e = parser.parseExpression(expression);
+        Expression e = parser.parseExpression(session.getCatalogRegistry(), expression);
         Object actual = null;
 
         ExecutionContext context = new ExecutionContext(session);
@@ -203,7 +203,7 @@ public class BuiltinCatalogTest extends Assert
     {
         try
         {
-            Expression expr = parser.parseExpression(expression);
+            Expression expr = parser.parseExpression(session.getCatalogRegistry(), expression);
             ExecutionContext context = new ExecutionContext(session);
             context.setTuple(row);
             expr.eval(context);

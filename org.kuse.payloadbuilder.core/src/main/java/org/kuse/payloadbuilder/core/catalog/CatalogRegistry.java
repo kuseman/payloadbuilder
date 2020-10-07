@@ -15,6 +15,7 @@ public class CatalogRegistry
     public static final String DEFAULTCATALOG = "defaultCatalog";
     private final Map<String, Catalog> catalogByAlias = new HashMap<>();
     private final Catalog builtinCatalog;
+    private String defaultCatalogAlias;
 
     public CatalogRegistry()
     {
@@ -47,5 +48,50 @@ public class CatalogRegistry
     public void clearCatalogs()
     {
         catalogByAlias.clear();
+    }
+
+    /** Get default catalog for this session */
+    public Catalog getDefaultCatalog()
+    {
+        return isBlank(defaultCatalogAlias) ? null : getCatalog(defaultCatalogAlias);
+    }
+
+    /** Return default catalog alias */
+    public String getDefaultCatalogAlias()
+    {
+        return defaultCatalogAlias;
+    }
+
+    /**
+     * Get default catalog for this session
+     *
+     * @param alias Alias of the catalog to set as default
+     **/
+    public void setDefaultCatalog(String alias)
+    {
+        defaultCatalogAlias = alias;
+    }
+    
+    /**
+     * Resolves function info from provided
+     */
+    public FunctionInfo resolveFunctionInfo(String catalogAlias, String function)
+    {
+        Catalog catalog;
+        if (catalogAlias == null)
+        {
+            catalog = getBuiltin();
+        }
+        else
+        {
+            catalog = getCatalog(lowerCase(catalogAlias));
+        }
+
+        if (catalog == null)
+        {
+            return null;
+        }
+
+        return catalog.getFunction(lowerCase(function));
     }
 }

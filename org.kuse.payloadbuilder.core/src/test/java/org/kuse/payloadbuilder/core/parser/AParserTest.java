@@ -8,15 +8,16 @@ import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 abstract class AParserTest extends Assert
 {
     private final QueryParser p = new QueryParser();
-    protected final ExecutionContext context = new ExecutionContext(new QuerySession(new CatalogRegistry()));
+    protected final QuerySession session = new QuerySession(new CatalogRegistry());
+    protected final ExecutionContext context = new ExecutionContext(session);
 
     protected QueryStatement q(String query)
     {
-        return p.parseQuery(query);
+        return p.parseQuery(session.getCatalogRegistry(), query);
     }
 
     protected Expression e(String expression)
     {
-        return p.parseExpression(expression);
+        return p.parseExpression(session.getCatalogRegistry(), expression);
     }
 }

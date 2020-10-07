@@ -12,6 +12,8 @@ import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Assert;
 import org.junit.Test;
+import org.kuse.payloadbuilder.core.QuerySession;
+import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzeItem;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair.Type;
@@ -27,6 +29,7 @@ import org.kuse.payloadbuilder.core.utils.CollectionUtils;
 public class PredicateAnalyzerTest extends Assert
 {
     private final QueryParser parser = new QueryParser();
+    private final QuerySession session = new QuerySession(new CatalogRegistry());
 
     @Test
     public void test_AnalyzeResult()
@@ -306,10 +309,10 @@ public class PredicateAnalyzerTest extends Assert
         assertFalse(p.isPushdown("s"));
         assertFalse(p.isPushdown("b"));
 
-        p = PredicateAnalyzer.AnalyzePair.of(alias, e("func(a.id) = func(s.id)"));
+        p = PredicateAnalyzer.AnalyzePair.of(alias, e("hash(a.id) = hash(s.id)"));
         assertEquals(Type.COMPARISION, p.getType());
         assertEquals(ComparisonExpression.Type.EQUAL, p.getComparisonType());
-        assertEquals(e("func(a.id) = func(s.id)"), p.getPredicate());
+        assertEquals(e("hash(a.id) = hash(s.id)"), p.getPredicate());
         assertNull(p.getColumn("b"));
         assertNull(p.getColumn("s"));
         assertFalse(p.isPushdown("s"));
@@ -317,8 +320,8 @@ public class PredicateAnalyzerTest extends Assert
         assertTrue(p.isEqui("a"));
         assertTrue(p.isEqui("s"));
         assertFalse(p.isEqui("b"));
-        assertEquals(Pair.of(e("func(a.id)"), e("func(s.id)")), p.getExpressionPair("a"));
-        assertEquals(Pair.of(e("func(s.id)"), e("func(a.id)")), p.getExpressionPair("s"));
+        assertEquals(Pair.of(e("hash(a.id)"), e("hash(s.id)")), p.getExpressionPair("a"));
+        assertEquals(Pair.of(e("hash(s.id)"), e("hash(a.id)")), p.getExpressionPair("s"));
 
         p = PredicateAnalyzer.AnalyzePair.of(alias, e("a.art_id = art_id_rel"));
         assertEquals(Type.COMPARISION, p.getType());
@@ -505,6 +508,6 @@ public class PredicateAnalyzerTest extends Assert
 
     private Expression e(String expression)
     {
-        return parser.parseExpression(expression);
+        return parser.parseExpression(session.getCatalogRegistry(), expression);
     }
 }

@@ -112,14 +112,7 @@ class OpenMapCollectionFunction extends TableFunctionInfo
                         }
                     }
 
-                    int length = columns.length;
-                    Object[] values = new Object[length];
-                    for (int i = 0; i < length; i++)
-                    {
-                        values[i] = item.get(columns[i]);
-                    }
-
-                    next = Row.of(tableAlias, pos++, columns, values);
+                    next = Row.of(tableAlias, pos++, columns, new Row.MapValues(item, columns));
                 }
 
                 return next != null;

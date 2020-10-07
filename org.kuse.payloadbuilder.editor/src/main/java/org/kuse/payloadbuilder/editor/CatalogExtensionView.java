@@ -179,7 +179,7 @@ class CatalogExtensionView extends JPanel
     void init(QueryFileModel model)
     {
         fireEvents = false;
-        if (Objects.equals(model.getQuerySession().getDefaultCatalogAlias(), tfAlias.getText()))
+        if (Objects.equals(model.getQuerySession().getCatalogRegistry().getDefaultCatalogAlias(), tfAlias.getText()))
         {
             rbDefault.setSelected(true);
         }

@@ -87,7 +87,7 @@ public class TestHarnessRunner
         ResultWriter writer = new ResultWriter();
         QuerySession session = new QuerySession(registry);
         // Set first catalog as default
-        session.setDefaultCatalog(harness.getCatalogs().get(0).getAlias());
+        session.getCatalogRegistry().setDefaultCatalog(harness.getCatalogs().get(0).getAlias());
         QueryResult result = Payloadbuilder.query(session, testCase.getQuery());
 
         List<List<List<ColumnValue>>> actualResultSets = new ArrayList<>();

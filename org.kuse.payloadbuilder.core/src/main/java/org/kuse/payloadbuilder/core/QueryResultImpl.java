@@ -2,6 +2,7 @@ package org.kuse.payloadbuilder.core;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_OBJECT_ARRAY;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -16,6 +17,7 @@ import java.util.stream.Stream;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
+import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.FunctionInfo;
 import org.kuse.payloadbuilder.core.operator.ObjectProjection;
 import org.kuse.payloadbuilder.core.operator.Operator;
@@ -55,6 +57,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             .build();
 
     private final QuerySession session;
+    private final CatalogRegistry registry;
     private ExecutionContext context;
     private final QueryStatement query;
     private Pair<Operator, Projection> currentSelect;
@@ -64,7 +67,8 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
 
     QueryResultImpl(QuerySession session, QueryStatement query)
     {
-        this.session = session;
+        this.session = requireNonNull(session);
+        this.registry = session.getCatalogRegistry();
         this.query = query;
         this.context = new ExecutionContext(session);
         queue.addAll(query.getStatements());
@@ -115,7 +119,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         // Change of default catalog
         if (statement.getExpression() == null)
         {
-            context.getSession().setDefaultCatalog(statement.getQname().getFirst());
+            registry.setDefaultCatalog(statement.getQname().getFirst());
         }
         // Set property
         else
@@ -170,7 +174,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         }
         else if (statement.getType() == Type.TABLES)
         {
-            String alias = defaultIfBlank(statement.getCatalog(), session.getDefaultCatalogAlias());
+            String alias = defaultIfBlank(statement.getCatalog(), registry.getDefaultCatalogAlias());
             if (isBlank(alias))
             {
                 throw new ParseException("No catalog alias provided.", statement.getToken());
@@ -203,7 +207,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         }
         else if (statement.getType() == Type.FUNCTIONS)
         {
-            String alias = defaultIfBlank(statement.getCatalog(), session.getDefaultCatalogAlias());
+            String alias = defaultIfBlank(statement.getCatalog(), registry.getDefaultCatalogAlias());
             Catalog catalog = session.getCatalogRegistry().getCatalog(alias);
             if (!isBlank(statement.getCatalog()) && catalog == null)
             {

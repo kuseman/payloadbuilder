@@ -20,6 +20,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.OutputWriter;
 import org.kuse.payloadbuilder.core.Payloadbuilder;
 import org.kuse.payloadbuilder.core.QueryResult;
+import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.parser.AExpressionVisitor;
 import org.kuse.payloadbuilder.core.parser.AStatementVisitor;
 import org.kuse.payloadbuilder.core.parser.Expression;
@@ -132,12 +133,12 @@ class PayloadbuilderService
     }
 
     /** Get named parameters from query */
-    static Set<String> getVariables(String query)
+    static Set<String> getVariables(CatalogRegistry registry, String query)
     {
         QueryStatement parsedQuery;
         try
         {
-            parsedQuery = PARSER.parseQuery(query);
+            parsedQuery = PARSER.parseQuery(registry, query);
         }
         catch (Exception e)
         {

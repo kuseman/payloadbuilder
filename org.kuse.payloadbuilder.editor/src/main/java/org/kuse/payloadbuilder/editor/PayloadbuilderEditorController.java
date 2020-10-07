@@ -221,7 +221,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
         if (editor != null)
         {
-            editor.getFile().getQuerySession().setDefaultCatalog(catalogAlias);
+            editor.getFile().getQuerySession().getCatalogRegistry().setDefaultCatalog(catalogAlias);
         }
     }
 
@@ -435,7 +435,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
 
             QueryFileModel fileModel = editor.getFile();
 
-            Set<String> variableNames = PayloadbuilderService.getVariables(queryString);
+            Set<String> variableNames = PayloadbuilderService.getVariables(fileModel.getQuerySession().getCatalogRegistry(), queryString);
 
             for (String name : variableNames)
             {

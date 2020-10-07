@@ -15,14 +15,17 @@ import org.kuse.payloadbuilder.core.utils.MapUtils;
 /** Row */
 public class Row implements Tuple
 {
-    protected int pos;
-    protected TableAlias tableAlias;
-    protected String[] columns;
+    private static final String POS = "__pos";
+
+    private int pos;
+    private TableAlias tableAlias;
+    private String[] columns;
     private Values values;
 
     private Row()
-    {}
-    
+    {
+    }
+
     /** Return columns for this row */
     public String[] getColumns()
     {
@@ -108,8 +111,6 @@ public class Row implements Tuple
         return values.get(ordinal);
     }
 
-    private static final String POS = "__pos";
-
     public Object getObject(String column)
     {
         if (POS.equals(column))
@@ -123,6 +124,30 @@ public class Row implements Tuple
     public TableAlias getTableAlias()
     {
         return tableAlias;
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return 17 + (pos * 37);
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof Row)
+        {
+            Row that = (Row) obj;
+            return pos == that.pos
+                && tableAlias == that.tableAlias;
+        }
+        return false;
+    }
+
+    @Override
+    public String toString()
+    {
+        return tableAlias.getTable() + " (" + pos + ") " + values;
     }
 
     public static Row of(TableAlias alias, int pos, Object[] values)
@@ -154,34 +179,29 @@ public class Row implements Tuple
         return t;
     }
 
-    @Override
-    public int hashCode()
-    {
-        return 17 + (pos * 37);
-    }
-
-    @Override
-    public boolean equals(Object obj)
-    {
-        if (obj instanceof Row)
-        {
-            Row that = (Row) obj;
-            return pos == that.pos
-                && tableAlias == that.tableAlias;
-        }
-        return false;
-    }
-
-    @Override
-    public String toString()
-    {
-        return tableAlias.getTable() + " (" + pos + ") " + values;
-    }
-
     /** Values definition of a rows values */
     public interface Values
     {
         Object get(int ordinal);
+    }
+
+    /** Implementation of {@link Values} that wraps a Map */
+    public static class MapValues implements Row.Values
+    {
+        protected final Map<String, Object> map;
+        protected final String[] columns;
+
+        public MapValues(Map<String, Object> map, String[] columns)
+        {
+            this.map = map;
+            this.columns = columns;
+        }
+
+        @Override
+        public Object get(int ordinal)
+        {
+            return map.get(columns[ordinal]);
+        }
     }
 
     /** Object array implementation of {@link Values} */

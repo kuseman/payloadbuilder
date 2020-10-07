@@ -67,7 +67,6 @@ Simple query using multiple catalogs:
         session.setPrintStream(System.out);
         session.getCatalogRegistry().registerCatalog("es", new ESCatalog());
         session.getCatalogRegistry().registerCatalog("fs", new FileSystemCatalog());
-        session.setDefaultCatalog("es");
 
         session.setCatalogProperty("es", "endpoint", "http://localhost:9200");
         session.setCatalogProperty("es", "index", "myindex");

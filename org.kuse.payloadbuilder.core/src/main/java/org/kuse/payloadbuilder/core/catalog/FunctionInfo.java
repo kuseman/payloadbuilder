@@ -4,11 +4,8 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 
-import org.antlr.v4.runtime.Token;
 import org.kuse.payloadbuilder.core.catalog.builtin.BuiltinCatalog;
 import org.kuse.payloadbuilder.core.parser.Expression;
-import org.kuse.payloadbuilder.core.parser.NamedExpression;
-import org.kuse.payloadbuilder.core.parser.ParseException;
 
 /** Definition of a function */
 public abstract class FunctionInfo
@@ -68,6 +65,14 @@ public abstract class FunctionInfo
     {
         return true;
     }
+    
+    /** Fold arguments. Is called upon parsing to let functions fold it's arguments.
+     *  Ie. Replace arguments with other values etc.
+     */
+    public List<Expression> foldArguments(List<Expression> arguments)
+    {
+        return arguments;
+    }
 
     @Override
     public String toString()
@@ -94,39 +99,6 @@ public abstract class FunctionInfo
                 && type.equals(fi.getType());
         }
         return false;
-    }
-
-    /** Validate function info against arguments */
-    public static void validate(FunctionInfo functionInfo, List<Expression> arguments, Token token)
-    {
-        if (functionInfo.getInputTypes() != null)
-        {
-            List<Class<? extends Expression>> inputTypes = functionInfo.getInputTypes();
-            int size = inputTypes.size();
-            if (arguments.size() != size)
-            {
-                throw new ParseException("Function " + functionInfo.getName() + " expected " + inputTypes.size() + " parameters, found " + arguments.size(), token);
-            }
-            for (int i = 0; i < size; i++)
-            {
-                Class<? extends Expression> inputType = inputTypes.get(i);
-                if (!inputType.isAssignableFrom(arguments.get(i).getClass()))
-                {
-                    throw new ParseException(
-                            "Function " + functionInfo.getName() + " expects " + inputType.getSimpleName() + " as parameter at index " + i + " but got "
-                                + arguments.get(i).getClass().getSimpleName(),
-                            token);
-                }
-            }
-        }
-        if (functionInfo.requiresNamedArguments() && (arguments.size() <= 0 || arguments.stream().anyMatch(a -> !(a instanceof NamedExpression))))
-        {
-            if (arguments.stream().anyMatch(a -> !(a instanceof NamedExpression)))
-            {
-                throw new ParseException(
-                        "Function " + functionInfo.getName() + " expects named parameters", token);
-            }
-        }
     }
 
     public enum Type

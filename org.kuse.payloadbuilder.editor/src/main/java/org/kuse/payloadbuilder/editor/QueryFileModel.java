@@ -87,7 +87,7 @@ class QueryFileModel
         // Set first extension as default
         if (catalogs.size() > 0)
         {
-            querySession.setDefaultCatalog(catalogs.get(0).getCatalogExtension().getDefaultAlias());
+            querySession.getCatalogRegistry().setDefaultCatalog(catalogs.get(0).getCatalogExtension().getDefaultAlias());
         }
     }
     

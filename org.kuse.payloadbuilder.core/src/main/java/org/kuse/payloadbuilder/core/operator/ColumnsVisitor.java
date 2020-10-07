@@ -140,6 +140,11 @@ class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsVisitor.
             List<String> tempParts = new ArrayList<>(parts);
             TableAlias tempAlias = getFromQualifiedName(alias, tempParts);
 
+            if (tempAlias == null)
+            {
+                continue;
+            }
+            
             if (tempParts.isEmpty())
             {
                 output.add(tempAlias);
@@ -163,7 +168,7 @@ class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsVisitor.
     @Override
     public Set<TableAlias> visit(QualifiedFunctionCallExpression expression, Context context)
     {
-        ScalarFunctionInfo functionInfo = expression.getFunctionInfo(context.session);
+        ScalarFunctionInfo functionInfo = expression.getFunctionInfo();
 
         // Store parent aliases before resolving this function call
         Set<TableAlias> parentAliases = context.parentAliases;

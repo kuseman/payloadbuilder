@@ -10,10 +10,13 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
 import java.util.List;
 
+import org.apache.commons.lang3.EnumUtils;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
+import org.kuse.payloadbuilder.core.parser.LiteralStringExpression;
+import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 
 /** Cast and convert function */
 class CastFunction extends ScalarFunctionInfo
@@ -25,6 +28,26 @@ class CastFunction extends ScalarFunctionInfo
         super(catalog, name);
     }
 
+    /** Convert DataType argument from QRES to Strings if they match DateType enum */
+    @Override
+    public List<Expression> foldArguments(List<Expression> arguments)
+    {
+        if (arguments.get(1) instanceof QualifiedReferenceExpression)
+        {
+            QualifiedReferenceExpression qre = (QualifiedReferenceExpression) arguments.get(1);
+            if (qre.getLambdaId() >= 0)
+            {
+                return arguments;
+            }
+            DataType dataType = EnumUtils.getEnumIgnoreCase(DataType.class, qre.getQname().toString().toUpperCase());
+            if (dataType != null)
+            {
+                arguments.set(1, new LiteralStringExpression(dataType.name()));
+            }
+        }
+        return arguments;
+    }
+    
     @Override
     public Object eval(ExecutionContext context, List<Expression> arguments)
     {

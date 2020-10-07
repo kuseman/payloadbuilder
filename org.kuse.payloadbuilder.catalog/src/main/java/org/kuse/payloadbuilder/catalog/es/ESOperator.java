@@ -531,40 +531,48 @@ class ESOperator extends AOperator
                         }
                     }
 
-                    Object[] data;
-                    int length = rowColumns.length;
-                    data = new Object[length];
-                    int index = 0;
-                    for (int i = 0; i < length; i++)
-                    {
-                        String column = rowColumns[i];
-                        if (INDEX.equals(column))
-                        {
-                            data[index++] = doc.index;
-                        }
-                        else if (TYPE.equals(column))
-                        {
-                            data[index++] = doc.type;
-                        }
-                        else if (DOCID.equals(column))
-                        {
-                            data[index++] = doc.docId;
-                        }
-                        else if (PARENTID.equals(column))
-                        {
-                            data[index++] = doc.fields != null ? doc.fields.get("_parent") : null;
-                        }
-                        else
-                        {
-                            data[index++] = doc.source.get(column);
-                        }
-                    }
-
-                    next = Row.of(tableAlias, rowPos++, rowColumns, data);
+                    next = Row.of(tableAlias, rowPos++, rowColumns, new DocValues(doc, rowColumns));
                 }
                 return true;
             }
         };
+    }
+    
+    /** DocValues. Wrapping a {@link Doc} to support index,type,id besides source fields */
+    private static class DocValues implements Row.Values
+    {
+        private final Doc doc;
+        private final String[] columns;
+
+        DocValues(Doc doc, String[] columns)
+        {
+            this.doc = doc;
+            this.columns = columns;
+        }
+        
+        @Override
+        public Object get(int ordinal)
+        {
+            String column = columns[ordinal];
+            if (INDEX.equals(column))
+            {
+                return doc.index;
+            }
+            else if (TYPE.equals(column))
+            {
+                return doc.type;
+            }
+            else if (DOCID.equals(column))
+            {
+                return doc.docId;
+            }
+            else if (PARENTID.equals(column))
+            {
+                return doc.fields != null ? doc.fields.get("_parent") : null;
+            }
+            
+            return doc.source.get(column);
+        }
     }
 
     private String getSearchBody(boolean isSingleType, ExecutionContext context)

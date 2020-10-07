@@ -23,6 +23,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.Catalog.OperatorData;
+import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
@@ -77,6 +78,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         private int nodeId;
 
         private QuerySession session;
+        private CatalogRegistry registry;
         private TableAlias currentTableAlias;
         Map<TableAlias, Set<String>> columnsByAlias = new THashMap<>();
 
@@ -119,6 +121,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     {
         Context context = new Context();
         context.session = session;
+        context.registry = session.getCatalogRegistry();
         select.accept(VISITOR, context);
         context.columnsByAlias.entrySet().forEach(e ->
         {
@@ -546,7 +549,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     @Override
     public Void visit(TableFunction tableFunction, Context context)
     {
-        TableFunctionInfo functionInfo = tableFunction.getFunctionInfo(context.session);
+        TableFunctionInfo functionInfo = tableFunction.getFunctionInfo();
         context.currentTableAlias = tableFunction.getTableAlias();
         context.currentTableAlias.setColumns(functionInfo.getColumns());
         tableFunction.getArguments().forEach(a -> visit(a, context));
@@ -810,12 +813,12 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     {
         if (isBlank(catalogAlias))
         {
-            Catalog catalog = context.session.getDefaultCatalog();
+            Catalog catalog = context.registry.getDefaultCatalog();
             if (catalog == null)
             {
                 throw new ParseException("No default catalog set", token);
             }
-            return Pair.of(context.session.getDefaultCatalogAlias(), catalog);
+            return Pair.of(context.registry.getDefaultCatalogAlias(), catalog);
         }
 
         Catalog catalog = context.session.getCatalogRegistry().getCatalog(catalogAlias);

@@ -23,6 +23,7 @@ public class ExpressionTest extends Assert
 {
     private final CatalogRegistry catalogRegistry = new CatalogRegistry();
     private final QueryParser parser = new QueryParser();
+    private final QuerySession session = new QuerySession(catalogRegistry);
     private final TableAlias alias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("article"), "a").columns(new String[] {"a", "b", "c", "d", "e", "f", "g"}).build();
 
     @Test
@@ -558,7 +559,7 @@ public class ExpressionTest extends Assert
     {
         try
         {
-            Expression expr = parser.parseExpression(expression);
+            Expression expr = parser.parseExpression(session.getCatalogRegistry(), expression);
             ExecutionContext context = new ExecutionContext(new QuerySession(new CatalogRegistry()));
             context.setTuple(row);
             expr.eval(context);
@@ -575,7 +576,7 @@ public class ExpressionTest extends Assert
     {
         try
         {
-            Expression expr = parser.parseExpression(expression);
+            Expression expr = parser.parseExpression(session.getCatalogRegistry(), expression);
             ExecutionContext context = new ExecutionContext(new QuerySession(catalogRegistry));
             context.setTuple(row);
             assertEquals("Eval: " + expression, value, expr.eval(context));

@@ -24,10 +24,14 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.RecognitionException;
 import org.antlr.v4.runtime.Recognizer;
+import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.atn.PredictionMode;
 import org.antlr.v4.runtime.misc.ParseCancellationException;
-import org.apache.commons.lang3.tuple.Pair;
+import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
+import org.kuse.payloadbuilder.core.catalog.FunctionInfo;
+import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
+import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.Apply.ApplyType;
@@ -76,25 +80,25 @@ import org.kuse.payloadbuilder.core.parser.SortItem.Order;
 public class QueryParser
 {
     /** Parse query */
-    public QueryStatement parseQuery(String query)
+    public QueryStatement parseQuery(CatalogRegistry registry, String query)
     {
-        return getTree(query, p -> p.query());
+        return getTree(registry, query, p -> p.query());
     }
 
     /** Parse select */
-    public Select parseSelect(String query)
+    public Select parseSelect(CatalogRegistry registry, String query)
     {
-        return getTree(query, p -> p.topSelect());
+        return getTree(registry, query, p -> p.topSelect());
     }
 
     /** Parse expression */
-    public Expression parseExpression(String expression)
+    public Expression parseExpression(CatalogRegistry registry, String expression)
     {
-        return getTree(expression, p -> p.topExpression());
+        return getTree(registry, expression, p -> p.topExpression());
     }
 
     @SuppressWarnings("unchecked")
-    private <T> T getTree(String body, Function<PayloadBuilderQueryParser, ParserRuleContext> function)
+    private <T> T getTree(CatalogRegistry registry, String body, Function<PayloadBuilderQueryParser, ParserRuleContext> function)
     {
         BaseErrorListener errorListener = new BaseErrorListener()
         {
@@ -130,28 +134,26 @@ public class QueryParser
             tree = function.apply(parser);
         }
 
-        return (T) new AstBuilder().visit(tree);
+        return (T) new AstBuilder(registry).visit(tree);
     }
 
     /** Builds tree */
     private static class AstBuilder extends PayloadBuilderQueryBaseVisitor<Object>
     {
-        /**
-         * Function identifier counter. Ticks up for each unique catalog/function name combo. This to be able to cache function lookup by id
-         */
-        private int functionId;
-        private final Map<Pair<String, String>, Integer> functionIdByName = new HashMap<>();
-
         /** Lambda parameters and slot id in current scope */
         private final Map<String, Integer> lambdaParameters = new HashMap<>();
         private Expression leftDereference;
 
-        //        private String parentAlias;
         private TableAlias parentTableAlias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT").build();
+        private final CatalogRegistry registry;
+        
+        AstBuilder(CatalogRegistry registry)
+        {
+            this.registry = registry;
+        }
 
         private void clear()
         {
-            //            parentAlias = null;
             parentTableAlias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT").build();
         }
 
@@ -371,27 +373,12 @@ public class QueryParser
         @Override
         public Object visitTableSourceJoined(TableSourceJoinedContext ctx)
         {
-            //            String prevAlias = parentAlias;
-            //            TableAlias prevParent = parentTableAlias;
-
             TableSource tableSource = (TableSource) visit(ctx.tableSource());
-
-            //            parentAlias = tableSource.alias;
-            //            parentTableAlias = currentTableAlias;
-
             List<AJoin> joins = ctx
                     .joinPart()
                     .stream()
-                    .map(j ->
-                    {
-                        //                        parentAlias = getIdentifier(j.tableSource().identifier());
-                        //                        AJoin join = (AJoin) visit(j);
-                        return (AJoin) visit(j);
-                    })
+                    .map(j -> (AJoin) visit(j))
                     .collect(toList());
-
-            //            parentTableAlias = prevParent;
-            //            parentAlias = prevAlias;
 
             return new TableSourceJoined(tableSource, joins);
         }
@@ -412,11 +399,6 @@ public class QueryParser
             return new Apply(tableSource, applyType);
         }
 
-        private TableAlias getParentTableAlias()
-        {
-            return parentTableAlias;
-        }
-
         @Override
         public Object visitTableSource(TableSourceContext ctx)
         {
@@ -426,12 +408,21 @@ public class QueryParser
             if (ctx.functionCall() != null)
             {
                 FunctionCallInfo functionCallInfo = (FunctionCallInfo) visit(ctx.functionCall());
+                if (!(functionCallInfo.functionInfo instanceof TableFunctionInfo))
+                {
+                    throw new ParseException("Expected a TABLE function for " + functionCallInfo.functionInfo.toString(), ctx.start);
+                }
                 TableAlias tableAlias = TableAliasBuilder
-                        .of(TableAlias.Type.FUNCTION, QualifiedName.of(functionCallInfo.function), defaultIfNull(alias, ""), ctx.functionCall().start)
+                        .of(TableAlias.Type.FUNCTION, QualifiedName.of(functionCallInfo.functionInfo.getName()), defaultIfNull(alias, ""), ctx.functionCall().start)
                         .parent(getParentTableAlias())
                         .build();
-                return new TableFunction(functionCallInfo.catalog, tableAlias, functionCallInfo.function, functionCallInfo.arguments/*, defaultIfNull(alias, "")*/, options,
-                        functionCallInfo.functionId, ctx.functionCall().start);
+                return new TableFunction(
+                        functionCallInfo.catalogAlias,
+                        tableAlias,
+                        (TableFunctionInfo) functionCallInfo.functionInfo,
+                        functionCallInfo.arguments,
+                        options,
+                        ctx.functionCall().start);
             }
             else if (ctx.subQuery() != null)
             {
@@ -502,7 +493,11 @@ public class QueryParser
         public Object visitFunctionCallExpression(FunctionCallExpressionContext ctx)
         {
             FunctionCallInfo functionCallInfo = (FunctionCallInfo) visit(ctx.functionCall());
-            return new QualifiedFunctionCallExpression(functionCallInfo.catalog, functionCallInfo.function, functionCallInfo.arguments, functionCallInfo.functionId, ctx.functionCall().start);
+            if (!(functionCallInfo.functionInfo instanceof ScalarFunctionInfo))
+            {
+                throw new ParseException("Expected a SCALAR function for " + functionCallInfo.functionInfo.toString(), ctx.start);
+            }
+            return new QualifiedFunctionCallExpression((ScalarFunctionInfo) functionCallInfo.functionInfo, functionCallInfo.arguments);
         }
 
         @Override
@@ -523,7 +518,7 @@ public class QueryParser
             String function = getIdentifier(ctx.functionName().function);
 
             List<Expression> arguments = ctx.arguments.stream().map(a -> getExpression(a)).collect(toList());
-            int id = functionIdByName.computeIfAbsent(Pair.of(catalog, function), key -> functionId++);
+
             /* Wrap argument in a dereference expression if we are inside a dereference
             * Ie.
             * Left dereference:
@@ -541,7 +536,15 @@ public class QueryParser
                 arguments.add(0, prevLeftDereference);
             }
 
-            return new FunctionCallInfo(id, catalog, function, arguments);
+            FunctionInfo functionInfo = registry.resolveFunctionInfo(catalog, function);
+            if (functionInfo == null)
+            {
+                throw new ParseException("No function found named: " + function + " in catalog: " + (isBlank(catalog) ? "BuiltIn" : catalog), ctx.start);
+            }
+            validateFunction(functionInfo, arguments, ctx.start);
+            arguments = functionInfo.foldArguments(arguments);
+            
+            return new FunctionCallInfo(catalog, functionInfo, arguments);
         }
 
         @Override
@@ -623,7 +626,6 @@ public class QueryParser
         @Override
         public Object visitDereference(DereferenceContext ctx)
         {
-            //            Expression prevLeftDereference = leftDereference;
             Expression left = getExpression(ctx.left);
             leftDereference = left;
 
@@ -648,10 +650,14 @@ public class QueryParser
             else
             {
                 FunctionCallInfo functionCallInfo = (FunctionCallInfo) visit(ctx.functionCall());
-                result = new QualifiedFunctionCallExpression(functionCallInfo.catalog, functionCallInfo.function, functionCallInfo.arguments, functionCallInfo.functionId, ctx.functionCall().start);
+                if (!(functionCallInfo.functionInfo instanceof ScalarFunctionInfo))
+                {
+                    throw new ParseException("Expected a SCALAR function for " + functionCallInfo.functionInfo.toString(), ctx.start);
+                }
+                result = new QualifiedFunctionCallExpression((ScalarFunctionInfo) functionCallInfo.functionInfo, functionCallInfo.arguments);
             }
 
-            leftDereference = null;//prevLeftDereference;
+            leftDereference = null;
             return result;
         }
 
@@ -756,6 +762,43 @@ public class QueryParser
             text = text.replaceAll("''", "'");
             return new LiteralStringExpression(text);
         }
+        
+        private void validateFunction(FunctionInfo functionInfo, List<Expression> arguments, Token token)
+        {
+            if (functionInfo.getInputTypes() != null)
+            {
+                List<Class<? extends Expression>> inputTypes = functionInfo.getInputTypes();
+                int size = inputTypes.size();
+                if (arguments.size() != size)
+                {
+                    throw new ParseException("Function " + functionInfo.getName() + " expected " + inputTypes.size() + " parameters, found " + arguments.size(), token);
+                }
+                for (int i = 0; i < size; i++)
+                {
+                    Class<? extends Expression> inputType = inputTypes.get(i);
+                    if (!inputType.isAssignableFrom(arguments.get(i).getClass()))
+                    {
+                        throw new ParseException(
+                                "Function " + functionInfo.getName() + " expects " + inputType.getSimpleName() + " as parameter at index " + i + " but got "
+                                    + arguments.get(i).getClass().getSimpleName(),
+                                token);
+                    }
+                }
+            }
+            if (functionInfo.requiresNamedArguments() && (arguments.size() <= 0 || arguments.stream().anyMatch(a -> !(a instanceof NamedExpression))))
+            {
+                if (arguments.stream().anyMatch(a -> !(a instanceof NamedExpression)))
+                {
+                    throw new ParseException(
+                            "Function " + functionInfo.getName() + " expects named parameters", token);
+                }
+            }
+        }
+
+        private TableAlias getParentTableAlias()
+        {
+            return parentTableAlias;
+        }
 
         private SortItem getSortItem(SortItemContext ctx)
         {
@@ -836,16 +879,14 @@ public class QueryParser
 
         private static class FunctionCallInfo
         {
-            int functionId;
-            String catalog;
-            String function;
+            String catalogAlias;
+            FunctionInfo functionInfo;
             List<Expression> arguments;
 
-            FunctionCallInfo(int functionId, String catalog, String function, List<Expression> arguments)
+            FunctionCallInfo(String catalogAlias, FunctionInfo functionInfo, List<Expression> arguments)
             {
-                this.functionId = functionId;
-                this.catalog = catalog;
-                this.function = function;
+                this.catalogAlias = catalogAlias;
+                this.functionInfo = functionInfo;
                 this.arguments = arguments;
             }
         }

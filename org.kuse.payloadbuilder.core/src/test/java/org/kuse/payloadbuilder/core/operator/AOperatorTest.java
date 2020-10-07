@@ -26,7 +26,7 @@ public class AOperatorTest extends Assert
 
     protected Expression e(String expression)
     {
-        return parser.parseExpression(expression);
+        return parser.parseExpression(session.getCatalogRegistry(), expression);
     }
 
     protected Operator op(final Function<ExecutionContext, Iterator<Tuple>> it)
@@ -129,8 +129,8 @@ public class AOperatorTest extends Assert
             }
         };
         session.getCatalogRegistry().registerCatalog("c", c);
-        session.setDefaultCatalog("c");
-        Pair<Operator, Projection> pair = OperatorBuilder.create(session, parser.parseSelect(query));
+        session.getCatalogRegistry().setDefaultCatalog("c");
+        Pair<Operator, Projection> pair = OperatorBuilder.create(session, parser.parseSelect(session.getCatalogRegistry(), query));
 
         QueryResult result = new QueryResult();
 

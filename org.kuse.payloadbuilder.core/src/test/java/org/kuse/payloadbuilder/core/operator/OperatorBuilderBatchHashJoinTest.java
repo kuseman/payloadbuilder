@@ -40,9 +40,9 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         Catalog c = catalog(ofEntries(
                 entry("article", asList("art_id"))), operators);
         session.getCatalogRegistry().registerCatalog("c", c);
-        session.setDefaultCatalog("c");
+        session.getCatalogRegistry().setDefaultCatalog("c");
 
-        Select select = parser.parseSelect(queryString);
+        Select select = parser.parseSelect(session.getCatalogRegistry(), queryString);
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
 
         Operator expected = new NestedLoopJoin(
@@ -98,9 +98,9 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 entry("article", asList("club_id", "country_id", "art_id")),
                 entry("article_attribute", asList("art_id"))), operators);
         session.getCatalogRegistry().registerCatalog("c", c);
-        session.setDefaultCatalog("c");
+        session.getCatalogRegistry().setDefaultCatalog("c");
 
-        Select select = parser.parseSelect(queryString);
+        Select select = parser.parseSelect(session.getCatalogRegistry(), queryString);
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
 
         Operator expected = new BatchHashJoin(
@@ -156,9 +156,9 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         List<Operator> operators = new ArrayList<>();
         Catalog c = catalog(ofEntries(entry("article", asList("club_id", "country_id", "art_id"))), operators);
         session.getCatalogRegistry().registerCatalog("c", c);
-        session.setDefaultCatalog("c");
+        session.getCatalogRegistry().setDefaultCatalog("c");
 
-        Select select = parser.parseSelect(queryString);
+        Select select = parser.parseSelect(session.getCatalogRegistry(), queryString);
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
 
         Operator expected = new BatchHashJoin(
@@ -200,9 +200,9 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         List<Operator> operators = new ArrayList<>();
         Catalog c = catalog(ofEntries(entry("article", asList("club_id", "country_id", "art_id"))), operators);
         session.getCatalogRegistry().registerCatalog("c", c);
-        session.setDefaultCatalog("c");
+        session.getCatalogRegistry().setDefaultCatalog("c");
 
-        Select select = parser.parseSelect(queryString);
+        Select select = parser.parseSelect(session.getCatalogRegistry(), queryString);
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
 
         Operator expected = new BatchHashJoin(
@@ -247,9 +247,9 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         List<Operator> operators = new ArrayList<>();
         Catalog c = catalog(ofEntries(entry("article", asList("club_id", "country_id", "art_id"))), operators);
         session.getCatalogRegistry().registerCatalog("c", c);
-        session.setDefaultCatalog("c");
+        session.getCatalogRegistry().setDefaultCatalog("c");
 
-        Select select = parser.parseSelect(queryString);
+        Select select = parser.parseSelect(session.getCatalogRegistry(), queryString);
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
 
         Operator expected = new BatchHashJoin(
@@ -293,9 +293,9 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         List<Operator> operators = new ArrayList<>();
         Catalog c = catalog(ofEntries(entry("article", asList("club_id", "country_id", "art_id"))), operators);
         session.getCatalogRegistry().registerCatalog("c", c);
-        session.setDefaultCatalog("c");
+        session.getCatalogRegistry().setDefaultCatalog("c");
 
-        Select select = parser.parseSelect(queryString);
+        Select select = parser.parseSelect(session.getCatalogRegistry(), queryString);
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
 
         Operator expected = new BatchHashJoin(

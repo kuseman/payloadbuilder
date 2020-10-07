@@ -2,13 +2,10 @@ package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
-import static org.kuse.payloadbuilder.core.catalog.FunctionInfo.validate;
 
 import java.util.List;
 
 import org.antlr.v4.runtime.Token;
-import org.kuse.payloadbuilder.core.QuerySession;
-import org.kuse.payloadbuilder.core.catalog.FunctionInfo;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.catalog.builtin.BuiltinCatalog;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
@@ -17,17 +14,21 @@ import org.kuse.payloadbuilder.core.operator.TableAlias;
 public class TableFunction extends TableSource
 {
     private final String catalogAlias;
-    private final String function;
+    private final TableFunctionInfo functionInfo;
     private final List<Expression> arguments;
-    private final int functionId;
 
-    public TableFunction(String catalogAlias, TableAlias tableAlias, String function, List<Expression> arguments, List<Option> options, int functionId, Token token)
+    public TableFunction(
+            String catalogAlias,
+            TableAlias tableAlias,
+            TableFunctionInfo functionInfo,
+            List<Expression> arguments,
+            List<Option> options,
+            Token token)
     {
         super(tableAlias, options, token);
         this.catalogAlias = catalogAlias;
-        this.function = requireNonNull(function, "function");
+        this.functionInfo = requireNonNull(functionInfo, "functionInfo");
         this.arguments = requireNonNull(arguments, "arguments");
-        this.functionId = functionId;
     }
 
     @Override
@@ -36,27 +37,9 @@ public class TableFunction extends TableSource
         return catalogAlias;
     }
 
-    public String getFunction()
+    public TableFunctionInfo getFunctionInfo()
     {
-        return function;
-    }
-
-    public TableFunctionInfo getFunctionInfo(QuerySession session)
-    {
-        FunctionInfo functionInfo = session.resolveFunctionInfo(catalogAlias, function, functionId);
-
-        if (functionInfo == null)
-        {
-            throw new ParseException("No function found with name " + function, token);
-        }
-        else if (!(functionInfo instanceof TableFunctionInfo))
-        {
-            throw new ParseException("Expected a table valued function but got " + functionInfo, token);
-        }
-
-        validate(functionInfo, arguments, token);
-
-        return (TableFunctionInfo) functionInfo;
+        return functionInfo;
     }
 
     public List<Expression> getArguments()
@@ -74,7 +57,7 @@ public class TableFunction extends TableSource
     public String toString()
     {
         return (catalogAlias != null ? catalogAlias : BuiltinCatalog.NAME) + "#"
-            + function
+            + functionInfo
             + "(" + arguments.stream().map(a -> a.toString()).collect(joining(", ")) + ") " + tableAlias.getAlias();
     }
 }

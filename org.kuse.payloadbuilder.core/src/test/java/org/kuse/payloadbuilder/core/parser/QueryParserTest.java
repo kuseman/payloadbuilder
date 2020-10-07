@@ -3,6 +3,8 @@ package org.kuse.payloadbuilder.core.parser;
 import static java.util.Arrays.asList;
 
 import org.junit.Test;
+import org.kuse.payloadbuilder.core.catalog.Catalog;
+import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.parser.ArithmeticBinaryExpression.Type;
 
 /** Test query parser */
@@ -37,35 +39,28 @@ public class QueryParserTest extends AParserTest
         assertExpression("isnull(null, 1+1.1)");
         assertExpression("coalesce(null, 1+1.1)");
 
-        assertExpression("a.filter(x -> x.val > 0).sort(x -> x.val).sum(x -> x.val2)");
+        assertExpression("a.filter(x -> x.val > 0).map(x -> x.val).sum(x -> x.val2)");
         assertExpression("a.filter(x -> x.val > 0)");
-        assertExpression("a.b.c.utils#filter(x -> x.val > 0).utils2#func().sort()");
 
         QualifiedFunctionCallExpression expected = new QualifiedFunctionCallExpression(
-                null,
-                "map",
+                (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "map"),
                 asList(
                         new QualifiedFunctionCallExpression(
-                                null,
-                                "flatMap",
+                                (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "flatMap"),
                                 asList(
                                         new QualifiedReferenceExpression(QualifiedName.of("aa"), -1),
                                         new LambdaExpression(
                                                 asList("x"),
                                                 new QualifiedReferenceExpression(QualifiedName.of("x", "ap"), 0),
-                                                new int[] {0})),
-                                0),
+                                                new int[] {0}))),
                         new LambdaExpression(
                                 asList("x"),
                                 new QualifiedFunctionCallExpression(
-                                        null,
-                                        "cast",
+                                        (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "cast"),
                                         asList(
                                                 new QualifiedReferenceExpression(QualifiedName.of("x", "price_sales"), 0),
-                                                new QualifiedReferenceExpression(QualifiedName.of("float"), -1)),
-                                        1),
-                                new int[] {0})),
-                2);
+                                                new LiteralStringExpression("FLOAT"))),
+                                new int[] {0})));
 
         assertExpression("aa.flatMap(x -> x.ap).map(x -> cast(x.price_sales, float))", expected);
     }
@@ -73,48 +68,60 @@ public class QueryParserTest extends AParserTest
     @Test
     public void test_dereference()
     {
+        session.getCatalogRegistry().getBuiltin().registerFunction(new ScalarFunctionInfo(session.getCatalogRegistry().getBuiltin(), "func")
+        {
+        });
+        session.getCatalogRegistry().registerCatalog("utils", new Catalog("utils")
+        {
+            {
+                registerFunction(new ScalarFunctionInfo(this, "func")
+                {
+                });
+                registerFunction(new ScalarFunctionInfo(this, "func2")
+                {
+                });
+            }
+        });
+
+        ScalarFunctionInfo hashFunction = (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "hash");
+        
         assertExpression("a.b.c", new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1));
         assertExpression("@list.filter(x -> x.value)",
-                new QualifiedFunctionCallExpression(null, "filter",
+                new QualifiedFunctionCallExpression(
+                        (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "filter"),
                         asList(
                                 new VariableExpression(QualifiedName.of("list")),
                                 new LambdaExpression(asList("x"),
                                         new QualifiedReferenceExpression(QualifiedName.of("x", "value"), 0),
-                                        new int[] {0})),
-                        0));
-        assertExpression("a.func()", new QualifiedFunctionCallExpression(null, "func", asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1)), 0));
-        assertExpression("a.func() + func(a)",
+                                        new int[] {0}))));
+        assertExpression("a.hash()", new QualifiedFunctionCallExpression(
+                hashFunction,
+                asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1))));
+        assertExpression("a.hash() + hash(a)",
                 new ArithmeticBinaryExpression(
                         Type.ADD,
-                        new QualifiedFunctionCallExpression(null, "func", asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1)), 0),
-                        new QualifiedFunctionCallExpression(null, "func", asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1)), 0)));
-        assertExpression("a.b.c.utils#func()",
-                new QualifiedFunctionCallExpression(
-                        "utils", "func",
-                        asList(new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1)), 0));
-        assertExpression("a.b.c.func().value",
+                        new QualifiedFunctionCallExpression(hashFunction, asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1))),
+                        new QualifiedFunctionCallExpression(hashFunction, asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1)))));
+        assertExpression("a.b.c.hash().value",
                 new DereferenceExpression(
-                        new QualifiedFunctionCallExpression(null, "func", asList(new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1)), 0),
+                        new QualifiedFunctionCallExpression(hashFunction, asList(new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1))),
                         new QualifiedReferenceExpression(QualifiedName.of("value"), -1)));
-        assertExpression("a.b.c.func().utils#func2()",
-                new QualifiedFunctionCallExpression("utils", "func2",
-                        asList(new QualifiedFunctionCallExpression(null, "func", asList(new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1)), 0)), 1));
-
-        assertExpression("a.b.c.func().utils#func2(123)",
-                new QualifiedFunctionCallExpression("utils", "func2",
+        assertExpression("a.b.c.hash().hash()",
+                new QualifiedFunctionCallExpression(hashFunction,
+                        asList(new QualifiedFunctionCallExpression(hashFunction, asList(new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1))))));
+        assertExpression("a.b.c.hash().hash(123)",
+                new QualifiedFunctionCallExpression(hashFunction,
                         asList(
-                                new QualifiedFunctionCallExpression(null, "func", asList(
-                                        new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1)),
-                                        0),
-                                new LiteralIntegerExpression(123)),
-                        1));
+                                new QualifiedFunctionCallExpression(hashFunction, asList(
+                                        new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1))),
+                                new LiteralIntegerExpression(123))));
     }
 
     @Test
     public void test_control_flow()
     {
         assertQuery("if true then print 'hello' else print 'world' end if");
-        assertQuery("print utils#func(a,b); print utils#func(10, null); print a.b.c.utils#func1(123, 12.10);");
+        assertQuery("print hash(a,b); print hash(10, null); print hash(123, 12.10);");
     }
 
     @Test

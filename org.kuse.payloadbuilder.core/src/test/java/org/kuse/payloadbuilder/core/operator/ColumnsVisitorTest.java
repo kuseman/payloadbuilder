@@ -217,6 +217,6 @@ public class ColumnsVisitorTest extends Assert
 
     private Expression e(String expression)
     {
-        return parser.parseExpression(expression);
+        return parser.parseExpression(session.getCatalogRegistry(), expression);
     }
 }
