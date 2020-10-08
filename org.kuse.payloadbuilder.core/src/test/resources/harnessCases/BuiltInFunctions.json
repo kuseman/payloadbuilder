@@ -21,7 +21,8 @@
       "name": "String functions",
       "query": [
         "select trim(' A ') trim, ltrim(' A ') ltrim, rtrim(' A ') rtrim ",
-        "select leftpad('A', 4) leftpad1, leftpad('A', 4, '#') leftpad2, rightpad('A', 4) rightpad1, rightpad('A', 4, '#') rightpad2"
+        "select leftpad('A', 4) leftpad1, leftpad('A', 4, '#') leftpad2, rightpad('A', 4) rightpad1, rightpad('A', 4, '#') rightpad2 ",
+        "select substring('hello', 2) start, substring('hello', 2, 2) startEnd"
       ],
       "expectedResultSets": [
         [
@@ -29,6 +30,9 @@
         ],
         [
           [{ "key": "leftpad1", "value": "   A" }, { "key": "leftpad2", "value": "###A" },{ "key": "rightpad1", "value": "A   " }, { "key": "rightpad2", "value": "A###" }]
+        ],
+        [
+          [{ "key": "start", "value": "llo" }, { "key": "startEnd", "value": "ll" }]
         ]
       ]
     },

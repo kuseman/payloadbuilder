@@ -38,6 +38,7 @@ public class BuiltinCatalog
         catalog.registerFunction(new RegexpLikeFunction(catalog));
         catalog.registerFunction(new LowerUpperFunction(catalog, true));
         catalog.registerFunction(new LowerUpperFunction(catalog, false));
+        catalog.registerFunction(new SubstringFunction(catalog));
         catalog.registerFunction(new TrimFunction(catalog, Type.BOTH));
         catalog.registerFunction(new TrimFunction(catalog, Type.LEFT));
         catalog.registerFunction(new TrimFunction(catalog, Type.RIGHT));
