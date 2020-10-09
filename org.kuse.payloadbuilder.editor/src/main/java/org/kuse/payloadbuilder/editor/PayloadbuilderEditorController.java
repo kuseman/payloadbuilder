@@ -14,6 +14,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -59,7 +60,9 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         init();
     }
 
+    //CSOFF
     private void init()
+    //CSON
     {
         view.setExecuteAction(new ExecuteListener());
         view.setCancelAction(() ->
@@ -70,8 +73,9 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                 editor.getFile().setState(State.ABORTED);
             }
         });
-        view.setNewQueryAction(new NewQueryListener());
-        //        view.setFormatAction(new FormatListener());
+
+        NewQueryListener newQueryListener = new NewQueryListener();
+        view.setNewQueryAction(newQueryListener);
         view.setSaveAction(new SaveListener());
         view.setOpenAction(new OpenListener());
         view.setToogleResultAction(() ->
@@ -99,6 +103,21 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                 editor.getFile().setOutput((Output) view.getOutputCombo().getSelectedItem());
             }
         });
+        view.setOpenRecentFileConsumer(file ->
+        {
+            int length = model.getFiles().size();
+            for (int i = 0; i < length; i++)
+            {
+                if (model.getFiles().get(0).getFilename().equals(file))
+                {
+                    model.setSelectedFile(i);
+                    return;
+                }
+            }
+
+            QueryFileModel queryFile = new QueryFileModel(config.getCatalogs(), new File(file));
+            model.addFile(queryFile);
+        });
 
         int y = 0;
         Insets insets = new Insets(0, 0, 3, 0);
@@ -125,6 +144,8 @@ class PayloadbuilderEditorController implements PropertyChangeListener
 
         view.getMemoryLabel().setText(getMemoryString());
         new Timer(TIMER_INTERVAL, evt -> view.getMemoryLabel().setText(getMemoryString())).start();
+        newQueryListener.run();
+        view.setRecentFiles(config.getRecentFiles());
     }
 
     private void exit()
@@ -235,6 +256,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
     private void saveConfig()
     {
         Main.saveConfig(config);
+        view.setRecentFiles(config.getRecentFiles());
     }
 
     private boolean save(QueryFileModel file)
@@ -289,6 +311,8 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         }
 
         file.save();
+        config.appendRecentFile(new File(file.getFilename()));
+        saveConfig();
         return true;
     }
 
@@ -498,10 +522,32 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         public void run()
         {
             JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+            fileChooser.setMultiSelectionEnabled(true);
+            if (!isBlank(config.getLastOpenPath()))
+            {
+                fileChooser.setCurrentDirectory(new File(config.getLastOpenPath()));
+            }
             if (fileChooser.showOpenDialog(view) == JFileChooser.APPROVE_OPTION)
             {
-                QueryFileModel file = new QueryFileModel(config.getCatalogs(), fileChooser.getSelectedFile());
-                model.addFile(file);
+                if (fileChooser.getSelectedFiles().length <= 0)
+                {
+                    return;
+                }
+
+                for (File selectedFile : fileChooser.getSelectedFiles())
+                {
+                    QueryFileModel file = new QueryFileModel(config.getCatalogs(), selectedFile);
+                    model.addFile(file);
+                    config.appendRecentFile(selectedFile);
+                }
+
+                // Store last selected path if differs
+                if (!Objects.equals(config.getLastOpenPath(), fileChooser.getCurrentDirectory().getAbsolutePath()))
+                {
+                    config.setLastOpenPath(fileChooser.getCurrentDirectory().getAbsolutePath());
+                }
+                saveConfig();
             }
         }
     }

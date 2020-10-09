@@ -17,6 +17,7 @@ import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 import javax.imageio.ImageIO;
 import javax.swing.AbstractAction;
@@ -96,11 +97,11 @@ class PayloadbuilderEditorView extends JFrame
     private final JMenuItem saveItem;
     private final JMenuItem saveAsItem;
     private final JMenuItem exitItem;
+    private final JMenu recentFiles;
     private final JComboBox<QueryFileModel.Output> comboOutput;
     private Runnable executeRunnable;
     private Runnable cancelRunnable;
     private Runnable newQueryRunnable;
-    //    private Runnable formatRunnable;
     private Runnable openRunnable;
     private Runnable saveRunnable;
     private Runnable saveAsRunnable;
@@ -109,6 +110,7 @@ class PayloadbuilderEditorView extends JFrame
     private Runnable toggleCommentRunnable;
     private Runnable outputChangedRunnable;
     private Runnable editVariablesRunnable;
+    private Consumer<String> openRecentFileConsumer;
 
     private boolean catalogsCollapsed;
     private int prevCatalogsDividerLocation;
@@ -153,12 +155,16 @@ class PayloadbuilderEditorView extends JFrame
         saveItem.setAccelerator(KeyStroke.getKeyStroke('S', Toolkit.getDefaultToolkit().getMenuShortcutKeyMask()));
         saveAsItem = new JMenuItem(saveAsAction);
         saveAsItem.setText("Save As ...");
+        recentFiles = new JMenu("Recent Files");
+
         exitItem = new JMenuItem(exitAction);
         exitItem.setText("Exit");
 
         menu.add(openItem);
         menu.add(saveItem);
         menu.add(saveAsItem);
+        menu.add(new JSeparator());
+        menu.add(recentFiles);
         menu.add(new JSeparator());
         menu.add(exitItem);
 
@@ -402,6 +408,20 @@ class PayloadbuilderEditorView extends JFrame
         }
     };
 
+    private final Action recentFileAction = new AbstractAction()
+    {
+        @Override
+        public void actionPerformed(ActionEvent e)
+        {
+            JMenuItem item = (JMenuItem) e.getSource();
+            String file = item.getText();
+            if (openRecentFileConsumer != null)
+            {
+                openRecentFileConsumer.accept(file);
+            }
+        }
+    };
+
     private void run(Runnable runnable)
     {
         if (runnable != null)
@@ -435,6 +455,17 @@ class PayloadbuilderEditorView extends JFrame
         return tabEditor;
     }
 
+    void setRecentFiles(List<String> recentFiles)
+    {
+        this.recentFiles.removeAll();
+        for (String file : recentFiles)
+        {
+            JMenuItem item = new JMenuItem(recentFileAction);
+            item.setText(file);
+            this.recentFiles.add(item);
+        }
+    }
+
     void setExecuteAction(Runnable executeRunnable)
     {
         this.executeRunnable = executeRunnable;
@@ -444,11 +475,6 @@ class PayloadbuilderEditorView extends JFrame
     {
         this.newQueryRunnable = newQueryRunnable;
     }
-
-    //    void setFormatAction(Runnable formatRunnable)
-    //    {
-    //        this.formatRunnable = formatRunnable;
-    //    }
 
     void setOpenAction(Runnable openRunnable)
     {
@@ -490,8 +516,13 @@ class PayloadbuilderEditorView extends JFrame
         this.cancelRunnable = cancelRunnable;
     }
 
-    public void setOutputChangedAction(Runnable outputChangedRunnable)
+    void setOutputChangedAction(Runnable outputChangedRunnable)
     {
         this.outputChangedRunnable = outputChangedRunnable;
+    }
+
+    void setOpenRecentFileConsumer(Consumer<String> openRecentFileConsumer)
+    {
+        this.openRecentFileConsumer = openRecentFileConsumer;
     }
 }

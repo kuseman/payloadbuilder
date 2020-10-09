@@ -7,6 +7,7 @@ import java.io.File;
 import java.lang.reflect.Constructor;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -17,8 +18,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 /** Editor config */
 class Config
 {
+    private static final int MAX_RECENT_FILES = 10;
     @JsonProperty
     private List<Catalog> catalogs;
+    @JsonProperty
+    private String lastOpenPath;
+    @JsonProperty
+    private final List<String> recentFiles = new ArrayList<>();
 
     List<Catalog> getCatalogs()
     {
@@ -27,6 +33,30 @@ class Config
             return emptyList();
         }
         return catalogs;
+    }
+
+    String getLastOpenPath()
+    {
+        return lastOpenPath;
+    }
+
+    void setLastOpenPath(String lastOpenPath)
+    {
+        this.lastOpenPath = lastOpenPath;
+    }
+
+    List<String> getRecentFiles()
+    {
+        return recentFiles;
+    }
+
+    void appendRecentFile(File file)
+    {
+        recentFiles.add(0, file.getAbsolutePath());
+        if (recentFiles.size() > MAX_RECENT_FILES)
+        {
+            recentFiles.remove(recentFiles.size() - 1);
+        }
     }
 
     void initExtensions()
