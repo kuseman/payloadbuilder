@@ -52,7 +52,9 @@ class Config
 
     void appendRecentFile(File file)
     {
-        recentFiles.add(0, file.getAbsolutePath());
+        String absolutPath = file.getAbsolutePath();
+        recentFiles.remove(absolutPath);
+        recentFiles.add(0, absolutPath);
         if (recentFiles.size() > MAX_RECENT_FILES)
         {
             recentFiles.remove(recentFiles.size() - 1);
