@@ -2,6 +2,7 @@ package org.kuse.payloadbuilder.core.parser;
 
 import org.antlr.v4.runtime.Token;
 
+/** Parse exception */
 public class ParseException extends RuntimeException
 {
     private final int line;

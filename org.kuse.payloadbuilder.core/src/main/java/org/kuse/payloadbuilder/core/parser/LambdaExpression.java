@@ -9,6 +9,7 @@ import java.util.List;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 
+/** Lambda expression */
 public class LambdaExpression extends Expression
 {
     private final List<String> identifiers;
@@ -77,10 +78,7 @@ public class LambdaExpression extends Expression
     @Override
     public int hashCode()
     {
-        return 17 +
-            37 * identifiers.hashCode() +
-            37 * expression.hashCode() +
-            37 * Arrays.hashCode(lambdaIds);
+        return expression.hashCode();
     }
 
     @Override
@@ -101,9 +99,9 @@ public class LambdaExpression extends Expression
     @Override
     public String toString()
     {
-        return (identifiers.size() > 1 ? "(" : "") +
-            identifiers.stream().map(i -> i.toString()).collect(joining(",")) +
-            (identifiers.size() > 1 ? ")" : "") +
-            " -> " + expression.toString();
+        return (identifiers.size() > 1 ? "(" : "")
+            + identifiers.stream().map(i -> i.toString()).collect(joining(","))
+            + (identifiers.size() > 1 ? ")" : "")
+            + " -> " + expression.toString();
     }
 }

@@ -8,6 +8,7 @@ import static org.kuse.payloadbuilder.core.parser.LiteralNullExpression.NULL_LIT
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 
+/** Logical not */
 public class LogicalNotExpression extends Expression
 {
     private final Expression expression;

@@ -3,6 +3,7 @@ package org.kuse.payloadbuilder.core.parser;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 
+/** Literal boolean */
 public class LiteralBooleanExpression extends LiteralExpression
 {
     public static final LiteralBooleanExpression TRUE_LITERAL = new LiteralBooleanExpression(true);

@@ -32,7 +32,7 @@ class ConcatFunction extends ScalarFunctionInfo
         // Result of a concat is the result of all arguments aliases
         return arguments
                 .stream()
-                .flatMap(a -> 
+                .flatMap(a ->
                 {
                     Set<TableAlias> argAliases = aliasResolver.apply(a);
                     return argAliases == null ? Stream.empty() : argAliases.stream();

@@ -134,7 +134,9 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         return Pair.of(context.operator, context.projection);
     }
 
+    //CSOFF
     @Override
+    //CSON
     public Void visit(Select select, Context context)
     {
         TableSourceJoined tsj = select.getFrom();
@@ -189,9 +191,10 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             {
                 Expression predicate = new AnalyzeResult(pairs).getPredicate();
                 // Gather columns from remaining predicate
-                //                context.currentTableAlias = tsj.getTableSource().getTableAlias();
                 visit(predicate, context);
+                //CSOFF
                 if (predicate != null)
+                //CSON
                 {
                     context.operator = new FilterOperator(context.acquireNodeId(), context.operator, new ExpressionPredicate(predicate));
                 }
@@ -253,7 +256,9 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         return null;
     }
 
+    //CSOFF
     @Override
+    //CSON
     public Void visit(NestedSelectItem nestedSelectItem, Context context)
     {
         Set<TableAlias> aliases = asSet(context.currentTableAlias);
@@ -364,9 +369,13 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             {
                 // Try parents children
                 TableAlias childAlias = alias.getChildAlias(selectItem.getAlias());
+                //CSOFF
                 if (childAlias != null)
+                //CSON
                 {
+                    //CSOFF
                     if (childAlias.getType() == TableAlias.Type.SUBQUERY)
+                    //CSON
                     {
                         childAlias.getChildAliases().get(0).setAsteriskColumns();
                     }
@@ -593,7 +602,9 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         context.operator = joinOperator;
     }
 
+    //CSOFF
     private Operator createJoin(
+            //CSON
             Context context,
             String logicalOperator,
             Operator outer,
@@ -844,7 +855,9 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             return outerValueExpressions != null && outerValueExpressions.size() > 0;
         }
 
+        //CSOFF
         IndexOperatorFoundation(
+                //CSON
                 String alias,
                 List<Index> indices,
                 AnalyzeResult analyzeResult)

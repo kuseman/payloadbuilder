@@ -219,7 +219,9 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             Catalog builtIn = session.getCatalogRegistry().getBuiltin();
             Collection<FunctionInfo> functions = catalog != null ? catalog.getFunctions() : emptyList();
             columns = SHOW_FUNCTIONS_ALIAS.getColumns();
+            //CSOFF
             operator = new Operator()
+            //CSON
             {
                 @Override
                 public RowIterator open(ExecutionContext context)
@@ -299,7 +301,6 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                     Object value = item.getAssignmentValue(context);
                     context.setVariable(item.getAssignmentName(), value);
                 }
-
             }
             iterator.close();
         }
@@ -314,7 +315,6 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                 context.setVariable(item.getAssignmentName(), value);
             }
         }
-
     }
 
     private boolean setNext()

@@ -1,8 +1,14 @@
 package org.kuse.payloadbuilder.core.parser;
 
-/** Visitor definition of expressions */
+/**
+ * Visitor definition of expressions
+ *
+ * @param <TR> Return type
+ * @param <TC> Context type
+ */
 public interface ExpressionVisitor<TR, TC>
 {
+    //CSOFF
     TR visit(LiteralNullExpression expression, TC context);
 
     TR visit(LiteralBooleanExpression expression, TC context);
@@ -44,4 +50,5 @@ public interface ExpressionVisitor<TR, TC>
     TR visit(VariableExpression expression, TC context);
 
     TR visit(SubscriptExpression expression, TC context);
+    //CSOFF
 }

@@ -16,7 +16,7 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 /** unix_timestamp. Date to epuch millis */
 class UnixTimeStampFunction extends ScalarFunctionInfo
 {
-    public UnixTimeStampFunction(Catalog catalog)
+    UnixTimeStampFunction(Catalog catalog)
     {
         super(catalog, "unix_timestamp");
     }

@@ -48,6 +48,8 @@ import org.kuse.payloadbuilder.editor.QueryFileModel.Output;
 /** Main view */
 class PayloadbuilderEditorView extends JFrame
 {
+    static final Dimension DEFAULT_DIALOG_SIZE = new Dimension(800, 600);
+
     private static final String TOGGLE_COMMENT = "toggleComment";
     private static final String TOGGLE_RESULT = "toggleResult";
     //    private static final String FORMAT = "Format";
@@ -108,17 +110,15 @@ class PayloadbuilderEditorView extends JFrame
     private Runnable outputChangedRunnable;
     private Runnable editVariablesRunnable;
 
-    private boolean catalogsCollapsed = false;
+    private boolean catalogsCollapsed;
     private int prevCatalogsDividerLocation;
-
-    //    private Runnable parametersAction;
 
     PayloadbuilderEditorView()
     {
         setTitle("Payloadbuilder Editor");
         setLocationRelativeTo(null);
         getContentPane().setLayout(new BorderLayout(0, 0));
-
+        //CSOFF
         panelStatus = new JPanel();
         panelStatus.setPreferredSize(new Dimension(10, 20));
         getContentPane().add(panelStatus, BorderLayout.SOUTH);
@@ -133,7 +133,7 @@ class PayloadbuilderEditorView extends JFrame
         labelCaret.setBorder(new EtchedBorder(EtchedBorder.LOWERED));
         labelCaret.setPreferredSize(new Dimension(100, 20));
         labelCaret.setToolTipText("Caret position (Line, column, position)");
-
+        //CSON
         panelStatus.add(labelMemory);
         panelStatus.add(labelCaret);
 
@@ -212,7 +212,9 @@ class PayloadbuilderEditorView extends JFrame
 
         comboOutput = new JComboBox<>(Output.values());
         comboOutput.setSelectedItem(Output.TABLE);
+        //CSOFF
         comboOutput.setMaximumSize(new Dimension(150, 20));
+        //CSON
         comboOutput.addItemListener(l -> run(outputChangedRunnable));
         toolBar.addSeparator();
         toolBar.add(new JLabel("Output "));
@@ -240,9 +242,11 @@ class PayloadbuilderEditorView extends JFrame
                 exitRunnable.run();
             }
         });
-        
+
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
+        //CSOFF
         setPreferredSize(new Dimension(1200, 800));
+        //CSON
         setLocationByPlatform(true);
         pack();
     }

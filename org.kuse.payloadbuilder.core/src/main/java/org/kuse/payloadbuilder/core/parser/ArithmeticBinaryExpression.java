@@ -11,6 +11,7 @@ import static org.kuse.payloadbuilder.core.parser.LiteralNullExpression.NULL_LIT
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 
+/** Arithmetic binary expression */
 public class ArithmeticBinaryExpression extends Expression
 {
     private final Type type;
@@ -124,7 +125,9 @@ public class ArithmeticBinaryExpression extends Expression
         ExpressionCode code = ExpressionCode.code(context);
 
         String method = null;
+        //CSOFF
         switch (type)
+        //CSON
         {
             case ADD:
                 method = "ExpressionMath.add";
@@ -184,10 +187,12 @@ public class ArithmeticBinaryExpression extends Expression
     @Override
     public int hashCode()
     {
-        return 17 +
-            (37 * left.hashCode()) +
-            (37 * right.hashCode()) +
-            (37 * type.hashCode());
+        //CSOFF
+        int hashCode = 17;
+        hashCode = hashCode * 37 + left.hashCode();
+        hashCode = hashCode * 37 + right.hashCode();
+        return hashCode;
+        //CSON
     }
 
     @Override
@@ -205,6 +210,7 @@ public class ArithmeticBinaryExpression extends Expression
         return false;
     }
 
+    /** Type */
     public enum Type
     {
         ADD("+"),

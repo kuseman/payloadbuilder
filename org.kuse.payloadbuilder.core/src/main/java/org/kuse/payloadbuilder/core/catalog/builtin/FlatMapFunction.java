@@ -65,32 +65,35 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
         }
         LambdaExpression le = (LambdaExpression) arguments.get(1);
         int lambdaId = le.getLambdaIds()[0];
-        return new ObjectGraphIterator(CollectionUtils.getIterator(argResult), new Transformer()
-        {
-            Iterator<Object> it;
+        return new ObjectGraphIterator(CollectionUtils.getIterator(argResult),
+                //CSOFF
+                new Transformer()
+                //CSON
+                {
+                    private Iterator<Object> it;
 
-            @Override
-            public Object transform(Object input)
-            {
-                if (it == null)
-                {
-                    context.setLambdaValue(lambdaId, input);
-                    Object value = le.getExpression().eval(context);
-                    it = CollectionUtils.getIterator(value);
-                    Object result = it;
-                    if (!it.hasNext())
+                    @Override
+                    public Object transform(Object input)
                     {
-                        it = null;
+                        if (it == null)
+                        {
+                            context.setLambdaValue(lambdaId, input);
+                            Object value = le.getExpression().eval(context);
+                            it = CollectionUtils.getIterator(value);
+                            Object result = it;
+                            if (!it.hasNext())
+                            {
+                                it = null;
+                            }
+                            return result;
+                        }
+                        else if (!it.hasNext())
+                        {
+                            it = null;
+                        }
+                        return input;
                     }
-                    return result;
-                }
-                else if (!it.hasNext())
-                {
-                    it = null;
-                }
-                return input;
-            }
-        });
+                });
     }
 
     @Override

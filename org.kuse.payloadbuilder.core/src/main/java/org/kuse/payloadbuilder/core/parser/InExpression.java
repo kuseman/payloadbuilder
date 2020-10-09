@@ -11,6 +11,7 @@ import java.util.List;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 
+/** In expression */
 public class InExpression extends Expression
 {
     private final Expression expression;
@@ -157,9 +158,12 @@ public class InExpression extends Expression
     @Override
     public int hashCode()
     {
-        return 17 +
-            31 * expression.hashCode() +
-            31 * arguments.hashCode();
+      //CSOFF
+        int hashCode = 17;
+        hashCode = hashCode * 37 + expression.hashCode();
+        hashCode = hashCode * 37 + arguments.hashCode();
+        return hashCode;
+        //CSON
     }
 
     @Override

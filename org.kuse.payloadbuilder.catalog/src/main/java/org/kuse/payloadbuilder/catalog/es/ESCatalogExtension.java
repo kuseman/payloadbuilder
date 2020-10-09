@@ -34,6 +34,7 @@ import javax.swing.SwingUtilities;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.HttpStatus;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.kuse.payloadbuilder.core.QuerySession;
@@ -194,7 +195,7 @@ class ESCatalogExtension implements ICatalogExtension
                 HttpGet getIndices = new HttpGet(endpoint + "/_aliases");
                 try (CloseableHttpResponse response = CLIENT.execute(getIndices))
                 {
-                    if (response.getStatusLine().getStatusCode() != 200)
+                    if (response.getStatusLine().getStatusCode() != HttpStatus.SC_OK)
                     {
                         throw new RuntimeException("Error query Elastic. " + IOUtils.toString(response.getEntity().getContent()));
                     }
@@ -236,7 +237,9 @@ class ESCatalogExtension implements ICatalogExtension
         {
             setLayout(new GridBagLayout());
 
+            //CSOFF
             add(new JLabel("Endpoint"), new GridBagConstraints(0, 0, 1, 1, 0.0, 0.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.NONE, new Insets(0, 0, 0, 5), 0, 0));
+            //CSOn
             endpoints = new JComboBox<>();
             endpoints.setModel(endpointsModel);
             endpoints.addItemListener(l ->

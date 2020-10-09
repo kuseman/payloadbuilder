@@ -40,6 +40,7 @@ public class Join extends AJoin
         return type + " JOIN " + getTableSource() + "\tON " + condition;
     }
 
+    /** Join type */
     public enum JoinType
     {
         INNER,

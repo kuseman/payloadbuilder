@@ -7,6 +7,7 @@ import static org.apache.commons.lang3.StringUtils.join;
 
 import java.util.List;
 
+/** Qualified name */
 public class QualifiedName
 {
     private final List<String> parts;
@@ -75,7 +76,6 @@ public class QualifiedName
         {
             QualifiedName that = (QualifiedName) obj;
             return parts.equals(that.parts);
-
         }
         return false;
     }
@@ -86,6 +86,7 @@ public class QualifiedName
         return join(parts, ".");
     }
 
+    /** Construct a qualified name from provided parts */
     public static QualifiedName of(String... parts)
     {
         return new QualifiedName(asList(parts));

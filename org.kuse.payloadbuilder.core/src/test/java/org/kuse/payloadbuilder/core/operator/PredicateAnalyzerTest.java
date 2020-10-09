@@ -41,7 +41,7 @@ public class PredicateAnalyzerTest extends Assert
                 .build();
 
         TableAlias alias = root.getChildAliases().get(0);
-        
+
         Pair<List<AnalyzePair>, AnalyzeResult> pair;
         AnalyzeResult result;
         result = PredicateAnalyzer.analyze(null, alias);
@@ -138,7 +138,7 @@ public class PredicateAnalyzerTest extends Assert
                         pair(Type.UNDEFINED, null, e("a.art_id = s.art_id or (sku_id = s.sku_id and active_flg and not a.internet_flg and a.value > 100)"), asSet("a", "s"), null)),
                 result);
     }
-    
+
     @Test
     public void test_nested_reference()
     {
@@ -150,7 +150,7 @@ public class PredicateAnalyzerTest extends Assert
                                         TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("article"), "a"),
                                         TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("articleBrand"), "ab")))))
                 .build();
-        
+
         AnalyzePair p;
 
         // Start from source and analyze a where, a nested reference cannot be pushed down
@@ -175,9 +175,9 @@ public class PredicateAnalyzerTest extends Assert
                                         TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableA"), "articleAttribute"),
                                         TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableS"), "a1")))))
                 .build();
-    
+
         TableAlias alias = root.getChildAliases().get(0);
-        
+
         AnalyzePair p;
 
         p = PredicateAnalyzer.AnalyzePair.of(alias, e("aa.art_id is null"));
@@ -234,9 +234,9 @@ public class PredicateAnalyzerTest extends Assert
         assertFalse(p.isPushdown("a_a"));
         assertFalse(p.isPushdown("b"));
         assertTrue(p.isEqui("s"));
-        
+
         alias = root.getChildAliases().get(0);
-        
+
         // Alias access
         p = PredicateAnalyzer.AnalyzePair.of(alias, e("s"));
         assertEquals(Type.COMPARISION, p.getType());

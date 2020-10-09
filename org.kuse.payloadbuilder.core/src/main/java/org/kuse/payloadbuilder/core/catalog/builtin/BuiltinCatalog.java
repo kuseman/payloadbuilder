@@ -59,6 +59,7 @@ public class BuiltinCatalog
         return catalog;
     }
 
+    /** Built in catalog */
     private static class BuiltInCatalog extends Catalog
     {
         BuiltInCatalog()

@@ -87,7 +87,7 @@ class QueryFileView extends JPanel
     private final PrintStream messagePrintStream;
     private final List<ResultTable> tables = new ArrayList<>();
     private final Point tableClickLocation = new Point();
-    
+
     private boolean resultCollapsed;
     private int prevDividerLocation;
 
@@ -99,6 +99,7 @@ class QueryFileView extends JPanel
         this.file = file;
         setLayout(new BorderLayout());
 
+        //CSOFF
         textEditor = new TextEditorPane();
         textEditor.setColumns(80);
         textEditor.setRows(40);
@@ -139,7 +140,7 @@ class QueryFileView extends JPanel
         panelStatus.setPreferredSize(new Dimension(10, 20));
         add(panelStatus, BorderLayout.SOUTH);
         panelStatus.setLayout(new FlowLayout(FlowLayout.LEFT, 5, 0));
-
+        //CSON
         labelExecutionStatus = new JLabel(getIconFromState(file.getState()));
 
         labelRunTime = new JLabel("", SwingConstants.LEFT);
@@ -186,7 +187,9 @@ class QueryFileView extends JPanel
         labelExecutionStatus.setIcon(getIconFromState(state));
         labelExecutionStatus.setToolTipText(state.getToolTip());
 
+        //CSOFF
         switch (state)
+        //CSON
         {
             case EXECUTING:
                 resultsPanel.removeAll();
@@ -223,7 +226,7 @@ class QueryFileView extends JPanel
             resultTabs.setSelectedIndex(1);
         }
     }
-    
+
     private void resizeLastTablesColumns()
     {
         // Resize last columns if not already done
@@ -234,7 +237,9 @@ class QueryFileView extends JPanel
         }
     }
 
+    //CSOFF
     private void handleResultModelAdded(final ResultModel resultModel)
+    //CSON
     {
         ResultTable resultTable = createResultTable();
         resultModel.addTableModelListener(e ->
@@ -257,7 +262,9 @@ class QueryFileView extends JPanel
         resultsPanel.removeAll();
 
         // 8 rows plus header plus spacing
+        //CSOFF
         int tablHeight = resultTable.getRowHeight() * 9 + 10;
+        //CSON
 
         Component parent = null;
 
@@ -271,7 +278,9 @@ class QueryFileView extends JPanel
                 JScrollBar horizontalScrollBar = ((JScrollPane) ((JViewport) prevTable.getParent()).getParent()).getHorizontalScrollBar();
 
                 // The least of 8 rows or actual rows in prev table
+                //CSOFF
                 prevTableHeight = Math.min((prevTable.getRowCount() + 1) * prevTable.getRowHeight() + 15, tablHeight);
+                //CSON
                 if (horizontalScrollBar.isVisible())
                 {
                     prevTableHeight += SCROLLBAR_WIDTH;
@@ -353,7 +362,9 @@ class QueryFileView extends JPanel
         });
         resultTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         resultTable.setCellSelectionEnabled(true);
+        //CSOFF
         resultTable.setDefaultRenderer(Object.class, new DefaultTableCellRenderer()
+        //CSON
         {
             @Override
             public Component getTableCellRendererComponent(JTable table, Object val, boolean isSelected, boolean hasFocus, int row, int column)
@@ -393,7 +404,9 @@ class QueryFileView extends JPanel
                 if (e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1 && resultTable.getTableHeader().getCursor().getType() == Cursor.E_RESIZE_CURSOR)
                 {
                     // Move the point a bit to left to avoid resizing wrong column
+                    //CSOFF
                     Point p = new Point(e.getPoint().x - 15, e.getPoint().y);
+                    //CSON
                     int col = resultTable.getTableHeader().columnAtPoint(p);
                     TableColumn column = resultTable.getColumnModel().getColumn(col);
                     if (column != null)
@@ -403,8 +416,10 @@ class QueryFileView extends JPanel
                 }
             }
         });
-        
+
+        //CSOFF
         resultTable.addMouseListener(new MouseAdapter()
+        //CSON
         {
             @Override
             public void mouseClicked(MouseEvent e)
@@ -419,7 +434,6 @@ class QueryFileView extends JPanel
                     {
                         showValueDialog(resultTable, resultTable.getValueAt(row, col), row, col);
                     }
-                    
                 }
                 else if (e.getClickCount() == 1 && e.getButton() == MouseEvent.BUTTON1)
                 {
@@ -433,12 +447,14 @@ class QueryFileView extends JPanel
                 }
             }
         });
-        
+
         resultTable.setComponentPopupMenu(tablePopupMenu);
         return resultTable;
     }
-    
+
+    //CSOFF
     private final Action viewAsJsonAction = new AbstractAction("View as JSON", STICKY_NOTE_O)
+    //CSON
     {
         @Override
         public void actionPerformed(ActionEvent e)
@@ -460,9 +476,10 @@ class QueryFileView extends JPanel
             showValueDialog(table, value, row, col);
         }
     };
-    
-    private void showValueDialog(JTable resultTable, Object value, int row, int col)
+
+    private void showValueDialog(JTable resultTable, Object val, int row, int col)
     {
+        Object value = val;
         if (value == null)
         {
             return;
@@ -481,8 +498,10 @@ class QueryFileView extends JPanel
         JFrame frame = new JFrame("Json viewer - " + resultTable.getColumnName(col) + " (Row: " + (row + 1) + ")");
         frame.setIconImages(PayloadbuilderEditorView.APPLICATION_ICONS);
         RSyntaxTextArea rta = new RSyntaxTextArea();
+        //CSOFF
         rta.setColumns(80);
         rta.setRows(40);
+        //CSON
         if (value instanceof Collection || value instanceof Map)
         {
             rta.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JSON);
@@ -498,14 +517,16 @@ class QueryFileView extends JPanel
         rta.setEditable(false);
         RTextScrollPane sp = new RTextScrollPane(rta);
         frame.getContentPane().add(sp);
-        frame.setSize(800, 600);
+        frame.setSize(PayloadbuilderEditorView.DEFAULT_DIALOG_SIZE);
         frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
         frame.setVisible(true);
     }
 
     private Icon getIconFromState(State state)
     {
+        //CSOFF
         switch (state)
+        //CSOn
         {
             case ABORTED:
                 return CLOSE_ICON;
@@ -684,12 +705,13 @@ class QueryFileView extends JPanel
     {
         return value >= start && value <= end;
     }
-    
+
     /** Wrapper class with a connected column adjuster */
     private static class ResultTable extends JTable
     {
         private final TableColumnAdjuster adjuster = new TableColumnAdjuster(this, 10);
         private final AtomicBoolean columnsAdjusted = new AtomicBoolean();
+
         void adjustColumns()
         {
             if (!columnsAdjusted.get())

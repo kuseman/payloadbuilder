@@ -45,7 +45,7 @@ public class ExpressionSelectItem extends SelectItem
     {
         return assignmentName;
     }
-    
+
     @Override
     public Object getAssignmentValue(ExecutionContext context)
     {

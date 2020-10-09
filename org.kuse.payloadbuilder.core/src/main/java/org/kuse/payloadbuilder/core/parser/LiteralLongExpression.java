@@ -3,6 +3,7 @@ package org.kuse.payloadbuilder.core.parser;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 
+/** Literal long */
 public class LiteralLongExpression extends LiteralExpression
 {
     private final long value;
@@ -44,5 +45,4 @@ public class LiteralLongExpression extends LiteralExpression
     {
         return Long.toString(value);
     }
-
 }

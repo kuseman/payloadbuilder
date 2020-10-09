@@ -542,7 +542,7 @@ public class BatchHashJoinTest extends AOperatorTest
 
         int[] expectedInnerPositions = new int[] {
                 0, 0, 1,        // Batch 1
-                1, 2, 2, 3, 3,  // Batch 2      
+                1, 2, 2, 3, 3,  // Batch 2
                 4, 4            // Batch 2
         };
 
@@ -612,7 +612,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 null, null, null,
                 null, null, null,
                 0, 0, 1,        // Batch 1
-                1, 2, 2,        // Batch 2      
+                1, 2, 2,        // Batch 2
                 3, 3, 4,        // Batch 2
                 4, null, null
         };

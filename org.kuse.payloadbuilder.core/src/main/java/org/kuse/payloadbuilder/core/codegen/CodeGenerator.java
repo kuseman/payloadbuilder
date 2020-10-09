@@ -11,28 +11,27 @@ import org.codehaus.janino.ClassBodyEvaluator;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
-/** Code generator 
- *  
- *  Concept inspired by Apache Spark 
- *  https://github.com/apache/spark/blob/master/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/expressions/codegen/CodeGenerator.scala
+/**
+ * Code generator Concept inspired by Apache Spark
+ * https://github.com/apache/spark/blob/master/sql/catalyst/src/main/scala/org/apache/spark/sql/catalyst/expressions/codegen/CodeGenerator.scala
  **/
 public class CodeGenerator
 {
-    private static final String PREDICATE = System.lineSeparator() +
-        "public boolean test(Object __row) " + System.lineSeparator() +
-        "{ " + System.lineSeparator() +
-        "  final Row row = (Row) __row;" + System.lineSeparator() +
-        "  %s" + System.lineSeparator() +
-        "  return !%s && %s;" + System.lineSeparator() +
-        "}";
+    private static final String PREDICATE = System.lineSeparator()
+        + "public boolean test(Object __row) " + System.lineSeparator()
+        + "{ " + System.lineSeparator()
+        + "  final Row row = (Row) __row;" + System.lineSeparator()
+        + "  %s" + System.lineSeparator()
+        + "  return !%s && %s;" + System.lineSeparator()
+        + "}";
 
-    private static final String FUNCTION = System.lineSeparator() +
-        "public Object apply(Object __row) " + System.lineSeparator() +
-        "{ " + System.lineSeparator() +
-        "  final Row row = (Row) __row;" + System.lineSeparator() +
-        "  %s" + System.lineSeparator() +
-        "  return %s ? null : %s;" + System.lineSeparator() +
-        "}";
+    private static final String FUNCTION = System.lineSeparator()
+        + "public Object apply(Object __row) " + System.lineSeparator()
+        + "{ " + System.lineSeparator()
+        + "  final Row row = (Row) __row;" + System.lineSeparator()
+        + "  %s" + System.lineSeparator()
+        + "  return %s ? null : %s;" + System.lineSeparator()
+        + "}";
 
     /** Generate a predicate. Used filters */
     public BasePredicate generatePredicate(TableAlias tableAlias, Expression expression)
@@ -54,7 +53,7 @@ public class CodeGenerator
     private ExpressionCode generate(Expression expression, TableAlias tableAlias)
     {
         CodeGeneratorContext context = new CodeGeneratorContext();
-        context.tableAlias = tableAlias;
+        context.setTableAlias(tableAlias);
         return expression.generateCode(context, null);
     }
 
@@ -83,6 +82,5 @@ public class CodeGenerator
         {
             throw new IllegalArgumentException("Error compiling code: " + code, e);
         }
-
     }
 }

@@ -68,7 +68,9 @@ class BatchMergeJoin extends AOperator
     // TODO: min and max batch size (merge and hash)
     //       to guard against to large batches even if all values are the same
 
+    //CSOFF
     BatchMergeJoin(
+    //CSON
             int nodeId,
             String logicalOperator,
             Operator outer,
@@ -97,17 +99,21 @@ class BatchMergeJoin extends AOperator
         this.batchSize = batchSize;
     }
 
+    //CSOFF
     @Override
+    //CSON
     public RowIterator open(ExecutionContext context)
     {
         final RowIterator outerIt = outer.open(context);
         final JoinTuple joinTuple = new JoinTuple();
         joinTuple.setContextOuter(context.getTuple());
+        //CSOFF
         return new RowIterator()
+        //CSON
         {
             /** Batched rows */
             private List<TupleHolder> outerRows;
-            private int outerIndex = 0;
+            private int outerIndex;
             private TupleHolder batchedLeftOverRow;
             private Iterator<Tuple> innerIt;
 
@@ -128,7 +134,7 @@ class BatchMergeJoin extends AOperator
              * Used in many-mode when rewinding outer rows.
              * </pre>
              */
-            private int largerThanIndex = 0;
+            private int largerThanIndex;
             /** Index of outerRows where to rewind in case of man-mode */
             private int rewindIndex = -1;
 
@@ -149,7 +155,9 @@ class BatchMergeJoin extends AOperator
                 return setNext();
             }
 
+            //CSOFF
             private boolean setNext()
+            //CSON
             {
                 while (next == null)
                 {
@@ -176,7 +184,9 @@ class BatchMergeJoin extends AOperator
                         if (!innerIt.hasNext())
                         {
                             verifyOuterValuesIterator();
+                            //CSOFF
                             if (emitEmptyOuterRows)
+                            //CSON
                             {
                                 emitOuterRows = true;
                                 continue;
@@ -198,7 +208,9 @@ class BatchMergeJoin extends AOperator
                             verifyOuterValuesIterator();
 
                             // Populating mode, emit outer rows
+                            //CSOFF
                             if (populating)
+                            //CSON
                             {
                                 outerIndex = 0;
                                 emitOuterRows = true;
@@ -246,7 +258,9 @@ class BatchMergeJoin extends AOperator
                         }
                         else
                         {
+                            //CSOFF
                             if (!populating && emitEmptyOuterRows)
+                            //CSON
                             {
                                 next = outerRow.tuple;
                             }
@@ -294,7 +308,6 @@ class BatchMergeJoin extends AOperator
                         innerRow = null;
                         outerIndex = rewindIndex;
                     }
-
                 }
                 return true;
             }
@@ -418,9 +431,11 @@ class BatchMergeJoin extends AOperator
 
             private Iterator<Object[]> outerValuesIterator()
             {
+                //CSOFF
                 return new Iterator<Object[]>()
+                //CSON
                 {
-                    private int outerRowsIndex = 0;
+                    private int outerRowsIndex;
                     private Object[] nextArray;
                     private Object[] prevArray;
 
@@ -474,9 +489,12 @@ class BatchMergeJoin extends AOperator
     @Override
     public int hashCode()
     {
-        return 17 +
-            37 * outer.hashCode() +
-            37 * inner.hashCode();
+        //CSOFF
+        int hashCode = 17;
+        hashCode = hashCode * 37 + outer.hashCode();
+        hashCode = hashCode * 37 + inner.hashCode();
+        return hashCode;
+        //CSON
     }
 
     @Override

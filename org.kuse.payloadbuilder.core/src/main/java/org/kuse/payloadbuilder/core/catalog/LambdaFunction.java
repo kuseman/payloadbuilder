@@ -11,17 +11,18 @@ public interface LambdaFunction
 {
     /**
      * Returns lambda bindings pairs. Left expression binds to right lambda expression
+     *
      * <pre>
      * This is used to be able to correctly analyze expression return types to connect
      * which fields belongs to which aliases in a query.
-     * 
-     * Ie. 
-     * 
+     *
+     * Ie.
+     *
      * <i>map(list, x -> x.id)</i>
      * Here argument <b>list</b> binds to the lambda expression <b>x -> x.id</b>.
      * </pre>
+     *
      * @param arguments Argument expression to function
      */
     List<Pair<Expression, LambdaExpression>> getLambdaBindings(List<Expression> arguments);
-
 }

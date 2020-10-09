@@ -6,6 +6,7 @@ import org.apache.commons.lang3.NotImplementedException;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 
+/** Arithmetic unary expression */
 public class ArithmeticUnaryExpression extends Expression
 {
     private final Type type;
@@ -79,7 +80,9 @@ public class ArithmeticUnaryExpression extends Expression
         ExpressionCode code = ExpressionCode.code(context);
 
         String method = null;
+        //CSOFF
         switch (type)
+        //CSON
         {
             case MINUS:
                 method = "ExpressionMath.negate";
@@ -132,6 +135,7 @@ public class ArithmeticUnaryExpression extends Expression
         return false;
     }
 
+    /** Type */
     public enum Type
     {
         PLUS("+"),

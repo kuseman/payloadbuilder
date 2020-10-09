@@ -24,8 +24,8 @@ class TrimFunction extends ScalarFunctionInfo
     @Override
     public String getDescription()
     {
-        return "Returns " + type.descriptiveName + " string value of provided argument." + System.lineSeparator() +
-            "If argument is non String the argument is returned as is.";
+        return "Returns " + type.descriptiveName + " string value of provided argument." + System.lineSeparator()
+            + "If argument is non String the argument is returned as is.";
     }
 
     @Override
@@ -44,7 +44,9 @@ class TrimFunction extends ScalarFunctionInfo
         }
 
         String value = String.valueOf(obj);
+        //CSOFF
         switch (type)
+        //CSON
         {
             case BOTH:
                 return StringUtils.trim(value);
@@ -57,6 +59,7 @@ class TrimFunction extends ScalarFunctionInfo
         return null;
     }
 
+    /** Type */
     enum Type
     {
         BOTH("trim", "trimmed"),

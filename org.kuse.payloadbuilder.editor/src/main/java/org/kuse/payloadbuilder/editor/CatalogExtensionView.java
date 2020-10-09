@@ -5,7 +5,6 @@ import static org.kuse.payloadbuilder.editor.ICatalogExtension.CONFIG;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Container;
-import java.awt.Dimension;
 import java.awt.Frame;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -43,7 +42,7 @@ class CatalogExtensionView extends JPanel
     private final Runnable propertiesChangedAction;
     private boolean fireEvents = true;
     private boolean configChanged;
-    
+
     CatalogExtensionView(
             ICatalogExtension extension,
             ButtonGroup defaultGroup,
@@ -81,10 +80,10 @@ class CatalogExtensionView extends JPanel
                 }
             }
         });
-        
+
         rbDefault = new JRadioButton();
         rbDefault.setToolTipText("Set default catalog");
-        rbDefault.addActionListener(l -> 
+        rbDefault.addActionListener(l ->
         {
             if (rbDefault.isSelected() && fireEvents)
             {
@@ -105,7 +104,7 @@ class CatalogExtensionView extends JPanel
                 enabledChangedAction.accept(cbEnabled.isSelected());
             }
         });
-        btnConfig.addActionListener(l -> 
+        btnConfig.addActionListener(l ->
         {
             JDialog dialog = new JDialog((Frame) null, true);
             dialog.setIconImages(PayloadbuilderEditorView.APPLICATION_ICONS);
@@ -113,7 +112,7 @@ class CatalogExtensionView extends JPanel
             dialog.getContentPane().setLayout(new BorderLayout());
             dialog.getContentPane().add(extension.getConfigComponent(), BorderLayout.CENTER);
             dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
-            dialog.setPreferredSize(new Dimension(800, 600));
+            dialog.setPreferredSize(PayloadbuilderEditorView.DEFAULT_DIALOG_SIZE);
             dialog.pack();
             dialog.setLocationRelativeTo(null);
             dialog.pack();
@@ -132,7 +131,7 @@ class CatalogExtensionView extends JPanel
             });
         });
         btnConfig.setEnabled(extension.getConfigComponent() != null);
-        
+        //CSOFF
         topPanel.add(rbDefault, new GridBagConstraints(0, 0, 1, 1, 0, 0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.NONE, new Insets(0, 0, 5, 0), 0, 0));
         topPanel.add(cbEnabled, new GridBagConstraints(1, 0, 1, 1, 0, 0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.NONE, new Insets(0, 0, 5, 0), 0, 0));
         topPanel.add(new JLabel("Alias: "), new GridBagConstraints(2, 0, 1, 0, 0, 0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.NONE, new Insets(0, 0, 0, 0), 0, 0));
@@ -140,10 +139,10 @@ class CatalogExtensionView extends JPanel
                 new GridBagConstraints(3, 0, 1, 0, 1, 0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
         topPanel.add(btnConfig,
                 new GridBagConstraints(4, 0, 1, 0, 0, 0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 5, 0), 0, -4));
-
+        //CSON
         add(topPanel, BorderLayout.NORTH);
         add(extensionPanel, BorderLayout.CENTER);
-        
+
         Component propertiesComponent = extension.getQuickPropertiesComponent();
         if (propertiesComponent != null)
         {
@@ -151,9 +150,9 @@ class CatalogExtensionView extends JPanel
         }
 
         // Add listener
-        extension.addPropertyChangeListener(l ->  handlePropertyChanged(l.getPropertyName()));
+        extension.addPropertyChangeListener(l -> handlePropertyChanged(l.getPropertyName()));
     }
-    
+
     private void handlePropertyChanged(String property)
     {
         if (CONFIG.equals(property))
@@ -165,7 +164,7 @@ class CatalogExtensionView extends JPanel
             propertiesChangedAction.run();
         }
     }
-    
+
     private void setEnabled()
     {
         rbDefault.setEnabled(cbEnabled.isSelected());
@@ -174,7 +173,7 @@ class CatalogExtensionView extends JPanel
         btnConfig.setEnabled(btnConfig.isEnabled() && cbEnabled.isSelected());
         setPanelEnabled(extensionPanel, cbEnabled.isSelected());
     }
-    
+
     /** Init view from QueryFileModel */
     void init(QueryFileModel model)
     {
@@ -183,7 +182,7 @@ class CatalogExtensionView extends JPanel
         {
             rbDefault.setSelected(true);
         }
-        
+
         CatalogExtensionModel extensionModel = model.getCatalogExtensions().get(extension);
         tfAlias.setText(extensionModel.getAlias());
         cbEnabled.setSelected(extensionModel.isEnabled());
@@ -192,7 +191,7 @@ class CatalogExtensionView extends JPanel
         extension.update(extensionModel.getAlias(), model.getQuerySession());
         fireEvents = true;
     }
-    
+
     void setPanelEnabled(Container container, boolean isEnabled)
     {
         container.setEnabled(isEnabled);

@@ -102,6 +102,7 @@ public class Row implements Tuple
                 .iterator();
     }
 
+    /** Get value for provided ordinal */
     public Object getObject(int ordinal)
     {
         if (ordinal < 0)
@@ -111,6 +112,7 @@ public class Row implements Tuple
         return values.get(ordinal);
     }
 
+    /** Get value for provided column */
     public Object getObject(String column)
     {
         if (POS.equals(column))
@@ -129,7 +131,7 @@ public class Row implements Tuple
     @Override
     public int hashCode()
     {
-        return 17 + (pos * 37);
+        return pos;
     }
 
     @Override
@@ -150,8 +152,8 @@ public class Row implements Tuple
         return tableAlias.getTable() + " (" + pos + ") " + values;
     }
 
-    public static Row of(TableAlias alias, int pos, Object[] values)
     /** Construct a row with provided alias, values and position */
+    public static Row of(TableAlias alias, int pos, Object[] values)
     {
         return of(alias, pos, alias.getColumns(), values);
     }
@@ -182,6 +184,7 @@ public class Row implements Tuple
     /** Values definition of a rows values */
     public interface Values
     {
+        /** Get value for provided ordinal */
         Object get(int ordinal);
     }
 

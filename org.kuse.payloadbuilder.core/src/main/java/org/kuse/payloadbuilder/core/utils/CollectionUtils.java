@@ -14,6 +14,7 @@ import org.apache.commons.collections.iterators.EnumerationIterator;
 import org.apache.commons.collections.iterators.ObjectArrayIterator;
 import org.apache.commons.collections.iterators.SingletonIterator;
 
+/** Collection utils */
 public final class CollectionUtils
 {
     private CollectionUtils()
@@ -26,7 +27,7 @@ public final class CollectionUtils
     {
         return new HashSet<>(asList(items));
     }
-    
+
     /** Get iterator from provided object */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static <T> Iterator<T> getIterator(Object obj)
@@ -42,12 +43,10 @@ public final class CollectionUtils
                 return emptyIterator();
             }
             return ((Collection) obj).iterator();
-
         }
         else if (obj instanceof Object[])
         {
             return new ObjectArrayIterator((Object[]) obj);
-
         }
         else if (obj instanceof Enumeration)
         {

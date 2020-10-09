@@ -48,6 +48,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
+import org.apache.http.HttpStatus;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
@@ -91,6 +92,8 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 /** Operator for Elastic search */
 class ESOperator extends AOperator
 {
+    private static final int DEFAULT_RECIEVE_TIMEOUT = 15000;
+    private static final int DEFAULT_CONNECT_TIMEOUT = 500;
     static final Charset UTF_8 = Charset.forName("UTF-8");
     private static final String FIELDS = "fields";
     static final String INDEX = "__index";
@@ -113,8 +116,8 @@ class ESOperator extends AOperator
             .setDefaultRequestConfig(RequestConfig
                     .custom()
                     .setContentCompressionEnabled(true)
-                    .setConnectTimeout(500)
-                    .setSocketTimeout(15000)
+                    .setConnectTimeout(DEFAULT_CONNECT_TIMEOUT)
+                    .setSocketTimeout(DEFAULT_RECIEVE_TIMEOUT)
                     .build())
             .build();
 
@@ -124,7 +127,7 @@ class ESOperator extends AOperator
     private final List<PropertyPredicate> propertyPredicates;
     private final List<Pair<String, String>> sortItems;
 
-    public ESOperator(
+    ESOperator(
             int nodeId,
             String catalogAlias,
             TableAlias tableAlias,
@@ -297,7 +300,7 @@ class ESOperator extends AOperator
         return getUrl(String.format("%s/%s%s/_search?%s%s",
                 endpoint,
                 isBlank(index) ? "*" : index,
-                isBlank(type) ? "" : ("/"  + type),
+                isBlank(type) ? "" : ("/" + type),
                 scrollMinutes != null ? ("scroll=" + scrollMinutes + "m") : "",
                 size != null ? ("&size=" + size) : ""), "hits.hits", alias, operatorIndex, isSingleType);
     }
@@ -401,12 +404,14 @@ class ESOperator extends AOperator
             AtomicLong receivedBytes,
             Function<MutableObject<String>, HttpUriRequest> requestSupplier)
     {
+        //CSOFF
         return new RowIterator()
+        //CSON
         {
             private final Set<String> columns = tableAlias.isAsteriskColumns() ? emptySet() : new HashSet<>(asList(tableAlias.getColumns()));
             private Set<String> addedColumns;
             private String[] rowColumns = tableAlias.isAsteriskColumns() ? null : tableAlias.getColumns();
-            private int rowPos = 0;
+            private int rowPos;
             private final MutableObject<String> scrollId = new MutableObject<>();
             private Iterator<Doc> docIt;
             private Row next;
@@ -445,7 +450,7 @@ class ESOperator extends AOperator
                     try (CloseableHttpResponse response = CLIENT.execute(delete))
                     {
                         int status = response.getStatusLine().getStatusCode();
-                        if (!(status == 200 || status == 404))
+                        if (!(status == HttpStatus.SC_OK || status == HttpStatus.SC_NOT_FOUND))
                         {
                             String body = IOUtils.toString(response.getEntity().getContent());
                             throw new RuntimeException("Error clearing scroll: " + body);
@@ -458,7 +463,9 @@ class ESOperator extends AOperator
                 }
             }
 
+            //CSOFF
             private boolean setNext()
+            //CSON
             {
                 while (next == null)
                 {
@@ -479,7 +486,7 @@ class ESOperator extends AOperator
                         ESResponse esReponse;
                         try (CloseableHttpResponse response = CLIENT.execute(request);)
                         {
-                            if (response.getStatusLine().getStatusCode() != 200)
+                            if (response.getStatusLine().getStatusCode() != HttpStatus.SC_OK)
                             {
                                 throw new RuntimeException("Error query Elastic. " + IOUtils.toString(response.getEntity().getContent()));
                             }
@@ -517,7 +524,9 @@ class ESOperator extends AOperator
                     {
                         if (addedColumns == null)
                         {
+                            //CSOFF
                             addedColumns = new LinkedHashSet<>(doc.source.keySet().size() + 4);
+                            //CSON
                             addedColumns.add(INDEX);
                             addedColumns.add(TYPE);
                             addedColumns.add(DOCID);
@@ -537,7 +546,7 @@ class ESOperator extends AOperator
             }
         };
     }
-    
+
     /** DocValues. Wrapping a {@link Doc} to support index,type,id besides source fields */
     private static class DocValues implements Row.Values
     {
@@ -549,7 +558,7 @@ class ESOperator extends AOperator
             this.doc = doc;
             this.columns = columns;
         }
-        
+
         @Override
         public Object get(int ordinal)
         {
@@ -570,7 +579,7 @@ class ESOperator extends AOperator
             {
                 return doc.fields != null ? doc.fields.get("_parent") : null;
             }
-            
+
             return doc.source.get(column);
         }
     }
@@ -678,12 +687,14 @@ class ESOperator extends AOperator
         }
     }
 
+    /** Outer hits */
     private static class OuterHits
     {
         @JsonProperty("hits")
         List<Doc> hits;
     }
 
+    /** Doc */
     private static class Doc
     {
         @JsonDeserialize(using = SourceDeserializer.class)
@@ -703,7 +714,7 @@ class ESOperator extends AOperator
         public boolean isValid()
         {
             // mget => found
-            // search => 
+            // search =>
             return source != null && (found == null || found);
         }
     }
@@ -869,14 +880,17 @@ class ESOperator extends AOperator
                     return;
                 }
                 String stringValue = quote(value);
+                //CSOFF
                 switch (pair.getComparisonType())
+                //CSON
                 {
                     case NOT_EQUAL:
                         // TODO: move this must_not since not filter is deprecated
                         // { "not": { ..... } }
                         sb.append("{\"not\":");
+                    //CSOFF
                     case EQUAL:
-
+                    //CSON
                         // { "term": { "property": value }}
                         sb.append("{\"term\":{\"")
                                 .append(property)
@@ -940,8 +954,9 @@ class ESOperator extends AOperator
             }
         }
 
-        private String quote(Object value)
+        private String quote(Object val)
         {
+            Object value = val;
             if (value == null)
             {
                 return "null";
@@ -976,7 +991,7 @@ class ESOperator extends AOperator
             return METHOD_NAME;
         }
 
-        public HttpDeleteWithBody(final String uri)
+        HttpDeleteWithBody(final String uri)
         {
             super();
             setURI(URI.create(uri));

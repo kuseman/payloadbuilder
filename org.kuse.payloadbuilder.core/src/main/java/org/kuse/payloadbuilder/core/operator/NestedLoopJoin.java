@@ -85,7 +85,9 @@ class NestedLoopJoin extends AOperator
 
         final RowIterator it = outer.open(context);
         executionCount++;
+        //CSOFF
         return new RowIterator()
+        //CSON
         {
             /** Single instance to avoid allocations */
             private Tuple next;
@@ -113,7 +115,9 @@ class NestedLoopJoin extends AOperator
                 it.close();
             }
 
+            //CSOFF
             private boolean setNext()
+            //CSON
             {
                 while (next == null)
                 {
@@ -173,7 +177,12 @@ class NestedLoopJoin extends AOperator
     @Override
     public int hashCode()
     {
-        return 17 + (outer.hashCode() * 37) + (inner.hashCode() * 37);
+        //CSOFF
+        int hashCode = 17;
+        hashCode = hashCode * 37 + outer.hashCode();
+        hashCode = hashCode * 37 + inner.hashCode();
+        return hashCode;
+        //CSON
     }
 
     @Override

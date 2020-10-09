@@ -62,7 +62,7 @@ public class QualifiedReferenceExpressionTest extends AParserTest
     {
         // Lambda value in context is null
         assertReference(null, aRow, 0, null, "x", "col1");
-        
+
         // Single lambda value
         assertReference(666, aRow, 0, 666, "x");
         // Row access

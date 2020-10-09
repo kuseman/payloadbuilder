@@ -1,8 +1,12 @@
 package org.kuse.payloadbuilder.core.parser;
 
-/** Visitor definition of tree */
+/** Visitor definition of tree
+ * @param <TR> Return type
+ * @param <TC> Context type
+ * */
 public interface SelectVisitor<TR, TC>
 {
+    //CSOFF
     TR visit(Select select, TC context);
 
     TR visit(TableSourceJoined joinedTableSource, TC context);
@@ -24,4 +28,5 @@ public interface SelectVisitor<TR, TC>
     TR visit(Apply apply, TC context);
 
     TR visit(SubQueryTableSource populatingJoin, TC context);
+    //CSON
 }

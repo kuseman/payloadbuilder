@@ -13,12 +13,7 @@ import org.kuse.payloadbuilder.core.operator.TableAlias;
 public class CodeGeneratorContext
 {
     private final Map<String, AtomicInteger> varCountByPreix = new HashMap<>();
-    // Generating a bi predicate
-    // Row associations are outer and inner else row
-    // TableAlias should reference inner relation
-    //    public boolean biPredicate;
-    public TableAlias tableAlias;
-    //    boolean pretty;
+    private TableAlias tableAlias;
     private final long now = System.currentTimeMillis();
     private final String rowVarName = "row";
     // Current lambda parameters in scope
@@ -32,6 +27,16 @@ public class CodeGeneratorContext
     public String getRowVarName()
     {
         return rowVarName;
+    }
+
+    public TableAlias getTableAlias()
+    {
+        return tableAlias;
+    }
+
+    public void setTableAlias(TableAlias tableAlias)
+    {
+        this.tableAlias = tableAlias;
     }
 
     /** Allocate a new unique variable name */

@@ -3,6 +3,7 @@ package org.kuse.payloadbuilder.core.parser;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 
+/** Literal float */
 public class LiteralFloatExpression extends LiteralExpression
 {
     private final float value;

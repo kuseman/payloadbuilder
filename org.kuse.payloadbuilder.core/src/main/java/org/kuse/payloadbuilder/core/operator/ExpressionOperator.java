@@ -17,7 +17,7 @@ import org.kuse.payloadbuilder.core.utils.CollectionUtils;
 /** Operator that operates over an expression (that returns rows) */
 class ExpressionOperator extends AOperator
 {
-    private final TableAlias MAP_ALIAS = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of(""), "").asteriskColumns().build();
+    private static final TableAlias MAP_ALIAS = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of(""), "").asteriskColumns().build();
     private final Expression expression;
 
     ExpressionOperator(int nodeId, Expression expression)
@@ -38,7 +38,9 @@ class ExpressionOperator extends AOperator
 
         // Transformer that supports Map's beyond rows
         Iterator<Object> iterator = CollectionUtils.getIterator(result);
+        //CSOFF
         return new RowIterator()
+        //CSON
         {
             private Set<String> columns;
             private String[] rowColumns;
@@ -97,8 +99,7 @@ class ExpressionOperator extends AOperator
     @Override
     public int hashCode()
     {
-        return 17 +
-            37 * expression.hashCode();
+        return expression.hashCode();
     }
 
     @Override

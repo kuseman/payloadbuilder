@@ -49,7 +49,6 @@ public class ExpressionTest extends Assert
 
         assertExpression(false, null, "1L <= '0'");
         assertExpression(false, null, "1D <= '0'");
-
     }
 
     @Test

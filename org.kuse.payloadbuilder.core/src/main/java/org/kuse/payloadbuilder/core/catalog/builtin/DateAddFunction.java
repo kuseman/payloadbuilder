@@ -28,9 +28,9 @@ class DateAddFunction extends ScalarFunctionInfo
     @Override
     public String getDescription()
     {
-        return "Adds a number for a specific date part to provided Date. " + System.lineSeparator() +
-            "Valid parts are: " + System.lineSeparator() +
-            Arrays.stream(DatePartFunction.Part.values())
+        return "Adds a number for a specific date part to provided Date. " + System.lineSeparator()
+            + "Valid parts are: " + System.lineSeparator()
+            + Arrays.stream(DatePartFunction.Part.values())
                     .filter(p -> p.abbreviationFor == null)
                     .map(p ->
                     {
@@ -44,8 +44,8 @@ class DateAddFunction extends ScalarFunctionInfo
                         return name + " ( Abbreviations: " + abbreviations.toString() + " )";
                     })
                     .collect(joining(System.lineSeparator()))
-            + System.lineSeparator() +
-            "Ex. dateadd(datepartExpression, integerExpression, dateExpression) ";
+            + System.lineSeparator()
+            + "Ex. dateadd(datepartExpression, integerExpression, dateExpression) ";
     }
 
     @Override
@@ -53,7 +53,7 @@ class DateAddFunction extends ScalarFunctionInfo
     {
         return asList(Expression.class, Expression.class, Expression.class);
     }
-    
+
     /** Convert Part argument from QRES to Strings if they match DateType enum */
     @Override
     public List<Expression> foldArguments(List<Expression> arguments)

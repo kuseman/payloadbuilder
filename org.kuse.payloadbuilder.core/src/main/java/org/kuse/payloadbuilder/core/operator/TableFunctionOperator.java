@@ -59,9 +59,12 @@ class TableFunctionOperator extends AOperator
     @Override
     public int hashCode()
     {
-        return 17 +
-            (37 * functionInfo.hashCode()) +
-            (37 * arguments.hashCode());
+        //CSOFF
+        int hashCode = 17;
+        hashCode = hashCode * 37 + functionInfo.hashCode();
+        hashCode = hashCode * 37 + arguments.hashCode();
+        return hashCode;
+        //CSON
     }
 
     @Override

@@ -88,7 +88,7 @@ public class OperatorBuilderTest extends AOperatorTest
         Operator expected = new SortByOperator(
                 1,
                 queryResult.tableOperators.get(0),
-                new ExpressionTupleComparator((asList(new SortItem(e("a.art_id"), Order.ASC, NullOrder.UNDEFINED)))));
+                new ExpressionTupleComparator(asList(new SortItem(e("a.art_id"), Order.ASC, NullOrder.UNDEFINED))));
 
         //                System.out.println(queryResult.operator.toString(1));
         //                System.err.println(expected.toString(1));
@@ -165,8 +165,8 @@ public class OperatorBuilderTest extends AOperatorTest
                         false),
                 new ExpressionPredicate(e("a.ab.active_flg = true")));
 
-//        System.out.println(queryResult.operator.toString(1));
-//        System.err.println(expected.toString(1));
+        //        System.out.println(queryResult.operator.toString(1));
+        //        System.err.println(expected.toString(1));
 
         assertEquals(expected, queryResult.operator);
     }
@@ -631,7 +631,6 @@ public class OperatorBuilderTest extends AOperatorTest
         //                                System.err.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
-
     }
 
     @Test
@@ -712,8 +711,8 @@ public class OperatorBuilderTest extends AOperatorTest
                         true,
                         false);
 
-//        System.err.println(expected.toString(1));
-//        System.out.println(result.operator.toString(1));
+        //        System.err.println(expected.toString(1));
+        //        System.out.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
 

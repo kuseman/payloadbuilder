@@ -2,6 +2,7 @@ package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Objects.requireNonNull;
 
+/** Apply join */
 public class Apply extends AJoin
 {
     private final ApplyType type;
@@ -25,6 +26,7 @@ public class Apply extends AJoin
         return visitor.visit(this, context);
     }
 
+    /** Apply type */
     public enum ApplyType
     {
         OUTER,

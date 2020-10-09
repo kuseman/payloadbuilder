@@ -1,7 +1,6 @@
 package org.kuse.payloadbuilder.editor;
 
 import java.awt.BorderLayout;
-import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.util.Map;
 
@@ -58,7 +57,7 @@ class VariablesDialog extends JDialog
 
         getContentPane().add(new JScrollPane(textEditor), BorderLayout.CENTER);
 
-        setPreferredSize(new Dimension(800, 600));
+        setPreferredSize(PayloadbuilderEditorView.DEFAULT_DIALOG_SIZE);
         pack();
         setLocationRelativeTo(null);
     }

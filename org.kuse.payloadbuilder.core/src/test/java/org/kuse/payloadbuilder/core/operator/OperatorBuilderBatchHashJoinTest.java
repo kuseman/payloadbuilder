@@ -354,6 +354,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         };
     }
 
+    /** Test operator */
     private static class TestOperator implements Operator
     {
         private final String name;
@@ -386,6 +387,5 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         {
             return name;
         }
-
     }
 }

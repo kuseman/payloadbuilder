@@ -65,5 +65,4 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorTest
                         new ExpressionProjection(e("a.id2")))),
                 result.projection);
     }
-
 }

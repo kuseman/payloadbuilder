@@ -81,6 +81,5 @@ public class ExpressionTupleComparatorTest extends AOperatorTest
         a = Row.of(alias, 0, new Object[] {1});
         b = Row.of(alias, 0, new Object[] {null});
         assertEquals(1, comparator.compare(context, a, b));
-
     }
 }

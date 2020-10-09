@@ -15,8 +15,8 @@ import org.apache.http.entity.StringEntity;
 import org.kuse.payloadbuilder.catalog.es.ESOperator.EsType;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
-import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.NamedExpression;
@@ -24,6 +24,8 @@ import org.kuse.payloadbuilder.core.parser.NamedExpression;
 /** Search ES */
 class SearchFunction extends TableFunctionInfo
 {
+    private static final int SCROLL_SIZE = 1000;
+
     SearchFunction(Catalog catalog)
     {
         super(catalog, "search");
@@ -35,7 +37,9 @@ class SearchFunction extends TableFunctionInfo
         return true;
     }
 
+    //CSOFF
     @Override
+    //CSON
     public RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
     {
         String endpoint = null;
@@ -118,7 +122,7 @@ class SearchFunction extends TableFunctionInfo
                 endpoint,
                 index,
                 type,
-                scroll ? 1000 : null,
+                scroll ? SCROLL_SIZE : null,
                 scroll ? 2 : null,
                 tableAlias,
                 null)
@@ -126,7 +130,7 @@ class SearchFunction extends TableFunctionInfo
                     endpoint,
                     index,
                     type,
-                    scroll ? 1000 : null,
+                    scroll ? SCROLL_SIZE : null,
                     scroll ? 2 : null,
                     tableAlias,
                     null);

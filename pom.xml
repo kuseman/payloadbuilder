@@ -23,4 +23,59 @@
         <module>org.kuse.payloadbuilder.editor</module>
     </modules>
 
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>2.17</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.puppycrawl.tools</groupId>
+                        <artifactId>checkstyle</artifactId>
+                        <version>8.18</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <violationSeverity>warning</violationSeverity>
+                    <linkXRef>false</linkXRef>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>checkstyle</id>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <phase>verify</phase>
+                        <configuration>
+                            <sourceDirectories>
+                                <sourceDirectory>src/main/java/</sourceDirectory>
+                            </sourceDirectories>
+                            <includeResources>true</includeResources>
+                            <includeTestResources>false</includeTestResources>
+                            <configLocation>checkstyle.xml</configLocation>
+                            <outputFile>${project.build.directory}/checkstyle-result.xml</outputFile>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>checkstyle-test</id>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <phase>verify</phase>
+                        <configuration>
+                            <sourceDirectories>
+                                <sourceDirectory>src/test/java/</sourceDirectory>
+                            </sourceDirectories>
+                            <includeResources>false</includeResources>
+                            <includeTestResources>true</includeTestResources>
+                            <configLocation>checkstyle-test.xml</configLocation>
+                            <outputFile>${project.build.directory}/checkstyle-result-test.xml</outputFile>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
 </project>

@@ -18,6 +18,7 @@ import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
+import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -151,12 +152,12 @@ public class BuiltinCatalogTest extends Assert
         assertFunction(null, null, "cast(1, null)");
 
         assertFunction(1, null, "cast(1, 'integer')");
-        assertFunction(1l, null, "cast(1, 'long')");
+        assertFunction(1L, null, "cast(1, 'long')");
         assertFunction(1.0f, null, "cast(1, 'float')");
         assertFunction(1.0d, null, "cast(1, 'double')");
 
         assertFunction(1, null, "cast('1', 'integer')");
-        assertFunction(1l, null, "cast('1', 'long')");
+        assertFunction(1L, null, "cast('1', 'long')");
         assertFunction(1.0f, null, "cast('1', 'float')");
         assertFunction(1.0d, null, "cast('1', 'double')");
 
@@ -184,12 +185,12 @@ public class BuiltinCatalogTest extends Assert
     @SuppressWarnings("unchecked")
     private void assertFunction(Object expected, Row row, String expression)
     {
-        row = row != null ? row : Row.of(alias, 0, new Object[0]);
+        Tuple tuple = row != null ? row : Row.of(alias, 0, new Object[0]);
         Expression e = parser.parseExpression(session.getCatalogRegistry(), expression);
         Object actual = null;
 
         ExecutionContext context = new ExecutionContext(session);
-        context.setTuple(row);
+        context.setTuple(tuple);
         actual = e.eval(context);
         if (actual instanceof Iterator)
         {

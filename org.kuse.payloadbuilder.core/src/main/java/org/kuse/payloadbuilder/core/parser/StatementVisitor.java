@@ -1,8 +1,14 @@
 package org.kuse.payloadbuilder.core.parser;
 
-/** Visitor definition of statements */
+/**
+ * Visitor definition of statements
+ *
+ * @param <TR> Return type
+ * @param <TC> Context type
+ */
 public interface StatementVisitor<TR, TC>
 {
+    //CSOFF
     /* Control flow nodes */
     TR visit(IfStatement statement, TC context);
 
@@ -21,4 +27,5 @@ public interface StatementVisitor<TR, TC>
 
     /* DML nodes */
     TR visit(SelectStatement statement, TC context);
+    //CSON
 }

@@ -21,7 +21,7 @@ import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 /** Cast and convert function */
 class CastFunction extends ScalarFunctionInfo
 {
-    private final static DateTimeFormatter ISO_DATE_OPTIONAL_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd['T'HH:mm[:ss][.SSS][X]]");
+    private static final DateTimeFormatter ISO_DATE_OPTIONAL_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd['T'HH:mm[:ss][.SSS][X]]");
 
     CastFunction(Catalog catalog, String name)
     {
@@ -47,7 +47,7 @@ class CastFunction extends ScalarFunctionInfo
         }
         return arguments;
     }
-    
+
     @Override
     public Object eval(ExecutionContext context, List<Expression> arguments)
     {
@@ -83,6 +83,7 @@ class CastFunction extends ScalarFunctionInfo
         return dataType.convert(source, style);
     }
 
+    /** Data types */
     enum DataType
     {
         BOOLEAN(Boolean.class)

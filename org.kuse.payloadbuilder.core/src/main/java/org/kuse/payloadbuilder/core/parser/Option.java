@@ -27,9 +27,7 @@ public class Option
     @Override
     public int hashCode()
     {
-        return 37
-            + (17 * option.hashCode())
-            + (17 * valueExpression.hashCode());
+        return option.hashCode();
     }
 
     @Override

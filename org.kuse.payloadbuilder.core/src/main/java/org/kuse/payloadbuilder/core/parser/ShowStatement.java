@@ -37,6 +37,7 @@ public class ShowStatement extends Statement
         return visitor.visit(this, context);
     }
 
+    /** Type */
     public enum Type
     {
         VARIABLES,

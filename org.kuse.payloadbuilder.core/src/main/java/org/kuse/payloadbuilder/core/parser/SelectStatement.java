@@ -23,7 +23,7 @@ public class SelectStatement extends Statement
     {
         return assignmentSelect;
     }
-    
+
     @Override
     public <TR, TC> TR accept(StatementVisitor<TR, TC> visitor, TC context)
     {

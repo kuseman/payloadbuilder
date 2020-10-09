@@ -10,6 +10,7 @@ import static org.kuse.payloadbuilder.core.parser.ExpressionMath.lte;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 
+/** Comparison expression */
 public class ComparisonExpression extends Expression
 {
     private final Type type;
@@ -77,7 +78,9 @@ public class ComparisonExpression extends Expression
         ExpressionCode code = ExpressionCode.code(context);
 
         String cmpOp = null;
+        //CSOFF
         switch (type)
+        //CSON
         {
             case EQUAL:
                 cmpOp = "ExpressionMath.eq";
@@ -171,10 +174,12 @@ public class ComparisonExpression extends Expression
     @Override
     public int hashCode()
     {
-        return 17 +
-            (37 * type.hashCode()) +
-            (37 * left.hashCode()) +
-            (37 * right.hashCode());
+      //CSOFF
+        int hashCode = 17;
+        hashCode = hashCode * 37 + left.hashCode();
+        hashCode = hashCode * 37 + right.hashCode();
+        return hashCode;
+        //CSON
     }
 
     @Override
@@ -198,6 +203,7 @@ public class ComparisonExpression extends Expression
         return visitor.visit(this, context);
     }
 
+    /** Type */
     public enum Type
     {
         EQUAL("="),

@@ -5,8 +5,11 @@ import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 
 /** Base class for expressions */
+//CSOFF
 public abstract class Expression
+//CSON
 {
+    /** Visitor accept definition */
     public abstract <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context);
 
     /** Returns true if the result from this expression is nullable. Primitive result or not */

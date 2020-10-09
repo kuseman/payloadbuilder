@@ -9,7 +9,9 @@ import org.apache.commons.lang3.NotImplementedException;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 
 /** Base class for table sources */
+//CSOFF
 public abstract class TableSource extends ASelectNode
+//CSON
 {
     protected final TableAlias tableAlias;
     protected final Token token;
@@ -55,5 +57,4 @@ public abstract class TableSource extends ASelectNode
     {
         throw new NotImplementedException(getClass().getSimpleName().toString());
     }
-
 }

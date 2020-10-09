@@ -29,9 +29,9 @@ class MustacheCompileFunction extends ScalarFunctionInfo
     @Override
     public String getDescription()
     {
-        return "Compiles provided mustable template with provided params." + System.lineSeparator() +
-            "Ex. mustachecompile(templateExpression, paramsExpression)" + System.lineSeparator() +
-            "NOTE! paramsExpression should evaluate to a Map.";
+        return "Compiles provided mustable template with provided params." + System.lineSeparator()
+            + "Ex. mustachecompile(templateExpression, paramsExpression)" + System.lineSeparator()
+            + "NOTE! paramsExpression should evaluate to a Map.";
     }
 
     @Override

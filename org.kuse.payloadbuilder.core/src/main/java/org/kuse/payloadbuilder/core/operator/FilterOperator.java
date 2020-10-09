@@ -49,7 +49,9 @@ class FilterOperator extends AOperator
     public RowIterator open(ExecutionContext context)
     {
         RowIterator iterator = operator.open(context);
+        //CSOFF
         return new RowIterator()
+        //CSON
         {
             private Tuple next;
 
@@ -96,9 +98,7 @@ class FilterOperator extends AOperator
     @Override
     public int hashCode()
     {
-        return 17 +
-            37 * operator.hashCode() +
-            37 * predicate.hashCode();
+        return operator.hashCode();
     }
 
     @Override

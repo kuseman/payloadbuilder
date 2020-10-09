@@ -54,9 +54,12 @@ class ArrayProjection implements Projection
     @Override
     public int hashCode()
     {
-        return 17 +
-            37 * selection.hashCode() +
-            37 * projections.hashCode();
+        //CSOFF
+        int hashCode = 17;
+        hashCode = hashCode * 37 + selection.hashCode();
+        hashCode = hashCode * 37 + projections.hashCode();
+        //CSON
+        return hashCode;
     }
 
     @Override

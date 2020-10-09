@@ -265,6 +265,7 @@ public class NestedLoopJoinTest extends AOperatorTest
         assertEquals(4, count);
     }
 
+    /** Test range function */
     static class Range extends TableFunctionInfo
     {
         private final int to;

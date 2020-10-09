@@ -5,6 +5,7 @@ import static java.util.Objects.requireNonNull;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 
+/** Nested expression */
 public class NestedExpression extends Expression
 {
     private final Expression expression;
@@ -64,7 +65,7 @@ public class NestedExpression extends Expression
     @Override
     public int hashCode()
     {
-        return 37 * expression.hashCode();
+        return expression.hashCode();
     }
 
     @Override

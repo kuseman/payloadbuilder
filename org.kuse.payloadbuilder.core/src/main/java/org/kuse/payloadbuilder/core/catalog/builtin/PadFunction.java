@@ -22,11 +22,11 @@ class PadFunction extends ScalarFunctionInfo
     @Override
     public String getDescription()
     {
-        return "Returns " + (left ? "left" : "right") + " padded string of first argument." + System.lineSeparator() +
-            "with length of second argument." + System.lineSeparator() +
-            "A optional third argument can be supplied for pad string (defaults to single white space). " + System.lineSeparator() +
-            "Ex. " + (left ? "left" : "right") + "pad(expression, integerExpression [, expression])" + System.lineSeparator() +
-            "NOTE! First argument is converted to a string.";
+        return "Returns " + (left ? "left" : "right") + " padded string of first argument." + System.lineSeparator()
+        + "with length of second argument." + System.lineSeparator()
+        + "A optional third argument can be supplied for pad string (defaults to single white space). " + System.lineSeparator()
+        + "Ex. " + (left ? "left" : "right") + "pad(expression, integerExpression [, expression])" + System.lineSeparator()
+        + "NOTE! First argument is converted to a string.";
     }
 
     @Override

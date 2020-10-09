@@ -71,5 +71,4 @@ public class DereferenceExpressionTest extends AParserTest
         Expression e = e("a.map(x -> x)[0].elite");
         assertEquals(1337, e.eval(ctx));
     }
-
 }

@@ -65,8 +65,7 @@ class OuterValuesOperator extends AOperator
     @Override
     public int hashCode()
     {
-        return 17 +
-            (37 * operator.hashCode());
+        return operator.hashCode();
     }
 
     @Override
@@ -90,5 +89,4 @@ class OuterValuesOperator extends AOperator
             +
             indentString + operator.toString(indent + 1);
     }
-
 }

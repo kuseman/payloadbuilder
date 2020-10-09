@@ -45,15 +45,15 @@ class OpenMapCollectionFunction extends TableFunctionInfo
     @Override
     public String getDescription()
     {
-        return "Table valued function that opens a row set from a collection of maps." + System.lineSeparator() + System.lineSeparator() +
-            "Ex. " + System.lineSeparator() +
-            "set @rows = '[ { \"key\": 123 }, { \"key\": 456 } ]'" + System.lineSeparator() +
-            "select * from " + getName() + "(json_value(@rows)) " + System.lineSeparator() + System.lineSeparator() +
-            "Will yield a row set like: " + System.lineSeparator() + System.lineSeparator() +
-            "key" + System.lineSeparator() +
-            "---" + System.lineSeparator() +
-            "123" + System.lineSeparator() +
-            "456";
+        return "Table valued function that opens a row set from a collection of maps." + System.lineSeparator() + System.lineSeparator()
+            + "Ex. " + System.lineSeparator()
+            + "set @rows = '[ { \"key\": 123 }, { \"key\": 456 } ]'" + System.lineSeparator()
+            + "select * from " + getName() + "(json_value(@rows)) " + System.lineSeparator() + System.lineSeparator()
+            + "Will yield a row set like: " + System.lineSeparator() + System.lineSeparator()
+            + "key" + System.lineSeparator()
+            + "---" + System.lineSeparator()
+            + "123" + System.lineSeparator()
+            + "456";
     }
 
     @Override
@@ -61,11 +61,13 @@ class OpenMapCollectionFunction extends TableFunctionInfo
     {
         final Object value = arguments.get(0).eval(context);
         final Iterator<Object> it = CollectionUtils.getIterator(value);
+        //CSOFF
         return new RowIterator()
+        //CSON
         {
             private Set<String> addedColumns;
             private String[] columns = tableAlias.isAsteriskColumns() ? null : tableAlias.getColumns();
-            private int pos = 0;
+            private int pos;
             private Row next;
 
             @Override
@@ -98,7 +100,7 @@ class OpenMapCollectionFunction extends TableFunctionInfo
                     {
                         continue;
                     }
-                    
+
                     if (tableAlias.isAsteriskColumns())
                     {
                         if (addedColumns == null)

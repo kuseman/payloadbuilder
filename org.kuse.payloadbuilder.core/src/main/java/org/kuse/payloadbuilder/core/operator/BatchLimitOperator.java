@@ -69,7 +69,9 @@ class BatchLimitOperator extends AOperator
             data.count.setValue(0);
         }
         RowIterator it = data.iterator;
+        //CSOFF
         return new RowIterator()
+        //CSON
         {
             @Override
             public Tuple next()

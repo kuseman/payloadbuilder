@@ -90,12 +90,12 @@ class QueryFileModel
             querySession.getCatalogRegistry().setDefaultCatalog(catalogs.get(0).getCatalogExtension().getDefaultAlias());
         }
     }
-    
+
     int getQueryId()
     {
         return queryId.get();
     }
-    
+
     int incrementAndGetQueryId()
     {
         return queryId.incrementAndGet();
@@ -289,7 +289,7 @@ class QueryFileModel
     {
         return querySession;
     }
-    
+
     Map<String, Object> getVariables()
     {
         return variables;

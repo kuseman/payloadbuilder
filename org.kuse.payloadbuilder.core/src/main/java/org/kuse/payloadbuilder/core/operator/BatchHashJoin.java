@@ -69,7 +69,9 @@ class BatchHashJoin extends AOperator
     /* Statistics */
     private int executionCount;
 
+    //CSOFF
     BatchHashJoin(
+    //CSON
             int nodeId,
             String logicalOperator,
             Operator outer,
@@ -123,6 +125,7 @@ class BatchHashJoin extends AOperator
                 entry(INNER_VALUES, innerValuesExtractor));
     }
 
+    /** Node data */
     class Data extends NodeData
     {
         AtomicLong time = new AtomicLong();
@@ -136,7 +139,9 @@ class BatchHashJoin extends AOperator
         }
     }
 
+    //CSOFF
     @Override
+    //CSON
     public RowIterator open(ExecutionContext context)
     {
         final Tuple contextOuter = context.getTuple();
@@ -157,7 +162,9 @@ class BatchHashJoin extends AOperator
         }
         final StopWatch sw = new StopWatch();
         final int batchSize = temp;
+        //CSOFF
         return new RowIterator()
+        //CSON
         {
             /** Batched rows */
             private List<TupleHolder> outerTuples;
@@ -239,7 +246,9 @@ class BatchHashJoin extends AOperator
                         if (outerTupleIndex >= outerTuples.size())
                         {
                             // Populating mode, emit outer rows
+                            //CSOFF
                             if (populating)
+                            //CSON
                             {
                                 outerTupleIndex = 0;
                                 emitOuterRows = true;
@@ -262,7 +271,9 @@ class BatchHashJoin extends AOperator
                         innerTuples = tableValue.getRows();
                         if (innerTuples.isEmpty())
                         {
+                            //CSOFF
                             if (!populating && emitEmptyOuterRows)
+                            //CSON
                             {
                                 next = outerTuple.tuple;
                             }
@@ -406,9 +417,11 @@ class BatchHashJoin extends AOperator
 
             private Iterator<Object[]> outerValuesIterator(ExecutionContext context)
             {
+                //CSOFF
                 return new Iterator<Object[]>()
+                //CSON
                 {
-                    private int outerRowsIndex = 0;
+                    private int outerRowsIndex;
                     private Object[] nextArray;
 
                     @Override
@@ -487,7 +500,9 @@ class BatchHashJoin extends AOperator
                 value = Integer.parseInt((String) value);
             }
 
-            result = 31 * result + (value == null ? 0 : value.hashCode());
+            //CSOFF
+            result = result * 37 + (value == null ? 0 : value.hashCode());
+            //CSON
         }
         return result;
     }
@@ -495,9 +510,12 @@ class BatchHashJoin extends AOperator
     @Override
     public int hashCode()
     {
-        return 17 +
-            37 * outer.hashCode() +
-            37 * inner.hashCode();
+        //CSOFF
+        int hashCode = 17;
+        hashCode = hashCode * 37 + outer.hashCode();
+        hashCode = hashCode * 37 + inner.hashCode();
+        return hashCode;
+        //CSON
     }
 
     @Override
@@ -543,6 +561,7 @@ class BatchHashJoin extends AOperator
             + indentString + inner.toString(indent + 1);
     }
 
+    /** Tuple holder */
     private static class TupleHolder
     {
         private Tuple tuple;

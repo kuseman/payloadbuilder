@@ -32,7 +32,7 @@ class SubQueryTuple implements Tuple
         {
             index++;
         }
-        
+
         return tuple.getValue(qname, index);
     }
 

@@ -45,9 +45,6 @@ public class PredicateAnalyzer
      * Splits expression into items. Used by detection of hash join, merge join push down predicates.
      *
      * @param predicate Join condition to analyze
-     * @param currentAlias Current alias in scope.
-     * @param availableAliases A map with available aliases as key and set of sub aliases for the key alias. This to limit what types of expressions
-     *            can be utilized as pushdown etc.
      * @return Analyze result of expression
      */
     public static AnalyzeResult analyze(Expression predicate, TableAlias tableAlias)
@@ -182,7 +179,6 @@ public class PredicateAnalyzer
             {
                 AnalyzeResult that = (AnalyzeResult) obj;
                 return pairs.equals(that.pairs);
-
             }
             return false;
         }
@@ -425,9 +421,12 @@ public class PredicateAnalyzer
         @Override
         public int hashCode()
         {
-            return 17 +
-                31 * left.hashCode() +
-                37 * (right != null ? right.hashCode() : 0);
+            //CSOFF
+            int hashCode = 17;
+            hashCode = hashCode * 37 + left.hashCode();
+            hashCode = hashCode * 37 + (right != null ? right.hashCode() : 0);
+            return hashCode;
+            //CSON
         }
 
         @Override
@@ -543,15 +542,18 @@ public class PredicateAnalyzer
                 {
                     int extractFrom = 1;
                     String alias = pair.getKey();
+                    //CSOFF
                     if (pair.getValue() != null)
+                    //CSON
                     {
                         extractFrom = 2;
                         alias += "." + pair.getValue();
                     }
 
                     aliases = asSet(alias);
-
+                    //CSOFF
                     if (qname.getParts().size() > extractFrom)
+                    //CSON
                     {
                         qname = qname.extract(extractFrom);
                     }
@@ -649,8 +651,7 @@ public class PredicateAnalyzer
         @Override
         public int hashCode()
         {
-            return 17 +
-                37 * (expression != null ? expression.hashCode() : 0);
+            return expression != null ? expression.hashCode() : 0;
         }
 
         @Override
@@ -680,6 +681,7 @@ public class PredicateAnalyzer
         private static final QualifiedReferenceVisitor QR_VISITOR = new QualifiedReferenceVisitor();
         private static final Pair<String, String> EMPTY_PAIR = Pair.of(null, null);
 
+        /** Visitor context */
         private static class Context
         {
             TableAlias tableAlias;
@@ -706,7 +708,7 @@ public class PredicateAnalyzer
         static Pair<String, String> getAlias(TableAlias tableAlias, QualifiedName qname)
         {
             Pair<String, String> result = find(tableAlias, qname);
-            
+
             TableAlias current = tableAlias.getParent();
             while (current != null && result == EMPTY_PAIR)
             {
@@ -714,10 +716,10 @@ public class PredicateAnalyzer
                 result = find(current, qname);
                 current = current.getParent();
             }
-            
+
             return result;
         }
-        
+
         private static Pair<String, String> find(TableAlias tableAlias, QualifiedName qname)
         {
             List<String> parts = qname.getParts();
@@ -730,7 +732,9 @@ public class PredicateAnalyzer
                 if (parts.size() > 1)
                 {
                     TableAlias temp = tableAlias.getChildAlias(parts.get(1));
+                    //CSOFF
                     if (temp != null)
+                    //CSON
                     {
                         return Pair.of(alias, parts.get(1));
                     }
@@ -752,7 +756,9 @@ public class PredicateAnalyzer
                 if (parts.size() > 1)
                 {
                     temp = temp.getChildAlias(parts.get(1));
+                    //CSOFF
                     if (temp != null)
+                    //CSON
                     {
                         subAlias = alias;
                         alias = "##";
@@ -768,9 +774,8 @@ public class PredicateAnalyzer
 
                 return Pair.of(alias, subAlias);
             }
-            
+
             return EMPTY_PAIR;
-            
         }
 
         @Override
@@ -793,5 +798,4 @@ public class PredicateAnalyzer
             return null;
         }
     }
-
 }

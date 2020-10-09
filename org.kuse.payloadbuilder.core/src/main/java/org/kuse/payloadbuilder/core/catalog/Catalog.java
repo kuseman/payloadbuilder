@@ -19,7 +19,9 @@ import org.kuse.payloadbuilder.core.parser.SortItem;
 /**
  * Catalog. Defines the hooking points for retrieving data, functions etc.
  */
+//CSOFF
 public abstract class Catalog
+//CSON
 {
     /** Name of the catalog */
     private final String name;
@@ -78,9 +80,10 @@ public abstract class Catalog
     }
 
     /**
-     * Get operator for provided data 
+     * Get operator for provided data
+     *
      * <pre>
-     * NOTE! In main loop of operator add check of {@link QuerySession#abortQuery()} to not hang a 
+     * NOTE! In main loop of operator add check of {@link QuerySession#abortQuery()} to not hang a
      * thread in execution state.
      * </pre>
      */
@@ -91,11 +94,13 @@ public abstract class Catalog
 
     /**
      * Get operator for provided alias
+     *
      * <pre>
-     * NOTE! In main loop of operator add check of {@link QuerySession#abortQuery()} to not hang a 
+     * NOTE! In main loop of operator add check of {@link QuerySession#abortQuery()} to not hang a
      * thread in execution state.
      * </pre>
-     * @param index Index to use 
+     *
+     * @param index Index to use
      */
     public Operator getIndexOperator(OperatorData data, Index index)
     {

@@ -6,6 +6,7 @@ import java.util.List;
 
 import javax.swing.event.SwingPropertyChangeSupport;
 
+/** Editor model */
 class PayloadbuilderEditorModel
 {
     private final SwingPropertyChangeSupport pcs = new SwingPropertyChangeSupport(this);
@@ -13,7 +14,7 @@ class PayloadbuilderEditorModel
     public static final String SELECTED_FILE = "selectedFile";
 
     private final List<QueryFileModel> files = new ArrayList<>();
-    
+
     void addPropertyChangeListener(PropertyChangeListener listener)
     {
         pcs.addPropertyChangeListener(listener);
@@ -23,7 +24,7 @@ class PayloadbuilderEditorModel
     {
         setSelectedFile(files.size(), file);
     }
-    
+
     void setSelectedFile(int index)
     {
         setSelectedFile(index, files.get(index));

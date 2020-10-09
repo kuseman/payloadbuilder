@@ -17,14 +17,16 @@ public class MapUtils
     {
     }
 
+    /** Build map out of entries */
     @SafeVarargs
     public static <K, V> Map<K, V> ofEntries(SimpleEntry<K, V>... values)
     {
         return ofEntries(false, values);
     }
 
+    /** Build a map with kept insertion order out of entries */
     @SafeVarargs
-    public static <K, V> Map<K, V> ofEntries(boolean sorted, SimpleEntry<K, V>... values)
+    public static <K, V> Map<K, V> ofEntries(boolean keepInsertOrder, SimpleEntry<K, V>... values)
     {
         return Stream.of(values)
                 .collect(toMap(
@@ -34,14 +36,16 @@ public class MapUtils
                         {
                             throw new IllegalStateException(String.format("Duplicate key %s", u));
                         },
-                        sorted ? LinkedHashMap::new : HashMap::new));
+                        keepInsertOrder ? LinkedHashMap::new : HashMap::new));
     }
 
+    /** Build entry out of provided key and value */
     public static <K, V> SimpleEntry<K, V> entry(K key, V value)
     {
         return new SimpleEntry<>(key, value);
     }
 
+    /** Traverse map out of provided parts */
     public static Object traverse(Map<Object, Object> map, List<String> parts)
     {
         return traverse(map, 0, parts);
@@ -73,5 +77,4 @@ public class MapUtils
 
         return current.get(parts.get(size - 1));
     }
-
 }

@@ -1,7 +1,9 @@
 package org.kuse.payloadbuilder.core.parser;
 
 /** Base class for select items */
+//CSOFF
 public abstract class SelectItem extends ASelectNode
+//CSON
 {
     protected final String identifier;
     private final boolean explicitIdentifier;
@@ -21,15 +23,18 @@ public abstract class SelectItem extends ASelectNode
     {
         return identifier;
     }
-    
+
     /** Name of assignment variable if any */
     public String getAssignmentName()
     {
         return null;
     }
-    
-    /** Calculate assignment value if any
-     * @param context Execution context */
+
+    /**
+     * Calculate assignment value if any
+     *
+     * @param context Execution context
+     */
     public Object getAssignmentValue(ExecutionContext context)
     {
         return null;

@@ -150,6 +150,7 @@ class PayloadbuilderService
         return parameters;
     }
 
+    /** Variable visitor */
     private static class VariableVisitor extends AStatementVisitor<Void, Set<String>>
     {
         private static final ExpressionVisitor EXPRESSION_VISITOR = new ExpressionVisitor();
@@ -160,6 +161,7 @@ class PayloadbuilderService
             expression.accept(EXPRESSION_VISITOR, context);
         }
 
+        /** Expression visitor */
         private static class ExpressionVisitor extends AExpressionVisitor<Void, Set<String>>
         {
             @Override
@@ -170,7 +172,7 @@ class PayloadbuilderService
             }
         }
     }
-    
+
     /** Output writer used in NONE output mode */
     private static class NoneOutputWriter implements OutputWriter
     {
@@ -180,13 +182,13 @@ class PayloadbuilderService
         {
             this.resultModel = resultModel;
         }
-        
+
         @Override
         public void endRow()
         {
             resultModel.addRow(ArrayUtils.EMPTY_OBJECT_ARRAY);
         }
-        
+
         @Override
         public void writeFieldName(String name)
         {
@@ -252,7 +254,7 @@ class PayloadbuilderService
 
             return result;
         }
-        
+
         @Override
         public void initResult(String[] columns)
         {
@@ -367,6 +369,7 @@ class PayloadbuilderService
             }
         }
 
+        /** Pair list */
         private static class PairList extends ArrayList<Pair<String, Object>>
         {
         }

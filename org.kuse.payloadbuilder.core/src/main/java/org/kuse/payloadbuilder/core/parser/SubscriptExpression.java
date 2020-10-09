@@ -119,9 +119,12 @@ public class SubscriptExpression extends Expression
     @Override
     public int hashCode()
     {
-        return 17
-            + (37 * value.hashCode())
-            + (37 * subscript.hashCode());
+        //CSOFF
+        int hashCode = 17;
+        hashCode = hashCode * 37 + value.hashCode();
+        hashCode = hashCode * 37 + subscript.hashCode();
+        return hashCode;
+        //CSON
     }
 
     @Override

@@ -99,15 +99,16 @@ public class TestHarnessRunner
         }
 
         int size = testCase.getExpectedResultSets().size();
-        
+
         Assert.assertEquals("Expected number of result sets to be equal", size, actualResultSets.size());
-        
+
         for (int i = 0; i < size; i++)
         {
             Assert.assertEquals("Expected rows in result set: " + (i + 1) + " to be equal", testCase.getExpectedResultSets().get(i), actualResultSets.get(i));
         }
     }
 
+    /** Harness catalog */
     private static class TCatalog extends Catalog
     {
         private final TestCatalog catalog;
@@ -133,6 +134,7 @@ public class TestHarnessRunner
         }
     }
 
+    /** Harness operator */
     private static class TOperator implements Operator
     {
         private final TestTable table;
@@ -176,6 +178,7 @@ public class TestHarnessRunner
         }
     }
 
+    /** Harness result writer */
     private static class ResultWriter implements OutputWriter
     {
         private List<List<ColumnValue>> rows = new ArrayList<>();
@@ -212,11 +215,12 @@ public class TestHarnessRunner
         @Override
         public void writeValue(Object value)
         {
-            if (value instanceof Iterator)
+            Object result = value;
+            if (result instanceof Iterator)
             {
-                value = IteratorUtils.toList((Iterator<Object>) value);
+                result = IteratorUtils.toList((Iterator<Object>) result);
             }
-            row.add(new ColumnValue(column, value));
+            row.add(new ColumnValue(column, result));
         }
 
         @Override
@@ -238,6 +242,5 @@ public class TestHarnessRunner
         public void endArray()
         {
         }
-
     }
 }

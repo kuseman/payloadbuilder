@@ -25,9 +25,9 @@ class RegexpLikeFunction extends ScalarFunctionInfo
     @Override
     public String getDescription()
     {
-        return "Matches first argument to regex provided in second argument." + System.lineSeparator() +
-            "Ex. regexp_like(expression, stringExpression)." + System.lineSeparator() +
-            "Returns a boolean value.";
+        return "Matches first argument to regex provided in second argument." + System.lineSeparator()
+            + "Ex. regexp_like(expression, stringExpression)." + System.lineSeparator()
+            + "Returns a boolean value.";
     }
 
     @Override

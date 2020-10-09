@@ -13,6 +13,8 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 /** Function that generates a hash from provided expressions */
 class ExpressionHashFunction implements ToIntBiFunction<ExecutionContext, Tuple>
 {
+    private static final int HASH_MULTIPLIER = 37;
+    private static final int HASH_CONSTANT = 17;
     private final List<Expression> expressions;
 
     ExpressionHashFunction(List<Expression> expressions)
@@ -24,7 +26,7 @@ class ExpressionHashFunction implements ToIntBiFunction<ExecutionContext, Tuple>
     public int applyAsInt(ExecutionContext context, Tuple tuple)
     {
         context.setTuple(tuple);
-        int hash = 37;
+        int hash = HASH_CONSTANT;
         for (Expression expression : expressions)
         {
             Object result = expression.eval(context);
@@ -36,7 +38,7 @@ class ExpressionHashFunction implements ToIntBiFunction<ExecutionContext, Tuple>
             {
                 result = Integer.parseInt((String) result);
             }
-            hash += 17 * (result != null ? result.hashCode() : 0);
+            hash = hash * HASH_MULTIPLIER + (result != null ? result.hashCode() : 0);
         }
         return hash;
     }

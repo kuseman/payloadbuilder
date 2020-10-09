@@ -12,7 +12,9 @@ import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Definition of a scalar function */
+//CSOFF
 public abstract class ScalarFunctionInfo extends FunctionInfo
+//CSON
 {
     public ScalarFunctionInfo(Catalog catalog, String name)
     {

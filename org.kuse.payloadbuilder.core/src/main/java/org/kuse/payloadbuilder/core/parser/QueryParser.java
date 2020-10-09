@@ -77,6 +77,7 @@ import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.VariableExp
 import org.kuse.payloadbuilder.core.parser.SortItem.NullOrder;
 import org.kuse.payloadbuilder.core.parser.SortItem.Order;
 
+/** Parser for a payload builder query */
 public class QueryParser
 {
     /** Parse query */
@@ -234,7 +235,9 @@ public class QueryParser
             return ((SelectStatement) visit(ctx.selectStatement())).getSelect();
         }
 
+        //CSOFF
         @Override
+        //CSON
         public Object visitSelectStatement(SelectStatementContext ctx)
         {
             List<SelectItem> selectItems = ctx.selectItem().stream().map(s -> (SelectItem) visit(s)).collect(toList());
@@ -330,7 +333,9 @@ public class QueryParser
                 {
                     Optional<SelectItem> item = selectItems.stream().filter(si -> !isBlank(si.getIdentifier()) && si.isExplicitIdentifier()).findAny();
 
+                    //CSOFF
                     if (item.isPresent())
+                    //CSON
                     {
                         int index = selectItems.indexOf(item.get());
                         SelectItemContext itemCtx = ctx.nestedSelectItem().selectItem(index);
@@ -340,7 +345,9 @@ public class QueryParser
 
                 if (from == null)
                 {
+                    //CSOFF
                     if (where != null)
+                    //CSON
                     {
                         throw new ParseException("Cannot have a WHERE clause without a FROM clause: " + selectItems, ctx.nestedSelectItem().where.start);
                     }
@@ -638,7 +645,7 @@ public class QueryParser
                 parts.add(getIdentifier(ctx.identifier()));
                 if (left instanceof QualifiedReferenceExpression)
                 {
-                    QualifiedReferenceExpression qfe = ((QualifiedReferenceExpression) left);
+                    QualifiedReferenceExpression qfe = (QualifiedReferenceExpression) left;
                     parts.addAll(0, qfe.getQname().getParts());
                     result = new QualifiedReferenceExpression(new QualifiedName(parts), qfe.getLambdaId());
                 }
@@ -691,7 +698,9 @@ public class QueryParser
             Expression expression = getExpression(ctx.expression());
             ArithmeticUnaryExpression.Type type = null;
 
+            //CSOFF
             switch (ctx.op.getType())
+            //CSOn
             {
                 case PayloadBuilderQueryLexer.PLUS:
                     type = ArithmeticUnaryExpression.Type.PLUS;

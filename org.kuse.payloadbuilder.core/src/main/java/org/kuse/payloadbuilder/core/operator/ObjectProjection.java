@@ -75,10 +75,7 @@ public class ObjectProjection implements Projection
     @Override
     public int hashCode()
     {
-        return 17 +
-            37 * (selection != null ? selection.hashCode() : 0) +
-            37 * projections.hashCode() +
-            37 * Arrays.hashCode(columns);
+        return projections.hashCode();
     }
 
     @Override

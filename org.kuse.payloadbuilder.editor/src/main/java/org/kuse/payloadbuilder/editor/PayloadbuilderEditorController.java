@@ -34,6 +34,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 /** Main controller for editor */
 class PayloadbuilderEditorController implements PropertyChangeListener
 {
+    private static final int TIMER_INTERVAL = 250;
     static final ObjectMapper MAPPER = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private final PayloadbuilderEditorView view;
@@ -123,7 +124,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         view.setExitAction(this::exit);
 
         view.getMemoryLabel().setText(getMemoryString());
-        new Timer(250, evt -> view.getMemoryLabel().setText(getMemoryString())).start();
+        new Timer(TIMER_INTERVAL, evt -> view.getMemoryLabel().setText(getMemoryString())).start();
     }
 
     private void exit()
@@ -140,9 +141,9 @@ class PayloadbuilderEditorController implements PropertyChangeListener
 
         int result = JOptionPane.showConfirmDialog(
                 view,
-                "Save changes to the following files: " +
-                    System.lineSeparator() +
-                    dirtyFiles
+                "Save changes to the following files: "
+                    + System.lineSeparator()
+                    + dirtyFiles
                             .stream()
                             .map(f -> FilenameUtils.getName(f.getFilename()))
                             .collect(joining(System.lineSeparator())),
@@ -245,7 +246,9 @@ class PayloadbuilderEditorController implements PropertyChangeListener
 
         if (file.isNew())
         {
+            //CSOFF
             JFileChooser fileChooser = new JFileChooser()
+            //CSON
             {
                 @Override
                 public void approveSelection()
@@ -254,7 +257,9 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                     if (f.exists() && getDialogType() == SAVE_DIALOG)
                     {
                         int result = JOptionPane.showConfirmDialog(this, "The file exists, overwrite?", "Existing file", JOptionPane.YES_NO_CANCEL_OPTION);
+                        //CSOFF
                         switch (result)
+                        //CSON
                         {
                             case JOptionPane.YES_OPTION:
                                 super.approveSelection();
@@ -304,16 +309,22 @@ class PayloadbuilderEditorController implements PropertyChangeListener
 
                 TabComponentView tabComponent = new TabComponentView(file.getTabTitle(), null, () ->
                 {
+                    //CSOFF
                     if (file.isDirty())
+                    //CSON
                     {
                         int result = JOptionPane.showConfirmDialog(view, "Save changes ?", "Save", JOptionPane.YES_NO_CANCEL_OPTION);
+                        //CSOFF
                         if (result == JOptionPane.CANCEL_OPTION)
+                        //CSON
                         {
                             return;
                         }
                         else if (result == JOptionPane.YES_OPTION)
                         {
+                            //CSOFF
                             if (!save(file))
+                            //CSON
                             {
                                 return;
                             }
@@ -324,7 +335,9 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                     int length = view.getEditorsTabbedPane().getComponents().length;
                     for (int i = 0; i < length; i++)
                     {
+                        //CSOFF
                         if (view.getEditorsTabbedPane().getComponents()[i] == content)
+                        //CSON
                         {
                             model.removeFile(file);
                             view.getEditorsTabbedPane().remove(content);
@@ -344,13 +357,10 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                 view.getEditorsTabbedPane().setSelectedIndex(index);
                 content.requestFocusInWindow();
             }
-            // Set selected
-            else
-            {
-            }
         }
     };
 
+    /** Selected file listener */
     private class SelectedFileListener implements ChangeListener
     {
         @Override
@@ -369,6 +379,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         }
     }
 
+    /** Execute listener */
     private class ExecuteListener implements Runnable
     {
         @Override
@@ -416,7 +427,8 @@ class PayloadbuilderEditorController implements PropertyChangeListener
             });
         }
     }
-    
+
+    /** Edit vars listener */
     private class EditVariablesListener implements Runnable
     {
         @Override
@@ -457,6 +469,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         }
     }
 
+    /** Caret change listener */
     private class CaretChangedListener implements Consumer<QueryFileView>
     {
         @Override
@@ -466,6 +479,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         }
     }
 
+    /** New query listener */
     private class NewQueryListener implements Runnable
     {
         @Override
@@ -477,6 +491,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         }
     }
 
+    /** Open listener */
     private class OpenListener implements Runnable
     {
         @Override
@@ -491,6 +506,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         }
     }
 
+    /** Open listener */
     private class SaveListener implements Runnable
     {
         @Override

@@ -20,9 +20,9 @@ class TypeOfFunction extends ScalarFunctionInfo
     @Override
     public String getDescription()
     {
-        return "Returns type string of provided argument. " + System.lineSeparator() +
-            "Ex. typeof(expression)" + System.lineSeparator() +
-            "Mainly used when debugging values.";
+        return "Returns type string of provided argument. " + System.lineSeparator()
+            + "Ex. typeof(expression)" + System.lineSeparator()
+            + "Mainly used when debugging values.";
     }
 
     @Override

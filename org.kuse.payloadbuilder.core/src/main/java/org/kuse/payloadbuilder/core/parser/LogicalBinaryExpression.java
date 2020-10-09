@@ -7,6 +7,7 @@ import static org.kuse.payloadbuilder.core.parser.LiteralBooleanExpression.TRUE_
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 
+/** Logical binary expression */
 public class LogicalBinaryExpression extends Expression
 {
     private final Type type;
@@ -90,8 +91,10 @@ public class LogicalBinaryExpression extends Expression
         return left.isNullable() || right.isNullable();
     }
 
+    //CSOFF
     @Override
     public Object eval(ExecutionContext context)
+    //CSON
     {
         Object lr = left.eval(context);
         if (type == Type.AND)
@@ -118,7 +121,7 @@ public class LogicalBinaryExpression extends Expression
         }
 
         /* OR 3vl
-         True if either side is true or null */
+            True if either side is true or null */
         if (lr != null && (Boolean) lr)
         {
             return true;
@@ -296,10 +299,12 @@ public class LogicalBinaryExpression extends Expression
     @Override
     public int hashCode()
     {
-        return 17 +
-            (37 * left.hashCode()) +
-            (37 * right.hashCode()) +
-            (37 * type.hashCode());
+      //CSOFF
+        int hashCode = 17;
+        hashCode = hashCode * 37 + left.hashCode();
+        hashCode = hashCode * 37 + right.hashCode();
+        return hashCode;
+        //CSON
     }
 
     @Override
@@ -315,6 +320,7 @@ public class LogicalBinaryExpression extends Expression
         return false;
     }
 
+    /** Type */
     public enum Type
     {
         AND, OR;

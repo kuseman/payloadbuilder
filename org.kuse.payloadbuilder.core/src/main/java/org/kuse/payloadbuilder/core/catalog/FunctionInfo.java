@@ -8,7 +8,9 @@ import org.kuse.payloadbuilder.core.catalog.builtin.BuiltinCatalog;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Definition of a function */
+//CSOFF
 public abstract class FunctionInfo
+//CSON
 {
     private final Catalog catalog;
     private final String name;
@@ -65,9 +67,9 @@ public abstract class FunctionInfo
     {
         return true;
     }
-    
-    /** Fold arguments. Is called upon parsing to let functions fold it's arguments.
-     *  Ie. Replace arguments with other values etc.
+
+    /**
+     * Fold arguments. Is called upon parsing to let functions fold it's arguments. Ie. Replace arguments with other values etc.
      */
     public List<Expression> foldArguments(List<Expression> arguments)
     {
@@ -83,9 +85,7 @@ public abstract class FunctionInfo
     @Override
     public int hashCode()
     {
-        return 17 +
-            (37 * catalog.getName().hashCode()) +
-            (37 * name.hashCode());
+        return name.hashCode();
     }
 
     @Override
@@ -101,6 +101,7 @@ public abstract class FunctionInfo
         return false;
     }
 
+    /** Function type */
     public enum Type
     {
         SCALAR,

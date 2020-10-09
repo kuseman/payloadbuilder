@@ -13,7 +13,8 @@ import javax.swing.UnsupportedLookAndFeelException;
 public class Main
 {
     private static final File CONFIG_FILE = new File("config.json");
-    
+
+    /** Main */
     public static void main(String[] args)
     {
         try
@@ -23,7 +24,7 @@ public class Main
         catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException ex)
         {
         }
-        
+
         Config config = loadConfig();
 
         // Start all Swing applications on the EDT.
@@ -36,7 +37,7 @@ public class Main
             view.setVisible(true);
         });
     }
-    
+
     private static Config loadConfig()
     {
         if (!CONFIG_FILE.exists())
@@ -54,7 +55,7 @@ public class Main
             throw new RuntimeException("Error loading config from " + CONFIG_FILE.getAbsolutePath(), e);
         }
     }
-    
+
     static void saveConfig(Config config)
     {
         try

@@ -58,9 +58,12 @@ public class QualifiedFunctionCallExpression extends Expression
     @Override
     public int hashCode()
     {
-        return 17 +
-            (37 * functionInfo.hashCode()) +
-            (37 * arguments.hashCode());
+      //CSOFF
+        int hashCode = 17;
+        hashCode = hashCode * 37 + functionInfo.hashCode();
+        hashCode = hashCode * 37 + arguments.hashCode();
+        return hashCode;
+        //CSON
     }
 
     @Override
@@ -79,7 +82,7 @@ public class QualifiedFunctionCallExpression extends Expression
     public String toString()
     {
         return functionInfo.getCatalog().getName() + "#"
-                + functionInfo.getName()
-                + "(" + arguments.stream().map(a -> a.toString()).collect(joining(", ")) + ")";
+            + functionInfo.getName()
+            + "(" + arguments.stream().map(a -> a.toString()).collect(joining(", ")) + ")";
     }
 }

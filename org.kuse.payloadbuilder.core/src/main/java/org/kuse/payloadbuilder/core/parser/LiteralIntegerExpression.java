@@ -3,6 +3,7 @@ package org.kuse.payloadbuilder.core.parser;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 
+/** Literal integer */
 public class LiteralIntegerExpression extends LiteralExpression
 {
     private final int value;

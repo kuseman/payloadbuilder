@@ -88,6 +88,7 @@ public class TableAlias
         return childAliases;
     }
 
+    /** Get child alias for provided alias */
     public TableAlias getChildAlias(String alias)
     {
         if (childAliases == null)
@@ -183,6 +184,7 @@ public class TableAlias
             && IntStream.range(0, childAliases.size()).allMatch(i -> childAliases.get(i).isEqual(other.childAliases.get(i)));
     }
 
+    /** Alias type */
     public enum Type
     {
         TABLE,
@@ -210,6 +212,7 @@ public class TableAlias
             this.token = token;
         }
 
+        //CSOFF
         public TableAliasBuilder parent(TableAlias parent)
         {
             this.parent = requireNonNull(parent);
@@ -233,7 +236,9 @@ public class TableAlias
             this.childAliases = requireNonNull(childAliases);
             return this;
         }
+        //CSON
 
+        /** Build alias */
         public TableAlias build()
         {
             TableAlias result = new TableAlias(parent, qname, alias, columns, asteriskColumns, type, token);

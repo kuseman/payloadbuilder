@@ -2,7 +2,10 @@ package org.kuse.payloadbuilder.core.parser;
 
 import java.util.List;
 
-/** Visitor adapter for expression visitors */
+/** Visitor adapter for expression visitors
+ * @param <TR> Result type
+ * @param <TC> Context type
+ * */
 public class AStatementVisitor<TR, TC> implements StatementVisitor<TR, TC>, SelectVisitor<TR, TC>
 {
     private static final Statement[] EMPTY = new Statement[0];
@@ -199,6 +202,7 @@ public class AStatementVisitor<TR, TC> implements StatementVisitor<TR, TC>, Sele
 
     /* END SELECT visitor */
 
+    /** Visit provided children */
     protected TR visitChildren(TC context, List<Statement> statements, Statement... args)
     {
         TR result = defaultResult(context);

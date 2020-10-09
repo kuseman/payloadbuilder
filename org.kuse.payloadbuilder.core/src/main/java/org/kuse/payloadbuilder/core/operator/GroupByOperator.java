@@ -93,10 +93,7 @@ class GroupByOperator extends AOperator
     @Override
     public int hashCode()
     {
-        return 17
-            + (37 * operator.hashCode())
-            + (37 * valuesExtractor.hashCode())
-            + (37 * size);
+        return operator.hashCode();
     }
 
     @Override

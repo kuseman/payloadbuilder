@@ -20,6 +20,7 @@ import java.util.Optional;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.http.HttpStatus;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.kuse.payloadbuilder.catalog.es.ESOperator.EsType;
@@ -68,7 +69,7 @@ public class ESCatalog extends Catalog
         HttpGet getMappings = new HttpGet(String.format("%s/%s/_mapping", endpoint, index));
         try (CloseableHttpResponse response = CLIENT.execute(getMappings))
         {
-            if (response.getStatusLine().getStatusCode() != 200)
+            if (response.getStatusLine().getStatusCode() != HttpStatus.SC_OK)
             {
                 throw new RuntimeException("Error query Elastic for mappings." + IOUtils.toString(response.getEntity().getContent()));
             }
@@ -204,7 +205,9 @@ public class ESCatalog extends Catalog
         }
     }
 
+    //CSOFF
     private List<Pair<String, String>> collectSortItems(
+            //CSON
             TableAlias tableAlias,
             Map<String, String> analyzedProperties,
             List<SortItem> sortItems)
@@ -280,7 +283,7 @@ public class ESCatalog extends Catalog
         HttpGet getMappings = new HttpGet(String.format("%s/%s/%s_mapping", esType.endpoint, esType.index, isSingleType ? "" : esType.type + "/"));
         try (CloseableHttpResponse response = CLIENT.execute(getMappings))
         {
-            if (response.getStatusLine().getStatusCode() != 200)
+            if (response.getStatusLine().getStatusCode() != HttpStatus.SC_OK)
             {
                 return emptyMap();
             }
@@ -311,18 +314,22 @@ public class ESCatalog extends Catalog
     /** Maker class for _id index */
     static class IdIndex extends Index
     {
+        private static final int BATCH_SIZE = 250;
+
         IdIndex(QualifiedName table)
         {
-            super(table, asList(ESOperator.DOCID), 250);
+            super(table, asList(ESOperator.DOCID), BATCH_SIZE);
         }
     }
 
     /** Maker class for _parent index */
     static class ParentIndex extends Index
     {
+        private static final int BATCH_SIZE = 250;
+
         ParentIndex(QualifiedName table)
         {
-            super(table, asList(ESOperator.PARENTID), 250);
+            super(table, asList(ESOperator.PARENTID), BATCH_SIZE);
         }
     }
 
@@ -371,7 +378,7 @@ public class ESCatalog extends Catalog
                 }
             }
 
-            if ((index == null || "not_analyzed".equals(index)))
+            if (index == null || "not_analyzed".equals(index))
             {
                 result.put((parentKey != null ? parentKey + "." : "") + entry.getKey(), "");
             }

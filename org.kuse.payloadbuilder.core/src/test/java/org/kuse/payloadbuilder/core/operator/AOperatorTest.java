@@ -149,6 +149,7 @@ public class AOperatorTest extends Assert
         return result;
     }
 
+    /** Query result */
     static class QueryResult
     {
         List<Operator> tableOperators;

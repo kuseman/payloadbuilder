@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.kuse.payloadbuilder.core.operator.Tuple;
 
+/** Dereference expression */
 public class DereferenceExpression extends Expression
 {
     private final Expression left;
@@ -68,9 +69,12 @@ public class DereferenceExpression extends Expression
     @Override
     public int hashCode()
     {
-        return 17
-            + (37 * left.hashCode())
-            + (37 * right.hashCode());
+        //CSOFF
+        int hashCode = 17;
+        hashCode = hashCode * 37 + left.hashCode();
+        hashCode = hashCode * 37 + right.hashCode();
+        return hashCode;
+        //CSON
     }
 
     @Override

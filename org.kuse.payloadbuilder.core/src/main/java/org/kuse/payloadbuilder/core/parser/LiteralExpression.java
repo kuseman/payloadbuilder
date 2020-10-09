@@ -2,7 +2,10 @@ package org.kuse.payloadbuilder.core.parser;
 
 import java.util.Objects;
 
+/** Base literal expression */
+//CSOFF
 public abstract class LiteralExpression extends Expression
+//CSON
 {
     private final Object objectValue;
 
@@ -43,8 +46,9 @@ public abstract class LiteralExpression extends Expression
     @Override
     public int hashCode()
     {
-        return 17 +
-            37 * (objectValue != null ? objectValue.hashCode() : 0);
+        //CSOFF
+        return 17 * 37 + (objectValue != null ? objectValue.hashCode() : 0);
+        //CSON
     }
 
     @Override

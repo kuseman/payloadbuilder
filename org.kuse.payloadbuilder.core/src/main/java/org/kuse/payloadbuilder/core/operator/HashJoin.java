@@ -88,6 +88,7 @@ class HashJoin extends AOperator
                 entry(INNER_VALUES, innerHashFunction));
     }
 
+    /** Node data */
     class Data extends NodeData
     {
         AtomicLong time = new AtomicLong();
@@ -177,7 +178,9 @@ class HashJoin extends AOperator
         final RowIterator ii = inner.open(context);
         final JoinTuple joinTuple = new JoinTuple();
         joinTuple.setContextOuter(contextOuter);
+        //CSOFF
         return new RowIterator()
+        //CSON
         {
             private Tuple next;
             private Tuple currentInner;
@@ -264,7 +267,9 @@ class HashJoin extends AOperator
             TableIteratorType type)
     {
         final Iterator<List<TupleHolder>> tableIt = table.values().iterator();
+        //CSOFF
         return new RowIterator()
+        //CSON
         {
             private Tuple next;
             private List<TupleHolder> list;
@@ -320,6 +325,7 @@ class HashJoin extends AOperator
         };
     }
 
+    /** Tuple holder */
     private static class TupleHolder
     {
         private Tuple tuple;
@@ -361,6 +367,7 @@ class HashJoin extends AOperator
         }
     }
 
+    /** Iterator type */
     private enum TableIteratorType
     {
         MATCHED,
@@ -371,7 +378,12 @@ class HashJoin extends AOperator
     @Override
     public int hashCode()
     {
-        return 17 + (outer.hashCode() * 37) + (inner.hashCode() * 37);
+        //CSOFF
+        int hashCode = 17;
+        hashCode = hashCode * 37 + outer.hashCode();
+        hashCode = hashCode * 37 + inner.hashCode();
+        return hashCode;
+        //CSON
     }
 
     @Override

@@ -1,6 +1,9 @@
 package org.kuse.payloadbuilder.core.parser;
 
-/** Visitor adapter for select visitors */
+/** Visitor adapter for select visitors
+ * @param <TR> Result type
+ * @param <TC> Context type
+ **/
 public abstract class ASelectVisitor<TR, TC> implements SelectVisitor<TR, TC>
 {
     /**

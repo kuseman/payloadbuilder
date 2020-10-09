@@ -7,20 +7,21 @@ import java.util.Map;
 
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 
-/** Operator that wraps a sub operator and decorates it's
- * tuples with a subquery tuple */
+/**
+ * Operator that wraps a sub operator and decorates it's tuples with a subquery tuple
+ */
 class SubQueryOperator extends AOperator
 {
     private final Operator operator;
     private final String alias;
-    
+
     SubQueryOperator(Operator operator, String alias)
     {
         super(operator.getNodeId());
         this.operator = requireNonNull(operator, "operator");
         this.alias = requireNonNull(alias, "alias");
     }
-    
+
     @Override
     public List<Operator> getChildOperators()
     {
@@ -44,7 +45,7 @@ class SubQueryOperator extends AOperator
     {
         return operator.getDescribeProperties();
     }
-    
+
     @Override
     public RowIterator open(ExecutionContext context)
     {
@@ -56,7 +57,7 @@ class SubQueryOperator extends AOperator
             {
                 return new SubQueryTuple(it.next(), alias);
             }
-            
+
             @Override
             public boolean hasNext()
             {
@@ -64,13 +65,13 @@ class SubQueryOperator extends AOperator
             }
         };
     }
-    
+
     @Override
     public int hashCode()
     {
         return operator.hashCode();
     }
-    
+
     @Override
     public boolean equals(Object obj)
     {
@@ -78,17 +79,17 @@ class SubQueryOperator extends AOperator
         {
             SubQueryOperator that = (SubQueryOperator) obj;
             return operator.equals(that.operator)
-                    && alias.equals(that.alias);
+                && alias.equals(that.alias);
         }
         return false;
     }
-    
+
     @Override
     public String toString()
     {
         return operator.toString();
     }
-    
+
     @Override
     public String toString(int indent)
     {

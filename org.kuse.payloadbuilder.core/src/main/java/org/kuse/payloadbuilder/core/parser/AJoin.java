@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 
 import org.apache.commons.lang3.NotImplementedException;
 
+/** Base class for joins */
 public abstract class AJoin extends ASelectNode
 {
     private final TableSource tableSource;

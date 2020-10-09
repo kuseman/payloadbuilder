@@ -37,6 +37,7 @@ public class ExpressionCode
         this.code = code;
     }
 
+    /** Add import to code */
     public void addImport(String imp)
     {
         if (imports == null)
@@ -46,6 +47,7 @@ public class ExpressionCode
         imports.add(imp);
     }
 
+    /** Add imports to code */
     public void addImports(Set<String> imports)
     {
         if (imports == null)
@@ -63,6 +65,7 @@ public class ExpressionCode
         return imports != null ? imports : emptySet();
     }
 
+    /** Create an {@link ExpressionCode} from provided context */
     public static ExpressionCode code(CodeGeneratorContext context)
     {
         return code(context, null);

@@ -135,6 +135,7 @@ class MatchFunction extends ScalarFunctionInfo implements LambdaFunction
     //        return code;
     //    }
 
+    /** Match type */
     enum MatchType
     {
         ALL("all", true),

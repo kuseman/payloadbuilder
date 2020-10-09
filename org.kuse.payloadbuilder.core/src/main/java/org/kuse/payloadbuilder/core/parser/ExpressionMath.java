@@ -12,13 +12,7 @@ public final class ExpressionMath
     private static final byte ONE = 1;
     private static final byte ZERO = 1;
 
-    /* COMPARISON METHODS
-     *
-     * Comparison is supported between:
-     * - numbers
-     * - booleans
-     * - strings
-     **/
+    /** Equals */
     public static boolean eq(Number left, Number right)
     {
         if (left instanceof Double || right instanceof Double)
@@ -37,6 +31,7 @@ public final class ExpressionMath
         return left.intValue() == right.intValue();
     }
 
+    /** Greater than */
     public static boolean gt(Number left, Number right)
     {
         if (left instanceof Double || right instanceof Double)
@@ -55,6 +50,7 @@ public final class ExpressionMath
         return left.intValue() > right.intValue();
     }
 
+    /** Greater than equal */
     public static boolean gte(Number left, Number right)
     {
         if (left instanceof Double || right instanceof Double)
@@ -73,6 +69,7 @@ public final class ExpressionMath
         return left.intValue() >= right.intValue();
     }
 
+    /** Less than */
     public static boolean lt(Number left, Number right)
     {
         if (left instanceof Double || right instanceof Double)
@@ -91,6 +88,7 @@ public final class ExpressionMath
         return left.intValue() < right.intValue();
     }
 
+    /** Less than equal */
     public static boolean lte(Number left, Number right)
     {
         if (left instanceof Double || right instanceof Double)
@@ -109,6 +107,7 @@ public final class ExpressionMath
         return left.intValue() <= right.intValue();
     }
 
+    /** Greater than */
     @SuppressWarnings("unchecked")
     public static boolean gt(Object left, Object right)
     {
@@ -145,6 +144,7 @@ public final class ExpressionMath
         return ((Comparable<Object>) left).compareTo(right) > 0;
     }
 
+    /** Greater than equal */
     @SuppressWarnings("unchecked")
     public static boolean gte(Object left, Object right)
     {
@@ -181,6 +181,7 @@ public final class ExpressionMath
         return ((Comparable<Object>) left).compareTo(right) >= 0;
     }
 
+    /** Less than equal */
     @SuppressWarnings("unchecked")
     public static boolean lt(Object left, Object right)
     {
@@ -217,6 +218,7 @@ public final class ExpressionMath
         return ((Comparable<Object>) left).compareTo(right) < 0;
     }
 
+    /** Less than equal */
     @SuppressWarnings("unchecked")
     public static boolean lte(Object left, Object right)
     {
@@ -253,11 +255,13 @@ public final class ExpressionMath
         return ((Comparable<Object>) left).compareTo(right) <= 0;
     }
 
+    /** Equal */
     public static boolean eq(Object left, Object right)
     {
         return eq(left, right, true);
     }
 
+    /** Compare */
     @SuppressWarnings("unchecked")
     public static int cmp(Object left, Object right)
     {
@@ -269,6 +273,7 @@ public final class ExpressionMath
         return ((Comparable<Object>) left).compareTo(right);
     }
 
+    /** Equal */
     @SuppressWarnings("unchecked")
     public static boolean eq(Object left, Object right, boolean throwIfNotComparable)
     {
@@ -309,37 +314,43 @@ public final class ExpressionMath
     }
 
     /* ARITHMETIC METHODS  */
-
+    /** Add */
     public static long add(long left, long right)
     {
         return left + right;
     };
 
+    /** Add */
     public static double add(long left, double right)
     {
         return left + right;
     };
 
+    /** Add */
     public static double add(double left, long right)
     {
         return left + right;
     };
 
+    /** Add */
     public static double add(double left, double right)
     {
         return left + right;
     };
 
+    /** Add */
     public static Number add(double left, Number right)
     {
         return right != null ? left + right.doubleValue() : null;
     }
 
+    /** Add */
     public static Number add(Number left, double right)
     {
         return left != null ? left.doubleValue() + right : null;
     }
 
+    /** Add */
     public static Number add(Number left, long right)
     {
         if (left == null)
@@ -361,6 +372,7 @@ public final class ExpressionMath
         return left.intValue() + right;
     }
 
+    /** Add */
     public static Number add(long left, Number right)
     {
         if (right == null)
@@ -382,6 +394,7 @@ public final class ExpressionMath
         return left + right.intValue();
     }
 
+    /** Add */
     public static Number add(Number left, Number right)
     {
         if (left == null || right == null)
@@ -405,36 +418,43 @@ public final class ExpressionMath
         return left.intValue() + right.intValue();
     }
 
+    /** Subtract */
     public static long subtract(long left, long right)
     {
         return left - right;
     };
 
+    /** Subtract */
     public static double subtract(long left, double right)
     {
         return left - right;
     };
 
+    /** Subtract */
     public static double subtract(double left, long right)
     {
         return left - right;
     };
 
+    /** Subtract */
     public static double subtract(double left, double right)
     {
         return left - right;
     };
 
+    /** Subtract */
     public static Number subtract(double left, Number right)
     {
         return right != null ? left - right.longValue() : null;
     }
 
+    /** Subtract */
     public static Number subtract(Number left, double right)
     {
         return left != null ? left.longValue() - right : null;
     }
 
+    /** Subtract */
     public static Number subtract(Number left, long right)
     {
         if (left == null)
@@ -456,6 +476,7 @@ public final class ExpressionMath
         return left.intValue() - right;
     }
 
+    /** Subtract */
     public static Number subtract(long left, Number right)
     {
         if (right == null)
@@ -477,6 +498,7 @@ public final class ExpressionMath
         return left - right.intValue();
     }
 
+    /** Subtract */
     public static Number subtract(Number left, Number right)
     {
         if (left == null || right == null)
@@ -500,36 +522,43 @@ public final class ExpressionMath
         return left.intValue() - right.intValue();
     }
 
+    /** Multiply */
     public static long multiply(long left, long right)
     {
         return left * right;
     };
 
+    /** Multiply */
     public static double multiply(long left, double right)
     {
         return left * right;
     };
 
+    /** Multiply */
     public static double multiply(double left, long right)
     {
         return left * right;
     };
 
+    /** Multiply */
     public static double multiply(double left, double right)
     {
         return left * right;
     };
 
+    /** Multiply */
     public static Number multiply(double left, Number right)
     {
         return right != null ? left * right.doubleValue() : null;
     }
 
+    /** Multiply */
     public static Number multiply(Number left, double right)
     {
         return left != null ? left.doubleValue() * right : null;
     }
 
+    /** Multiply */
     public static Number multiply(Number left, long right)
     {
         if (left == null)
@@ -551,6 +580,7 @@ public final class ExpressionMath
         return left.intValue() * right;
     }
 
+    /** Multiply */
     public static Number multiply(long left, Number right)
     {
         if (right == null)
@@ -572,6 +602,7 @@ public final class ExpressionMath
         return left * right.intValue();
     }
 
+    /** Multiply */
     public static Number multiply(Number left, Number right)
     {
         if (left == null || right == null)
@@ -595,36 +626,43 @@ public final class ExpressionMath
         return left.intValue() * right.intValue();
     }
 
+    /** Divide */
     public static long divide(long left, long right)
     {
         return left / right;
     };
 
+    /** Divide */
     public static double divide(long left, double right)
     {
         return left / right;
     };
 
+    /** Divide */
     public static double divide(double left, long right)
     {
         return left / right;
     };
 
+    /** Divide */
     public static double divide(double left, double right)
     {
         return left / right;
     };
 
+    /** Divide */
     public static Number divide(double left, Number right)
     {
         return right != null ? left / right.doubleValue() : null;
     }
 
+    /** Divide */
     public static Number divide(Number left, double right)
     {
         return left != null ? left.doubleValue() / right : null;
     }
 
+    /** Divide */
     public static Number divide(Number left, long right)
     {
         if (left == null)
@@ -646,6 +684,7 @@ public final class ExpressionMath
         return left.intValue() / right;
     }
 
+    /** Divide */
     public static Number divide(long left, Number right)
     {
         if (right == null)
@@ -667,6 +706,7 @@ public final class ExpressionMath
         return left / right.intValue();
     }
 
+    /** Divide */
     public static Number divide(Number left, Number right)
     {
         if (left == null || right == null)
@@ -690,36 +730,43 @@ public final class ExpressionMath
         return left.intValue() / right.intValue();
     }
 
+    /** Modulo */
     public static long modulo(long left, long right)
     {
         return left % right;
     };
 
+    /** Modulo */
     public static double modulo(long left, double right)
     {
         return left % right;
     };
 
+    /** Modulo */
     public static double modulo(double left, long right)
     {
         return left % right;
     };
 
+    /** Modulo */
     public static double modulo(double left, double right)
     {
         return left % right;
     };
 
+    /** Modulo */
     public static Number modulo(double left, Number right)
     {
         return right != null ? left % right.doubleValue() : null;
     }
 
+    /** Modulo */
     public static Number modulo(Number left, double right)
     {
         return left != null ? left.doubleValue() % right : null;
     }
 
+    /** Modulo */
     public static Number modulo(Number left, long right)
     {
         if (left == null)
@@ -741,6 +788,7 @@ public final class ExpressionMath
         return left.intValue() % right;
     }
 
+    /** Modulo */
     public static Number modulo(long left, Number right)
     {
         if (right == null)
@@ -762,6 +810,7 @@ public final class ExpressionMath
         return left % right.intValue();
     }
 
+    /** Modulo */
     public static Number modulo(Number left, Number right)
     {
         if (left == null || right == null)
@@ -785,6 +834,7 @@ public final class ExpressionMath
         return left.intValue() % right.intValue();
     }
 
+    /** Add */
     public static Object add(Object left, Object right)
     {
         if (left == null || right == null)
@@ -803,6 +853,7 @@ public final class ExpressionMath
         throw new ArithmeticException("Cannot add " + left + " and " + right);
     }
 
+    /** Subtract */
     public static Number subtract(Object left, Object right)
     {
         if (left == null || right == null)
@@ -817,6 +868,7 @@ public final class ExpressionMath
         throw new ArithmeticException("Cannot subtract " + left + " and " + right);
     }
 
+    /** Multiply */
     public static Number multiply(Object left, Object right)
     {
         if (left == null || right == null)
@@ -831,6 +883,7 @@ public final class ExpressionMath
         throw new ArithmeticException("Cannot multiply " + left + " and " + right);
     }
 
+    /** Divide */
     public static Number divide(Object left, Object right)
     {
         if (left == null || right == null)
@@ -845,6 +898,7 @@ public final class ExpressionMath
         throw new ArithmeticException("Cannot divide " + left + " and " + right);
     }
 
+    /** Modulo */
     public static Number modulo(Object left, Object right)
     {
         if (left == null || right == null)
@@ -859,6 +913,7 @@ public final class ExpressionMath
         throw new ArithmeticException("Cannot modulo " + left + " and " + right);
     }
 
+    /** Negate */
     public static Object negate(Object value)
     {
         if (value instanceof Double)
@@ -931,6 +986,7 @@ public final class ExpressionMath
         return null;
     }
 
+    /** In */
     @SuppressWarnings("unchecked")
     public static boolean inValue(Object value, Object arg)
     {
@@ -940,7 +996,6 @@ public final class ExpressionMath
             {
                 return true;
             }
-
         }
         else if (value instanceof Collection)
         {

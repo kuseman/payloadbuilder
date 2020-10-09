@@ -9,6 +9,7 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 
+/** Utils for operator building */
 class OperatorBuilderUtils
 {
     /**

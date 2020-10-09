@@ -2,6 +2,7 @@ package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Objects.requireNonNull;
 
+/** Sort item */
 public class SortItem extends ASelectNode
 {
     private final Expression expression;
@@ -39,8 +40,7 @@ public class SortItem extends ASelectNode
     @Override
     public int hashCode()
     {
-        return 17
-            + (37 * expression.hashCode());
+        return expression.hashCode();
     }
 
     @Override
@@ -62,11 +62,13 @@ public class SortItem extends ASelectNode
         return expression + " " + order + (nullOrder != NullOrder.UNDEFINED ? (" NULLS " + nullOrder) : "");
     }
 
+    /** Null order type */
     public enum NullOrder
     {
         FIRST, LAST, UNDEFINED;
     }
 
+    /** Order direction */
     public enum Order
     {
         ASC, DESC;

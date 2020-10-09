@@ -75,7 +75,7 @@ public class ColumnsVisitorTest extends Assert
         actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);
         assertEquals(asSet(articlePrice), actual);
         assertEquals(emptyMap(), columnsByAlias);
-        
+
         columnsByAlias.clear();
         e = e("aa.map(x -> concat(x, ','))");
         actual = ColumnsVisitor.getColumnsByAlias(session, columnsByAlias, source, e);

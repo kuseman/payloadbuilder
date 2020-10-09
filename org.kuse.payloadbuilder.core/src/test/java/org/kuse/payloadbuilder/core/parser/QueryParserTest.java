@@ -25,7 +25,7 @@ public class QueryParserTest extends AParserTest
         assertQuery("select @var = a.col from table a");
         assertQueryFail(ParseException.class, "Cannot combine variable assignment items with data retrieval items", "select @var = a.col, a.col2 from table a");
     }
-    
+
     @Test
     public void test_selectItems()
     {
@@ -90,7 +90,7 @@ public class QueryParserTest extends AParserTest
         });
 
         ScalarFunctionInfo hashFunction = (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "hash");
-        
+
         assertExpression("a.b.c", new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1));
         assertExpression("@list.filter(x -> x.value)",
                 new QualifiedFunctionCallExpression(
@@ -183,7 +183,6 @@ public class QueryParserTest extends AParserTest
         assertExpression("not a != 1");
         assertExpression("not a in (1,1,true,2,3.,3,null,false)");
         assertExpression("@value > 10 AND @value_two < 20");
-
     }
 
     @Test

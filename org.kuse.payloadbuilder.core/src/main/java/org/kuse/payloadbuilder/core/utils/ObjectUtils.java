@@ -6,6 +6,7 @@ import java.util.Iterator;
 import org.apache.commons.collections.IteratorUtils;
 import org.apache.commons.lang3.StringUtils;
 
+/** Object utils */
 public final class ObjectUtils
 {
     private ObjectUtils()

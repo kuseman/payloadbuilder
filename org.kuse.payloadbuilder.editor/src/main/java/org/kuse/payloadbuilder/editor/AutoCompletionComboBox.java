@@ -10,7 +10,6 @@ import java.awt.event.KeyListener;
 import javax.swing.ComboBoxEditor;
 import javax.swing.ComboBoxModel;
 import javax.swing.JComboBox;
-import javax.swing.JFrame;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.JTextComponent;
@@ -20,6 +19,7 @@ import javax.swing.text.PlainDocument;
  * To view a copy of the public domain dedication, visit
  * http://creativecommons.org/licenses/publicdomain/
  */
+/** Auto completion combobox */
 public class AutoCompletionComboBox extends PlainDocument
 {
     JComboBox<?> comboBox;
@@ -27,9 +27,9 @@ public class AutoCompletionComboBox extends PlainDocument
     JTextComponent editor;
     // flag to indicate if setSelectedItem has been called
     // subsequent calls to remove/insertString should be ignored
-    boolean selecting = false;
+    boolean selecting;
     boolean hidePopupOnFocusLoss;
-    boolean hitBackspace = false;
+    boolean hitBackspace;
     boolean hitBackspaceOnSelection;
 
     KeyListener editorKeyListener;
@@ -57,7 +57,9 @@ public class AutoCompletionComboBox extends PlainDocument
                 model = (ComboBoxModel<?>) e.getNewValue();
             }
         });
+        //CSOFF
         editorKeyListener = new KeyAdapter()
+        //CSON
         {
             @Override
             public void keyPressed(KeyEvent e)
@@ -67,7 +69,9 @@ public class AutoCompletionComboBox extends PlainDocument
                     comboBox.setPopupVisible(true);
                 }
                 hitBackspace = false;
+                //CSOFF
                 switch (e.getKeyCode())
+                //CSON
                 {
                     // determine if the pressed key is backspace (needed by the remove method)
                     case KeyEvent.VK_BACK_SPACE:
@@ -113,6 +117,7 @@ public class AutoCompletionComboBox extends PlainDocument
         highlightCompletedText(0);
     }
 
+    /** Enable auto complete */
     public static void enable(JComboBox<?> comboBox)
     {
         // has to be editable
@@ -139,8 +144,9 @@ public class AutoCompletionComboBox extends PlainDocument
     }
 
     @Override
-    public void remove(int offs, int len) throws BadLocationException
+    public void remove(int offset, int len) throws BadLocationException
     {
+        int offs = offset;
         // return immediately when selecting an item
         if (selecting)
         {
@@ -152,7 +158,9 @@ public class AutoCompletionComboBox extends PlainDocument
             // old item keeps being selected
             if (offs > 0)
             {
+                //CSOFF
                 if (hitBackspaceOnSelection)
+                //CSON
                 {
                     offs--;
                 }
@@ -171,8 +179,9 @@ public class AutoCompletionComboBox extends PlainDocument
     }
 
     @Override
-    public void insertString(int offs, String str, AttributeSet a) throws BadLocationException
+    public void insertString(int offset, String str, AttributeSet a) throws BadLocationException
     {
+        int offs = offset;
         // return immediately when selecting an item
         if (selecting)
         {
@@ -259,24 +268,5 @@ public class AutoCompletionComboBox extends PlainDocument
     private boolean startsWithIgnoreCase(String str1, String str2)
     {
         return str1.toUpperCase().startsWith(str2.toUpperCase());
-    }
-
-    private static void createAndShowGUI()
-    {
-        // the combo box (add/modify items if you like to)
-        final JComboBox<String> comboBox = new JComboBox<>(new String[] {"Ester", "Jordi", "Jordina", "Jorge", "Sergi"});
-        enable(comboBox);
-
-        // create and show a window containing the combo box
-        final JFrame frame = new JFrame();
-        frame.setDefaultCloseOperation(3);
-        frame.getContentPane().add(comboBox);
-        frame.pack();
-        frame.setVisible(true);
-    }
-
-    public static void main(String[] args)
-    {
-        javax.swing.SwingUtilities.invokeLater(() -> createAndShowGUI());
     }
 }

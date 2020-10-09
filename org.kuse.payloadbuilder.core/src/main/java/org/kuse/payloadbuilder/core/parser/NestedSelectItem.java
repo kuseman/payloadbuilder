@@ -5,6 +5,7 @@ import static java.util.stream.Collectors.joining;
 
 import java.util.List;
 
+/** Nested select item. OBJECT/ARRAY */
 public class NestedSelectItem extends SelectItem
 {
     private final List<SelectItem> selectItems;
@@ -89,6 +90,7 @@ public class NestedSelectItem extends SelectItem
         return sb.toString();
     }
 
+    /** Type */
     public enum Type
     {
         OBJECT,

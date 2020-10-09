@@ -5,6 +5,7 @@ import static java.util.Objects.requireNonNull;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 
+/** Literal string */
 public class LiteralStringExpression extends LiteralExpression
 {
     private final String value;

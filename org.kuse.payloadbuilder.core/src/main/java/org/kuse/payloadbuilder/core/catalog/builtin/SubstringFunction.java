@@ -18,8 +18,8 @@ class SubstringFunction extends ScalarFunctionInfo
     @Override
     public String getDescription()
     {
-        return "Returns part of a string according to provided arguments." + System.lineSeparator() +
-            "Ex. substring(<expression>, <start expression> |, <length expression>| ) ";
+        return "Returns part of a string according to provided arguments." + System.lineSeparator()
+        + "Ex. substring(<expression>, <start expression> [, <length expression>] ) ";
     }
 
     @Override
@@ -41,7 +41,7 @@ class SubstringFunction extends ScalarFunctionInfo
         {
             throw new IllegalArgumentException("Expected integer argument for start to function " + getName() + " but got: " + obj);
         }
-        
+
         int start = (Integer) obj;
 
         if (arguments.size() > 2)
@@ -55,10 +55,10 @@ class SubstringFunction extends ScalarFunctionInfo
             {
                 throw new IllegalArgumentException("Expected integer argument for length to function " + getName() + " but got: " + obj);
             }
-            
+
             return value.substring(start, start + (int) obj);
         }
-        
+
         return value.substring(start);
     }
 }

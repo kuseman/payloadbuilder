@@ -11,6 +11,7 @@ public class JsonStringWriter implements OutputWriter
 {
     private StringBuilder sb = new StringBuilder();
 
+    /** Append string */
     public void append(String string)
     {
         sb.append(string);
@@ -22,6 +23,7 @@ public class JsonStringWriter implements OutputWriter
         sb.append(System.lineSeparator());
     }
 
+    /** Return string and reset buffer */
     public String getAndReset()
     {
         if (sb.length() > 0 && sb.charAt(sb.length() - 1) == ',')

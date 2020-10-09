@@ -144,7 +144,7 @@ class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsVisitor.
             {
                 continue;
             }
-            
+
             if (tempParts.isEmpty())
             {
                 output.add(tempAlias);

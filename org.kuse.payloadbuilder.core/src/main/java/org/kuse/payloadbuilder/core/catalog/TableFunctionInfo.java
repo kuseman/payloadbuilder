@@ -11,7 +11,9 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 /**
  * Definition of a table valued function These functions are applied row by row.
  **/
+//CSOFF
 public abstract class TableFunctionInfo extends FunctionInfo
+//CSON
 {
     public TableFunctionInfo(Catalog catalog, String name)
     {
@@ -28,12 +30,12 @@ public abstract class TableFunctionInfo extends FunctionInfo
      * Open iterator for this function
      *
      * <pre>
-     * NOTE! In main loop of operator add check of {@link QuerySession#abortQuery()} to not hang a 
+     * NOTE! In main loop of operator add check of {@link QuerySession#abortQuery()} to not hang a
      * thread in execution state.
      * </pre>
      *
      * @param context Context
-     * @param tableAlias Table alias used for this function 
+     * @param tableAlias Table alias used for this function
      * @param arguments Arguments to function
      **/
     public abstract RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments);

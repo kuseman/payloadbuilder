@@ -71,7 +71,7 @@ public class CatalogRegistry
     {
         defaultCatalogAlias = alias;
     }
-    
+
     /**
      * Resolves function info from provided
      */

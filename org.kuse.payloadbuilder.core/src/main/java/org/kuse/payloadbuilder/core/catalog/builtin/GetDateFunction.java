@@ -24,8 +24,8 @@ class GetDateFunction extends ScalarFunctionInfo
     @Override
     public String getDescription()
     {
-        return "Returns current " + (utc ? "UTC " : "") + " Date. " + System.lineSeparator() +
-            "NOTE! That same value is used during the whole execution.";
+        return "Returns current " + (utc ? "UTC " : "") + " Date. " + System.lineSeparator()
+            + "NOTE! That same value is used during the whole execution.";
     }
 
     @Override

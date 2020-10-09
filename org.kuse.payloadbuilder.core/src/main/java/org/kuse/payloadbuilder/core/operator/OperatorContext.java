@@ -25,6 +25,7 @@ public class OperatorContext
         this.outerIndexValues = outerIndexValues;
     }
 
+    /** Clear context state */
     public void clear()
     {
         outerIndexValues = null;
@@ -59,10 +60,12 @@ public class OperatorContext
     }
 
     /** Base class for node data. */
+    //CSOFF
     public static class NodeData
     {
         public int executionCount;
         /** Operator specific properties. Bytes fetched etc. */
         public Map<String, Object> properties = new HashMap<>();
     }
+    //CSON
 }

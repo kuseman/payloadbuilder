@@ -5,6 +5,7 @@ import static java.util.stream.Collectors.joining;
 
 import java.util.List;
 
+/** Table source with join */
 public class TableSourceJoined extends ASelectNode
 {
     private final TableSource tableSource;

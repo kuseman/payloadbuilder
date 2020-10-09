@@ -54,7 +54,9 @@ class BatchRepeatOperator extends AOperator
         // return an iterator that return rows from the queue
         // poll from queue and before each poll check if all tasks iterators are complete
 
+        //CSOFF
         return new RowIterator()
+        //CSON
         {
             private RowIterator it;
             private Tuple next;

@@ -51,7 +51,9 @@ class TopOperator extends AOperator
         }
         final int top = ((Integer) obj).intValue();
         final RowIterator it = target.open(context);
+        //CSOFF
         return new RowIterator()
+        //CSON
         {
             private int count;
 

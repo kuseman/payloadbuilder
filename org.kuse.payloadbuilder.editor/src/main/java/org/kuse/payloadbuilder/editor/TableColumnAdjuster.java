@@ -7,14 +7,16 @@ import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import javax.swing.table.TableColumnModel;
 
+/** Table column adjuster */
 class TableColumnAdjuster
 {
+    private static final int DEFAULT_SPACING = 6;
     private final JTable table;
     private final int spacing;
 
     TableColumnAdjuster(JTable table)
     {
-        this(table, 6);
+        this(table, DEFAULT_SPACING);
     }
 
     TableColumnAdjuster(JTable table, int spacing)
@@ -94,8 +96,9 @@ class TableColumnAdjuster
         return width;
     }
 
-    private void updateTableColumn(int column, int width, int maxWidth)
+    private void updateTableColumn(int column, int w, int maxWidth)
     {
+        int width = w;
         TableColumn tableColumn = table.getColumnModel().getColumn(column);
         if (!tableColumn.getResizable())
         {

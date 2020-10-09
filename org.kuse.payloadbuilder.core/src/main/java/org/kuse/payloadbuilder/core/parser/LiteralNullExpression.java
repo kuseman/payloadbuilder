@@ -3,6 +3,7 @@ package org.kuse.payloadbuilder.core.parser;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 
+/** Literal null */
 public class LiteralNullExpression extends LiteralExpression
 {
     public static final LiteralNullExpression NULL_LITERAL = new LiteralNullExpression();

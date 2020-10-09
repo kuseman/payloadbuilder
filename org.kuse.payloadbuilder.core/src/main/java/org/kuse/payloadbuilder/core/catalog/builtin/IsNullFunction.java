@@ -20,9 +20,9 @@ class IsNullFunction extends ScalarFunctionInfo
     @Override
     public String getDescription()
     {
-        return "Returns first non null value of provided arguments. " + System.lineSeparator() +
-            "Ex. isnull(expression, expression)" + System.lineSeparator() +
-            "If both arguments yield null, null is returned.";
+        return "Returns first non null value of provided arguments. " + System.lineSeparator()
+            + "Ex. isnull(expression, expression)" + System.lineSeparator()
+            + "If both arguments yield null, null is returned.";
     }
 
     @Override

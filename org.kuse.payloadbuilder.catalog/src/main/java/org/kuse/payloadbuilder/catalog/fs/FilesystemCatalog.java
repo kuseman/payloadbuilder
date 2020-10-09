@@ -40,6 +40,7 @@ public class FilesystemCatalog extends Catalog
         registerFunction(new ContentsFunction(this));
     }
 
+    /** File function */
     private static class FileFunction extends TableFunctionInfo
     {
         FileFunction(Catalog catalog)
@@ -100,7 +101,7 @@ public class FilesystemCatalog extends Catalog
     /** List function. Traverses a path */
     private static class ListFunction extends TableFunctionInfo
     {
-        public ListFunction(Catalog catalog)
+        ListFunction(Catalog catalog)
         {
             super(catalog, "list");
         }
@@ -127,15 +128,17 @@ public class FilesystemCatalog extends Catalog
             }
 
             final Iterator<Path> it = getIterator(path, recursive);
+            //CSOFF
             return new RowIterator()
+            //CSON
             {
-                private final int pos = 0;
+                private int pos;
 
                 @Override
                 public Row next()
                 {
                     Path p = it.next();
-                    return fromPath(tableAlias, pos, p);
+                    return fromPath(tableAlias, pos++, p);
                 }
 
                 @Override
@@ -185,7 +188,7 @@ public class FilesystemCatalog extends Catalog
                     lastModifiedTime,
                     isDirectory
             };
-            return Row.of(alias, pos++, COLUMNS, values);
+            return Row.of(alias, pos, COLUMNS, values);
         }
 
         private Iterator<Path> getIterator(String strPath, boolean recursive)
@@ -199,7 +202,6 @@ public class FilesystemCatalog extends Catalog
                 }
 
                 return Files.newDirectoryStream(path).iterator();
-
             }
             catch (IOException e)
             {

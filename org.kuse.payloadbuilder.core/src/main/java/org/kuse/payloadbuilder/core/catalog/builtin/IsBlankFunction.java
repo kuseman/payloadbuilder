@@ -21,10 +21,10 @@ class IsBlankFunction extends ScalarFunctionInfo
     @Override
     public String getDescription()
     {
-        return "Returns first non blank value of provided arguments. " + System.lineSeparator() +
-            "Ex. isblank(expression1, expression2)" + System.lineSeparator() +
-            "If both arguments is blank, second argument is returned. " + System.lineSeparator() +
-            "NOTE! First argument is transfomed to a string to determine blank-ness.";
+        return "Returns first non blank value of provided arguments. " + System.lineSeparator()
+            + "Ex. isblank(expression1, expression2)" + System.lineSeparator()
+            + "If both arguments is blank, second argument is returned. " + System.lineSeparator()
+            + "NOTE! First argument is transfomed to a string to determine blank-ness.";
     }
 
     @Override

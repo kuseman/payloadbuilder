@@ -58,9 +58,10 @@ public interface Operator
     /** Definition of a iterator that stream {@link Tuple}'s */
     public interface RowIterator extends Iterator<Tuple>
     {
-        public static RowIterator EMPTY = wrap(emptyIterator());
+        RowIterator EMPTY = wrap(emptyIterator());
 
-        public static RowIterator wrap(Iterator<Tuple> iterator)
+        /** Wrap an {@link Iterator} of {@link Tuple} in a {@link RowIterator} */
+        static RowIterator wrap(Iterator<Tuple> iterator)
         {
             return new RowIterator()
             {

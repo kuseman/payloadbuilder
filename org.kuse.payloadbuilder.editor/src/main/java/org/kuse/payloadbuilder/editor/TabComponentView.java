@@ -24,12 +24,12 @@ import javax.swing.plaf.basic.BasicButtonUI;
 class TabComponentView extends JPanel
 {
     private final JLabel lblTitle;
-    
+
     TabComponentView(String title, Icon icon)
     {
         this(title, icon, null);
     }
-    
+
     TabComponentView(String title, Icon icon, final Runnable closeAction)
     {
         super(new FlowLayout(FlowLayout.LEFT, 0, 0));
@@ -37,7 +37,9 @@ class TabComponentView extends JPanel
         setBorder(BorderFactory.createEmptyBorder(2, 0, 0, 0));
 
         lblTitle = new JLabel(title, icon, SwingConstants.CENTER);
+        //CSOFF
         lblTitle.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 5));
+        //CSON
         add(lblTitle);
 
         if (closeAction != null)
@@ -46,19 +48,22 @@ class TabComponentView extends JPanel
             button.addActionListener(evt -> closeAction.run());
             add(button);
         }
-
     }
-    
+
     public void setTitle(String titleString)
     {
         lblTitle.setText(titleString);
     }
 
-    class TabButton extends JButton// implements ActionListener
+    /** Tab button */
+    class TabButton extends JButton
     {
-        public TabButton()
+        private static final int DELTA = 6;
+        private static final int SIZE = 17;
+
+        TabButton()
         {
-            int size = 17;
+            int size = SIZE;
             setPreferredSize(new Dimension(size, size));
             //Make the button looks the same for all Laf's
             setUI(new BasicButtonUI());
@@ -70,7 +75,7 @@ class TabComponentView extends JPanel
             setBorderPainted(false);
             //Making nice rollover effect
             //we use the same listener for all buttons
-            addMouseListener(buttonMouseListener);
+            addMouseListener(BUTTON_MOUSE_LISTENER);
             setRolloverEnabled(true);
         }
 
@@ -97,14 +102,16 @@ class TabComponentView extends JPanel
             {
                 g2.setColor(Color.MAGENTA);
             }
-            int delta = 6;
+            int delta = DELTA;
             g2.drawLine(delta, delta, getWidth() - delta - 1, getHeight() - delta - 1);
             g2.drawLine(getWidth() - delta - 1, delta, delta, getHeight() - delta - 1);
             g2.dispose();
         }
     }
 
-    private final static MouseListener buttonMouseListener = new MouseAdapter()
+    //CSOFF
+    private static final MouseListener BUTTON_MOUSE_LISTENER = new MouseAdapter()
+    //CSON
     {
         @Override
         public void mouseEntered(MouseEvent e)

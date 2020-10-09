@@ -28,9 +28,9 @@ class DatePartFunction extends ScalarFunctionInfo
     @Override
     public String getDescription()
     {
-        return "Returns date part from provided Date. " + System.lineSeparator() +
-            "Valid parts are: " + System.lineSeparator() +
-            Arrays.stream(Part.values())
+        return "Returns date part from provided Date. " + System.lineSeparator()
+            + "Valid parts are: " + System.lineSeparator()
+            + Arrays.stream(Part.values())
                     .filter(p -> p.abbreviationFor == null)
                     .map(p ->
                     {
@@ -44,8 +44,8 @@ class DatePartFunction extends ScalarFunctionInfo
                         return name + " ( Abbreviations: " + abbreviations.toString() + " )";
                     })
                     .collect(joining(System.lineSeparator()))
-            + System.lineSeparator() +
-            "Ex. datepart(datepartExpression, dateExpression) ";
+            + System.lineSeparator()
+            + "Ex. datepart(datepartExpression, dateExpression) ";
     }
 
     @Override
@@ -99,6 +99,7 @@ class DatePartFunction extends ScalarFunctionInfo
         return temporal.get(part.getChronoField());
     }
 
+    /** Date parts */
     enum Part
     {
         YEAR(ChronoField.YEAR),

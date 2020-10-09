@@ -3,7 +3,9 @@ package org.kuse.payloadbuilder.core.parser;
 import java.util.List;
 
 /** Visitor adapter for expression visitors */
+//CSOFF
 public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR, TC>
+//CSON
 {
     /**
      * Default result
@@ -153,6 +155,7 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
         return visitChildren(context, null, args);
     }
 
+    /** Visit provided expressions */
     protected TR visitChildren(TC context, List<Expression> expressions, Expression... args)
     {
         TR result = defaultResult(context);

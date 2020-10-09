@@ -20,10 +20,10 @@ class ReplaceFunction extends ScalarFunctionInfo
     @Override
     public String getDescription()
     {
-        return "Replaces all occurrences of specified string with a replacement string" + System.lineSeparator() +
-            "Ex. replace(expression, searchExpression, replaceExpression)" + System.lineSeparator() +
-            "NOTE! All input arguments is converted to String if not String already." + System.lineSeparator() +
-            "      If any input evaluates to null, null is returned";
+        return "Replaces all occurrences of specified string with a replacement string" + System.lineSeparator()
+            + "Ex. replace(expression, searchExpression, replaceExpression)" + System.lineSeparator()
+            + "NOTE! All input arguments is converted to String if not String already." + System.lineSeparator()
+            + "      If any input evaluates to null, null is returned";
     }
 
     @Override

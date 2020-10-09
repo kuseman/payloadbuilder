@@ -23,8 +23,8 @@ class LowerUpperFunction extends ScalarFunctionInfo
     @Override
     public String getDescription()
     {
-        return "Returns " + (lower ? "lower" : "upper") + " case of provided argument." + System.lineSeparator() +
-            "NOTE! Argument is converted to a string.";
+        return "Returns " + (lower ? "lower" : "upper") + " case of provided argument." + System.lineSeparator()
+            + "NOTE! Argument is converted to a string.";
     }
 
     @Override

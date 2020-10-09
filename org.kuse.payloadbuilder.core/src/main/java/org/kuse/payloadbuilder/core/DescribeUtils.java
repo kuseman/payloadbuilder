@@ -43,9 +43,10 @@ public class DescribeUtils
     }
 
     /**
-     * Builds a describe table select 
+     * Builds a describe table select
+     *
      * <pre>
-     * TODO: this needs to be changed and delegated to catalog. 
+     * TODO: this needs to be changed and delegated to catalog.
      * For example Elastic there are alot of different documents
      * in the same type
      * </pre>
@@ -151,21 +152,22 @@ public class DescribeUtils
             boolean last)
     {
         rows.add(new DescribeOperatorRow(parent.getNodeId(), indent + "+- " + parent.getName(), parent.getDescribeProperties()));
-        indent += last ? "   " : "|  ";
+        String nextIndent = indent + (last ? "   " : "|  ");
         for (int i = 0; i < parent.getChildOperators().size(); i++)
         {
             Operator child = parent.getChildOperators().get(i);
-            collectOperatorDescribeRows(rows, child, pos++, indent, i == parent.getChildOperators().size() - 1);
+            collectOperatorDescribeRows(rows, child, pos + 1, nextIndent, i == parent.getChildOperators().size() - 1);
         }
     }
 
+    /** Describe row */
     private static class DescribeOperatorRow
     {
         final int nodeId;
         final String name;
         final Map<String, Object> properties;
 
-        public DescribeOperatorRow(int nodeId, String name, Map<String, Object> properties)
+        DescribeOperatorRow(int nodeId, String name, Map<String, Object> properties)
         {
             this.nodeId = nodeId;
             this.name = name;

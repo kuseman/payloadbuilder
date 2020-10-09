@@ -58,8 +58,9 @@ class TestCase
         private Object value;
 
         ColumnValue()
-        {}
-        
+        {
+        }
+
         ColumnValue(String key, Object value)
         {
             this.key = key;
@@ -103,7 +104,7 @@ class TestCase
             }
             return false;
         }
-        
+
         @Override
         public String toString()
         {
