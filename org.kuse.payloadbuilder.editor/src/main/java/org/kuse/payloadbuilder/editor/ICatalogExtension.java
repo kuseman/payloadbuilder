@@ -8,13 +8,13 @@ import java.util.Map;
 
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
+import org.kuse.payloadbuilder.core.catalog.CatalogException;
 
 /** Definition of a catalog extension */
 public interface ICatalogExtension
 {
     /** Property changed keys */
     String PROPERTIES = "properties";
-    String CONFIG = "config";
 
     /** Get title of extension */
     String getTitle();
@@ -78,6 +78,15 @@ public interface ICatalogExtension
     /** Get the actual catalog implementation for this extension */
     Catalog getCatalog();
 
+    /** Handle provided exception
+     * @param querySession Current query session
+     * @param exception Exception to handle
+     **/
+    default ExceptionAction handleException(QuerySession querySession, CatalogException exception)
+    {
+        return ExceptionAction.NONE;
+    }
+
     /**
      * Add property change listener
      *
@@ -94,5 +103,14 @@ public interface ICatalogExtension
      **/
     default void removePropertyChangeListener(PropertyChangeListener listener)
     {
+    }
+
+    /** Action that should be performed after handling of an Exception */
+    enum ExceptionAction
+    {
+        /** Do nothing action */
+        NONE,
+        /** Re-run query. */
+        RERUN;
     }
 }

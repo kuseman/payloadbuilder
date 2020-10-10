@@ -772,7 +772,7 @@ class ESOperator extends AOperator
             String endpoint = (String) session.getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY);
             if (isBlank(endpoint))
             {
-                throw new IllegalArgumentException("Missing endpoint key in catalog properties.");
+                throw new IllegalArgumentException("Missing endpoint key in catalog properties for: " + catalogAlias);
             }
             return endpoint;
         }
@@ -782,7 +782,7 @@ class ESOperator extends AOperator
             String index = (String) session.getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY);
             if (isBlank(index))
             {
-                throw new IllegalArgumentException("Missing index key in catalog properties.");
+                throw new IllegalArgumentException("Missing index key in catalog properties for: " + catalogAlias);
             }
             return index;
         }
@@ -888,9 +888,9 @@ class ESOperator extends AOperator
                         // TODO: move this must_not since not filter is deprecated
                         // { "not": { ..... } }
                         sb.append("{\"not\":");
-                    //CSOFF
+                        //CSOFF
                     case EQUAL:
-                    //CSON
+                        //CSON
                         // { "term": { "property": value }}
                         sb.append("{\"term\":{\"")
                                 .append(property)

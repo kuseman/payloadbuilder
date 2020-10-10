@@ -249,7 +249,7 @@ booleanLiteral
  ;
  
 nonReserved
- : FROM | FIRST
+ : FROM | FIRST | TABLES
  ;
  
 // Tokens

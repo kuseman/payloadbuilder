@@ -7,6 +7,7 @@ import static org.apache.commons.lang3.StringUtils.lowerCase;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.catalog.builtin.BuiltinCatalog;
 
 /** Catalog registry */
@@ -75,11 +76,24 @@ public class CatalogRegistry
     /**
      * Resolves function info from provided
      */
-    public FunctionInfo resolveFunctionInfo(String catalogAlias, String function)
+    public Pair<String, FunctionInfo> resolveFunctionInfo(String catalogAlias, String function)
     {
         Catalog catalog;
-        if (catalogAlias == null)
+        if (isBlank(catalogAlias))
         {
+            // First try default catalog
+            catalog = getDefaultCatalog();
+            if (catalog != null)
+            {
+                FunctionInfo f = catalog.getFunction(lowerCase(function));
+                //CSOFF
+                if (f != null)
+                //CSON
+                {
+                    return Pair.of(defaultCatalogAlias, f);
+                }
+            }
+
             catalog = getBuiltin();
         }
         else
@@ -92,6 +106,11 @@ public class CatalogRegistry
             return null;
         }
 
-        return catalog.getFunction(lowerCase(function));
+        FunctionInfo f = catalog.getFunction(lowerCase(function));
+        if (f == null)
+        {
+            return null;
+        }
+        return Pair.of(catalogAlias, f);
     }
 }

@@ -284,25 +284,32 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
 
         if (operator != null)
         {
-            RowIterator iterator = operator.open(context);
-            Tuple tuple = null;
-            while (iterator.hasNext())
+            RowIterator iterator = null;
+            try
             {
-                if (session.abortQuery())
+                iterator = operator.open(context);
+                Tuple tuple = null;
+                while (iterator.hasNext())
                 {
-                    break;
-                }
-                tuple = iterator.next();
-                context.setTuple(tuple);
+                    if (session.abortQuery())
+                    {
+                        break;
+                    }
+                    tuple = iterator.next();
+                    context.setTuple(tuple);
 
-                for (int i = 0; i < size; i++)
-                {
-                    SelectItem item = select.getSelectItems().get(i);
-                    Object value = item.getAssignmentValue(context);
-                    context.setVariable(item.getAssignmentName(), value);
+                    for (int i = 0; i < size; i++)
+                    {
+                        SelectItem item = select.getSelectItems().get(i);
+                        Object value = item.getAssignmentValue(context);
+                        context.setVariable(item.getAssignmentName(), value);
+                    }
                 }
             }
-            iterator.close();
+            finally
+            {
+                iterator.close();
+            }
         }
         else
         {
@@ -361,20 +368,27 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         context.clear();
         if (operator != null)
         {
-            RowIterator iterator = operator.open(context);
-            while (iterator.hasNext())
+            RowIterator iterator = null;
+            try
             {
-                if (session.abortQuery())
+                iterator = operator.open(context);
+                while (iterator.hasNext())
                 {
-                    break;
+                    if (session.abortQuery())
+                    {
+                        break;
+                    }
+                    writer.startRow();
+                    Tuple tuple = iterator.next();
+                    context.setTuple(tuple);
+                    projection.writeValue(writer, context);
+                    writer.endRow();
                 }
-                writer.startRow();
-                Tuple tuple = iterator.next();
-                context.setTuple(tuple);
-                projection.writeValue(writer, context);
-                writer.endRow();
             }
-            iterator.close();
+            finally
+            {
+                iterator.close();
+            }
         }
         else
         {

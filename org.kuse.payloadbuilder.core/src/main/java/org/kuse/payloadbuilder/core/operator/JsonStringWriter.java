@@ -20,6 +20,10 @@ public class JsonStringWriter implements OutputWriter
     @Override
     public void endRow()
     {
+        if (sb.length() > 0 && sb.charAt(sb.length() - 1) == ',')
+        {
+            sb.deleteCharAt(sb.length() - 1);
+        }
         sb.append(System.lineSeparator());
     }
 
