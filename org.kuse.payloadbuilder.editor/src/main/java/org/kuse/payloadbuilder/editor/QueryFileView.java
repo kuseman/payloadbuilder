@@ -17,6 +17,7 @@ import java.awt.event.MouseEvent;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -370,7 +371,6 @@ class QueryFileView extends JPanel
             public Component getTableCellRendererComponent(JTable table, Object val, boolean isSelected, boolean hasFocus, int row, int column)
             {
                 Object value = val;
-                super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
 
                 if (value instanceof Row)
                 {
@@ -379,6 +379,24 @@ class QueryFileView extends JPanel
                     value = ofEntries(
                             entry("table", alias.getTable().toString()));
                 }
+                else if (value != null && value.getClass().isArray())
+                {
+                    StringBuilder sb = new StringBuilder();
+                    int length = Array.getLength(value);
+                    sb.append("[");
+                    for (int i = 0; i < length; i++)
+                    {
+                        if (i > 0)
+                        {
+                            sb.append(", ");
+                        }
+                        sb.append(Array.get(value, i));
+                    }
+                    sb.append("]");
+                    value = sb.toString();
+                }
+
+                super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
 
                 if (value == null)
                 {
@@ -493,6 +511,16 @@ class QueryFileView extends JPanel
                     entry("table", alias.getTable().toString()),
                     entry("columns", pbRow.getColumns()),
                     entry("values", pbRow.getValues()));
+        }
+        else if (value.getClass().isArray())
+        {
+            int length = Array.getLength(value);
+            List<Object> list = new ArrayList<>(length);
+            for (int i = 0; i < length; i++)
+            {
+                list.add(Array.get(value, i));
+            }
+            value = list;
         }
 
         JFrame frame = new JFrame("Json viewer - " + resultTable.getColumnName(col) + " (Row: " + (row + 1) + ")");

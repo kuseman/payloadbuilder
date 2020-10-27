@@ -9,6 +9,8 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.Executor;
@@ -20,6 +22,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.OutputWriter;
 import org.kuse.payloadbuilder.core.Payloadbuilder;
 import org.kuse.payloadbuilder.core.QueryResult;
+import org.kuse.payloadbuilder.core.catalog.CatalogException;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.parser.AExpressionVisitor;
 import org.kuse.payloadbuilder.core.parser.AStatementVisitor;
@@ -28,6 +31,7 @@ import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.QueryParser;
 import org.kuse.payloadbuilder.core.parser.QueryStatement;
 import org.kuse.payloadbuilder.core.parser.VariableExpression;
+import org.kuse.payloadbuilder.editor.ICatalogExtension.ExceptionAction;
 import org.kuse.payloadbuilder.editor.QueryFileModel.Output;
 import org.kuse.payloadbuilder.editor.QueryFileModel.State;
 
@@ -54,79 +58,106 @@ class PayloadbuilderService
     {
         EXECUTOR.execute(() ->
         {
-            int queryId = file.incrementAndGetQueryId();
-            file.setState(State.EXECUTING);
-            try
+            boolean completed = false;
+            while (!completed)
             {
-                file.getQuerySession().setAbortSupplier(() -> file.getState() == State.ABORTED);
-                QueryResult queryResult = Payloadbuilder.query(file.getQuerySession(), queryString);
+                int queryId = file.incrementAndGetQueryId();
+                file.setState(State.EXECUTING);
+                try
+                {
+                    file.getQuerySession().setAbortSupplier(() -> file.getState() == State.ABORTED);
+                    QueryResult queryResult = Payloadbuilder.query(file.getQuerySession(), queryString);
 
-                while (queryResult.hasMoreResults())
-                {
-                    if (file.getState() == State.ABORTED)
+                    while (queryResult.hasMoreResults())
                     {
-                        break;
-                    }
-                    ResultModel resultModel = new ResultModel(file);
-                    file.addResult(resultModel);
-                    OutputWriter writer = null;
-                    if (file.getOutput() == Output.TABLE)
-                    {
-                        writer = new ObjectWriter(resultModel);
-                    }
-                    else
-                    {
-                        writer = new NoneOutputWriter(resultModel);
-                    }
-                    queryResult.writeResult(writer);
+                        if (file.getState() == State.ABORTED)
+                        {
+                            break;
+                        }
+                        ResultModel resultModel = new ResultModel(file);
+                        file.addResult(resultModel);
+                        OutputWriter writer = null;
+                        if (file.getOutput() == Output.TABLE)
+                        {
+                            writer = new ObjectWriter(resultModel);
+                        }
+                        else
+                        {
+                            writer = new NoneOutputWriter(resultModel);
+                        }
+                        queryResult.writeResult(writer);
 
-                    resultModel.done();
-                    file
-                            .getQuerySession()
-                            .printLine(
-                                    String.valueOf(resultModel.getActualRowCount())
-                                        + " row(s) selected"
-                                        + System.lineSeparator());
-                }
+                        resultModel.done();
+                        file
+                                .getQuerySession()
+                                .printLine(
+                                        String.valueOf(resultModel.getActualRowCount())
+                                            + " row(s) selected"
+                                            + System.lineSeparator());
+                    }
 
-                if (file.getState() == State.EXECUTING)
-                {
-                    file.setState(State.COMPLETED);
-                }
-            }
-            catch (ParseException e)
-            {
-                file.setError(String.format("Syntax error. Line: %d, Column: %d. %s", e.getLine(), e.getColumn(), e.getMessage()));
-                file.setParseErrorLocation(Pair.of(e.getLine(), e.getColumn()));
-                file.setState(State.ERROR);
-            }
-            catch (Exception e)
-            {
-                // Only set error messages if this is the latest query made
-                if (queryId == file.getQueryId())
-                {
-                    String message = e.getMessage();
-                    if (e.getCause() != null)
-                    {
-                        message += " (" + e.getCause().getClass().getSimpleName() + ")";
-                    }
-                    file.setError(message);
-                    file.setState(State.ERROR);
-                    if (System.getProperty("devEnv") != null)
-                    {
-                        e.printStackTrace();
-                    }
-                }
-            }
-            finally
-            {
-                if (queryId == file.getQueryId())
-                {
                     if (file.getState() == State.EXECUTING)
                     {
                         file.setState(State.COMPLETED);
                     }
-                    queryFinnishedCallback.run();
+
+                    completed = true;
+                }
+                catch (ParseException e)
+                {
+                    file.setError(String.format("Syntax error. Line: %d, Column: %d. %s", e.getLine(), e.getColumn(), e.getMessage()));
+                    file.setParseErrorLocation(Pair.of(e.getLine(), e.getColumn()));
+                    file.setState(State.ERROR);
+                    completed = true;
+                }
+                catch (Exception e)
+                {
+                    if (e instanceof CatalogException)
+                    {
+                        CatalogException ce = (CatalogException) e;
+                        Optional<ICatalogExtension> catalogExtension = file.getCatalogExtensions()
+                                .entrySet()
+                                .stream()
+                                .filter(kv -> Objects.equals(ce.getCatalogAlias(), kv.getValue().getAlias()))
+                                .map(kv -> kv.getKey())
+                                .findFirst();
+
+                        if (catalogExtension.isPresent()
+                            && catalogExtension.get().handleException(file.getQuerySession(), ce) == ExceptionAction.RERUN)
+                        {
+                            // Re-run query
+                            continue;
+                        }
+                    }
+
+                    // Only set error messages if this is the latest query made
+                    if (queryId == file.getQueryId())
+                    {
+                        String message = e.getMessage();
+                        if (e.getCause() != null)
+                        {
+                            message += " (" + e.getCause().getClass().getSimpleName() + ")";
+                        }
+                        file.setError(message);
+                        file.setState(State.ERROR);
+                        if (System.getProperty("devEnv") != null)
+                        {
+                            e.printStackTrace();
+                        }
+                    }
+
+                    completed = true;
+                }
+                finally
+                {
+                    if (queryId == file.getQueryId())
+                    {
+                        if (file.getState() == State.EXECUTING)
+                        {
+                            file.setState(State.COMPLETED);
+                        }
+                        queryFinnishedCallback.run();
+                    }
                 }
             }
         });

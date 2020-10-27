@@ -49,10 +49,10 @@ public class QueryParserTest extends AParserTest
         assertExpression("a.filter(x -> x.val > 0)");
 
         QualifiedFunctionCallExpression expected = new QualifiedFunctionCallExpression(
-                (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "map"),
+                (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "map").getValue(),
                 asList(
                         new QualifiedFunctionCallExpression(
-                                (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "flatMap"),
+                                (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "flatMap").getValue(),
                                 asList(
                                         new QualifiedReferenceExpression(QualifiedName.of("aa"), -1),
                                         new LambdaExpression(
@@ -62,7 +62,7 @@ public class QueryParserTest extends AParserTest
                         new LambdaExpression(
                                 asList("x"),
                                 new QualifiedFunctionCallExpression(
-                                        (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "cast"),
+                                        (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "cast").getValue(),
                                         asList(
                                                 new QualifiedReferenceExpression(QualifiedName.of("x", "price_sales"), 0),
                                                 new LiteralStringExpression("FLOAT"))),
@@ -89,12 +89,12 @@ public class QueryParserTest extends AParserTest
             }
         });
 
-        ScalarFunctionInfo hashFunction = (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "hash");
+        ScalarFunctionInfo hashFunction = (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "hash").getValue();
 
         assertExpression("a.b.c", new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1));
         assertExpression("@list.filter(x -> x.value)",
                 new QualifiedFunctionCallExpression(
-                        (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "filter"),
+                        (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "filter").getValue(),
                         asList(
                                 new VariableExpression(QualifiedName.of("list")),
                                 new LambdaExpression(asList("x"),

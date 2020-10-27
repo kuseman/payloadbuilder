@@ -239,7 +239,6 @@ class ESCatalogExtension implements ICatalogExtension
 
             //CSOFF
             add(new JLabel("Endpoint"), new GridBagConstraints(0, 0, 1, 1, 0.0, 0.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.NONE, new Insets(0, 0, 0, 5), 0, 0));
-            //CSOn
             endpoints = new JComboBox<>();
             endpoints.setModel(endpointsModel);
             endpoints.addItemListener(l ->
@@ -270,6 +269,7 @@ class ESCatalogExtension implements ICatalogExtension
             add(reloadInstances, new GridBagConstraints(1, 2, 1, 1, 1.0, 1.0, GridBagConstraints.BASELINE, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
 
             setPreferredSize(new Dimension(240, 75));
+            //CSON
         }
     }
 
@@ -289,7 +289,7 @@ class ESCatalogExtension implements ICatalogExtension
             listEndpoints = new JList<>();
             listEndpoints.setModel(new DefaultComboBoxModel<>(getEndpoints().toArray(ArrayUtils.EMPTY_STRING_ARRAY)));
             panelEndpoints.add(new JScrollPane(listEndpoints),
-                    new GridBagConstraints(1, 0, 1, 3, 1.0, 1.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.BOTH, new Insets(0, 5, 0, 0), 0, 0));
+                    new GridBagConstraints(1, 0, 1, 3, 1.0, 1.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.BOTH, new Insets(0, 3, 0, 0), 0, 0));
 
             JButton addEndpoint = new JButton("Add");
             addEndpoint.addActionListener(l ->
@@ -302,39 +302,12 @@ class ESCatalogExtension implements ICatalogExtension
                     {
                         endpoints.add(endpoint);
                         update();
-                        pcs.firePropertyChange(CONFIG, null, null);
                     }
                 }
             });
             panelEndpoints.add(addEndpoint, new GridBagConstraints(0, 0, 1, 1, 0.0, 0.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
 
             JButton editEndpoint = new JButton("Edit");
-            addEndpoint.addActionListener(l ->
-            {
-                //                if (cbEndpoints.getSelectedItem() == null)
-                //                {
-                //                    return;
-                //                }
-                //
-                //                String endpoint = (String) JOptionPane.showInputDialog(
-                //                        null,
-                //                        "Endpoint",
-                //                        "Edit endpoint",
-                //                        JOptionPane.QUESTION_MESSAGE,
-                //                        null,
-                //                        null,
-                //                        cbEndpoints.getSelectedItem());
-                //                if (endpoint != null)
-                //                {
-                //
-                ////                    List<String> endpoints = getEndpoints();
-                ////                    if (!endpoints.contains(endpoint))
-                ////                    {
-                ////                        endpoints.add(endpoint);
-                ////                        cbEndpoints.setModel(new DefaultComboBoxModel<>(endpoints.toArray(ArrayUtils.EMPTY_STRING_ARRAY)));
-                ////                    }
-                //                }
-            });
             panelEndpoints.add(editEndpoint, new GridBagConstraints(0, 1, 1, 1, 0.0, 0.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
             editEndpoint.setEnabled(false);
 
@@ -343,7 +316,6 @@ class ESCatalogExtension implements ICatalogExtension
             {
                 getEndpoints().remove(listEndpoints.getSelectedValue());
                 update();
-                pcs.firePropertyChange(CONFIG, null, null);
             });
             panelEndpoints.add(removeEndpoint, new GridBagConstraints(0, 2, 1, 1, 0.0, 1.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
             add(panelEndpoints, BorderLayout.CENTER);

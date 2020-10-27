@@ -1,16 +1,13 @@
 package org.kuse.payloadbuilder.editor;
 
-import static org.kuse.payloadbuilder.editor.ICatalogExtension.CONFIG;
-
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Container;
+import java.awt.Dialog.ModalityType;
 import java.awt.Frame;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -26,6 +23,7 @@ import javax.swing.JRadioButton;
 import javax.swing.JTextField;
 import javax.swing.WindowConstants;
 
+import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.kordamp.ikonli.fontawesome.FontAwesome;
 import org.kordamp.ikonli.swing.FontIcon;
 
@@ -41,7 +39,6 @@ class CatalogExtensionView extends JPanel
     private final JPanel extensionPanel;
     private final Runnable propertiesChangedAction;
     private boolean fireEvents = true;
-    private boolean configChanged;
 
     CatalogExtensionView(
             ICatalogExtension extension,
@@ -106,29 +103,45 @@ class CatalogExtensionView extends JPanel
         });
         btnConfig.addActionListener(l ->
         {
+            MutableBoolean okClick = new MutableBoolean();
+
             JDialog dialog = new JDialog((Frame) null, true);
             dialog.setIconImages(PayloadbuilderEditorView.APPLICATION_ICONS);
             dialog.setTitle("Config " + extension.getTitle());
             dialog.getContentPane().setLayout(new BorderLayout());
             dialog.getContentPane().add(extension.getConfigComponent(), BorderLayout.CENTER);
+
+            JButton ok = new JButton("OK");
+            ok.addActionListener(l1 ->
+            {
+                okClick.setTrue();
+                dialog.setVisible(false);
+            });
+            JButton cancel = new JButton("Canel");
+            cancel.addActionListener(l1 ->
+            {
+                dialog.setVisible(false);
+            });
+
+            JPanel bottomPanel = new JPanel();
+            bottomPanel.add(ok);
+            bottomPanel.add(cancel);
+
+            dialog.getContentPane().add(bottomPanel, BorderLayout.SOUTH);
+
             dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
             dialog.setPreferredSize(PayloadbuilderEditorView.DEFAULT_DIALOG_SIZE);
             dialog.pack();
             dialog.setLocationRelativeTo(null);
             dialog.pack();
+
+            dialog.setModalityType(ModalityType.APPLICATION_MODAL);
             dialog.setVisible(true);
-            dialog.addWindowListener(new WindowAdapter()
+
+            if (okClick.isTrue())
             {
-                @Override
-                public void windowClosed(WindowEvent e)
-                {
-                    if (configChanged)
-                    {
-                        configChanged = false;
-                        configChangedAction.run();
-                    }
-                }
-            });
+                configChangedAction.run();
+            }
         });
         btnConfig.setEnabled(extension.getConfigComponent() != null);
         //CSOFF
@@ -155,11 +168,7 @@ class CatalogExtensionView extends JPanel
 
     private void handlePropertyChanged(String property)
     {
-        if (CONFIG.equals(property))
-        {
-            configChanged = true;
-        }
-        else if (ICatalogExtension.PROPERTIES.equals(property))
+        if (ICatalogExtension.PROPERTIES.equals(property))
         {
             propertiesChangedAction.run();
         }

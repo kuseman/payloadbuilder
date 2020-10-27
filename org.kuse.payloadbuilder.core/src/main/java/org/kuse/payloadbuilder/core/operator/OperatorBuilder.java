@@ -765,7 +765,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             /* Find the first matching index from extracted columns above */
             index = indices
                     .stream()
-                    .filter(i -> columnItems.containsAll(i.getColumns()))
+                    .filter(i -> i.getColumns() == Index.ALL_COLUMNS || columnItems.containsAll(i.getColumns()))
                     .findFirst()
                     .orElse(null);
         }
@@ -907,6 +907,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             */
             index = getIndex(equiItems, alias, indices);
             size = equiItems.size();
+            List<String> indexColumns = null;
             outerValueExpressions = new ArrayList<>(size);
             innerValueExpressions = new ArrayList<>(size);
             Set<String> processedColumns = new HashSet<>();
@@ -919,18 +920,35 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 boolean isIndexPair = false;
                 if (index != null && column != null)
                 {
-                    columnIndex = index.getColumns().indexOf(column);
-                    if (columnIndex == -1)
+                    if (index.getColumns() == Index.ALL_COLUMNS)
                     {
-                        leftOverEquiItems.add(pair);
-                        continue;
+                        //CSOFF
+                        if (indexColumns == null)
+                        //CSON
+                        {
+                            indexColumns = new ArrayList<>(size);
+                        }
+                        columnIndex = indexColumns.size();
+                        indexColumns.add(column);
                     }
-
-                    if (!processedColumns.add(column))
+                    else
                     {
-                        // TODO: pick the best avaiable expression
-                        // Ie. Expression#isConstant over any other
-                        continue;
+                        columnIndex = index.getColumns().indexOf(column);
+                        //CSOFF
+                        if (columnIndex == -1)
+                        //CSON
+                        {
+                            leftOverEquiItems.add(pair);
+                            continue;
+                        }
+                        //CSOFF
+                        if (!processedColumns.add(column))
+                        //CSON
+                        {
+                            // TODO: pick the best available expression
+                            // Ie. Expression#isConstant over any other
+                            continue;
+                        }
                     }
 
                     isIndexPair = true;
@@ -956,6 +974,12 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 {
                     leftOverEquiItems.add(pair);
                 }
+            }
+
+            // Create a new index with current columns
+            if (indexColumns != null)
+            {
+                index = new Index(index.getTable(), indexColumns, index.getBatchSize());
             }
 
             AnalyzeResult result = new AnalyzeResult(leftOverEquiItems);

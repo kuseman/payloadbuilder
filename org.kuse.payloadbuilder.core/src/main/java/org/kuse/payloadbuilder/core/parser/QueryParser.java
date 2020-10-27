@@ -28,6 +28,7 @@ import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.atn.PredictionMode;
 import org.antlr.v4.runtime.misc.ParseCancellationException;
+import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.FunctionInfo;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
@@ -544,15 +545,15 @@ public class QueryParser
                 arguments.add(0, prevLeftDereference);
             }
 
-            FunctionInfo functionInfo = registry.resolveFunctionInfo(catalog, function);
+            Pair<String,  FunctionInfo> functionInfo = registry.resolveFunctionInfo(catalog, function);
             if (functionInfo == null)
             {
                 throw new ParseException("No function found named: " + function + " in catalog: " + (isBlank(catalog) ? "BuiltIn" : catalog), ctx.start);
             }
-            validateFunction(functionInfo, arguments, ctx.start);
-            arguments = functionInfo.foldArguments(arguments);
+            validateFunction(functionInfo.getValue(), arguments, ctx.start);
+            arguments = functionInfo.getValue().foldArguments(arguments);
 
-            return new FunctionCallInfo(catalog, functionInfo, arguments);
+            return new FunctionCallInfo(functionInfo.getKey(), functionInfo.getValue(), arguments);
         }
 
         @Override

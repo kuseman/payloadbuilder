@@ -30,6 +30,12 @@ class ExpressionValuesExtractor implements ValuesExtractor
     }
 
     @Override
+    public int size()
+    {
+        return size;
+    }
+
+    @Override
     public int hashCode()
     {
         return expressions.hashCode();

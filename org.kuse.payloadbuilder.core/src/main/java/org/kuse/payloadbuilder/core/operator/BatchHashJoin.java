@@ -96,7 +96,7 @@ class BatchHashJoin extends AOperator
         this.populating = populating;
         this.emitEmptyOuterRows = emitEmptyOuterRows;
         this.innerIndex = requireNonNull(innerIndex, "innerIndex");
-        this.valuesSize = innerIndex.getColumns().size();
+        this.valuesSize = outerValuesExtractor.size();
         this.batchSizeOption = batchSizeOption;
     }
 

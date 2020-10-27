@@ -50,11 +50,10 @@ class Config
         return recentFiles;
     }
 
-    void appendRecentFile(File file)
+    void appendRecentFile(String file)
     {
-        String absolutPath = file.getAbsolutePath();
-        recentFiles.remove(absolutPath);
-        recentFiles.add(0, absolutPath);
+        recentFiles.remove(file);
+        recentFiles.add(0, file);
         if (recentFiles.size() > MAX_RECENT_FILES)
         {
             recentFiles.remove(recentFiles.size() - 1);

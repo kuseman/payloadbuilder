@@ -1,5 +1,6 @@
 package org.kuse.payloadbuilder.core.catalog;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 import java.util.List;
@@ -11,6 +12,9 @@ import org.kuse.payloadbuilder.core.parser.QualifiedName;
  **/
 public class Index
 {
+    /** Marker list of an index which has all possible columns defined. */
+    public static final List<String> ALL_COLUMNS = emptyList();
+
     private final QualifiedName table;
     private final List<String> columns;
     private final int batchSize;

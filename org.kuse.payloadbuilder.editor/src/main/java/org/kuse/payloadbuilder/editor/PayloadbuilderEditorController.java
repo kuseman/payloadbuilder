@@ -108,15 +108,20 @@ class PayloadbuilderEditorController implements PropertyChangeListener
             int length = model.getFiles().size();
             for (int i = 0; i < length; i++)
             {
-                if (model.getFiles().get(0).getFilename().equals(file))
+                if (model.getFiles().get(i).getFilename().equals(file))
                 {
                     model.setSelectedFile(i);
+                    // TODO: remove this when proper binding exist in PayloadBuilderEditorModel
+                    //       for selected file
+                    view.getEditorsTabbedPane().setSelectedIndex(i);
                     return;
                 }
             }
 
             QueryFileModel queryFile = new QueryFileModel(config.getCatalogs(), new File(file));
             model.addFile(queryFile);
+            config.appendRecentFile(file);
+            saveConfig();
         });
 
         int y = 0;
@@ -311,7 +316,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         }
 
         file.save();
-        config.appendRecentFile(new File(file.getFilename()));
+        config.appendRecentFile(file.getFilename());
         saveConfig();
         return true;
     }
@@ -445,9 +450,15 @@ class PayloadbuilderEditorController implements PropertyChangeListener
 
             PayloadbuilderService.executeQuery(fileModel, queryString, () ->
             {
-                // Update properties in UI after query is finished
-                // Change current index/instance/database etc. that was altered in query
-                catalogExtensionViews.forEach(v -> v.init(fileModel));
+                QueryFileView current = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
+
+                // Only update extensions panel if the completed query is current query file
+                if (fileModel == current.getFile())
+                {
+                    // Update properties in UI after query is finished
+                    // Change current index/instance/database etc. that was altered in query
+                    catalogExtensionViews.forEach(v -> v.init(fileModel));
+                }
             });
         }
     }
@@ -539,7 +550,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                 {
                     QueryFileModel file = new QueryFileModel(config.getCatalogs(), selectedFile);
                     model.addFile(file);
-                    config.appendRecentFile(selectedFile);
+                    config.appendRecentFile(selectedFile.getAbsolutePath());
                 }
 
                 // Store last selected path if differs
