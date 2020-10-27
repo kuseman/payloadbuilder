@@ -39,10 +39,7 @@ Catalogs is the extension point where external data is provided.
 A catalog implementation can provide scalar functions, table valued functions,
 data operators for tables.
 
-Example of provided catalogs:
-
-* [ElasticSearch](https://github.com/kuseman/payloadbuilder/tree/master/org.kuse.payloadbuilder.catalog/src/main/java/org/kuse/payloadbuilder/catalog/es)
-* [FileSystem](https://github.com/kuseman/payloadbuilder/tree/master/org.kuse.payloadbuilder.catalog/src/main/java/org/kuse/payloadbuilder/catalog/fs)
+[Provided catalogs](https://github.com/kuseman/payloadbuilder/tree/master/org.kuse.payloadbuilder.catalog)
 
 ### Built With
 
