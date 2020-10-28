@@ -33,10 +33,12 @@ public class JdbcCatalog extends Catalog
 {
     private static final int BATCH_SIZE = 500;
     public static final String NAME = "JdbcCatalog";
-    static final String CONNECTION_STRING = "connectionstring";
+    static final String URL = "url";
     static final String USERNAME = "username";
     static final String PASSWORD = "password";
     static final String DATABASE = "database";
+
+    private final Map<String, HikariDataSource> dataSourceByURL = new ConcurrentHashMap<>();
 
     public JdbcCatalog()
     {
@@ -146,15 +148,13 @@ public class JdbcCatalog extends Catalog
             || (qname.getParts().size() == 2 && equalsIgnoreCase(tableAlias.getAlias(), qname.getParts().get(0)));
     }
 
-    private final Map<String, HikariDataSource> dataSourceByUrl = new ConcurrentHashMap<>();
-
     /** Get connection for provided session/catalog alias */
     Connection getConnection(QuerySession session, String catalogAlias)
     {
-        final String connectionString = (String) session.getCatalogProperty(catalogAlias, JdbcCatalog.CONNECTION_STRING);
-        if (isBlank(connectionString))
+        final String url = (String) session.getCatalogProperty(catalogAlias, JdbcCatalog.URL);
+        if (isBlank(url))
         {
-            throw new IllegalArgumentException("Missing connectionstring in catalog properties for " + catalogAlias);
+            throw new IllegalArgumentException("Missing URL in catalog properties for " + catalogAlias);
         }
 
         final String username = (String) session.getCatalogProperty(catalogAlias, JdbcCatalog.USERNAME);
@@ -164,24 +164,24 @@ public class JdbcCatalog extends Catalog
             throw new CredentialsException(catalogAlias, "Missing username/password in catalog properties for " + catalogAlias);
         }
 
-        return getConnection(connectionString, username, password, catalogAlias);
+        return getConnection(url, username, password, catalogAlias);
     }
 
-    /** Get connection for provided connection string and user/pass */
-    Connection getConnection(String connectionString, String username, String password, String catalogAlias)
+    /** Get connection for provided url and user/pass */
+    Connection getConnection(String url, String username, String password, String catalogAlias)
     {
         try
         {
-            return dataSourceByUrl.compute(connectionString, (k, v) ->
+            return dataSourceByURL.compute(url, (k, v) ->
             {
                 if (v == null)
                 {
                     HikariDataSource ds = new HikariDataSource();
                     ds.setRegisterMbeans(true);
                     //CSOFF
-                    ds.setPoolName(connectionString.substring(0, 40));
+                    ds.setPoolName(url.replace(':', '_').substring(0, 40));
                     //CSON
-                    ds.setJdbcUrl(connectionString);
+                    ds.setJdbcUrl(url);
                     ds.setUsername(username);
                     ds.setPassword(password);
                     return ds;

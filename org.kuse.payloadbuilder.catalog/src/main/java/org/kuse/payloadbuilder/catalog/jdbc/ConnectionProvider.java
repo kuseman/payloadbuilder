@@ -4,7 +4,11 @@ import java.awt.Component;
 import java.util.Map;
 
 /**
- * Definition of a connection provider. Used to build specific connection strings etc. Provider specific UI extension
+ * Definition of a connection provider.
+ * <pre>
+ * Used to build specific jdbc urls etc.
+ * Provides connection specific UI for configuration and properties
+ * </pre>
  **/
 interface ConnectionProvider
 {
@@ -14,6 +18,6 @@ interface ConnectionProvider
     /** Init component from properties */
     void initComponent(Map<String, Object> properties);
 
-    /** Construct connection string from properties */
-    String getConnectionString(Map<String, Object> properties);
+    /** Construct jdbc url from properties */
+    String getURL(Map<String, Object> properties);
 }

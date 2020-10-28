@@ -22,14 +22,14 @@ class SqlServerProvider implements ConnectionProvider
     private static final String DOMAIN = "domain";
     private static final String AUTHENTICATION_TYPE = "authenticationType";
     private static final String APPLICATION_NAME = "applicationName";
-    private static final String CONNECTION_STRING_SUFFIX = "connectionStringSuffix";
+    private static final String URL_SUFFIX = "urlSuffix";
 
     private final JPanel component = new JPanel();
     private final JComboBox<AuthenticationType> authenticationType = new JComboBox<>(AuthenticationType.values());
     private final JTextField server = new JTextField();
     private final JTextField domain = new JTextField();
     private final JTextField applicationName = new JTextField("PayloadBuilder");
-    private final JTextField connectionStringSuffix = new JTextField("selectMode=cursor");
+    private final JTextField urlSuffix = new JTextField("selectMode=cursor");
     private Map<String, Object> properties;
 
     SqlServerProvider()
@@ -40,19 +40,19 @@ class SqlServerProvider implements ConnectionProvider
         component.add(new JLabel("Authentication Type"), new GridBagConstraints(0, 1, 1, 1, 0.0, 0.0, GridBagConstraints.BASELINE, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 3, 3), 0, 0));
         component.add(new JLabel("Domain"), new GridBagConstraints(0, 2, 1, 1, 0.0, 0.0, GridBagConstraints.BASELINE, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 3, 3), 0, 0));
         component.add(new JLabel("Application Name"), new GridBagConstraints(0, 3, 1, 1, 0.0, 0.0, GridBagConstraints.BASELINE, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 3, 3), 0, 0));
-        component.add(new JLabel("Connection String Suffix"), new GridBagConstraints(0, 4, 1, 1, 0.0, 1.0, GridBagConstraints.BASELINE, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 3), 0, 0));
+        component.add(new JLabel("URL Suffix"), new GridBagConstraints(0, 4, 1, 1, 0.0, 1.0, GridBagConstraints.BASELINE, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 3), 0, 0));
 
         component.add(server, new GridBagConstraints(1, 0, 1, 1, 0.0, 0.0, GridBagConstraints.BASELINE, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 3, 3), 0, 0));
         component.add(authenticationType, new GridBagConstraints(1, 1, 1, 1, 1.0, 0.0, GridBagConstraints.BASELINE, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 3, 0), 0, 0));
         component.add(domain, new GridBagConstraints(1, 2, 1, 1, 1.0, 0.0, GridBagConstraints.BASELINE, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 3, 0), 0, 0));
         component.add(applicationName, new GridBagConstraints(1, 3, 1, 1, 1.0, 0.0, GridBagConstraints.BASELINE, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 3, 0), 0, 0));
-        component.add(connectionStringSuffix, new GridBagConstraints(1, 4, 1, 1, 1.0, 0.0, GridBagConstraints.BASELINE, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
+        component.add(urlSuffix, new GridBagConstraints(1, 4, 1, 1, 1.0, 0.0, GridBagConstraints.BASELINE, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
         //CSON
 
         bind(server, SERVER);
         bind(domain, DOMAIN);
         bind(applicationName, APPLICATION_NAME);
-        bind(connectionStringSuffix, CONNECTION_STRING_SUFFIX);
+        bind(urlSuffix, URL_SUFFIX);
         authenticationType.addActionListener(l ->
         {
             if (properties != null)
@@ -79,21 +79,21 @@ class SqlServerProvider implements ConnectionProvider
         load(server, SERVER);
         load(domain, DOMAIN);
         load(applicationName, APPLICATION_NAME);
-        load(connectionStringSuffix, CONNECTION_STRING_SUFFIX);
+        load(urlSuffix, URL_SUFFIX);
         AuthenticationType authenticationType = AuthenticationType.valueOf((String) properties.getOrDefault(AUTHENTICATION_TYPE, AuthenticationType.SQL_SERVER_AUTHENTICATION.name()));
         this.authenticationType.setSelectedItem(authenticationType);
     }
 
     @Override
-    public String getConnectionString(Map<String, Object> properties)
+    public String getURL(Map<String, Object> properties)
     {
         AuthenticationType authenticationType = AuthenticationType.valueOf((String) properties.getOrDefault(AUTHENTICATION_TYPE, AuthenticationType.SQL_SERVER_AUTHENTICATION.name()));
         String server = (String) properties.getOrDefault(SERVER, "");
         String domain = (String) properties.getOrDefault(DOMAIN, "");
         String applicationName = (String) properties.getOrDefault(APPLICATION_NAME, "");
-        String connectionStringSuffix = (String) properties.getOrDefault(CONNECTION_STRING_SUFFIX, "");
+        String urlSuffix = (String) properties.getOrDefault(URL_SUFFIX, "");
 
-        return authenticationType.generateConnectionString(server, domain, applicationName, connectionStringSuffix);
+        return authenticationType.generateURL(server, domain, applicationName, urlSuffix);
     }
 
     private void load(JTextField tf, String property)
@@ -123,14 +123,14 @@ class SqlServerProvider implements ConnectionProvider
         WINDOWS_AUTHENTICATION_CREDENTIAlS("Windows NTLM Authentication")
         {
             @Override
-            String generateConnectionString(String server, String domain, String applicationName, String connectionStringSuffix)
+            String generateURL(String server, String domain, String applicationName, String urlSuffix)
             {
                 return "jdbc:sqlserver://"
                     + server
                     + ";integratedSecurity=true;authenticationScheme=NTLM"
                     + ";domain=" + domain
                     + (!isBlank(applicationName) ? (";applicationName=" + applicationName) : "")
-                    + (!isBlank(connectionStringSuffix) ? (";" + connectionStringSuffix) : "");
+                    + (!isBlank(urlSuffix) ? (";" + urlSuffix) : "");
             }
         },
 
@@ -138,12 +138,12 @@ class SqlServerProvider implements ConnectionProvider
         SQL_SERVER_AUTHENTICATION("SQL Server Authentication")
         {
             @Override
-            String generateConnectionString(String server, String domain, String applicationName, String connectionStringSuffix)
+            String generateURL(String server, String domain, String applicationName, String urlSuffix)
             {
                 return "jdbc:sqlserver://"
                     + server
                     + (!isBlank(applicationName) ? (";applicationName=" + applicationName) : "")
-                    + (!isBlank(connectionStringSuffix) ? (";" + connectionStringSuffix) : "");
+                    + (!isBlank(urlSuffix) ? (";" + urlSuffix) : "");
             }
         };
 
@@ -155,7 +155,7 @@ class SqlServerProvider implements ConnectionProvider
         }
 
         /** Generate connection string */
-        abstract String generateConnectionString(String server, String domain, String applicationName, String connectionStringSuffix);
+        abstract String generateURL(String server, String domain, String applicationName, String urlSuffix);
 
         @Override
         public String toString()

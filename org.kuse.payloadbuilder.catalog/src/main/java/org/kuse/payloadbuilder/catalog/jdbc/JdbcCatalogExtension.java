@@ -101,22 +101,22 @@ class JdbcCatalogExtension implements ICatalogExtension
     public void setup(String catalogAlias, QuerySession querySession)
     {
         ServerConnection connection = (ServerConnection) propertiesComponent.connections.getSelectedItem();
-        String connectionString = "";
+        String url = "";
         if (connection != null)
         {
-            connectionString = connection.getConnectionString();
+            url = connection.getURL();
             querySession.setCatalogProperty(catalogAlias, JdbcCatalog.USERNAME, connection.username);
             querySession.setCatalogProperty(catalogAlias, JdbcCatalog.PASSWORD, connection.password);
         }
         String database = (String) propertiesComponent.databases.getSelectedItem();
-        querySession.setCatalogProperty(catalogAlias, JdbcCatalog.CONNECTION_STRING, connectionString);
+        querySession.setCatalogProperty(catalogAlias, JdbcCatalog.URL, url);
         querySession.setCatalogProperty(catalogAlias, JdbcCatalog.DATABASE, database);
     }
 
     @Override
     public void update(String catalogAlias, QuerySession querySession)
     {
-        String connectionString = (String) querySession.getCatalogProperty(catalogAlias, JdbcCatalog.CONNECTION_STRING);
+        String url = (String) querySession.getCatalogProperty(catalogAlias, JdbcCatalog.URL);
         String database = (String) querySession.getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE);
 
         MutableObject<ServerConnection> connectionToSelect = new MutableObject<>();
@@ -127,7 +127,7 @@ class JdbcCatalogExtension implements ICatalogExtension
         {
             ServerConnection connection = propertiesComponent.connectionsModel.getElementAt(i);
 
-            if (!equalsIgnoreCase(connectionString, connection.getConnectionString()))
+            if (!equalsIgnoreCase(url, connection.getURL()))
             {
                 continue;
             }
@@ -167,11 +167,11 @@ class JdbcCatalogExtension implements ICatalogExtension
         if (askForCredentials)
         {
             ServerConnection connection = (ServerConnection) propertiesComponent.connections.getSelectedItem();
-            String connectionString = (String) querySession.getCatalogProperty(catalogAlias, JdbcCatalog.CONNECTION_STRING);
+            String url = (String) querySession.getCatalogProperty(catalogAlias, JdbcCatalog.URL);
 
-            boolean isSelectedConnection = equalsIgnoreCase(connectionString, connection.getConnectionString());
+            boolean isSelectedConnection = equalsIgnoreCase(url, connection.getURL());
 
-            String connectionDescription = isSelectedConnection ? connection.toString() : connectionString;
+            String connectionDescription = isSelectedConnection ? connection.toString() : url;
             String prefilledUsername = isSelectedConnection ? connection.username : (String) querySession.getCatalogProperty(catalogAlias, JdbcCatalog.USERNAME);
 
             Pair<String, char[]> credentials = getCredentials(connectionDescription, prefilledUsername);
@@ -356,7 +356,7 @@ class JdbcCatalogExtension implements ICatalogExtension
             Thread t = new Thread(() ->
             {
                 try (Connection sqlConnection = CATALOG.getConnection(
-                        connection.getConnectionString(),
+                        connection.getURL(),
                         connection.username,
                         new String(connection.password),
                         ""))
@@ -424,7 +424,7 @@ class JdbcCatalogExtension implements ICatalogExtension
             JButton add = new JButton("Add");
             add.addActionListener(l ->
             {
-                connectionsListModel.addElement(new ServerConnection("Connection", SqlType.CONNECTION_STRING));
+                connectionsListModel.addElement(new ServerConnection("Connection", SqlType.JDBC_URL));
                 connectionsList.setSelectedIndex(connectionsList.getModel().getSize() - 1);
                 populateProviderProperties();
             });
@@ -561,13 +561,13 @@ class JdbcCatalogExtension implements ICatalogExtension
             this.type = type;
         }
 
-        String getConnectionString()
+        String getURL()
         {
             if (type == null)
             {
                 return null;
             }
-            return type.provider.getConnectionString(properties);
+            return type.provider.getURL(properties);
         }
 
         @Override
@@ -580,7 +580,7 @@ class JdbcCatalogExtension implements ICatalogExtension
     /** Type of sql */
     enum SqlType
     {
-        CONNECTION_STRING("Raw connection string", new ConnectionStringProvider()),
+        JDBC_URL("Raw JDBC URL", new JdbcURLProvider()),
         SQLSERVER("MSSql Server", new SqlServerProvider());
 
         private final String title;

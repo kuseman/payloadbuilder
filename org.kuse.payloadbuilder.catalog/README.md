@@ -67,7 +67,7 @@ Fully qualified name is sent to Jdbc as is
 
 | Name             | Description               |
 |:-----------------|:--------------------------|
-| connectionstring | Jdbc connection url       |
+| url              | Jdbc connection url       |
 | username         | Username for connection   |
 | password         | Password for connection   |
 
