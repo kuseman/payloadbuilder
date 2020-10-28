@@ -75,4 +75,4 @@ Fully qualified name is sent to Jdbc as is
 
 | Name            | Type          | Description                                        | Arguments                     | Example |
 |:----------------|:--------------|:---------------------------------------------------|:------------------------------|---------|
-| query           | Table         | Queries Jdbc with a nativ query                    | query (String)<br/>parameters (List) Optional parameters for the prepared statement in query | use jdbc.connectionstring = 'jdbc://........'<br/>use jdbc.username = 'user'<br/>use jdbc.password = 'pass'<br/><br/>select *<br/>from jdbc#query('select * from table where col1 = ?', listOf(1337)) |
+| query           | Table         | Queries Jdbc with a nativ query                    | query (String)<br/>parameters (List) Optional parameters for the prepared statement in query | use jdbc.url = 'jdbc://........'<br/>use jdbc.username = 'user'<br/>use jdbc.password = 'pass'<br/><br/>select *<br/>from jdbc#query('select * from table where col1 = ?', listOf(1337)) |
