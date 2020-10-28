@@ -29,7 +29,7 @@ class SqlServerProvider implements ConnectionProvider
     private final JTextField server = new JTextField();
     private final JTextField domain = new JTextField();
     private final JTextField applicationName = new JTextField("PayloadBuilder");
-    private final JTextField urlSuffix = new JTextField("selectMode=cursor");
+    private final JTextField urlSuffix = new JTextField("");
     private Map<String, Object> properties;
 
     SqlServerProvider()
