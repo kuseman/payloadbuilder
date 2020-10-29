@@ -308,7 +308,10 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             }
             finally
             {
-                iterator.close();
+                if (iterator != null)
+                {
+                    iterator.close();
+                }
             }
         }
         else
@@ -387,7 +390,10 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             }
             finally
             {
-                iterator.close();
+                if (iterator != null)
+                {
+                    iterator.close();
+                }
             }
         }
         else

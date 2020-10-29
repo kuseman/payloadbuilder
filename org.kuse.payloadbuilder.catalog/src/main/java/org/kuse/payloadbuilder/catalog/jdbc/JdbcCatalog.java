@@ -4,6 +4,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -33,6 +34,7 @@ public class JdbcCatalog extends Catalog
 {
     private static final int BATCH_SIZE = 500;
     public static final String NAME = "JdbcCatalog";
+    static final String DRIVER_CLASSNAME = "driverclassname";
     static final String URL = "url";
     static final String USERNAME = "username";
     static final String PASSWORD = "password";
@@ -151,6 +153,7 @@ public class JdbcCatalog extends Catalog
     /** Get connection for provided session/catalog alias */
     Connection getConnection(QuerySession session, String catalogAlias)
     {
+        final String driverClassName = (String) session.getCatalogProperty(catalogAlias, JdbcCatalog.DRIVER_CLASSNAME);
         final String url = (String) session.getCatalogProperty(catalogAlias, JdbcCatalog.URL);
         if (isBlank(url))
         {
@@ -164,11 +167,11 @@ public class JdbcCatalog extends Catalog
             throw new CredentialsException(catalogAlias, "Missing username/password in catalog properties for " + catalogAlias);
         }
 
-        return getConnection(url, username, password, catalogAlias);
+        return getConnection(driverClassName, url, username, password, catalogAlias);
     }
 
     /** Get connection for provided url and user/pass */
-    Connection getConnection(String url, String username, String password, String catalogAlias)
+    Connection getConnection(String driverClassName, String url, String username, String password, String catalogAlias)
     {
         try
         {
@@ -177,6 +180,10 @@ public class JdbcCatalog extends Catalog
                 if (v == null)
                 {
                     HikariDataSource ds = new HikariDataSource();
+                    if (isNotBlank(driverClassName))
+                    {
+                        ds.setDriverClassName(driverClassName);
+                    }
                     ds.setRegisterMbeans(true);
                     //CSOFF
                     ds.setPoolName(url.replace(':', '_').substring(0, 40));

@@ -20,4 +20,7 @@ interface ConnectionProvider
 
     /** Construct jdbc url from properties */
     String getURL(Map<String, Object> properties);
+
+    /**  Return driver class name for this provider */
+    String getDriverClassName();
 }

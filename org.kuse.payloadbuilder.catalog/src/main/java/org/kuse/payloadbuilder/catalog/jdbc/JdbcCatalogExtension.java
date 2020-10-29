@@ -102,13 +102,16 @@ class JdbcCatalogExtension implements ICatalogExtension
     {
         ServerConnection connection = (ServerConnection) propertiesComponent.connections.getSelectedItem();
         String url = "";
+        String driverClassName = "";
         if (connection != null)
         {
             url = connection.getURL();
+            driverClassName = connection.getDriverClassName();
             querySession.setCatalogProperty(catalogAlias, JdbcCatalog.USERNAME, connection.username);
             querySession.setCatalogProperty(catalogAlias, JdbcCatalog.PASSWORD, connection.password);
         }
         String database = (String) propertiesComponent.databases.getSelectedItem();
+        querySession.setCatalogProperty(catalogAlias, JdbcCatalog.DRIVER_CLASSNAME, driverClassName);
         querySession.setCatalogProperty(catalogAlias, JdbcCatalog.URL, url);
         querySession.setCatalogProperty(catalogAlias, JdbcCatalog.DATABASE, database);
     }
@@ -356,6 +359,7 @@ class JdbcCatalogExtension implements ICatalogExtension
             Thread t = new Thread(() ->
             {
                 try (Connection sqlConnection = CATALOG.getConnection(
+                        connection.getDriverClassName(),
                         connection.getURL(),
                         connection.username,
                         new String(connection.password),
@@ -568,6 +572,15 @@ class JdbcCatalogExtension implements ICatalogExtension
                 return null;
             }
             return type.provider.getURL(properties);
+        }
+
+        String getDriverClassName()
+        {
+            if (type == null)
+            {
+                return "";
+            }
+            return type.provider.getDriverClassName();
         }
 
         @Override

@@ -98,7 +98,7 @@ Alot :)
 * Documentation
 * Insert/Update/Delete support
 * More operators (Merge join, union, except, anti-join, semi-join etc.)
-* More catalog implementations (JDBC, Mongo, Redis etc.)
+* More catalog implementations (Mongo, Redis etc.)
 
 ## Contributing
 

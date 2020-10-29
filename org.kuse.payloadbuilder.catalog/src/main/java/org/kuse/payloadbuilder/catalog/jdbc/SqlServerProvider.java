@@ -96,6 +96,12 @@ class SqlServerProvider implements ConnectionProvider
         return authenticationType.generateURL(server, domain, applicationName, urlSuffix);
     }
 
+    @Override
+    public String getDriverClassName()
+    {
+        return "com.microsoft.sqlserver.jdbc.SQLServerDriver";
+    }
+
     private void load(JTextField tf, String property)
     {
         tf.setText((String) properties.getOrDefault(property, ""));

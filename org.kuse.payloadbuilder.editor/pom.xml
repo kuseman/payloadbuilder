@@ -23,6 +23,11 @@
         </dependency>
         
         <!-- External -->
+         <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+            <version>1.7.30</version>
+        </dependency>
         <!--  UI -->
         <dependency>
             <groupId>org.kordamp.ikonli</groupId>
