@@ -1,6 +1,5 @@
 package org.kuse.payloadbuilder.editor;
 
-import static java.util.Arrays.asList;
 import static java.util.Collections.emptySet;
 
 import java.util.ArrayList;
@@ -32,6 +31,7 @@ import org.kuse.payloadbuilder.core.parser.QueryParser;
 import org.kuse.payloadbuilder.core.parser.QueryStatement;
 import org.kuse.payloadbuilder.core.parser.VariableExpression;
 import org.kuse.payloadbuilder.editor.ICatalogExtension.ExceptionAction;
+import org.kuse.payloadbuilder.editor.PayloadbuilderService.ObjectWriter.PairList;
 import org.kuse.payloadbuilder.editor.QueryFileModel.Output;
 import org.kuse.payloadbuilder.editor.QueryFileModel.State;
 
@@ -217,7 +217,7 @@ class PayloadbuilderService
         @Override
         public void endRow()
         {
-            resultModel.addRow(ArrayUtils.EMPTY_OBJECT_ARRAY);
+            resultModel.addRow(PairList.EMPTY);
         }
 
         @Override
@@ -252,7 +252,7 @@ class PayloadbuilderService
     }
 
     /** Writer that writes object structure from a projection */
-    private static class ObjectWriter implements OutputWriter
+    static class ObjectWriter implements OutputWriter
     {
         private final Stack<Object> parent = new Stack<>();
         private final Stack<String> currentField = new Stack<>();
@@ -264,7 +264,7 @@ class PayloadbuilderService
         }
 
         /** Returns written value and clears state */
-        private Object[] getValue(int rowNumber)
+        private PairList getValue(int rowNumber)
         {
             currentField.clear();
             Object v = parent.pop();
@@ -273,46 +273,22 @@ class PayloadbuilderService
                 throw new RuntimeException("Expected a list of string/value pairs but got " + v);
             }
 
-            PairList pairList = (PairList) v;
-
-            Object[] result = new Object[pairList.size() + 1];
-            int index = 0;
-            result[index++] = rowNumber;
-            for (Pair<String, Object> pair : pairList)
-            {
-                result[index++] = pair.getValue();
-            }
-
-            return result;
-        }
-
-        @Override
-        public void initResult(String[] columns)
-        {
-            if (columns != null)
-            {
-                List<String> columnList = new ArrayList<>(asList(columns));
-                // Row id column
-                columnList.add(0, "");
-                resultModel.setColumns(columns);
-            }
+            PairList result = (PairList) v;
+            result.add(0, Pair.of("", rowNumber));
+            return (PairList) v;
         }
 
         @Override
         public void endRow()
         {
             // Adjust columns
-            PairList pairList = (PairList) parent.peek();
+            PairList pairList = getValue(resultModel.getRowCount() + 1);
             if (resultModel.getColumnCount() < (pairList.size() + 1))
             {
-                List<String> columns = new ArrayList<>(pairList.size() + 1);
-                // Row id column
-                columns.add("");
-                pairList.stream().map(p -> p.getKey()).forEach(column -> columns.add(column));
-                resultModel.setColumns(columns.toArray(ArrayUtils.EMPTY_STRING_ARRAY));
+                resultModel.setColumns(pairList.columns.toArray(ArrayUtils.EMPTY_STRING_ARRAY));
             }
 
-            resultModel.addRow(getValue(resultModel.getRowCount() + 1));
+            resultModel.addRow(pairList);
         }
 
         @Override
@@ -348,7 +324,9 @@ class PayloadbuilderService
             // since we might have duplicate column names
             if (parent.size() == 0)
             {
-                parent.push(new PairList());
+                //CSOFF
+                parent.push(new PairList(10));
+                //CSON
             }
             else
             {
@@ -401,8 +379,35 @@ class PayloadbuilderService
         }
 
         /** Pair list */
-        private static class PairList extends ArrayList<Pair<String, Object>>
+        static class PairList extends ArrayList<Pair<String, Object>>
         {
+            static final PairList EMPTY = new PairList(0);
+            private final List<String> columns;
+
+            private PairList(int capacity)
+            {
+                super(capacity);
+                columns = new ArrayList<>(capacity);
+            }
+
+            List<String> getColumns()
+            {
+                return columns;
+            }
+
+            @Override
+            public void add(int index, Pair<String, Object> pair)
+            {
+                columns.add(index, pair.getKey());
+                super.add(index, pair);
+            }
+
+            @Override
+            public boolean add(Pair<String, Object> pair)
+            {
+                columns.add(pair.getKey());
+                return super.add(pair);
+            }
         }
     }
 }
