@@ -72,6 +72,7 @@ class QueryFileView extends JPanel
     private static final Icon CLOSE_ICON = FontIcon.of(FontAwesome.CLOSE);
     private static final Icon WARNING_ICON = FontIcon.of(FontAwesome.WARNING);
     private static final Icon STICKY_NOTE_O = FontIcon.of(FontAwesome.STICKY_NOTE_O);
+    private static final Icon FILE_CODE_O = FontIcon.of(FontAwesome.FILE_CODE_O);
     private static final int SCROLLBAR_WIDTH = ((Integer) UIManager.get("ScrollBar.width")).intValue();
 
     private final JSplitPane splitPane;
@@ -181,6 +182,7 @@ class QueryFileView extends JPanel
 
         file.getQuerySession().setPrintStream(messagePrintStream);
         tablePopupMenu.add(viewAsJsonAction);
+        tablePopupMenu.add(viewAsXmlAction);
     }
 
     private void handleStateChanged(State state)
@@ -450,7 +452,7 @@ class QueryFileView extends JPanel
 
                     if (row >= 0)
                     {
-                        showValueDialog(resultTable, resultTable.getValueAt(row, col), row, col);
+                        showValueDialog(resultTable, resultTable.getValueAt(row, col), row, col, null);
                     }
                 }
                 else if (e.getClickCount() == 1 && e.getButton() == MouseEvent.BUTTON1)
@@ -491,11 +493,30 @@ class QueryFileView extends JPanel
                 {
                 }
             }
-            showValueDialog(table, value, row, col);
+            showValueDialog(table, value, row, col, SyntaxConstants.SYNTAX_STYLE_JSON);
         }
     };
 
-    private void showValueDialog(JTable resultTable, Object val, int row, int col)
+    //CSOFF
+    private final Action viewAsXmlAction = new AbstractAction("View as XML", FILE_CODE_O)
+    //CSON
+    {
+        @Override
+        public void actionPerformed(ActionEvent e)
+        {
+            JTable table = (JTable) tablePopupMenu.getInvoker();
+            int row = table.rowAtPoint(tableClickLocation);
+            int col = table.columnAtPoint(tableClickLocation);
+            Object value = table.getValueAt(row, col);
+            if (value instanceof String)
+            {
+                value = Utils.formatXML((String) value);
+            }
+            showValueDialog(table, value, row, col, SyntaxConstants.SYNTAX_STYLE_XML);
+        }
+    };
+
+    private void showValueDialog(JTable resultTable, Object val, int row, int col, String preferredSntax)
     {
         Object value = val;
         if (value == null)
@@ -532,6 +553,7 @@ class QueryFileView extends JPanel
         //CSON
         if (value instanceof Collection || value instanceof Map)
         {
+            // Always use json for map/collection types
             rta.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JSON);
             rta.setCodeFoldingEnabled(true);
             rta.setBracketMatchingEnabled(true);
@@ -539,6 +561,7 @@ class QueryFileView extends JPanel
         }
         else
         {
+            rta.setSyntaxEditingStyle(preferredSntax);
             rta.setText(String.valueOf(value));
         }
         rta.setCaretPosition(0);
