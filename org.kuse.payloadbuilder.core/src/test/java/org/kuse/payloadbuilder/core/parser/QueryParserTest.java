@@ -31,8 +31,8 @@ public class QueryParserTest extends AParserTest
     {
         assertQuery("select 'str' myObj from articleName an where an.lang_id = 1 order by an.id asc nulls last, an.id2 desc nulls first, an.id3, an.id4 desc, an.id4 nulls last");
 
-        assertQuery("select an.art_id, a.a_flg = a.b_flg as \"boolean column\" from articleName an");
-        assertQuery("select an.art_id \"my shiny field\", a.art_id \"my \"\"new id\", aa.sku_id as \"my new ' id again\" from articleName an");
+        assertQuery("select an.art_id, an.a_flg = an.b_flg as \"boolean column\" from articleName an");
+        assertQuery("select an.art_id \"my shiny field\", an.art_id \"my \"\"new id\", an.sku_id as \"my new ' id again\" from articleName an");
         assertQuery("select an.art_id, object(an.lang_id, an.id, an.id2 < 0.1 TEST, 'str' \"MY STRING\" from an.brand where brand_id > 0 ) myObj from articleName an");
         assertQuery("select array(array(object(1 col), 'str', null from a), 1.1, a.field from a) arr from article a");
 
@@ -131,6 +131,17 @@ public class QueryParserTest extends AParserTest
     }
 
     @Test
+    public void test_alias_policy()
+    {
+        assertQuery("select art_id from article");
+        assertQuery("select art_id from article where a.id = 10");
+        assertQueryFail(ParseException.class, "Invalid table source reference 'b'", "select art_id from article a where b.art_id > 10");
+        assertQueryFail(ParseException.class, "Alias is mandatory", "select * from tableA inner join tableB b on b.art_id = art_id");
+        assertQueryFail(ParseException.class, "Alias is mandatory", "select * from tableA a inner join tableB on b.art_id = art_id");
+        assertQueryFail(ParseException.class, "Invalid table source reference 'q'", "select art_id from article a inner join (from tableB where id= 1 and q.id = 10) b on b.id = a.id");
+    }
+
+    @Test
     public void test_joins()
     {
         assertQuery("select art_id from article a");
@@ -200,7 +211,7 @@ public class QueryParserTest extends AParserTest
         assertExpression("articleAttribute.map(aa -> aa.price.map(a -> a.price_sales) and aa.balance.map(a -> a.balance_disp))");
 
         // Lambda parameter already in use
-        assertExpressionFail(ParseException.class, "Lambda identifier a is already defined in scope", "articleAttribute.map(a -> p.price.map(a -> a.price_sales))");
+        assertExpressionFail(ParseException.class, "Lambda identifier a is already defined in scope", "articleAttribute.map(a -> a.price.map(a -> a.price_sales))");
     }
 
     private void assertExpression(String expression)

@@ -4,6 +4,7 @@ import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
+import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
 import static org.apache.commons.lang3.StringUtils.upperCase;
@@ -84,23 +85,23 @@ public class QueryParser
     /** Parse query */
     public QueryStatement parseQuery(CatalogRegistry registry, String query)
     {
-        return getTree(registry, query, p -> p.query());
+        return getTree(registry, query, p -> p.query(), true);
     }
 
     /** Parse select */
     public Select parseSelect(CatalogRegistry registry, String query)
     {
-        return getTree(registry, query, p -> p.topSelect());
+        return getTree(registry, query, p -> p.topSelect(), true);
     }
 
     /** Parse expression */
     public Expression parseExpression(CatalogRegistry registry, String expression)
     {
-        return getTree(registry, expression, p -> p.topExpression());
+        return getTree(registry, expression, p -> p.topExpression(), false);
     }
 
     @SuppressWarnings("unchecked")
-    private <T> T getTree(CatalogRegistry registry, String body, Function<PayloadBuilderQueryParser, ParserRuleContext> function)
+    private <T> T getTree(CatalogRegistry registry, String body, Function<PayloadBuilderQueryParser, ParserRuleContext> function, boolean validateQualifiedReferences)
     {
         BaseErrorListener errorListener = new BaseErrorListener()
         {
@@ -136,7 +137,7 @@ public class QueryParser
             tree = function.apply(parser);
         }
 
-        return (T) new AstBuilder(registry).visit(tree);
+        return (T) new AstBuilder(registry, validateQualifiedReferences).visit(tree);
     }
 
     /** Builds tree */
@@ -148,10 +149,12 @@ public class QueryParser
 
         private TableAlias parentTableAlias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT").build();
         private final CatalogRegistry registry;
+        private final boolean validateQualifiedReferences;
 
-        AstBuilder(CatalogRegistry registry)
+        AstBuilder(CatalogRegistry registry, boolean validateQualifiedReferences)
         {
             this.registry = registry;
+            this.validateQualifiedReferences = validateQualifiedReferences;
         }
 
         private void clear()
@@ -241,19 +244,6 @@ public class QueryParser
         //CSON
         public Object visitSelectStatement(SelectStatementContext ctx)
         {
-            List<SelectItem> selectItems = ctx.selectItem().stream().map(s -> (SelectItem) visit(s)).collect(toList());
-
-            boolean assignmentSelect = false;
-            /** Verify/determine assignment select */
-            if (selectItems.stream().anyMatch(s -> s.getAssignmentName() != null))
-            {
-                if (selectItems.stream().anyMatch(s -> s.getAssignmentName() == null))
-                {
-                    throw new ParseException("Cannot combine variable assignment items with data retrieval items", ctx.start);
-                }
-                assignmentSelect = true;
-            }
-
             TableSourceJoined joinedTableSource = ctx.tableSourceJoined() != null ? (TableSourceJoined) visit(ctx.tableSourceJoined()) : null;
             Expression topExpression = ctx.topCount() != null ? (Expression) visit(ctx.topCount()) : null;
             if (joinedTableSource == null)
@@ -276,6 +266,24 @@ public class QueryParser
                 }
             }
 
+            List<SelectItem> selectItems = ctx.selectItem().stream().map(s -> (SelectItem) visit(s)).collect(toList());
+
+            boolean assignmentSelect = false;
+            /** Verify/determine assignment select */
+            if (selectItems.stream().anyMatch(s -> s.getAssignmentName() != null))
+            {
+                if (selectItems.stream().anyMatch(s -> s.getAssignmentName() == null))
+                {
+                    throw new ParseException("Cannot combine variable assignment items with data retrieval items", ctx.start);
+                }
+                assignmentSelect = true;
+            }
+
+            // Point parent to the from table source
+            if (parentTableAlias.getChildAliases().size() > 0)
+            {
+                parentTableAlias = parentTableAlias.getChildAliases().get(0);
+            }
             Expression where = getExpression(ctx.where);
             List<Expression> groupBy = ctx.groupBy != null ? ctx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
             List<SortItem> orderBy = ctx.sortItem() != null ? ctx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
@@ -383,6 +391,11 @@ public class QueryParser
         public Object visitTableSourceJoined(TableSourceJoinedContext ctx)
         {
             TableSource tableSource = (TableSource) visit(ctx.tableSource());
+            if (ctx.joinPart().size() > 0 && isBlank(tableSource.getTableAlias().getAlias()))
+            {
+                throw new ParseException("Alias is mandatory.", ctx.tableSource().start);
+            }
+
             List<AJoin> joins = ctx
                     .joinPart()
                     .stream()
@@ -395,15 +408,18 @@ public class QueryParser
         @Override
         public Object visitJoinPart(JoinPartContext ctx)
         {
+            TableSource tableSource = (TableSource) visit(ctx.tableSource());
+            if (isBlank(tableSource.getTableAlias().getAlias()))
+            {
+                throw new ParseException("Alias is mandatory", ctx.tableSource().start);
+            }
             if (ctx.JOIN() != null)
             {
-                TableSource tableSource = (TableSource) visit(ctx.tableSource());
                 Expression condition = getExpression(ctx.expression());
                 Join.JoinType joinType = ctx.INNER() != null ? JoinType.INNER : JoinType.LEFT;
                 return new Join(tableSource, joinType, condition);
             }
 
-            TableSource tableSource = (TableSource) visit(ctx.tableSource());
             ApplyType applyType = ctx.OUTER() != null ? ApplyType.OUTER : ApplyType.CROSS;
             return new Apply(tableSource, applyType);
         }
@@ -451,8 +467,6 @@ public class QueryParser
 
                 TableSourceJoined tableSourceJoined = (TableSourceJoined) visit(subQueryCtx.tableSourceJoined());
 
-                parentTableAlias = prevParent;
-
                 if (tableSourceJoined.getTableSource() instanceof SubQueryTableSource)
                 {
                     throw new ParseException("Table source in populate query cannot be a populate table source", subQueryCtx.start);
@@ -461,6 +475,8 @@ public class QueryParser
                 Expression where = subQueryCtx.where != null ? getExpression(subQueryCtx.where) : null;
                 List<Expression> groupBy = subQueryCtx.groupBy != null ? subQueryCtx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
                 List<SortItem> orderBy = subQueryCtx.sortItem() != null ? subQueryCtx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
+
+                parentTableAlias = prevParent;
 
                 return new SubQueryTableSource(tableAlias, options, tableSourceJoined, where, groupBy, orderBy, ctx.subQuery().start);
             }
@@ -545,7 +561,7 @@ public class QueryParser
                 arguments.add(0, prevLeftDereference);
             }
 
-            Pair<String,  FunctionInfo> functionInfo = registry.resolveFunctionInfo(catalog, function);
+            Pair<String, FunctionInfo> functionInfo = registry.resolveFunctionInfo(catalog, function);
             if (functionInfo == null)
             {
                 throw new ParseException("No function found named: " + function + " in catalog: " + (isBlank(catalog) ? "BuiltIn" : catalog), ctx.start);
@@ -649,6 +665,7 @@ public class QueryParser
                     QualifiedReferenceExpression qfe = (QualifiedReferenceExpression) left;
                     parts.addAll(0, qfe.getQname().getParts());
                     result = new QualifiedReferenceExpression(new QualifiedName(parts), qfe.getLambdaId());
+                    validateQualifiedReference(ctx, (QualifiedReferenceExpression) result);
                 }
                 else
                 {
@@ -772,6 +789,46 @@ public class QueryParser
             // Remove escaped single quotes
             text = text.replaceAll("''", "'");
             return new LiteralStringExpression(text);
+        }
+
+        /** Validate alias in QRE is pointing to an existing table alias */
+        private void validateQualifiedReference(ParserRuleContext ctx, QualifiedReferenceExpression qfe)
+        {
+            if (!validateQualifiedReferences
+                || isBlank(parentTableAlias.getAlias())
+                || qfe.getLambdaId() >= 0)
+            {
+                return;
+            }
+
+            String aliasRef = qfe.getQname().getParts().get(0);
+
+            // Pointer to current alias
+            if (equalsIgnoreCase(aliasRef, parentTableAlias.getAlias()))
+            {
+                return;
+            }
+
+            // Pointer to child alias
+            if (parentTableAlias.getChildAlias(aliasRef) != null)
+            {
+                return;
+            }
+
+            // Traverse parents and try to find match
+            TableAlias current = parentTableAlias.getParent();
+
+            while (current != null)
+            {
+                if (current.getChildAlias(aliasRef) != null)
+                {
+                    return;
+                }
+
+                current = current.getParent();
+            }
+
+            throw new ParseException("Invalid table source reference '" + aliasRef + "'", ctx.start);
         }
 
         private void validateFunction(FunctionInfo functionInfo, List<Expression> arguments, Token token)

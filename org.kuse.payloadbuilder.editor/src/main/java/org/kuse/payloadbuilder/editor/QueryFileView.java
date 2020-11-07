@@ -247,8 +247,8 @@ class QueryFileView extends JPanel
         ResultTable resultTable = createResultTable();
         resultModel.addTableModelListener(e ->
         {
-            if (e.getType() == TableModelEvent.INSERT
-                && !resultTable.columnsAdjusted.get()
+            if (!resultTable.columnsAdjusted.get()
+                && e.getType() == TableModelEvent.INSERT
                 && resultModel.getRowCount() > COLUMN_ADJUST_ROW_LIMIT)
             {
                 resultTable.adjustColumns();
@@ -355,6 +355,7 @@ class QueryFileView extends JPanel
                 return super.isCellSelected(row, column);
             }
         };
+
         resultTable.addMouseListener(new MouseAdapter()
         {
             @Override
@@ -767,8 +768,8 @@ class QueryFileView extends JPanel
         {
             if (!columnsAdjusted.get())
             {
-                adjuster.adjustColumns(250);
                 columnsAdjusted.set(true);
+                adjuster.adjustColumns(250);
             }
         }
     }

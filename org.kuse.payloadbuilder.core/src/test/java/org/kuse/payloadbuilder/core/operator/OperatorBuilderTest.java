@@ -174,7 +174,7 @@ public class OperatorBuilderTest extends AOperatorTest
     @Test
     public void test_no_push_down_from_left_join_on_predicate_accessing_previous_alias()
     {
-        String query = "select aa.sku_id "
+        String query = "select raa.sku_id "
             + "from source s "
             + "inner join article a "
             + "  on a.art_id = s.art_id "
@@ -430,13 +430,13 @@ public class OperatorBuilderTest extends AOperatorTest
             + "    pluno, "
             + "    object "
             + "    ("
-            + "      a1.rgb_code"
+            + "      aa.a1.rgb_code"
             + "    ) attribute1, "
             + "    object "
             + "    ("
-            + "      a1.colorGroup "
+            + "      aa.a1.colorGroup "
             + "      from a1 "
-            + "      where a1.group_flg "
+            + "      where aa.a1.group_flg "
             + "    ) attribute1Group "
             + "    from aa "
             + "    order by aa.internet_date_start"
@@ -526,12 +526,12 @@ public class OperatorBuilderTest extends AOperatorTest
     @Test
     public void test_single_table()
     {
-        String query = "select s.id1, a.id2 from source s";
+        String query = "select s.id1, s.id2 from source s";
         QueryResult result = getQueryResult(query);
 
         TableAlias root = TableAliasBuilder.of(Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
                 .children(asList(
-                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("source"), "s").columns(new String[] {"a", "id1"})))
+                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("source"), "s").columns(new String[] {"id2", "id1"})))
                 .build();
 
         //        System.out.println(root.printHierarchy(1));
@@ -543,7 +543,7 @@ public class OperatorBuilderTest extends AOperatorTest
         assertEquals(new ObjectProjection(asList("id1", "id2"),
                 asList(
                         new ExpressionProjection(e("s.id1")),
-                        new ExpressionProjection(e("a.id2")))),
+                        new ExpressionProjection(e("s.id2")))),
                 result.projection);
     }
 

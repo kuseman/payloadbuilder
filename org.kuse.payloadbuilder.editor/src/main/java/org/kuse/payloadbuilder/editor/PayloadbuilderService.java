@@ -283,7 +283,7 @@ class PayloadbuilderService
         {
             // Adjust columns
             PairList pairList = getValue(resultModel.getRowCount() + 1);
-            if (resultModel.getColumnCount() < (pairList.size() + 1))
+            if (resultModel.getColumnCount() < pairList.size())
             {
                 resultModel.setColumns(pairList.columns.toArray(ArrayUtils.EMPTY_STRING_ARRAY));
             }
