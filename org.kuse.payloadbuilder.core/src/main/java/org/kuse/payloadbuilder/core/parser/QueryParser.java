@@ -266,6 +266,12 @@ public class QueryParser
                 }
             }
 
+            // Point parent to the from table source
+            if (parentTableAlias.getChildAliases().size() > 0)
+            {
+                parentTableAlias = parentTableAlias.getChildAliases().get(0);
+            }
+
             List<SelectItem> selectItems = ctx.selectItem().stream().map(s -> (SelectItem) visit(s)).collect(toList());
 
             boolean assignmentSelect = false;
@@ -279,11 +285,6 @@ public class QueryParser
                 assignmentSelect = true;
             }
 
-            // Point parent to the from table source
-            if (parentTableAlias.getChildAliases().size() > 0)
-            {
-                parentTableAlias = parentTableAlias.getChildAliases().get(0);
-            }
             Expression where = getExpression(ctx.where);
             List<Expression> groupBy = ctx.groupBy != null ? ctx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
             List<SortItem> orderBy = ctx.sortItem() != null ? ctx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
