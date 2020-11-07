@@ -253,6 +253,10 @@ class QueryFileView extends JPanel
             {
                 resultTable.adjustColumns();
             }
+            else if (e.getFirstRow() == TableModelEvent.HEADER_ROW && resultTable.columnsAdjusted.get())
+            {
+                resultTable.restoreWidths();
+            }
         });
         resultTable.setModel(resultModel);
 
@@ -763,6 +767,7 @@ class QueryFileView extends JPanel
     {
         private final TableColumnAdjuster adjuster = new TableColumnAdjuster(this, 10);
         private final AtomicBoolean columnsAdjusted = new AtomicBoolean();
+        private final List<Integer> adjustedWidths = new ArrayList<>();
 
         void adjustColumns()
         {
@@ -770,6 +775,22 @@ class QueryFileView extends JPanel
             {
                 columnsAdjusted.set(true);
                 adjuster.adjustColumns(250);
+                int columns = getColumnCount();
+                for (int i = 0; i < columns; i++)
+                {
+                    adjustedWidths.add(getColumnModel().getColumn(i).getWidth());
+                }
+            }
+        }
+
+        void restoreWidths()
+        {
+            int size = adjustedWidths.size();
+            for (int i = 0; i < size; i++)
+            {
+                TableColumn column = getColumnModel().getColumn(i);
+                getTableHeader().setResizingColumn(column);
+                column.setWidth(adjustedWidths.get(i));
             }
         }
     }
