@@ -279,6 +279,12 @@ class PayloadbuilderService
         }
 
         @Override
+        public void initResult(String[] columns)
+        {
+            resultModel.setColumns(columns);
+        }
+
+        @Override
         public void endRow()
         {
             // Adjust columns
