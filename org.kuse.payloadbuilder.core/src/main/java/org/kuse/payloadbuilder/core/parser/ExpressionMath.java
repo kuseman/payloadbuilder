@@ -1,6 +1,7 @@
 package org.kuse.payloadbuilder.core.parser;
 
 import java.util.Collection;
+import java.util.Iterator;
 
 /** Math methods used when evaluating expressions */
 public final class ExpressionMath
@@ -992,16 +993,32 @@ public final class ExpressionMath
     {
         if (arg instanceof Collection)
         {
-            if (((Collection<Object>) arg).contains(value))
+            return ((Collection<Object>) arg).contains(value);
+        }
+        if (arg instanceof Iterator)
+        {
+            Iterator<Object> it = (Iterator<Object>) arg;
+            while (it.hasNext())
             {
-                return true;
+                if (eq(value, it.next()))
+                {
+                    return true;
+                }
             }
         }
         else if (value instanceof Collection)
         {
-            if (((Collection<Object>) value).contains(arg))
+            return ((Collection<Object>) value).contains(arg);
+        }
+        else if (value instanceof Iterator)
+        {
+            Iterator<Object> it = (Iterator<Object>) value;
+            while (it.hasNext())
             {
-                return true;
+                if (eq(arg, it.next()))
+                {
+                    return true;
+                }
             }
         }
         else if (eq(value, arg, false))
