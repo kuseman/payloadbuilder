@@ -120,6 +120,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                                 false,
                                 false,
                                 c.getIndices(session, "", QualifiedName.of("article_attribute")).get(0),
+                                null,
+                                null,
                                 null),
                         "a"),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("s.art_id"))),
@@ -129,6 +131,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 true,
                 false,
                 c.getIndices(session, "", QualifiedName.of("article")).get(0),
+                null,
+                null,
                 null);
 
         Operator actual = pair.getKey();
@@ -173,6 +177,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 false,
                 false,
                 c.getIndices(session, "", QualifiedName.of("article")).get(0),
+                null,
+                null,
                 null);
 
         Operator actual = pair.getKey();
@@ -219,6 +225,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 true,
                 false,
                 c.getIndices(session, "", QualifiedName.of("article")).get(0),
+                null,
+                null,
                 null);
 
         Operator actual = pair.getKey();
@@ -266,6 +274,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 true,
                 true,
                 c.getIndices(session, "", QualifiedName.of("article")).get(0),
+                null,
+                null,
                 null);
 
         Operator actual = pair.getKey();
@@ -310,6 +320,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 false,
                 true,
                 c.getIndices(session, "", QualifiedName.of("article")).get(0),
+                null,
+                null,
                 null);
 
         Operator actual = pair.getKey();

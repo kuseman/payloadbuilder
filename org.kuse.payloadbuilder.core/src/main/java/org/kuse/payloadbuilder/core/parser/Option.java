@@ -8,7 +8,7 @@ public class Option
     private final QualifiedName option;
     private final Expression valueExpression;
 
-    Option(QualifiedName option, Expression valueExpression)
+    public Option(QualifiedName option, Expression valueExpression)
     {
         this.option = requireNonNull(option, "option");
         this.valueExpression = requireNonNull(valueExpression, "valueExpression");

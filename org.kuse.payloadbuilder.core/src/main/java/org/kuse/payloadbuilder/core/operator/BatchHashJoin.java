@@ -28,6 +28,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.lang3.time.StopWatch;
+import org.kuse.payloadbuilder.core.CacheProvider;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
@@ -64,14 +65,18 @@ class BatchHashJoin extends AOperator
     private final boolean emitEmptyOuterRows;
     private final Index innerIndex;
     private final int valuesSize;
-    private final Option batchSizeOption;
+    private final Option batchSize;
+
+    private final Option cacheKey;
+    /** TTL of cache in minutes */
+    private final Option cacheTTL;
 
     /* Statistics */
     private int executionCount;
 
     //CSOFF
     BatchHashJoin(
-    //CSON
+            //CSON
             int nodeId,
             String logicalOperator,
             Operator outer,
@@ -83,7 +88,9 @@ class BatchHashJoin extends AOperator
             boolean populating,
             boolean emitEmptyOuterRows,
             Index innerIndex,
-            Option batchSizeOption)
+            Option batchSize,
+            Option cacheKey,
+            Option cacheTTL)
     {
         super(nodeId);
         this.logicalOperator = requireNonNull(logicalOperator, "logicalOperator");
@@ -97,7 +104,9 @@ class BatchHashJoin extends AOperator
         this.emitEmptyOuterRows = emitEmptyOuterRows;
         this.innerIndex = requireNonNull(innerIndex, "innerIndex");
         this.valuesSize = outerValuesExtractor.size();
-        this.batchSizeOption = batchSizeOption;
+        this.batchSize = batchSize;
+        this.cacheKey = cacheKey;
+        this.cacheTTL = cacheTTL;
     }
 
     @Override
@@ -118,7 +127,7 @@ class BatchHashJoin extends AOperator
         return ofEntries(true,
                 entry(LOGICAL_OPERATOR, logicalOperator),
                 entry(POPULATING, populating),
-                entry(BATCH_SIZE, batchSizeOption != null ? batchSizeOption.getValueExpression().toString() : innerIndex.getBatchSize()),
+                entry(BATCH_SIZE, batchSize != null ? batchSize.getValueExpression().toString() : innerIndex.getBatchSize()),
                 entry(PREDICATE, predicate),
                 entry(INDEX, innerIndex),
                 entry(OUTER_VALUES, outerValuesExtractor),
@@ -146,17 +155,27 @@ class BatchHashJoin extends AOperator
     {
         final Tuple contextOuter = context.getTuple();
         final JoinTuple joinTuple = new JoinTuple();
+        CacheProvider tempProvider = null;
+        if (cacheKey != null)
+        {
+            tempProvider = context.getSession().getCacheProvider();
+            if (tempProvider == null)
+            {
+                throw new OperatorException("Cannot use cache table option with no cache provider registered in session");
+            }
+        }
+        final CacheProvider cacheProvider = tempProvider;
         joinTuple.setContextOuter(contextOuter);
         Data data = context.getOperatorContext().getNodeData(nodeId, () -> new Data());
         executionCount++;
         final RowIterator outerIt = outer.open(context);
         int temp = innerIndex.getBatchSize();
-        if (batchSizeOption != null)
+        if (batchSize != null)
         {
-            Object obj = batchSizeOption.getValueExpression().eval(context);
+            Object obj = batchSize.getValueExpression().eval(context);
             if (!(obj instanceof Integer) || (Integer) obj < 0)
             {
-                throw new OperatorException("Batch size expression " + batchSizeOption.getValueExpression() + " should return a positive Integer. Got: " + obj);
+                throw new OperatorException("Batch size expression " + batchSize.getValueExpression() + " should return a positive Integer. Got: " + obj);
             }
             temp = (int) obj;
         }
@@ -171,6 +190,8 @@ class BatchHashJoin extends AOperator
             private int outerTupleIndex;
             private List<Tuple> innerTuples;
             private int innerRowIndex;
+
+            private List<Tuple> cachedTuples;
 
             /** Reference to outer values iterator to verify that implementations of Operator fully uses the index if specified */
             private Iterator<Object[]> outerValuesIterator;
@@ -223,7 +244,7 @@ class BatchHashJoin extends AOperator
 
                     if (outerTuples == null)
                     {
-                        batchOuterRows();
+                        batchOuterRows(cacheProvider);
                         if (outerTuples.isEmpty())
                         {
                             verifyOuterValuesIterator();
@@ -237,6 +258,20 @@ class BatchHashJoin extends AOperator
                         hashInnerBatch();
 
                         // Start probing
+                        continue;
+                    }
+                    // Cached values state
+                    else if (cachedTuples != null)
+                    {
+                        if (innerRowIndex >= cachedTuples.size())
+                        {
+                            innerRowIndex = 0;
+                            cachedTuples = null;
+                            continue;
+                        }
+
+                        next = cachedTuples.get(innerRowIndex);
+                        innerRowIndex++;
                         continue;
                     }
                     // Probe current outer tuple
@@ -261,6 +296,14 @@ class BatchHashJoin extends AOperator
                         }
 
                         outerTuple = outerTuples.get(outerTupleIndex);
+
+                        if (outerTuple.cachedInnerTuples != null)
+                        {
+                            outerTupleIndex++;
+                            cachedTuples = outerTuple.cachedInnerTuples;
+                            continue;
+                        }
+
                         TableValue tableValue = table.get(outerTuple.hash);
                         if (tableValue == null)
                         {
@@ -297,6 +340,8 @@ class BatchHashJoin extends AOperator
 
                     if (predicate.test(context, joinTuple))
                     {
+                        System.out.println("Cache " + innerRow + " with key " + outerTuple.cacheKey);
+
                         sw1.start();
 
                         next = rowMerger.merge(outerTuple.tuple, innerRow, populating, nodeId);
@@ -318,7 +363,7 @@ class BatchHashJoin extends AOperator
             StopWatch sw1 = new StopWatch();
 
             /** Batch outer rows and generate outer keys */
-            private void batchOuterRows()
+            private void batchOuterRows(CacheProvider cacheProvider)
             {
                 // Stop early to avoid allocation of lists
                 if (!outerIt.hasNext())
@@ -333,12 +378,41 @@ class BatchHashJoin extends AOperator
                 while (outerIt.hasNext())
                 {
                     Tuple tuple = outerIt.next();
-                    outerTuples.add(new TupleHolder(tuple));
+                    TupleHolder holder = new TupleHolder(tuple);
+
+                    // Generate cache key for tuple
+                    if (cacheKey != null)
+                    {
+                        context.setTuple(tuple);
+                        holder.cacheKey = cacheKey.getValueExpression().eval(context);
+//                        System.out.println("Lookup " + key);
+                    }
+
+//                    outerValuesExtractor.extract(context, tuple, keyValues);
+//                    int hash = hash(keyValues); //populateKeyValues(outerValuesExtractor, context, holder.tuple);
+//                    // Cannot be null values in keys
+//                    if (contains(keyValues, null))
+//                    {
+//                        // TODO: warn, debug mode?
+//                        continue;
+//                    }
+
+//                    holder.hash = hash;
+//                    holder.cacheKey = key;
+//                    holder.keyValues = Arrays.copyOf(keyValues, keyValues.length);
+                    outerTuples.add(holder);
+
                     count++;
                     if (batchSize > 0 && count >= batchSize)
                     {
                         break;
                     }
+                }
+
+                // Lookup outer tuples cache keys in cache
+                if (cacheKey != null)
+                {
+//                    cacheProvider.getAll(keys)
                 }
             }
 
@@ -404,6 +478,7 @@ class BatchHashJoin extends AOperator
                 outerTuples = null;
                 outerTupleIndex = 0;
                 emitOuterRows = false;
+                cachedTuples = null;
             }
 
             private int populateKeyValues(
@@ -453,13 +528,22 @@ class BatchHashJoin extends AOperator
                             }
 
                             TupleHolder holder = outerTuples.get(outerRowsIndex++);
-                            int hash = populateKeyValues(outerValuesExtractor, context, holder.tuple);
+
+                            // Cache data, skip this outer tuple
+                            if (holder.cachedInnerTuples != null)
+                            {
+                                continue;
+                            }
+
+                            outerValuesExtractor.extract(context, holder.tuple, keyValues);
+                            int hash = hash(keyValues); //populateKeyValues(outerValuesExtractor, context, holder.tuple);
                             // Cannot be null values in keys
                             if (contains(keyValues, null))
                             {
                                 continue;
                             }
                             holder.hash = hash;
+
                             TableValue tableValue = table.get(holder.hash);
                             if (tableValue == null)
                             {
@@ -467,7 +551,7 @@ class BatchHashJoin extends AOperator
                                 table.put(holder.hash, tableValue);
                             }
 
-                            if (!tableValue.addInnterValues(keyValues))
+                            if (!tableValue.addInnerValues(keyValues))
                             {
                                 // Value already present, no need to push values to downstream
                                 continue;
@@ -535,7 +619,9 @@ class BatchHashJoin extends AOperator
                 && populating == that.populating
                 && emitEmptyOuterRows == that.emitEmptyOuterRows
                 && innerIndex.equals(that.innerIndex)
-                && Objects.equals(batchSizeOption, that.batchSizeOption);
+                && Objects.equals(batchSize, that.batchSize)
+                && Objects.equals(cacheKey, that.cacheKey)
+                && Objects.equals(cacheTTL, that.cacheTTL);
         }
         return false;
     }
@@ -551,7 +637,7 @@ class BatchHashJoin extends AOperator
                 populating,
                 emitEmptyOuterRows,
                 executionCount,
-                batchSizeOption != null ? batchSizeOption.getValueExpression().toString() : innerIndex.getBatchSize(),
+                batchSize != null ? batchSize.getValueExpression().toString() : innerIndex.getBatchSize(),
                 innerIndex,
                 outerValuesExtractor,
                 innerValuesExtractor,
@@ -566,7 +652,11 @@ class BatchHashJoin extends AOperator
     {
         private Tuple tuple;
         private int hash;
+//        private Object[] keyValues;
         private boolean match;
+
+        private Object cacheKey;
+        private List<Tuple> cachedInnerTuples;
 
         TupleHolder(Tuple tuple)
         {
@@ -614,7 +704,7 @@ class BatchHashJoin extends AOperator
          *
          * @return True if array was added
          */
-        boolean addInnterValues(Object[] keyValues)
+        boolean addInnerValues(Object[] keyValues)
         {
             if (values == null)
             {

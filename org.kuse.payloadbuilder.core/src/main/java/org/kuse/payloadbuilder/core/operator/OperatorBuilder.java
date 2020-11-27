@@ -64,6 +64,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 {
     private static final String BATCH_LIMIT = "batch_limit";
     private static final String BATCH_SIZE = "batch_size";
+    private static final String CACHE_KEY = "cache_key";
+    private static final String CACHE_TTL = "cache_ttl";
     private static final String POPULATE = "populate";
 
     //    private static final String HASH_INNER = "hash_inner";
@@ -732,6 +734,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         // Get batch size option for provided table source (if any) Used to override default {@link Index#getBatchSize()} for a table
         Option batchSizeOption = getOption(innerTableSource, BATCH_SIZE);
+        Option cacheKeyOption = getOption(innerTableSource, CACHE_KEY);
+        Option cacheTTLOption = getOption(innerTableSource, CACHE_TTL);
 
         return new BatchHashJoin(
                 context.acquireNodeId(),
@@ -745,7 +749,9 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 populating,
                 emitEmptyOuterRows,
                 index,
-                batchSizeOption);
+                batchSizeOption,
+                cacheKeyOption,
+                cacheTTLOption);
     }
 
     /** Fetch index from provided equi pairs and indices list */
@@ -1007,6 +1013,12 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 return null;
             }
         };
+
+        /** Don't visit table options when resolving correlated queries */
+        @Override
+        protected void visitOption(Option option, Set<String> context)
+        {
+        }
 
         @Override
         protected void visitExpression(Set<String> context, Expression expression)

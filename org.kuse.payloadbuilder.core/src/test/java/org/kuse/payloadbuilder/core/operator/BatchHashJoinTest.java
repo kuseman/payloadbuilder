@@ -7,6 +7,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiPredicate;
 import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 
@@ -17,6 +18,7 @@ import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
+import org.kuse.payloadbuilder.core.parser.Option;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Test {@link BatchHashJoin} */
@@ -41,19 +43,15 @@ public class BatchHashJoinTest extends AOperatorTest
         Operator left = op(ctx -> RowIterator.EMPTY);
         Operator right = op(ctx -> RowIterator.EMPTY);
 
-        BatchHashJoin op = new BatchHashJoin(
-                0,
-                "",
+        BatchHashJoin op = batchHashJoin(
                 left,
                 right,
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                false,
                 index,
-                null);
+                false,
+                false);
 
         assertFalse(op.open(new ExecutionContext(session)).hasNext());
     }
@@ -71,18 +69,15 @@ public class BatchHashJoinTest extends AOperatorTest
             }
             return RowIterator.EMPTY;
         });
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
+        BatchHashJoin op = batchHashJoin(
                 left,
                 right,
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                false,
                 index,
-                null);
+                false,
+                false);
 
         assertFalse(op.open(new ExecutionContext(session)).hasNext());
     }
@@ -94,18 +89,15 @@ public class BatchHashJoinTest extends AOperatorTest
         Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator());
         Operator right = op(context -> RowIterator.EMPTY);
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
+        BatchHashJoin op = batchHashJoin(
                 left,
                 right,
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                false,
                 index,
-                null);
+                false,
+                false);
 
         op.open(new ExecutionContext(session)).hasNext();
     }
@@ -122,18 +114,15 @@ public class BatchHashJoinTest extends AOperatorTest
             return asList((Tuple) Row.of(a, 0, ar)).iterator();
         });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
+        BatchHashJoin op = batchHashJoin(
                 left,
                 right,
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                false,
                 index,
-                null);
+                false,
+                false);
 
         op.open(new ExecutionContext(session)).hasNext();
     }
@@ -153,18 +142,15 @@ public class BatchHashJoinTest extends AOperatorTest
             return RowIterator.EMPTY;
         });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
+        BatchHashJoin op = batchHashJoin(
                 left,
                 right,
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                false,
                 index,
-                null);
+                false,
+                false);
 
         op.open(new ExecutionContext(session)).hasNext();
     }
@@ -210,18 +196,18 @@ public class BatchHashJoinTest extends AOperatorTest
                 0,
                 "",
                 opA,
-                new BatchHashJoin(
+                batchHashJoin(
                         1,
-                        "",
                         opB,
                         opC,
                         new ExpressionValuesExtractor(asList(e("b.col1"))),
                         new ExpressionValuesExtractor(asList(e("c.col1"))),
                         new ExpressionPredicate(e("c.col1 = b.col1 and c.col2 = a.col2")),
-                        DefaultTupleMerger.DEFAULT,
-                        false,
-                        false,
                         index,
+                        false,
+                        false,
+                        null,
+                        null,
                         null),
                 new ExpressionPredicate(e("b.col1 = a.col1")),
                 DefaultTupleMerger.DEFAULT,
@@ -271,18 +257,15 @@ public class BatchHashJoinTest extends AOperatorTest
             return inner.iterator();
         }, () -> rightClose.increment());
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
+        BatchHashJoin op = batchHashJoin(
                 left,
                 right,
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                false,
                 index,
-                null);
+                false,
+                false);
 
         RowIterator it = op.open(new ExecutionContext(session));
 
@@ -299,6 +282,92 @@ public class BatchHashJoinTest extends AOperatorTest
         };
 
         int count = 0;
+        while (it.hasNext())
+        {
+            Tuple tuple = it.next();
+            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals(expectedInnerPositions[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
+            count++;
+        }
+        it.close();
+
+        assertEquals(5, count);
+        assertTrue(leftClose.booleanValue());
+        assertEquals(5, rightClose.intValue());
+    }
+
+    @Test
+    public void test_inner_join_one_to_one_with_cache()
+    {
+        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
+        MutableInt posLeft = new MutableInt();
+        MutableInt posRight = new MutableInt();
+        MutableBoolean leftClose = new MutableBoolean();
+        MutableInt rightClose = new MutableInt();
+        Operator left = op(context -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+                .stream()
+                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                .iterator(), () -> leftClose.setTrue());
+        Operator right = op(context ->
+        {
+            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
+                    .map(ar -> (Integer) ar[0])
+                    .filter(val -> val >= 5 && val <= 9)
+                    .distinct()
+                    .map(val -> Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
+                    .collect(toList());
+
+            return inner.iterator();
+        }, () -> rightClose.increment());
+
+        BatchHashJoin op = batchHashJoin(
+                0,
+                left,
+                right,
+                new ExpressionValuesExtractor(asList(e("a.col1"))),
+                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
+                index,
+                false,
+                false,
+                null,
+                new Option(QualifiedName.of("cacheKey"), e("listOf('cache', a.col1)")),
+                null
+                );
+
+        int[] expectedOuterPositions = new int[] {
+                7,          // Batch 1
+                8, 9, 10,   // Batch 2
+                11          // Batch 3
+        };
+
+        int[] expectedInnerPositions = new int[] {
+                0,          // Batch 1
+                1, 2, 3,    // Batch 2
+                4           // Batch 3
+        };
+
+        RowIterator it = op.open(new ExecutionContext(session));
+
+        int count = 0;
+        while (it.hasNext())
+        {
+            Tuple tuple = it.next();
+            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals(expectedInnerPositions[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
+            count++;
+        }
+        it.close();
+
+        assertEquals(5, count);
+        assertTrue(leftClose.booleanValue());
+        assertEquals(5, rightClose.intValue());
+        
+        // Execute second time, now inner rows should be cached and no calls to inner operator should be made
+        it = op.open(new ExecutionContext(session));
+
+        count = 0;
         while (it.hasNext())
         {
             Tuple tuple = it.next();
@@ -336,17 +405,15 @@ public class BatchHashJoinTest extends AOperatorTest
             return inner.iterator();
         });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
+        BatchHashJoin op = batchHashJoin(
                 left,
                 right,
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
+                index,
                 false,
-                true,
-                index, null);
+                true);
 
         RowIterator it = op.open(new ExecutionContext(session));
 
@@ -395,17 +462,15 @@ public class BatchHashJoinTest extends AOperatorTest
                     .iterator();
         });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
+        BatchHashJoin op = batchHashJoin(
                 left,
                 right,
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
+                index,
                 false,
-                false,
-                index, null);
+                false);
 
         RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -454,17 +519,15 @@ public class BatchHashJoinTest extends AOperatorTest
                     .iterator();
         });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
+        BatchHashJoin op = batchHashJoin(
                 left,
                 right,
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
+                index,
                 false,
-                true,
-                index, null);
+                true);
 
         RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -519,17 +582,15 @@ public class BatchHashJoinTest extends AOperatorTest
             return rows.iterator();
         });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
+        BatchHashJoin op = batchHashJoin(
                 left,
                 right,
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
+                index,
                 false,
-                false,
-                index, null);
+                false);
 
         RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -580,17 +641,15 @@ public class BatchHashJoinTest extends AOperatorTest
             return inner.iterator();
         });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
+        BatchHashJoin op = batchHashJoin(
                 left,
                 right,
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
+                index,
                 false,
-                true,
-                index, null);
+                true);
 
         RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -653,17 +712,15 @@ public class BatchHashJoinTest extends AOperatorTest
             return inner.iterator();
         });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
+        BatchHashJoin op = batchHashJoin(
                 left,
                 right,
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
+                index,
                 false,
-                false,
-                index, null);
+                false);
 
         RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -718,17 +775,15 @@ public class BatchHashJoinTest extends AOperatorTest
             return inner.iterator();
         });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
+        BatchHashJoin op = batchHashJoin(
                 left,
                 right,
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1 and b.col2 < 3")),
-                DefaultTupleMerger.DEFAULT,
+                index,
                 false,
-                true,
-                index, null);
+                true);
 
         int[] expectedOuterPositions = new int[] {
                 0, 1, 2,
@@ -788,17 +843,15 @@ public class BatchHashJoinTest extends AOperatorTest
             return inner.iterator();
         });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
+        BatchHashJoin op = batchHashJoin(
                 left,
                 right,
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
+                index,
                 true,
-                false,
-                index, null);
+                false);
 
         RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -850,17 +903,15 @@ public class BatchHashJoinTest extends AOperatorTest
             return inner.iterator();
         });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
+        BatchHashJoin op = batchHashJoin(
                 left,
                 right,
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
+                index,
                 true,
-                true,
-                index, null);
+                true);
 
         RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -914,17 +965,15 @@ public class BatchHashJoinTest extends AOperatorTest
                     .iterator();
         });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
+        BatchHashJoin op = batchHashJoin(
                 left,
                 right,
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
+                index,
                 true,
-                false,
-                index, null);
+                false);
 
         RowIterator it = op.open(new ExecutionContext(session));
 
@@ -977,17 +1026,15 @@ public class BatchHashJoinTest extends AOperatorTest
                     .iterator();
         });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
+        BatchHashJoin op = batchHashJoin(
                 left,
                 right,
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
+                index,
                 true,
-                true,
-                index, null);
+                true);
 
         RowIterator it = op.open(new ExecutionContext(session));
 
@@ -1054,17 +1101,15 @@ public class BatchHashJoinTest extends AOperatorTest
                     .iterator();
         });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
+        BatchHashJoin op = batchHashJoin(
                 left,
                 right,
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
+                index,
                 true,
-                false,
-                index, null);
+                false);
 
         RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -1121,20 +1166,15 @@ public class BatchHashJoinTest extends AOperatorTest
                     .iterator();
         });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
+        BatchHashJoin op = batchHashJoin(
                 left,
                 right,
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
-                //                (ctx, row, values) -> values[0] = row.getObject(0),
-                //                (ctx, row, values) -> values[0] = row.getObject(0),
-                //                (ctx, row) -> (Integer) row.getParent().getObject(0) > 0 && (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultTupleMerger.DEFAULT,
+                index,
                 true,
-                true,
-                index, null);
+                true);
 
         RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -1173,6 +1213,62 @@ public class BatchHashJoinTest extends AOperatorTest
         }
 
         assertEquals(24, count);
+    }
+
+    private BatchHashJoin batchHashJoin(
+            Operator left,
+            Operator right,
+            ValuesExtractor outerValuesExtractor,
+            ValuesExtractor innerValuesExtractor,
+            BiPredicate<ExecutionContext, Tuple> predicate,
+            Index index,
+            boolean populating,
+            boolean emitEmptyOuterRows)
+    {
+        return batchHashJoin(
+                0,
+                left,
+                right,
+                outerValuesExtractor,
+                innerValuesExtractor,
+                predicate,
+                index,
+                populating,
+                emitEmptyOuterRows,
+                null,
+                null,
+                null);
+    }
+
+    private BatchHashJoin batchHashJoin(
+            int nodeId,
+            Operator outer,
+            Operator inner,
+            ValuesExtractor outerValuesExtractor,
+            ValuesExtractor innerValuesExtractor,
+            BiPredicate<ExecutionContext, Tuple> predicate,
+            Index index,
+            boolean populating,
+            boolean emitEmptyOuterRows,
+            Option batchSize,
+            Option cacheKey,
+            Option cacheTTL)
+    {
+        return new BatchHashJoin(
+                nodeId,
+                "",
+                outer,
+                inner,
+                outerValuesExtractor,
+                innerValuesExtractor,
+                predicate,
+                DefaultTupleMerger.DEFAULT,
+                populating,
+                emitEmptyOuterRows,
+                index,
+                batchSize,
+                cacheKey,
+                cacheTTL);
     }
 
     //    @Ignore

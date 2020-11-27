@@ -23,6 +23,8 @@ public class QuerySession
     private Map<String, Map<String, Object>> catalogProperties;
     private PrintStream printStream;
     private BooleanSupplier abortSupplier;
+    // TODO: Default cache provider noop or inmemory
+    private CacheProvider cacheProvider;
 
     public QuerySession(CatalogRegistry catalogRegistry)
     {
@@ -96,5 +98,15 @@ public class QuerySession
         }
 
         return catalogProperties.getOrDefault(alias, emptyMap()).get(key);
+    }
+
+    public CacheProvider getCacheProvider()
+    {
+        return cacheProvider;
+    }
+
+    public void setCacheProvider(CacheProvider cacheProvider)
+    {
+        this.cacheProvider = cacheProvider;
     }
 }

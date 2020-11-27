@@ -53,20 +53,20 @@ class ExpressionOperator extends AOperator
             };
 
             @Override
-            public Row next()
+            public Tuple next()
             {
                 return transform(iterator.next());
             };
 
-            private Row transform(Object input)
+            private Tuple transform(Object input)
             {
                 if (input == null)
                 {
                     return null;
                 }
-                else if (input instanceof Row)
+                else if (input instanceof Tuple)
                 {
-                    return (Row) input;
+                    return (Tuple) input;
                 }
                 else if (input instanceof Map)
                 {
