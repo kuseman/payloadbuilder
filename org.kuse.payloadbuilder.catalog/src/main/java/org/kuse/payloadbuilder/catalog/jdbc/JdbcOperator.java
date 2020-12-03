@@ -61,7 +61,7 @@ class JdbcOperator extends AOperator
     }
 
     @Override
-    public Map<String, Object> getDescribeProperties()
+    public Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
         Map<String, Object> result = ofEntries(true,
                 entry(CATALOG, JdbcCatalog.NAME));

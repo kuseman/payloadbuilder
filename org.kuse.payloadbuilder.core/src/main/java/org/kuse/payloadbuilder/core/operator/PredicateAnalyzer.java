@@ -20,6 +20,7 @@ import org.kuse.payloadbuilder.core.parser.AExpressionVisitor;
 import org.kuse.payloadbuilder.core.parser.ComparisonExpression;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.InExpression;
+import org.kuse.payloadbuilder.core.parser.LikeExpression;
 import org.kuse.payloadbuilder.core.parser.LiteralBooleanExpression;
 import org.kuse.payloadbuilder.core.parser.LogicalBinaryExpression;
 import org.kuse.payloadbuilder.core.parser.LogicalNotExpression;
@@ -253,6 +254,11 @@ public class PredicateAnalyzer
             else if (type == Type.IN)
             {
                 // Right expression contains the whole in expression
+                return right.expression;
+            }
+            else if (type == Type.LIKE)
+            {
+                // Right expression contains the whole like expression
                 return right.expression;
             }
 
@@ -494,6 +500,20 @@ public class PredicateAnalyzer
                     return new AnalyzePair(Type.IN, leftItem, rightItem);
                 }
             }
+            else if (expression instanceof LikeExpression)
+            {
+                LikeExpression le = (LikeExpression) expression;
+                if (le.getExpression() instanceof QualifiedReferenceExpression)
+                {
+                    AnalyzeItem leftItem = getQualifiedItem(tableAlias, le.getExpression());
+
+                    // Fetch all aliases pattern
+                    Set<String> aliases = new HashSet<>();
+                    QualifiedReferenceVisitor.getAliases(tableAlias, le.getPatternExpression(), aliases);
+                    AnalyzeItem rightItem = new AnalyzeItem(le, aliases, null);
+                    return new AnalyzePair(Type.LIKE, leftItem, rightItem);
+                }
+            }
             else if (expression instanceof QualifiedReferenceExpression)
             {
                 // A single qualified expression in a predicate is a boolean expression
@@ -578,6 +598,9 @@ public class PredicateAnalyzer
             COMPARISION,
             /** In pair. {@link InExpression} is used */
             IN,
+
+            /** Like pair. {@link LikeExpression} is used */
+            LIKE,
 
             /** Null predicate. */
             NULL,

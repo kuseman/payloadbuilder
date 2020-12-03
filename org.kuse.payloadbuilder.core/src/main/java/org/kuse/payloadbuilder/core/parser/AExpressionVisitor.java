@@ -109,6 +109,12 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
     }
 
     @Override
+    public TR visit(LikeExpression expression, TC context)
+    {
+        return visitChildren(context, expression.getExpression(), expression.getPatternExpression());
+    }
+
+    @Override
     public TR visit(QualifiedReferenceExpression expression, TC context)
     {
         return defaultResult(context);

@@ -1,3 +1,4 @@
+
 # Payloadbuilder Catalogs
 
 ## Table of Contents
@@ -55,6 +56,12 @@ NOTE! For ES versions where type is not longer present the qualified name **_doc
 |:----------------|:--------------|:---------------------------------------------------|:------------------------------|---------|
 | mustachecompile | Scalar        | Compiles provided mustasch template with arguments | template (Sting), model (Map) |         |
 | search          | Table         | Queries Elasticsearch with a nativ query           | **Named arguments:**<br/> endpoint (String) (Optional if provided in catalog properties <br/>index (String) (Optional if provided in catalog properties <br/>type (String) <br/>body (String) Mutual exclusive with template <br/>template (String) Mutual exclusive with body <br/>scroll (Boolean)<br/>params (Map) Model provided to template| use es.endpoint = 'http://localhost:9200'<br/>use es.index='myIndex'<br/><br/>select *<br/>from es#search(<br/>body: '{ "filter": { "match_all": {} }',<br/>scroll: true<br/>) |
+|match|Scalar|Function that utilizes ES match operator as a predicate. NOTE! Only applicable in query predicates for ES catalog tables.|matchFields (Qualified name or String with comma separated field names. If multiple fields are used then a multi_match query is used.)<br/>query (String)|select *<br/>from es#_doc<br/>where match(name, 'some phrase')<br/><br/>select *<br/>from es#_doc<br/>where es#match('name,message', 'some phrase')|
+|query|Scalar|Function that utilizes ES query_string operator as a predicate. NOTE! Only applicable in query predicates for ES catalog tables.|query (String)<br/>|select *<br/>from es#_doc<br/>where es#query('type:log AND severity:200')|
+
+#### Misc
+
+LIKE operator is pushed down as a Elastic WILDCARD query
 
 ## Jdbc
 

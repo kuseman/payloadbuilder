@@ -443,6 +443,22 @@ public class PredicateAnalyzerTest extends Assert
         assertEquals("art_id", p.getColumn("a"));
         assertNull(p.getColumn("s"));
 
+        p = PredicateAnalyzer.AnalyzePair.of(alias, e("a.art_id LIKE 'pat'"));
+        assertEquals(Type.LIKE, p.getType());
+        assertNull(p.getComparisonType());
+        assertEquals(e("a.art_id LIKE 'pat'"), p.getPredicate());
+        assertNull(p.getColumn("b"));
+        assertEquals("art_id", p.getColumn("a"));
+        assertNull(p.getColumn("s"));
+
+        p = PredicateAnalyzer.AnalyzePair.of(alias, e("a.art_id not LIKE @var"));
+        assertEquals(Type.LIKE, p.getType());
+        assertNull(p.getComparisonType());
+        assertEquals(e("a.art_id not LIKE @var"), p.getPredicate());
+        assertNull(p.getColumn("b"));
+        assertEquals("art_id", p.getColumn("a"));
+        assertNull(p.getColumn("s"));
+
         p = PredicateAnalyzer.AnalyzePair.of(alias, e("@val in (200, 300)"));
         assertEquals(Type.UNDEFINED, p.getType());
         assertNull(p.getComparisonType());

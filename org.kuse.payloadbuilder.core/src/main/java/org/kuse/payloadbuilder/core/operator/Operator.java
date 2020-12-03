@@ -39,8 +39,10 @@ public interface Operator
         return "";
     }
 
-    /** Returns more detail properties of describe statement if {@link #getDescribeString()} is not enough. */
-    default Map<String, Object> getDescribeProperties()
+    /** Returns more detail properties of describe statement if {@link #getDescribeString()} is not enough.
+     * @param context Execution context
+     * */
+    default Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
         return emptyMap();
     }

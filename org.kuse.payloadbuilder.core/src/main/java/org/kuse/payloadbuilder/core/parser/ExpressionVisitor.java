@@ -34,6 +34,8 @@ public interface ExpressionVisitor<TR, TC>
     TR visit(LogicalNotExpression expression, TC context);
 
     TR visit(InExpression expression, TC context);
+    
+    TR visit(LikeExpression expression, TC context);
 
     TR visit(QualifiedReferenceExpression expression, TC context);
 

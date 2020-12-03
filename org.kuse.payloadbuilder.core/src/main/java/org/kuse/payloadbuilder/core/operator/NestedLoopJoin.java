@@ -62,7 +62,7 @@ class NestedLoopJoin extends AOperator
     }
 
     @Override
-    public Map<String, Object> getDescribeProperties()
+    public Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
         return ofEntries(
                 entry(DescribeUtils.PREDICATE, predicate == null ? "" : predicate.toString()),

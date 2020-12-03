@@ -12,7 +12,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
-import org.kuse.payloadbuilder.catalog.es.ESOperator.EsType;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
@@ -106,11 +105,11 @@ class SearchFunction extends TableFunctionInfo
 
         if (endpoint == null)
         {
-            endpoint = EsType.getEndpoint(context.getSession(), catalogAlias);
+            endpoint = ESType.getEndpoint(context.getSession(), catalogAlias);
         }
         if (index == null)
         {
-            index = EsType.getIndex(context.getSession(), catalogAlias);
+            index = ESType.getIndex(context.getSession(), catalogAlias);
         }
 
         if (template != null && body != null)

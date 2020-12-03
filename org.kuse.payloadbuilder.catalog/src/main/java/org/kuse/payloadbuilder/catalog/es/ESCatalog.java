@@ -3,7 +3,7 @@ package org.kuse.payloadbuilder.catalog.es;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
-import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
+import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.kuse.payloadbuilder.catalog.es.ESOperator.CLIENT;
 import static org.kuse.payloadbuilder.catalog.es.ESOperator.MAPPER;
@@ -23,16 +23,17 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
-import org.kuse.payloadbuilder.catalog.es.ESOperator.EsType;
-import org.kuse.payloadbuilder.catalog.es.ESOperator.PropertyPredicate;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.Index;
+import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair.Type;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.ComparisonExpression;
+import org.kuse.payloadbuilder.core.parser.Expression;
+import org.kuse.payloadbuilder.core.parser.QualifiedFunctionCallExpression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 import org.kuse.payloadbuilder.core.parser.SortItem;
@@ -52,6 +53,8 @@ public class ESCatalog extends Catalog
         super("EsCatalog");
         registerFunction(new MustacheCompileFunction(this));
         registerFunction(new SearchFunction(this));
+        registerFunction(new MatchFunction(this));
+        registerFunction(new QueryFunction(this));
     }
 
     @SuppressWarnings("unchecked")
@@ -116,17 +119,21 @@ public class ESCatalog extends Catalog
         if (!data.getPredicatePairs().isEmpty() || !data.getSortItems().isEmpty())
         {
             // Fetch analyzed properties
-            Map<String, String> analyzedFields = getAnalyzedPropertyNames(data.getSession(), data.getCatalogAlias(), data.getTableAlias().getTable());
+            Map<String, MappedProperty> properties = getProperties(data.getSession(), data.getCatalogAlias(), data.getTableAlias().getTable());
 
             if (!data.getPredicatePairs().isEmpty())
             {
                 propertyPredicates = new ArrayList<>();
-                collectPredicates(data.getTableAlias(), data.getPredicatePairs(), analyzedFields, propertyPredicates);
+                collectPredicates(
+                        data.getTableAlias(),
+                        data.getPredicatePairs(),
+                        properties,
+                        propertyPredicates);
             }
 
             if (!data.getSortItems().isEmpty())
             {
-                sortItems = collectSortItems(data.getTableAlias(), analyzedFields, data.getSortItems());
+                sortItems = collectSortItems(data.getTableAlias(), properties, data.getSortItems());
             }
         }
 
@@ -155,8 +162,8 @@ public class ESCatalog extends Catalog
     private void collectPredicates(
             TableAlias tableAlias,
             List<AnalyzePair> predicatePairs,
-            Map<String, String> analyzedProperties,
-            List<ESOperator.PropertyPredicate> propertyPredicates)
+            Map<String, MappedProperty> properties,
+            List<PropertyPredicate> propertyPredicates)
     {
         Iterator<AnalyzePair> it = predicatePairs.iterator();
         while (it.hasNext())
@@ -164,6 +171,12 @@ public class ESCatalog extends Catalog
             AnalyzePair pair = it.next();
             if (pair.getType() == Type.UNDEFINED)
             {
+                if (isFullTextSearchPredicate(pair.getPredicate()))
+                {
+                    propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), "", pair, true));
+                    it.remove();
+                }
+
                 continue;
             }
 
@@ -174,42 +187,66 @@ public class ESCatalog extends Catalog
             }
 
             String column = qname.toString();
-            String key = analyzedProperties.get(column);
+            MappedProperty property = properties.get(column);
             // Extra columns only support EQUALS
             if (ESOperator.INDEX.equals(column) && pair.getComparisonType() == ComparisonExpression.Type.EQUAL)
             {
-                propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), "_index", pair));
+                propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), "_index", pair, false));
                 it.remove();
             }
             else if (ESOperator.TYPE.equals(column) && pair.getComparisonType() == ComparisonExpression.Type.EQUAL)
             {
-                propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), "_type", pair));
+                propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), "_type", pair, false));
                 it.remove();
             }
             else if (ESOperator.DOCID.equals(column) && pair.getComparisonType() == ComparisonExpression.Type.EQUAL)
             {
-                propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), "_id", pair));
+                propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), "_id", pair, false));
                 it.remove();
             }
             else if (ESOperator.PARENTID.equals(column) && pair.getComparisonType() == ComparisonExpression.Type.EQUAL)
             {
-                propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), "_parent", pair));
+                propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), "_parent", pair, false));
                 it.remove();
             }
             // TODO: strings only support equals
-            else if (key != null)
+            else if (property != null)
             {
-                propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), defaultIfBlank(key, column), pair));
+                String field = property.name;
+                if (property.isFreeTextMapping())
+                {
+                    property = property.getNonFreeTextField();
+                    //CSOFF
+                    if (property == null)
+                    //CSON
+                    {
+                        continue;
+                    }
+                    field = property.name;
+                }
+
+                propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), field, pair, false));
                 it.remove();
             }
         }
+    }
+
+    private boolean isFullTextSearchPredicate(Expression expression)
+    {
+        if (!(expression instanceof QualifiedFunctionCallExpression))
+        {
+            return false;
+        }
+        ScalarFunctionInfo functionInfo = ((QualifiedFunctionCallExpression) expression).getFunctionInfo();
+        Class<?> clazz = functionInfo.getClass();
+        return clazz == MatchFunction.class || clazz == QueryFunction.class;
     }
 
     //CSOFF
     private List<Pair<String, String>> collectSortItems(
             //CSON
             TableAlias tableAlias,
-            Map<String, String> analyzedProperties,
+            Map<String, MappedProperty> properties,
             List<SortItem> sortItems)
     {
         List<Pair<String, String>> result = null;
@@ -259,14 +296,25 @@ public class ESCatalog extends Catalog
                 continue;
             }
 
-            String key = analyzedProperties.get(column);
-
-            if (key == null)
+            MappedProperty property = properties.get(column);
+            if (property == null)
             {
                 return emptyList();
             }
+            String field = property.name;
 
-            result.add(Pair.of(defaultIfBlank(key, column), sortItem.getOrder() == Order.ASC ? "asc" : "desc"));
+            // Try to find a non free text mapping
+            if (property.isFreeTextMapping())
+            {
+                property = property.getNonFreeTextField();
+                if (property == null)
+                {
+                    return emptyList();
+                }
+                field = property.name;
+            }
+
+            result.add(Pair.of(field, sortItem.getOrder() == Order.ASC ? "asc" : "desc"));
         }
 
         // Consume items from framework
@@ -274,11 +322,56 @@ public class ESCatalog extends Catalog
         return result;
     }
 
+    /** Class containing info about a mapped property such as type, ev. fields, analyzed etc. */
+    static class MappedProperty
+    {
+        final String name;
+        final String type;
+        final Object index;
+        List<MappedProperty> fields;
+
+        MappedProperty(String name, String type, Object index)
+        {
+            this.name = requireNonNull(name, "name");
+            this.type = requireNonNull(type, "type");
+            this.index = index;
+        }
+
+        /**
+         * Returns true if this mapped property is free text mapping. ie. the value is analyzed and tokenized
+         */
+        boolean isFreeTextMapping()
+        {
+            // Old ES version style
+            return ("string".equals(type)
+                && !"not_analyzed".equals(index))
+                // New ES version style
+                || ("text".equals(type));
+        }
+
+        /**
+         * Searches among mapped fields for first non freetext property. Used when the top level field is freetext and a non freetext field is wanted
+         * for a EQUAL comparison etc.
+         */
+        MappedProperty getNonFreeTextField()
+        {
+            if (fields == null)
+            {
+                return null;
+            }
+            return fields
+                    .stream()
+                    .filter(f -> !f.isFreeTextMapping())
+                    .findFirst()
+                    .orElse(null);
+        }
+    }
+
     /** Returns mapping for provided table */
     @SuppressWarnings("unchecked")
-    private Map<String, String> getAnalyzedPropertyNames(QuerySession session, String catalogAlias, QualifiedName table)
+    private Map<String, MappedProperty> getProperties(QuerySession session, String catalogAlias, QualifiedName table)
     {
-        EsType esType = EsType.of(session, catalogAlias, table);
+        ESType esType = ESType.of(session, catalogAlias, table);
         final boolean isSingleType = SINGLE_TYPE_TABLE_NAME.equals(esType.type);
         HttpGet getMappings = new HttpGet(String.format("%s/%s/%s_mapping", esType.endpoint, esType.index, isSingleType ? "" : esType.type + "/"));
         try (CloseableHttpResponse response = CLIENT.execute(getMappings))
@@ -293,7 +386,7 @@ public class ESCatalog extends Catalog
             {
                 return emptyMap();
             }
-            Map<String, String> result = new HashMap<>();
+            Map<String, MappedProperty> result = new HashMap<>();
             // Loop all indices in mappings result
             for (Entry<String, Object> e : map.entrySet())
             {
@@ -333,7 +426,7 @@ public class ESCatalog extends Catalog
         }
     }
 
-    private void populateAnalyzedFields(Map<String, String> result, Map<String, Object> properties, String parentKey)
+    private void populateAnalyzedFields(Map<String, MappedProperty> result, Map<String, Object> properties, String parentKey)
     {
         for (Entry<String, Object> entry : properties.entrySet())
         {
@@ -348,40 +441,35 @@ public class ESCatalog extends Catalog
                 continue;
             }
 
-            Object index = propertiesMap.get("index");
-            String type = (String) propertiesMap.get("type");
+            String name = (parentKey == null ? "" : parentKey + ".") + entry.getKey();
+            MappedProperty mappedProperty = create(name, propertiesMap);
+
+            result.put(name, mappedProperty);
 
             @SuppressWarnings("unchecked")
             Map<String, Object> fields = (Map<String, Object>) propertiesMap.get("fields");
 
-            // if index is null and there exists a field that is not_analyzed pick that one
-            if (index == null && fields != null && ("string".equals(type) || "text".equals(type)))
+            if (fields != null)
             {
-                boolean added = false;
+                List<MappedProperty> fieldsMappedProperties = new ArrayList<>(fields.size());
+                // Only traverse one level of fields (don't know if there can be multiple levels)
                 for (Entry<String, Object> e : fields.entrySet())
                 {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> fieldProperties = (Map<String, Object>) e.getValue();
-                    String fieldIndex = (String) fieldProperties.get("index");
-                    String fieldType = (String) fieldProperties.get("type");
-                    if ("not_analyzed".equals(fieldIndex) || "keyword".equals(fieldType))
-                    {
-                        String property = (parentKey != null ? parentKey + "." : "") + entry.getKey();
-                        result.put(property, property + "." + e.getKey());
-                        added = true;
-                        break;
-                    }
+                    String fieldName = name + "." + e.getKey();
+                    fieldsMappedProperties.add(create(fieldName, fieldProperties));
                 }
-                if (added)
-                {
-                    continue;
-                }
-            }
-
-            if (index == null || "not_analyzed".equals(index))
-            {
-                result.put((parentKey != null ? parentKey + "." : "") + entry.getKey(), "");
+                mappedProperty.fields = fieldsMappedProperties;
             }
         }
+    }
+
+    private MappedProperty create(String name, Map<String, Object> propertiesMap)
+    {
+        String type = (String) propertiesMap.get("type");
+        Object index = propertiesMap.get("index");
+
+        return new MappedProperty(name, type, index);
     }
 }
