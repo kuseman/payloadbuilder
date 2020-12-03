@@ -9,6 +9,7 @@ import static java.util.stream.Collectors.joining;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
 import static org.apache.commons.lang3.ArrayUtils.indexOf;
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.kuse.payloadbuilder.catalog.es.ESCatalog.SINGLE_TYPE_TABLE_NAME;
 import static org.kuse.payloadbuilder.core.DescribeUtils.CATALOG;
 import static org.kuse.payloadbuilder.core.DescribeUtils.PREDICATE;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
@@ -20,11 +21,6 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.Temporal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,7 +28,6 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -41,7 +36,6 @@ import java.util.function.Function;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.CountingInputStream;
 import org.apache.commons.io.output.CountingOutputStream;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.tuple.Pair;
@@ -62,20 +56,13 @@ import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicHeader;
 import org.kuse.payloadbuilder.catalog.es.ESCatalog.IdIndex;
 import org.kuse.payloadbuilder.catalog.es.ESCatalog.ParentIndex;
-import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.AOperator;
 import org.kuse.payloadbuilder.core.operator.OperatorContext;
 import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
-import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
-import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair.Type;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
-import org.kuse.payloadbuilder.core.parser.ComparisonExpression;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
-import org.kuse.payloadbuilder.core.parser.Expression;
-import org.kuse.payloadbuilder.core.parser.InExpression;
-import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.utils.ObjectUtils;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -150,8 +137,10 @@ class ESOperator extends AOperator
     }
 
     @Override
-    public Map<String, Object> getDescribeProperties()
+    public Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
+        ESType esType = ESType.of(context.getSession(), catalogAlias, tableAlias.getTable());
+
         Map<String, Object> result = ofEntries(true,
                 entry(CATALOG, ESCatalog.NAME),
                 entry(PREDICATE, propertyPredicates
@@ -161,7 +150,8 @@ class ESOperator extends AOperator
                 entry("Sort", sortItems
                         .stream()
                         .map(i -> i.getKey() + ":" + i.getValue())
-                        .collect(joining(","))));
+                        .collect(joining(","))),
+                entry("Query", ESUtils.getSearchBody(sortItems, propertyPredicates, SINGLE_TYPE_TABLE_NAME.equals(esType.type), context)));
 
         if (index != null)
         {
@@ -173,7 +163,7 @@ class ESOperator extends AOperator
     @Override
     public RowIterator open(ExecutionContext context)
     {
-        EsType esType = EsType.of(context.getSession(), catalogAlias, tableAlias.getTable());
+        ESType esType = ESType.of(context.getSession(), catalogAlias, tableAlias.getTable());
 
         // TODO: turn on only in analyze mode
         NodeData nodeData = context.getOperatorContext().getNodeData(nodeId, NodeData::new);
@@ -183,13 +173,13 @@ class ESOperator extends AOperator
 
         if (index instanceof IdIndex)
         {
-            boolean isSingleAlias = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(esType.type);
+            boolean isSingleType = SINGLE_TYPE_TABLE_NAME.equals(esType.type);
             String mgetUrl = getUrl(
                     String.format("%s/%s/%s/_mget?", esType.endpoint, esType.index, esType.type),
                     "docs",
                     tableAlias,
                     index,
-                    isSingleAlias);
+                    isSingleType);
 
             DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getOperatorContext(), sentBytes);
             MutableBoolean doRequest = new MutableBoolean(true);
@@ -247,7 +237,7 @@ class ESOperator extends AOperator
         }
         else
         {
-            body = getSearchBody(isSingleType, context);
+            body = ESUtils.getSearchBody(sortItems, propertyPredicates, isSingleType, context);
         }
 
         final String actualBody = body;
@@ -584,79 +574,6 @@ class ESOperator extends AOperator
         }
     }
 
-    private String getSearchBody(boolean isSingleType, ExecutionContext context)
-    {
-        StringBuilder sb = new StringBuilder("{");
-        appendSortItems(sb);
-        if (sb.length() > 1)
-        {
-            sb.append(",");
-        }
-        appendPropertyPredicates(isSingleType, sb, context);
-        if (sb.charAt(sb.length() - 1) == ',')
-        {
-            sb.deleteCharAt(sb.length() - 1);
-        }
-        sb.append("}");
-        return sb.toString();
-    }
-
-    private void appendPropertyPredicates(boolean isSIngleType, StringBuilder sb, ExecutionContext context)
-    {
-        if (propertyPredicates.isEmpty())
-        {
-            return;
-        }
-
-        if (isSIngleType)
-        {
-            sb.append("\"query\":{\"bool\":{\"filter\":[");
-        }
-        else
-        {
-            sb.append("\"filter\":{\"bool\":{\"must\":[");
-        }
-        for (PropertyPredicate predicate : propertyPredicates)
-        {
-            predicate.appendBooleanClause(sb, context);
-            if (sb.charAt(sb.length() - 1) != ',')
-            {
-                sb.append(",");
-            }
-        }
-        if (sb.charAt(sb.length() - 1) == ',')
-        {
-            sb.deleteCharAt(sb.length() - 1);
-        }
-        sb.append("]}}");
-    }
-
-    private void appendSortItems(StringBuilder sb)
-    {
-        sb.append("\"sort\":[");
-        if (sortItems.isEmpty())
-        {
-            sb.append("\"_doc\"]");
-            return;
-        }
-
-        for (Pair<String, String> sortItem : sortItems)
-        {
-            // { "field": { "order": "desc" } }
-            sb.append("{\"")
-                    .append(sortItem.getKey())
-                    .append("\":{\"order\":\"")
-                    .append(sortItem.getValue())
-                    .append("\"}}")
-                    .append(",");
-        }
-        if (sb.charAt(sb.length() - 1) == ',')
-        {
-            sb.deleteCharAt(sb.length() - 1);
-        }
-        sb.append("]");
-    }
-
     /** Top response (Used both in get request and search request) */
     private static class ESResponse
     {
@@ -751,233 +668,6 @@ class ESOperator extends AOperator
     public String toString()
     {
         return String.format("ID: %d, %s", nodeId, (index != null ? "index" : "scan") + " (" + tableAlias.toString() + ")");
-    }
-
-    /** Class representing a endpoint/index/type combo. */
-    static class EsType
-    {
-        final String endpoint;
-        final String index;
-        final String type;
-
-        EsType(String endpoint, String index, String type)
-        {
-            this.endpoint = StringUtils.stripEnd(endpoint, "/");
-            this.index = index;
-            this.type = type;
-        }
-
-        static String getEndpoint(QuerySession session, String catalogAlias)
-        {
-            String endpoint = (String) session.getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY);
-            if (isBlank(endpoint))
-            {
-                throw new IllegalArgumentException("Missing endpoint key in catalog properties for: " + catalogAlias);
-            }
-            return endpoint;
-        }
-
-        static String getIndex(QuerySession session, String catalogAlias)
-        {
-            String index = (String) session.getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY);
-            if (isBlank(index))
-            {
-                throw new IllegalArgumentException("Missing index key in catalog properties for: " + catalogAlias);
-            }
-            return index;
-        }
-
-        /** Create type from provided session/table */
-        static EsType of(QuerySession session, String catalogAlias, QualifiedName table)
-        {
-            String endpoint;
-            String indexName;
-            String type;
-
-            List<String> parts = table.getParts();
-
-            // Three part qualified name -> <endpoint>.<index>.<type>
-            if (parts.size() == 3)
-            {
-                endpoint = parts.get(0);
-                // If first part is blank then try to get from properties
-                // This to support reusing selected endpoint but use another index
-                if (isBlank(endpoint))
-                {
-                    endpoint = getEndpoint(session, catalogAlias);
-                }
-                indexName = parts.get(1);
-                type = parts.get(2);
-            }
-            // Tow or one part qualified name -> <index>.<type> or <type>
-            else if (parts.size() <= 2)
-            {
-                endpoint = getEndpoint(session, catalogAlias);
-                if (parts.size() == 2)
-                {
-                    indexName = parts.get(0);
-                    type = parts.get(1);
-                }
-                else
-                {
-                    indexName = getIndex(session, catalogAlias);
-                    type = parts.get(0);
-                }
-            }
-            else
-            {
-                throw new IllegalArgumentException("Invalid qualified table name " + table + ". Requires 1 to 3 parts. <endpoint>.<index>.<type>");
-            }
-
-            return new EsType(endpoint, indexName, type);
-        }
-    }
-
-    /** Predicate for a property */
-    static class PropertyPredicate
-    {
-        final String alias;
-        final String property;
-        final AnalyzePair pair;
-
-        PropertyPredicate(String alias, String property, AnalyzePair pair)
-        {
-            this.alias = alias;
-            this.property = requireNonNull(property, "property");
-            this.pair = requireNonNull(pair, "pair");
-        }
-
-        private String getDescription()
-        {
-            if (pair.getType() == Type.COMPARISION)
-            {
-                Pair<Expression, Expression> ePair = pair.getExpressionPair(alias);
-                return property + " " + pair.getComparisonType().getValue() + " " + ePair.getRight().toString();
-            }
-            else if (pair.getType() == Type.IN)
-            {
-                return property + " IN (" + ((InExpression) pair.getRight().getExpression()).getArguments() + ")";
-            }
-
-            return "";
-        }
-
-        private void appendBooleanClause(StringBuilder sb, ExecutionContext context)
-        {
-            if (pair.getType() == Type.COMPARISION)
-            {
-                Pair<Expression, Expression> ePair = pair.getExpressionPair(alias);
-                Object value = ePair.getRight().eval(context);
-                if (value == null)
-                {
-                    // if we have null here this means we have a
-                    // query that should always return no rows
-                    // This because something compared to NULL using
-                    // a NON Null-predicate (is null, is not null) always
-                    // yields false so add a term that can never be true
-                    sb.append("{\"term\": { \"_id\": \"\" }}");
-
-                    return;
-                }
-                String stringValue = quote(value);
-                //CSOFF
-                switch (pair.getComparisonType())
-                //CSON
-                {
-                    case NOT_EQUAL:
-                        // TODO: move this must_not since not filter is deprecated
-                        // { "not": { ..... } }
-                        sb.append("{\"not\":");
-                        //CSOFF
-                    case EQUAL:
-                        //CSON
-                        // { "term": { "property": value }}
-                        sb.append("{\"term\":{\"")
-                                .append(property)
-                                .append("\":")
-                                .append(stringValue)
-                                .append("}}");
-
-                        if (pair.getComparisonType() == ComparisonExpression.Type.NOT_EQUAL)
-                        {
-                            sb.append("}");
-                        }
-                        return;
-                    case GREATER_THAN:
-                    case GREATER_THAN_EQUAL:
-                    case LESS_THAN:
-                    case LESS_THAN_EQUAL:
-
-                        // { "range": { "property": { "gt": 100 }}}
-                        sb.append("{\"range\":{\"")
-                                .append(property)
-                                .append("\":{\"")
-                                .append(getRangeOp(pair.getComparisonType()))
-                                .append("\":")
-                                .append(stringValue)
-                                .append("}}}");
-                }
-            }
-            else if (pair.getType() == Type.IN)
-            {
-                // { "terms": { "property": [ "value", "value2"] }}
-                sb.append("{\"terms\":{\"")
-                        .append(property)
-                        .append("\":[");
-
-                List<Expression> arguments = ((InExpression) pair.getRight().getExpression()).getArguments();
-                sb.append(arguments
-                        .stream()
-                        .map(e -> e.eval(context))
-                        .filter(Objects::nonNull)
-                        .map(o -> quote(o))
-                        .collect(joining(",")));
-
-                sb.append("]}}");
-            }
-        }
-
-        private String getRangeOp(ComparisonExpression.Type type)
-        {
-            switch (type)
-            {
-                case GREATER_THAN:
-                    return "gt";
-                case GREATER_THAN_EQUAL:
-                    return "gte";
-                case LESS_THAN:
-                    return "lt";
-                case LESS_THAN_EQUAL:
-                    return "lte";
-                default:
-                    return "";
-            }
-        }
-
-        private String quote(Object val)
-        {
-            Object value = val;
-            if (value == null)
-            {
-                return "null";
-            }
-
-            if (value instanceof ZonedDateTime)
-            {
-                value = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format((Temporal) value);
-            }
-            else if (value instanceof LocalDateTime)
-            {
-                value = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(((LocalDateTime) value).atZone(ZoneId.systemDefault()));
-            }
-
-            String stringValue = String.valueOf(value);
-            if (!(value instanceof Number || value instanceof Boolean))
-            {
-                return "\"" + stringValue + "\"";
-            }
-            return stringValue;
-        }
     }
 
     /** Entity support for DELETE */

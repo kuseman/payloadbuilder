@@ -52,6 +52,7 @@ import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.IfStatement
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.InExpressionContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.JoinPartContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.LambdaExpressionContext;
+import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.LikeExpressionContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.LiteralContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.LogicalBinaryContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.LogicalNotContext;
@@ -629,6 +630,13 @@ public class QueryParser
         public Object visitLogicalNot(LogicalNotContext ctx)
         {
             return new LogicalNotExpression(getExpression(ctx.expression()));
+        }
+
+        @Override
+        public Object visitLikeExpression(LikeExpressionContext ctx)
+        {
+            boolean not = ctx.NOT() != null;
+            return new LikeExpression(getExpression(ctx.left), getExpression(ctx.right), not, getExpression(ctx.escape));
         }
 
         @Override

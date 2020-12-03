@@ -13,7 +13,10 @@ public abstract class Expression
     public abstract <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context);
 
     /** Returns true if the result from this expression is nullable. Primitive result or not */
-    public abstract boolean isNullable();
+    public boolean isNullable()
+    {
+        return false;
+    }
 
     public Class<?> getDataType()
     {

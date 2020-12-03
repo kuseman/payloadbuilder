@@ -41,9 +41,9 @@ class SubQueryOperator extends AOperator
     }
 
     @Override
-    public Map<String, Object> getDescribeProperties()
+    public Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
-        return operator.getDescribeProperties();
+        return operator.getDescribeProperties(context);
     }
 
     @Override

@@ -159,34 +159,47 @@ topExpression
  ;
  
 expression
- : primary                                              	#primaryExpression
+ : primary													#primaryExpression
+ 
+ //
+ 
  | op=(MINUS | PLUS) expression								#arithmeticUnary 
  | left=expression 
    op=(ASTERISK | SLASH | PERCENT | PLUS | MINUS)
-   right=expression                                         #arithmeticBinary
+   right=expression											#arithmeticBinary
  | left=expression
    op=(EQUALS | NOTEQUALS| LESSTHAN | LESSTHANEQUAL | GREATERTHAN| GREATERTHANEQUAL) 
    right=expression											#comparisonExpression
+
+ //
+ 
  | left=expression 
    NOT? IN 
    '(' expression (',' expression)* ')'						#inExpression
+ | left=expression 
+   // Have to use primary here to solve ambiguity when ie. nesting AND's
+   NOT? LIKE right=primary
+   (ESCAPE escape=expression)?								#likeExpression
  | expression IS NOT? NULL  								#nullPredicate
- | NOT expression                                           #logicalNot
+ 
+ // 
+ 
+ | NOT expression											#logicalNot
  | left=expression 
    op=(AND | OR) 
-   right=expression     									#logicalBinary
+   right=expression											#logicalBinary
  ;
  
 primary
  : literal													#literalExpression
- | left=primary '.' (identifier | functionCall)				#dereference	
+ | left=primary '.' (identifier | functionCall)				#dereference
  | identifier												#columnReference
  | functionCall 											#functionCallExpression	
- | identifier '->' expression                               #lambdaExpression
+ | identifier '->' expression								#lambdaExpression
  | '(' identifier (',' identifier)+ ')' '->' expression  	#lambdaExpression
- | value=primary '[' subscript=expression ']'    			#subscript	
+ | value=primary '[' subscript=expression ']'    			#subscript
  | variable													#variableExpression
- | '(' expression ')' 										#nestedExpression			
+ | '(' expression ')' 										#nestedExpression
  ;
 
 functionCall
@@ -202,11 +215,11 @@ functionName
  ;
  
 literal
- : NULL														
- | booleanLiteral											
- | numericLiteral 								
+ : NULL
+ | booleanLiteral
+ | numericLiteral
  | decimalLiteral
- | stringLiteral											
+ | stringLiteral
  ;
  
 variable
@@ -249,7 +262,7 @@ booleanLiteral
  ;
  
 nonReserved
- : FROM | FIRST | TABLES
+ : FROM | FIRST | TABLES | LIKE
  ;
  
 // Tokens
@@ -264,6 +277,7 @@ DESC	     : D E S C;
 DESCRIBE	 : D E S C R I B E;
 ELSE		 : E L S E;
 END			 : E N D;
+ESCAPE		 : E S C A P E;
 FALSE	     : F A L S E;
 FIRST	     : F I R S T;
 FROM	     : F R O M;
@@ -277,6 +291,7 @@ IS           : I S;
 JOIN	     : J O I N;
 LAST	     : L A S T;
 LEFT	     : L E F T;
+LIKE		 : L I K E;
 NOT		     : N O T;
 NULL	     : N U L L;
 NULLS	     : N U L L S;

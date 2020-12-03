@@ -40,7 +40,7 @@ class BatchRepeatOperator extends AOperator
     }
 
     @Override
-    public Map<String, Object> getDescribeProperties()
+    public Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
         return ofEntries(true,
                 entry("Target nodeId", targetNodeId));

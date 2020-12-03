@@ -140,7 +140,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     @Override
     public Void visit(DescribeSelectStatement statement, Void ctx)
     {
-        currentSelect = DescribeUtils.getDescribeSelect(session, statement.getSelectStatement().getSelect());
+        currentSelect = DescribeUtils.getDescribeSelect(context, statement.getSelectStatement().getSelect());
         return null;
     }
 

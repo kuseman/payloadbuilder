@@ -44,7 +44,7 @@ class BatchLimitOperator extends AOperator
     }
 
     @Override
-    public Map<String, Object> getDescribeProperties()
+    public Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
         return ofEntries(true,
                 entry(DescribeUtils.BATCH_SIZE, batchLimitExpression));

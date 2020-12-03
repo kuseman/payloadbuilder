@@ -58,13 +58,13 @@ public class DescribeUtils
     }
 
     /** Build describe select from provided select */
-    static Pair<Operator, Projection> getDescribeSelect(QuerySession session, Select select)
+    static Pair<Operator, Projection> getDescribeSelect(ExecutionContext context, Select select)
     {
-        Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
+        Pair<Operator, Projection> pair = OperatorBuilder.create(context.getSession(), select);
         Operator root = pair.getKey();
 
         final List<DescribeOperatorRow> describeRows = new ArrayList<>();
-        collectOperatorDescribeRows(describeRows, root, 0, "", false);
+        collectOperatorDescribeRows(context, describeRows, root, 0, "", false);
 
         List<String> describeColumns = new ArrayList<>();
         Map<String, MutableInt> countByColumn = new HashMap<>();
@@ -145,18 +145,19 @@ public class DescribeUtils
     }
 
     private static void collectOperatorDescribeRows(
+            ExecutionContext context,
             List<DescribeOperatorRow> rows,
             Operator parent,
             int pos,
             String indent,
             boolean last)
     {
-        rows.add(new DescribeOperatorRow(parent.getNodeId(), indent + "+- " + parent.getName(), parent.getDescribeProperties()));
+        rows.add(new DescribeOperatorRow(parent.getNodeId(), indent + "+- " + parent.getName(), parent.getDescribeProperties(context)));
         String nextIndent = indent + (last ? "   " : "|  ");
         for (int i = 0; i < parent.getChildOperators().size(); i++)
         {
             Operator child = parent.getChildOperators().get(i);
-            collectOperatorDescribeRows(rows, child, pos + 1, nextIndent, i == parent.getChildOperators().size() - 1);
+            collectOperatorDescribeRows(context, rows, child, pos + 1, nextIndent, i == parent.getChildOperators().size() - 1);
         }
     }
 

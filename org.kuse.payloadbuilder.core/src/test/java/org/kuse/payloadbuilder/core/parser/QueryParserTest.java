@@ -175,6 +175,16 @@ public class QueryParserTest extends AParserTest
     }
 
     @Test
+    public void test_like()
+    {
+        assertExpression("col like 'hello' and col2 not like 'world'",
+                new LogicalBinaryExpression(
+                        LogicalBinaryExpression.Type.AND,
+                        new LikeExpression(new QualifiedReferenceExpression(QualifiedName.of("col"), -1), new LiteralStringExpression("hello"), false, null),
+                        new LikeExpression(new QualifiedReferenceExpression(QualifiedName.of("col2"), -1), new LiteralStringExpression("world"), true, null)));
+    }
+
+    @Test
     public void test_expressions()
     {
         assertExpression("1");

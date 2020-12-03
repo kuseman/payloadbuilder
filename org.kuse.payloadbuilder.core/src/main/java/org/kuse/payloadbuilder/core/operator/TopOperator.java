@@ -30,7 +30,7 @@ class TopOperator extends AOperator
     }
 
     @Override
-    public Map<String, Object> getDescribeProperties()
+    public Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
         return MapUtils.ofEntries(MapUtils.entry("Value", topExpression));
     }

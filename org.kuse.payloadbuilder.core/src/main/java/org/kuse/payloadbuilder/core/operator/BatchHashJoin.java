@@ -113,7 +113,7 @@ class BatchHashJoin extends AOperator
     }
 
     @Override
-    public Map<String, Object> getDescribeProperties()
+    public Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
         return ofEntries(true,
                 entry(LOGICAL_OPERATOR, logicalOperator),
