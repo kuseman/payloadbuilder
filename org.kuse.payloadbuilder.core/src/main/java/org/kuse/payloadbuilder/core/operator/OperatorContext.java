@@ -13,14 +13,14 @@ public class OperatorContext
     private final Map<Integer, NodeData> nodeDataById = new ConcurrentHashMap<>();
 
     /** Iterator of outer row values used when having an indexed inner operator in Batched operators */
-    private Iterator<Object[]> outerIndexValues;
+    private Iterator<OuterValues> outerIndexValues;
 
-    public Iterator<Object[]> getOuterIndexValues()
+    public Iterator<OuterValues> getOuterIndexValues()
     {
         return outerIndexValues;
     }
 
-    public void setOuterIndexValues(Iterator<Object[]> outerIndexValues)
+    void setOuterIndexValues(Iterator<OuterValues> outerIndexValues)
     {
         this.outerIndexValues = outerIndexValues;
     }
@@ -68,4 +68,33 @@ public class OperatorContext
         public Map<String, Object> properties = new HashMap<>();
     }
     //CSON
+
+    /**
+     * Class used when utilizing an Index, and downstream operator fetches values based on outer values
+     */
+    public static class OuterValues
+    {
+        private Object[] values;
+        private Tuple outerTuple;
+
+        public Object[] getValues()
+        {
+            return values;
+        }
+
+        void setValues(Object[] values)
+        {
+            this.values = values;
+        }
+
+        public Tuple getOuterTuple()
+        {
+            return outerTuple;
+        }
+
+        void setOuterTuple(Tuple outerTuple)
+        {
+            this.outerTuple = outerTuple;
+        }
+    }
 }

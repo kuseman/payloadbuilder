@@ -31,6 +31,7 @@ import org.apache.commons.lang3.time.StopWatch;
 import org.kuse.payloadbuilder.core.CacheProvider;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
+import org.kuse.payloadbuilder.core.operator.OperatorContext.OuterValues;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Option;
 
@@ -194,7 +195,7 @@ class BatchHashJoin extends AOperator
             private List<Tuple> cachedTuples;
 
             /** Reference to outer values iterator to verify that implementations of Operator fully uses the index if specified */
-            private Iterator<Object[]> outerValuesIterator;
+            private Iterator<OuterValues> outerValuesIterator;
 
             /** Table use for hashed inner values */
             private final TIntObjectMap<TableValue> table = new TIntObjectHashMap<>((int) (batchSize * 1.5));
@@ -340,7 +341,7 @@ class BatchHashJoin extends AOperator
 
                     if (predicate.test(context, joinTuple))
                     {
-                        System.out.println("Cache " + innerRow + " with key " + outerTuple.cacheKey);
+//                        System.out.println("Cache " + innerRow + " with key " + outerTuple.cacheKey);
 
                         sw1.start();
 
@@ -435,6 +436,7 @@ class BatchHashJoin extends AOperator
                     TableValue tableValue = table.get(hash);
                     if (tableValue == null)
                     {
+                        System.err.println("HIT");
                         // No outer row exists for this inner rows hash, no need to add it
                         continue;
                     }
@@ -490,10 +492,11 @@ class BatchHashJoin extends AOperator
                 return hash(keyValues);
             }
 
-            private Iterator<Object[]> outerValuesIterator(ExecutionContext context)
+            private Iterator<OuterValues> outerValuesIterator(ExecutionContext context)
             {
+                final OuterValues outerValues = new OuterValues();
                 //CSOFF
-                return new Iterator<Object[]>()
+                return new Iterator<OuterValues>()
                 //CSON
                 {
                     private int outerRowsIndex;
@@ -506,16 +509,15 @@ class BatchHashJoin extends AOperator
                     }
 
                     @Override
-                    public Object[] next()
+                    public OuterValues next()
                     {
                         if (nextArray == null)
                         {
                             throw new NoSuchElementException();
                         }
 
-                        Object[] result = nextArray;
                         nextArray = null;
-                        return result;
+                        return outerValues;
                     }
 
                     private boolean setNext()
@@ -558,6 +560,8 @@ class BatchHashJoin extends AOperator
                             }
 
                             nextArray = keyValues;
+                            outerValues.setOuterTuple(holder.tuple);
+                            outerValues.setValues(nextArray);
                         }
 
                         return true;

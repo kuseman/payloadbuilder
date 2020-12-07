@@ -60,6 +60,7 @@ import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.AOperator;
 import org.kuse.payloadbuilder.core.operator.OperatorContext;
 import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
+import org.kuse.payloadbuilder.core.operator.OperatorContext.OuterValues;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
@@ -226,7 +227,7 @@ class ESOperator extends AOperator
             List<String> parentIds = new ArrayList<>();
             while (context.getOperatorContext().getOuterIndexValues().hasNext())
             {
-                Object[] array = context.getOperatorContext().getOuterIndexValues().next();
+                Object[] array = context.getOperatorContext().getOuterIndexValues().next().getValues();
                 if (array[0] != null)
                 {
                     parentIds.add(String.valueOf(array[0]));
@@ -745,7 +746,7 @@ class ESOperator extends AOperator
         @Override
         public void writeTo(OutputStream outStream) throws IOException
         {
-            Iterator<Object[]> values = context.getOuterIndexValues();
+            Iterator<OuterValues> values = context.getOuterIndexValues();
             try (CountingOutputStream bos = new CountingOutputStream(outStream))
             {
                 bos.write(HEADER_BYTES);
@@ -753,7 +754,7 @@ class ESOperator extends AOperator
                 boolean first = true;
                 while (values.hasNext())
                 {
-                    String docId = String.valueOf(values.next()[0]);
+                    String docId = String.valueOf(values.next().getValues()[0]);
                     if (!first)
                     {
                         bos.write(COMMA_BYTES);

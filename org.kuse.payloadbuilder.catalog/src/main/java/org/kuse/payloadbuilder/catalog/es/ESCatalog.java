@@ -209,10 +209,10 @@ public class ESCatalog extends Catalog
                 propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), "_parent", pair, false));
                 it.remove();
             }
-            // TODO: strings only support equals
             else if (property != null)
             {
                 String field = property.name;
+                boolean consumePredicate = true;
                 if (property.isFreeTextMapping())
                 {
                     property = property.getNonFreeTextField();
@@ -220,13 +220,23 @@ public class ESCatalog extends Catalog
                     if (property == null)
                     //CSON
                     {
-                        continue;
+                        // No non free text field found
+                        // then let ES filter as best it can
+                        // but also let PLB filter in case
+                        // of false positives
+                        consumePredicate = false;
                     }
-                    field = property.name;
+                    else
+                    {
+                        field = property.name;
+                    }
                 }
 
                 propertyPredicates.add(new PropertyPredicate(tableAlias.getAlias(), field, pair, false));
-                it.remove();
+                if (consumePredicate)
+                {
+                    it.remove();
+                }
             }
         }
     }

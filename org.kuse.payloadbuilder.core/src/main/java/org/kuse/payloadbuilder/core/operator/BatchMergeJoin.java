@@ -12,6 +12,7 @@ import java.util.function.BiPredicate;
 
 import org.apache.commons.lang3.StringUtils;
 import org.kuse.payloadbuilder.core.catalog.Index;
+import org.kuse.payloadbuilder.core.operator.OperatorContext.OuterValues;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 
 /**
@@ -118,7 +119,7 @@ class BatchMergeJoin extends AOperator
             private Iterator<Tuple> innerIt;
 
             /** Reference to outer values iterator to verify that implementations of Operator fully uses the index if specified */
-            private Iterator<Object[]> outerValuesIterator;
+            private Iterator<OuterValues> outerValuesIterator;
 
             private Tuple next;
             /** Current process outer row */
@@ -429,10 +430,11 @@ class BatchMergeJoin extends AOperator
                 }
             }
 
-            private Iterator<Object[]> outerValuesIterator()
+            private Iterator<OuterValues> outerValuesIterator()
             {
+                final OuterValues outerValues = new OuterValues();
                 //CSOFF
-                return new Iterator<Object[]>()
+                return new Iterator<OuterValues>()
                 //CSON
                 {
                     private int outerRowsIndex;
@@ -446,16 +448,15 @@ class BatchMergeJoin extends AOperator
                     }
 
                     @Override
-                    public Object[] next()
+                    public OuterValues next()
                     {
                         if (nextArray == null)
                         {
                             throw new NoSuchElementException();
                         }
 
-                        Object[] result = nextArray;
                         nextArray = null;
-                        return result;
+                        return outerValues;
                     }
 
                     private boolean setNext()
@@ -477,6 +478,8 @@ class BatchMergeJoin extends AOperator
 
                             nextArray = tuple.extractedValues;
                             prevArray = nextArray;
+                            outerValues.setOuterTuple(tuple.tuple);
+                            outerValues.setValues(nextArray);
                         }
 
                         return true;

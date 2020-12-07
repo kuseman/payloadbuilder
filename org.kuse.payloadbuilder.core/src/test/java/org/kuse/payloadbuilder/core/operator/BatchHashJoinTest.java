@@ -16,6 +16,7 @@ import org.apache.commons.lang3.mutable.MutableInt;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.OperatorContext.OuterValues;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Option;
@@ -110,7 +111,7 @@ public class BatchHashJoinTest extends AOperatorTest
         Operator right = op(context ->
         {
             context.getOperatorContext().getOuterIndexValues().hasNext();
-            Object[] ar = context.getOperatorContext().getOuterIndexValues().next();
+            Object[] ar = context.getOperatorContext().getOuterIndexValues().next().getValues();
             return asList((Tuple) Row.of(a, 0, ar)).iterator();
         });
 
@@ -183,9 +184,9 @@ public class BatchHashJoinTest extends AOperatorTest
         AtomicInteger posC = new AtomicInteger();
         Operator opC = op(context ->
         {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<OuterValues> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValues()[0])
                     .map(val -> (Tuple) Row.of(c, posC.getAndIncrement(), new Object[] {val, "val" + val}))
                     .collect(toList());
 
@@ -246,9 +247,9 @@ public class BatchHashJoinTest extends AOperatorTest
                 .iterator(), () -> leftClose.setTrue());
         Operator right = op(context ->
         {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<OuterValues> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValues()[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .map(val -> Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
@@ -297,92 +298,6 @@ public class BatchHashJoinTest extends AOperatorTest
     }
 
     @Test
-    public void test_inner_join_one_to_one_with_cache()
-    {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
-        MutableInt posLeft = new MutableInt();
-        MutableInt posRight = new MutableInt();
-        MutableBoolean leftClose = new MutableBoolean();
-        MutableInt rightClose = new MutableInt();
-        Operator left = op(context -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
-                .stream()
-                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator(), () -> leftClose.setTrue());
-        Operator right = op(context ->
-        {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
-                    .filter(val -> val >= 5 && val <= 9)
-                    .distinct()
-                    .map(val -> Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
-                    .collect(toList());
-
-            return inner.iterator();
-        }, () -> rightClose.increment());
-
-        BatchHashJoin op = batchHashJoin(
-                0,
-                left,
-                right,
-                new ExpressionValuesExtractor(asList(e("a.col1"))),
-                new ExpressionValuesExtractor(asList(e("b.col1"))),
-                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
-                index,
-                false,
-                false,
-                null,
-                new Option(QualifiedName.of("cacheKey"), e("listOf('cache', a.col1)")),
-                null
-                );
-
-        int[] expectedOuterPositions = new int[] {
-                7,          // Batch 1
-                8, 9, 10,   // Batch 2
-                11          // Batch 3
-        };
-
-        int[] expectedInnerPositions = new int[] {
-                0,          // Batch 1
-                1, 2, 3,    // Batch 2
-                4           // Batch 3
-        };
-
-        RowIterator it = op.open(new ExecutionContext(session));
-
-        int count = 0;
-        while (it.hasNext())
-        {
-            Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
-            assertEquals(expectedInnerPositions[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
-            count++;
-        }
-        it.close();
-
-        assertEquals(5, count);
-        assertTrue(leftClose.booleanValue());
-        assertEquals(5, rightClose.intValue());
-        
-        // Execute second time, now inner rows should be cached and no calls to inner operator should be made
-        it = op.open(new ExecutionContext(session));
-
-        count = 0;
-        while (it.hasNext())
-        {
-            Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
-            assertEquals(expectedInnerPositions[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
-            count++;
-        }
-        it.close();
-
-        assertEquals(5, count);
-        assertTrue(leftClose.booleanValue());
-        assertEquals(5, rightClose.intValue());
-    }
-
-    @Test
     public void test_outer_join_one_to_one()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
@@ -394,9 +309,9 @@ public class BatchHashJoinTest extends AOperatorTest
                 .iterator());
         Operator right = op(context ->
         {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<OuterValues> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValues()[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .map(val -> Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
@@ -452,9 +367,9 @@ public class BatchHashJoinTest extends AOperatorTest
         Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
         Operator right = op(context ->
         {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<OuterValues> it = () -> context.getOperatorContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValues()[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}, new Object[] {-666, 3}).stream())
@@ -509,9 +424,9 @@ public class BatchHashJoinTest extends AOperatorTest
         Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
         Operator right = op(context ->
         {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<OuterValues> it = () -> context.getOperatorContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValues()[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
@@ -571,9 +486,9 @@ public class BatchHashJoinTest extends AOperatorTest
                 .iterator());
         Operator right = op(context ->
         {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<OuterValues> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Tuple> rows = StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValues()[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .map(val -> (Tuple) Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
@@ -630,9 +545,9 @@ public class BatchHashJoinTest extends AOperatorTest
                 .iterator());
         Operator right = op(context ->
         {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<OuterValues> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValues()[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .map(val -> (Tuple) Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
@@ -700,9 +615,9 @@ public class BatchHashJoinTest extends AOperatorTest
         Operator right = op(context ->
         {
             // Create 2 rows for each input row
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<OuterValues> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValues()[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
@@ -763,9 +678,9 @@ public class BatchHashJoinTest extends AOperatorTest
         Operator right = op(context ->
         {
             // Create 2 rows for each input row
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<OuterValues> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValues()[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}, new Object[] {val, 3}).stream())
@@ -832,9 +747,9 @@ public class BatchHashJoinTest extends AOperatorTest
                 .iterator());
         Operator right = op(context ->
         {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<OuterValues> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValues()[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .map(val -> Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
@@ -892,9 +807,9 @@ public class BatchHashJoinTest extends AOperatorTest
                 .iterator());
         Operator right = op(context ->
         {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<OuterValues> it = () -> context.getOperatorContext().getOuterIndexValues();
             List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValues()[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .map(val -> Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
@@ -955,9 +870,9 @@ public class BatchHashJoinTest extends AOperatorTest
         Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
         Operator right = op(context ->
         {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<OuterValues> it = () -> context.getOperatorContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValues()[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
@@ -1016,9 +931,9 @@ public class BatchHashJoinTest extends AOperatorTest
         Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
         Operator right = op(context ->
         {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<OuterValues> it = () -> context.getOperatorContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValues()[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
@@ -1091,9 +1006,9 @@ public class BatchHashJoinTest extends AOperatorTest
         Operator right = op(context ->
         {
             // Create 2 rows for each input row
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<OuterValues> it = () -> context.getOperatorContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValues()[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
@@ -1156,9 +1071,9 @@ public class BatchHashJoinTest extends AOperatorTest
         Operator right = op(context ->
         {
             // Create 2 rows for each input row
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<OuterValues> it = () -> context.getOperatorContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValues()[0])
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())

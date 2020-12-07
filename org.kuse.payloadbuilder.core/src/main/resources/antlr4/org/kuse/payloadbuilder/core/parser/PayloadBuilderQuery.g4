@@ -78,7 +78,7 @@ dmlStatement
 topSelect
  : selectStatement EOF
  ;
-
+ 
 selectStatement
  : SELECT (TOP topCount)? selectItem (',' selectItem)*
    (FROM tableSourceJoined)?
