@@ -140,6 +140,20 @@ class SqlServerProvider implements ConnectionProvider
             }
         },
 
+        KERBEROS_AUTHENTICATION_CREDENTIAlS("Kerberos Authentication")
+        {
+            @Override
+            String generateURL(String server, String domain, String applicationName, String urlSuffix)
+            {
+                return "jdbc:sqlserver://"
+                    + server
+                    + ";integratedSecurity=true;authenticationScheme=JavaKerberos"
+                    + ";domain=" + domain
+                    + (!isBlank(applicationName) ? (";applicationName=" + applicationName) : "")
+                    + (!isBlank(urlSuffix) ? (";" + urlSuffix) : "");
+            }
+        },
+
         /** Authentication with sql server user and password */
         SQL_SERVER_AUTHENTICATION("SQL Server Authentication")
         {
