@@ -116,12 +116,8 @@ class JdbcOperator extends AOperator
                 }
                 QualifiedName qname = pair.getQname(tableAlias.getAlias());
                 Pair<Expression, Expression> expressionPair = pair.getExpressionPair(tableAlias.getAlias());
-                //CSOFF
                 switch (pair.getType())
-                //CSON
                 {
-                    case UNDEFINED:
-                        throw new IllegalArgumentException("Illegal predicate type");
                     case COMPARISION:
                         Object value = convertValue(expressionPair.getRight().eval(context));
                         sb.append(qname);
@@ -129,7 +125,12 @@ class JdbcOperator extends AOperator
                         sb.append(value);
                         break;
                     case IN:
+                        InExpression ie = (InExpression) pair.getRight().getExpression();
                         sb.append(qname);
+                        if (ie.isNot())
+                        {
+                            sb.append(" NOT");
+                        }
                         sb.append(" IN (");
                         List<Expression> arguments = ((InExpression) pair.getRight().getExpression()).getArguments();
                         sb.append(arguments
@@ -148,6 +149,8 @@ class JdbcOperator extends AOperator
                         sb.append(qname);
                         sb.append(" IS NOT NULL");
                         break;
+                    default:
+                        throw new IllegalArgumentException("Illegal predicate pair type " + pair.getType());
                 }
             }
         }

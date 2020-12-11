@@ -17,8 +17,6 @@ class DefaultTupleMerger implements TupleMerger
     @Override
     public Tuple merge(Tuple outer, Tuple inner, boolean populating, int nodeId)
     {
-        //        Tuple result = outer;
-
         // No populating merge, create/or merge a composite tuple
         if (!populating)
         {
@@ -71,15 +69,6 @@ class DefaultTupleMerger implements TupleMerger
         }
 
         return outerTuple;
-
-        // Parent is always populated
-        //        inner.addParent(result);
-        //        List<Row> childRows = result.getChildRows(inner.getTableAlias());
-        //        if (limit < 0 || childRows.size() < limit)
-        //        {
-        //            childRows.add(inner);
-        //        }
-        //        return result;
     }
 
     @Override

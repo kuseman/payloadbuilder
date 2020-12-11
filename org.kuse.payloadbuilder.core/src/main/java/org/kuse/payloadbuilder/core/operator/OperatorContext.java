@@ -12,7 +12,8 @@ public class OperatorContext
     /** Stores node unique data by node's unique id */
     private final Map<Integer, NodeData> nodeDataById = new ConcurrentHashMap<>();
 
-    /** Iterator of outer row values used when having an indexed inner operator in Batched operators */
+    /** Iterator of outer row values used when having an indexed inner operator in Batched operators.
+     * NOTE! Value returned from iterator might be a mutable single instance. */
     private Iterator<OuterValues> outerIndexValues;
 
     public Iterator<OuterValues> getOuterIndexValues()

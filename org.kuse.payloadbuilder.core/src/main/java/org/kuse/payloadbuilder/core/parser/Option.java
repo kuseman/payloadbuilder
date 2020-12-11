@@ -45,6 +45,6 @@ public class Option
     @Override
     public String toString()
     {
-        return option + "=" + valueExpression;
+        return option + " = " + valueExpression.toString();
     }
 }

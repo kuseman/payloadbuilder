@@ -498,8 +498,10 @@ public class QueryParser
         public Object visitTableSourceOption(TableSourceOptionContext ctx)
         {
             QualifiedName option = getQualifiedName(ctx.qname());
-            Expression valueExpression = getExpression(ctx.expression());
-            return new Option(option, valueExpression);
+            validateQualifiedReference = false;
+            Expression expression = getExpression(ctx.expression());
+            validateQualifiedReference = true;
+            return new Option(option, expression);
         }
 
         @Override
@@ -799,10 +801,17 @@ public class QueryParser
             text = text.replaceAll("''", "'");
             return new LiteralStringExpression(text);
         }
+        
+        private boolean validateQualifiedReference = true;
 
         /** Validate alias in QRE is pointing to an existing table alias */
         private void validateQualifiedReference(ParserRuleContext ctx, QualifiedReferenceExpression qfe)
         {
+            if (!validateQualifiedReference)
+            {
+                return;
+            }
+            
             if (!validateQualifiedReferences
                 || isBlank(parentTableAlias.getAlias())
                 || qfe.getLambdaId() >= 0)

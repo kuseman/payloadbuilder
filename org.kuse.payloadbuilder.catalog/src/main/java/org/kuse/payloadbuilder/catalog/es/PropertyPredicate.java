@@ -49,7 +49,8 @@ class PropertyPredicate
         }
         else if (pair.getType() == Type.IN)
         {
-            return property + " IN (" + ((InExpression) pair.getRight().getExpression()).getArguments() + ")";
+            InExpression ie = (InExpression) pair.getRight().getExpression();
+            return property + (ie.isNot() ? " NOT" : "") + " IN (" + ie.getArguments() + ")";
         }
         else if (pair.getType() == Type.LIKE)
         {
@@ -119,19 +120,22 @@ class PropertyPredicate
         else if (pair.getType() == Type.IN)
         {
             // { "terms": { "property": [ "value", "value2"] }}
-            filterMust.append("{\"terms\":{\"")
+            InExpression ie = (InExpression) pair.getRight().getExpression();
+            StringBuilder sb = ie.isNot() ? filterMustNot : filterMust;
+
+            sb.append("{\"terms\":{\"")
                     .append(property)
                     .append("\":[");
 
             List<Expression> arguments = ((InExpression) pair.getRight().getExpression()).getArguments();
-            filterMust.append(arguments
+            sb.append(arguments
                     .stream()
                     .map(e -> e.eval(context))
                     .filter(Objects::nonNull)
                     .map(o -> quote(o))
                     .collect(joining(",")));
 
-            filterMust.append("]}}");
+            sb.append("]}}");
         }
         else if (pair.getType() == Type.LIKE)
         {

@@ -120,8 +120,6 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                                 false,
                                 false,
                                 c.getIndices(session, "", QualifiedName.of("article_attribute")).get(0),
-                                null,
-                                null,
                                 null),
                         "a"),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("s.art_id"))),
@@ -131,14 +129,61 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 true,
                 false,
                 c.getIndices(session, "", QualifiedName.of("article")).get(0),
-                null,
-                null,
                 null);
 
         Operator actual = pair.getKey();
 
         //                System.out.println(actual.toString(1));
         //                System.err.println(expected.toString(1));
+
+        assertEquals(expected, actual);
+
+        RowIterator it = actual.open(new ExecutionContext(session));
+        assertFalse(it.hasNext());
+    }
+
+    @Test
+    public void test_inner_join_with_cache()
+    {
+        String queryString = "SELECT a.art_id " +
+            "FROM source s " +
+            "INNER JOIN article a with (cachettl = 'pt10m', cacheouterkey = s.art_id, cacheinnerkey = a.art_id)" +
+            "  ON a.art_id = s.art_id " +
+            "  AND a.club_id = 1337 + 123 " +
+            "  AND a.country_id = 0 " +
+            "  AND a.active_flg = 1";
+
+        List<Operator> operators = new ArrayList<>();
+        Catalog c = catalog(ofEntries(entry("article", asList("club_id", "country_id", "art_id"))), operators);
+        session.getCatalogRegistry().registerCatalog("c", c);
+        session.getCatalogRegistry().setDefaultCatalog("c");
+
+        Select select = parser.parseSelect(session.getCatalogRegistry(), queryString);
+        Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
+
+        Operator expected = new BatchHashJoin(
+                4,
+                "INNER JOIN",
+                operators.get(0),
+                new OuterValuesCacheOperator(
+                        3,
+                        new FilterOperator(2, operators.get(1), new ExpressionPredicate(e("a.active_flg = 1"))),
+                        e("'pt10m'"),
+                        e("s.art_id"),
+                        e("a.art_id")),
+                new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("s.art_id"))),
+                new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("a.art_id"))),
+                new ExpressionPredicate(e("a.art_id = s.art_id")),
+                DefaultTupleMerger.DEFAULT,
+                false,
+                false,
+                c.getIndices(session, "", QualifiedName.of("article")).get(0),
+                null);
+
+        Operator actual = pair.getKey();
+
+//        System.out.println(actual.toString(1));
+//        System.err.println(expected.toString(1));
 
         assertEquals(expected, actual);
 
@@ -177,8 +222,6 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 false,
                 false,
                 c.getIndices(session, "", QualifiedName.of("article")).get(0),
-                null,
-                null,
                 null);
 
         Operator actual = pair.getKey();
@@ -225,8 +268,6 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 true,
                 false,
                 c.getIndices(session, "", QualifiedName.of("article")).get(0),
-                null,
-                null,
                 null);
 
         Operator actual = pair.getKey();
@@ -274,8 +315,6 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 true,
                 true,
                 c.getIndices(session, "", QualifiedName.of("article")).get(0),
-                null,
-                null,
                 null);
 
         Operator actual = pair.getKey();
@@ -320,8 +359,6 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 false,
                 true,
                 c.getIndices(session, "", QualifiedName.of("article")).get(0),
-                null,
-                null,
                 null);
 
         Operator actual = pair.getKey();

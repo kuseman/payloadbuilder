@@ -1,6 +1,7 @@
 package org.kuse.payloadbuilder.catalog.jdbc;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.upperCase;
 
 import java.awt.Component;
 import java.awt.GridBagConstraints;
@@ -80,14 +81,14 @@ class SqlServerProvider implements ConnectionProvider
         load(domain, DOMAIN);
         load(applicationName, APPLICATION_NAME);
         load(urlSuffix, URL_SUFFIX);
-        AuthenticationType authenticationType = AuthenticationType.valueOf((String) properties.getOrDefault(AUTHENTICATION_TYPE, AuthenticationType.SQL_SERVER_AUTHENTICATION.name()));
+        AuthenticationType authenticationType = AuthenticationType.valueOf(upperCase((String) properties.getOrDefault(AUTHENTICATION_TYPE, AuthenticationType.SQL_SERVER_AUTHENTICATION.name())));
         this.authenticationType.setSelectedItem(authenticationType);
     }
 
     @Override
     public String getURL(Map<String, Object> properties)
     {
-        AuthenticationType authenticationType = AuthenticationType.valueOf((String) properties.getOrDefault(AUTHENTICATION_TYPE, AuthenticationType.SQL_SERVER_AUTHENTICATION.name()));
+        AuthenticationType authenticationType = AuthenticationType.valueOf(upperCase((String) properties.getOrDefault(AUTHENTICATION_TYPE, AuthenticationType.SQL_SERVER_AUTHENTICATION.name())));
         String server = (String) properties.getOrDefault(SERVER, "");
         String domain = (String) properties.getOrDefault(DOMAIN, "");
         String applicationName = (String) properties.getOrDefault(APPLICATION_NAME, "");
@@ -126,7 +127,7 @@ class SqlServerProvider implements ConnectionProvider
     enum AuthenticationType
     {
         /** Authentication with windows domain user and password */
-        WINDOWS_AUTHENTICATION_CREDENTIAlS("Windows NTLM Authentication")
+        WINDOWS_AUTHENTICATION_CREDENTIALS("Windows NTLM Authentication")
         {
             @Override
             String generateURL(String server, String domain, String applicationName, String urlSuffix)
@@ -140,7 +141,7 @@ class SqlServerProvider implements ConnectionProvider
             }
         },
 
-        KERBEROS_AUTHENTICATION_CREDENTIAlS("Kerberos Authentication")
+        KERBEROS_AUTHENTICATION_CREDENTIALS("Kerberos Authentication")
         {
             @Override
             String generateURL(String server, String domain, String applicationName, String urlSuffix)

@@ -53,10 +53,6 @@ class CompositeTuple extends ArrayList<Tuple> implements Tuple
     @Override
     public Object getValue(QualifiedName qname, int partIndex)
     {
-        if (partIndex >= qname.getParts().size())
-        {
-            System.err.println();
-        }
         String part = qname.getParts().get(partIndex);
 
         int size = size();
@@ -84,18 +80,4 @@ class CompositeTuple extends ArrayList<Tuple> implements Tuple
                 .flatMap(tuple -> StreamSupport.stream(spliteratorUnknownSize(tuple.getQualifiedNames(), 0), false))
                 .iterator();
     }
-
-    //    @Override
-    //    public void writeColumns(OutputWriter writer, String alias)
-    //    {
-    //        int size = size();
-    //        for (int i = 0; i < size; i++)
-    //        {
-    //            Tuple tuple = get(i);
-    //            if (alias == null || tuple.containsAlias(alias))
-    //            {
-    //                tuple.writeColumns(writer, alias);
-    //            }
-    //        }
-    //    }
 }

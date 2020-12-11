@@ -39,6 +39,7 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.ExpressionSelectItem;
 import org.kuse.payloadbuilder.core.parser.Join;
 import org.kuse.payloadbuilder.core.parser.Join.JoinType;
+import org.kuse.payloadbuilder.core.parser.LiteralNullExpression;
 import org.kuse.payloadbuilder.core.parser.NestedSelectItem;
 import org.kuse.payloadbuilder.core.parser.NestedSelectItem.Type;
 import org.kuse.payloadbuilder.core.parser.Option;
@@ -64,9 +65,13 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 {
     private static final String BATCH_LIMIT = "batch_limit";
     private static final String BATCH_SIZE = "batch_size";
-    private static final String CACHE_KEY = "cache_key";
-    private static final String CACHE_TTL = "cache_ttl";
+    private static final String CACHE_TTL = "cachettl";
+    private static final String CACHE_INNER_KEY = "cacheinnerkey";
+    private static final String CACHE_OUTER_KEY = "cacheouterkey";
     private static final String POPULATE = "populate";
+    //    private static final String CACHE_TTL = "cachettl";
+    //    private static final String CACHE_TTL = "cachettl";
+    //
 
     //    private static final String HASH_INNER = "hash_inner";
     private static final OperatorBuilder VISITOR = new OperatorBuilder();
@@ -734,8 +739,23 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         // Get batch size option for provided table source (if any) Used to override default {@link Index#getBatchSize()} for a table
         Option batchSizeOption = getOption(innerTableSource, BATCH_SIZE);
-        Option cacheKeyOption = getOption(innerTableSource, CACHE_KEY);
-        Option cacheTTLOption = getOption(innerTableSource, CACHE_TTL);
+        Option cacheOuterKeyOption = getOption(innerTableSource, CACHE_OUTER_KEY);
+
+        // Wrap inner with a cache operator
+        if (cacheOuterKeyOption != null)
+        {
+            Option cacheInnerKeyOption = getOption(innerTableSource, CACHE_INNER_KEY);
+            Option cacheTTLOption = getOption(innerTableSource, CACHE_TTL);
+            if (cacheInnerKeyOption != null)
+            {
+                inner = new OuterValuesCacheOperator(
+                        context.acquireNodeId(),
+                        inner,
+                        cacheTTLOption != null ? cacheTTLOption.getValueExpression() : LiteralNullExpression.NULL_LITERAL,
+                        cacheOuterKeyOption.getValueExpression(),
+                        cacheInnerKeyOption.getValueExpression());
+            }
+        }
 
         return new BatchHashJoin(
                 context.acquireNodeId(),
@@ -749,9 +769,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 populating,
                 emitEmptyOuterRows,
                 index,
-                batchSizeOption,
-                cacheKeyOption,
-                cacheTTLOption);
+                batchSizeOption);
     }
 
     /** Fetch index from provided equi pairs and indices list */

@@ -9,6 +9,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.ObjectUtils;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
 
@@ -17,13 +18,17 @@ public class Row implements Tuple
 {
     private static final String POS = "__pos";
 
-    private int pos;
-    private TableAlias tableAlias;
-    private String[] columns;
-    private Values values;
+    private final int pos;
+    private final TableAlias tableAlias;
+    private final String[] columns;
+    private final Values values;
 
-    private Row()
+    private Row(int pos, TableAlias tableAlias, String[] columns, Values values)
     {
+        this.pos = pos;
+        this.tableAlias = tableAlias;
+        this.columns = columns;
+        this.values = values;
     }
 
     /** Return columns for this row */
@@ -173,12 +178,7 @@ public class Row implements Tuple
     /** Construct a row with provided parent, alias, columns, values and position */
     public static Row of(TableAlias alias, int pos, String[] columns, Values values)
     {
-        Row t = new Row();
-        t.pos = pos;
-        t.tableAlias = alias;
-        t.columns = columns;
-        t.values = values;
-        return t;
+        return new Row(pos, alias, columns, values);
     }
 
     /** Values definition of a rows values */
@@ -214,7 +214,7 @@ public class Row implements Tuple
 
         ObjectValues(Object[] values)
         {
-            this.values = values;
+            this.values = ObjectUtils.defaultIfNull(values, ArrayUtils.EMPTY_OBJECT_ARRAY);
         }
 
         @Override

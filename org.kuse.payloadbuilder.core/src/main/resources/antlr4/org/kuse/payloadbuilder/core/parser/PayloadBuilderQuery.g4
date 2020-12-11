@@ -121,7 +121,7 @@ tableSource
  ;
 
 tableSourceOptions
- : WITH '(' options+=tableSourceOption (',' tableOptions+=tableSourceOption)* ')'
+ : WITH '(' options+=tableSourceOption (',' options+=tableSourceOption)* ')'
  ;
 
 tableSourceOption

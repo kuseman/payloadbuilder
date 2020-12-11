@@ -207,8 +207,6 @@ public class BatchHashJoinTest extends AOperatorTest
                         index,
                         false,
                         false,
-                        null,
-                        null,
                         null),
                 new ExpressionPredicate(e("b.col1 = a.col1")),
                 DefaultTupleMerger.DEFAULT,
@@ -1150,8 +1148,6 @@ public class BatchHashJoinTest extends AOperatorTest
                 index,
                 populating,
                 emitEmptyOuterRows,
-                null,
-                null,
                 null);
     }
 
@@ -1165,9 +1161,7 @@ public class BatchHashJoinTest extends AOperatorTest
             Index index,
             boolean populating,
             boolean emitEmptyOuterRows,
-            Option batchSize,
-            Option cacheKey,
-            Option cacheTTL)
+            Option batchSize)
     {
         return new BatchHashJoin(
                 nodeId,
@@ -1181,9 +1175,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 populating,
                 emitEmptyOuterRows,
                 index,
-                batchSize,
-                cacheKey,
-                cacheTTL);
+                batchSize);
     }
 
     //    @Ignore

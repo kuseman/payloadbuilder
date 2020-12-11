@@ -468,12 +468,12 @@ public class PredicateAnalyzerTest extends Assert
         assertNull(p.getColumn("s"));
 
         p = PredicateAnalyzer.AnalyzePair.of(alias, e("not (a.art_id > s.art_id)"));
-        assertEquals(Type.UNDEFINED, p.getType());
-        assertNull(p.getComparisonType());
-        assertEquals(e("not (a.art_id > s.art_id)"), p.getPredicate());
+        assertEquals(Type.COMPARISION, p.getType());
+        assertEquals(ComparisonExpression.Type.LESS_THAN_EQUAL, p.getComparisonType());
+        assertEquals(e("a.art_id <= s.art_id"), p.getPredicate());
         assertNull(p.getColumn("b"));
-        assertNull(p.getColumn("a"));
-        assertNull(p.getColumn("s"));
+        assertEquals("art_id", p.getColumn("a"));
+        assertEquals("art_id", p.getColumn("s"));
 
         p = PredicateAnalyzer.AnalyzePair.of(alias, e("not a.flag"));
         assertEquals(Type.COMPARISION, p.getType());

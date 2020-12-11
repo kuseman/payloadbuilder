@@ -51,6 +51,11 @@ public class LikeExpression extends Expression
         return not;
     }
 
+    public Expression getEscapeCharacterExpression()
+    {
+        return escapeCharacterExpression;
+    }
+
     @Override
     public boolean isConstant()
     {

@@ -7,6 +7,7 @@ import static org.kuse.payloadbuilder.core.parser.LiteralNullExpression.NULL_LIT
 
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
+import org.kuse.payloadbuilder.core.parser.ComparisonExpression.Type;
 
 /** Logical not */
 public class LogicalNotExpression extends Expression
@@ -41,7 +42,63 @@ public class LogicalNotExpression extends Expression
             boolean value = ((LiteralBooleanExpression) expression).getValue();
             return value ? FALSE_LITERAL : TRUE_LITERAL;
         }
+        else if (expression instanceof ComparisonExpression)
+        {
+            ComparisonExpression ce = (ComparisonExpression) expression;
+            switch (ce.getType())
+            {
+                case EQUAL:
+                    // =  >=  !=
+                    return new ComparisonExpression(Type.NOT_EQUAL, ce.getLeft(), ce.getRight());
+                case GREATER_THAN:
+                    // >  >= <=
+                    return new ComparisonExpression(Type.LESS_THAN_EQUAL, ce.getLeft(), ce.getRight());
+                case GREATER_THAN_EQUAL:
+                    // >=  >= <
+                    return new ComparisonExpression(Type.LESS_THAN, ce.getLeft(), ce.getRight());
+                case LESS_THAN:
+                    // <  >= >=
+                    return new ComparisonExpression(Type.GREATER_THAN_EQUAL, ce.getLeft(), ce.getRight());
+                case LESS_THAN_EQUAL:
+                    // <=  >= >
+                    return new ComparisonExpression(Type.GREATER_THAN, ce.getLeft(), ce.getRight());
+                case NOT_EQUAL:
+                    // !=  >=  =
+                    return new ComparisonExpression(Type.EQUAL, ce.getLeft(), ce.getRight());
+                default:
+                    throw new IllegalArgumentException("Unkown comparison type " + ce.getType());
+            }
+        }
+        else if (expression instanceof LogicalBinaryExpression)
+        {
+            LogicalBinaryExpression lbe = (LogicalBinaryExpression) expression;
+            if (lbe.getType() == LogicalBinaryExpression.Type.AND)
+            {
+                return new LogicalBinaryExpression(
+                        LogicalBinaryExpression.Type.OR,
+                        new LogicalNotExpression(lbe.getLeft()),
+                        new LogicalNotExpression(lbe.getRight()));
+            }
 
+            return new LogicalBinaryExpression(
+                    LogicalBinaryExpression.Type.AND,
+                    new LogicalNotExpression(lbe.getLeft()),
+                    new LogicalNotExpression(lbe.getRight()));
+        }
+        else if (expression instanceof LogicalNotExpression)
+        {
+            return ((LogicalNotExpression) expression).getExpression();
+        }
+        else if (expression instanceof LikeExpression)
+        {
+            LikeExpression le = (LikeExpression) expression;
+            return new LikeExpression(le.getExpression(), le.getPatternExpression(), !le.isNot(), le.getEscapeCharacterExpression());
+        }
+        else if (expression instanceof InExpression)
+        {
+            InExpression ie = (InExpression) expression;
+            return new InExpression(ie.getExpression(), ie.getArguments(), !ie.isNot());
+        }
         return this;
     }
 
