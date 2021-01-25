@@ -25,6 +25,9 @@ public interface StatementVisitor<TR, TC>
 
     TR visit(ShowStatement statement, TC context);
 
+    TR visit(CacheFlushStatement statement, TC context);
+    
+    TR visit(CacheRemoveStatement statement, TC context);
     /* DML nodes */
     TR visit(SelectStatement statement, TC context);
     //CSON

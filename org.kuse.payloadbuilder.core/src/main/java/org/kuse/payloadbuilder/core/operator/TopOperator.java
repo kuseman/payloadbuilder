@@ -6,6 +6,7 @@ import static java.util.Objects.requireNonNull;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang3.StringUtils;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
@@ -97,8 +98,11 @@ class TopOperator extends AOperator
     }
 
     @Override
-    public String toString()
+    public String toString(int indent)
     {
-        return super.toString();
+        String indentString = StringUtils.repeat("  ", indent);
+        return String.format("TOP (ID: %d, top: %s)", nodeId, topExpression) + System.lineSeparator()
+            +
+            indentString + target.toString(indent + 1);
     }
 }

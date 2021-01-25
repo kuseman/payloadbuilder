@@ -186,6 +186,22 @@
           [{ "key": "Var1", "value": 30 }, { "key": "Var2", "value": 11 }, { "key": "Var3", "value": 3 }]
         ]
       ]
+    },
+    {
+      "name": "Case expression",
+      "query": [
+        "select @var = 10",
+        "select case when @var > 0 then 'hello' else 'world' end col",
+        "select case when @var < 0 then 'hello' end col"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col", "value": "hello" }]
+        ],
+        [
+          [{ "key": "col", "value": null }]
+        ]
+      ]
     }
   ]
 }

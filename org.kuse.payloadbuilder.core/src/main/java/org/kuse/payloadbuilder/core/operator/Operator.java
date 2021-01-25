@@ -39,9 +39,11 @@ public interface Operator
         return "";
     }
 
-    /** Returns more detail properties of describe statement if {@link #getDescribeString()} is not enough.
+    /**
+     * Returns more detail properties of describe statement if {@link #getDescribeString()} is not enough.
+     *
      * @param context Execution context
-     * */
+     */
     default Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
         return emptyMap();
@@ -86,4 +88,20 @@ public interface Operator
         {
         }
     }
+
+    /** Empty operator */
+    Operator EMPTY_OPERATOR = new Operator()
+    {
+        @Override
+        public int getNodeId()
+        {
+            return 0;
+        }
+
+        @Override
+        public RowIterator open(ExecutionContext context)
+        {
+            return RowIterator.EMPTY;
+        }
+    };
 }

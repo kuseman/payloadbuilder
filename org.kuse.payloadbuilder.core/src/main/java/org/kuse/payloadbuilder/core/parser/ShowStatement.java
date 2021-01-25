@@ -42,6 +42,7 @@ public class ShowStatement extends Statement
     {
         VARIABLES,
         TABLES,
-        FUNCTIONS
+        FUNCTIONS,
+        CACHES;
     }
 }

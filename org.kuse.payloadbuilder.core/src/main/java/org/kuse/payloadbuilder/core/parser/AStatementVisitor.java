@@ -88,6 +88,18 @@ public class AStatementVisitor<TR, TC> implements StatementVisitor<TR, TC>, Sele
     }
 
     @Override
+    public TR visit(CacheFlushStatement statement, TC context)
+    {
+        return null;
+    }
+
+    @Override
+    public TR visit(CacheRemoveStatement statement, TC context)
+    {
+        return null;
+    }
+
+    @Override
     public TR visit(SelectStatement statement, TC context)
     {
         statement.getSelect().accept(this, context);

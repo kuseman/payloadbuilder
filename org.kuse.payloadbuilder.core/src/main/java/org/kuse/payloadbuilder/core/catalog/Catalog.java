@@ -12,6 +12,7 @@ import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
+import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Option;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.SortItem;
@@ -105,6 +106,18 @@ public abstract class Catalog
     public Operator getIndexOperator(OperatorData data, Index index)
     {
         throw new IllegalArgumentException("Catalog " + data.catalogAlias + " (" + name + ") doesn't support index operators.");
+    }
+
+    /**
+     * Prepares tuple cache name before get/put.
+     * Example prepend server/database name to cache name
+     * @param context Execution context
+     * @param catalogAlias Alias of the current catalog
+     * @param cacheName Name of cache that should be prepared
+     */
+    public String prepareTupleCacheName(ExecutionContext context, String catalogAlias, String cacheName)
+    {
+        throw new RuntimeException(getName() + " does not support caching");
     }
 
     /** Register function */

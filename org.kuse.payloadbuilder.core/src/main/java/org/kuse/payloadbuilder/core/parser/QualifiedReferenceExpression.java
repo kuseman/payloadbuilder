@@ -11,7 +11,7 @@ import org.kuse.payloadbuilder.core.utils.MapUtils;
 /**
  * Expression of a qualified name type. Column reference with a nested path. Ie. field.subField.value
  **/
-public class QualifiedReferenceExpression extends Expression
+public class QualifiedReferenceExpression extends Expression implements HasIdentifier
 {
     private final QualifiedName qname;
     /**
@@ -36,6 +36,12 @@ public class QualifiedReferenceExpression extends Expression
     public int getLambdaId()
     {
         return lambdaId;
+    }
+
+    @Override
+    public String getIdentifier()
+    {
+        return qname.getLast();
     }
 
     @Override

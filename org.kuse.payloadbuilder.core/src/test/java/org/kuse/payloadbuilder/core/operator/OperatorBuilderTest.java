@@ -16,6 +16,7 @@ import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.operator.TableAlias.Type;
 import org.kuse.payloadbuilder.core.parser.Expression;
+import org.kuse.payloadbuilder.core.parser.LiteralNullExpression;
 import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.SortItem;
@@ -92,6 +93,83 @@ public class OperatorBuilderTest extends AOperatorTest
 
         //                System.out.println(queryResult.operator.toString(1));
         //                System.err.println(expected.toString(1));
+
+        assertEquals(expected, queryResult.operator);
+    }
+
+    @Test
+    public void test_cache_from()
+    {
+        String query = "select top 10 a.art_id from article a with (cachename = 'article', cacheouterkey = 123, cacheinnerkey = a.art_id)";
+        QueryResult queryResult = getQueryResult(query);
+
+        Operator expected = new TopOperator(
+                2,
+                new OuterValuesCacheOperator(
+                        1,
+                        queryResult.tableOperators.get(0),
+                        session.getCatalogRegistry().getCatalog("c"),
+                        "c",
+                        e("'article'"),
+                        e("123"),
+                        e("a.art_id"),
+                        LiteralNullExpression.NULL_LITERAL),
+                e("10"));
+
+        //        System.out.println(queryResult.operator.toString(1));
+        //        System.err.println(expected.toString(1));
+
+        assertEquals(expected, queryResult.operator);
+    }
+
+    @Test
+    public void test_cache_from_with_filter_cache()
+    {
+        String query = "select top 10 a.art_id from article a with (cachename = 'article', cacheouterkey = 123, cacheinnerkey = a.art_id) where a.active_flg";
+        QueryResult queryResult = getQueryResult(query);
+
+        Operator expected = new TopOperator(
+                3,
+                new OuterValuesCacheOperator(
+                        2,
+                        new FilterOperator(1, queryResult.tableOperators.get(0), new ExpressionPredicate(e("a.active_flg = true"))),
+                        session.getCatalogRegistry().getCatalog("c"),
+                        "c",
+                        e("'article'"),
+                        e("123"),
+                        e("a.art_id"),
+                        LiteralNullExpression.NULL_LITERAL),
+                e("10"));
+
+        //        System.out.println(queryResult.operator.toString(1));
+        //        System.err.println(expected.toString(1));
+
+        assertEquals(expected, queryResult.operator);
+    }
+
+    @Test
+    public void test_cache_from_with_no_filter_cache()
+    {
+        String query = "select top 10 a.art_id from article a with (cachename = 'article', cacheouterkey = 123, cacheinnerkey = a.art_id, cachefilters = false) where a.active_flg";
+        QueryResult queryResult = getQueryResult(query);
+
+        Operator expected = new TopOperator(
+                3,
+                new FilterOperator(2,
+                        new OuterValuesCacheOperator(
+                                1,
+                                queryResult.tableOperators.get(0),
+                                session.getCatalogRegistry().getCatalog("c"),
+                                "c",
+                                e("'article'"),
+                                e("123"),
+                                e("a.art_id"),
+                                LiteralNullExpression.NULL_LITERAL),
+                        new ExpressionPredicate(e("a.active_flg = true"))),
+                e("10"));
+
+//                System.out.println(queryResult.operator.toString(1));
+//                System.err.println(expected.toString(1));
 
         assertEquals(expected, queryResult.operator);
     }

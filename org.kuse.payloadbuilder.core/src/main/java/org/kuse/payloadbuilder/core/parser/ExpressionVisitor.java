@@ -52,5 +52,7 @@ public interface ExpressionVisitor<TR, TC>
     TR visit(VariableExpression expression, TC context);
 
     TR visit(SubscriptExpression expression, TC context);
+
+    TR visit(CaseExpression expression, TC context);
     //CSOFF
 }

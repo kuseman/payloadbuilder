@@ -330,6 +330,14 @@ class JdbcOperator extends AOperator
                 {
                     try
                     {
+                        statement.cancel();
+                    }
+                    catch (SQLException e)
+                    {
+                        throw new RuntimeException("Error cancelling statement", e);
+                    }
+                    try
+                    {
                         statement.getConnection().close();
                     }
                     catch (SQLException e)

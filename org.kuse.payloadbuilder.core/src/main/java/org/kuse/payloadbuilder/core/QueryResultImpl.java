@@ -1,24 +1,15 @@
 package org.kuse.payloadbuilder.core;
 
-import static java.util.Arrays.asList;
-import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_OBJECT_ARRAY;
-import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
-import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.join;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Stream;
 
-import org.apache.commons.lang3.mutable.MutableInt;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
-import org.kuse.payloadbuilder.core.catalog.FunctionInfo;
 import org.kuse.payloadbuilder.core.operator.ObjectProjection;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
@@ -28,11 +19,12 @@ import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.operator.Tuple;
+import org.kuse.payloadbuilder.core.parser.CacheFlushStatement;
+import org.kuse.payloadbuilder.core.parser.CacheRemoveStatement;
 import org.kuse.payloadbuilder.core.parser.DescribeSelectStatement;
 import org.kuse.payloadbuilder.core.parser.DescribeTableStatement;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.IfStatement;
-import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.PrintStatement;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QueryStatement;
@@ -41,7 +33,6 @@ import org.kuse.payloadbuilder.core.parser.SelectItem;
 import org.kuse.payloadbuilder.core.parser.SelectStatement;
 import org.kuse.payloadbuilder.core.parser.SetStatement;
 import org.kuse.payloadbuilder.core.parser.ShowStatement;
-import org.kuse.payloadbuilder.core.parser.ShowStatement.Type;
 import org.kuse.payloadbuilder.core.parser.Statement;
 import org.kuse.payloadbuilder.core.parser.StatementVisitor;
 import org.kuse.payloadbuilder.core.parser.UseStatement;
@@ -52,12 +43,6 @@ import org.kuse.payloadbuilder.core.parser.UseStatement;
 class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
 {
     private static final Row DUMMY_ROW = Row.of(TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("dummy"), "d").build(), 0, EMPTY_OBJECT_ARRAY);
-    private static final TableAlias SHOW_VARIABLES_ALIAS = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("variables"), "v").columns(new String[] {"Name", "Value"}).build();
-    private static final TableAlias SHOW_TABLES_ALIAS = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tables"), "t").columns(new String[] {"Name"}).build();
-    private static final TableAlias SHOW_FUNCTIONS_ALIAS = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("functions"), "f")
-            .columns(new String[] {"Name", "Type", "Description"})
-            .build();
-
     private final QuerySession session;
     private final CatalogRegistry registry;
     private ExecutionContext context;
@@ -148,109 +133,35 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     public Void visit(ShowStatement statement, Void ctx)
     {
         context.clear();
-        Operator operator = null;
-        MutableInt pos = new MutableInt();
-        String[] columns = null;
-        if (statement.getType() == Type.VARIABLES)
+        currentSelect = ShowUtils.createShowOperator(context, statement);
+        return null;
+    }
+
+    @Override
+    public Void visit(CacheFlushStatement statement, Void ctx)
+    {
+        if (statement.isAll())
         {
-            Map<String, Object> variables = context.getVariables();
-            columns = SHOW_VARIABLES_ALIAS.getColumns();
-            operator = new Operator()
-            {
-                @Override
-                public RowIterator open(ExecutionContext context)
-                {
-                    return RowIterator.wrap(variables
-                            .entrySet()
-                            .stream()
-                            .map(e -> (Tuple) Row.of(SHOW_VARIABLES_ALIAS, pos.incrementAndGet(), new Object[] {e.getKey(), e.getValue()}))
-                            .iterator());
-                }
-
-                @Override
-                public int getNodeId()
-                {
-                    return 0;
-                }
-            };
-        }
-        else if (statement.getType() == Type.TABLES)
-        {
-            String alias = defaultIfBlank(statement.getCatalog(), registry.getDefaultCatalogAlias());
-            if (isBlank(alias))
-            {
-                throw new ParseException("No catalog alias provided.", statement.getToken());
-            }
-            Catalog catalog = session.getCatalogRegistry().getCatalog(alias);
-            if (catalog == null)
-            {
-                throw new ParseException("No catalog found with alias: " + alias, statement.getToken());
-            }
-
-            List<String> tables = catalog.getTables(session, alias);
-            columns = SHOW_TABLES_ALIAS.getColumns();
-            operator = new Operator()
-            {
-                @Override
-                public RowIterator open(ExecutionContext context)
-                {
-                    return RowIterator.wrap(tables
-                            .stream()
-                            .map(table -> (Tuple) Row.of(SHOW_TABLES_ALIAS, pos.incrementAndGet(), new Object[] {table}))
-                            .iterator());
-                }
-
-                @Override
-                public int getNodeId()
-                {
-                    return 0;
-                }
-            };
-        }
-        else if (statement.getType() == Type.FUNCTIONS)
-        {
-            String alias = defaultIfBlank(statement.getCatalog(), registry.getDefaultCatalogAlias());
-            Catalog catalog = session.getCatalogRegistry().getCatalog(alias);
-            if (!isBlank(statement.getCatalog()) && catalog == null)
-            {
-                throw new ParseException("No catalog found with alias: " + statement.getCatalog(), statement.getToken());
-            }
-
-            Catalog builtIn = session.getCatalogRegistry().getBuiltin();
-            Collection<FunctionInfo> functions = catalog != null ? catalog.getFunctions() : emptyList();
-            columns = SHOW_FUNCTIONS_ALIAS.getColumns();
-            //CSOFF
-            operator = new Operator()
-            //CSON
-            {
-                @Override
-                public RowIterator open(ExecutionContext context)
-                {
-                    return RowIterator.wrap(Stream.concat(
-                            functions
-                                    .stream()
-                                    .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName()))
-                                    .map(function -> (Tuple) Row.of(SHOW_FUNCTIONS_ALIAS, pos.incrementAndGet(), new Object[] {function.getName(), function.getType(), function.getDescription()})),
-                            Stream.concat(
-                                    functions.size() > 0
-                                        ? Stream.of(Row.of(SHOW_FUNCTIONS_ALIAS, pos.incrementAndGet(), new Object[] {"-- Built in --", "", ""}))
-                                        : Stream.empty(),
-                                    builtIn.getFunctions()
-                                            .stream()
-                                            .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName()))
-                                            .map(function -> Row.of(SHOW_FUNCTIONS_ALIAS, pos.incrementAndGet(), new Object[] {function.getName(), function.getType(), function.getDescription()}))))
-                            .iterator());
-                }
-
-                @Override
-                public int getNodeId()
-                {
-                    return 0;
-                }
-            };
+            // NOT Supported!
+            return null;
         }
 
-        currentSelect = Pair.of(operator, DescribeUtils.getIndexProjection(asList(columns)));
+        if (statement.getKey() != null)
+        {
+            Object key = statement.getKey().eval(context);
+            context.getSession().getTupleCacheProvider().flushCache(statement.getName(), key);
+        }
+        else
+        {
+            context.getSession().getTupleCacheProvider().flushCache(statement.getName());
+        }
+        return null;
+    }
+
+    @Override
+    public Void visit(CacheRemoveStatement statement, Void ctx)
+    {
+        context.getSession().getTupleCacheProvider().removeCache(statement.getName());
         return null;
     }
 
@@ -361,7 +272,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         Operator operator = currentSelect.getKey();
         Projection projection = currentSelect.getValue();
 
-        String[] columns = null;
+        String[] columns = ArrayUtils.EMPTY_STRING_ARRAY;
         if (projection instanceof ObjectProjection)
         {
             columns = ((ObjectProjection) projection).getColumns();

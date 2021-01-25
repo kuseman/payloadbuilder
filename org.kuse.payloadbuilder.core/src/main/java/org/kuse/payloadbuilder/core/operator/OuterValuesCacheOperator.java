@@ -1,9 +1,12 @@
 package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Collections.emptyIterator;
+import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
+import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
+import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -15,38 +18,58 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Objects;
 
+import org.apache.commons.collections.iterators.SingletonIterator;
 import org.apache.commons.lang3.StringUtils;
-import org.kuse.payloadbuilder.core.CacheProvider;
+import org.kuse.payloadbuilder.core.TupleCacheProvider;
+import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.operator.OperatorContext.OuterValues;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
-import org.kuse.payloadbuilder.core.utils.MapUtils;
 
 /**
- * Cache operator that sits between a Batch operator and the inner operator to allow for external cache of values
+ * <pre>
+ * Cache operator that caches tuples with a
+ * probing outer key expression and put values to cache
+ * with an inner key expression.
+ *
+ * NOTE! If operatorContext has an {@link OperatorContext#getOuterIndexValues()) set
+ * that one is consumed by outer keys expression as lookup in cache.
+ *
+ * Else outer key is evaluated once and assumed constant for lookup in cache.
+ * </pre>
  */
 class OuterValuesCacheOperator extends AOperator
 {
     private final Operator operator;
+    private final Catalog operatorCatalog;
+    private final String operatorCatalogAlias;
+    /** Cache name */
+    private final Expression nameExpression;
+    /** Cache key for the inner relation */
+    private final Expression outerKeyExpression;
+    /** Cache key for the outer relation */
+    private final Expression innerKeyExpression;
     /** TTL expression in https://en.wikipedia.org/wiki/ISO_8601#Durations format */
     private final Expression ttlExpression;
-    /** Cache key for the outer relation */
-    private final Expression outerKeyExpression;
-    /** Cache key for the inner relation */
-    private final Expression innerKeyExpression;
 
     OuterValuesCacheOperator(
             int nodeId,
             Operator operator,
-            Expression ttlExpression,
+            Catalog operatorCatalog,
+            String operatorCatalogAlias,
+            Expression nameExpression,
             Expression outerKeyExpression,
-            Expression innerKeyExpression)
+            Expression innerKeyExpression,
+            Expression ttlExpression)
     {
         super(nodeId);
         this.operator = requireNonNull(operator, "operator");
-        this.ttlExpression = requireNonNull(ttlExpression, "ttlExpression");
+        this.operatorCatalog = requireNonNull(operatorCatalog, "operatorCatalog");
+        this.operatorCatalogAlias = requireNonNull(operatorCatalogAlias, "operatorCatalogAlias");
+        this.nameExpression = requireNonNull(nameExpression, "nameExpression");
         this.outerKeyExpression = requireNonNull(outerKeyExpression, "outerKeyExpression");
         this.innerKeyExpression = requireNonNull(innerKeyExpression, "innerKeyExpression");
+        this.ttlExpression = requireNonNull(ttlExpression, "ttlExpression");
     }
 
     @Override
@@ -58,16 +81,16 @@ class OuterValuesCacheOperator extends AOperator
     @Override
     public Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
-        return MapUtils.ofEntries(
-                MapUtils.entry("Outer key", outerKeyExpression.toString()),
-                MapUtils.entry("Inner key", innerKeyExpression.toString()),
-                MapUtils.entry("TTL", ttlExpression.toString()));
+        return ofEntries(
+                entry("Outer key", outerKeyExpression.toString()),
+                entry("Inner key", innerKeyExpression.toString()),
+                entry("TTL", ttlExpression.toString()));
     }
 
     @Override
     public RowIterator open(ExecutionContext context)
     {
-        CacheProvider cacheProvider = context.getSession().getCacheProvider();
+        TupleCacheProvider cacheProvider = context.getSession().getTupleCacheProvider();
         if (cacheProvider == null)
         {
             throw new OperatorException("Cannot use cache table option without a registered CacheProvider in session");
@@ -80,8 +103,17 @@ class OuterValuesCacheOperator extends AOperator
             ttl = Duration.parse(String.valueOf(obj));
         }
 
-        Map<CacheKeyImpl, List<Tuple>> cachedValues = cacheProvider.getAll(getCacheKeyIterable(context));
-        Map<Object, List<Tuple>> nonCachedValues = getAndCache(context, cacheProvider, ttl, cachedValues);
+        obj = nameExpression.eval(context);
+        if (obj == null)
+        {
+            throw new OperatorException("Cache name evaluated to null");
+        }
+
+        String name = String.valueOf(obj);
+        String cacheName = operatorCatalog.prepareTupleCacheName(context, operatorCatalogAlias, name);
+        boolean hasOuterValues = context.getOperatorContext().getOuterIndexValues() != null;
+        Map<CacheKeyImpl, List<Tuple>> cachedValues = cacheProvider.getAll(cacheName, getCacheKeyIterable(context, hasOuterValues));
+        Map<Object, List<Tuple>> nonCachedValues = getAndCache(context, hasOuterValues, cacheProvider, cacheName, ttl, cachedValues);
 
         final Iterator<Entry<CacheKeyImpl, List<Tuple>>> it1 = cachedValues.entrySet().iterator();
         final Iterator<Entry<Object, List<Tuple>>> it2 = nonCachedValues.size() > 0
@@ -162,17 +194,29 @@ class OuterValuesCacheOperator extends AOperator
     /** Get and cache values from down stream operator */
     private Map<Object, List<Tuple>> getAndCache(
             ExecutionContext context,
-            CacheProvider cacheProvider,
+            boolean hasOuterValues,
+            TupleCacheProvider cacheProvider,
+            String name,
             Duration ttl,
             Map<CacheKeyImpl, List<Tuple>> cachedValues)
     {
-        Iterator<OuterValues> outerValuesIterator = getOuterValuesIterator(cachedValues);
-        // No values to fetch, everything was present in cache
-        if (!outerValuesIterator.hasNext())
+        // Put a non cached values outer values iterator to context
+        if (hasOuterValues)
+        {
+            Iterator<OuterValues> outerValuesIterator = getOuterValuesIterator(cachedValues);
+            // No values to fetch, everything was present in cache
+            if (!outerValuesIterator.hasNext())
+            {
+                return emptyMap();
+            }
+            context.getOperatorContext().setOuterIndexValues(outerValuesIterator);
+        }
+        // No outer values mode and there are cached values then no need to open down stream
+        else if (cachedValues.entrySet().stream().anyMatch(e -> e.getValue() != null && e.getValue().size() > 0))
         {
             return emptyMap();
         }
-        context.getOperatorContext().setOuterIndexValues(outerValuesIterator);
+
         RowIterator it = operator.open(context);
 
         Map<Object, List<Tuple>> values = new LinkedHashMap<>();
@@ -180,13 +224,17 @@ class OuterValuesCacheOperator extends AOperator
         {
             Tuple tuple = it.next();
             context.setTuple(tuple);
-            Object key = innerKeyExpression.eval(context);
+            final Object key = innerKeyExpression.eval(context);
             values.computeIfAbsent(key, k -> new ArrayList<>()).add(tuple);
         }
         it.close();
 
-        cacheProvider.putAll(values, ttl);
-
+        // Add missing new keys to cache as empty lists
+        for (Entry<CacheKeyImpl, List<Tuple>> e : cachedValues.entrySet())
+        {
+            values.putIfAbsent(e.getKey().cacheKey, emptyList());
+        }
+        cacheProvider.putAll(name, values, ttl);
         return values;
     }
 
@@ -244,9 +292,17 @@ class OuterValuesCacheOperator extends AOperator
 
     /**
      * Create an iterable that transforms outer key values from context to a stream of cache keys
+     *
+     * @param hasOuterValues
      */
-    private Iterable<CacheKeyImpl> getCacheKeyIterable(ExecutionContext context)
+    @SuppressWarnings("unchecked")
+    private Iterable<CacheKeyImpl> getCacheKeyIterable(ExecutionContext context, boolean hasOuterValues)
     {
+        if (!hasOuterValues)
+        {
+            return () -> new SingletonIterator(new CacheKeyImpl(outerKeyExpression.eval(context), null, null));
+        }
+
         //CSOFF
         return () -> new Iterator<CacheKeyImpl>()
         //CSON
@@ -282,9 +338,10 @@ class OuterValuesCacheOperator extends AOperator
             OuterValuesCacheOperator that = (OuterValuesCacheOperator) obj;
             return nodeId == that.nodeId
                 && operator.equals(that.operator)
-                && ttlExpression.equals(that.ttlExpression)
+                && nameExpression.equals(that.nameExpression)
                 && outerKeyExpression.equals(that.outerKeyExpression)
-                && innerKeyExpression.equals(that.innerKeyExpression);
+                && innerKeyExpression.equals(that.innerKeyExpression)
+                && ttlExpression.equals(that.ttlExpression);
         }
         return false;
     }
@@ -300,7 +357,7 @@ class OuterValuesCacheOperator extends AOperator
     }
 
     /** Cache key */
-    static class CacheKeyImpl implements CacheProvider.CacheKey
+    static class CacheKeyImpl implements TupleCacheProvider.CacheKey
     {
         private final Object cacheKey;
         private final Object[] outerValues;

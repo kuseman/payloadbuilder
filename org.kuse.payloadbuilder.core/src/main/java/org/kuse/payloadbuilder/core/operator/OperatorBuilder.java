@@ -1,6 +1,7 @@
 package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.collections.CollectionUtils.containsAny;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
@@ -65,15 +66,12 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 {
     private static final String BATCH_LIMIT = "batch_limit";
     private static final String BATCH_SIZE = "batch_size";
-    private static final String CACHE_TTL = "cachettl";
+    private static final String CACHE_NAME = "cachename";
     private static final String CACHE_INNER_KEY = "cacheinnerkey";
     private static final String CACHE_OUTER_KEY = "cacheouterkey";
+    private static final String CACHE_TTL = "cachettl";
+    private static final String CACHE_FILTERS = "cachefilters";
     private static final String POPULATE = "populate";
-    //    private static final String CACHE_TTL = "cachettl";
-    //    private static final String CACHE_TTL = "cachettl";
-    //
-
-    //    private static final String HASH_INNER = "hash_inner";
     private static final OperatorBuilder VISITOR = new OperatorBuilder();
 
     private final CorrelatedDetector correlatedDetector = new CorrelatedDetector();
@@ -178,6 +176,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             where = analyzeResult.getPredicate();
         }
 
+        CacheOptions cacheOptions = tsj != null ? CacheOptions.from(tsj.getTableSource()) : null;
         Option batchLimitOption = null;
         int batchLimitId = -1;
         List<AJoin> joins = tsj != null ? tsj.getJoins() : emptyList();
@@ -192,19 +191,64 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         if (tsj != null)
         {
+            /*
+             * Apply cache
+             * -----------
+             * Depending on the existence of cache filters table option
+             * the filter operator needs to be put before/after the cache operator
+             *
+             *  Cache filter
+             *
+             *   cache
+             *     filter
+             *       scan
+             *
+             *  No cache of filter
+             *
+             *    filter
+             *      cache
+             *        scan
+             *
+             */
+
+            String alias = tsj.getTableSource().getTableAlias().getAlias();
+            boolean cache = cacheOptions != null;
+            boolean cacheFilters = cache && cacheOptions.cacheFilters == null;
+            List<AnalyzePair> pairs = null;
+            // No caching of filters => extract predicates prior to visit of table source
+            if (cache && !cacheFilters)
+            {
+                pairs = context.pushDownPredicateByAlias.remove(alias);
+            }
+
             tsj.getTableSource().accept(this, context);
-            List<AnalyzePair> pairs = context.pushDownPredicateByAlias.remove(tsj.getTableSource().getTableAlias().getAlias());
+
+            // Extract left over predicates not picked up by catalog
+            if (pairs == null)
+            {
+                pairs = context.pushDownPredicateByAlias.remove(alias);
+            }
+
+            Expression predicate = null;
             if (pairs != null)
             {
-                Expression predicate = new AnalyzeResult(pairs).getPredicate();
+                predicate = new AnalyzeResult(pairs).getPredicate();
                 // Gather columns from remaining predicate
                 visit(predicate, context);
-                //CSOFF
-                if (predicate != null)
-                //CSON
-                {
-                    context.operator = new FilterOperator(context.acquireNodeId(), context.operator, new ExpressionPredicate(predicate));
-                }
+            }
+
+            // Apply filter BEFORE cache if filters should be cached
+            if (predicate != null && (!cache || cacheFilters))
+            {
+                context.operator = new FilterOperator(context.acquireNodeId(), context.operator, new ExpressionPredicate(predicate));
+            }
+
+            context.operator = applyCache(cacheOptions, context, context.operator, tsj.getTableSource());
+
+            // Apply filter AFTER cache if filters should not be cached
+            if (predicate != null && (cache && !cacheFilters))
+            {
+                context.operator = new FilterOperator(context.acquireNodeId(), context.operator, new ExpressionPredicate(predicate));
             }
         }
 
@@ -573,10 +617,38 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         return null;
     }
 
+    private Operator applyCache(
+            CacheOptions cacheOptions,
+            Context context,
+            Operator operator,
+            TableSource tableSource)
+    {
+        if (cacheOptions == null)
+        {
+            return operator;
+        }
+
+        Pair<String, Catalog> pair = getCatalog(context, tableSource.getCatalogAlias(), tableSource.getToken());
+
+        // Use asterisk columns when cache is turned on else
+        // the specified columns will be cached and any projection changes won't work
+        tableSource.getTableAlias().setAsteriskColumns();
+
+        return new OuterValuesCacheOperator(
+                context.acquireNodeId(),
+                operator,
+                pair.getValue(),
+                pair.getKey(),
+                cacheOptions.cacheName.getValueExpression(),
+                cacheOptions.cacheOuterKey.getValueExpression(),
+                cacheOptions.cacheInnerKey.getValueExpression(),
+                cacheOptions.cacheTTL != null ? cacheOptions.cacheTTL.getValueExpression() : LiteralNullExpression.NULL_LITERAL);
+    }
+
     /**
      * Return a batch size option for provided table source (if any) Used to override default {@link Index#getBatchSize()} for a table
      **/
-    private Option getOption(TableSource ts, String name)
+    private static Option getOption(TableSource ts, String name)
     {
         return ts
                 .getOptions()
@@ -726,12 +798,25 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         }
 
         context.index = index;
+
+        // If cache should be applied prior to filters
+        // then cache operator should be set here
+
+        CacheOptions cacheOptions = CacheOptions.from(innerTableSource);
+        boolean cache = cacheOptions != null;
+        boolean cacheFilters = cache && cacheOptions.cacheFilters == null;
+
+        List<AnalyzePair> pushDownPairs = null;
+        if (cache && !cacheFilters)
+        {
+            pushDownPairs = context.pushDownPredicateByAlias.remove(innerTableSource.getTableAlias().getAlias());
+        }
+
         innerTableSource.accept(this, context);
         if (context.index != null)
         {
-            throw new RuntimeException("Index " + index + " should have been consumed by " + innerTableSource.getTable());
+            throw new OperatorException("Index " + index + " should have been consumed by " + innerTableSource.getTable());
         }
-        Operator inner = wrapWithPushDown(context, context.operator, innerTableSource.getTableAlias());
 
         constantalizeValueExtractors(foundation.outerValueExpressions, foundation.innerValueExpressions);
         ExpressionValuesExtractor outerValuesExtractor = new ExpressionValuesExtractor(foundation.outerValueExpressions);
@@ -739,22 +824,19 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         // Get batch size option for provided table source (if any) Used to override default {@link Index#getBatchSize()} for a table
         Option batchSizeOption = getOption(innerTableSource, BATCH_SIZE);
-        Option cacheOuterKeyOption = getOption(innerTableSource, CACHE_OUTER_KEY);
+
+        // Cache filters => apply BEFORE cache operator
+        Operator inner = pushDownPairs == null
+            ? wrapWithPushDown(context, context.operator, innerTableSource.getTableAlias())
+            : context.operator;
 
         // Wrap inner with a cache operator
-        if (cacheOuterKeyOption != null)
+        inner = applyCache(cacheOptions, context, inner, innerTableSource);
+
+        // No cache filters => apply AFTER cache operator
+        if (cache && !cacheFilters)
         {
-            Option cacheInnerKeyOption = getOption(innerTableSource, CACHE_INNER_KEY);
-            Option cacheTTLOption = getOption(innerTableSource, CACHE_TTL);
-            if (cacheInnerKeyOption != null)
-            {
-                inner = new OuterValuesCacheOperator(
-                        context.acquireNodeId(),
-                        inner,
-                        cacheTTLOption != null ? cacheTTLOption.getValueExpression() : LiteralNullExpression.NULL_LITERAL,
-                        cacheOuterKeyOption.getValueExpression(),
-                        cacheInnerKeyOption.getValueExpression());
-            }
+            inner = wrapWithPushDown(context, inner, pushDownPairs);
         }
 
         return new BatchHashJoin(
@@ -832,11 +914,19 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     private Operator wrapWithPushDown(Context context, Operator operator, TableAlias tableAlias)
     {
         List<AnalyzePair> pushDownPairs = context.pushDownPredicateByAlias.remove(tableAlias.getAlias());
+        return wrapWithPushDown(context, operator, pushDownPairs);
+    }
+
+    /** Wraps provided operator with push down predicate filter for provided pairs **/
+    private Operator wrapWithPushDown(
+            Context context,
+            Operator operator,
+            List<AnalyzePair> pushDownPairs)
+    {
         /* Apply any pushdown filter */
         if (pushDownPairs != null)
         {
             Expression pushDownPredicate = new AnalyzeResult(pushDownPairs).getPredicate();
-            context.currentTableAlias = tableAlias;
             visit(pushDownPredicate, context);
             return new FilterOperator(context.acquireNodeId(), operator, new ExpressionPredicate(pushDownPredicate));
         }
@@ -1065,6 +1155,52 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             join.getTableSource().accept(this, joinAliases);
 
             return containsAny(aliases, joinAliases);
+        }
+    }
+
+    /** Class holding information about cache options */
+    private static class CacheOptions
+    {
+        private final Option cacheName;
+        private final Option cacheOuterKey;
+        private final Option cacheInnerKey;
+        private final Option cacheTTL;
+        private final Option cacheFilters;
+
+        private CacheOptions(
+                Option cacheName,
+                Option cacheOuterKey,
+                Option cacheInnerKey,
+                Option cacheTTL,
+                Option cacheFilters)
+        {
+            this.cacheName = requireNonNull(cacheName, "cacheName");
+            this.cacheOuterKey = requireNonNull(cacheOuterKey, "cacheOuterKey");
+            this.cacheInnerKey = requireNonNull(cacheInnerKey, "cacheInnerKey");
+            this.cacheTTL = cacheTTL;
+            this.cacheFilters = cacheFilters;
+        }
+
+        static CacheOptions from(TableSource tableSource)
+        {
+            Option cacheName = getOption(tableSource, CACHE_NAME);
+            if (cacheName != null)
+            {
+                Option cacheOuterKey = getOption(tableSource, CACHE_OUTER_KEY);
+                Option cacheInnerKey = getOption(tableSource, CACHE_INNER_KEY);
+
+                if (cacheOuterKey == null || cacheInnerKey == null)
+                {
+                    throw new OperatorException("Using cache requires options: cacheName, cacheOuterKey, cacheInnerKey");
+                }
+
+                Option cacheTTL = getOption(tableSource, CACHE_TTL);
+                Option cacheFilters = getOption(tableSource, CACHE_FILTERS);
+
+                return new CacheOptions(cacheName, cacheOuterKey, cacheInnerKey, cacheTTL, cacheFilters);
+            }
+
+            return null;
         }
     }
 }

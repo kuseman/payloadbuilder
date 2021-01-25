@@ -28,6 +28,7 @@ miscStatement
  | useStatement
  | describeStatement
  | showStatement
+ | cacheFlushStatement
  ;
 
 setStatement
@@ -52,7 +53,14 @@ showStatement
  	  VARIABLES 
  	| (catalog=identifier '#')? TABLES 
  	| (catalog=identifier '#')? FUNCTIONS
+ 	| CACHES
  )
+ ;
+
+cacheFlushStatement
+ : CACHE FLUSH ALL									#cacheFlushAll
+ | CACHE REMOVE name=identifier						#cacheRemoveCache
+ | CACHE FLUSH name=identifier key=expression?		#cacheFlushNameKey
  ;
 
 controlFlowStatement
@@ -161,6 +169,7 @@ topExpression
 expression
  : primary													#primaryExpression
  
+ | CASE when+ (ELSE elseExpr=expression)? END 				#caseExpression
  //
  
  | op=(MINUS | PLUS) expression								#arithmeticUnary 
@@ -200,6 +209,10 @@ primary
  | value=primary '[' subscript=expression ']'    			#subscript
  | variable													#variableExpression
  | '(' expression ')' 										#nestedExpression
+ ;
+
+when
+ : WHEN condition=expression THEN result=expression
  ;
 
 functionCall
@@ -262,20 +275,25 @@ booleanLiteral
  ;
  
 nonReserved
- : FROM | FIRST | TABLES | LIKE
+ : FROM | FIRST | TABLES | LIKE | ALL
  ;
  
 // Tokens
 
+ALL          : A L L;
 AND		     : A N D;
 ARRAY	     : A R R A Y;
 AS		     : A S;
 ASC		     : A S C;
 APPLY	     : A P P L Y;
+CACHE		 : C A C H E;
+CACHES		 : C A C H E S;
+CASE         : C A S E;
 CROSS        : C R O S S;
 DESC	     : D E S C;
 DESCRIBE	 : D E S C R I B E;
 ELSE		 : E L S E;
+FLUSH        : F L U S H;
 END			 : E N D;
 ESCAPE		 : E S C A P E;
 FALSE	     : F A L S E;
@@ -302,6 +320,7 @@ ORDERBY	     : O R D E R ' ' B Y;
 OUTER        : O U T E R;
 PARAMETERS   : P A R A M E T E R S;
 PRINT        : P R I N T;
+REMOVE       : R E M O V E;
 SELECT	     : S E L E C T;
 SESSION		 : S E S S I O N;
 SET			 : S E T;
@@ -313,6 +332,7 @@ TRUE	     : T R U E;
 USE			 : U S E;
 VARIABLES	 : V A R I A B L E S;
 WITH         : W I T H;
+WHEN         : W H E N;
 WHERE	     : W H E R E;
 
 ASTERISK			: '*';

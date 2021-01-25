@@ -1,6 +1,9 @@
 package org.kuse.payloadbuilder.core.parser;
 
+import java.util.ArrayList;
 import java.util.List;
+
+import org.kuse.payloadbuilder.core.parser.CaseExpression.WhenClause;
 
 /** Visitor adapter for expression visitors */
 //CSOFF
@@ -70,6 +73,22 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
     public TR visit(VariableExpression expression, TC context)
     {
         return defaultResult(context);
+    }
+
+    @Override
+    public TR visit(CaseExpression expression, TC context)
+    {
+        List<Expression> children = new ArrayList<>(expression.getWhenClauses().size() * 2 + 1);
+        for (WhenClause whenClause : expression.getWhenClauses())
+        {
+            children.add(whenClause.getCondition());
+            children.add(whenClause.getResult());
+        }
+        if (expression.getElseExpression() != null)
+        {
+            children.add(expression.getElseExpression());
+        }
+        return visitChildren(context, children);
     }
 
     @Override

@@ -23,13 +23,9 @@ public class ExpressionSelectItem extends SelectItem
             return identifier;
         }
 
-        if (expression instanceof QualifiedReferenceExpression)
+        if (expression instanceof HasIdentifier)
         {
-            return ((QualifiedReferenceExpression) expression).getQname().getLast();
-        }
-        else if (expression instanceof DereferenceExpression)
-        {
-            return ((DereferenceExpression) expression).getRight().getQname().getLast();
+            return ((HasIdentifier) expression).getIdentifier();
         }
 
         return "No column name";

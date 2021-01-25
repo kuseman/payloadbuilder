@@ -8,4 +8,9 @@ public interface Projection
 {
     /** Write value for provided writer and current execution context */
     void writeValue(OutputWriter writer, ExecutionContext context);
+
+    /** Empty projection */
+    Projection EMPTY_PROJECTION = (writer, context) ->
+    {
+    };
 }

@@ -1,6 +1,6 @@
 package org.kuse.payloadbuilder.core.operator;
 
-import static org.apache.commons.lang3.StringUtils.equalsAnyIgnoreCase;
+import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
@@ -26,7 +26,7 @@ public class Row implements Tuple
     private Row(int pos, TableAlias tableAlias, String[] columns, Values values)
     {
         this.pos = pos;
-        this.tableAlias = tableAlias;
+        this.tableAlias = requireNonNull(tableAlias, "tableAlias");
         this.columns = columns;
         this.values = values;
     }
@@ -64,7 +64,7 @@ public class Row implements Tuple
 
         // First part is pointing to this alias, step up one part
         int index = partIndex;
-        if (size - 1 > index && equalsAnyIgnoreCase(qname.getParts().get(index), tableAlias.getAlias()))
+        if (size - 1 > index && equalsIgnoreCase(qname.getParts().get(index), tableAlias.getAlias()))
         {
             index++;
         }
@@ -146,7 +146,7 @@ public class Row implements Tuple
         {
             Row that = (Row) obj;
             return pos == that.pos
-                && tableAlias == that.tableAlias;
+                && tableAlias.isEqual(that.tableAlias);
         }
         return false;
     }

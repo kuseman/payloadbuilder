@@ -152,7 +152,7 @@ class ESOperator extends AOperator
                         .stream()
                         .map(i -> i.getKey() + ":" + i.getValue())
                         .collect(joining(","))),
-                entry("Query", ESUtils.getSearchBody(sortItems, propertyPredicates, SINGLE_TYPE_TABLE_NAME.equals(esType.type), context)));
+                entry("Elasric Query", ESUtils.getSearchBody(sortItems, propertyPredicates, SINGLE_TYPE_TABLE_NAME.equals(esType.type), context)));
 
         if (index != null)
         {

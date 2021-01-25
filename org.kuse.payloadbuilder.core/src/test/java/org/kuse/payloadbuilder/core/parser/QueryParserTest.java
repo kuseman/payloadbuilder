@@ -131,6 +131,44 @@ public class QueryParserTest extends AParserTest
     }
 
     @Test
+    public void test_case_expression()
+    {
+        assertExpression("case \r\n" +
+                "when a  > 100 then 1\r\n" +
+                "when a  > 10 then 10\r\n" +
+                "when a  > 0 then 100\r\n" +
+                "else 1000 \r\n" +
+                "end");
+    }
+
+    @Test
+    public void test_cache_statements()
+    {
+        ShowStatement stm = (ShowStatement) assertQuery("show caches").getStatements().get(0);
+
+        assertEquals(ShowStatement.Type.CACHES, stm.getType());
+        assertNull(stm.getCatalog());
+
+        CacheFlushStatement stm1 = (CacheFlushStatement) assertQuery("cache flush all").getStatements().get(0);
+        assertTrue(stm1.isAll());
+        assertNull(stm1.getName());
+        assertNull(stm1.getKey());
+
+        stm1 = (CacheFlushStatement) assertQuery("cache flush article").getStatements().get(0);
+        assertFalse(stm1.isAll());
+        assertEquals("article", stm1.getName());
+        assertNull(stm1.getKey());
+
+        stm1 = (CacheFlushStatement) assertQuery("cache flush \"article cache\" listof(1, 123)").getStatements().get(0);
+        assertFalse(stm1.isAll());
+        assertEquals("article cache", stm1.getName());
+        assertEquals(e("listof(1, 123)"), stm1.getKey());
+
+        CacheRemoveStatement stm2 = (CacheRemoveStatement) assertQuery("cache remove some_cache_name").getStatements().get(0);
+        assertEquals("some_cache_name", stm2.getName());
+    }
+
+    @Test
     public void test_alias_policy()
     {
         assertQuery("select art_id from article");

@@ -37,10 +37,15 @@ import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.Apply.ApplyType;
+import org.kuse.payloadbuilder.core.parser.CaseExpression.WhenClause;
 import org.kuse.payloadbuilder.core.parser.ComparisonExpression.Type;
 import org.kuse.payloadbuilder.core.parser.Join.JoinType;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ArithmeticBinaryContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ArithmeticUnaryContext;
+import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.CacheFlushAllContext;
+import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.CacheFlushNameKeyContext;
+import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.CacheRemoveCacheContext;
+import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.CaseExpressionContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ColumnReferenceContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ComparisonExpressionContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.DereferenceContext;
@@ -232,6 +237,25 @@ public class QueryParser
             String catalog = getIdentifier(ctx.catalog);
             ShowStatement.Type type = ShowStatement.Type.valueOf(upperCase(ctx.getChild(ctx.getChildCount() - 1).getText()));
             return new ShowStatement(type, catalog, ctx.start);
+        }
+
+        @Override
+        public Object visitCacheFlushAll(CacheFlushAllContext ctx)
+        {
+            return CacheFlushStatement.all();
+        }
+
+        @Override
+        public Object visitCacheFlushNameKey(CacheFlushNameKeyContext ctx)
+        {
+            Expression key = getExpression(ctx.key);
+            return CacheFlushStatement.cache(getIdentifier(ctx.name), key);
+        }
+
+        @Override
+        public Object visitCacheRemoveCache(CacheRemoveCacheContext ctx)
+        {
+            return new CacheRemoveStatement(getIdentifier(ctx.name));
         }
 
         @Override
@@ -502,6 +526,19 @@ public class QueryParser
             Expression expression = getExpression(ctx.expression());
             validateQualifiedReference = true;
             return new Option(option, expression);
+        }
+
+        @Override
+        public Object visitCaseExpression(CaseExpressionContext ctx)
+        {
+            List<WhenClause> whenClauses = ctx.when()
+                    .stream()
+                    .map(w -> new CaseExpression.WhenClause(getExpression(w.condition), getExpression(w.result)))
+                    .collect(toList());
+
+            Expression elseExpression = getExpression(ctx.elseExpr);
+
+            return new CaseExpression(whenClauses, elseExpression);
         }
 
         @Override
@@ -801,7 +838,7 @@ public class QueryParser
             text = text.replaceAll("''", "'");
             return new LiteralStringExpression(text);
         }
-        
+
         private boolean validateQualifiedReference = true;
 
         /** Validate alias in QRE is pointing to an existing table alias */
@@ -811,7 +848,7 @@ public class QueryParser
             {
                 return;
             }
-            
+
             if (!validateQualifiedReferences
                 || isBlank(parentTableAlias.getAlias())
                 || qfe.getLambdaId() >= 0)
