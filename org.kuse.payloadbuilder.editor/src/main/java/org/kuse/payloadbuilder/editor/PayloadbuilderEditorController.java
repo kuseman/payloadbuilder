@@ -77,6 +77,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         NewQueryListener newQueryListener = new NewQueryListener();
         view.setNewQueryAction(newQueryListener);
         view.setSaveAction(new SaveListener());
+        view.setSaveAsAction(new SaveAsListener());
         view.setOpenAction(new OpenListener());
         view.setToogleResultAction(() ->
         {
@@ -188,7 +189,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         for (QueryFileModel file : dirtyFiles)
         {
             // Abort on first Cancel
-            if (!save(file))
+            if (!save(file, false))
             {
                 return;
             }
@@ -264,14 +265,14 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         view.setRecentFiles(config.getRecentFiles());
     }
 
-    private boolean save(QueryFileModel file)
+    private boolean save(QueryFileModel file, boolean saveAs)
     {
-        if (!file.isDirty())
+        if (!saveAs && !file.isDirty())
         {
             return true;
         }
 
-        if (file.isNew())
+        if (saveAs || file.isNew())
         {
             //CSOFF
             JFileChooser fileChooser = new JFileChooser()
@@ -330,13 +331,13 @@ class PayloadbuilderEditorController implements PropertyChangeListener
             // New tab
             if (evt.getOldValue() == null)
             {
-                QueryFileView content = new QueryFileView(
+                final QueryFileView content = new QueryFileView(
                         file,
                         text -> file.setQuery(text),
                         caretChangedListener);
                 view.getEditorsTabbedPane().add(content);
 
-                TabComponentView tabComponent = new TabComponentView(file.getTabTitle(), null, () ->
+                final TabComponentView tabComponent = new TabComponentView(file.getTabTitle(), null, () ->
                 {
                     //CSOFF
                     if (file.isDirty())
@@ -352,7 +353,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                         else if (result == JOptionPane.YES_OPTION)
                         {
                             //CSOFF
-                            if (!save(file))
+                            if (!save(file, false))
                             //CSON
                             {
                                 return;
@@ -375,9 +376,27 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                     }
                 });
 
+                // Set title and tooltip upon change
                 file.addPropertyChangeListener(l ->
                 {
-                    tabComponent.setTitle(file.getTabTitle());
+                    //CSOFF
+                    if (QueryFileModel.FILENAME.equals(l.getPropertyName()) || QueryFileModel.DIRTY.equals(l.getPropertyName()))
+                    //CSON
+                    {
+                        tabComponent.setTitle(file.getTabTitle());
+
+                        int length = view.getEditorsTabbedPane().getTabCount();
+                        for (int i = 0; i < length; i++)
+                        {
+                            //CSOFF
+                            if (view.getEditorsTabbedPane().getTabComponentAt(i) == tabComponent)
+                            //CSON
+                            {
+                                view.getEditorsTabbedPane().setToolTipTextAt(i, file.getFilename());
+                                break;
+                            }
+                        }
+                    }
                 });
 
                 int index = model.getFiles().size() - 1;
@@ -563,7 +582,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         }
     }
 
-    /** Open listener */
+    /** Save listener */
     private class SaveListener implements Runnable
     {
         @Override
@@ -573,7 +592,22 @@ class PayloadbuilderEditorController implements PropertyChangeListener
             if (editor != null)
             {
                 QueryFileModel file = editor.getFile();
-                save(file);
+                save(file, false);
+            }
+        }
+    }
+
+    /** Save As listener */
+    private class SaveAsListener implements Runnable
+    {
+        @Override
+        public void run()
+        {
+            QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
+            if (editor != null)
+            {
+                QueryFileModel file = editor.getFile();
+                save(file, true);
             }
         }
     }
