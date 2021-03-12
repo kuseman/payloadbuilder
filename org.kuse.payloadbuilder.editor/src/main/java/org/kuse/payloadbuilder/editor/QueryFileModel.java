@@ -195,8 +195,8 @@ class QueryFileModel
         String oldValue = this.filename;
         if (!newValue.equals(oldValue))
         {
-            pcs.firePropertyChange(FILENAME, oldValue, newValue);
             this.filename = filename;
+            pcs.firePropertyChange(FILENAME, oldValue, newValue);
         }
     }
 
@@ -227,11 +227,10 @@ class QueryFileModel
         String oldValue = this.query;
         if (!newValue.equals(oldValue))
         {
-            pcs.firePropertyChange(QUERY, oldValue, newValue);
             this.query = query;
+            pcs.firePropertyChange(QUERY, oldValue, newValue);
+            setDirty(!Objects.equals(query, savedQuery));
         }
-
-        setDirty(!Objects.equals(query, savedQuery));
     }
 
     void addPropertyChangeListener(PropertyChangeListener listener)

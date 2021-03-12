@@ -179,7 +179,7 @@ public class FilesystemCatalog extends Catalog
             }
 
             Object[] values = new Object[] {
-                    path.getFileName(),
+                    path.getFileName().toString(),
                     path.getParent() != null ? path.getParent().toString() : null,
                     size,
                     Files.exists(path),

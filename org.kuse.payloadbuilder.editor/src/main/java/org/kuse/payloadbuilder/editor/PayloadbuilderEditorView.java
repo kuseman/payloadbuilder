@@ -251,7 +251,7 @@ class PayloadbuilderEditorView extends JFrame
 
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         //CSOFF
-        setPreferredSize(new Dimension(1200, 800));
+        setPreferredSize(new Dimension(1600, 800));
         //CSON
         setLocationByPlatform(true);
         pack();
