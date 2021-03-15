@@ -82,11 +82,7 @@ public class JsonOutputWriter implements OutputWriter
     {
         try
         {
-            if (currentField != null)
-            {
-                generator.writeFieldName(currentField);
-                currentField = null;
-            }
+            writeFieldName();
             if (value == null)
             {
                 generator.writeNull();
@@ -164,6 +160,7 @@ public class JsonOutputWriter implements OutputWriter
     {
         try
         {
+            writeFieldName();
             generator.writeStartObject();
         }
         catch (IOException e)
@@ -190,6 +187,7 @@ public class JsonOutputWriter implements OutputWriter
     {
         try
         {
+            writeFieldName();
             generator.writeStartArray();
         }
         catch (IOException e)
@@ -209,5 +207,16 @@ public class JsonOutputWriter implements OutputWriter
         {
             throw new RuntimeException("Error writing JSON end array", e);
         }
+    }
+
+    private void writeFieldName() throws IOException
+    {
+        if (currentField == null)
+        {
+            return;
+        }
+        String field = currentField;
+        currentField = null;
+        generator.writeFieldName(field);
     }
 }
