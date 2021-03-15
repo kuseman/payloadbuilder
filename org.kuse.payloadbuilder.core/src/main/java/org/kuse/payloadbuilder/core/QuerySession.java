@@ -3,7 +3,8 @@ package org.kuse.payloadbuilder.core;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 
-import java.io.PrintStream;
+import java.io.IOException;
+import java.io.Writer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
@@ -21,7 +22,7 @@ public class QuerySession
     private final Map<String, Object> variables;
     /** Catalog properties by catalog alias */
     private Map<String, Map<String, Object>> catalogProperties;
-    private PrintStream printStream;
+    private Writer printWriter;
     private BooleanSupplier abortSupplier;
 
     public QuerySession(CatalogRegistry catalogRegistry)
@@ -35,10 +36,16 @@ public class QuerySession
         this.variables = requireNonNull(variables, "variables");
     }
 
-    /** Set print stream */
-    public void setPrintStream(PrintStream printStream)
+    /** Get current print writer*/
+    public Writer getPrintWriter()
     {
-        this.printStream = printStream;
+        return printWriter;
+    }
+
+    /** Set print writer */
+    public void setPrintWriter(Writer printWriter)
+    {
+        this.printWriter = printWriter;
     }
 
     /** Set abort supplier. */
@@ -68,9 +75,17 @@ public class QuerySession
     /** Print value to print stream if set */
     public void printLine(Object value)
     {
-        if (printStream != null)
+        if (printWriter != null)
         {
-            printStream.println(value);
+            try
+            {
+                printWriter.append(String.valueOf(value));
+                printWriter.append(System.lineSeparator());
+            }
+            catch (IOException e)
+            {
+                throw new RuntimeException("Error writing to print writer", e);
+            }
         }
     }
 

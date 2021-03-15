@@ -2,6 +2,14 @@ package org.kuse.payloadbuilder.editor;
 
 import static java.util.Collections.emptySet;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Reader;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -16,8 +24,17 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import javax.swing.JFileChooser;
+import javax.swing.JOptionPane;
+
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.output.CountingOutputStream;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.tuple.Pair;
+import org.kuse.payloadbuilder.core.CsvOutputWriter;
+import org.kuse.payloadbuilder.core.JsonOutputWriter;
 import org.kuse.payloadbuilder.core.OutputWriter;
 import org.kuse.payloadbuilder.core.Payloadbuilder;
 import org.kuse.payloadbuilder.core.QueryResult;
@@ -31,13 +48,17 @@ import org.kuse.payloadbuilder.core.parser.QueryParser;
 import org.kuse.payloadbuilder.core.parser.QueryStatement;
 import org.kuse.payloadbuilder.core.parser.VariableExpression;
 import org.kuse.payloadbuilder.editor.ICatalogExtension.ExceptionAction;
-import org.kuse.payloadbuilder.editor.PayloadbuilderService.ObjectWriter.PairList;
+import org.kuse.payloadbuilder.editor.QueryFileModel.Format;
 import org.kuse.payloadbuilder.editor.QueryFileModel.Output;
 import org.kuse.payloadbuilder.editor.QueryFileModel.State;
 
 /** Class the executes queries etc. */
 class PayloadbuilderService
 {
+    private static final Runnable NO_OP = () ->
+    {
+    };
+    private static final int FILE_WRITER_BUFFER_SIZE = 4096;
     private static final VariableVisitor VARIABLES_VISITOR = new VariableVisitor();
     private static final QueryParser PARSER = new QueryParser();
     private static final AtomicInteger THREAD_ID = new AtomicInteger(1);
@@ -51,11 +72,25 @@ class PayloadbuilderService
     });
 
     /** Execute query for provider query file */
+    //CSOFF
     static void executeQuery(
+            //CSON
             QueryFileModel file,
             String queryString,
             Runnable queryFinnishedCallback)
     {
+        MutableObject<String> outputFileName = new MutableObject<>();
+        if (file.getOutput() == Output.FILE)
+        {
+            String fileName = getOutputFileName();
+            // Abort
+            if (fileName == null)
+            {
+                return;
+            }
+            outputFileName.setValue(fileName);
+        }
+
         EXECUTOR.execute(() ->
         {
             boolean completed = false;
@@ -63,39 +98,29 @@ class PayloadbuilderService
             {
                 int queryId = file.incrementAndGetQueryId();
                 file.setState(State.EXECUTING);
+                EditorOutputWriter writer = null;
                 try
                 {
                     file.getQuerySession().setAbortSupplier(() -> file.getState() == State.ABORTED);
                     QueryResult queryResult = Payloadbuilder.query(file.getQuerySession(), queryString);
 
+                    writer = getOutputWriter(file, outputFileName.getValue());
+
                     while (queryResult.hasMoreResults())
                     {
+                        writer.newResultSet.run();
                         if (file.getState() == State.ABORTED)
                         {
                             break;
                         }
-                        ResultModel resultModel = new ResultModel(file);
-                        file.addResult(resultModel);
-                        OutputWriter writer = null;
-                        if (file.getOutput() == Output.TABLE)
-                        {
-                            writer = new ObjectWriter(resultModel);
-                        }
-                        else
-                        {
-                            writer = new NoneOutputWriter(resultModel);
-                        }
-                        queryResult.writeResult(writer);
 
-                        resultModel.done();
-                        file
-                                .getQuerySession()
-                                .printLine(
-                                        String.valueOf(resultModel.getActualRowCount())
-                                            + " row(s) selected"
-                                            + System.lineSeparator());
+                        queryResult.writeResult(writer.writer);
+                        // Flush after each result set
+                        writer.writer.flush();
+                        writer.resultSetComplete.run();
                     }
 
+                    writer.complete.run();
                     if (file.getState() == State.EXECUTING)
                     {
                         file.setState(State.COMPLETED);
@@ -150,6 +175,11 @@ class PayloadbuilderService
                 }
                 finally
                 {
+                    if (writer != null)
+                    {
+                        writer.writer.close();
+                    }
+
                     if (queryId == file.getQueryId())
                     {
                         if (file.getState() == State.EXECUTING)
@@ -161,6 +191,190 @@ class PayloadbuilderService
                 }
             }
         });
+    }
+
+    /** Extened interface for editor output writers */
+    private static class EditorOutputWriter
+    {
+        private final OutputWriter writer;
+        private final Runnable newResultSet;
+        private final Runnable resultSetComplete;
+        private final Runnable complete;
+
+        EditorOutputWriter(OutputWriter writer, Runnable newResultSet, Runnable resultSetComplete, Runnable complete)
+        {
+            this.writer = writer;
+            this.newResultSet = newResultSet;
+            this.resultSetComplete = resultSetComplete;
+            this.complete = complete;
+        }
+    }
+
+    private static EditorOutputWriter getOutputWriter(QueryFileModel file, String outputFileName)
+    {
+        if (file.getOutput() == Output.TABLE)
+        {
+            final TableOutputWriter writer = new TableOutputWriter();
+            return new EditorOutputWriter(writer, () ->
+            {
+                // Create new model
+                ResultModel model = new ResultModel(file);
+                writer.setResultModel(model);
+                file.addResult(model);
+            }, () ->
+            {
+                // Mark current model as done and print result
+                writer.resultModel.done();
+                printRowCountResult(file, writer.resultModel.getActualRowCount());
+            }, NO_OP);
+        }
+        else if (file.getOutput() == Output.NONE)
+        {
+            final NoneOutputWriter writer = new NoneOutputWriter(file);
+            return new EditorOutputWriter(writer, () -> writer.rowCount = 0, () -> printRowCountResult(file, writer.rowCount), () ->
+            {
+            });
+        }
+        else if (file.getOutput() == Output.TEXT
+            || file.getOutput() == Output.FILE)
+        {
+            Writer output = file.getQuerySession().getPrintWriter();
+            final MutableObject<CountingOutputStream> countingOutputStream = new MutableObject<>();
+            final MutableObject<OutputWriter> writer = new MutableObject<>();
+
+            // Redirect output to chosen file
+            if (file.getOutput() == Output.FILE)
+            {
+                try
+                {
+                    countingOutputStream.setValue(new CountingOutputStream(
+                            new FileOutputStream(
+                                    new File(outputFileName))));
+
+                    output = new BufferedWriter(
+                            new OutputStreamWriter(countingOutputStream.getValue(), StandardCharsets.UTF_8), FILE_WRITER_BUFFER_SIZE);
+                }
+                catch (IOException e)
+                {
+                    throw new RuntimeException("Error creating writer for output " + outputFileName);
+                }
+            }
+
+            if (file.getFormat() == Format.CSV)
+            {
+                writer.setValue(new CsvOutputWriter(output)
+                {
+                    @Override
+                    public void endRow()
+                    {
+                        super.endRow();
+                        file.incrementTotalRowCount();
+                    };
+                });
+            }
+            else if (file.getFormat() == Format.JSON)
+            {
+                writer.setValue(new JsonOutputWriter(output)
+                {
+                    @Override
+                    public void endRow()
+                    {
+                        super.endRow();
+                        file.incrementTotalRowCount();
+                    };
+                });
+            }
+
+            if (writer.getValue() == null)
+            {
+                throw new RuntimeException("Unsupported format " + file.getFormat());
+            }
+
+            return new EditorOutputWriter(writer.getValue(), NO_OP,
+                    () ->
+                    {
+                        //CSOFF
+                        if (countingOutputStream.getValue() == null)
+                        //CSON
+                        {
+                            file.getQuerySession().printLine("");
+                        }
+                    },
+                    () ->
+                    {
+                        //CSOFF
+                        if (countingOutputStream.getValue() != null)
+                        //CSON
+                        {
+                            printBytesWritten(file, countingOutputStream.getValue().getByteCount(), outputFileName);
+                        }
+                    });
+        }
+
+        throw new RuntimeException("Unsupported output " + file.getOutput());
+    }
+
+    private static String getOutputFileName()
+    {
+        //CSOFF
+        JFileChooser fileChooser = new JFileChooser()
+        //CSON
+        {
+            @Override
+            public void approveSelection()
+            {
+                File f = getSelectedFile();
+                if (f.exists() && getDialogType() == SAVE_DIALOG)
+                {
+                    int result = JOptionPane.showConfirmDialog(this, "The file exists, overwrite?", "Existing file", JOptionPane.YES_NO_CANCEL_OPTION);
+                    //CSOFF
+                    switch (result)
+                    //CSON
+                    {
+                        case JOptionPane.YES_OPTION:
+                            super.approveSelection();
+                            return;
+                        case JOptionPane.NO_OPTION:
+                            return;
+                        case JOptionPane.CLOSED_OPTION:
+                            return;
+                        case JOptionPane.CANCEL_OPTION:
+                            cancelSelection();
+                            return;
+                    }
+                }
+                super.approveSelection();
+            }
+        };
+        fileChooser.setDialogTitle("Select output filename");
+        int result = fileChooser.showSaveDialog(null);
+        if (result == JFileChooser.APPROVE_OPTION)
+        {
+            return fileChooser.getSelectedFile().getAbsolutePath();
+        }
+
+        return null;
+    }
+
+    private static void printRowCountResult(QueryFileModel file, int rowCount)
+    {
+        file
+                .getQuerySession()
+                .printLine(
+                        String.valueOf(rowCount)
+                            + " row(s) selected"
+                            + System.lineSeparator());
+    }
+
+    private static void printBytesWritten(QueryFileModel file, long bytes, String filename)
+    {
+        file
+                .getQuerySession()
+                .printLine(
+                        FileUtils.byteCountToDisplaySize(bytes)
+                            + " written to "
+                            + filename
+                            + System.lineSeparator());
     }
 
     /** Get named parameters from query */
@@ -207,17 +421,19 @@ class PayloadbuilderService
     /** Output writer used in NONE output mode */
     private static class NoneOutputWriter implements OutputWriter
     {
-        private final ResultModel resultModel;
+        private final QueryFileModel file;
+        private int rowCount;
 
-        NoneOutputWriter(ResultModel resultModel)
+        NoneOutputWriter(QueryFileModel file)
         {
-            this.resultModel = resultModel;
+            this.file = file;
         }
 
         @Override
         public void endRow()
         {
-            resultModel.addRow(PairList.EMPTY);
+            file.incrementTotalRowCount();
+            rowCount++;
         }
 
         @Override
@@ -252,13 +468,14 @@ class PayloadbuilderService
     }
 
     /** Writer that writes object structure from a projection */
-    static class ObjectWriter implements OutputWriter
+    static class TableOutputWriter implements OutputWriter
     {
+        private ResultModel resultModel;
+
         private final Stack<Object> parent = new Stack<>();
         private final Stack<String> currentField = new Stack<>();
-        private final ResultModel resultModel;
 
-        ObjectWriter(ResultModel resultModel)
+        void setResultModel(ResultModel resultModel)
         {
             this.resultModel = resultModel;
         }
@@ -318,6 +535,17 @@ class PayloadbuilderService
                 }
                 endArray();
                 return;
+            }
+            else if (value instanceof Reader)
+            {
+                try (Reader reader = (Reader) value)
+                {
+                    value = IOUtils.toString(reader);
+                }
+                catch (IOException e)
+                {
+                    throw new RuntimeException("Error reading reader to string", e);
+                }
             }
 
             putValue(value);

@@ -45,6 +45,7 @@ class QueryFileModel
     private String savedQuery = "";
     private String query = "";
     private Output output = Output.TABLE;
+    private Format format = Format.CSV;
 
     private final Map<String, Object> variables = new HashMap<>();
     private final QuerySession querySession = new QuerySession(new CatalogRegistry(), variables);
@@ -52,6 +53,7 @@ class QueryFileModel
 
     /** Execution fields */
     private final List<ResultModel> results = new ArrayList<>();
+    private int totalRowCount;
     private StopWatch sw;
     private String error;
     private Pair<Integer, Integer> parseErrorLocation;
@@ -169,6 +171,7 @@ class QueryFileModel
 
     void clearForExecution()
     {
+        totalRowCount = 0;
         error = "";
         parseErrorLocation = null;
         results.clear();
@@ -248,6 +251,16 @@ class QueryFileModel
         this.output = output;
     }
 
+    Format getFormat()
+    {
+        return format;
+    }
+
+    void setFormat(Format format)
+    {
+        this.format = format;
+    }
+
     String getError()
     {
         return error;
@@ -308,6 +321,17 @@ class QueryFileModel
         }
     }
 
+    /** Total row count of current execution including all result sets */
+    int getTotalRowCount()
+    {
+        return totalRowCount;
+    }
+
+    void incrementTotalRowCount()
+    {
+        totalRowCount++;
+    }
+
     Map<ICatalogExtension, CatalogExtensionModel> getCatalogExtensions()
     {
         return catalogExtensions;
@@ -339,6 +363,14 @@ class QueryFileModel
     {
         TABLE,
         FILE,
+        TEXT,
         NONE;
+    }
+
+    /** Current output format of this file */
+    enum Format
+    {
+        CSV,
+        JSON
     }
 }

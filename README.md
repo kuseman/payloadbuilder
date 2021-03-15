@@ -61,7 +61,7 @@ Simple query using multiple catalogs:
 
 ```java
         QuerySession session = new QuerySession(new CatalogRegistry());
-        session.setPrintStream(System.out);
+        session.setPrintWriter(new OutputStreamWriter(System.out));
         session.getCatalogRegistry().registerCatalog("es", new ESCatalog());
         session.getCatalogRegistry().registerCatalog("fs", new FileSystemCatalog());
 

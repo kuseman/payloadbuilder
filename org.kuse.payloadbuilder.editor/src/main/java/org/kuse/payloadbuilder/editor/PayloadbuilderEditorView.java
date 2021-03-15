@@ -4,6 +4,7 @@ import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.toList;
 
 import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.GridBagLayout;
@@ -22,6 +23,7 @@ import java.util.function.Consumer;
 import javax.imageio.ImageIO;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.Icon;
 import javax.swing.InputMap;
 import javax.swing.JButton;
@@ -29,6 +31,7 @@ import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
@@ -44,6 +47,7 @@ import javax.swing.border.EtchedBorder;
 
 import org.kordamp.ikonli.fontawesome.FontAwesome;
 import org.kordamp.ikonli.swing.FontIcon;
+import org.kuse.payloadbuilder.editor.QueryFileModel.Format;
 import org.kuse.payloadbuilder.editor.QueryFileModel.Output;
 
 /** Main view */
@@ -53,11 +57,13 @@ class PayloadbuilderEditorView extends JFrame
 
     private static final String TOGGLE_COMMENT = "toggleComment";
     private static final String TOGGLE_RESULT = "toggleResult";
-    //    private static final String FORMAT = "Format";
     private static final String NEW_QUERY = "NewQuery";
     private static final String EXECUTE = "Execute";
     private static final String STOP = "Stop";
     private static final String EDIT_VARIABLES = "EditVariables";
+    private static final String TABLE_OUTPUT = "TableOutput";
+    private static final String TEXT_OUTPUT = "TextOutput";
+    private static final String FILE_OUTPUT = "FileOutput";
 
     private static final Icon FOLDER_OPEN_O = FontIcon.of(FontAwesome.FOLDER_OPEN_O);
     private static final Icon SAVE = FontIcon.of(FontAwesome.SAVE);
@@ -99,6 +105,7 @@ class PayloadbuilderEditorView extends JFrame
     private final JMenuItem exitItem;
     private final JMenu recentFiles;
     private final JComboBox<QueryFileModel.Output> comboOutput;
+    private final JComboBox<QueryFileModel.Format> comboFormat;
     private Runnable executeRunnable;
     private Runnable cancelRunnable;
     private Runnable newQueryRunnable;
@@ -109,13 +116,16 @@ class PayloadbuilderEditorView extends JFrame
     private Runnable toggleResultRunnable;
     private Runnable toggleCommentRunnable;
     private Runnable outputChangedRunnable;
+    private Runnable formatChangedRunnable;
     private Runnable editVariablesRunnable;
     private Consumer<String> openRecentFileConsumer;
 
     private boolean catalogsCollapsed;
     private int prevCatalogsDividerLocation;
 
+    //CSOFF
     PayloadbuilderEditorView()
+    //CSON
     {
         setTitle("Payloadbuilder Editor");
         setLocationRelativeTo(null);
@@ -180,20 +190,48 @@ class PayloadbuilderEditorView extends JFrame
         KeyStroke newQueryKeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_N, InputEvent.CTRL_DOWN_MASK);
         KeyStroke toggleResultKeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_R, InputEvent.CTRL_DOWN_MASK);
         KeyStroke toggleCommentKeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_7, InputEvent.CTRL_DOWN_MASK);
+        KeyStroke tableOutputKeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_T, InputEvent.CTRL_DOWN_MASK);
+        KeyStroke textOutputKeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_T, InputEvent.CTRL_DOWN_MASK + InputEvent.SHIFT_DOWN_MASK);
+        KeyStroke fileOutputKeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_F, InputEvent.CTRL_DOWN_MASK + InputEvent.SHIFT_DOWN_MASK);
 
         InputMap inputMap = topPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
         inputMap.put(executeKeyStroke, EXECUTE);
         inputMap.put(stopKeyStroke, STOP);
         inputMap.put(newQueryKeyStroke, NEW_QUERY);
-        //        topPanel.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW).put(KeyStroke.getKeyStroke(KeyEvent.VK_F, InputEvent.CTRL_DOWN_MASK), FORMAT);
         inputMap.put(toggleResultKeyStroke, TOGGLE_RESULT);
         inputMap.put(toggleCommentKeyStroke, TOGGLE_COMMENT);
+        inputMap.put(tableOutputKeyStroke, TABLE_OUTPUT);
+        inputMap.put(textOutputKeyStroke, TEXT_OUTPUT);
+        inputMap.put(fileOutputKeyStroke, FILE_OUTPUT);
         topPanel.getActionMap().put(EXECUTE, executeAction);
         topPanel.getActionMap().put(STOP, stopAction);
         topPanel.getActionMap().put(NEW_QUERY, newQueryAction);
-        //        topPanel.getActionMap().put(FORMAT, formatAction);
         topPanel.getActionMap().put(TOGGLE_RESULT, toggleResultAction);
         topPanel.getActionMap().put(TOGGLE_COMMENT, toggleCommentAction);
+        topPanel.getActionMap().put(TABLE_OUTPUT, new AbstractAction()
+        {
+            @Override
+            public void actionPerformed(ActionEvent e)
+            {
+                comboOutput.setSelectedItem(QueryFileModel.Output.TABLE);
+            }
+        });
+        topPanel.getActionMap().put(TEXT_OUTPUT, new AbstractAction()
+        {
+            @Override
+            public void actionPerformed(ActionEvent e)
+            {
+                comboOutput.setSelectedItem(QueryFileModel.Output.TEXT);
+            }
+        });
+        topPanel.getActionMap().put(FILE_OUTPUT, new AbstractAction()
+        {
+            @Override
+            public void actionPerformed(ActionEvent e)
+            {
+                comboOutput.setSelectedItem(QueryFileModel.Output.FILE);
+            }
+        });
 
         JButton newQueryButton = new JButton(newQueryAction);
         newQueryButton.setText("New query");
@@ -212,19 +250,54 @@ class PayloadbuilderEditorView extends JFrame
         toolBar.addSeparator();
         toolBar.add(toggleCatalogsAction).setToolTipText("Toggle catalogs pane");
         toolBar.add(toggleResultAction).setToolTipText("Toggle result pane (" + getAcceleratorText(toggleResultKeyStroke) + ")");
-        //        toolBar.add(formatAction).setToolTipText("Format query");
         toolBar.add(toggleCommentAction).setToolTipText("Toggle comment on selected lines (" + getAcceleratorText(toggleCommentKeyStroke) + ")");
         toolBar.add(editVariablesAction).setToolTipText("Edit parameters");
 
         comboOutput = new JComboBox<>(Output.values());
         comboOutput.setSelectedItem(Output.TABLE);
         //CSOFF
-        comboOutput.setMaximumSize(new Dimension(150, 20));
+        comboOutput.setRenderer(new DefaultListCellRenderer()
+        //CSON
+        {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value, int index, boolean isSelected, boolean cellHasFocus)
+            {
+                super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+
+                if (value == QueryFileModel.Output.TABLE)
+                {
+                    setText(getText() + " (" + getAcceleratorText(tableOutputKeyStroke) + ")");
+                }
+                else if (value == QueryFileModel.Output.TEXT)
+                {
+                    setText(getText() + " (" + getAcceleratorText(textOutputKeyStroke) + ")");
+                }
+                else if (value == QueryFileModel.Output.FILE)
+                {
+                    setText(getText() + " (" + getAcceleratorText(textOutputKeyStroke) + ")");
+                }
+                return this;
+            }
+        });
+        //CSOFF
+        comboOutput.setMaximumSize(new Dimension(130, 20));
         //CSON
         comboOutput.addItemListener(l -> run(outputChangedRunnable));
+
+        comboFormat = new JComboBox<>(Format.values());
+        comboFormat.setSelectedItem(Format.CSV);
+        //CSOFF
+        comboFormat.setMaximumSize(new Dimension(100, 20));
+        //CSON
+        comboFormat.addItemListener(l -> run(formatChangedRunnable));
+
         toolBar.addSeparator();
         toolBar.add(new JLabel("Output "));
         toolBar.add(comboOutput);
+
+        toolBar.addSeparator();
+        toolBar.add(new JLabel("Format "));
+        toolBar.add(comboFormat);
 
         splitPane = new JSplitPane();
         splitPane.setDividerSize(3);
@@ -352,15 +425,6 @@ class PayloadbuilderEditorView extends JFrame
         }
     };
 
-    //    private final Action formatAction = new AbstractAction(FORMAT, FontIcon.of(FontAwesome.REORDER))
-    //    {
-    //        @Override
-    //        public void actionPerformed(ActionEvent e)
-    //        {
-    //            run(formatRunnable);
-    //        }
-    //    };
-
     private final Action toggleResultAction = new AbstractAction(TOGGLE_RESULT, ARROWS_V)
     {
         @Override
@@ -450,6 +514,11 @@ class PayloadbuilderEditorView extends JFrame
         return comboOutput;
     }
 
+    JComboBox<Format> getFormatCombo()
+    {
+        return comboFormat;
+    }
+
     JTabbedPane getEditorsTabbedPane()
     {
         return tabEditor;
@@ -519,6 +588,11 @@ class PayloadbuilderEditorView extends JFrame
     void setOutputChangedAction(Runnable outputChangedRunnable)
     {
         this.outputChangedRunnable = outputChangedRunnable;
+    }
+
+    void setFormatChangedAction(Runnable formatChangedRunnable)
+    {
+        this.formatChangedRunnable = formatChangedRunnable;
     }
 
     void setOpenRecentFileConsumer(Consumer<String> openRecentFileConsumer)

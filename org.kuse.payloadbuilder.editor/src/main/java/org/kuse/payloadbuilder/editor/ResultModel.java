@@ -52,7 +52,7 @@ class ResultModel extends AbstractTableModel
     }
 
     private final QueryFileModel file;
-    private final List<PayloadbuilderService.ObjectWriter.PairList> rows = new ArrayList<>(50);
+    private final List<PayloadbuilderService.TableOutputWriter.PairList> rows = new ArrayList<>(50);
     private String[] columns = EMPTY_STRING_ARRAY;
     private boolean complete;
     private int lastNotifyRowIndex = -1;
@@ -63,7 +63,7 @@ class ResultModel extends AbstractTableModel
     }
 
     /** Add row */
-    void addRow(PayloadbuilderService.ObjectWriter.PairList row)
+    void addRow(PayloadbuilderService.TableOutputWriter.PairList row)
     {
         if (complete)
         {
@@ -71,6 +71,7 @@ class ResultModel extends AbstractTableModel
         }
 
         rows.add(row);
+        file.incrementTotalRowCount();
     }
 
     /** Called when result is completed. */
@@ -124,19 +125,19 @@ class ResultModel extends AbstractTableModel
     @Override
     public Object getValueAt(int rowIndex, int columnIndex)
     {
-        PayloadbuilderService.ObjectWriter.PairList row = rows.get(rowIndex);
-        if (row == null)
+        if (rowIndex >= rows.size())
         {
             return null;
         }
 
-        String column = columns[columnIndex];
-        int index = row.getColumns().indexOf(column);
-        if (index < 0 || index >= row.size())
+        PayloadbuilderService.TableOutputWriter.PairList row = rows.get(rowIndex);
+
+        if (columnIndex >= row.size())
         {
             return null;
         }
-        return row.get(index).getValue();
+
+        return row.get(columnIndex).getValue();
     }
 
     @Override

@@ -26,6 +26,7 @@ import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
 import org.apache.commons.io.FilenameUtils;
+import org.kuse.payloadbuilder.editor.QueryFileModel.Format;
 import org.kuse.payloadbuilder.editor.QueryFileModel.Output;
 import org.kuse.payloadbuilder.editor.QueryFileModel.State;
 
@@ -102,6 +103,14 @@ class PayloadbuilderEditorController implements PropertyChangeListener
             if (editor != null)
             {
                 editor.getFile().setOutput((Output) view.getOutputCombo().getSelectedItem());
+            }
+        });
+        view.setFormatChangedAction(() ->
+        {
+            QueryFileView editor = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
+            if (editor != null)
+            {
+                editor.getFile().setFormat((Format) view.getFormatCombo().getSelectedItem());
             }
         });
         view.setOpenRecentFileConsumer(file ->
@@ -379,22 +388,16 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                 // Set title and tooltip upon change
                 file.addPropertyChangeListener(l ->
                 {
-                    //CSOFF
-                    if (QueryFileModel.FILENAME.equals(l.getPropertyName()) || QueryFileModel.DIRTY.equals(l.getPropertyName()))
-                    //CSON
+                    tabComponent.setTitle(file.getTabTitle());
+                    int length = view.getEditorsTabbedPane().getTabCount();
+                    for (int i = 0; i < length; i++)
                     {
-                        tabComponent.setTitle(file.getTabTitle());
-
-                        int length = view.getEditorsTabbedPane().getTabCount();
-                        for (int i = 0; i < length; i++)
+                        //CSOFF
+                        if (view.getEditorsTabbedPane().getTabComponentAt(i) == tabComponent)
+                        //CSON
                         {
-                            //CSOFF
-                            if (view.getEditorsTabbedPane().getTabComponentAt(i) == tabComponent)
-                            //CSON
-                            {
-                                view.getEditorsTabbedPane().setToolTipTextAt(i, file.getFilename());
-                                break;
-                            }
+                            view.getEditorsTabbedPane().setToolTipTextAt(i, file.getFilename());
+                            break;
                         }
                     }
                 });
@@ -421,6 +424,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                 caretChangedListener.accept(editor);
                 model.setSelectedFile(index);
                 view.getOutputCombo().setSelectedItem(editor.getFile().getOutput());
+                view.getFormatCombo().setSelectedItem(editor.getFile().getFormat());
                 defaultGroup.clearSelection();
                 catalogExtensionViews.forEach(v -> v.init(editor.getFile()));
             }

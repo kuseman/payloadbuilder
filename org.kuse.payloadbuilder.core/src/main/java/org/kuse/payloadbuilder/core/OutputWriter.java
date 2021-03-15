@@ -3,6 +3,16 @@ package org.kuse.payloadbuilder.core;
 /** Output writer that writes generated output */
 public interface OutputWriter
 {
+    /** Flush this writer */
+    default void flush()
+    {
+    }
+
+    /** Close this writer */
+    default void close()
+    {
+    }
+
     /**
      * Start a new a result set with provided columns.
      *

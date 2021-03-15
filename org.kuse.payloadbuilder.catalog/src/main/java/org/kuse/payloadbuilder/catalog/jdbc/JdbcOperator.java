@@ -128,9 +128,16 @@ class JdbcOperator extends AOperator
                         sb.append(value);
                         break;
                     case IN:
+                        InExpression ie = (InExpression) pair.getRight().getExpression();
                         sb.append(qname);
+
+                        if (ie.isNot())
+                        {
+                            sb.append(" NOT");
+                        }
+
                         sb.append(" IN (");
-                        List<Expression> arguments = ((InExpression) pair.getRight().getExpression()).getArguments();
+                        List<Expression> arguments = ie.getArguments();
                         sb.append(arguments
                                 .stream()
                                 .map(e -> e.eval(context))

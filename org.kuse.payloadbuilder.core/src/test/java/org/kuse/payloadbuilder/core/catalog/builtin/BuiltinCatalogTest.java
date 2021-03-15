@@ -4,6 +4,9 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 
+import java.io.IOException;
+import java.io.Reader;
+import java.io.StringReader;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -11,6 +14,7 @@ import java.time.format.DateTimeParseException;
 import java.util.Iterator;
 
 import org.apache.commons.collections.IteratorUtils;
+import org.apache.commons.io.IOUtils;
 import org.junit.Assert;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.QuerySession;
@@ -182,6 +186,33 @@ public class BuiltinCatalogTest extends Assert
         assertFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, 'double')");
     }
 
+    @Test
+    public void test_function_replace()
+    {
+        assertFunction(null, null, "replace('hello xxx', null, 'world')");
+        assertFunction(null, null, "replace('hello xxx', null, null)");
+        assertFunction(null, null, "replace(null, 'xxx', null)");
+        assertFunction(null, null, "replace(null, 'xxx', 'world')");
+        assertFunction("hello world", null, "replace('hello xxx', 'xxx', 'world')");
+        assertFunction("hello xxx", null, "replace('hello xxx', 'yyy', 'world')");
+
+        // Test reader replacement
+        Row row = null;
+
+        row = Row.of(alias, 0, new Object[] { new StringReader("hello xxx") });
+        assertFunction("hello world", row, "replace(a, 'xxx', 'world')");
+        row = Row.of(alias, 0, new Object[] { new StringReader("hello xxx") });
+        assertFunction("hello ", row, "replace(a, 'xxx', '')");
+        row = Row.of(alias, 0, new Object[] { new StringReader("hello xxx") });
+        assertFunction("hello xxx", row, "replace(a, 'yyy', '')");
+        row = Row.of(alias, 0, new Object[] { new StringReader("hello xxx") });
+        assertFunction("hello xxx", row, "replace(a, 'xyy', '')");
+        row = Row.of(alias, 0, new Object[] { new StringReader("hello xxx") });
+        assertFunction("åäöello xxx", row, "replace(a, 'h', 'åäö')");
+        row = Row.of(alias, 0, new Object[] { new StringReader("hello xyz") });
+        assertFunction("hello xyåäö", row, "replace(a, 'z', 'åäö')");
+    }
+
     @SuppressWarnings("unchecked")
     private void assertFunction(Object expected, Row row, String expression)
     {
@@ -195,6 +226,17 @@ public class BuiltinCatalogTest extends Assert
         if (actual instanceof Iterator)
         {
             actual = IteratorUtils.toList((Iterator<Object>) actual);
+        }
+        else if (actual instanceof Reader)
+        {
+            try
+            {
+                actual = IOUtils.toString((Reader) actual);
+            }
+            catch (IOException e1)
+            {
+                throw new RuntimeException(e1);
+            }
         }
 
         assertEquals("Eval", expected, actual);

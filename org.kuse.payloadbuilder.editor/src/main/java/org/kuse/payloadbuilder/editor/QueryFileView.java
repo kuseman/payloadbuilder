@@ -15,8 +15,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.io.Writer;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -40,6 +40,7 @@ import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JViewport;
 import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
 import javax.swing.Timer;
 import javax.swing.UIManager;
 import javax.swing.WindowConstants;
@@ -59,6 +60,7 @@ import org.kordamp.ikonli.fontawesome.FontAwesome;
 import org.kordamp.ikonli.swing.FontIcon;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
+import org.kuse.payloadbuilder.editor.QueryFileModel.Output;
 import org.kuse.payloadbuilder.editor.QueryFileModel.State;
 
 /** Content of a query editor. Text editor and a result panel separated with a split panel */
@@ -86,7 +88,7 @@ class QueryFileView extends JPanel
     private final JLabel labelExecutionStatus;
     private final JPopupMenu tablePopupMenu = new JPopupMenu();
     private final Timer executionTimer;
-    private final PrintStream messagePrintStream;
+    private final PrintWriter messagePrintWriter;
     private final List<ResultTable> tables = new ArrayList<>();
     private final Point tableClickLocation = new Point();
 
@@ -161,7 +163,7 @@ class QueryFileView extends JPanel
         {
             if (QueryFileModel.STATE.equals(l.getPropertyName()))
             {
-                handleStateChanged((State) l.getNewValue());
+                handleStateChanged(file, (State) l.getNewValue());
             }
             else if (QueryFileModel.RESULT_MODEL.equals(l.getPropertyName()))
             {
@@ -170,22 +172,55 @@ class QueryFileView extends JPanel
         });
 
         // Redirect query sessions output to messages text area
-        messagePrintStream = new PrintStream(new OutputStream()
-        {
-            @Override
-            public void write(int b) throws IOException
-            {
-                messages.append(String.valueOf((char) b));
-                messages.setCaretPosition(messages.getDocument().getLength());
-            }
-        });
-
-        file.getQuerySession().setPrintStream(messagePrintStream);
+        messagePrintWriter = getPrintWriter();
+        file.getQuerySession().setPrintWriter(messagePrintWriter);
         tablePopupMenu.add(viewAsJsonAction);
         tablePopupMenu.add(viewAsXmlAction);
     }
 
-    private void handleStateChanged(State state)
+    private PrintWriter getPrintWriter()
+    {
+        //CSOFF
+        Writer writer = new Writer()
+        //CSON
+        {
+            @Override
+            public void write(char[] cbuf, int off, int len) throws IOException
+            {
+                final String string = new String(cbuf, off, len);
+                Runnable r = () -> messages.append(string);
+                if (SwingUtilities.isEventDispatchThread())
+                {
+                    r.run();
+                }
+                else
+                {
+                    SwingUtilities.invokeLater(r);
+                }
+            }
+
+            @Override
+            public void flush() throws IOException
+            {
+            }
+
+            @Override
+            public void close() throws IOException
+            {
+            }
+        };
+
+        return new PrintWriter(writer, true)
+        {
+            @Override
+            public void close()
+            {
+                // DO nothing on close
+            }
+        };
+    }
+
+    private void handleStateChanged(QueryFileModel file, State state)
     {
         labelExecutionStatus.setIcon(getIconFromState(state));
         labelExecutionStatus.setToolTipText(state.getToolTip());
@@ -200,8 +235,16 @@ class QueryFileView extends JPanel
                 file.clearForExecution();
                 messages.setText("");
                 executionTimer.start();
-                resultTabs.setSelectedIndex(0);
                 clearHighLights();
+
+                if (file.getOutput() == Output.TABLE)
+                {
+                    resultTabs.setSelectedIndex(0);
+                }
+                else
+                {
+                    resultTabs.setSelectedIndex(1);
+                }
                 break;
             case COMPLETED:
                 setExecutionStats();
@@ -210,12 +253,12 @@ class QueryFileView extends JPanel
                 break;
             case ABORTED:
                 setExecutionStats();
-                messagePrintStream.println("Query was aborted!");
+                messagePrintWriter.println("Query was aborted!");
                 executionTimer.stop();
                 break;
             case ERROR:
                 resultTabs.setSelectedIndex(1);
-                messagePrintStream.println(file.getError());
+                messagePrintWriter.println(file.getError());
                 if (file.getParseErrorLocation() != null)
                 {
                     highLight(file.getParseErrorLocation().getKey(), file.getParseErrorLocation().getValue());
@@ -600,7 +643,7 @@ class QueryFileView extends JPanel
     private void setExecutionStats()
     {
         labelRunTime.setText(DurationFormatUtils.formatDurationHMS(file.getExecutionTime()));
-        labelRowCount.setText(String.valueOf(file.getResults().stream().mapToInt(r -> r.getActualRowCount()).sum()));
+        labelRowCount.setText(String.valueOf(file.getTotalRowCount()));
         if (file.getResults().size() > 0)
         {
             ResultModel currentModel = file.getResults().get(file.getResults().size() - 1);

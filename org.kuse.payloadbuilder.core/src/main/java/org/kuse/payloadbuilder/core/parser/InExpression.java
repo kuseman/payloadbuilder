@@ -25,6 +25,11 @@ public class InExpression extends Expression
         this.arguments = requireNonNull(arguments, "arguments");
     }
 
+    public boolean isNot()
+    {
+        return not;
+    }
+
     public Expression getExpression()
     {
         return expression;

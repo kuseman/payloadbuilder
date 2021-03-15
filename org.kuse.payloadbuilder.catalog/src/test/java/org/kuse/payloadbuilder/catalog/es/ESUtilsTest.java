@@ -144,11 +144,12 @@ public class ESUtilsTest extends Assert
                     "and field3 like 'some%string_end'" +
                     "and field4 like 'other%string_end'" +
                     "and field5 not like 'some_string%end'" +
-                    "and field6 not like 'other_string%end'"),
+                    "and field6 not like 'other_string%end'" +
+                    "and field7 not in (4,5,6)"),
                 alias);
 
         assertEquals(
-                "{\"sort\":[\"_doc\"],\"filter\":{\"bool\":{\"must\":[{\"wildcard\":{\"field4\":{\"value\":\"other*string?end\"}}},{\"wildcard\":{\"field3\":{\"value\":\"some*string?end\"}}},{\"terms\":{\"field\":[1,2,3]}},{\"term\":{\"count\":10}},{\"range\":{\"timestamp\":{\"lte\":\"20201010T10:10:10:000Z\"}}},{\"range\":{\"timestamp\":{\"gte\":\"20201010T10:10:10:000Z\"}}},{\"range\":{\"timestamp\":{\"lt\":\"20201010T10:10:10:000Z\"}}},{\"range\":{\"timestamp\":{\"gt\":\"20201010T10:10:10:000Z\"}}}],\"must_not\":[{\"wildcard\":{\"field6\":{\"value\":\"other?string*end\"}}},{\"wildcard\":{\"field5\":{\"value\":\"some?string*end\"}}},{\"term\":{\"field2\":true}},{\"term\":{\"field1\":20}}]}}}",
+                "{\"sort\":[\"_doc\"],\"filter\":{\"bool\":{\"must\":[{\"wildcard\":{\"field4\":{\"value\":\"other*string?end\"}}},{\"wildcard\":{\"field3\":{\"value\":\"some*string?end\"}}},{\"terms\":{\"field\":[1,2,3]}},{\"term\":{\"count\":10}},{\"range\":{\"timestamp\":{\"lte\":\"20201010T10:10:10:000Z\"}}},{\"range\":{\"timestamp\":{\"gte\":\"20201010T10:10:10:000Z\"}}},{\"range\":{\"timestamp\":{\"lt\":\"20201010T10:10:10:000Z\"}}},{\"range\":{\"timestamp\":{\"gt\":\"20201010T10:10:10:000Z\"}}}],\"must_not\":[{\"terms\":{\"field7\":[4,5,6]}},{\"wildcard\":{\"field6\":{\"value\":\"other?string*end\"}}},{\"wildcard\":{\"field5\":{\"value\":\"some?string*end\"}}},{\"term\":{\"field2\":true}},{\"term\":{\"field1\":20}}]}}}",
                 ESUtils.getSearchBody(
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", p.getColumn("t"), p, false)).collect(toList()),

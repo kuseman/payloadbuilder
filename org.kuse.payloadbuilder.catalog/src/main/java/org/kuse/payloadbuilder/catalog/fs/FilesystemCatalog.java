@@ -1,6 +1,11 @@
 package org.kuse.payloadbuilder.catalog.fs;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -89,11 +94,36 @@ public class FilesystemCatalog extends Catalog
             try
             {
                 Path path = FileSystems.getDefault().getPath(strPath);
-                return FileUtils.readFileToString(path.toFile());
+                return new FSFileReader(path.toFile());
             }
             catch (IOException e)
             {
                 throw new RuntimeException("Error reading contents from: " + strPath, e);
+            }
+        }
+    }
+
+    /** File reader that reads whole file to string as fallback */
+    static class FSFileReader extends BufferedReader
+    {
+        private final File file;
+        FSFileReader(File file) throws FileNotFoundException
+        {
+            super(new FileReader(file));
+            this.file = file;
+        }
+
+        @Override
+        public String toString()
+        {
+            // Fallback to read the file to string for operators and functions not supporting a reader
+            try
+            {
+                return FileUtils.readFileToString(file, StandardCharsets.UTF_8);
+            }
+            catch (IOException e)
+            {
+                throw new RuntimeException("Error reading file contents to string", e);
             }
         }
     }

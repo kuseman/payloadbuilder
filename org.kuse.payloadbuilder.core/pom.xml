@@ -11,8 +11,11 @@
     <name>Payloadbuilder Core Module</name>
 
     <properties>
-        <antlr4.version>4.7.1</antlr4.version>
         <license.dir>${project.parent.basedir}</license.dir>
+        
+        <!-- Versions -->
+        <antlr4.version>4.7.1</antlr4.version>
+        <jackson.version>2.10.0</jackson.version>
     </properties>
 
     <dependencies>
@@ -49,7 +52,12 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.10.0</version>
+            <version>${jackson.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-xml</artifactId>
+            <version>${jackson.version}</version>
         </dependency>
         
          <!-- TEST -->
