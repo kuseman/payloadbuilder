@@ -274,7 +274,7 @@ class PayloadbuilderEditorView extends JFrame
                 }
                 else if (value == QueryFileModel.Output.FILE)
                 {
-                    setText(getText() + " (" + getAcceleratorText(textOutputKeyStroke) + ")");
+                    setText(getText() + " (" + getAcceleratorText(fileOutputKeyStroke) + ")");
                 }
                 return this;
             }
