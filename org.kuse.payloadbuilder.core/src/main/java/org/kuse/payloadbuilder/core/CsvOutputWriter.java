@@ -4,11 +4,14 @@ import static java.util.Objects.requireNonNull;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.io.StringReader;
 import java.io.Writer;
 
 /** Output writer that writes CSV */
 public class CsvOutputWriter implements OutputWriter
 {
+    private static final char CHAR_10 = 10;
+    private static final char CHAR_13 = 13;
     private static final char[] NULL = "null".toCharArray();
     private static final char[] TRUE = "true".toCharArray();
     private static final char[] FALSE = "false".toCharArray();
@@ -117,30 +120,13 @@ public class CsvOutputWriter implements OutputWriter
             }
             else if (value instanceof Reader)
             {
-                // NOTE: quoting not supported here, since then all contents would be needed in memory
-                try (Reader reader = (Reader) value)
-                {
-                    int c;
-                    while ((c = reader.read()) != -1)
-                    {
-                        writer.write((char) c);
-                    }
-                }
+                write((Reader) value);
             }
             else
             {
-                String str = String.valueOf(value);
-                boolean quote = !singleColumnResult && quote(str);
-                if (quote)
-                {
-                    writer.write(settings.quoteChar);
-                }
                 // ToString the value as fallback
-                writer.write(str);
-                if (quote)
-                {
-                    writer.write(settings.quoteChar);
-                }
+                String str = String.valueOf(value);
+                write(new StringReader(str));
             }
 
             firstEntryOnRow = false;
@@ -188,29 +174,38 @@ public class CsvOutputWriter implements OutputWriter
         writeValue(settings.arrayEndChar);
     }
 
-    private boolean quote(String value)
+    private void write(Reader reader) throws IOException
     {
-        int length = value.length();
-        for (int i = 0; i < length; i++)
+        try (Reader r = reader)
         {
-            if (value.charAt(i) == settings.separatorChar.charAt(0))
+            int c;
+            while ((c = r.read()) != -1)
             {
-                return true;
+                if (c == settings.separatorChar)
+                {
+                    writer.write(settings.escapeChar);
+                }
+                else if (settings.escapeNewLines && (c == CHAR_10 || c == CHAR_13))
+                {
+                    writer.write(settings.escapeChar);
+                    writer.write(c == CHAR_10 ? 'n' : 'r');
+                    continue;
+                }
+                writer.write(c);
             }
         }
-
-        return false;
     }
 
     /** Csv writer settings */
     static class CsvSettings
     {
-        private final String quoteChar = "\"";
-        private final String separatorChar = ",";
-        private final String arrayStartChar = "[";
-        private final String arrayEndChar = "]";
-        private final String objectStartChar = "{";
-        private final String objectEndChar = "}";
+        private final char escapeChar = '\\';
+        private final char separatorChar = ',';
+        private final char arrayStartChar = '[';
+        private final char arrayEndChar = ']';
+        private final char objectStartChar = '{';
+        private final char objectEndChar = '}';
         private final boolean writeHeaders = true;
+        private final boolean escapeNewLines = true;
     }
 }
