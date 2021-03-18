@@ -1,6 +1,7 @@
 package org.kuse.payloadbuilder.core.parser;
 
 import static org.apache.commons.lang3.StringUtils.join;
+import static org.apache.commons.lang3.StringUtils.lowerCase;
 
 /** A variable (@var) */
 public class VariableExpression extends Expression
@@ -15,7 +16,7 @@ public class VariableExpression extends Expression
 
     public VariableExpression(QualifiedName qname, boolean system)
     {
-        this.name = join(qname.getParts(), ".");
+        this.name = lowerCase(join(qname.getParts(), "."));
         this.system = system;
     }
 
@@ -39,6 +40,20 @@ public class VariableExpression extends Expression
     @Override
     public Object eval(ExecutionContext context)
     {
+        if (system)
+        {
+            if ("rowcount".equals(name))
+            {
+                return context.getRowCount();
+            }
+            else if ("version".equals(name))
+            {
+                return context.getVersionString();
+            }
+
+            return null;
+        }
+
         return context.getVariableValue(name);
     }
 
@@ -55,7 +70,7 @@ public class VariableExpression extends Expression
         {
             VariableExpression that = (VariableExpression) obj;
             return name.equals(that.name)
-                    && system == that.system;
+                && system == that.system;
         }
         return false;
     }

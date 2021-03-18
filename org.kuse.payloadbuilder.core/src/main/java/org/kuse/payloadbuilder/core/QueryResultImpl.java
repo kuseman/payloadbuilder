@@ -407,8 +407,8 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             rowCount++;
         }
 
-        context.setVariable(ExecutionContext.ROW_COUNT, rowCount);
-        
+        context.setRowCount(rowCount);
+
         currentSelect = null;
     }
 }

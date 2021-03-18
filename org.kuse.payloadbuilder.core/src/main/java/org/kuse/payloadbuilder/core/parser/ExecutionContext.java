@@ -19,14 +19,15 @@ import org.kuse.payloadbuilder.core.operator.Tuple;
 /** Context used during execution of a query */
 public class ExecutionContext
 {
-    public static final String ROW_COUNT = "rowcount";
-
     private final QuerySession session;
     /** Holder for lambda references during evaluation */
     private List<Object> lambdaValues;
     private Map<String, Object> variables;
     private final ZonedDateTime now = ZonedDateTime.now();
     private final OperatorContext operatorContext = new OperatorContext();
+
+    /** Current row count of previous select statement */
+    private int rowCount;
 
     /** Reference to tuple. Used in projections, correlated sub queries */
     private Tuple tuple;
@@ -71,6 +72,21 @@ public class ExecutionContext
     public OperatorContext getOperatorContext()
     {
         return operatorContext;
+    }
+
+    public int getRowCount()
+    {
+        return rowCount;
+    }
+
+    public void setRowCount(int rowCount)
+    {
+        this.rowCount = rowCount;
+    }
+
+    public String getVersionString()
+    {
+        return ExecutionContext.class.getPackage().getImplementationVersion();
     }
 
     /** Get lambda value in scope for provided id */
