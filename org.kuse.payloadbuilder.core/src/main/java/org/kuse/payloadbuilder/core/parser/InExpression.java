@@ -187,6 +187,6 @@ public class InExpression extends Expression
     @Override
     public String toString()
     {
-        return expression.toString() + " IN (" + arguments.stream().map(e -> e.toString()).collect(joining(", ")) + ")";
+        return expression.toString() + (not ? " NOT" : "") + " IN (" + arguments.stream().map(e -> e.toString()).collect(joining(", ")) + ")";
     }
 }

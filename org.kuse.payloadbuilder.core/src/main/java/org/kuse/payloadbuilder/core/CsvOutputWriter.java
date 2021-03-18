@@ -199,6 +199,8 @@ public class CsvOutputWriter implements OutputWriter
     /** Csv writer settings */
     static class CsvSettings
     {
+        // TODO: quoting char
+
         private final char escapeChar = '\\';
         private final char separatorChar = ',';
         private final char arrayStartChar = '[';

@@ -37,10 +37,12 @@ import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.Apply.ApplyType;
+import org.kuse.payloadbuilder.core.parser.CaseExpression.WhenClause;
 import org.kuse.payloadbuilder.core.parser.ComparisonExpression.Type;
 import org.kuse.payloadbuilder.core.parser.Join.JoinType;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ArithmeticBinaryContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ArithmeticUnaryContext;
+import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.CaseExpressionContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ColumnReferenceContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ComparisonExpressionContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.DereferenceContext;
@@ -500,6 +502,19 @@ public class QueryParser
             QualifiedName option = getQualifiedName(ctx.qname());
             Expression valueExpression = getExpression(ctx.expression());
             return new Option(option, valueExpression);
+        }
+
+        @Override
+        public Object visitCaseExpression(CaseExpressionContext ctx)
+        {
+            List<WhenClause> whenClauses = ctx.when()
+                    .stream()
+                    .map(w -> new CaseExpression.WhenClause(getExpression(w.condition), getExpression(w.result)))
+                    .collect(toList());
+
+            Expression elseExpression = getExpression(ctx.elseExpr);
+
+            return new CaseExpression(whenClauses, elseExpression);
         }
 
         @Override

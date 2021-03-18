@@ -161,6 +161,8 @@ topExpression
 expression
  : primary													#primaryExpression
  
+ | CASE when+ (ELSE elseExpr=expression)? END               #caseExpression
+ 
  //
  
  | op=(MINUS | PLUS) expression								#arithmeticUnary 
@@ -200,6 +202,10 @@ primary
  | value=primary '[' subscript=expression ']'    			#subscript
  | variable													#variableExpression
  | '(' expression ')' 										#nestedExpression
+ ;
+
+when
+ : WHEN condition=expression THEN result=expression
  ;
 
 functionCall
@@ -272,6 +278,7 @@ ARRAY	     : A R R A Y;
 AS		     : A S;
 ASC		     : A S C;
 APPLY	     : A P P L Y;
+CASE         : C A S E;
 CROSS        : C R O S S;
 DESC	     : D E S C;
 DESCRIBE	 : D E S C R I B E;
@@ -312,6 +319,7 @@ TOP			 : T O P;
 TRUE	     : T R U E;
 USE			 : U S E;
 VARIABLES	 : V A R I A B L E S;
+WHEN		 : W H E N;
 WITH         : W I T H;
 WHERE	     : W H E R E;
 
