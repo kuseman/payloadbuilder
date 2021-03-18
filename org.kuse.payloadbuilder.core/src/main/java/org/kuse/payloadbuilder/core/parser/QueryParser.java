@@ -319,6 +319,10 @@ public class QueryParser
             if (ctx.expression() != null)
             {
                 QualifiedName assignmentQname = ctx.variable() != null ? getQualifiedName(ctx.variable().qname()) : null;
+                if (ctx.variable() != null && ctx.variable().system != null)
+                {
+                    throw new ParseException("Cannot assign to system variables", ctx.start);
+                }
                 Expression expression = getExpression(ctx.expression());
                 return new ExpressionSelectItem(expression, identifier, assignmentQname);
             }
@@ -528,7 +532,7 @@ public class QueryParser
         @Override
         public Object visitVariableExpression(VariableExpressionContext ctx)
         {
-            return new VariableExpression(getQualifiedName(ctx.variable().qname()));
+            return new VariableExpression(getQualifiedName(ctx.variable().qname()), ctx.variable().system != null);
         }
 
         @Override

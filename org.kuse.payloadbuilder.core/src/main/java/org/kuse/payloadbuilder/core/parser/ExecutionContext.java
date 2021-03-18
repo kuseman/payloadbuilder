@@ -3,6 +3,7 @@ package org.kuse.payloadbuilder.core.parser;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
+import static org.apache.commons.lang3.StringUtils.lowerCase;
 
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -18,6 +19,8 @@ import org.kuse.payloadbuilder.core.operator.Tuple;
 /** Context used during execution of a query */
 public class ExecutionContext
 {
+    public static final String ROW_COUNT = "rowcount";
+
     private final QuerySession session;
     /** Holder for lambda references during evaluation */
     private List<Object> lambdaValues;
@@ -111,7 +114,7 @@ public class ExecutionContext
     /** Get variable from context */
     public Object getVariableValue(String name)
     {
-        return variables != null ? variables.get(name) : null;
+        return variables != null ? variables.get(lowerCase(name)) : null;
     }
 
     private void ensureSize(List<?> list, int itemIndex)

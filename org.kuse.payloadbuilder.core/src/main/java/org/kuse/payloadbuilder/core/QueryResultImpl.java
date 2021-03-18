@@ -368,6 +368,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         }
         writer.initResult(columns);
 
+        int rowCount = 0;
         context.clear();
         if (operator != null)
         {
@@ -386,6 +387,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                     context.setTuple(tuple);
                     projection.writeValue(writer, context);
                     writer.endRow();
+                    rowCount++;
                 }
             }
             finally
@@ -402,8 +404,11 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             context.setTuple(DUMMY_ROW);
             projection.writeValue(writer, context);
             writer.endRow();
+            rowCount++;
         }
 
+        context.setVariable(ExecutionContext.ROW_COUNT, rowCount);
+        
         currentSelect = null;
     }
 }

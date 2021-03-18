@@ -160,9 +160,7 @@ topExpression
  
 expression
  : primary													#primaryExpression
- 
- | CASE when+ (ELSE elseExpr=expression)? END               #caseExpression
- 
+  
  //
  
  | op=(MINUS | PLUS) expression								#arithmeticUnary 
@@ -202,6 +200,7 @@ primary
  | value=primary '[' subscript=expression ']'    			#subscript
  | variable													#variableExpression
  | '(' expression ')' 										#nestedExpression
+ | CASE when+ (ELSE elseExpr=expression)? END               #caseExpression
  ;
 
 when
@@ -229,7 +228,7 @@ literal
  ;
  
 variable
- : '@' qname
+ : '@' (system='@')? qname
  ;
  
 compareOperator

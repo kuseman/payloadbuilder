@@ -24,6 +24,8 @@ public class QueryParserTest extends AParserTest
         assertQuery("select @var = 10");
         assertQuery("select @var = a.col from table a");
         assertQueryFail(ParseException.class, "Cannot combine variable assignment items with data retrieval items", "select @var = a.col, a.col2 from table a");
+
+        assertQueryFail(ParseException.class, "Cannot assign to system variables", "select @@rowcount = 1");
     }
 
     @Test

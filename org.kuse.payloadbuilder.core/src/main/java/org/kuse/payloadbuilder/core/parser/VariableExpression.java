@@ -6,10 +6,17 @@ import static org.apache.commons.lang3.StringUtils.join;
 public class VariableExpression extends Expression
 {
     private final String name;
+    private final boolean system;
 
     public VariableExpression(QualifiedName qname)
     {
+        this(qname, false);
+    }
+
+    public VariableExpression(QualifiedName qname, boolean system)
+    {
         this.name = join(qname.getParts(), ".");
+        this.system = system;
     }
 
     public String getName()
@@ -47,7 +54,8 @@ public class VariableExpression extends Expression
         if (obj instanceof VariableExpression)
         {
             VariableExpression that = (VariableExpression) obj;
-            return name.equals(that.name);
+            return name.equals(that.name)
+                    && system == that.system;
         }
         return false;
     }
@@ -55,6 +63,6 @@ public class VariableExpression extends Expression
     @Override
     public String toString()
     {
-        return "@" + name;
+        return "@" + (system ? "@" : "") + name;
     }
 }
