@@ -12,6 +12,8 @@ class TestCase
     private String name;
     private String query;
     private List<List<List<ColumnValue>>> expectedResultSets;
+    private Class<? extends Exception> expectedException;
+    private String expectedMessageContains;
 
     String getName()
     {
@@ -49,6 +51,26 @@ class TestCase
     void setExpectedResultSets(List<List<List<ColumnValue>>> expectedResultSets)
     {
         this.expectedResultSets = expectedResultSets;
+    }
+
+    void setExpectedException(Class<? extends Exception> expectedException)
+    {
+        this.expectedException = expectedException;
+    }
+
+    Class<? extends Exception> getExpectedException()
+    {
+        return expectedException;
+    }
+
+    String getExpectedMessageContains()
+    {
+        return expectedMessageContains;
+    }
+
+    void setExpectedMessageContains(String expectedMessageContains)
+    {
+        this.expectedMessageContains = expectedMessageContains;
     }
 
     /** Result of a cell in a result set */

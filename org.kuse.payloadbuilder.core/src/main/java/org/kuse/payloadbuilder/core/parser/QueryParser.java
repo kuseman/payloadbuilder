@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -47,6 +48,7 @@ import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ColumnRefer
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ComparisonExpressionContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.DereferenceContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.DescribeStatementContext;
+import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.DropTableStatementContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.FunctionArgumentContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.FunctionCallContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.FunctionCallExpressionContext;
@@ -71,6 +73,7 @@ import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SortItemCon
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.StatementContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SubQueryContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SubscriptContext;
+import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableNameContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceJoinedContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceOptionContext;
@@ -187,7 +190,11 @@ public class QueryParser
         @Override
         public Object visitQuery(QueryContext ctx)
         {
-            List<Statement> statements = ctx.statements().children.stream().map(c -> (Statement) visit(c)).collect(toList());
+            List<Statement> statements = ctx.statements().children
+                    .stream()
+                    .map(c -> (Statement) visit(c))
+                    .filter(Objects::nonNull)
+                    .collect(toList());
             return new QueryStatement(statements);
         }
 
@@ -245,14 +252,24 @@ public class QueryParser
             return ((SelectStatement) visit(ctx.selectStatement())).getSelect();
         }
 
+        @Override
+        public Object visitDropTableStatement(DropTableStatementContext ctx)
+        {
+            String catalogAlias = ctx.tableName().catalog != null ? ctx.tableName().catalog.getText() : null;
+            QualifiedName qname = getQualifiedName(ctx.tableName().qname());
+            boolean lenient = ctx.EXISTS() != null;
+            boolean tempTable = ctx.tableName().tempHash != null;
+            return new DropTableStatement(catalogAlias, qname, lenient, tempTable, ctx.start);
+        }
+
         //CSOFF
         @Override
         //CSON
         public Object visitSelectStatement(SelectStatementContext ctx)
         {
-            TableSourceJoined joinedTableSource = ctx.tableSourceJoined() != null ? (TableSourceJoined) visit(ctx.tableSourceJoined()) : null;
+            TableSourceJoined from = ctx.tableSourceJoined() != null ? (TableSourceJoined) visit(ctx.tableSourceJoined()) : null;
             Expression topExpression = ctx.topCount() != null ? (Expression) visit(ctx.topCount()) : null;
-            if (joinedTableSource == null)
+            if (from == null)
             {
                 if (ctx.where != null)
                 {
@@ -291,10 +308,30 @@ public class QueryParser
                 assignmentSelect = true;
             }
 
+            Table into = null;
+            if (ctx.into != null)
+            {
+                if (assignmentSelect)
+                {
+                    throw new ParseException("Cannot have assignments in a SELECT INTO statement", ctx.start);
+                }
+
+                if (selectItems.stream().anyMatch(i -> isBlank(i.getIdentifier()) && i.isEmptyIdentifier()))
+                {
+                    throw new ParseException("All items must have an identifier when using a SELECT INTO statement", ctx.start);
+                }
+
+                TableName tableName = (TableName) visit(ctx.tableName());
+                TableAlias.Type type = tableName.isTempTable() ? TableAlias.Type.TEMPORARY_TABLE : TableAlias.Type.TABLE;
+                TableAlias alias = TableAlias.TableAliasBuilder.of(-1, type, getQualifiedName(ctx.into.qname()), "").build();
+                List<Option> options = ctx.intoOptions != null ? ctx.intoOptions.options.stream().map(to -> (Option) visit(to)).collect(toList()) : emptyList();
+                into = new Table("", alias, options, ctx.into.start);
+            }
+
             Expression where = getExpression(ctx.where);
             List<Expression> groupBy = ctx.groupBy != null ? ctx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
             List<SortItem> orderBy = ctx.sortItem() != null ? ctx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
-            Select select = new Select(selectItems, joinedTableSource, topExpression, where, groupBy, orderBy);
+            Select select = new Select(selectItems, from, into, topExpression, where, groupBy, orderBy);
             return new SelectStatement(select, assignmentSelect);
         }
 
@@ -317,7 +354,7 @@ public class QueryParser
         @Override
         public Object visitSelectItem(SelectItemContext ctx)
         {
-            String identifier = getIdentifier(ctx.identifier());
+            String identifier = defaultIfBlank(getIdentifier(ctx.identifier()), "");
             // Expression select item
             if (ctx.expression() != null)
             {
@@ -327,7 +364,7 @@ public class QueryParser
                     throw new ParseException("Cannot assign to system variables", ctx.start);
                 }
                 Expression expression = getExpression(ctx.expression());
-                return new ExpressionSelectItem(expression, identifier, assignmentQname);
+                return new ExpressionSelectItem(expression, identifier, assignmentQname, ctx.expression().start);
             }
             // Nested select item
             else if (ctx.nestedSelectItem() != null)
@@ -351,7 +388,7 @@ public class QueryParser
 
                 if (type == NestedSelectItem.Type.ARRAY)
                 {
-                    Optional<SelectItem> item = selectItems.stream().filter(si -> !isBlank(si.getIdentifier()) && si.isExplicitIdentifier()).findAny();
+                    Optional<SelectItem> item = selectItems.stream().filter(si -> !si.isEmptyIdentifier()).findAny();
 
                     //CSOFF
                     if (item.isPresent())
@@ -381,7 +418,7 @@ public class QueryParser
                     }
                 }
 
-                return new NestedSelectItem(type, selectItems, from, where, identifier, groupBy, orderBy);
+                return new NestedSelectItem(type, selectItems, from, where, identifier, groupBy, orderBy, ctx.nestedSelectItem().start);
             }
             // Wildcard select item
             else if (ctx.ASTERISK() != null)
@@ -391,8 +428,8 @@ public class QueryParser
                 {
                     alias = getIdentifier(ctx.alias);
                 }
-
-                return new AsteriskSelectItem(alias, ctx.start);
+                boolean recursive = ctx.ASTERISK().size() > 1;
+                return new AsteriskSelectItem(alias, recursive, ctx.start);
             }
 
             throw new ParseException("Caould no create a select item.", ctx.start);
@@ -438,7 +475,7 @@ public class QueryParser
         @Override
         public Object visitTableSource(TableSourceContext ctx)
         {
-            String alias = getIdentifier(ctx.identifier());
+            String alias = defaultIfBlank(getIdentifier(ctx.identifier()), "");
 
             List<Option> options = ctx.tableSourceOptions() != null ? ctx.tableSourceOptions().options.stream().map(to -> (Option) visit(to)).collect(toList()) : emptyList();
             if (ctx.functionCall() != null)
@@ -469,6 +506,7 @@ public class QueryParser
 
                 SubQueryContext subQueryCtx = ctx.subQuery();
 
+                List<SelectItem> selectItems = subQueryCtx.selectItem().stream().map(s -> (SelectItem) visit(s)).collect(toList());
                 TableAlias prevParent = parentTableAlias;
                 TableAlias tableAlias = TableAliasBuilder
                         .of(tupleOrdinal++, TableAlias.Type.SUBQUERY, QualifiedName.of("SubQuery"), alias, subQueryCtx.start)
@@ -476,31 +514,35 @@ public class QueryParser
                         .build();
                 parentTableAlias = tableAlias;
 
-                TableSourceJoined tableSourceJoined = (TableSourceJoined) visit(subQueryCtx.tableSourceJoined());
-
-                if (tableSourceJoined.getTableSource() instanceof SubQueryTableSource)
-                {
-                    throw new ParseException("Table source in populate query cannot be a populate table source", subQueryCtx.start);
-                }
-
+                TableSourceJoined from = (TableSourceJoined) visit(subQueryCtx.tableSourceJoined());
                 Expression where = subQueryCtx.where != null ? getExpression(subQueryCtx.where) : null;
                 List<Expression> groupBy = subQueryCtx.groupBy != null ? subQueryCtx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
                 List<SortItem> orderBy = subQueryCtx.sortItem() != null ? subQueryCtx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
 
                 parentTableAlias = prevParent;
 
-                return new SubQueryTableSource(tableAlias, options, tableSourceJoined, where, groupBy, orderBy, ctx.subQuery().start);
+                return new SubQueryTableSource(selectItems, tableAlias, options, from, where, groupBy, orderBy, ctx.subQuery().start);
             }
 
-            QualifiedName table = getQualifiedName(ctx.tableName().qname());
+            TableName tableName = (TableName) visit(ctx.tableName());
+            TableAlias.Type type = tableName.isTempTable() ? TableAlias.Type.TEMPORARY_TABLE : TableAlias.Type.TABLE;
 
             TableAlias tableAlias = TableAliasBuilder
-                    .of(tupleOrdinal++, TableAlias.Type.TABLE, table, defaultIfBlank(alias, ""), ctx.tableName().start)
+                    .of(tupleOrdinal++, type, tableName.getQname(), defaultIfBlank(alias, ""), ctx.tableName().start)
                     .parent(getParentTableAlias())
                     .build();
 
             String catalog = ctx.tableName().catalog != null ? ctx.tableName().catalog.getText() : null;
             return new Table(catalog, tableAlias, options, ctx.tableName().start);
+        }
+
+        @Override
+        public Object visitTableName(TableNameContext ctx)
+        {
+            String catalogAlias = ctx.catalog != null ? ctx.catalog.getText() : null;
+            QualifiedName qname = getQualifiedName(ctx.qname());
+            boolean tempTable = ctx.tempHash != null;
+            return new TableName(catalogAlias, qname, tempTable);
         }
 
         @Override
@@ -527,9 +569,11 @@ public class QueryParser
         @Override
         public Object visitColumnReference(ColumnReferenceContext ctx)
         {
-            String identifier = getIdentifier(ctx.identifier());
-            Integer lambdaId = lambdaParameters.get(identifier);
-            return new QualifiedReferenceExpression(QualifiedName.of(identifier), lambdaId != null ? lambdaId.intValue() : -1, ctx.start);
+            QualifiedName qname = getQualifiedName(ctx.qname());
+            int lambdaId = lambdaParameters.getOrDefault(qname.getFirst(), -1);
+            QualifiedReferenceExpression result = new QualifiedReferenceExpression(qname, lambdaId, ctx.start);
+            validateQualifiedReference(ctx, result);
+            return result;
         }
 
         @Override
@@ -691,17 +735,17 @@ public class QueryParser
             {
                 List<String> parts = new ArrayList<>();
                 parts.add(getIdentifier(ctx.identifier()));
-                if (left instanceof QualifiedReferenceExpression)
-                {
-                    QualifiedReferenceExpression qfe = (QualifiedReferenceExpression) left;
-                    parts.addAll(0, qfe.getQname().getParts());
-                    result = new QualifiedReferenceExpression(new QualifiedName(parts), qfe.getLambdaId(), qfe.getToken());
-                    validateQualifiedReference(ctx, (QualifiedReferenceExpression) result);
-                }
-                else
-                {
-                    result = new DereferenceExpression(left, new QualifiedReferenceExpression(new QualifiedName(parts), -1, ctx.start));
-                }
+                //                if (left instanceof QualifiedReferenceExpression)
+                //                {
+                //                    QualifiedReferenceExpression qfe = (QualifiedReferenceExpression) left;
+                //                    parts.addAll(0, qfe.getQname().getParts());
+                //                    result = new QualifiedReferenceExpression(new QualifiedName(parts), qfe.getLambdaId());
+                //                    validateQualifiedReference(ctx, (QualifiedReferenceExpression) result);
+                //                }
+                //                else
+                //                {
+                result = new DereferenceExpression(left, new QualifiedReferenceExpression(new QualifiedName(parts), -1, ctx.start));
+                //                }
             }
             // Dereferenced function call
             else
@@ -827,6 +871,7 @@ public class QueryParser
         {
             if (!validateQualifiedReferences
                 || isBlank(parentTableAlias.getAlias())
+                || qfe.getQname().getParts().size() == 1
                 || qfe.getLambdaId() >= 0)
             {
                 return;
@@ -921,7 +966,7 @@ public class QueryParser
                 nullOrder = NullOrder.LAST;
             }
 
-            return new SortItem(expression, order, nullOrder);
+            return new SortItem(expression, order, nullOrder, ctx.start);
         }
 
         private String getIdentifier(ParserRuleContext ctx)

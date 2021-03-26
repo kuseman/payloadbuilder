@@ -1,5 +1,6 @@
 package org.kuse.payloadbuilder.core.operator;
 
+import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.toSet;
@@ -12,6 +13,7 @@ import static org.kuse.payloadbuilder.core.operator.OperatorBuilderUtils.createG
 import static org.kuse.payloadbuilder.core.utils.CollectionUtils.asSet;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +44,7 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.ExpressionSelectItem;
 import org.kuse.payloadbuilder.core.parser.Join;
 import org.kuse.payloadbuilder.core.parser.Join.JoinType;
+import org.kuse.payloadbuilder.core.parser.LiteralIntegerExpression;
 import org.kuse.payloadbuilder.core.parser.NestedSelectItem;
 import org.kuse.payloadbuilder.core.parser.NestedSelectItem.Type;
 import org.kuse.payloadbuilder.core.parser.Option;
@@ -229,6 +232,10 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             joins.get(i).accept(this, context);
         }
 
+        Pair<List<SelectItem>, List<SortItem>> pair = pushDownComputedColumns(select, context);
+        List<SelectItem> items = pair.getKey();
+        List<SortItem> sortItems = pair.getValue();
+
         if (where != null)
         {
             context.operator = new FilterOperator(context.acquireNodeId(), context.operator, new ExpressionPredicate(where));
@@ -247,10 +254,10 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             context.operator = new BatchRepeatOperator(context.acquireNodeId(), batchLimitId, context.operator);
         }
 
-        if (!context.sortItems.isEmpty())
+        if (!sortItems.isEmpty())
         {
-            context.sortItems.forEach(si -> si.accept(this, context));
-            context.operator = new SortByOperator(context.acquireNodeId(), context.operator, new ExpressionTupleComparator(context.sortItems));
+            sortItems.forEach(si -> si.accept(this, context));
+            context.operator = new OrderByOperator(context.acquireNodeId(), context.operator, new ExpressionTupleComparator(sortItems));
         }
 
         if (select.getTopExpression() != null)
@@ -267,7 +274,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         List<String> projectionAliases = new ArrayList<>();
         List<Projection> projections = new ArrayList<>();
-        select.getSelectItems().forEach(s ->
+        items.forEach(s ->
         {
             s.accept(this, context);
             projectionAliases.add(defaultIfBlank(s.getIdentifier(), ""));
@@ -339,7 +346,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         if (!nestedSelectItem.getOrderBy().isEmpty())
         {
-            fromOperator = new SortByOperator(context.acquireNodeId(), fromOperator, new ExpressionTupleComparator(nestedSelectItem.getOrderBy()));
+            fromOperator = new OrderByOperator(context.acquireNodeId(), fromOperator, new ExpressionTupleComparator(nestedSelectItem.getOrderBy()));
         }
 
         if (nestedSelectItem.getType() == Type.ARRAY)
@@ -476,7 +483,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     @Override
     public Void visit(SubQueryTableSource tableSource, Context context)
     {
-        TableSourceJoined tsj = tableSource.getTableSourceJoined();
+        TableSourceJoined tsj = tableSource.getFrom();
         TableSource ts = tsj.getTableSource();
         TableAlias tableAlias = ts.getTableAlias();
         String alias = tableAlias.getAlias();
@@ -536,10 +543,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         if (!sortBys.isEmpty())
         {
             sortBys.forEach(si -> si.accept(this, context));
-            context.operator = new SortByOperator(context.acquireNodeId(), context.operator, new ExpressionTupleComparator(sortBys));
+            context.operator = new OrderByOperator(context.acquireNodeId(), context.operator, new ExpressionTupleComparator(sortBys));
         }
-
-        //        context.operator = new SubQueryOperator(context.operator, tableSource.getTableAlias().getAlias());
 
         // Restore prev alias
         context.currentTableAlias = prevCurrentTableAlias;
@@ -550,6 +555,12 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     @Override
     public Void visit(Table table, Context context)
     {
+        if (table.isTempTable())
+        {
+            context.operator = new TemporaryTableScanOperator(context.acquireNodeId(), table);
+            return null;
+        }
+
         Pair<String, Catalog> pair = getCatalog(context, table.getCatalogAlias(), table.getToken());
         int nodeId = context.acquireNodeId();
         context.currentTableAlias = table.getTableAlias();
@@ -599,6 +610,136 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         tableFunction.getArguments().forEach(a -> visit(a, context));
         context.operator = new TableFunctionOperator(context.acquireNodeId(), tableFunction.getCatalogAlias(), tableFunction.getTableAlias(), functionInfo, tableFunction.getArguments());
         return null;
+    }
+
+    /**
+     * <pre>
+     * Push downs all expressions select items that are referenced in order by
+     * this to be able to sort by expression items that would otherwise be invisible to
+     * the sort operator.
+     *
+     * Also pushes down ordinal referenced columns like "ORDER BY 1"
+     *
+     *   Ex.
+     *
+     *   select col, col * 2 newCol
+     *   from table
+     *   order by newCol, 1
+     *
+     *   Pre Projection: col, col * 2 newCol
+     *   Pre operator tree
+     *     sort(newCol, 1)         <-- newCol and col does not exist here
+     *       scan(table)
+     *
+     *   Post Projection: _Expre01 col, newCol
+     *   Post operator tree
+     *     sort(newCol)
+     *       computedColumns (newCol: col * 2, _Expr01: col)
+     *         scan(table)
+     * </pre>
+     **/
+    //CSOFF
+    private Pair<List<SelectItem>, List<SortItem>> pushDownComputedColumns(Select select, Context context)
+    //CSON
+    {
+        // No FROM or no sort or assignment select then drop out
+        // cause
+        if (context.operator == null
+            || context.sortItems.isEmpty()
+            || select.getSelectItems().stream().anyMatch(i -> i.getAssignmentName() != null))
+        {
+            return Pair.of(select.getSelectItems(), context.sortItems);
+        }
+
+        // Index select items by non qualified expressions, these are the ones we want to push down
+
+        Map<String, Integer> expressionItemsByIndex = new HashMap<>();
+        int index = 0;
+        for (SelectItem item : select.getSelectItems())
+        {
+            if (item instanceof ExpressionSelectItem
+                && !(((ExpressionSelectItem) item).getExpression() instanceof QualifiedReferenceExpression))
+            {
+                expressionItemsByIndex.put(lowerCase(item.getIdentifier()), index);
+            }
+            index++;
+        }
+
+        List<SelectItem> selectItems = new ArrayList<>(select.getSelectItems());
+        List<SortItem> sortItems = new ArrayList<>(context.sortItems);
+        List<String> columns = null;
+        List<Expression> computedExpressions = null;
+
+        int size = context.sortItems.size();
+        for (int i = 0; i < size; i++)
+        {
+            SortItem item = context.sortItems.get(i);
+            Integer itemIndex = null;
+
+            // Sort item that references an expression from select items
+            if (item.getExpression() instanceof QualifiedReferenceExpression
+                && ((QualifiedReferenceExpression) item.getExpression()).getQname().getParts().size() == 1)
+            {
+                String column = ((QualifiedReferenceExpression) item.getExpression()).getQname().getFirst();
+                itemIndex = expressionItemsByIndex.get(lowerCase(column));
+            }
+            // Sort item that references an select item by ordinal
+            else if (item.getExpression() instanceof LiteralIntegerExpression)
+            {
+                // 1-based
+                itemIndex = ((LiteralIntegerExpression) item.getExpression()).getValue() - 1;
+            }
+
+            // Item does not need modifications
+            if (itemIndex == null)
+            {
+                continue;
+            }
+            else if (itemIndex >= selectItems.size())
+            {
+                throw new ParseException("ORDER BY position is out of range", item.getToken());
+            }
+
+            if (computedExpressions == null)
+            {
+                computedExpressions = new ArrayList<>();
+                columns = new ArrayList<>();
+            }
+
+            SelectItem selectItem = selectItems.get(itemIndex);
+
+            if (!(selectItem instanceof ExpressionSelectItem))
+            {
+                throw new ParseException("ORDER BY position is not supported for asterisk selects", item.getToken());
+            }
+
+            // Extract current expression index
+            index = computedExpressions.size();
+            columns.add(selectItem.getIdentifier());
+            computedExpressions.add(((ExpressionSelectItem) selectItem).getExpression());
+
+            Expression newReference = new QualifiedReferenceExpression(
+                    QualifiedName.of(selectItem.getIdentifier()),
+                    -1,
+                    asList(new QualifiedReferenceExpression.ResolvePath(-1, -1, emptyList(), index)),
+                    null);
+
+            // Replace SelectItem
+            selectItems.set(itemIndex, new ExpressionSelectItem(newReference,
+                    selectItem.getIdentifier(),
+                    null,
+                    selectItem.getToken()));
+
+            // Replace SortItem
+            sortItems.set(i, new SortItem(newReference, item.getOrder(), item.getNullOrder(), item.getToken()));
+        }
+
+        if (computedExpressions != null)
+        {
+            context.operator = new ComputedColumnsOperator(context.acquireNodeId(), context.operator, columns, computedExpressions);
+        }
+
+        return Pair.of(selectItems, sortItems);
     }
 
     /**
@@ -653,13 +794,19 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         String catalogAlias = innerTableSource.getCatalogAlias();
         QualifiedName table = innerTableSource.getTable();
         List<Index> indices = emptyList();
+        boolean innerIsTempTable = false;
 
         // Sub query, use the inner table sources table and catalog when resolving indices
         if (innerTableSource instanceof SubQueryTableSource)
         {
+            // TODO: needs some refactoring when doing nested unions etc.
             SubQueryTableSource subQuery = (SubQueryTableSource) innerTableSource;
-            catalogAlias = subQuery.getTableSourceJoined().getTableSource().getCatalogAlias();
-            table = subQuery.getTableSourceJoined().getTableSource().getTable();
+            catalogAlias = subQuery.getFrom().getTableSource().getCatalogAlias();
+            table = subQuery.getFrom().getTableSource().getTable();
+        }
+        else if (innerTableSource instanceof Table)
+        {
+            innerIsTempTable = ((Table) innerTableSource).isTempTable();
         }
 
         if (table != null)
@@ -680,7 +827,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         // with 2 nested filter operators
         if (innerTableSource instanceof SubQueryTableSource)
         {
-            String alias = ((SubQueryTableSource) innerTableSource).getTableSourceJoined().getTableSource().getTableAlias().getAlias();
+            // TODO: needs some refactoring when doing nested unions etc.
+            String alias = ((SubQueryTableSource) innerTableSource).getFrom().getTableSource().getTableAlias().getAlias();
 
             // Move any previous push downs from sub query alias to inner table alias
             List<AnalyzePair> pairs = context.pushDownPredicateByAlias.remove(innerAlias);
@@ -708,7 +856,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             Operator inner = wrapWithPushDown(context, context.operator, innerTableSource.getTableAlias());
 
             // Cache inner operator if this is a regular nested loop
-            if (!isCorrelated)
+            // and it's not a temp table.
+            if (!isCorrelated && !innerIsTempTable)
             {
                 inner = new CachingOperator(context.acquireNodeId(), inner);
             }

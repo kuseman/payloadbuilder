@@ -20,17 +20,17 @@ public class AsteriskSelectItem extends SelectItem implements Projection
 {
     private static final List<Integer> ALL_ASTERISK_ORDINALS = singletonList(-1);
     private final String alias;
-    private final Token token;
     /**
      * If this select items is alias-based and is contained in a multi alias context we need to traverse values for all
      */
     private List<Integer> aliasTupleOrdinals;
+    private final boolean recursive;
 
-    public AsteriskSelectItem(String alias, Token token)
+    public AsteriskSelectItem(String alias, boolean recursive, Token token)
     {
-        super(null, false);
+        super("", false, token);
         this.alias = alias;
-        this.token = token;
+        this.recursive = recursive;
     }
 
     /** Temporary setter until parser/analyzer is done in a 2 pahse fashion */
@@ -53,9 +53,9 @@ public class AsteriskSelectItem extends SelectItem implements Projection
         return alias;
     }
 
-    public Token getToken()
+    public boolean isRecursive()
     {
-        return token;
+        return recursive;
     }
 
     @Override

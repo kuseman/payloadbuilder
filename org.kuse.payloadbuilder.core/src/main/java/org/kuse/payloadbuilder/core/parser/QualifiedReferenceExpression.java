@@ -11,12 +11,13 @@ import java.util.Objects;
 import org.antlr.v4.runtime.Token;
 import org.apache.commons.lang3.ObjectUtils;
 import org.kuse.payloadbuilder.core.operator.Tuple;
+import org.kuse.payloadbuilder.core.operator.Tuple.ComputedTuple;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
 
 /**
  * Expression of a qualified name type. Column reference with a nested path. Ie. field.subField.value
  **/
-public class QualifiedReferenceExpression extends Expression
+public class QualifiedReferenceExpression extends Expression implements HasIdentifier
 {
     private final QualifiedName qname;
     /**
@@ -27,6 +28,7 @@ public class QualifiedReferenceExpression extends Expression
      */
     private final int lambdaId;
     private final Token token;
+    private final boolean initiallyResolved;
 
     /**
      * Mutable property. Temporary until query parser is rewritten to and a 2 pass analyze phase is done that resolves this.
@@ -38,14 +40,16 @@ public class QualifiedReferenceExpression extends Expression
         this.qname = requireNonNull(qname, "qname");
         this.lambdaId = lambdaId;
         this.token = token;
+        this.initiallyResolved = false;
     }
 
     public QualifiedReferenceExpression(QualifiedName qname, int lambdaId, List<ResolvePath> resolvePaths, Token token)
     {
         this.qname = requireNonNull(qname, "qname");
-        this.resolvePaths = requireNonNull(resolvePaths, "resolvePaths");
         this.lambdaId = lambdaId;
         this.token = token;
+        this.initiallyResolved = true;
+        setResolvePaths(resolvePaths);
     }
 
     public QualifiedName getQname()
@@ -61,6 +65,11 @@ public class QualifiedReferenceExpression extends Expression
     public Token getToken()
     {
         return token;
+    }
+
+    public boolean isInitiallyResolved()
+    {
+        return initiallyResolved;
     }
 
     void setResolvePaths(List<ResolvePath> resolvePaths)
@@ -80,6 +89,12 @@ public class QualifiedReferenceExpression extends Expression
     public List<ResolvePath> getResolvePaths()
     {
         return ObjectUtils.defaultIfNull(resolvePaths, emptyList());
+    }
+
+    @Override
+    public String identifier()
+    {
+        return qname.getLast();
     }
 
     @Override
@@ -108,6 +123,7 @@ public class QualifiedReferenceExpression extends Expression
             // TODO: sorceTupleOrdinal
             ResolvePath path = resolvePaths.get(0);
             parts = path.unresolvedPath;
+            Tuple tuple = context.getTuple();
             if (lambdaId >= 0)
             {
                 value = context.getLambdaValue(lambdaId);
@@ -118,7 +134,7 @@ public class QualifiedReferenceExpression extends Expression
                 // else just keep on with what ever value was located in lambda
                 if (path.targetTupleOrdinal >= 0 && value instanceof Tuple)
                 {
-                    Tuple tuple = (Tuple) value;
+                    tuple = (Tuple) value;
                     tuple = tuple.getTuple(path.targetTupleOrdinal);
 
                     // Nothing more to resolve here return tuple
@@ -134,10 +150,22 @@ public class QualifiedReferenceExpression extends Expression
                     value = tuple.getValue(parts.get(partIndex++));
                 }
             }
-            else if (context.getTuple() != null)
+            else if (tuple != null)
             {
+                //CSOFF
+                if (path.computedColumnIndex >= 0)
+                {
+                    if (!(tuple instanceof Tuple.ComputedTuple))
+                    //CSON
+                    {
+                        throw new IllegalArgumentException("Expected a computed tuple but got " + tuple.getClass().getSimpleName());
+                    }
+
+                    return ((Tuple.ComputedTuple) tuple).getComputedValue(path.computedColumnIndex);
+                }
+
                 // Resolve target tuple
-                Tuple tuple = context.getTuple().getTuple(path.targetTupleOrdinal);
+                tuple = tuple.getTuple(path.targetTupleOrdinal);
 
                 // Nothing more to resolve here return tuple
                 //CSOFF
@@ -195,7 +223,7 @@ public class QualifiedReferenceExpression extends Expression
             QualifiedReferenceExpression that = (QualifiedReferenceExpression) obj;
             return qname.equals(that.qname)
                 && lambdaId == that.lambdaId;
-//                && Objects.equals(resolvePaths, that.resolvePaths);
+            //                && Objects.equals(resolvePaths, that.resolvePaths);
         }
         return false;
     }
@@ -223,12 +251,12 @@ public class QualifiedReferenceExpression extends Expression
          *       tuple ordinals for x.aliasC
          * </pre>
          */
-        int sourceTupleOrinal;
+        final int sourceTupleOrinal;
 
         /**
          * The target tuple ordinal that this path refers to.
          */
-        int targetTupleOrdinal;
+        final int targetTupleOrdinal;
 
         /**
          * Any left over path that needs to be resolved.
@@ -240,25 +268,34 @@ public class QualifiedReferenceExpression extends Expression
          *   then we have col.key.subkey left to resolve runtime from the target tuple
          * </pre>
          */
-        List<String> unresolvedPath;
+        final List<String> unresolvedPath;
 
-        ResolvePath(int sourceTupleOrdinal, int targetTupleOrdinal, List<String> unresolvedPath)
+        /**
+         * This is a resolve path to a computed column and is pointing to the index of the computed value.
+         *
+         * <pre>
+         * Assumes that the tuple in the stream is of
+         * {@link ComputedTuple} type.
+         * </pre>
+         */
+        final int computedColumnIndex;
+
+        public ResolvePath(int sourceTupleOrdinal, int targetTupleOrdinal, List<String> unresolvedPath)
+        {
+            this(sourceTupleOrdinal, targetTupleOrdinal, unresolvedPath, -1);
+        }
+
+        public ResolvePath(int sourceTupleOrdinal, int targetTupleOrdinal, List<String> unresolvedPath, int computedColumnIndex)
         {
             this.sourceTupleOrinal = sourceTupleOrdinal;
             this.targetTupleOrdinal = targetTupleOrdinal;
             this.unresolvedPath = unmodifiableList(requireNonNull(unresolvedPath, "unresolvedPath"));
+            this.computedColumnIndex = computedColumnIndex;
         }
 
         public int getTargetTupleOrdinal()
         {
             return targetTupleOrdinal;
-        }
-
-        /** Empty path */
-        boolean isEmpty()
-        {
-            return targetTupleOrdinal == -1
-                && unresolvedPath.isEmpty();
         }
 
         @Override

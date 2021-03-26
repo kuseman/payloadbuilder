@@ -10,25 +10,35 @@ import org.kuse.payloadbuilder.core.operator.TableAlias;
 /** Sub query table source */
 public class SubQueryTableSource extends TableSource
 {
-    private final TableSourceJoined tableSourceJoined;
+    private final TableSourceJoined from;
     private final Expression where;
     private final List<Expression> groupBy;
     private final List<SortItem> orderBy;
+    private final List<SelectItem> selectItems;
 
     public SubQueryTableSource(
+            List<SelectItem> selectItems,
             TableAlias tableAlias,
             List<Option> options,
-            TableSourceJoined tableSourceJoined,
+            TableSourceJoined from,
             Expression where,
             List<Expression> groupBy,
             List<SortItem> orderBy,
             Token token)
     {
         super(tableAlias, options, token);
-        this.tableSourceJoined = requireNonNull(tableSourceJoined, "tableSourceJoined");
+        this.selectItems = requireNonNull(selectItems, "selectItems");
+        this.from = requireNonNull(from, "from");
         this.orderBy = requireNonNull(orderBy, "orderBy");
         this.groupBy = requireNonNull(groupBy, "groupBy");
         this.where = where;
+
+        if (selectItems.size() != 1
+            || !(selectItems.get(0) instanceof AsteriskSelectItem)
+            || !((AsteriskSelectItem) selectItems.get(0)).isRecursive())
+        {
+            throw new ParseException("Only a recursive asterisk select (**) is supporte for sub queries", token);
+        }
     }
 
     //    @Override
@@ -37,9 +47,14 @@ public class SubQueryTableSource extends TableSource
     //        return tableSourceJoined.getTableSource().getTableAlias();
     //    }
 
-    public TableSourceJoined getTableSourceJoined()
+    public List<SelectItem> getSelectItems()
     {
-        return tableSourceJoined;
+        return selectItems;
+    }
+
+    public TableSourceJoined getFrom()
+    {
+        return from;
     }
 
     //    @Override
@@ -80,7 +95,7 @@ public class SubQueryTableSource extends TableSource
     {
         StringBuilder sb = new StringBuilder();
         sb.append("(").append(System.lineSeparator());
-        sb.append(tableSourceJoined).append(System.lineSeparator());
+        sb.append(from).append(System.lineSeparator());
         sb.append(") ").append(tableAlias.getAlias()).append(System.lineSeparator());
         return sb.toString();
     }

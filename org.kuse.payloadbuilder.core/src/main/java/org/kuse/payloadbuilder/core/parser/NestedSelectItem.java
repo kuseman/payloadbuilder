@@ -2,8 +2,11 @@ package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.util.List;
+
+import org.antlr.v4.runtime.Token;
 
 /** Nested select item. OBJECT/ARRAY */
 public class NestedSelectItem extends SelectItem
@@ -22,9 +25,10 @@ public class NestedSelectItem extends SelectItem
             Expression where,
             String identifier,
             List<Expression> groupBy,
-            List<SortItem> orderBy)
+            List<SortItem> orderBy,
+            Token token)
     {
-        super(identifier, identifier != null);
+        super(identifier, isBlank(identifier), token);
         this.type = requireNonNull(type, "type");
         this.selectItems = requireNonNull(selectItems, "selectItems");
         this.from = from;

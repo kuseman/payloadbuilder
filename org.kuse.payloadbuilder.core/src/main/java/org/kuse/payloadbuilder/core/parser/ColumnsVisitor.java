@@ -124,9 +124,15 @@ public class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsV
     @Override
     public Set<TableAlias> visit(QualifiedReferenceExpression expression, Context context)
     {
+        Set<TableAlias> tableAliases = context.parentAliases;
+        // Reference already resolved, skip
+        if (expression.isInitiallyResolved())
+        {
+            return tableAliases;
+        }
+
         QualifiedName qname = expression.getQname();
         List<String> parts = new ArrayList<>(qname.getParts());
-        Set<TableAlias> tableAliases = context.parentAliases;
 
         // Lambda reference => resolve table alias
         if (expression.getLambdaId() >= 0)

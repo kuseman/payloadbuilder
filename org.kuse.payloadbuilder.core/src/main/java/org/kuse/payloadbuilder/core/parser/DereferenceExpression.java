@@ -7,7 +7,7 @@ import java.util.Map;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 
 /** Dereference expression */
-public class DereferenceExpression extends Expression
+public class DereferenceExpression extends Expression implements HasIdentifier
 {
     private final Expression left;
     private final QualifiedReferenceExpression right;
@@ -26,6 +26,12 @@ public class DereferenceExpression extends Expression
     public QualifiedReferenceExpression getRight()
     {
         return right;
+    }
+
+    @Override
+    public String identifier()
+    {
+        return right.getQname().getLast();
     }
 
     @Override

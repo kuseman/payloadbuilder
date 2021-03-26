@@ -3,6 +3,7 @@ package org.kuse.payloadbuilder.core;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_OBJECT_ARRAY;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
@@ -30,6 +32,7 @@ import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.DescribeSelectStatement;
 import org.kuse.payloadbuilder.core.parser.DescribeTableStatement;
+import org.kuse.payloadbuilder.core.parser.DropTableStatement;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.IfStatement;
 import org.kuse.payloadbuilder.core.parser.ParseException;
@@ -187,7 +190,9 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                 throw new ParseException("No catalog found with alias: " + alias, statement.getToken());
             }
 
-            List<String> tables = catalog.getTables(session, alias);
+            List<String> tables = new ArrayList<>();
+            tables.addAll(session.getTemporaryTableNames().stream().map(t -> "#" + t.toString()).collect(toList()));
+            tables.addAll(catalog.getTables(session, alias));
             columns = SHOW_TABLES_ALIAS.getColumns();
             operator = new Operator()
             {
@@ -268,11 +273,90 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         {
             applyAssignmentSelect(statement.getSelect());
         }
+        else if (statement.getSelect().getInto() != null)
+        {
+            applySelectInto(statement.getSelect());
+        }
         else
         {
             currentSelect = OperatorBuilder.create(session, statement.getSelect());
         }
         return null;
+    }
+
+    @Override
+    public Void visit(DropTableStatement statement, Void context)
+    {
+        if (!statement.isTempTable())
+        {
+            throw new ParseException("DROP TABLE can only be performed on temporary tables", statement.getToken());
+        }
+
+        session.dropTemporaryTable(statement.getQname(), statement.isLenient());
+        return null;
+    }
+
+    private void applySelectInto(Select select)
+    {
+        Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
+        final List<Tuple> rows = new ArrayList<>();
+        final List<String> columns = new ArrayList<>();
+        final List<Object> values = new ArrayList<>();
+
+        TableAlias alias = TableAliasBuilder.of(-1, TableAlias.Type.TEMPORARY_TABLE, select.getInto().getTable(), "")
+                .build();
+
+        //CSOFF
+        OutputWriterAdapter writer = new OutputWriterAdapter()
+        //CSON
+        {
+            int pos;
+            boolean root = true;
+            String field;
+
+            @Override
+            public void writeFieldName(String name)
+            {
+                field = name;
+            };
+
+            @Override
+            public void writeValue(Object value)
+            {
+                columns.add(field);
+                values.add(value);
+            }
+
+            @Override
+            public void endRow()
+            {
+                rows.add(Row.of(alias, pos++, columns.toArray(ArrayUtils.EMPTY_STRING_ARRAY), values.toArray()));
+                columns.clear();
+                values.clear();
+                root = true;
+            }
+
+            @Override
+            public void startObject()
+            {
+                if (!root)
+                {
+                    throw new QueryException("Object values is not supported in SELECT INTO");
+                }
+                root = false;
+            }
+
+            @Override
+            public void startArray()
+            {
+                throw new QueryException("Array values is not supported in SELECT INTO");
+            }
+        };
+
+        Operator operator = pair.getKey();
+        Projection projection = pair.getValue();
+        writeInternal(operator, projection, writer);
+        this.context.getSession().setTemporaryTable(select.getInto().getTable(), rows);
     }
 
     private void applyAssignmentSelect(Select select)
@@ -282,6 +366,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         Operator operator = pair.getKey();
         int size = select.getSelectItems().size();
 
+        int rowCount = 0;
         if (operator != null)
         {
             RowIterator iterator = null;
@@ -304,6 +389,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                         Object value = item.getAssignmentValue(context);
                         context.setVariable(item.getAssignmentName(), value);
                     }
+                    rowCount++;
                 }
             }
             finally
@@ -316,6 +402,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         }
         else
         {
+            rowCount++;
             context.setTuple(DUMMY_ROW);
 
             for (int i = 0; i < size; i++)
@@ -325,6 +412,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                 context.setVariable(item.getAssignmentName(), value);
             }
         }
+        context.setRowCount(rowCount);
     }
 
     private boolean setNext()
@@ -337,6 +425,10 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             }
 
             Statement stm = queue.remove(0);
+            if (stm == null)
+            {
+                System.err.println();
+            }
             // context.clearStatementCache();
             stm.accept(this, null);
         }
@@ -367,7 +459,12 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             columns = ((ObjectProjection) projection).getColumns();
         }
         writer.initResult(columns);
+        writeInternal(operator, projection, writer);
+        currentSelect = null;
+    }
 
+    private void writeInternal(Operator operator, Projection projection, OutputWriter writer)
+    {
         int rowCount = 0;
         context.clear();
         if (operator != null)
@@ -408,7 +505,5 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         }
 
         context.setRowCount(rowCount);
-
-        currentSelect = null;
     }
 }

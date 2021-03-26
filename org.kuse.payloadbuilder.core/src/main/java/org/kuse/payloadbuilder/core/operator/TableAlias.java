@@ -211,6 +211,7 @@ public class TableAlias
     /** Alias type */
     public enum Type
     {
+        TEMPORARY_TABLE,
         TABLE,
         FUNCTION,
         SUBQUERY;

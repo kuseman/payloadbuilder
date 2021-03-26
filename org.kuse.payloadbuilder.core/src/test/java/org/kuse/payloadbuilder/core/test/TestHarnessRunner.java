@@ -2,7 +2,10 @@ package org.kuse.payloadbuilder.core.test;
 
 import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.toList;
+import static org.apache.commons.lang3.StringUtils.containsIgnoreCase;
 import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
+import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,7 +20,7 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.kuse.payloadbuilder.core.OutputWriter;
+import org.kuse.payloadbuilder.core.OutputWriterAdapter;
 import org.kuse.payloadbuilder.core.Payloadbuilder;
 import org.kuse.payloadbuilder.core.QueryResult;
 import org.kuse.payloadbuilder.core.QuerySession;
@@ -49,7 +52,8 @@ public class TestHarnessRunner
         List<String> testFiles = asList(
                 "BaseContructs.json",
                 "Joins.json",
-                "BuiltInFunctions.json");
+                "BuiltInFunctions.json",
+                "TemporaryTables.json");
 
         List<TestHarness> harnesses = new ArrayList<>();
         for (String file : testFiles)
@@ -88,14 +92,50 @@ public class TestHarnessRunner
         QuerySession session = new QuerySession(registry);
         // Set first catalog as default
         session.getCatalogRegistry().setDefaultCatalog(harness.getCatalogs().get(0).getAlias());
-        QueryResult result = Payloadbuilder.query(session, testCase.getQuery());
-
         List<List<List<ColumnValue>>> actualResultSets = new ArrayList<>();
 
-        while (result.hasMoreResults())
+        boolean fail = false;
+        try
         {
-            result.writeResult(writer);
-            actualResultSets.add(writer.reset());
+            QueryResult result = Payloadbuilder.query(session, testCase.getQuery());
+            while (result.hasMoreResults())
+            {
+                result.writeResult(writer);
+                actualResultSets.add(writer.reset());
+            }
+
+            if (testCase.getExpectedException() != null)
+            {
+                fail = true;
+                fail("Expected " + testCase.getExpectedException() + " to be thrown");
+            }
+        }
+        catch (Throwable e)
+        {
+            if (fail)
+            {
+                throw e;
+            }
+
+            if (testCase.getExpectedException() != null)
+            {
+                Assert.assertTrue(
+                        "Expected " + testCase.getExpectedException() + " to be thrown, but got " + e.getClass(),
+                        e.getClass().isAssignableFrom(testCase.getExpectedException()));
+
+                if (!isBlank(testCase.getExpectedMessageContains()))
+                {
+                    Assert.assertTrue(
+                            "Expected message to contain " + testCase.getExpectedMessageContains() + ", but got " + e.getMessage(),
+                            containsIgnoreCase(e.getMessage(), testCase.getExpectedMessageContains()));
+                }
+
+                return;
+            }
+            else
+            {
+                throw e;
+            }
         }
 
         int size = testCase.getExpectedResultSets().size();
@@ -179,7 +219,7 @@ public class TestHarnessRunner
     }
 
     /** Harness result writer */
-    private static class ResultWriter implements OutputWriter
+    private static class ResultWriter extends OutputWriterAdapter
     {
         private List<List<ColumnValue>> rows = new ArrayList<>();
 
@@ -221,26 +261,6 @@ public class TestHarnessRunner
                 result = IteratorUtils.toList((Iterator<Object>) result);
             }
             row.add(new ColumnValue(column, result));
-        }
-
-        @Override
-        public void startObject()
-        {
-        }
-
-        @Override
-        public void endObject()
-        {
-        }
-
-        @Override
-        public void startArray()
-        {
-        }
-
-        @Override
-        public void endArray()
-        {
         }
     }
 }

@@ -26,14 +26,14 @@ public class ExpressionTupleComparatorTest extends AOperatorTest
         b = Row.of(alias, 0, new Object[] {2});
 
         List<SortItem> items = new ArrayList<>(asList(
-                new SortItem(e("col1"), Order.ASC, NullOrder.UNDEFINED)));
+                new SortItem(e("col1"), Order.ASC, NullOrder.UNDEFINED, null)));
 
         ExecutionContext context = new ExecutionContext(session);
         ExpressionTupleComparator comparator = new ExpressionTupleComparator(items);
         assertEquals(-1, comparator.compare(context, a, b));
 
         items.clear();
-        items.add(new SortItem(e("col1"), Order.DESC, NullOrder.UNDEFINED));
+        items.add(new SortItem(e("col1"), Order.DESC, NullOrder.UNDEFINED, null));
         assertEquals(1, comparator.compare(context, a, b));
 
         a = Row.of(alias, 0, new Object[] {2});
@@ -46,35 +46,35 @@ public class ExpressionTupleComparatorTest extends AOperatorTest
 
         // Nulls first
         items.clear();
-        items.add(new SortItem(e("col1"), Order.DESC, NullOrder.FIRST));
+        items.add(new SortItem(e("col1"), Order.DESC, NullOrder.FIRST, null));
         a = Row.of(alias, 0, new Object[] {1});
         b = Row.of(alias, 0, new Object[] {null});
         assertEquals(1, comparator.compare(context, a, b));
 
         // Nulls last
         items.clear();
-        items.add(new SortItem(e("col1"), Order.DESC, NullOrder.LAST));
+        items.add(new SortItem(e("col1"), Order.DESC, NullOrder.LAST, null));
         a = Row.of(alias, 0, new Object[] {1});
         b = Row.of(alias, 0, new Object[] {null});
         assertEquals(-1, comparator.compare(context, a, b));
 
         // Nulls first
         items.clear();
-        items.add(new SortItem(e("col1"), Order.DESC, NullOrder.FIRST));
+        items.add(new SortItem(e("col1"), Order.DESC, NullOrder.FIRST, null));
         a = Row.of(alias, 0, new Object[] {null});
         b = Row.of(alias, 0, new Object[] {1});
         assertEquals(-1, comparator.compare(context, a, b));
 
         // Nulls last
         items.clear();
-        items.add(new SortItem(e("col1"), Order.DESC, NullOrder.LAST));
+        items.add(new SortItem(e("col1"), Order.DESC, NullOrder.LAST, null));
         a = Row.of(alias, 0, new Object[] {null});
         b = Row.of(alias, 0, new Object[] {1});
         assertEquals(1, comparator.compare(context, a, b));
 
         // Nulls first if undefined
         items.clear();
-        items.add(new SortItem(e("col1"), Order.DESC, NullOrder.UNDEFINED));
+        items.add(new SortItem(e("col1"), Order.DESC, NullOrder.UNDEFINED, null));
         a = Row.of(alias, 0, new Object[] {null});
         b = Row.of(alias, 0, new Object[] {1});
         assertEquals(-1, comparator.compare(context, a, b));

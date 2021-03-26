@@ -145,7 +145,7 @@ public class QueryParserTest extends AParserTest
         assertQueryFail(ParseException.class, "Invalid table source reference 'b'", "select art_id from article a where b.art_id > 10");
         assertQueryFail(ParseException.class, "Alias is mandatory", "select * from tableA inner join tableB b on b.art_id = art_id");
         assertQueryFail(ParseException.class, "Alias is mandatory", "select * from tableA a inner join tableB on b.art_id = art_id");
-        assertQueryFail(ParseException.class, "Invalid table source reference 'q'", "select art_id from article a inner join (from tableB where id= 1 and q.id = 10) b on b.id = a.id");
+        assertQueryFail(ParseException.class, "Invalid table source reference 'q'", "select art_id from article a inner join (select ** from tableB where id= 1 and q.id = 10) b on b.id = a.id");
     }
 
     @Test
@@ -168,9 +168,9 @@ public class QueryParserTest extends AParserTest
         assertQuery("select art_id from article a left join articleAttribute aa with (populate=true) on art_id = a.art_id ");
 
         // Nested
-        assertQuery("select art_id from article a inner join (from articleAttribute aa  inner join articlePrice ap on ap.sku_id = aa.sku_id) aa with (populate=true) on aa.art_id = a.art_id ");
+        assertQuery("select art_id from article a inner join (select ** from articleAttribute aa  inner join articlePrice ap on ap.sku_id = aa.sku_id) aa with (populate=true) on aa.art_id = a.art_id ");
         assertQuery(
-                "select art_id from article a inner join (from articleAttribute aa  left join articlePrice ap with (populate=true) on ap.sku_id = aa.sku_id) aa with (populate=true) on aa.art_id = a.art_id ");
+                "select art_id from article a inner join (select ** from articleAttribute aa  left join articlePrice ap with (populate=true) on ap.sku_id = aa.sku_id) aa with (populate=true) on aa.art_id = a.art_id ");
 
         // TODO: more parser tests, where, orderby, group by
     }

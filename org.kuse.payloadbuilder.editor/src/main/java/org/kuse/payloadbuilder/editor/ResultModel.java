@@ -2,6 +2,7 @@ package org.kuse.payloadbuilder.editor;
 
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.io.IOException;
 import java.io.StringWriter;
@@ -26,6 +27,7 @@ import com.fasterxml.jackson.databind.ObjectWriter;
 /** Resulting model of a query */
 class ResultModel extends AbstractTableModel
 {
+    private static final String NO_COLUMN_NAME = "(No column name)";
     static final ObjectWriter WRITER;
     static final ObjectReader READER;
     static
@@ -119,7 +121,12 @@ class ResultModel extends AbstractTableModel
     @Override
     public String getColumnName(int column)
     {
-        return columns[column];
+        String col = columns[column];
+        if (column > 0 && isBlank(col))
+        {
+            return NO_COLUMN_NAME;
+        }
+        return col;
     }
 
     @Override

@@ -21,7 +21,7 @@ public abstract class TableSource extends ASelectNode
     {
         this.tableAlias = requireNonNull(tableAlias, "tableAlias");
         this.options = requireNonNull(options, "options");
-        this.token = requireNonNull(token, "token");
+        this.token = token;
     }
 
     public TableAlias getTableAlias()

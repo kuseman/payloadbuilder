@@ -73,4 +73,11 @@ public interface Tuple
         /** Name of the column */
         String getColumn();
     }
+
+    /** Marker interface for a tuple which contains computed values  */
+    interface ComputedTuple extends Tuple
+    {
+        /** Get computed value for provided ordinal */
+        Object getComputedValue(int ordinal);
+    }
 }

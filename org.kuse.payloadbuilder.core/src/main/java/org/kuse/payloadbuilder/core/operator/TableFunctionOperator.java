@@ -39,7 +39,7 @@ class TableFunctionOperator extends AOperator
     @Override
     public String getName()
     {
-        return "Function: " + functionInfo.getName();
+        return "Function: " + functionInfo.getCatalog().getName() + "#" + functionInfo.getName();
     }
 
     @Override

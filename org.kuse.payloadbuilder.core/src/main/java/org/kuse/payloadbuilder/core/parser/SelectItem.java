@@ -1,27 +1,40 @@
 package org.kuse.payloadbuilder.core.parser;
 
+import static java.util.Objects.requireNonNull;
+
+import org.antlr.v4.runtime.Token;
+
 /** Base class for select items */
 //CSOFF
 public abstract class SelectItem extends ASelectNode
 //CSON
 {
     protected final String identifier;
-    private final boolean explicitIdentifier;
+    private final Token token;
+    private final boolean emptyIdentifier;
 
-    public SelectItem(String identifier, boolean explicitIdentifier)
+    public SelectItem(String identifier, boolean emptyIdentifier, Token token)
     {
-        this.identifier = identifier;
-        this.explicitIdentifier = explicitIdentifier;
+        this.emptyIdentifier = emptyIdentifier;
+        this.identifier = requireNonNull(identifier, "identifier");
+        this.token = token;
     }
 
-    public boolean isExplicitIdentifier()
+    /** Returns true if this items identifier was defined empty */
+    boolean isEmptyIdentifier()
     {
-        return explicitIdentifier;
+        return emptyIdentifier;
     }
 
+    /** Get identifier for this select item */
     public String getIdentifier()
     {
         return identifier;
+    }
+
+    public Token getToken()
+    {
+        return token;
     }
 
     /** Name of assignment variable if any */

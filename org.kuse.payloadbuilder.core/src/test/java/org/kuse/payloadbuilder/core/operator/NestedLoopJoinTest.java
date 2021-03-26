@@ -43,6 +43,7 @@ public class NestedLoopJoinTest extends AOperatorTest
 
         String query = "select * from tableA a " +
             "inner join (" +
+            "  select ** " +
             "  from tableB b " +
             "  inner join tableC c " +
             "     on col2 = a.col2 " +

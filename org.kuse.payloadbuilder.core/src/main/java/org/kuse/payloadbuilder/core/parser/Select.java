@@ -5,11 +5,14 @@ import static java.util.stream.Collectors.joining;
 
 import java.util.List;
 
+import org.kuse.payloadbuilder.core.operator.TableAlias.Type;
+
 /** Select */
 public class Select extends ASelectNode
 {
     private final List<SelectItem> selectItems;
     private final TableSourceJoined from;
+    private final Table into;
     private final Expression topExpression;
     private final Expression where;
     private final List<Expression> groupBy;
@@ -17,6 +20,7 @@ public class Select extends ASelectNode
 
     Select(List<SelectItem> selectItems,
             TableSourceJoined from,
+            Table into,
             Expression topExpression,
             Expression where,
             List<Expression> groupBy,
@@ -24,10 +28,16 @@ public class Select extends ASelectNode
     {
         this.selectItems = requireNonNull(selectItems, "selectItems");
         this.from = from;
+        this.into = into;
         this.topExpression = topExpression;
         this.where = where;
         this.groupBy = requireNonNull(groupBy, "groupBy");
         this.orderBy = requireNonNull(orderBy, "orderBy");
+
+        if (into != null && into.getTableAlias().getType() != Type.TEMPORARY_TABLE)
+        {
+            throw new ParseException("Can only insert into temporary tables", into.getToken());
+        }
     }
 
     public List<SelectItem> getSelectItems()
@@ -38,6 +48,11 @@ public class Select extends ASelectNode
     public TableSourceJoined getFrom()
     {
         return from;
+    }
+
+    public Table getInto()
+    {
+        return into;
     }
 
     public Expression getTopExpression()

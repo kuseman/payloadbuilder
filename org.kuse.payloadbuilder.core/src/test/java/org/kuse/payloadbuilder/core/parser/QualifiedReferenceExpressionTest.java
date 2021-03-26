@@ -1,6 +1,7 @@
 package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
@@ -144,6 +145,48 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         {
             assertTrue(ee.getMessage().contains("Cannot dereference value "));
         }
+
+        // Computed column index access
+        e = new QualifiedReferenceExpression(QualifiedName.of(), -1, null);
+        e.setResolvePaths(asList(new ResolvePath(-1, -1, emptyList(), 0)));
+
+        try
+        {
+            e.eval(context);
+        }
+        catch (IllegalArgumentException ee)
+        {
+            assertTrue(ee.getMessage(), ee.getMessage().contains("Expected a computed tuple but got "));
+        }
+
+        context.setTuple(new Tuple.ComputedTuple()
+        {
+            @Override
+            public Object getValue(String column)
+            {
+                return null;
+            }
+
+            @Override
+            public int getTupleOrdinal()
+            {
+                return 0;
+            }
+
+            @Override
+            public Tuple getTuple(int tupleOrdinal)
+            {
+                return null;
+            }
+
+            @Override
+            public Object getComputedValue(int ordinal)
+            {
+                return "computed value";
+            }
+        });
+
+        assertEquals("computed value", e.eval(context));
     }
 
     @Test

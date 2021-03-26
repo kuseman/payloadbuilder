@@ -55,7 +55,7 @@
     {
       "name": "Subquery with a single table source",
       "query": [
-        "select x.col1, x.col2 from (from source) x"
+        "select x.col1, x.col2 from (select ** from source) x"
       ],
       "expectedResultSets": [
         [
@@ -100,6 +100,54 @@
           [{ "key": "col1", "value": 1 }]
         ]
       ]
+    },
+    {
+      "name": "Order by expression",
+      "query": [
+        "select id - row_id newCol from data order by newcol desc"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "newCol", "value": 2 }],
+          [{ "key": "newCol", "value": 1 }],
+          [{ "key": "newCol", "value": 1 }],
+          [{ "key": "newCol", "value": 0 }],
+          [{ "key": "newCol", "value": 0 }],
+          [{ "key": "newCol", "value": -1 }]
+        ]
+      ]
+    },
+    {
+      "name": "Order by ordinal",
+      "query": [
+        "select id - row_id newCol from data order by 1 desc"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "newCol", "value": 2 }],
+          [{ "key": "newCol", "value": 1 }],
+          [{ "key": "newCol", "value": 1 }],
+          [{ "key": "newCol", "value": 0 }],
+          [{ "key": "newCol", "value": 0 }],
+          [{ "key": "newCol", "value": -1 }]
+        ]
+      ]
+    },
+    {
+      "name": "Order by ordinal, out of range",
+      "query": [
+        "select id - row_id newCol from data order by 10 desc"
+      ],
+      "expectedException": "org.kuse.payloadbuilder.core.parser.ParseException",
+      "expectedMessageContains": "ORDER BY position is out of range"
+    },
+    {
+      "name": "Order by ordinal, asterisk",
+      "query": [
+        "select * from data order by 1 desc"
+      ],
+      "expectedException": "org.kuse.payloadbuilder.core.parser.ParseException",
+      "expectedMessageContains": "ORDER BY position is not supported for asterisk"
     },
     {
       "name": "Where",

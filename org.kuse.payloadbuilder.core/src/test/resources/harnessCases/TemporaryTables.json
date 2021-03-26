@@ -1,0 +1,198 @@
+{
+  "name": "Temporary tables",
+  "catalogs": [
+    {
+      "alias": "c",
+      "tables": [
+        {
+          "name": "source",
+          "columns": [ "col1", "col2" ],
+          "rows": [
+            [1, 2],
+            [3, 4],
+            [5, 6]
+          ]
+        },
+        {
+          "name": "data",
+          "columns": [ "id", "row_id", "data" ],
+          "rows": [
+            [1, 1, "1_1"],
+            [1, 2, "1_2"],
+            [2, 1, "2_1"],
+            [3, 1, "3_1"],
+            [3, 2, "3_2"],
+            [3, 3, "3_3"]
+          ]
+        },
+        {
+          "name": "strings",
+          "columns": [ "id", "string1", "string2" ],
+          "rows": [
+            [1, "some string 1", "123abc"],
+            [2,  "hello world", "asd"],
+            [3, "string 3", "2_1"],
+            [4, "same little text", "$56"]
+          ]
+        }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "name": "Select into",
+      "query": [
+        "select col1 * 2 newCol1, col2 * 10 newCol2 into #temp from source",
+        "select * from #temp"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "newCol1", "value": 2 }, { "key": "newCol2", "value": 20 } ],
+          [{ "key": "newCol1", "value": 6 }, { "key": "newCol2", "value": 40 } ],
+          [{ "key": "newCol1", "value": 10 }, { "key": "newCol2", "value": 60 } ]
+        ]
+      ]
+    },
+    {
+      "name": "Select into table already exists",
+      "query": [
+        "select 1 col into #temp",
+        "select col into #temp from source"
+      ],
+      "expectedException": "org.kuse.payloadbuilder.core.QueryException",
+      "expectedMessageContains": "Temporary table #temp already exists"
+    },
+    {
+      "name": "Drop table fail",
+      "query": [
+        "drop table #temp"
+      ],
+      "expectedException": "org.kuse.payloadbuilder.core.QueryException",
+      "expectedMessageContains": "No temporary table found with name #temp"
+    },
+    {
+      "name": "Drop table fail 2",
+      "query": [
+        "select 1 col into #temp",
+        "drop table #temp1"
+      ],
+      "expectedException": "org.kuse.payloadbuilder.core.QueryException",
+      "expectedMessageContains": "No temporary table found with name #temp"
+    },
+    {
+      "name": "Drop table lenient",
+      "query": [
+        "drop table if exists #temp"
+      ],
+      "expectedResultSets": []
+    },
+    {
+      "name": "Drop table",
+      "query": [
+        "select 1 col into #temp",
+        "drop table #temp"
+      ],
+      "expectedResultSets": []
+    },
+    {
+      "name": "Select fail",
+      "query": [
+        "select * from #temp"
+      ],
+      "expectedException": "org.kuse.payloadbuilder.core.QueryException",
+      "expectedMessageContains": "No temporary table found with name #temp"
+    },
+    {
+      "name": "Select fail 2",
+      "query": [
+        "select 1 col into #temp",
+        "select * from #temp2"
+      ],
+      "expectedException": "org.kuse.payloadbuilder.core.QueryException",
+      "expectedMessageContains": "No temporary table found with name #temp"
+    },
+    {
+      "name": "Select fail 3",
+      "query": [
+        "select 1 + 2 into #temp",
+        "select * from #temp"
+      ],
+      "expectedException": "org.kuse.payloadbuilder.core.parser.ParseException",
+      "expectedMessageContains": "All items must have an identifier when using a SELECT INTO"
+    },
+    {
+      "name": "Select fail 4",
+      "query": [
+        "select @a = 1 + 2 into #temp",
+        "select * from #temp"
+      ],
+      "expectedException": "org.kuse.payloadbuilder.core.parser.ParseException",
+      "expectedMessageContains": "Cannot have assignments in a SELECT INTO"
+    },
+    {
+      "name": "Select",
+      "query": [
+        "select 1 col into #temp",
+        "select *, col * 10 from #temp"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col", "value": 1 }, { "key": "", "value": 10 } ]
+        ]
+      ]
+    },
+    {
+      "name": "join 2 temporary",
+      "query": [
+        "select 1 col into #temp",
+        "select 10 col2 into #temp1",
+        "select col, t2.col2 from #temp t1 cross apply #temp1 t2 " 
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col", "value": 1 }, { "key": "col2", "value": 10 } ]
+        ]
+      ]
+    },
+    {
+      "name": "join 2 temporary asterisk select",
+      "query": [
+		"select *, Value + 1 newCol_temp ",
+		"into #temp ",
+		"from range(1,3) ",
+		"",
+		"select *, Value + 2 newCol_temp_1 ",
+		"into #temp1 ",
+		"from range(1,3) ",
+		"",
+		"select * from #temp t ",
+		"inner join #temp1 t1 ",
+		"  on t1.Value = t.Value ",
+		"order by t1.newCol_temp_1 desc"      
+	  ],
+      "expectedResultSets": [
+        [
+          [{ "key": "Value", "value": 2 }, { "key": "newCol_temp", "value": 3 },{ "key": "Value", "value": 2 }, { "key": "newCol_temp_1", "value": 4 } ],
+          [{ "key": "Value", "value": 1 }, { "key": "newCol_temp", "value": 2 },{ "key": "Value", "value": 1 }, { "key": "newCol_temp_1", "value": 3 } ]
+        ]
+      ]
+    },
+    {
+      "name": "Select into with asterisk and computed",
+      "query": [
+        "select *, id + row_id col into #temp from data",
+        "select id, row_id, data, col from #temp"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 1 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "1_1" }, { "key": "col", "value": 2 } ],
+          [{ "key": "id", "value": 1 }, { "key": "row_id", "value": 2 }, { "key": "data", "value": "1_2" }, { "key": "col", "value": 3 } ],
+          [{ "key": "id", "value": 2 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "2_1" }, { "key": "col", "value": 3 } ],
+          [{ "key": "id", "value": 3 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "3_1" }, { "key": "col", "value": 4 } ],
+          [{ "key": "id", "value": 3 }, { "key": "row_id", "value": 2 }, { "key": "data", "value": "3_2" }, { "key": "col", "value": 5 } ],
+          [{ "key": "id", "value": 3 }, { "key": "row_id", "value": 3 }, { "key": "data", "value": "3_3" }, { "key": "col", "value": 6 } ]
+        ]
+      ]
+    }
+  ]
+}

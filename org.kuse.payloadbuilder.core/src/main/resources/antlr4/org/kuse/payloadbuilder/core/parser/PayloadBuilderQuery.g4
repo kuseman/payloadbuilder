@@ -21,6 +21,7 @@ statement
  : miscStatement
  | controlFlowStatement
  | dmlStatement
+ | ddlStatement
  ;
  
 miscStatement
@@ -75,16 +76,25 @@ dmlStatement
  : selectStatement
  ;
 
+ddlStatement
+ : dropTableStatement
+ ;
+
 topSelect
  : selectStatement EOF
  ;
 
 selectStatement
  : SELECT (TOP topCount)? selectItem (',' selectItem)*
+   (INTO into=tableName intoOptions=tableSourceOptions?)?
    (FROM tableSourceJoined)?
    (WHERE where=expression)?
    (GROUPBY groupBy+=expression (',' groupBy+=expression)*)?
    (ORDERBY sortItem (',' sortItem)*)?
+ ;
+
+dropTableStatement
+ : DROP TABLE (IF EXISTS)? tableName
  ;
 
 topCount
@@ -94,7 +104,7 @@ topCount
 
 selectItem
  : 
- 	ASTERISK
+ 	ASTERISK ASTERISK?
  |  alias=identifier '.' ASTERISK
  |  (OBJECT | ARRAY) nestedSelectItem (AS? identifier)?
  |  (variable EQUALS)? expression 	  (AS? identifier)?
@@ -130,6 +140,7 @@ tableSourceOption
  
 tableName
  : (catalog=identifier '#')? qname
+ | tempHash='#' qname
  ;
 
 joinPart
@@ -139,8 +150,8 @@ joinPart
 
 subQuery
  : '('
-//   (SELECT (TOP topCount)? selectItem (',' selectItem)*)? TODO: build a custom select with items
-   FROM tableSourceJoined
+   SELECT (TOP topCount)? selectItem (',' selectItem)*
+   (FROM tableSourceJoined)?
    (WHERE where=expression)?
    (GROUPBY groupBy+=expression (',' groupBy+=expression)*)?
    (ORDERBY sortItem (',' sortItem)*)?
@@ -193,7 +204,7 @@ expression
 primary
  : literal													#literalExpression
  | left=primary '.' (identifier | functionCall)				#dereference
- | identifier												#columnReference
+ | qname													#columnReference
  | functionCall 											#functionCallExpression	
  | identifier '->' expression								#lambdaExpression
  | '(' identifier (',' identifier)+ ')' '->' expression  	#lambdaExpression
@@ -267,7 +278,7 @@ booleanLiteral
  ;
  
 nonReserved
- : FROM | FIRST | TABLES | LIKE
+ : FROM | FIRST | TABLE | TABLES | LIKE
  ;
  
 // Tokens
@@ -281,9 +292,11 @@ CASE         : C A S E;
 CROSS        : C R O S S;
 DESC	     : D E S C;
 DESCRIBE	 : D E S C R I B E;
+DROP		 : D R O P;
 ELSE		 : E L S E;
 END			 : E N D;
 ESCAPE		 : E S C A P E;
+EXISTS       : E X I S T S;
 FALSE	     : F A L S E;
 FIRST	     : F I R S T;
 FROM	     : F R O M;
@@ -293,6 +306,8 @@ HAVING       : H A V I N G;
 IF           : I F;
 IN		     : I N;
 INNER	     : I N N E R;
+INSERT       : I N S E R T;
+INTO         : I N T O;
 IS           : I S;
 JOIN	     : J O I N;
 LAST	     : L A S T;
@@ -312,6 +327,7 @@ SELECT	     : S E L E C T;
 SESSION		 : S E S S I O N;
 SET			 : S E T;
 SHOW		 : S H O W;
+TABLE		 : T A B L E;
 TABLES		 : T A B L E S;
 THEN		 : T H E N;
 TOP			 : T O P;

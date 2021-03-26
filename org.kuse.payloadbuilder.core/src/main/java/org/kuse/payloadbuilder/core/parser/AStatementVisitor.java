@@ -75,6 +75,12 @@ public class AStatementVisitor<TR, TC> implements StatementVisitor<TR, TC>, Sele
     }
 
     @Override
+    public TR visit(DropTableStatement statement, TC context)
+    {
+        return null;
+    }
+
+    @Override
     public TR visit(DescribeSelectStatement statement, TC context)
     {
         statement.getSelectStatement().getSelect().accept(this, context);
@@ -186,17 +192,17 @@ public class AStatementVisitor<TR, TC> implements StatementVisitor<TR, TC>, Sele
     }
 
     @Override
-    public TR visit(SubQueryTableSource populatingJoin, TC context)
+    public TR visit(SubQueryTableSource tableSource, TC context)
     {
-        populatingJoin.getTableSourceJoined().accept(this, context);
-        populatingJoin.getOptions().forEach(to -> visitExpression(context, to.getValueExpression()));
+        tableSource.getFrom().accept(this, context);
+        tableSource.getOptions().forEach(to -> visitExpression(context, to.getValueExpression()));
 
-        if (populatingJoin.getWhere() != null)
+        if (tableSource.getWhere() != null)
         {
-            visitExpression(context, populatingJoin.getWhere());
+            visitExpression(context, tableSource.getWhere());
         }
-        populatingJoin.getGroupBy().forEach(g -> visitExpression(context, g));
-        populatingJoin.getOrderBy().forEach(o -> o.accept(this, context));
+        tableSource.getGroupBy().forEach(g -> visitExpression(context, g));
+        tableSource.getOrderBy().forEach(o -> o.accept(this, context));
         return null;
     }
 

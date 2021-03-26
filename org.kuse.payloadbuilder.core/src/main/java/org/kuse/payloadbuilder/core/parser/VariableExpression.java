@@ -4,7 +4,7 @@ import static org.apache.commons.lang3.StringUtils.join;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
 
 /** A variable (@var) */
-public class VariableExpression extends Expression
+public class VariableExpression extends Expression implements HasIdentifier
 {
     private final String name;
     private final boolean system;
@@ -21,6 +21,12 @@ public class VariableExpression extends Expression
     }
 
     public String getName()
+    {
+        return name;
+    }
+
+    @Override
+    public String identifier()
     {
         return name;
     }

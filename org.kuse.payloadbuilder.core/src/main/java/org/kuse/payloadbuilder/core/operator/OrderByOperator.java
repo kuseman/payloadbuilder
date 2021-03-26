@@ -14,12 +14,12 @@ import org.apache.commons.lang3.StringUtils;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 
 /** Operator sorting target operator */
-class SortByOperator extends AOperator
+class OrderByOperator extends AOperator
 {
     private final Operator target;
     private final TupleComparator comparator;
 
-    SortByOperator(int nodeId, Operator target, TupleComparator comparator)
+    OrderByOperator(int nodeId, Operator target, TupleComparator comparator)
     {
         super(nodeId);
         this.target = requireNonNull(target, "target");
@@ -68,9 +68,9 @@ class SortByOperator extends AOperator
     @Override
     public boolean equals(Object obj)
     {
-        if (obj instanceof SortByOperator)
+        if (obj instanceof OrderByOperator)
         {
-            SortByOperator that = (SortByOperator) obj;
+            OrderByOperator that = (OrderByOperator) obj;
             return target.equals(that.target)
                 && comparator.equals(that.comparator);
         }

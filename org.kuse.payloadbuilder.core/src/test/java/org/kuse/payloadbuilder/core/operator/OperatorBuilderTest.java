@@ -18,6 +18,7 @@ import org.kuse.payloadbuilder.core.operator.TableAlias.Type;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
+import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 import org.kuse.payloadbuilder.core.parser.SortItem;
 import org.kuse.payloadbuilder.core.parser.SortItem.NullOrder;
 import org.kuse.payloadbuilder.core.parser.SortItem.Order;
@@ -81,20 +82,54 @@ public class OperatorBuilderTest extends AOperatorTest
     }
 
     @Test
-    public void test_sortBy()
+    public void test_orderBy()
     {
         String query = "select a.art_id from article a order by a.art_id";
         QueryResult queryResult = getQueryResult(query);
 
-        Operator expected = new SortByOperator(
+        Operator expected = new OrderByOperator(
                 1,
                 queryResult.tableOperators.get(0),
-                new ExpressionTupleComparator(asList(new SortItem(e("a.art_id"), Order.ASC, NullOrder.UNDEFINED))));
+                new ExpressionTupleComparator(asList(new SortItem(e("a.art_id"), Order.ASC, NullOrder.UNDEFINED, null))));
 
         //                System.out.println(queryResult.operator.toString(1));
         //                System.err.println(expected.toString(1));
 
         assertEquals(expected, queryResult.operator);
+    }
+
+    @Test
+    public void test_orderBy_with_calculated_columns()
+    {
+        String query = "select a.art_id, art_id * 10 newCol from article a order by newcol";
+        QueryResult queryResult = getQueryResult(query);
+
+        Operator expected = new OrderByOperator(
+                2,
+                new ComputedColumnsOperator(
+                        1,
+                        queryResult.tableOperators.get(0),
+                        asList("newCol"),
+                        asList(e("art_id * 10"))),
+                new ExpressionTupleComparator(asList(new SortItem(
+                        new QualifiedReferenceExpression(QualifiedName.of("newCol"), -1, null),
+                        Order.ASC,
+                        NullOrder.UNDEFINED, null))));
+
+//                        System.out.println(queryResult.operator.toString(1));
+//                        System.err.println(expected.toString(1));
+
+        assertEquals(expected, queryResult.operator);
+
+        // Verify that projection is changed
+        Projection expectedProjection = new ObjectProjection(asList("art_id", "newCol"), asList(
+                new ExpressionProjection(e("a.art_id")),
+                new ExpressionProjection(new QualifiedReferenceExpression(QualifiedName.of("newCol"), -1, null))));
+
+        //                                System.err.println(expected.toString(1));
+        //                                System.out.println(queryResult.operator.toString(1));
+
+        assertEquals(expectedProjection, queryResult.projection);
     }
 
     @Test
@@ -136,7 +171,7 @@ public class OperatorBuilderTest extends AOperatorTest
     @Test
     public void test_no_push_down_from_where_to_join_when_accessing_nested_alias()
     {
-        String query = "select * from source s inner join (from article a inner join articleBrand ab with(populate=true) on ab.art_id = a.art_id) a with(populate=true) on a.art_id = s.art_id where a.ab.active_flg";
+        String query = "select * from source s inner join (select ** from article a inner join articleBrand ab with(populate=true) on ab.art_id = a.art_id) a with(populate=true) on a.art_id = s.art_id where a.ab.active_flg";
         QueryResult queryResult = getQueryResult(query);
 
         Operator expected = new FilterOperator(
@@ -331,6 +366,7 @@ public class OperatorBuilderTest extends AOperatorTest
             + "  on a.art_id = s.art_id "
             + "inner join "
             + "("
+            + "  select ** "
             + "  from articleAttribute aa"
             + "  inner join articlePrice ap"
             + "    on ap.sku_id = aa.sku_id"
@@ -454,6 +490,7 @@ public class OperatorBuilderTest extends AOperatorTest
             + "from article a "
             + "inner join "
             + "("
+            + "  select ** "
             + "  from articleAttribute aa "
             + "  inner join articlePrice ap with(populate=true) "
             + "    on ap.sku_id = aa.sku_id "
@@ -475,12 +512,14 @@ public class OperatorBuilderTest extends AOperatorTest
             + "  and aa.internet_flg "
             + "inner join "
             + "("
+            + "  select ** "
             + "  from articleProperty "
             + "  group by propertykey_id "
             + ") ap with(populate=true) "
             + "  on ap.art_id = a.art_id "
             + "cross apply "
             + "("
+            + "  select ** "
             + "  from range(10) r "
             + "  inner join attribute1 a1 with(populate=true)"
             + "      on a1.someId = r.Value "
@@ -598,7 +637,7 @@ public class OperatorBuilderTest extends AOperatorTest
             s.clear();
         });
 
-        List<SortItem> expectedSortItems = asList(new SortItem(e("s.id1"), Order.ASC, NullOrder.UNDEFINED));
+        List<SortItem> expectedSortItems = asList(new SortItem(e("s.id1"), Order.ASC, NullOrder.UNDEFINED, null));
         assertEquals(expectedSortItems, catalogOrderBy.getValue());
 
         Operator expected = result.tableOperators.get(0);
@@ -634,7 +673,7 @@ public class OperatorBuilderTest extends AOperatorTest
     @Test
     public void test_select_item_with_filter()
     {
-        String query = "select object(s.id1, a.id2 from s where s.id4 > 0) arr from source s inner join (from article where note_id > 0) a with(populate=true) on a.art_id = s.art_id and a.active_flg where s.id3 > 0";
+        String query = "select object(s.id1, a.id2 from s where s.id4 > 0) arr from source s inner join (select ** from article where note_id > 0) a with(populate=true) on a.art_id = s.art_id and a.active_flg where s.id3 > 0";
         QueryResult result = getQueryResult(query);
 
         Operator expected = new HashJoin(
@@ -675,6 +714,7 @@ public class OperatorBuilderTest extends AOperatorTest
             + "FROM source s "
             + "INNER JOIN "
             + "("
+            + "  select ** "
             + "  from article a"
             + "  INNER JOIN articleAttribute aa with(populate=true)"
             + "    ON aa.art_id = a.art_id "

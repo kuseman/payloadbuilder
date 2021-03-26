@@ -1,15 +1,20 @@
 package org.kuse.payloadbuilder.core;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 
 import java.io.IOException;
 import java.io.Writer;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
 
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
+import org.kuse.payloadbuilder.core.operator.Tuple;
+import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.VariableExpression;
 
 /**
@@ -24,6 +29,7 @@ public class QuerySession
     private Map<String, Map<String, Object>> catalogProperties;
     private Writer printWriter;
     private BooleanSupplier abortSupplier;
+    private Map<QualifiedName, List<Tuple>> temporaryTables;
 
     public QuerySession(CatalogRegistry catalogRegistry)
     {
@@ -87,6 +93,61 @@ public class QuerySession
                 throw new RuntimeException("Error writing to print writer", e);
             }
         }
+    }
+
+    /** Get temporary table with provided qualifier */
+    public List<Tuple> getTemporaryTable(QualifiedName table)
+    {
+        List<Tuple> rows;
+        //CSOFF
+        if (temporaryTables == null
+                || (rows = temporaryTables.get(table)) == null)
+        //CSON
+        {
+            throw new QueryException("No temporary table found with name #" + table);
+        }
+
+        return rows;
+    }
+
+    /** Set a temporary table into context */
+    public void setTemporaryTable(QualifiedName table, List<Tuple> rows)
+    {
+        requireNonNull(rows);
+        if (temporaryTables == null)
+        {
+            temporaryTables = new HashMap<>();
+        }
+        if (temporaryTables.containsKey(table))
+        {
+            throw new QueryException("Temporary table #" + table + " already exists in session");
+        }
+        temporaryTables.put(table, rows);
+    }
+
+    /** Drop temporary table */
+    public void dropTemporaryTable(QualifiedName table, boolean lenient)
+    {
+        if (!lenient
+                && (temporaryTables == null
+                || !temporaryTables.containsKey(table)))
+        {
+            throw new QueryException("No temporary table found with name #" + table);
+        }
+        else if (temporaryTables != null)
+        {
+            temporaryTables.remove(table);
+        }
+    }
+
+    /** Return temporary table names */
+    public Collection<QualifiedName> getTemporaryTableNames()
+    {
+        if (temporaryTables == null)
+        {
+            return emptyList();
+        }
+        return temporaryTables.keySet();
     }
 
     /** Set catalog property */
