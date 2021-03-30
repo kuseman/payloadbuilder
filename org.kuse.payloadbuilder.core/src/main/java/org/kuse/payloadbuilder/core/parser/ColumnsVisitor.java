@@ -133,6 +133,9 @@ public class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsV
         {
             tableAliases = context.lambdaAliasById.get(expression.getLambdaId());
 
+            // Remove first part since it's resolved to an alias via lambda identifier
+            parts.remove(0);
+
             // No alias connected to this lambda
             // which means we can only try to resolve the lambda value with parts
             // at runtime
@@ -141,9 +144,6 @@ public class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsV
                 expression.setResolvePaths(singletonList(new ResolvePath(-1, -1, parts)));
                 return null;
             }
-
-            // Remove first part since it's resolved to an alias via lambda identifier
-            parts.remove(0);
 
             // Nothing left to process
             if (parts.isEmpty())

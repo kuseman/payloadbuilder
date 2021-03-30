@@ -72,6 +72,10 @@ public class Row implements Tuple
             return pos;
         }
         int ordinal = ArrayUtils.indexOf(getColumns(), column);
+        if (ordinal == -1)
+        {
+            return null;
+        }
         return values.get(ordinal);
     }
 

@@ -114,18 +114,14 @@ public class QualifiedReferenceExpression extends Expression
 
                 //CSOFF
                 // We have a target ordinal
-                // then we expect a tuple value
-                if (value != null && path.targetTupleOrdinal >= 0)
+                // If the lambda value was a Tuple, resolve the ordinal and first part value
+                // else just keep on with what ever value was located in lambda
+                if (path.targetTupleOrdinal >= 0 && value instanceof Tuple)
                 {
-                    if (!(value instanceof Tuple))
-                    //CSON
-                    {
-                        throw new IllegalArgumentException("Expected a Tuple from lambda value but got: " + value);
-                    }
-
                     Tuple tuple = (Tuple) value;
                     tuple = tuple.getTuple(path.targetTupleOrdinal);
 
+                    // Nothing more to resolve here return tuple
                     //CSOFF
                     if (tuple == null
                         //CSON

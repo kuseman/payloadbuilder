@@ -169,18 +169,10 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         assertEquals("value", e.eval(context));
 
         e = new QualifiedReferenceExpression(QualifiedName.of(), 0, null);
-        // Tuple access from lambda with invalid value
+        // Tuple access from lambda with non Tuple value
         e.setResolvePaths(asList(new ResolvePath(-1, 0, asList())));
 
-        try
-        {
-            e.eval(context);
-            fail();
-        }
-        catch (IllegalArgumentException ee)
-        {
-            assertTrue(ee.getMessage().contains("Expected a Tuple from lambda value but got"));
-        }
+        assertEquals(MapUtils.ofEntries(MapUtils.entry("key", "value")), e.eval(context));
 
         // Set up tuple
         Map<Integer, Tuple> tupleByOrdinal = new HashMap<>();
