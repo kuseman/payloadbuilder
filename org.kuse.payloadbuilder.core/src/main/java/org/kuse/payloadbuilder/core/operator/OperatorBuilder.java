@@ -1,6 +1,7 @@
 package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.collections.CollectionUtils.containsAny;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
@@ -18,6 +19,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import org.antlr.v4.runtime.Token;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.QuerySession;
@@ -35,6 +37,7 @@ import org.kuse.payloadbuilder.core.parser.AStatementVisitor;
 import org.kuse.payloadbuilder.core.parser.Apply;
 import org.kuse.payloadbuilder.core.parser.Apply.ApplyType;
 import org.kuse.payloadbuilder.core.parser.AsteriskSelectItem;
+import org.kuse.payloadbuilder.core.parser.ColumnsVisitor;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.ExpressionSelectItem;
 import org.kuse.payloadbuilder.core.parser.Join;
@@ -79,7 +82,21 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         private QuerySession session;
         private CatalogRegistry registry;
+
+        /** Current table alias used when analyzing FROM-part in the query */
         private TableAlias currentTableAlias;
+
+        /**
+         * Current table aliases used when analyzing SELECT-items part in the query.
+         *
+         * <pre>
+         * We need a set of aliases when analyzing the select items since we can have FROM
+         * expressions that unions two or more aliases ie. FROM unionall(alias1, alias2)
+         * then we need to resolve all items with context of a set of aliases
+         * </pre>
+         **/
+        private Set<TableAlias> currentTableAliases;
+
         Map<TableAlias, Set<String>> columnsByAlias = new THashMap<>();
 
         /** Resulting operator */
@@ -243,6 +260,11 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         }
 
         context.currentTableAlias = tsj != null ? tsj.getTableSource().getTableAlias() : null;
+
+        // Before processing the select items set the collection alias property in context to mark
+        // that this should be used
+        context.currentTableAliases = context.currentTableAlias != null ? asSet(context.currentTableAlias) : emptySet();
+
         List<String> projectionAliases = new ArrayList<>();
         List<Projection> projections = new ArrayList<>();
         select.getSelectItems().forEach(s ->
@@ -261,13 +283,13 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     //CSON
     public Void visit(NestedSelectItem nestedSelectItem, Context context)
     {
-        Set<TableAlias> aliases = asSet(context.currentTableAlias);
+        Set<TableAlias> aliases = context.currentTableAliases;
         Operator fromOperator = null;
         Expression from = nestedSelectItem.getFrom();
         if (from != null)
         {
             fromOperator = new ExpressionOperator(context.acquireNodeId(), from);
-            aliases = ColumnsVisitor.getColumnsByAlias(context.session, context.columnsByAlias, context.currentTableAlias, from);
+            aliases = ColumnsVisitor.getColumnsByAlias(context.session, context.columnsByAlias, aliases, from);
         }
 
         List<String> projectionAliases = new ArrayList<>();
@@ -275,37 +297,35 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         boolean projectionsAdded = false;
 
         // Use found aliases and traverse select items, order, groupBy and where
-        TableAlias parent = context.currentTableAlias;
-        for (TableAlias alias : aliases)
+        Set<TableAlias> parent = context.currentTableAliases;
+        context.currentTableAliases = aliases;
+        for (SelectItem s : nestedSelectItem.getSelectItems())
         {
-            context.currentTableAlias = alias;
-            for (SelectItem s : nestedSelectItem.getSelectItems())
+            s.accept(this, context);
+            if (!projectionsAdded)
             {
-                s.accept(this, context);
-                if (!projectionsAdded)
-                {
-                    projectionAliases.add(s.getIdentifier());
-                    projections.add(context.projection);
-                }
+                projectionAliases.add(s.getIdentifier());
+                projections.add(context.projection);
             }
-
-            if (nestedSelectItem.getWhere() != null)
-            {
-                visit(nestedSelectItem.getWhere(), context);
-            }
-
-            if (!nestedSelectItem.getGroupBy().isEmpty())
-            {
-                nestedSelectItem.getGroupBy().forEach(gb -> visit(gb, context));
-            }
-
-            if (!nestedSelectItem.getOrderBy().isEmpty())
-            {
-                nestedSelectItem.getOrderBy().forEach(si -> si.accept(this, context));
-            }
-
-            projectionsAdded = true;
         }
+
+        if (nestedSelectItem.getWhere() != null)
+        {
+            visit(nestedSelectItem.getWhere(), context);
+        }
+
+        if (!nestedSelectItem.getGroupBy().isEmpty())
+        {
+            nestedSelectItem.getGroupBy().forEach(gb -> visit(gb, context));
+        }
+
+        if (!nestedSelectItem.getOrderBy().isEmpty())
+        {
+            nestedSelectItem.getOrderBy().forEach(si -> si.accept(this, context));
+        }
+
+        projectionsAdded = true;
+        //        }
 
         if (nestedSelectItem.getWhere() != null)
         {
@@ -330,7 +350,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         {
             context.projection = new ObjectProjection(projectionAliases, projections, fromOperator);
         }
-        context.currentTableAlias = parent;
+        context.currentTableAliases = parent;
         return null;
     }
 
@@ -343,64 +363,70 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         return null;
     }
 
-    private static final Projection NO_OP_PROJECTION = (writer, context) ->
-    {
-    };
-
     @Override
     public Void visit(AsteriskSelectItem selectItem, Context context)
     {
-        if (context.currentTableAlias == null)
+        if (CollectionUtils.isEmpty(context.currentTableAliases))
         {
-            context.projection = NO_OP_PROJECTION;
+            context.projection = Projection.NO_OP_PROJECTION;
             return null;
         }
 
-        TableAlias alias = context.currentTableAlias.getParent();
-
-        // Set asterisk columns on aliases
-        if (selectItem.getAlias() != null)
+        List<Integer> tupleOrdinals = new ArrayList<>();
+        // Process all alias in context for this select item
+        for (TableAlias alias : context.currentTableAliases)
         {
-            if (alias.getAlias().equalsIgnoreCase(selectItem.getAlias()))
+            // Set asterisk columns on aliases
+            if (selectItem.getAlias() != null)
             {
-                alias.setAsteriskColumns();
+                if (alias.getAlias().equalsIgnoreCase(selectItem.getAlias()))
+                {
+                    tupleOrdinals.add(alias.getTupleOrdinal());
+                    alias.setAsteriskColumns();
+                }
+                else
+                {
+                    // Try parents children
+                    TableAlias tempAlias = alias.getChildAlias(selectItem.getAlias());
+                    //CSOFF
+                    if (tempAlias != null)
+                    //CSON
+                    {
+                        tempAlias.setAsteriskColumns();
+                        tupleOrdinals.add(tempAlias.getTupleOrdinal());
+                        continue;
+                    }
+                    // Sibling
+                    tempAlias = alias.getSiblingAlias(selectItem.getAlias());
+                    //CSOFF
+                    if (tempAlias != null)
+                    //CSON
+                    {
+                        tempAlias.setAsteriskColumns();
+                        tupleOrdinals.add(tempAlias.getTupleOrdinal());
+                    }
+                }
             }
             else
             {
-                // Try parents children
-                TableAlias childAlias = alias.getChildAlias(selectItem.getAlias());
-                //CSOFF
-                if (childAlias != null)
-                //CSON
-                {
-                    //CSOFF
-                    if (childAlias.getType() == TableAlias.Type.SUBQUERY)
-                    //CSON
-                    {
-                        childAlias.getChildAliases().get(0).setAsteriskColumns();
-                    }
-                    else
-                    {
-                        childAlias.setAsteriskColumns();
-                    }
-                }
-            }
-        }
-        else
-        {
-            alias.setAsteriskColumns();
-            for (TableAlias childAlias : alias.getChildAliases())
-            {
-                if (childAlias.getType() == TableAlias.Type.SUBQUERY)
-                {
-                    childAlias.getChildAliases().get(0).setAsteriskColumns();
-                }
-                else
+                alias.setAsteriskColumns();
+                for (TableAlias childAlias : alias.getChildAliases())
                 {
                     childAlias.setAsteriskColumns();
                 }
             }
         }
+
+        if (selectItem.getAlias() != null && tupleOrdinals.isEmpty())
+        {
+            throw new ParseException("No alias found with name: " + selectItem.getAlias(), selectItem.getToken());
+        }
+
+        if (!tupleOrdinals.isEmpty())
+        {
+            selectItem.setAliasTupleOrdinals(tupleOrdinals);
+        }
+
         context.projection = selectItem;
         return null;
     }
@@ -413,7 +439,16 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             return;
         }
         // Resolve columns
-        ColumnsVisitor.getColumnsByAlias(context.session, context.columnsByAlias, context.currentTableAlias, expression);
+
+        // In multi alias mode => processing select items
+        if (context.currentTableAliases != null)
+        {
+            ColumnsVisitor.getColumnsByAlias(context.session, context.columnsByAlias, context.currentTableAliases, expression);
+        }
+        else
+        {
+            ColumnsVisitor.getColumnsByAlias(context.session, context.columnsByAlias, context.currentTableAlias, expression);
+        }
     }
 
     @Override
@@ -504,7 +539,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             context.operator = new SortByOperator(context.acquireNodeId(), context.operator, new ExpressionTupleComparator(sortBys));
         }
 
-        context.operator = new SubQueryOperator(context.operator, tableSource.getTableAlias().getAlias());
+        //        context.operator = new SubQueryOperator(context.operator, tableSource.getTableAlias().getAlias());
 
         // Restore prev alias
         context.currentTableAlias = prevCurrentTableAlias;

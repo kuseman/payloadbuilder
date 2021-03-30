@@ -1,43 +1,23 @@
 package org.kuse.payloadbuilder.core.catalog.builtin;
 
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toSet;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Stream;
 
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
-import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
-import org.kuse.payloadbuilder.core.utils.ObjectUtils;
 
-/** Map function. Maps input into another form */
+/** Concat function. Concatenates all arguments into a string */
 class ConcatFunction extends ScalarFunctionInfo
 {
     ConcatFunction(Catalog catalog)
     {
         super(catalog, "concat");
-    }
-
-    @Override
-    public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Expression> arguments, Function<Expression, Set<TableAlias>> aliasResolver)
-    {
-        // Result of a concat is the result of all arguments aliases
-        return arguments
-                .stream()
-                .flatMap(a ->
-                {
-                    Set<TableAlias> argAliases = aliasResolver.apply(a);
-                    return argAliases == null ? Stream.empty() : argAliases.stream();
-                })
-                .collect(toSet());
     }
 
     @Override
@@ -49,13 +29,16 @@ class ConcatFunction extends ScalarFunctionInfo
             return null;
         }
 
-        Object[] args = new Object[size];
-        for (int i = 0; i < size; i++)
+        StringBuilder sb = new StringBuilder();
+        for (Expression arg : arguments)
         {
-            args[i] = arguments.get(i).eval(context);
+            Object object = arg.eval(context);
+            if (object != null)
+            {
+                sb.append(object);
+            }
         }
-
-        return ObjectUtils.concat(args);
+        return sb.toString();
     }
 
     @Override

@@ -53,6 +53,7 @@ public class BuiltinCatalog
         catalog.registerFunction(new DateAddFunction(catalog));
         catalog.registerFunction(new UnixTimeStampFunction(catalog));
         catalog.registerFunction(new ListOfFunction(catalog));
+        catalog.registerFunction(new UnionFunction(catalog, true));
 
         // Table functions
         catalog.registerFunction(new RangeFunction(catalog));

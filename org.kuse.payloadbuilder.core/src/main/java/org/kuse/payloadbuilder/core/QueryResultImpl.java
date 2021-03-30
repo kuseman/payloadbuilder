@@ -51,10 +51,10 @@ import org.kuse.payloadbuilder.core.parser.UseStatement;
  */
 class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
 {
-    private static final Row DUMMY_ROW = Row.of(TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("dummy"), "d").build(), 0, EMPTY_OBJECT_ARRAY);
-    private static final TableAlias SHOW_VARIABLES_ALIAS = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("variables"), "v").columns(new String[] {"Name", "Value"}).build();
-    private static final TableAlias SHOW_TABLES_ALIAS = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tables"), "t").columns(new String[] {"Name"}).build();
-    private static final TableAlias SHOW_FUNCTIONS_ALIAS = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("functions"), "f")
+    private static final Row DUMMY_ROW = Row.of(TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("dummy"), "d").build(), 0, EMPTY_OBJECT_ARRAY);
+    private static final TableAlias SHOW_VARIABLES_ALIAS = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("variables"), "v").columns(new String[] {"Name", "Value"}).build();
+    private static final TableAlias SHOW_TABLES_ALIAS = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("tables"), "t").columns(new String[] {"Name"}).build();
+    private static final TableAlias SHOW_FUNCTIONS_ALIAS = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("functions"), "f")
             .columns(new String[] {"Name", "Type", "Description"})
             .build();
 

@@ -49,6 +49,11 @@ class NestedLoopJoin extends AOperator
         this.emitEmptyOuterRows = emitEmptyOuterRows;
     }
 
+    Operator getInner()
+    {
+        return inner;
+    }
+
     @Override
     public List<Operator> getChildOperators()
     {
@@ -73,15 +78,13 @@ class NestedLoopJoin extends AOperator
     public RowIterator open(ExecutionContext context)
     {
         /*
-         * a
-         *   b
-         *     c
-         *
+         * from tableA a
+         * inner join tableB b
+         *   on ...
          */
 
         final Tuple contextParent = context.getTuple();
-        final JoinTuple joinTuple = new JoinTuple();
-        joinTuple.setContextOuter(contextParent);
+        final JoinTuple joinTuple = new JoinTuple(contextParent);
 
         final RowIterator it = outer.open(context);
         executionCount++;

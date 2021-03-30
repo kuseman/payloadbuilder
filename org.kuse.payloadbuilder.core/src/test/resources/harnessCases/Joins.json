@@ -57,6 +57,31 @@
       ]
     },
     {
+      "name": "Self join 3, asterisk select",
+      "query": [
+        "select * from source s inner join source s1 on s1.col1 = s.col1 inner join source s2 on s2.col1 = s1.col1"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }],
+          [{ "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }, { "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }, { "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }]
+        ]
+      ]
+    },
+    {
+      "name": "Inner join, asterisk alias select",
+      "query": [
+        "select s.* from source s inner join article a on a.col1 = s.col1"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }]
+        ]
+      ]
+    },
+    {
       "name": "Left join, asterisk select",
       "query": [
         "select * from source s left join article a on a.col1 = s.col1"
@@ -86,15 +111,64 @@
       ]
     },
     {
-      "name": "Subquery",
+      "name": "Subquery with asterisk alias select",
       "query": [
-        "select reservation.index, reservation.id, reservation.wareh_id ",
+        "select reservation.* ",
+        "from ",
+        "( ",
+        "  from reservation rs ",
+        "  cross apply open_map_collection(rs.stockhouses) sh",
+        ") reservation "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "index", "value": "idx1" },{ "key": "id", "value": 1 },{ "key": "stockhouses", "value": [{"wareh_id": 1, "qty": 1}] },{ "key": "wareh_id", "value": 1 },{ "key": "qty", "value": 1 }],
+          [{ "key": "index", "value": "idx2" },{ "key": "id", "value": 2 },{ "key": "stockhouses", "value": [{"wareh_id": 2, "qty": 1}] },{ "key": "wareh_id", "value": 2 },{ "key": "qty", "value": 1 }]
+        ]
+      ]
+    },
+    {
+      "name": "Subquery with asterisk select",
+      "query": [
+        "select * ",
+        "from ",
+        "( ",
+        "  from reservation rs ",
+        "  cross apply open_map_collection(rs.stockhouses) sh",
+        ") reservation "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "index", "value": "idx1" },{ "key": "id", "value": 1 },{ "key": "stockhouses", "value": [{"wareh_id": 1, "qty": 1}] },{ "key": "wareh_id", "value": 1 },{ "key": "qty", "value": 1 }],
+          [{ "key": "index", "value": "idx2" },{ "key": "id", "value": 2 },{ "key": "stockhouses", "value": [{"wareh_id": 2, "qty": 1}] },{ "key": "wareh_id", "value": 2 },{ "key": "qty", "value": 1 }]
+        ]
+      ]
+    },
+    {
+      "name": "Subquery with group by",
+      "query": [
+        "select reservation.rs.index, reservation.rs.id, reservation.sh.wareh_id ",
         "from ",
         "( ",
         "  from reservation rs ",
         "  cross apply open_map_collection(rs.stockhouses) sh",
         "  group by rs.index, rs.id, sh.wareh_id ",
         ") reservation "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "index", "value": "idx1" },{ "key": "id", "value": 1 },{ "key": "wareh_id", "value": 1 }],
+          [{ "key": "index", "value": "idx2" },{ "key": "id", "value": 2 },{ "key": "wareh_id", "value": 2 }]
+        ]
+      ]
+    },
+    {
+      "name": "Groyp by without subquery",
+      "query": [
+        "select rs.index, rs.id, sh.wareh_id ",
+        "  from reservation rs ",
+        "  cross apply open_map_collection(rs.stockhouses) sh",
+        "  group by rs.index, rs.id, sh.wareh_id "
       ],
       "expectedResultSets": [
         [
@@ -124,7 +198,7 @@
     {
       "name": "Subquery 2",
       "query": [
-        "select shopcart.index, shopcart.sku_id, shopcart.wareh_id, sum(shopcart.sh.qty) qty ",
+        "select shopcart.s.index, shopcart.sh.sku_id, shopcart.sh.wareh_id, sum(shopcart.sh.qty) qty ",
         "from ",
         "( ",
         "  from shopcart s ",

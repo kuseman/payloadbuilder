@@ -46,6 +46,7 @@ class RangeFunction extends TableFunctionInfo
             from = ((Number) requireNonNull(arguments.get(0).eval(context), "From argument to range cannot be null.")).intValue();
             to = ((Number) requireNonNull(arguments.get(1).eval(context), "To argument to range cannot be null.")).intValue();
         }
-        return RowIterator.wrap(IntStream.range(from, to).mapToObj(i -> (Tuple) Row.of(tableAlias, i, new Object[] {i})).iterator());
+        final int start = from;
+        return RowIterator.wrap(IntStream.range(from, to).mapToObj(i -> (Tuple) Row.of(tableAlias, i - start, new Object[] {i})).iterator());
     }
 }

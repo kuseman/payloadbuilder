@@ -1,16 +1,11 @@
 package org.kuse.payloadbuilder.core.operator;
 
-import static org.apache.commons.lang3.StringUtils.equalsAnyIgnoreCase;
-import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
-import static org.apache.commons.lang3.StringUtils.isNotBlank;
-
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import org.apache.commons.lang3.ArrayUtils;
-import org.kuse.payloadbuilder.core.parser.QualifiedName;
-import org.kuse.payloadbuilder.core.utils.MapUtils;
 
 /** Row */
 public class Row implements Tuple
@@ -27,100 +22,90 @@ public class Row implements Tuple
     }
 
     /** Return columns for this row */
-    public String[] getColumns()
+    private String[] getColumns()
     {
         return columns != null ? columns : tableAlias.getColumns();
     }
 
-    private int getColumnCount()
+    @Override
+    public int getTupleOrdinal()
     {
-        return getColumns().length;
-    }
-
-    /** Extracts values into an object array */
-    public Object[] getValues()
-    {
-        if (values instanceof ObjectValues)
-        {
-            return ((ObjectValues) values).values;
-        }
-        Object[] values = new Object[getColumnCount()];
-        for (int i = 0; i < values.length; i++)
-        {
-            values[i] = getObject(i);
-        }
-        return values;
+        return tableAlias.getTupleOrdinal();
     }
 
     @Override
-    public Object getValue(QualifiedName qname, int partIndex)
+    public Tuple getTuple(int ordinal)
     {
-        int size = qname.getParts().size();
-
-        // First part is pointing to this alias, step up one part
-        int index = partIndex;
-        if (size - 1 > index && equalsAnyIgnoreCase(qname.getParts().get(index), tableAlias.getAlias()))
+        // If the wanted tuple ordinal is a parent of this row
+        // then return our selves.
+        // This means we have a tuple stream of only rows
+        // but wrapped in a sub query etc. so the ordinal will be one level up
+        /*
+         * ie
+         * 
+         * select x.col1,               <- target ordinal 0
+         *        x.col2                <- target ordinal 0
+         * from                         <- ordinal 0
+         * (
+         *   from table                 <- ordinal 1
+         * ) x
+         * 
+         */
+        if (ordinal <= tableAlias.getTupleOrdinal())
         {
-            index++;
+            return this;
         }
-
-        Object result = getObject(qname.getParts().get(index));
-
-        if (result == null)
-        {
-            return null;
-        }
-
-        if (index < size - 1)
-        {
-            if (result instanceof Map)
-            {
-                @SuppressWarnings("unchecked")
-                Map<Object, Object> map = (Map<Object, Object>) result;
-                return MapUtils.traverse(map, qname.getParts().subList(index + 1, size));
-            }
-
-            throw new IllegalArgumentException("Cannot dereference value " + result);
-        }
-
-        return result;
+        return null;
     }
 
     @Override
-    public boolean containsAlias(String alias)
+    public Object getValue(int ordinal)
     {
-        return equalsIgnoreCase(alias, tableAlias.getAlias());
-    }
-
-    @Override
-    public Iterator<QualifiedName> getQualifiedNames()
-    {
-        String[] columns = getColumns();
-        String alias = tableAlias.getAlias();
-        return Arrays.stream(columns)
-                .map(c -> isNotBlank(alias) ? QualifiedName.of(alias, c) : QualifiedName.of(c))
-                .iterator();
-    }
-
-    /** Get value for provided ordinal */
-    public Object getObject(int ordinal)
-    {
-        if (ordinal < 0)
-        {
-            return null;
-        }
         return values.get(ordinal);
     }
 
-    /** Get value for provided column */
-    public Object getObject(String column)
+    @Override
+    public Object getValue(String column)
     {
         if (POS.equals(column))
         {
             return pos;
         }
         int ordinal = ArrayUtils.indexOf(getColumns(), column);
-        return getObject(ordinal);
+        return values.get(ordinal);
+    }
+
+    @Override
+    public Iterator<TupleColumn> getColumns(int tupleOrdinal)
+    {
+        final String[] columns = getColumns();
+        final int length = columns.length;
+        final RowTupleColumn value = new RowTupleColumn(tableAlias.getTupleOrdinal());
+        //CSOFF
+        return new Iterator<TupleColumn>()
+        //CSON
+        {
+            int index;
+
+            @Override
+            public boolean hasNext()
+            {
+                return index < length;
+            }
+
+            @Override
+            public TupleColumn next()
+            {
+                if (index >= length)
+                {
+                    throw new NoSuchElementException();
+                }
+
+                value.column = columns[index];
+                index++;
+                return value;
+            }
+        };
     }
 
     public TableAlias getTableAlias()
@@ -149,7 +134,31 @@ public class Row implements Tuple
     @Override
     public String toString()
     {
-        return tableAlias.getTable() + " (" + pos + ") " + values;
+        return tableAlias.getTable() + " row: " + pos;
+    }
+
+    /** Row tuple value */
+    private static class RowTupleColumn implements TupleColumn
+    {
+        private final int tupleOrdinal;
+        private String column;
+
+        RowTupleColumn(int tupleOrdinal)
+        {
+            this.tupleOrdinal = tupleOrdinal;
+        }
+
+        @Override
+        public int getTupleOrdinal()
+        {
+            return tupleOrdinal;
+        }
+
+        @Override
+        public String getColumn()
+        {
+            return column;
+        }
     }
 
     /** Construct a row with provided alias, values and position */

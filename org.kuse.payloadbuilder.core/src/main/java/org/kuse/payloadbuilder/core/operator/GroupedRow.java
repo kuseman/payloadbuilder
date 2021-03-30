@@ -1,55 +1,63 @@
 package org.kuse.payloadbuilder.core.operator;
 
+import static java.util.Collections.emptySet;
+import static java.util.Objects.requireNonNull;
 import static org.apache.commons.collections.CollectionUtils.isEmpty;
 
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.collections.iterators.TransformIterator;
-import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Grouped row. Result of a {@link GroupByOperator} */
 class GroupedRow implements Tuple
 {
+    private final int tupleOrdinal;
     private final List<Tuple> tuples;
     /** Set of columns in group expressions, these columns should not return an aggregated value */
-    private final Map<String, QualifiedName> columnReferences;
+    private final Map<Integer, Set<String>> columnReferences;
 
-    GroupedRow(List<Tuple> tuples, Map<String, QualifiedName> columnReferences)
+    GroupedRow(List<Tuple> tuples, Map<Integer, Set<String>> columnReferences)
     {
         if (isEmpty(tuples))
         {
             throw new RuntimeException("Rows cannot be empty.");
         }
         this.tuples = tuples;
-        this.columnReferences = columnReferences;
+        // Ordinal of a group by is the same as the rows
+        this.tupleOrdinal = tuples.get(0).getTupleOrdinal();
+        this.columnReferences = requireNonNull(columnReferences);
     }
 
     @Override
-    public boolean containsAlias(String alias)
+    public int getTupleOrdinal()
     {
-        return tuples.get(0).containsAlias(alias);
+        return tupleOrdinal;
     }
 
     @Override
-    public Object getValue(QualifiedName qname, int partIndex)
+    public Tuple getTuple(int ordinal)
     {
-        String column = qname.getLast();
-        QualifiedName columnRef = columnReferences.get(column);
-        if (columnRef != null)
-        {
-            return tuples.get(0).getValue(columnRef, 0);
-        }
-
-        return new TransformIterator(tuples.iterator(), tuple -> ((Tuple) tuple).getValue(qname, partIndex));
+        // Extract grouped columns for provided ordinal
+        Set<String> singleValueColumns = columnReferences.getOrDefault(ordinal, emptySet());
+        // Return a collection tuple for the provided ordinal and group columns
+        return new CollectionTuple(tuples, ordinal, singleValueColumns);
     }
 
     @Override
-    public Iterator<QualifiedName> getQualifiedNames()
+    public Object getValue(String column)
     {
-        // Use first row here.
-        // TODO: Might need to distinct all grouped rows qnames since there might be different ones further down
-        return tuples.get(0).getQualifiedNames();
+        // Get all columns for all tuples
+        return new TransformIterator(tuples.iterator(), tuple -> ((Tuple) tuple).getValue(column));
+    }
+
+    @Override
+    public Iterator<TupleColumn> getColumns(int tupleOrdinal)
+    {
+        // TODO: Might need to distinct all grouped rows columns since there might be different ones further down
+        // But for now just return the first rows columns
+        return tuples.get(0).getColumns(tupleOrdinal);
     }
 }

@@ -150,19 +150,22 @@ public class QueryParser
         private final Map<String, Integer> lambdaParameters = new HashMap<>();
         private Expression leftDereference;
 
-        private TableAlias parentTableAlias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT").build();
+        private TableAlias parentTableAlias;
         private final CatalogRegistry registry;
         private final boolean validateQualifiedReferences;
+        private int tupleOrdinal;
 
         AstBuilder(CatalogRegistry registry, boolean validateQualifiedReferences)
         {
             this.registry = registry;
             this.validateQualifiedReferences = validateQualifiedReferences;
+            clear();
         }
 
         private void clear()
         {
-            parentTableAlias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT").build();
+            tupleOrdinal = -1;
+            parentTableAlias = TableAliasBuilder.of(tupleOrdinal++, TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT").build();
         }
 
         @Override
@@ -389,7 +392,7 @@ public class QueryParser
                     alias = getIdentifier(ctx.alias);
                 }
 
-                return new AsteriskSelectItem(alias);
+                return new AsteriskSelectItem(alias, ctx.start);
             }
 
             throw new ParseException("Caould no create a select item.", ctx.start);
@@ -446,7 +449,7 @@ public class QueryParser
                     throw new ParseException("Expected a TABLE function for " + functionCallInfo.functionInfo.toString(), ctx.start);
                 }
                 TableAlias tableAlias = TableAliasBuilder
-                        .of(TableAlias.Type.FUNCTION, QualifiedName.of(functionCallInfo.functionInfo.getName()), defaultIfNull(alias, ""), ctx.functionCall().start)
+                        .of(tupleOrdinal++, TableAlias.Type.FUNCTION, QualifiedName.of(functionCallInfo.functionInfo.getName()), defaultIfNull(alias, ""), ctx.functionCall().start)
                         .parent(getParentTableAlias())
                         .build();
                 return new TableFunction(
@@ -468,7 +471,7 @@ public class QueryParser
 
                 TableAlias prevParent = parentTableAlias;
                 TableAlias tableAlias = TableAliasBuilder
-                        .of(TableAlias.Type.SUBQUERY, QualifiedName.of("SubQuery"), alias, subQueryCtx.start)
+                        .of(tupleOrdinal++, TableAlias.Type.SUBQUERY, QualifiedName.of("SubQuery"), alias, subQueryCtx.start)
                         .parent(getParentTableAlias())
                         .build();
                 parentTableAlias = tableAlias;
@@ -492,7 +495,7 @@ public class QueryParser
             QualifiedName table = getQualifiedName(ctx.tableName().qname());
 
             TableAlias tableAlias = TableAliasBuilder
-                    .of(TableAlias.Type.TABLE, table, defaultIfBlank(alias, ""), ctx.tableName().start)
+                    .of(tupleOrdinal++, TableAlias.Type.TABLE, table, defaultIfBlank(alias, ""), ctx.tableName().start)
                     .parent(getParentTableAlias())
                     .build();
 
@@ -526,7 +529,7 @@ public class QueryParser
         {
             String identifier = getIdentifier(ctx.identifier());
             Integer lambdaId = lambdaParameters.get(identifier);
-            return new QualifiedReferenceExpression(QualifiedName.of(identifier), lambdaId != null ? lambdaId.intValue() : -1);
+            return new QualifiedReferenceExpression(QualifiedName.of(identifier), lambdaId != null ? lambdaId.intValue() : -1, ctx.start);
         }
 
         @Override
@@ -543,7 +546,7 @@ public class QueryParser
             {
                 throw new ParseException("Expected a SCALAR function for " + functionCallInfo.functionInfo.toString(), ctx.start);
             }
-            return new QualifiedFunctionCallExpression((ScalarFunctionInfo) functionCallInfo.functionInfo, functionCallInfo.arguments);
+            return new QualifiedFunctionCallExpression((ScalarFunctionInfo) functionCallInfo.functionInfo, functionCallInfo.arguments, ctx.functionCall().start);
         }
 
         @Override
@@ -692,12 +695,12 @@ public class QueryParser
                 {
                     QualifiedReferenceExpression qfe = (QualifiedReferenceExpression) left;
                     parts.addAll(0, qfe.getQname().getParts());
-                    result = new QualifiedReferenceExpression(new QualifiedName(parts), qfe.getLambdaId());
+                    result = new QualifiedReferenceExpression(new QualifiedName(parts), qfe.getLambdaId(), qfe.getToken());
                     validateQualifiedReference(ctx, (QualifiedReferenceExpression) result);
                 }
                 else
                 {
-                    result = new DereferenceExpression(left, new QualifiedReferenceExpression(new QualifiedName(parts), -1));
+                    result = new DereferenceExpression(left, new QualifiedReferenceExpression(new QualifiedName(parts), -1, ctx.start));
                 }
             }
             // Dereferenced function call
@@ -708,7 +711,7 @@ public class QueryParser
                 {
                     throw new ParseException("Expected a SCALAR function for " + functionCallInfo.functionInfo.toString(), ctx.start);
                 }
-                result = new QualifiedFunctionCallExpression((ScalarFunctionInfo) functionCallInfo.functionInfo, functionCallInfo.arguments);
+                result = new QualifiedFunctionCallExpression((ScalarFunctionInfo) functionCallInfo.functionInfo, functionCallInfo.arguments, ctx.functionCall().start);
             }
 
             leftDereference = null;

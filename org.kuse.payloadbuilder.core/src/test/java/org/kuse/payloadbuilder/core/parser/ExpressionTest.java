@@ -2,35 +2,26 @@ package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Arrays.asList;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
-import org.junit.Assert;
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
-import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
-import org.kuse.payloadbuilder.core.operator.Row;
-import org.kuse.payloadbuilder.core.operator.TableAlias;
-import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 
 /** Test of various expression evaluations */
-public class ExpressionTest extends Assert
+public class ExpressionTest extends AParserTest
 {
-    private final CatalogRegistry catalogRegistry = new CatalogRegistry();
-    private final QueryParser parser = new QueryParser();
-    private final QuerySession session = new QuerySession(catalogRegistry);
-    private final TableAlias alias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("article"), "a").columns(new String[] {"a", "b", "c", "d", "e", "f", "g"}).build();
-
     @Test
     public void test_auto_cast_strings() throws Exception
     {
-        assertFail(IllegalArgumentException.class, "Cannot compare true and", "true = '1.0'");
-        assertFail(IllegalArgumentException.class, "Cannot convert value 1.0 to", "1 = '1.0'");
+        assertExpressionFail(IllegalArgumentException.class, "Cannot compare true and", null, "true = '1.0'");
+        assertExpressionFail(IllegalArgumentException.class, "Cannot convert value 1.0 to", null, "1 = '1.0'");
 
         assertExpression(true, null, "1 = '1'");
         assertExpression(true, null, "'1' = 1");
@@ -62,44 +53,50 @@ public class ExpressionTest extends Assert
     @Test
     public void test_1() throws Exception
     {
-        Row row = Row.of(alias, 0, new Object[] {true, false, false, false, false, null});
+        Map<String, Object> values = new HashMap<>();
+        values.put("a", true);
+        values.put("b", false);
+        values.put("c", false);
+        values.put("d", false);
+        values.put("e", false);
+        values.put("f", null);
 
-        assertExpression(true, row, "1 + 1 > 10 - 9");
+        assertExpression(true, null, "1 + 1 > 10 - 9");
 
-        assertExpression(null, row, "null and true");
-        assertExpression(null, row, "true and null");
-        assertExpression(true, row, "null or true");
-        assertExpression(true, row, "true or null");
-        assertExpression(null, row, "null or false");
-        assertExpression(null, row, "false or null");
-        assertExpression(false, row, "false and true");
-        assertExpression(true, row, "true and true");
-        assertExpression(false, row, "false and false");
+        assertExpression(null, null, "null and true");
+        assertExpression(null, null, "true and null");
+        assertExpression(true, null, "null or true");
+        assertExpression(true, null, "true or null");
+        assertExpression(null, null, "null or false");
+        assertExpression(null, null, "false or null");
+        assertExpression(false, null, "false and true");
+        assertExpression(true, null, "true and true");
+        assertExpression(false, null, "false and false");
 
-        assertExpression(false, row, "true and false and true");
+        assertExpression(false, null, "true and false and true");
 
-        assertExpression(null, row, "true and null and true");
-        assertExpression(null, row, "not (true and null and true)");
-        assertExpression(null, row, "not (null)");
-        assertExpression(false, row, "true and null and true and 1 > 1 and 1 != 2 and 1 = null");
-        assertExpression(true, row, "a and not (d or e)");
-        assertExpression(false, row, "true and not true");
-        assertExpression(false, row, "(1 = 0 or 3 in(1,2) or 2 in(3,2)) and not (4 in(4) or 5 in(5))");
-        assertExpression(null, row, "null in (1,2,3)");
-        assertExpression(false, row, "1 in (null,2,3)");
+        assertExpression(null, null, "true and null and true");
+        assertExpression(null, null, "not (true and null and true)");
+        assertExpression(null, null, "not (null)");
+        assertExpression(false, null, "true and null and true and 1 > 1 and 1 != 2 and 1 = null");
+        assertExpression(true, values, "a and not (d or e)");
+        assertExpression(false, null, "true and not true");
+        assertExpression(false, null, "(1 = 0 or 3 in(1,2) or 2 in(3,2)) and not (4 in(4) or 5 in(5))");
+        assertExpression(null, null, "null in (1,2,3)");
+        assertExpression(false, null, "1 in (null,2,3)");
 
-        assertExpression(true, row, "null is null");
-        assertExpression(false, row, "null is not null");
-        assertExpression(true, row, "a is not null");
-        assertExpression(true, row, "f is null");
-        assertExpression(true, row, "f is null and a");
-        assertExpression(994, row, "hash(1,2)");
-        assertExpression(null, row, "hash(1,null)");
+        assertExpression(true, null, "null is null");
+        assertExpression(false, null, "null is not null");
+        assertExpression(true, values, "a is not null");
+        assertExpression(true, values, "f is null");
+        assertExpression(true, values, "f is null and a");
+        assertExpression(994, null, "hash(1,2)");
+        assertExpression(null, null, "hash(1,null)");
 
-        assertExpression(-2, row, "-2");
+        assertExpression(-2, null, "-2");
         long v = Integer.MIN_VALUE;
         v--;
-        assertExpression(v, row, Long.toString(v));
+        assertExpression(v, null, Long.toString(v));
     }
 
     @Test
@@ -127,7 +124,7 @@ public class ExpressionTest extends Assert
                 return java.util.UUID.randomUUID().toString();
             }
         });
-        catalogRegistry.registerCatalog("UTILS", utils);
+        session.getCatalogRegistry().registerCatalog("UTILS", utils);
 
         assertExpression(true, null, "UTILS#uuid() is not null");
     }
@@ -135,42 +132,55 @@ public class ExpressionTest extends Assert
     @Test
     public void test_and() throws Exception
     {
-        Row row = Row.of(alias, 0, new Object[] {true, false, false, false, false});
+        Map<String, Object> values = new HashMap<>();
+        values.put("a", true);
+        values.put("b", false);
+        values.put("c", false);
+        values.put("d", false);
+        values.put("e", false);
 
-        assertExpression(true, row, "true and true");
-        assertExpression(false, row, "true and false");
-        assertExpression(null, row, "true and null");
-        assertExpression(false, row, "false and true");
-        assertExpression(false, row, "false and false");
-        assertExpression(false, row, "false and null");
+        assertExpression(true, values, "true and true");
+        assertExpression(false, values, "true and false");
+        assertExpression(null, values, "true and null");
+        assertExpression(false, values, "false and true");
+        assertExpression(false, values, "false and false");
+        assertExpression(false, values, "false and null");
     }
 
     @Test
     public void test_literal() throws Exception
     {
-        Row row = Row.of(alias, 0, new Object[] {true, false, false, false, false});
+        Map<String, Object> values = new HashMap<>();
+        values.put("a", true);
+        values.put("b", false);
+        values.put("c", false);
+        values.put("d", false);
+        values.put("e", false);
 
-        assertExpression(1, row, "1");
-        assertExpression(Long.MAX_VALUE, row, Long.toString(Long.MAX_VALUE));
-        assertExpression(1.1f, row, "1.1");
-        assertExpression(10, row, "10");
-        assertExpression("hello world", row, "'hello world'");
-        assertExpression(null, row, "null");
-        assertExpression(false, row, "false");
-        assertExpression(true, row, "true");
+        assertExpression(1, values, "1");
+        assertExpression(Long.MAX_VALUE, values, Long.toString(Long.MAX_VALUE));
+        assertExpression(1.1f, values, "1.1");
+        assertExpression(10, values, "10");
+        assertExpression("hello world", values, "'hello world'");
+        assertExpression(null, values, "null");
+        assertExpression(false, values, "false");
+        assertExpression(true, values, "true");
     }
 
     @Test
     public void test_in_expression() throws Exception
     {
-        Row row = Row.of(alias, 0, new Object[] {1, null, asList(1, 2)});
+        Map<String, Object> values = new HashMap<>();
+        values.put("a", 1);
+        values.put("b", null);
+        values.put("c", asList(1, 2));
 
-        assertExpression(false, row, "(1+2+3+4) > 123 and (1.0 <20)");
-        assertExpression(null, row, "null in(1,2,3,'str')");
-        assertExpression(true, row, "a in(1,null,3,'str')");
-        assertExpression(true, row, "'str' in(1,2,3,'str')");
-        assertExpression(true, row, "1 in(c, 1,2,3,'str', c)");
-        assertExpression(false, row, "10.1 in(c, 1,2,3,'str', c)");
+        assertExpression(false, values, "(1+2+3+4) > 123 and (1.0 <20)");
+        assertExpression(null, values, "null in(1,2,3,'str')");
+        assertExpression(true, values, "a in(1,null,3,'str')");
+        assertExpression(true, values, "'str' in(1,2,3,'str')");
+        assertExpression(true, values, "1 in(c, 1,2,3,'str', c)");
+        assertExpression(false, values, "10.1 in(c, 1,2,3,'str', c)");
     }
 
     @Test
@@ -179,7 +189,7 @@ public class ExpressionTest extends Assert
         assertExpression(10, null, "isnull(null, 10)");
         assertExpression(10, null, "isnull(10, var)");
         assertExpression(6, null, "coalesce(null, null, 1+2+3)");
-        assertFail(ParseException.class, "expected 2 parameters", "isnull(10, var, 1)");
+        assertExpressionFail(ParseException.class, "expected 2 parameters", null, "isnull(10, var, 1)");
     }
 
     @SuppressWarnings("unchecked")
@@ -191,22 +201,30 @@ public class ExpressionTest extends Assert
     @Test
     public void test_qualifiednames() throws Exception
     {
-        Row row = Row.of(alias, 0, new Object[] {1, null, true, 1.1, 1.0, "string", "string2"});
-        assertExpression(false, row, "a > 10");
-        assertExpression(null, row, "b > 10");
-        assertExpression(false, row, "a > 10.0");
-        assertExpression(false, row, "a > d");
-        assertExpression(false, row, "a >= d");
-        assertExpression(true, row, "a < d");
-        assertExpression(true, row, "a <= d");
-        assertExpression(false, row, "a = d");
-        assertExpression(true, row, "a != d");
-        assertExpression(true, row, "a = e");
-        assertExpression(false, row, "a != e");
-        assertExpression(true, row, "f != g");
-        assertExpression(false, row, "f = g");
-        assertExpression(false, row, "f > g");
-        assertExpression(true, row, "f < g");
+        Map<String, Object> values = new HashMap<>();
+        values.put("a", 1);
+        values.put("b", null);
+        values.put("c", true);
+        values.put("d", 1.1);
+        values.put("e", 1.0);
+        values.put("f", "string");
+        values.put("g", "string2");
+
+        assertExpression(false, values, "a > 10");
+        assertExpression(null, values, "b > 10");
+        assertExpression(false, values, "a > 10.0");
+        assertExpression(false, values, "a > d");
+        assertExpression(false, values, "a >= d");
+        assertExpression(true, values, "a < d");
+        assertExpression(true, values, "a <= d");
+        assertExpression(false, values, "a = d");
+        assertExpression(true, values, "a != d");
+        assertExpression(true, values, "a = e");
+        assertExpression(false, values, "a != e");
+        assertExpression(true, values, "f != g");
+        assertExpression(false, values, "f = g");
+        assertExpression(false, values, "f > g");
+        assertExpression(true, values, "f < g");
     }
 
     @Test
@@ -295,7 +313,11 @@ public class ExpressionTest extends Assert
                 null, null,
         };
 
-        Row row = Row.of(alias, 0, new Object[] {true, false, null, 10});
+        Map<String, Object> values = new HashMap<>();
+        values.put("a", true);
+        values.put("b", false);
+        values.put("c", null);
+        values.put("d", 10);
 
         int index = 0;
         for (String l : expression)
@@ -304,15 +326,15 @@ public class ExpressionTest extends Assert
             {
                 for (String o : operators)
                 {
-                    assertExpression(results[index++], row, l + " " + o + " " + r);
+                    assertExpression(results[index++], values, l + " " + o + " " + r);
                 }
             }
         }
 
-        assertExpression(false, row, "not (1 > 0)");
+        assertExpression(false, values, "not (1 > 0)");
         // Test different types
-        assertFail(ClassCastException.class, "java.lang.Integer cannot be cast to java.lang.Boolean", row, "a and d");
-        assertFail(ClassCastException.class, "java.lang.Integer cannot be cast to java.lang.Boolean", row, "b or d");
+        assertExpressionFail(ClassCastException.class, "java.lang.Integer cannot be cast to java.lang.Boolean", values, "a and d");
+        assertExpressionFail(ClassCastException.class, "java.lang.Integer cannot be cast to java.lang.Boolean", values, "b or d");
     }
 
     @Test
@@ -401,7 +423,10 @@ public class ExpressionTest extends Assert
                 null, null, null, null, null
         };
 
-        Row row = Row.of(alias, 0, new Object[] {1, 1.0f, null});
+        Map<String, Object> values = new HashMap<>();
+        values.put("a", 1);
+        values.put("b", 1.0f);
+        values.put("c", null);
 
         int index = 0;
         for (String l : expression)
@@ -410,20 +435,20 @@ public class ExpressionTest extends Assert
             {
                 for (String o : operators)
                 {
-                    assertExpression(results[index++], row, l + " " + o + " " + r);
+                    assertExpression(results[index++], values, l + " " + o + " " + r);
                 }
             }
         }
 
-        assertExpression("hello world", row, "'hello' + ' world'");
+        assertExpression("hello world", values, "'hello' + ' world'");
 
         // Test different types
-        assertFail(ArithmeticException.class, "Cannot subtract true", "true - 10");
-        assertFail(ArithmeticException.class, "Cannot multiply true", "true * 10");
-        assertFail(ArithmeticException.class, "Cannot divide true", "true / 10");
-        assertFail(ArithmeticException.class, "Cannot add true", "true + 10");
-        assertFail(ArithmeticException.class, "Cannot modulo true", "true % 10");
-        assertFail(ArithmeticException.class, "/ by zero", "1 / 0");
+        assertExpressionFail(ArithmeticException.class, "Cannot subtract true", null, "true - 10");
+        assertExpressionFail(ArithmeticException.class, "Cannot multiply true", null, "true * 10");
+        assertExpressionFail(ArithmeticException.class, "Cannot divide true", null, "true / 10");
+        assertExpressionFail(ArithmeticException.class, "Cannot add true", null, "true + 10");
+        assertExpressionFail(ArithmeticException.class, "Cannot modulo true", null, "true % 10");
+        assertExpressionFail(ArithmeticException.class, "/ by zero", null, "1 / 0");
     }
 
     @Test
@@ -512,7 +537,10 @@ public class ExpressionTest extends Assert
                 null, null, null, null, null, null,
         };
 
-        Row row = Row.of(alias, 0, new Object[] {1, 1.0, null});
+        Map<String, Object> values = new HashMap<>();
+        values.put("a", 1);
+        values.put("b", 1.0f);
+        values.put("c", null);
 
         int index = 0;
         for (String l : expression)
@@ -521,69 +549,31 @@ public class ExpressionTest extends Assert
             {
                 for (String o : operators)
                 {
-                    assertExpression(results[index++], row, l + " " + o + " " + r);
+                    assertExpression(results[index++], values, l + " " + o + " " + r);
                 }
             }
         }
 
-        assertExpression(true, row, "'str' = 'str'");
-        assertExpression(false, row, "'str' != 'str'");
-        assertExpression(false, row, "'str' > 'str'");
-        assertExpression(true, row, "'str' >= 'str'");
-        assertExpression(false, row, "'str' < 'str'");
-        assertExpression(true, row, "'str' <= 'str'");
+        assertExpression(true, values, "'str' = 'str'");
+        assertExpression(false, values, "'str' != 'str'");
+        assertExpression(false, values, "'str' > 'str'");
+        assertExpression(true, values, "'str' >= 'str'");
+        assertExpression(false, values, "'str' < 'str'");
+        assertExpression(true, values, "'str' <= 'str'");
 
-        assertExpression(true, row, "false = false");
-        assertExpression(false, row, "false != false");
-        assertExpression(false, row, "false > false");
-        assertExpression(true, row, "false >= false");
-        assertExpression(false, row, "false < false");
-        assertExpression(true, row, "false <= false");
+        assertExpression(true, values, "false = false");
+        assertExpression(false, values, "false != false");
+        assertExpression(false, values, "false > false");
+        assertExpression(true, values, "false >= false");
+        assertExpression(false, values, "false < false");
+        assertExpression(true, values, "false <= false");
 
         // Test different types
-        assertFail(IllegalArgumentException.class, "Cannot compare ", "getdate() = 10");
-        assertFail(IllegalArgumentException.class, "Cannot compare ", "getdate() != 10");
-        assertFail(IllegalArgumentException.class, "Cannot compare ", "getdate() > 10");
-        assertFail(IllegalArgumentException.class, "Cannot compare ", "getdate() >= 10");
-        assertFail(IllegalArgumentException.class, "Cannot compare ", "getdate() < 10");
-        assertFail(IllegalArgumentException.class, "Cannot compare ", "getdate() <= 10");
-    }
-
-    private void assertFail(Class<? extends Exception> e, String messageContains, String expression)
-    {
-        assertFail(e, messageContains, null, expression);
-    }
-
-    private void assertFail(Class<? extends Exception> e, String messageContains, Row row, String expression)
-    {
-        try
-        {
-            Expression expr = parser.parseExpression(session.getCatalogRegistry(), expression);
-            ExecutionContext context = new ExecutionContext(new QuerySession(new CatalogRegistry()));
-            context.setTuple(row);
-            expr.eval(context);
-            fail(expression + " should fail.");
-        }
-        catch (Exception ee)
-        {
-            assertEquals(e, ee.getClass());
-            assertTrue("Expected exception message to contain " + messageContains + " but was: " + ee.getMessage(), ee.getMessage().contains(messageContains));
-        }
-    }
-
-    private void assertExpression(Object value, Row row, String expression) throws Exception
-    {
-        try
-        {
-            Expression expr = parser.parseExpression(session.getCatalogRegistry(), expression);
-            ExecutionContext context = new ExecutionContext(new QuerySession(catalogRegistry));
-            context.setTuple(row);
-            assertEquals("Eval: " + expression, value, expr.eval(context));
-        }
-        catch (Exception e)
-        {
-            e.printStackTrace();
-            fail(expression + " " + e.getMessage());
-        }
+        assertExpressionFail(IllegalArgumentException.class, "Cannot compare ", null, "getdate() = 10");
+        assertExpressionFail(IllegalArgumentException.class, "Cannot compare ", null, "getdate() != 10");
+        assertExpressionFail(IllegalArgumentException.class, "Cannot compare ", null, "getdate() > 10");
+        assertExpressionFail(IllegalArgumentException.class, "Cannot compare ", null, "getdate() >= 10");
+        assertExpressionFail(IllegalArgumentException.class, "Cannot compare ", null, "getdate() < 10");
+        assertExpressionFail(IllegalArgumentException.class, "Cannot compare ", null, "getdate() <= 10");
     }
 }

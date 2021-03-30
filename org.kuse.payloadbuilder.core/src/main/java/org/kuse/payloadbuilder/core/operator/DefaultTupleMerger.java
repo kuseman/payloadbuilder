@@ -17,69 +17,43 @@ class DefaultTupleMerger implements TupleMerger
     @Override
     public Tuple merge(Tuple outer, Tuple inner, boolean populating, int nodeId)
     {
-        //        Tuple result = outer;
-
         // No populating merge, create/or merge a composite tuple
         if (!populating)
         {
+            // Outer is already a composite tuple
+            // make a copy and add merge inner to get a flat structure
             if (outer instanceof CompositeTuple)
             {
                 CompositeTuple tuple = (CompositeTuple) outer;
-                return new CompositeTuple(tuple, inner);
-            }
-            else if (inner instanceof CompositeTuple)
-            {
-                CompositeTuple tuple = (CompositeTuple) inner;
-                return new CompositeTuple(outer, tuple);
+                CompositeTuple newTuple = new CompositeTuple(tuple);
+                newTuple.add(inner);
+                return newTuple;
             }
 
             return new CompositeTuple(outer, inner);
         }
 
-        /*
-         * a    b
-         * 1    1,1
-         * 2    1,2
-         * 3    2,1
-         *      2,2
-         *
-         * (s, [a], [an])     (aa, ap, a1) = > (s, [a], [an], [aa])
-         *
-         *
-         */
-
         CompositeTuple outerTuple;
-        PopulatingTuple populatingTuple;
+        CollectionTuple populatingTuple;
         if (!(outer instanceof CompositeTuple))
         {
-            populatingTuple = new PopulatingTuple(nodeId, inner);
+            populatingTuple = new CollectionTuple(inner);
             return new CompositeTuple(outer, populatingTuple);
         }
 
         outerTuple = (CompositeTuple) outer;
-        // Fetch last tuple in the composite and see if that one belongs to the current merging node
-        Tuple tuple = outerTuple.getTuples().get(outerTuple.getTuples().size() - 1);
-        if (tuple instanceof PopulatingTuple && ((PopulatingTuple) tuple).getNodeId() == nodeId)
+
+        // Fetch the populating tuple from the outer
+        Tuple tuple = outerTuple.getTuple(inner.getTupleOrdinal());
+
+        if (!(tuple instanceof CollectionTuple))
         {
-            populatingTuple = (PopulatingTuple) tuple;
-            populatingTuple.getTuples().add(inner);
+            throw new RuntimeException("Expected a populating tuple but got: " + tuple);
         }
-        else
-        {
-            populatingTuple = new PopulatingTuple(nodeId, inner);
-            outerTuple.getTuples().add(populatingTuple);
-        }
+
+        ((CollectionTuple) tuple).add(inner);
 
         return outerTuple;
-
-        // Parent is always populated
-        //        inner.addParent(result);
-        //        List<Row> childRows = result.getChildRows(inner.getTableAlias());
-        //        if (limit < 0 || childRows.size() < limit)
-        //        {
-        //            childRows.add(inner);
-        //        }
-        //        return result;
     }
 
     @Override

@@ -572,16 +572,7 @@ class QueryFileView extends JPanel
             return;
         }
 
-        if (value instanceof Row)
-        {
-            Row pbRow = (Row) value;
-            TableAlias alias = pbRow.getTableAlias();
-            value = ofEntries(
-                    entry("table", alias.getTable().toString()),
-                    entry("columns", pbRow.getColumns()),
-                    entry("values", pbRow.getValues()));
-        }
-        else if (value.getClass().isArray())
+        if (value.getClass().isArray())
         {
             int length = Array.getLength(value);
             List<Object> list = new ArrayList<>(length);

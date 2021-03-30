@@ -2,22 +2,75 @@ package org.kuse.payloadbuilder.core.operator;
 
 import java.util.Iterator;
 
-import org.kuse.payloadbuilder.core.parser.QualifiedName;
+import org.apache.commons.collections.IteratorUtils;
 
 /** Result produced by an {@link Operator} */
 public interface Tuple
 {
-    /** Returns true if this tuple contains provided alias */
-    boolean containsAlias(String alias);
+    /** Returns this tuple's ordinal */
+    int getTupleOrdinal();
 
     /**
-     * Resolve value from provided qualified name
+     * Get tuple by ordinal.
      *
-     * @param qname Qualified name to resolve
-     * @param partIndex From which index to start resolve in {@link QualifiedName#getParts()}
+     * <pre>
+     * If this is a composite tuple that consist of other tuples
+     * this method is called to fetch the sub tuple by it's ordinal
+     *
+     * Ie. a query:
+     *
+     * select *
+     * from tableA a
+     * inner join tableB b
+     *   on a.col = b.col
+     *
+     * We will get a composite tuple stream that looks like:
+     *
+     * CompositeTuple
+     *   RowTuple (a)     (ordinal = 0)
+     *   RowTuple (b)     (ordinal = 1)
+     * </pre>
+     *
+     * @param tupleOrdinal Ordinal to resolve
      */
-    Object getValue(QualifiedName qname, int partIndex);
+    Tuple getTuple(int tupleOrdinal);
 
-    /** Returns an iterator of qualified names for this tuple. Used to resolve q-names when using asterisk selects. */
-    Iterator<QualifiedName> getQualifiedNames();
+    /**
+     * Get value for provided column ordinal
+     *
+     * @param columnOrdinal Ordinal to resolve
+     */
+    default Object getValue(int columnOrdinal)
+    {
+        throw new RuntimeException();
+    }
+
+    /**
+     * Get value for provided column
+     *
+     * @param column Column to resolve
+     */
+    Object getValue(String column);
+
+    /**
+     * Return an iterator with all values for provided ordinal
+     * NOTE! Value returned iterator might be a singleton if implementers chooses to.
+     * @param tupleOrdinal Ordinal to stream values for or -1 to stream all tuples values
+     */
+    default Iterator<TupleColumn> getColumns(int tupleOrdinal)
+    {
+        return IteratorUtils.emptyIterator();
+    }
+
+    /**
+     * Definition of a tuple column. Return when streaming all columns from a tuple
+     */
+    interface TupleColumn
+    {
+        /** Which tuple ordinal this value belongs to. */
+        int getTupleOrdinal();
+
+        /** Name of the column */
+        String getColumn();
+    }
 }

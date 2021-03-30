@@ -1,7 +1,7 @@
 package org.kuse.payloadbuilder.core.operator;
 
+import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
-import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -11,6 +11,7 @@ import java.util.stream.IntStream;
 
 import org.antlr.v4.runtime.Token;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -24,8 +25,13 @@ public class TableAlias
     private final QualifiedName table;
     private final String alias;
     private final List<TableAlias> childAliases = new ArrayList<>();
-    /** Index of this alias in parent child aliases */
-    private final int parentIndex;
+    /** Unique ordinal of this alias
+     * <pre>
+     * Each table source in a select query gets assigned
+     * a unique ordinal for fast access
+     *  </pre>
+     **/
+    private final int tupleOrdinal;
     private final Type type;
 
     private String[] columns;
@@ -33,6 +39,7 @@ public class TableAlias
     private boolean asteriskColumns;
 
     TableAlias(
+            int tupleOrdinal,
             TableAlias parent,
             QualifiedName table,
             String alias,
@@ -41,6 +48,7 @@ public class TableAlias
             Type type,
             Token token)
     {
+        this.tupleOrdinal = tupleOrdinal;
         this.parent = parent;
         this.table = requireNonNull(table, "table");
         this.alias = requireNonNull(alias, "alias");
@@ -48,7 +56,6 @@ public class TableAlias
         this.type = requireNonNull(type, "type");
         this.asteriskColumns = asteriskColumns;
 
-        int parentIndex = -1;
         if (parent != null)
         {
             // Verify no siblings has the same alias
@@ -58,9 +65,7 @@ public class TableAlias
             }
 
             parent.childAliases.add(this);
-            parentIndex = parent.childAliases.size() - 1;
         }
-        this.parentIndex = parentIndex;
     }
 
     public Type getType()
@@ -85,7 +90,7 @@ public class TableAlias
 
     public List<TableAlias> getChildAliases()
     {
-        return childAliases;
+        return unmodifiableList(childAliases);
     }
 
     /** Get child alias for provided alias */
@@ -108,10 +113,23 @@ public class TableAlias
         return null;
     }
 
+    /** Return sibling alias with provided alias */
+    public TableAlias getSiblingAlias(String alias)
+    {
+        TableAlias current = this.parent;
+        if (current == null)
+        {
+            return null;
+        }
+        return current.getChildAlias(alias);
+    }
+
     /**
      * <pre>
-     * Returns columns collected for this alias in the query.
+     * Returns columns defined to for this table
      * If not empty these columns should be used when constructing {@link Row}'s
+     * NOTE! If this is not empty values MUST come in the same order as in the array.
+     * This is because the core plans references to index:es for faster access
      * </pre>
      */
     public String[] getColumns()
@@ -125,7 +143,7 @@ public class TableAlias
         {
             throw new IllegalArgumentException("Cannot modify coulumns when set.");
         }
-        this.columns = defaultIfNull(columns, ArrayUtils.EMPTY_STRING_ARRAY);
+        this.columns = ObjectUtils.defaultIfNull(columns, ArrayUtils.EMPTY_STRING_ARRAY);
     }
 
     public boolean isAsteriskColumns()
@@ -136,15 +154,20 @@ public class TableAlias
     void setAsteriskColumns()
     {
         this.asteriskColumns = true;
+        // Propagate to child aliases
+        if (type == Type.SUBQUERY)
+        {
+            childAliases.forEach(a -> a.setAsteriskColumns());
+        }
     }
 
-    public int getParentIndex()
+    public int getTupleOrdinal()
     {
-        return parentIndex;
+        return tupleOrdinal;
     }
 
     /** Print alias hierarchy */
-    public String printHierarchy(int indent)
+    String printHierarchy(int indent)
     {
         StringBuilder sb = new StringBuilder();
         sb.append(StringUtils.repeat(' ', indent * 2));
@@ -170,13 +193,14 @@ public class TableAlias
     @Override
     public String toString()
     {
-        return table + " (" + alias + ")";
+        return table + " [" + alias + ", " + tupleOrdinal + "]";
     }
 
     /** Used for test verification only */
-    public boolean isEqual(TableAlias other)
+    boolean isEqual(TableAlias other)
     {
-        return table.equals(other.table)
+        return tupleOrdinal == other.tupleOrdinal
+            && table.equals(other.table)
             && alias.equals(other.alias)
             && Objects.deepEquals(columns, other.columns)
             && type == other.type
@@ -195,6 +219,7 @@ public class TableAlias
     /** Builder for aliases */
     public static class TableAliasBuilder
     {
+        private final int tupleOrdinal;
         private final Type type;
         private final QualifiedName qname;
         private final String alias;
@@ -204,8 +229,9 @@ public class TableAlias
         private boolean asteriskColumns;
         private List<TableAliasBuilder> childAliases;
 
-        TableAliasBuilder(Type type, QualifiedName qname, String alias, Token token)
+        TableAliasBuilder(int tupleOrdinal, Type type, QualifiedName qname, String alias, Token token)
         {
+            this.tupleOrdinal = tupleOrdinal;
             this.type = type;
             this.qname = qname;
             this.alias = alias;
@@ -241,7 +267,7 @@ public class TableAlias
         /** Build alias */
         public TableAlias build()
         {
-            TableAlias result = new TableAlias(parent, qname, alias, columns, asteriskColumns, type, token);
+            TableAlias result = new TableAlias(tupleOrdinal, parent, qname, alias, columns, asteriskColumns, type, token);
             if (childAliases != null)
             {
                 childAliases.forEach(c ->
@@ -254,15 +280,15 @@ public class TableAlias
         }
 
         /** Create a builder out of provided tyee, qname and alias */
-        public static TableAliasBuilder of(Type type, QualifiedName qname, String alias)
+        public static TableAliasBuilder of(int tupleOrdinal, Type type, QualifiedName qname, String alias)
         {
-            return of(type, qname, alias, null);
+            return of(tupleOrdinal, type, qname, alias, null);
         }
 
         /** Create a builder out of provided tyee, qname, alias and token */
-        public static TableAliasBuilder of(Type type, QualifiedName qname, String alias, Token token)
+        public static TableAliasBuilder of(int tupleOrdinal, Type type, QualifiedName qname, String alias, Token token)
         {
-            return new TableAliasBuilder(type, qname, alias, token);
+            return new TableAliasBuilder(tupleOrdinal, type, qname, alias, token);
         }
     }
 }

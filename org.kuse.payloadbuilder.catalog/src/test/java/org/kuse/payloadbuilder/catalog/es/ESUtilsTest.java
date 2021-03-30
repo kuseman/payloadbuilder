@@ -39,7 +39,7 @@ public class ESUtilsTest extends Assert
         assertEquals("{\"sort\":[{\"@timestamp\":{\"order\":\"desc\"}},{\"count\":{\"order\":\"asc\"}}]}",
                 ESUtils.getSearchBody(asList(Pair.of("@timestamp", "desc"), Pair.of("count", "asc")), emptyList(), true, context));
 
-        TableAlias alias = TableAlias.TableAliasBuilder.of(Type.TABLE, QualifiedName.of("table"), "t").build();
+        TableAlias alias = TableAlias.TableAliasBuilder.of(-1, Type.TABLE, QualifiedName.of("table"), "t").build();
         AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(parser.parseExpression(registry,
                 "timestamp > '20201010T10:10:10:000Z' " +
                     "and timestamp < '20201010T10:10:10:000Z' " +
@@ -131,7 +131,7 @@ public class ESUtilsTest extends Assert
         assertEquals("{\"sort\":[{\"@timestamp\":{\"order\":\"desc\"}},{\"count\":{\"order\":\"asc\"}}]}",
                 ESUtils.getSearchBody(asList(Pair.of("@timestamp", "desc"), Pair.of("count", "asc")), emptyList(), false, context));
 
-        TableAlias alias = TableAlias.TableAliasBuilder.of(Type.TABLE, QualifiedName.of("table"), "t").build();
+        TableAlias alias = TableAlias.TableAliasBuilder.of(-1, Type.TABLE, QualifiedName.of("table"), "t").build();
         AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(parser.parseExpression(registry,
                 "timestamp > '20201010T10:10:10:000Z' " +
                     "and timestamp < '20201010T10:10:10:000Z' " +

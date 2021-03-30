@@ -18,7 +18,7 @@ public class TopOperatorTest extends AOperatorTest
     public void test()
     {
         Random rnd = new Random();
-        TableAlias alias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("table"), "a").build();
+        TableAlias alias = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("table"), "a").build();
         MutableBoolean close = new MutableBoolean();
         Operator target = op(ctx -> IntStream.range(0, 100).mapToObj(i -> (Tuple) Row.of(alias, i, new Object[] {rnd.nextInt(100)})).iterator(), () -> close.setTrue());
         TopOperator operator = new TopOperator(

@@ -34,10 +34,10 @@ public class PredicateAnalyzerTest extends Assert
     @Test
     public void test_AnalyzeResult()
     {
-        TableAlias root = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
+        TableAlias root = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
                 .children(asList(
-                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableA"), "a"),
-                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableS"), "s")))
+                        TableAliasBuilder.of(0, TableAlias.Type.TABLE, QualifiedName.of("tableA"), "a"),
+                        TableAliasBuilder.of(1, TableAlias.Type.TABLE, QualifiedName.of("tableS"), "s")))
                 .build();
 
         TableAlias alias = root.getChildAliases().get(0);
@@ -142,13 +142,13 @@ public class PredicateAnalyzerTest extends Assert
     @Test
     public void test_nested_reference()
     {
-        TableAlias alias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
+        TableAlias alias = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
                 .children(asList(
-                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("source"), "s"),
-                        TableAliasBuilder.of(TableAlias.Type.SUBQUERY, QualifiedName.of("source"), "a")
+                        TableAliasBuilder.of(0, TableAlias.Type.TABLE, QualifiedName.of("source"), "s"),
+                        TableAliasBuilder.of(1, TableAlias.Type.SUBQUERY, QualifiedName.of("source"), "a")
                                 .children(asList(
-                                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("article"), "a"),
-                                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("articleBrand"), "ab")))))
+                                        TableAliasBuilder.of(2, TableAlias.Type.TABLE, QualifiedName.of("article"), "a"),
+                                        TableAliasBuilder.of(3, TableAlias.Type.TABLE, QualifiedName.of("articleBrand"), "ab")))))
                 .build();
 
         AnalyzePair p;
@@ -168,12 +168,12 @@ public class PredicateAnalyzerTest extends Assert
     @Test
     public void test_AnalyzePair()
     {
-        TableAlias root = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
+        TableAlias root = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
                 .children(asList(
-                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("SubQuery"), "aa")
+                        TableAliasBuilder.of(0, TableAlias.Type.TABLE, QualifiedName.of("SubQuery"), "aa")
                                 .children(asList(
-                                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableA"), "articleAttribute"),
-                                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableS"), "a1")))))
+                                        TableAliasBuilder.of(1, TableAlias.Type.TABLE, QualifiedName.of("tableA"), "articleAttribute"),
+                                        TableAliasBuilder.of(2, TableAlias.Type.TABLE, QualifiedName.of("tableS"), "a1")))))
                 .build();
 
         TableAlias alias = root.getChildAliases().get(0);
@@ -210,14 +210,14 @@ public class PredicateAnalyzerTest extends Assert
         assertFalse(p.isPushdown("b"));
         assertFalse(p.isEqui("s"));
 
-        root = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
+        root = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
                 .children(asList(
-                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableS"), "s"),
-                        TableAliasBuilder.of(TableAlias.Type.SUBQUERY, QualifiedName.of("tableA"), "a")
+                        TableAliasBuilder.of(0, TableAlias.Type.TABLE, QualifiedName.of("tableS"), "s"),
+                        TableAliasBuilder.of(1, TableAlias.Type.SUBQUERY, QualifiedName.of("tableA"), "a")
                                 .children(asList(
-                                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableA_A"), "a_a"))),
-                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableB"), "b"),
-                        TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableC"), "c")
+                                        TableAliasBuilder.of(2, TableAlias.Type.TABLE, QualifiedName.of("tableA_A"), "a_a"))),
+                        TableAliasBuilder.of(3, TableAlias.Type.TABLE, QualifiedName.of("tableB"), "b"),
+                        TableAliasBuilder.of(4, TableAlias.Type.TABLE, QualifiedName.of("tableC"), "c")
 
                 ))
                 .build();

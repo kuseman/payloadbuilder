@@ -266,7 +266,23 @@ public final class ExpressionMath
     @SuppressWarnings("unchecked")
     public static int cmp(Object left, Object right)
     {
-        if (left.getClass() != right.getClass() || !(left instanceof Comparable))
+        if (left instanceof Double && right instanceof Number)
+        {
+            return Double.compare(((Double) left).doubleValue(), ((Number) right).doubleValue());
+        }
+        else if (left instanceof Float && right instanceof Number)
+        {
+            return Float.compare(((Float) left).floatValue(), ((Number) right).floatValue());
+        }
+        else if (left instanceof Long && right instanceof Number)
+        {
+            return Long.compare(((Long) left).longValue(), ((Number) right).longValue());
+        }
+        else if (left instanceof Integer && right instanceof Number)
+        {
+            return Integer.compare(((Integer) left).intValue(), ((Number) right).intValue());
+        }
+        else if (left.getClass() != right.getClass() || !(left instanceof Comparable))
         {
             throw new IllegalArgumentException("Cannot compare " + left + " and " + right);
         }

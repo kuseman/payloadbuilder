@@ -5,6 +5,7 @@ import static java.util.stream.Collectors.joining;
 
 import java.util.List;
 
+import org.antlr.v4.runtime.Token;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 
 /** Scalar function call */
@@ -12,11 +13,14 @@ public class QualifiedFunctionCallExpression extends Expression
 {
     private final List<Expression> arguments;
     private final ScalarFunctionInfo functionInfo;
+    private final Token token;
 
     QualifiedFunctionCallExpression(
             ScalarFunctionInfo functionInfo,
-            List<Expression> arguments)
+            List<Expression> arguments,
+            Token token)
     {
+        this.token = token;
         this.functionInfo = requireNonNull(functionInfo, "functionInfo");
         this.arguments = requireNonNull(arguments, "arguments");
     }
@@ -29,6 +33,11 @@ public class QualifiedFunctionCallExpression extends Expression
     public List<Expression> getArguments()
     {
         return arguments;
+    }
+
+    public Token getToken()
+    {
+        return token;
     }
 
     @Override

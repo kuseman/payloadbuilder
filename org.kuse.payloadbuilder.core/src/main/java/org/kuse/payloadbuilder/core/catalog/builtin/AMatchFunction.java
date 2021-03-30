@@ -6,7 +6,6 @@ import static java.util.Collections.singletonList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.LambdaFunction;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
@@ -18,6 +17,9 @@ import org.kuse.payloadbuilder.core.utils.CollectionUtils;
 /** Any function. Check if any of inputs is true */
 class MatchFunction extends ScalarFunctionInfo implements LambdaFunction
 {
+    private static final List<LambdaBinding> LAMBDA_BINDINGS = singletonList(
+            new LambdaBinding(1, 0));
+
     private final MatchType type;
 
     MatchFunction(Catalog catalog, MatchType type)
@@ -27,9 +29,9 @@ class MatchFunction extends ScalarFunctionInfo implements LambdaFunction
     }
 
     @Override
-    public List<Pair<Expression, LambdaExpression>> getLambdaBindings(List<Expression> arguments)
+    public List<LambdaBinding> getLambdaBindings()
     {
-        return singletonList(Pair.of(arguments.get(0), (LambdaExpression) arguments.get(1)));
+        return LAMBDA_BINDINGS;
     }
 
     @Override

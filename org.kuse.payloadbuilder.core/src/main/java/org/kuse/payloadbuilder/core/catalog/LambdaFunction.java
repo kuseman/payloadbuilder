@@ -2,10 +2,6 @@ package org.kuse.payloadbuilder.core.catalog;
 
 import java.util.List;
 
-import org.apache.commons.lang3.tuple.Pair;
-import org.kuse.payloadbuilder.core.parser.Expression;
-import org.kuse.payloadbuilder.core.parser.LambdaExpression;
-
 /** Interface marking a function as a lambda function */
 public interface LambdaFunction
 {
@@ -21,8 +17,31 @@ public interface LambdaFunction
      * <i>map(list, x -> x.id)</i>
      * Here argument <b>list</b> binds to the lambda expression <b>x -> x.id</b>.
      * </pre>
-     *
-     * @param arguments Argument expression to function
      */
-    List<Pair<Expression, LambdaExpression>> getLambdaBindings(List<Expression> arguments);
+    List<LambdaBinding> getLambdaBindings();
+
+    /** A lambda binding */
+    class LambdaBinding
+    {
+        /** The index of the lambda argument*/
+        private final int lambdaArg;
+        /** The index of the destination argument */
+        private final int toArg;
+
+        public LambdaBinding(int lambdaArg, int toArg)
+        {
+            this.lambdaArg = lambdaArg;
+            this.toArg = toArg;
+        }
+
+        public int getLambdaArg()
+        {
+            return lambdaArg;
+        }
+
+        public int getToArg()
+        {
+            return toArg;
+        }
+    }
 }

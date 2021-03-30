@@ -8,27 +8,15 @@ import java.util.function.Function;
 
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.tuple.Pair;
-import org.junit.Assert;
-import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
-import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
+import org.kuse.payloadbuilder.core.parser.AParserTest;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
-import org.kuse.payloadbuilder.core.parser.Expression;
-import org.kuse.payloadbuilder.core.parser.QueryParser;
 import org.kuse.payloadbuilder.core.parser.SortItem;
 
 /** Base class of {@link OperatorBuilder} tests. */
-public class AOperatorTest extends Assert
+public class AOperatorTest extends AParserTest
 {
-    protected final QueryParser parser = new QueryParser();
-    protected final QuerySession session = new QuerySession(new CatalogRegistry());
-
-    protected Expression e(String expression)
-    {
-        return parser.parseExpression(session.getCatalogRegistry(), expression);
-    }
-
     protected Operator op(final Function<ExecutionContext, Iterator<Tuple>> it)
     {
         return op(it, null);
@@ -130,7 +118,7 @@ public class AOperatorTest extends Assert
         };
         session.getCatalogRegistry().registerCatalog("c", c);
         session.getCatalogRegistry().setDefaultCatalog("c");
-        Pair<Operator, Projection> pair = OperatorBuilder.create(session, parser.parseSelect(session.getCatalogRegistry(), query));
+        Pair<Operator, Projection> pair = OperatorBuilder.create(session, s(query));
 
         QueryResult result = new QueryResult();
 

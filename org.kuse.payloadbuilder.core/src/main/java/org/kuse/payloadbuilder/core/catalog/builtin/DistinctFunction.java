@@ -7,7 +7,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.function.Function;
 
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
@@ -23,11 +22,11 @@ class DistinctFunction extends ScalarFunctionInfo
         super(catalog, "distinct");
     }
 
-    // Aliases equals the input arguments aliases
     @Override
-    public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Expression> arguments, Function<Expression, Set<TableAlias>> aliasResolver)
+    public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Set<TableAlias>> argumentAliases)
     {
-        return aliasResolver.apply(arguments.get(0));
+        // Distinct result aliases is the input arguments aliases
+        return argumentAliases.get(0);
     }
 
     @Override

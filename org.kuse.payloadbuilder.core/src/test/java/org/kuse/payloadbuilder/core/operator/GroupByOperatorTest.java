@@ -20,19 +20,11 @@ public class GroupByOperatorTest extends AOperatorTest
     @Test
     public void test()
     {
-        TableAlias alias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("a"), "a").columns(new String[] {"col1", "col2"}).build();
+        TableAlias alias = TableAliasBuilder.of(0, TableAlias.Type.TABLE, QualifiedName.of("a"), "a").columns(new String[] {"col1", "col2"}).build();
         MutableBoolean close = new MutableBoolean();
         Operator op = op(ctx -> IntStream.range(0, 10).mapToObj(i -> (Tuple) Row.of(alias, i, new Object[] {i, i % 2})).iterator(), () -> close.setTrue());
 
-        Operator gop = OperatorBuilderUtils.createGroupBy(0, asList(e("a.col2")), op);
-
-        //        GroupByOperator gop = new GroupByOperator(
-        //                0,
-        //                op,
-        //                asSet(QualifiedName.of("a.col2")),
-        //                new ExpressionValuesExtractor(asList(e("a.col2"))),
-        ////                (ctx, tuple, values) -> values[0] = tuple.getValue(QualifiedName.of("a", "col2"), 0),
-        //                1);
+        Operator gop = OperatorBuilderUtils.createGroupBy(0, asList(e("a.col2", alias)), op);
 
         RowIterator it = gop.open(new ExecutionContext(session));
 
@@ -47,16 +39,19 @@ public class GroupByOperatorTest extends AOperatorTest
 
         List<Object> actual = new ArrayList<>();
 
+        int count = 0;
         while (it.hasNext())
         {
-            Tuple tuple = it.next();
+            Tuple tuple = it.next().getTuple(0);
 
-            actual.add(IteratorUtils.toList(IteratorUtils.getIterator(tuple.getValue(QualifiedName.of("a", "col1"), 0))));
-            actual.add(IteratorUtils.toList(IteratorUtils.getIterator(tuple.getValue(QualifiedName.of("col2"), 0))));
-            actual.add(IteratorUtils.toList(IteratorUtils.getIterator(tuple.getValue(QualifiedName.of("a", "col2"), 0))));
+            actual.add(IteratorUtils.toList(IteratorUtils.getIterator(tuple.getValue("col1"))));
+            actual.add(IteratorUtils.toList(IteratorUtils.getIterator(tuple.getValue("col2"))));
+            actual.add(IteratorUtils.toList(IteratorUtils.getIterator(tuple.getValue("col2"))));
+            count++;
         }
         it.close();
 
+        assertEquals(2, count);
         assertEquals(expected, actual);
         assertTrue(close.booleanValue());
     }

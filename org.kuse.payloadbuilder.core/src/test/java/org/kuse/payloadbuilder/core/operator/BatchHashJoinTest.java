@@ -2,38 +2,27 @@ package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.toList;
+import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
+import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 
-import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
-import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Test {@link BatchHashJoin} */
 public class BatchHashJoinTest extends AOperatorTest
 {
-    private final TableAlias a = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("table"), "a")
-            .columns(new String[] {"col1", "col2"})
-            .children(asList(
-                    TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableB"), "b")
-                            .columns(new String[] {"col1", "col2"})
-                            .children(asList(
-                                    TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableC"), "c")
-                                            .columns(new String[] {"col1", "col2"})))))
-            .build();
-    private final TableAlias b = a.getChildAliases().get(0);
-    private final TableAlias c = b.getChildAliases().get(0);
-
     @Test
     public void test_inner_join_empty_outer()
     {
@@ -61,112 +50,137 @@ public class BatchHashJoinTest extends AOperatorTest
     @Test
     public void test_inner_join_empty_inner()
     {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 1);
-        Operator left = op(contet -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator());
-        Operator right = op(context ->
-        {
-            while (context.getOperatorContext().getOuterIndexValues().hasNext())
-            {
-                context.getOperatorContext().getOuterIndexValues().next();
-            }
-            return RowIterator.EMPTY;
-        });
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionValuesExtractor(asList(e("a.col1"))),
-                new ExpressionValuesExtractor(asList(e("b.col1"))),
-                new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                false,
-                index,
-                null);
+        String query = "select * "
+            + "from tableA a "
+            + "inner join tableB b "
+            + "  on b.col1 = a.col1";
 
-        assertFalse(op.open(new ExecutionContext(session)).hasNext());
+        MutableInt aClose = new MutableInt();
+        MutableInt bClose = new MutableInt();
+
+        Index index = new Index(QualifiedName.of("table"), asList("col1"), 1);
+        Operator op = operator(query,
+                ofEntries(entry("tableB", index)),
+                ofEntries(entry("tableB", a -> op(ctx ->
+                {
+                    while (ctx.getOperatorContext().getOuterIndexValues().hasNext())
+                    {
+                        ctx.getOperatorContext().getOuterIndexValues().next();
+                    }
+                    return RowIterator.EMPTY;
+                }, () -> bClose.increment()))),
+                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator(), () -> aClose.increment()))));
+
+        assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
+
+        RowIterator it = op.open(new ExecutionContext(session));
+        assertFalse(it.hasNext());
+        it.close();
+        assertEquals(1, aClose.intValue());
+        // Batch size 1
+        assertEquals(9, bClose.intValue());
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void test_bad_implementation_of_inner_operator()
     {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
-        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator());
-        Operator right = op(context -> RowIterator.EMPTY);
+        String query = "select * "
+            + "from tableA a "
+            + "inner join tableB b "
+            + "  on b.col1 = a.col1";
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionValuesExtractor(asList(e("a.col1"))),
-                new ExpressionValuesExtractor(asList(e("b.col1"))),
-                new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                false,
-                index,
-                null);
+        MutableInt aClose = new MutableInt();
+        MutableInt bClose = new MutableInt();
 
-        op.open(new ExecutionContext(session)).hasNext();
+        Index index = new Index(QualifiedName.of("table"), asList("col1"), 1);
+        Operator op = operator(query,
+                ofEntries(entry("tableB", index)),
+                ofEntries(entry("tableB", a -> op(ctx -> RowIterator.EMPTY, () -> bClose.increment()))),
+                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator(), () -> aClose.increment()))));
+
+        assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
+
+        try
+        {
+            op.open(new ExecutionContext(session)).hasNext();
+            fail();
+        }
+        catch (IllegalArgumentException e)
+        {
+            assertTrue(e.getMessage(), e.getMessage().contains("Check implementation of operator with index: table [col1] not all outer values was processed."));
+        }
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void test_bad_implementation_of_inner_operator_2()
     {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
-        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator());
-        Operator right = op(context ->
+        String query = "select * "
+            + "from tableA a "
+            + "inner join tableB b "
+            + "  on b.col1 = a.col1";
+
+        MutableInt aClose = new MutableInt();
+        MutableInt bClose = new MutableInt();
+
+        Index index = new Index(QualifiedName.of("table"), asList("col1"), 2);
+        Operator op = operator(query,
+                ofEntries(entry("tableB", index)),
+                ofEntries(entry("tableB", a -> op(ctx ->
+                {
+                    ctx.getOperatorContext().getOuterIndexValues().hasNext();
+                    Object[] ar = ctx.getOperatorContext().getOuterIndexValues().next();
+                    return asList((Tuple) Row.of(a, 0, ar)).iterator();
+                }, () -> bClose.increment()))),
+                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator(), () -> aClose.increment()))));
+
+        assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
+
+        try
         {
-            context.getOperatorContext().getOuterIndexValues().hasNext();
-            Object[] ar = context.getOperatorContext().getOuterIndexValues().next();
-            return asList((Tuple) Row.of(a, 0, ar)).iterator();
-        });
-
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionValuesExtractor(asList(e("a.col1"))),
-                new ExpressionValuesExtractor(asList(e("b.col1"))),
-                new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                false,
-                index,
-                null);
-
-        op.open(new ExecutionContext(session)).hasNext();
+            op.open(new ExecutionContext(session)).hasNext();
+            fail();
+        }
+        catch (IllegalArgumentException e)
+        {
+            assertTrue(e.getMessage(), e.getMessage().contains("Check implementation of operator with index: table [col1] not all outer values was processed."));
+        }
     }
 
-    @Test(expected = NoSuchElementException.class)
+    @Test
     public void test_bad_implementation_of_inner_operator_3()
     {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
-        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator());
-        Operator right = op(context ->
+        String query = "select * "
+            + "from tableA a "
+            + "inner join tableB b "
+            + "  on b.col1 = a.col1";
+
+        MutableInt aClose = new MutableInt();
+        MutableInt bClose = new MutableInt();
+
+        Index index = new Index(QualifiedName.of("table"), asList("col1"), 2);
+        Operator op = operator(query,
+                ofEntries(entry("tableB", index)),
+                ofEntries(entry("tableB", a -> op(ctx ->
+                {
+                    while (ctx.getOperatorContext().getOuterIndexValues().hasNext())
+                    {
+                        ctx.getOperatorContext().getOuterIndexValues().next();
+                    }
+                    ctx.getOperatorContext().getOuterIndexValues().next();
+                    return RowIterator.EMPTY;
+                }, () -> bClose.increment()))),
+                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator(), () -> aClose.increment()))));
+
+        assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
+
+        try
         {
-            while (context.getOperatorContext().getOuterIndexValues().hasNext())
-            {
-                context.getOperatorContext().getOuterIndexValues().next();
-            }
-            context.getOperatorContext().getOuterIndexValues().next();
-            return RowIterator.EMPTY;
-        });
-
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionValuesExtractor(asList(e("a.col1"))),
-                new ExpressionValuesExtractor(asList(e("b.col1"))),
-                new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                false,
-                index,
-                null);
-
-        op.open(new ExecutionContext(session)).hasNext();
+            op.open(new ExecutionContext(session)).hasNext();
+            fail();
+        }
+        catch (NoSuchElementException e)
+        {
+        }
     }
 
     @Test
@@ -174,8 +188,6 @@ public class BatchHashJoinTest extends AOperatorTest
     {
         // Test that a correlated query with a batch hash join
         // uses the context row into consideration when joining
-
-        Index index = new Index(QualifiedName.of("tableA"), asList("col"), 3);
 
         /**
          * <pre>
@@ -191,42 +203,44 @@ public class BatchHashJoinTest extends AOperatorTest
          * </pre>
          */
 
-        Operator opA = op(ctx -> IntStream.of(1, 2, 3, 4, 5).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i, "val" + i})).iterator());
-        Operator opB = op(ctx -> IntStream.of(4, 5, 6, 7).mapToObj(i -> (Tuple) Row.of(b, 10 * i, new Object[] {i})).iterator());
+        String query = "select * from tableA a " +
+            "inner join (" +
+            "  from tableB b " +
+            "  inner join tableC c " +
+            "     on col2 = a.col2 " +
+            "     and c.col1 = b.col1 " +
+            ") b " +
+            "  on b.col1 = a.col1";
 
+        MutableInt aCloseCount = new MutableInt();
+        MutableInt bCloseCount = new MutableInt();
+        MutableInt cCloseCount = new MutableInt();
+
+        Index index = new Index(QualifiedName.of("tableC"), asList("col1"), 3);
         AtomicInteger posC = new AtomicInteger();
-        Operator opC = op(context ->
-        {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
-                    .map(val -> (Tuple) Row.of(c, posC.getAndIncrement(), new Object[] {val, "val" + val}))
-                    .collect(toList());
+        Operator op = operator(query,
+                ofEntries(entry("tableC", index)),
+                ofEntries(entry("tableC", a -> op(ctx ->
+                {
+                    Iterable<Object[]> it = () -> ctx.getOperatorContext().getOuterIndexValues();
+                    List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
+                            .map(ar -> (Integer) ar[0])
+                            .map(val -> (Tuple) Row.of(a, posC.getAndIncrement(), new String[] {"col1", "col2"}, new Object[] {val, "val" + val}))
+                            .collect(toList());
 
-            return inner.iterator();
-        });
+                    return inner.iterator();
+                }, () -> cCloseCount.increment()))),
+                ofEntries(
+                        entry("tableA",
+                                a -> op(ctx -> IntStream.of(1, 2, 3, 4, 5).mapToObj(i -> (Tuple) Row.of(a, i, new String[] {"col1", "col2"}, new Object[] {i, "val" + i})).iterator(),
+                                        () -> aCloseCount.increment())),
+                        entry("tableB",
+                                a -> op(ctx -> IntStream.of(4, 5, 6, 7).mapToObj(i -> (Tuple) Row.of(a, 10 * i, new String[] {"col1"}, new Object[] {i})).iterator(), () -> bCloseCount.increment()))
 
-        Operator op = new NestedLoopJoin(
-                0,
-                "",
-                opA,
-                new BatchHashJoin(
-                        1,
-                        "",
-                        opB,
-                        opC,
-                        new ExpressionValuesExtractor(asList(e("b.col1"))),
-                        new ExpressionValuesExtractor(asList(e("c.col1"))),
-                        new ExpressionPredicate(e("c.col1 = b.col1 and c.col2 = a.col2")),
-                        DefaultTupleMerger.DEFAULT,
-                        false,
-                        false,
-                        index,
-                        null),
-                new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                false);
+                ));
+
+        assertTrue("A Nested loop should have been constructed", op instanceof NestedLoopJoin);
+        assertTrue("A Batch Hash join should have been constructed as inner operator", ((NestedLoopJoin) op).getInner() instanceof BatchHashJoin);
 
         int[] tableAPos = new int[] {4, 5};
         int[] tableBPos = new int[] {40, 50};
@@ -237,52 +251,55 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(tableAPos[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
-            assertEquals(tableBPos[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
-            assertEquals(tableCPos[count], tuple.getValue(QualifiedName.of("c", "__pos"), 0));
+            assertEquals(tableAPos[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(tableBPos[count], tuple.getTuple(2).getValue("__pos"));
+            assertEquals(tableCPos[count], tuple.getTuple(3).getValue("__pos"));
             count++;
         }
+        it.close();
 
         assertEquals(2, count);
+        assertEquals(1, aCloseCount.intValue());
+        // Open/closed the same amount as outer operator rows (nested loop)
+        assertEquals(5, bCloseCount.intValue());
+        // Batch size 3, tableB has 4 rows, 2 batches per operator call, opened 5 times => 2 * 5 = 10
+        assertEquals(10, cCloseCount.intValue());
     }
 
     @Test
     public void test_inner_join_one_to_one()
     {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
+        String query = "select * "
+            + "from tableA a "
+            + "inner join tableB b "
+            + "  on b.col1 = a.col1";
+
+        MutableInt aClose = new MutableInt();
+        MutableInt bClose = new MutableInt();
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        MutableBoolean leftClose = new MutableBoolean();
-        MutableInt rightClose = new MutableInt();
-        Operator left = op(context -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
-                .stream()
-                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator(), () -> leftClose.setTrue());
-        Operator right = op(context ->
-        {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
-                    .filter(val -> val >= 5 && val <= 9)
-                    .distinct()
-                    .map(val -> Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
-                    .collect(toList());
 
-            return inner.iterator();
-        }, () -> rightClose.increment());
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Operator op = operator(query,
+                ofEntries(entry("tableB", index)),
+                ofEntries(entry("tableB", a -> op(context ->
+                {
+                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
+                            .map(ar -> (Integer) ar[0])
+                            .filter(val -> val >= 5 && val <= 9)
+                            .distinct()
+                            .map(val -> Row.of(a, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
+                            .collect(toList());
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionValuesExtractor(asList(e("a.col1"))),
-                new ExpressionValuesExtractor(asList(e("b.col1"))),
-                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                false,
-                index,
-                null);
+                    return inner.iterator();
+                }, () -> bClose.increment()))),
+                ofEntries(entry("tableA", a -> op(ctx -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+                        .stream()
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                        .iterator(), () -> aClose.increment()))));
+
+        assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
         RowIterator it = op.open(new ExecutionContext(session));
 
@@ -302,51 +319,51 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
-            assertEquals(expectedInnerPositions[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue("__pos"));
             count++;
         }
         it.close();
 
         assertEquals(5, count);
-        assertTrue(leftClose.booleanValue());
-        assertEquals(5, rightClose.intValue());
+        assertEquals(1, aClose.intValue());
+        assertEquals(5, bClose.intValue());
     }
 
     @Test
     public void test_outer_join_one_to_one()
     {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
+        String query = "select * "
+            + "from tableA a "
+            + "left join tableB b "
+            + "  on b.col1 = a.col1";
+
+        MutableInt aClose = new MutableInt();
+        MutableInt bClose = new MutableInt();
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = op(context -> asList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
-                .stream()
-                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator());
-        Operator right = op(context ->
-        {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
-                    .filter(val -> val >= 5 && val <= 9)
-                    .distinct()
-                    .map(val -> Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
-                    .collect(toList());
 
-            return inner.iterator();
-        });
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Operator op = operator(query,
+                ofEntries(entry("tableB", index)),
+                ofEntries(entry("tableB", a -> op(context ->
+                {
+                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
+                            .map(ar -> (Integer) ar[0])
+                            .filter(val -> val >= 5 && val <= 9)
+                            .distinct()
+                            .map(val -> Row.of(a, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
+                            .collect(toList());
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionValuesExtractor(asList(e("a.col1"))),
-                new ExpressionValuesExtractor(asList(e("b.col1"))),
-                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                true,
-                index, null);
+                    return inner.iterator();
+                }, () -> bClose.increment()))),
+                ofEntries(entry("tableA", a -> op(ctx -> asList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+                        .stream()
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                        .iterator(), () -> aClose.increment()))));
+
+        assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
         RowIterator it = op.open(new ExecutionContext(session));
 
@@ -368,44 +385,48 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
-            assertEquals(expectedInnerPositions[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+
+            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue("__pos")).orElse(null);
+            assertEquals(expectedInnerPositions[count], val);
             count++;
         }
-
+        it.close();
         assertEquals(12, count);
+        assertEquals(1, aClose.intValue());
+        assertEquals(4, bClose.intValue());
     }
 
     @Test
     public void test_inner_join_one_to_many()
     {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
+        String query = "select * "
+            + "from tableA a "
+            + "inner join tableB b "
+            + "  on b.col1 = a.col1";
+
+        MutableInt aClose = new MutableInt();
+        MutableInt bClose = new MutableInt();
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
-        Operator right = op(context ->
-        {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
-                    .filter(val -> val >= 5 && val <= 9)
-                    .distinct()
-                    .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}, new Object[] {-666, 3}).stream())
-                    .map(ar -> (Tuple) Row.of(b, posRight.getAndIncrement(), ar))
-                    .iterator();
-        });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionValuesExtractor(asList(e("a.col1"))),
-                new ExpressionValuesExtractor(asList(e("b.col1"))),
-                new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                false,
-                index, null);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Operator op = operator(query,
+                ofEntries(entry("tableB", index)),
+                ofEntries(entry("tableB", a -> op(context ->
+                {
+                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    return StreamSupport.stream(it.spliterator(), false)
+                            .map(ar -> (Integer) ar[0])
+                            .filter(val -> val >= 5 && val <= 9)
+                            .distinct()
+                            .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}, new Object[] {-666, 3}).stream())
+                            .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), ar))
+                            .iterator();
+                }, () -> bClose.increment()))),
+                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator(), () -> aClose.increment()))));
+
+        assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
         RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -427,44 +448,47 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
-            assertEquals(expectedInnerPositions[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue("__pos"));
             count++;
         }
+        it.close();
 
         assertEquals(10, count);
+        assertEquals(1, aClose.intValue());
+        assertEquals(5, bClose.intValue());
     }
 
     @Test
     public void test_outer_join_one_to_many()
     {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
+        String query = "select * "
+            + "from tableA a "
+            + "left join tableB b "
+            + "  on b.col1 = a.col1";
+
+        MutableInt aClose = new MutableInt();
+        MutableInt bClose = new MutableInt();
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
-        Operator right = op(context ->
-        {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
-                    .filter(val -> val >= 5 && val <= 9)
-                    .distinct()
-                    .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
-                    .map(ar -> (Tuple) Row.of(b, posRight.getAndIncrement(), ar))
-                    .iterator();
-        });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionValuesExtractor(asList(e("a.col1"))),
-                new ExpressionValuesExtractor(asList(e("b.col1"))),
-                new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                true,
-                index, null);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Operator op = operator(query,
+                ofEntries(entry("tableB", index)),
+                ofEntries(entry("tableB", a -> op(context ->
+                {
+                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    return StreamSupport.stream(it.spliterator(), false)
+                            .map(ar -> (Integer) ar[0])
+                            .filter(val -> val >= 5 && val <= 9)
+                            .distinct()
+                            .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
+                            .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), ar))
+                            .iterator();
+                }, () -> bClose.increment()))),
+                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator(), () -> aClose.increment()))));
+
+        assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
         RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -488,48 +512,53 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
-            assertEquals(expectedInnerPositions[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+
+            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue("__pos")).orElse(null);
+            assertEquals(expectedInnerPositions[count], val);
             count++;
         }
+        it.close();
 
         assertEquals(19, count);
+        assertEquals(1, aClose.intValue());
+        assertEquals(5, bClose.intValue());
     }
 
     @Test
     public void test_inner_join_many_to_one()
     {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 5);
+        String query = "select * "
+            + "from tableA a "
+            + "inner join tableB b "
+            + "  on b.col1 = a.col1";
+
+        MutableInt aClose = new MutableInt();
+        MutableInt bClose = new MutableInt();
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
-                .stream()
-                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator());
-        Operator right = op(context ->
-        {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            List<Tuple> rows = StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
-                    .filter(val -> val >= 5 && val <= 9)
-                    .distinct()
-                    .map(val -> (Tuple) Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
-                    .collect(toList());
 
-            return rows.iterator();
-        });
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 5);
+        Operator op = operator(query,
+                ofEntries(entry("tableB", index)),
+                ofEntries(entry("tableB", a -> op(context ->
+                {
+                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    List<Tuple> rows = StreamSupport.stream(it.spliterator(), false)
+                            .map(ar -> (Integer) ar[0])
+                            .filter(val -> val >= 5 && val <= 9)
+                            .distinct()
+                            .map(val -> (Tuple) Row.of(a, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
+                            .collect(toList());
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionValuesExtractor(asList(e("a.col1"))),
-                new ExpressionValuesExtractor(asList(e("b.col1"))),
-                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                false,
-                index, null);
+                    return rows.iterator();
+                }, () -> bClose.increment()))),
+                ofEntries(entry("tableA", a -> op(ctx -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
+                        .stream()
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                        .iterator(), () -> aClose.increment()))));
+
+        assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
         RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -549,48 +578,51 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
-            assertEquals(expectedInnerPositions[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue("__pos"));
             count++;
         }
+        it.close();
 
         assertEquals(10, count);
+        assertEquals(1, aClose.intValue());
+        assertEquals(5, bClose.intValue());
     }
 
     @Test
     public void test_outer_join_many_to_one()
     {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
+        String query = "select * "
+            + "from tableA a "
+            + "left join tableB b "
+            + "  on b.col1 = a.col1";
+
+        MutableInt aClose = new MutableInt();
+        MutableInt bClose = new MutableInt();
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
-                .stream()
-                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator());
-        Operator right = op(context ->
-        {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
-                    .filter(val -> val >= 5 && val <= 9)
-                    .distinct()
-                    .map(val -> (Tuple) Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
-                    .collect(toList());
 
-            return inner.iterator();
-        });
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Operator op = operator(query,
+                ofEntries(entry("tableB", index)),
+                ofEntries(entry("tableB", a -> op(context ->
+                {
+                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    List<Tuple> rows = StreamSupport.stream(it.spliterator(), false)
+                            .map(ar -> (Integer) ar[0])
+                            .filter(val -> val >= 5 && val <= 9)
+                            .distinct()
+                            .map(val -> (Tuple) Row.of(a, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
+                            .collect(toList());
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionValuesExtractor(asList(e("a.col1"))),
-                new ExpressionValuesExtractor(asList(e("b.col1"))),
-                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                true,
-                index, null);
+                    return rows.iterator();
+                }, () -> bClose.increment()))),
+                ofEntries(entry("tableA", a -> op(ctx -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
+                        .stream()
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                        .iterator(), () -> aClose.increment()))));
+
+        assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
         RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -620,50 +652,55 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
-            assertEquals(expectedInnerPositions[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+
+            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue("__pos")).orElse(null);
+            assertEquals(expectedInnerPositions[count], val);
             count++;
         }
+        it.close();
 
         assertEquals(24, count);
+        assertEquals(1, aClose.intValue());
+        assertEquals(8, bClose.intValue());
     }
 
     @Test
     public void test_inner_join_many_to_many()
     {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
+        String query = "select * "
+            + "from tableA a "
+            + "inner join tableB b "
+            + "  on b.col1 = a.col1";
+
+        MutableInt aClose = new MutableInt();
+        MutableInt bClose = new MutableInt();
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
-                .stream()
-                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator());
-        Operator right = op(context ->
-        {
-            // Create 2 rows for each input row
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
-                    .filter(val -> val >= 5 && val <= 9)
-                    .distinct()
-                    .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
-                    .map(ar -> Row.of(b, posRight.getAndIncrement(), ar))
-                    .collect(toList());
 
-            return inner.iterator();
-        });
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Operator op = operator(query,
+                ofEntries(entry("tableB", index)),
+                ofEntries(entry("tableB", a -> op(context ->
+                {
+                    // Create 2 rows for each input row
+                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
+                            .map(ar -> (Integer) ar[0])
+                            .filter(val -> val >= 5 && val <= 9)
+                            .distinct()
+                            .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
+                            .map(ar -> Row.of(a, posRight.getAndIncrement(), ar))
+                            .collect(toList());
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionValuesExtractor(asList(e("a.col1"))),
-                new ExpressionValuesExtractor(asList(e("b.col1"))),
-                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                false,
-                index, null);
+                    return inner.iterator();
+                }, () -> bClose.increment()))),
+                ofEntries(entry("tableA", a -> op(ctx -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
+                        .stream()
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                        .iterator(), () -> aClose.increment()))));
+
+        assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
         RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -685,50 +722,54 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
-            assertEquals(expectedInnerPositions[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue("__pos"));
             count++;
         }
+        it.close();
 
         assertEquals(20, count);
+        assertEquals(1, aClose.intValue());
+        assertEquals(8, bClose.intValue());
     }
 
     @Test
     public void test_outer_join_many_to_many()
     {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
+        String query = "select * "
+            + "from tableA a "
+            + "left join tableB b "
+            + "  on b.col1 = a.col1 "
+            + "  and b.col2 < 3 ";
+
+        MutableInt aClose = new MutableInt();
+        MutableInt bClose = new MutableInt();
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
-                .stream()
-                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator());
-        Operator right = op(context ->
-        {
-            // Create 2 rows for each input row
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
-                    .filter(val -> val >= 5 && val <= 9)
-                    .distinct()
-                    .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}, new Object[] {val, 3}).stream())
-                    .map(ar -> Row.of(b, posRight.getAndIncrement(), ar))
-                    .collect(toList());
 
-            return inner.iterator();
-        });
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Operator op = operator(query,
+                ofEntries(entry("tableB", index)),
+                ofEntries(entry("tableB", a -> op(context ->
+                {
+                    // Create 3 rows for each input row
+                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
+                            .map(ar -> (Integer) ar[0])
+                            .filter(val -> val >= 5 && val <= 9)
+                            .distinct()
+                            .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}, new Object[] {val, 3}).stream())
+                            .map(ar -> Row.of(a, posRight.getAndIncrement(), new String[] {"col1", "col2"}, ar))
+                            .collect(toList());
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionValuesExtractor(asList(e("a.col1"))),
-                new ExpressionValuesExtractor(asList(e("b.col1"))),
-                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1 and b.col2 < 3")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                true,
-                index, null);
+                    return inner.iterator();
+                }, () -> bClose.increment()))),
+                ofEntries(entry("tableA", a -> op(ctx -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
+                        .stream()
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                        .iterator(), () -> aClose.increment()))));
+
+        assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
         int[] expectedOuterPositions = new int[] {
                 0, 1, 2,
@@ -757,48 +798,53 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
-            assertEquals(expectedInnerPositions[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
+            assertEquals("Count :" + count, expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+
+            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue("__pos")).orElse(null);
+            assertEquals("Count: " + count, expectedInnerPositions[count], val);
             count++;
         }
+        it.close();
 
         assertEquals(34, count);
+        assertEquals(1, aClose.intValue());
+        assertEquals(8, bClose.intValue());
     }
 
     @Test
     public void test_inner_join_one_to_one_populating()
     {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
+        String query = "select * "
+            + "from tableA a "
+            + "inner join tableB b with(populate=True) "
+            + "  on b.col1 = a.col1 ";
+
+        MutableInt aClose = new MutableInt();
+        MutableInt bClose = new MutableInt();
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = op(context -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
-                .stream()
-                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator());
-        Operator right = op(context ->
-        {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
-                    .filter(val -> val >= 5 && val <= 9)
-                    .distinct()
-                    .map(val -> Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
-                    .collect(toList());
 
-            return inner.iterator();
-        });
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Operator op = operator(query,
+                ofEntries(entry("tableB", index)),
+                ofEntries(entry("tableB", a -> op(context ->
+                {
+                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
+                            .map(ar -> (Integer) ar[0])
+                            .filter(val -> val >= 5 && val <= 9)
+                            .distinct()
+                            .map(val -> Row.of(a, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
+                            .collect(toList());
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionValuesExtractor(asList(e("a.col1"))),
-                new ExpressionValuesExtractor(asList(e("b.col1"))),
-                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                true,
-                false,
-                index, null);
+                    return inner.iterator();
+                }, () -> bClose.increment()))),
+                ofEntries(entry("tableA", a -> op(ctx -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+                        .stream()
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                        .iterator(), () -> aClose.increment()))));
+
+        assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
         RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -816,51 +862,54 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals("Count: " + count, expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
 
             @SuppressWarnings("unchecked")
-            Collection<Tuple> col = (Collection<Tuple>) tuple.getValue(QualifiedName.of("b"), 0);
-            assertArrayEquals(new int[] {expectedInnerPositions[count]}, col.stream().mapToInt(t -> (int) t.getValue(QualifiedName.of("__pos"), 0)).toArray());
+            Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
+            assertArrayEquals("Count: " + count, new int[] {expectedInnerPositions[count]}, col.stream().mapToInt(t -> (int) t.getValue("__pos")).toArray());
             count++;
         }
+        it.close();
 
         assertEquals(5, count);
+        assertEquals(1, aClose.intValue());
+        assertEquals(5, bClose.intValue());
     }
 
     @Test
     public void test_outer_join_one_to_one_populating()
     {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
+        String query = "select * "
+            + "from tableA a "
+            + "left join tableB b with(populate=True) "
+            + "  on b.col1 = a.col1 ";
+
+        MutableInt aClose = new MutableInt();
+        MutableInt bClose = new MutableInt();
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = op(context -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
-                .stream()
-                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator());
-        Operator right = op(context ->
-        {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
-                    .filter(val -> val >= 5 && val <= 9)
-                    .distinct()
-                    .map(val -> Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
-                    .collect(toList());
 
-            return inner.iterator();
-        });
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Operator op = operator(query,
+                ofEntries(entry("tableB", index)),
+                ofEntries(entry("tableB", a -> op(context ->
+                {
+                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
+                            .map(ar -> (Integer) ar[0])
+                            .filter(val -> val >= 5 && val <= 9)
+                            .distinct()
+                            .map(val -> Row.of(a, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
+                            .collect(toList());
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionValuesExtractor(asList(e("a.col1"))),
-                new ExpressionValuesExtractor(asList(e("b.col1"))),
-                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                true,
-                true,
-                index, null);
+                    return inner.iterator();
+                }, () -> bClose.increment()))),
+                ofEntries(entry("tableA", a -> op(ctx -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+                        .stream()
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                        .iterator(), () -> aClose.increment()))));
+
+        assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
         RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -883,48 +932,51 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
 
             @SuppressWarnings("unchecked")
-            Collection<Tuple> col = (Collection<Tuple>) tuple.getValue(QualifiedName.of("b"), 0);
+            Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
 
-            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue(QualifiedName.of("__pos"), 0)).collect(toList()) : null);
+            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue("__pos")).collect(toList()) : null);
             count++;
         }
+        it.close();
 
         assertEquals(14, count);
+        assertEquals(1, aClose.intValue());
+        assertEquals(5, bClose.intValue());
     }
 
     @Test
     public void test_inner_join_one_to_many_populating()
     {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
+        String query = "select * "
+            + "from tableA a "
+            + "inner join tableB b with(populate=True) "
+            + "  on b.col1 = a.col1 ";
+
+        MutableInt aClose = new MutableInt();
+        MutableInt bClose = new MutableInt();
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
-        Operator right = op(context ->
-        {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
-                    .filter(val -> val >= 5 && val <= 9)
-                    .distinct()
-                    .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
-                    .map(ar -> (Tuple) Row.of(b, posRight.getAndIncrement(), ar))
-                    .iterator();
-        });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionValuesExtractor(asList(e("a.col1"))),
-                new ExpressionValuesExtractor(asList(e("b.col1"))),
-                new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                true,
-                false,
-                index, null);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Operator op = operator(query,
+                ofEntries(entry("tableB", index)),
+                ofEntries(entry("tableB", a -> op(context ->
+                {
+                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    return StreamSupport.stream(it.spliterator(), false)
+                            .map(ar -> (Integer) ar[0])
+                            .filter(val -> val >= 5 && val <= 9)
+                            .distinct()
+                            .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
+                            .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), ar))
+                            .iterator();
+                }, () -> bClose.increment()))),
+                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator(), () -> aClose.increment()))));
+
+        assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
         RowIterator it = op.open(new ExecutionContext(session));
 
@@ -946,48 +998,51 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
 
             @SuppressWarnings("unchecked")
-            Collection<Tuple> col = (Collection<Tuple>) tuple.getValue(QualifiedName.of("b"), 0);
+            Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
 
-            assertArrayEquals("" + count, expectedInnerPositions[count], col.stream().mapToInt(t -> (int) t.getValue(QualifiedName.of("__pos"), 0)).toArray());
+            assertArrayEquals("" + count, expectedInnerPositions[count], col.stream().mapToInt(t -> (int) t.getValue("__pos")).toArray());
             count++;
         }
+        it.close();
 
         assertEquals(5, count);
+        assertEquals(1, aClose.intValue());
+        assertEquals(5, bClose.intValue());
     }
 
     @Test
     public void test_outer_join_one_to_many_populating()
     {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 2);
+        String query = "select * "
+            + "from tableA a "
+            + "left join tableB b with(populate=True) "
+            + "  on b.col1 = a.col1 ";
+
+        MutableInt aClose = new MutableInt();
+        MutableInt bClose = new MutableInt();
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
-        Operator right = op(context ->
-        {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
-                    .filter(val -> val >= 5 && val <= 9)
-                    .distinct()
-                    .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
-                    .map(ar -> (Tuple) Row.of(b, posRight.getAndIncrement(), ar))
-                    .iterator();
-        });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionValuesExtractor(asList(e("a.col1"))),
-                new ExpressionValuesExtractor(asList(e("b.col1"))),
-                new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                true,
-                true,
-                index, null);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Operator op = operator(query,
+                ofEntries(entry("tableB", index)),
+                ofEntries(entry("tableB", a -> op(context ->
+                {
+                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    return StreamSupport.stream(it.spliterator(), false)
+                            .map(ar -> (Integer) ar[0])
+                            .filter(val -> val >= 5 && val <= 9)
+                            .distinct()
+                            .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
+                            .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), ar))
+                            .iterator();
+                }, () -> bClose.increment()))),
+                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator(), () -> aClose.increment()))));
+
+        assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
         RowIterator it = op.open(new ExecutionContext(session));
 
@@ -1019,52 +1074,56 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
 
             @SuppressWarnings("unchecked")
-            Collection<Tuple> col = (Collection<Tuple>) tuple.getValue(QualifiedName.of("b"), 0);
+            Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
 
-            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue(QualifiedName.of("__pos"), 0)).collect(toList()) : null);
+            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue("__pos")).collect(toList()) : null);
             count++;
         }
+        it.close();
 
         assertEquals(14, count);
+        assertEquals(1, aClose.intValue());
+        assertEquals(5, bClose.intValue());
     }
 
     @Test
     public void test_inner_join_many_to_many_populating()
     {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
+        String query = "select * "
+            + "from tableA a "
+            + "inner join tableB b with(populate=True) "
+            + "  on b.col1 = a.col1 "
+            + "  and a.col1 > 0";
+
+        MutableInt aClose = new MutableInt();
+        MutableInt bClose = new MutableInt();
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
-                .stream()
-                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator());
-        Operator right = op(context ->
-        {
-            // Create 2 rows for each input row
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
-                    .filter(val -> val >= 5 && val <= 9)
-                    .distinct()
-                    .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
-                    .map(ar -> (Tuple) Row.of(b, posRight.getAndIncrement(), ar))
-                    .iterator();
-        });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionValuesExtractor(asList(e("a.col1"))),
-                new ExpressionValuesExtractor(asList(e("b.col1"))),
-                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                true,
-                false,
-                index, null);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Operator op = operator(query,
+                ofEntries(entry("tableB", index)),
+                ofEntries(entry("tableB", a -> op(context ->
+                {
+                    // Create 2 rows for each input row
+                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    return StreamSupport.stream(it.spliterator(), false)
+                            .map(ar -> (Integer) ar[0])
+                            .filter(val -> val >= 5 && val <= 9)
+                            .distinct()
+                            .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
+                            .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), ar))
+                            .iterator();
+                }, () -> bClose.increment()))),
+                ofEntries(entry("tableA", a -> op(ctx -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
+                        .stream()
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                        .iterator(), () -> aClose.increment()))));
+
+        assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
         RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -1086,55 +1145,56 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals("Count: " + count, expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
 
             @SuppressWarnings("unchecked")
-            Collection<Tuple> col = (Collection<Tuple>) tuple.getValue(QualifiedName.of("b"), 0);
+            Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
 
-            assertArrayEquals("" + count, expectedInnerPositions[count], col.stream().mapToInt(t -> (int) t.getValue(QualifiedName.of("__pos"), 0)).toArray());
+            assertArrayEquals("Count: " + count, expectedInnerPositions[count], col.stream().mapToInt(t -> (int) t.getValue("__pos")).toArray());
             count++;
         }
+        it.close();
 
         assertEquals(10, count);
+        assertEquals(1, aClose.intValue());
+        assertEquals(8, bClose.intValue());
     }
 
     @Test
     public void test_outer_join_many_to_many_populating()
     {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 3);
+        String query = "select * "
+            + "from tableA a "
+            + "left join tableB b with(populate=True) "
+            + "  on b.col1 = a.col1 "
+            + "  and a.col1 > 0";
+
+        MutableInt aClose = new MutableInt();
+        MutableInt bClose = new MutableInt();
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
-        Operator left = op(context -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
-                .stream()
-                .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
-                .iterator());
-        Operator right = op(context ->
-        {
-            // Create 2 rows for each input row
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-            return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
-                    .filter(val -> val >= 5 && val <= 9)
-                    .distinct()
-                    .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
-                    .map(ar -> (Tuple) Row.of(b, posRight.getAndIncrement(), ar))
-                    .iterator();
-        });
 
-        BatchHashJoin op = new BatchHashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionValuesExtractor(asList(e("a.col1"))),
-                new ExpressionValuesExtractor(asList(e("b.col1"))),
-                new ExpressionPredicate(e("a.col1 > 0 and b.col1 = a.col1")),
-                //                (ctx, row, values) -> values[0] = row.getObject(0),
-                //                (ctx, row, values) -> values[0] = row.getObject(0),
-                //                (ctx, row) -> (Integer) row.getParent().getObject(0) > 0 && (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0),
-                DefaultTupleMerger.DEFAULT,
-                true,
-                true,
-                index, null);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Operator op = operator(query,
+                ofEntries(entry("tableB", index)),
+                ofEntries(entry("tableB", a -> op(context ->
+                {
+                    // Create 2 rows for each input row
+                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    return StreamSupport.stream(it.spliterator(), false)
+                            .map(ar -> (Integer) ar[0])
+                            .filter(val -> val >= 5 && val <= 9)
+                            .distinct()
+                            .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
+                            .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), ar))
+                            .iterator();
+                }, () -> bClose.increment()))),
+                ofEntries(entry("tableA", a -> op(ctx -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
+                        .stream()
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                        .iterator(), () -> aClose.increment()))));
+
+        assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
         RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
@@ -1163,104 +1223,98 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
 
             @SuppressWarnings("unchecked")
-            Collection<Tuple> col = (Collection<Tuple>) tuple.getValue(QualifiedName.of("b"), 0);
+            Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
 
-            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue(QualifiedName.of("__pos"), 0)).collect(toList()) : null);
+            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue("__pos")).collect(toList()) : null);
             count++;
         }
+        it.close();
 
         assertEquals(24, count);
+        assertEquals(1, aClose.intValue());
+        assertEquals(8, bClose.intValue());
     }
 
-    //    @Ignore
-    //    @Test
-    //    public void test_inner_join_large()
-    //    {
-    //        Index index = new Index(QualifiedName.of("table"), asList("col"), 250);
-    //        Random rnd = new Random();
-    //        TableAlias a = TableAlias.of(null, "tableA", "a");
-    //        TableAlias b = TableAlias.of(a, "tableB", "b");
-    //        TableAlias c = TableAlias.of(b, "tableC", "c");
-    //        MutableInt bPos = new MutableInt();
-    //        MutableInt cPos = new MutableInt();
-    //
-    //        Operator tableA = op(context -> IntStream.range(1, 1000000).mapToObj(i -> Row.of(a, i, new Object[] {rnd.nextInt(10000), rnd.nextBoolean()})).iterator());
-    //        Operator tableB = op(context ->
-    //        {
-    //            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-    //            return StreamSupport.stream(it.spliterator(), false)
-    //                    .map(ar -> (Integer) ar[0])
-    //                    .flatMap(val -> asList(
-    //                            new Object[] {val, 1, rnd.nextBoolean()},
-    //                            new Object[] {val, 2, rnd.nextBoolean()},
-    //                            new Object[] {val, 3, rnd.nextBoolean()},
-    //                            new Object[] {val, 4, rnd.nextBoolean()}).stream())
-    //                    .map(ar2 -> Row.of(b, bPos.getAndIncrement(), ar2))
-    //                    .iterator();
-    //        });
-    //        Operator tableC = op(context ->
-    //        {
-    //            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-    //            return StreamSupport.stream(it.spliterator(), false)
-    //                    .map(ar -> (Integer) ar[0])
-    //                    .flatMap(val -> asList(
-    //                            new Object[] {val, 1, "Val" + val},
-    //                            new Object[] {val, 4, rnd.nextBoolean()}).stream())
-    //                    .map(ar -> Row.of(c, cPos.getAndIncrement(), ar))
-    //                    .iterator();
-    //        });
-    //
-    //        BatchHashJoin op = new BatchHashJoin(0,
-    //                "",
-    //                tableA,
-    //                new BatchHashJoin(0,
-    //                        "",
-    //                        tableB,
-    //                        tableC,
-    //                        (ctx, row, values) -> values[0] = row.getObject(0),
-    //                        (ctx, row, values) -> values[0] = row.getObject(0),
-    //                        (ctx, row) ->
-    //                        {
-    //                            return (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0);
-    //                        },
-    //                        DefaultRowMerger.DEFAULT,
-    //                        false,
-    //                        false,
-    //                        index),
-    //                (ctx, row, values) -> values[0] = row.getObject(0),
-    //                (ctx, row, values) -> values[0] = row.getObject(0),
-    //                (ctx, row) ->
-    //                {
-    //                    return (Boolean) row.getObject(2)
-    //                        && (Boolean) row.getParent().getObject(1)
-    //                        && (Integer) row.getObject(0) == (Integer) row.getParent().getObject(0);
-    //                },
-    //                DefaultRowMerger.DEFAULT,
-    //                false,
-    //                false,
-    //                index, null);
-    //
-    //        for (int i = 0; i < 150; i++)
-    //        {
-    //            StopWatch sw = new StopWatch();
-    //            sw.start();
-    //            Iterator<Row> it = op.open(new ExecutionContext(session));
-    //            int count = 0;
-    //            while (it.hasNext())
-    //            {
-    //                Row row = it.next();
-    //                //                assertEquals(4, row.getChildRows(0).size());
-    //                //                                                                System.out.println(row + " " + row.getChildRows(0).stream().map(r -> r.toString() + " " + r.getChildRows(0)).collect(joining(", ")) );
-    //                //            assertEquals("Val" + row.getObject(0), row.getChildRows(0).get(0).getObject(1));
-    //                count++;
-    //            }
-    //            sw.stop();
-    //            long mem = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-    //            System.out.println("Time: " + sw.toString() + " rows: " + count + " mem: " + FileUtils.byteCountToDisplaySize(mem));
-    //        }
-    //        //        assertEquals(5, count);
-    //    }
+    //        @Ignore
+//    @Test
+//    public void test_inner_join_large()
+//    {
+//        Random rnd = new Random();
+//        //            TableAlias a = TableAlias.of(null, "tableA", "a");
+//        //            TableAlias b = TableAlias.of(a, "tableB", "b");
+//        //            TableAlias c = TableAlias.of(b, "tableC", "c");
+//
+//        MutableInt bPos = new MutableInt();
+//        MutableInt cPos = new MutableInt();
+//        Index indexB = new Index(QualifiedName.of("tableB"), asList("col1"), 250);
+//        Index indexC = new Index(QualifiedName.of("tableC"), asList("col1"), 250);
+//
+//        String query = "select * "
+//            + "from tableA a "
+//            + "inner join tableB b "
+//            + "  on b.col1 = a.col1 "
+//            + "  and b.col2 "
+//            + "inner join tableC c "
+//            + "  on c.col1 = b.col1 "
+//            + "  and c.col2 "
+//            + "where a.col2 ";
+//
+//        Operator op = operator(query,
+//                MapUtils.ofEntries(
+//                        MapUtils.entry("tableB", indexB),
+//                        MapUtils.entry("tableC", indexC)),
+//                MapUtils.ofEntries(
+//                        MapUtils.entry("tableB", a -> op(context ->
+//                        {
+//                            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+//                            return StreamSupport.stream(it.spliterator(), false)
+//                                    .map(ar -> (Integer) ar[0])
+//                                    .flatMap(val -> asList(
+//                                            new Object[] {val, 1, rnd.nextBoolean()},
+//                                            new Object[] {val, 2, rnd.nextBoolean()},
+//                                            new Object[] {val, 3, rnd.nextBoolean()},
+//                                            new Object[] {val, 4, rnd.nextBoolean()}).stream())
+//                                    .map(ar2 -> (Tuple) Row.of(a, bPos.getAndIncrement(), new String[] {"col1", "col2"}, ar2))
+//                                    .iterator();
+//                        })),
+//                        MapUtils.entry("tableC", a -> op(context ->
+//                        {
+//                            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+//                            return StreamSupport.stream(it.spliterator(), false)
+//                                    .map(ar -> (Integer) ar[0])
+//                                    .flatMap(val -> asList(
+//                                            new Object[] {val, 1, "Val" + val},
+//                                            new Object[] {val, 4, rnd.nextBoolean()}).stream())
+//                                    .map(ar -> (Tuple) Row.of(a, cPos.getAndIncrement(), ar))
+//                                    .iterator();
+//                        }))),
+//                MapUtils.ofEntries(
+//                        MapUtils.entry("tableA",
+//                                a -> op(ctx -> IntStream.range(1, 10000000)
+//                                        .mapToObj(i -> (Tuple) Row.of(a, i, new String[] {"col1", "col2"}, new Object[] {rnd.nextInt(10000), rnd.nextBoolean()}))
+//                                        .iterator()))));
+//
+//        for (int i = 0; i < 150; i++)
+//        {
+//            StopWatch sw = new StopWatch();
+//            sw.start();
+//            Iterator<Tuple> it = op.open(new ExecutionContext(session));
+//            int count = 0;
+//            while (it.hasNext())
+//            {
+//                Tuple tuple = it.next();
+//                //                assertEquals(4, row.getChildRows(0).size());
+//                //                                                                System.out.println(row + " " + row.getChildRows(0).stream().map(r -> r.toString() + " " + r.getChildRows(0)).collect(joining(", ")) );
+//                //            assertEquals("Val" + row.getObject(0), row.getChildRows(0).get(0).getObject(1));
+//                count++;
+//            }
+//            sw.stop();
+//            long mem = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+//            System.out.println("Time: " + sw.toString() + " rows: " + count + " mem: " + FileUtils.byteCountToDisplaySize(mem));
+//        }
+        //        assertEquals(5, count);
+//    }
 }

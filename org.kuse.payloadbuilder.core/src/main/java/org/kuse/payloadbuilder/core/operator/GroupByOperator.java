@@ -11,10 +11,10 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
-import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Operator that groups by a bucket function */
 class GroupByOperator extends AOperator
@@ -22,12 +22,12 @@ class GroupByOperator extends AOperator
     private final Operator operator;
     private final ValuesExtractor valuesExtractor;
     private final int size;
-    private final Map<String, QualifiedName> columnReferences;
+    private final Map<Integer, Set<String>> columnReferences;
 
     GroupByOperator(
             int nodeId,
             Operator operator,
-            Map<String, QualifiedName> columnReferences,
+            Map<Integer, Set<String>> columnReferences,
             ValuesExtractor valuesExtractor,
             int size)
     {

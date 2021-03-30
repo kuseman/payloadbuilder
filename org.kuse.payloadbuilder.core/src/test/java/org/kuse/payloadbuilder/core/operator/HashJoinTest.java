@@ -1,35 +1,22 @@
 package org.kuse.payloadbuilder.core.operator;
 
-import static java.util.Arrays.asList;
 import static java.util.Collections.emptyIterator;
-import static java.util.Collections.emptyList;
 
 import java.util.Collection;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.IntStream;
 
-import org.apache.commons.lang3.mutable.MutableBoolean;
+import org.apache.commons.lang3.mutable.MutableInt;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
-import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
-import org.kuse.payloadbuilder.core.parser.QualifiedName;
+import org.kuse.payloadbuilder.core.utils.MapUtils;
 
 /** Test {@link HashJoin} */
 public class HashJoinTest extends AOperatorTest
 {
-    private final TableAlias a = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableA"), "a")
-            .columns(new String[] {"col1", "col2"})
-            .children(asList(
-                    TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableB"), "b")
-                            .columns(new String[] {"col1"})
-                            .children(asList(
-                                    TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("tableC"), "c")
-                                            .columns(new String[] {"col1", "col2"})))))
-
-            .build();
-    private final TableAlias b = a.getChildAliases().get(0);
-    private final TableAlias c = b.getChildAliases().get(0);
-
     @Test
     public void test_inner_join_no_populate_empty()
     {
@@ -50,20 +37,19 @@ public class HashJoinTest extends AOperatorTest
     @Test
     public void test_inner_join_no_populate()
     {
-        MutableBoolean leftClose = new MutableBoolean();
-        MutableBoolean rightClose = new MutableBoolean();
-        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i - 1, new Object[] {i})).iterator(), () -> leftClose.setTrue());
-        Operator right = op(ctx -> new TableFunctionOperator(0, "", b, new NestedLoopJoinTest.Range(5), emptyList()).open(ctx), () -> rightClose.setTrue());
-        HashJoin op = new HashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionHashFunction(asList(e("a.col1"))),
-                new ExpressionHashFunction(asList(e("b.col1"))),
-                new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                false);
+        MutableInt leftClose = new MutableInt();
+
+        String query = "select * "
+            + "from tableA a "
+            + "inner join range(1, 6) b "
+            + "  on b.Value = a.col1";
+
+        Map<String, Function<TableAlias, Operator>> opByTable = MapUtils.ofEntries(
+                MapUtils.entry("tableA", a -> op(context -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i - 1, new Object[] {i})).iterator(), () -> leftClose.increment())));
+
+        Operator op = operator(query, opByTable);
+
+        assertTrue("A hash join should have been constructed", op instanceof HashJoin);
 
         RowIterator it = op.open(new ExecutionContext(session));
 
@@ -75,15 +61,14 @@ public class HashJoinTest extends AOperatorTest
         {
             Tuple tuple = it.next();
 
-            assertEquals(tableAPos[count], tuple.getValue(QualifiedName.of("a", "col1"), 0));
-            assertEquals(tableBPos[count], tuple.getValue(QualifiedName.of("b", "col1"), 0));
+            assertEquals(tableAPos[count], tuple.getTuple(0).getValue("col1"));
+            assertEquals(tableBPos[count], tuple.getTuple(1).getValue("Value"));
             count++;
         }
         it.close();
         assertFalse(it.hasNext());
         assertEquals(5, count);
-        assertTrue(leftClose.booleanValue());
-        assertTrue(rightClose.booleanValue());
+        assertEquals(1, leftClose.intValue());
     }
 
     @Test
@@ -106,29 +91,33 @@ public class HashJoinTest extends AOperatorTest
          * </pre>
          */
 
-        Operator opA = op(ctx -> IntStream.of(1, 2, 3, 4, 5).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i, "val" + i})).iterator());
-        Operator opB = op(ctx -> IntStream.of(4, 5, 6, 7).mapToObj(i -> (Tuple) Row.of(b, i * 10, new Object[] {i})).iterator());
-        Operator opC = op(ctx -> IntStream.of(1, 2, 3, 4, 5, 6, 7).mapToObj(i -> (Tuple) Row.of(c, i * 100, new Object[] {i, "val" + i})).iterator());
+        String query = "select * from tableA a " +
+            "inner join (" +
+            "  from tableB b " +
+            "  inner join tableC c " +
+            "     on col2 = a.col2 " +
+            "     and c.col1 = b.col1 " +
+            ") b " +
+            "  on b.col1 = a.col1";
 
-        Operator op = new NestedLoopJoin(
-                0,
-                "",
-                opA,
-                new HashJoin(
-                        1,
-                        "",
-                        opB,
-                        opC,
-                        new ExpressionHashFunction(asList(e("b.col1"))),
-                        new ExpressionHashFunction(asList(e("c.col1"))),
-                        new ExpressionPredicate(e("c.col1 = b.col1 and c.col2 = a.col2")),
-                        DefaultTupleMerger.DEFAULT,
-                        false,
-                        false),
-                new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                false);
+        MutableInt aCloseCount = new MutableInt();
+        MutableInt bCloseCount = new MutableInt();
+        MutableInt cCloseCount = new MutableInt();
+
+        Map<String, Function<TableAlias, Operator>> opByTable = MapUtils.ofEntries(
+                MapUtils.entry("tableA",
+                        a -> op(ctx -> IntStream.of(1, 2, 3, 4, 5).mapToObj(i -> (Tuple) Row.of(a, i, new String[] {"col1", "col2"}, new Object[] {i, "val" + i})).iterator(),
+                                () -> aCloseCount.increment())),
+                MapUtils.entry("tableB",
+                        a -> op(ctx -> IntStream.of(4, 5, 6, 7).mapToObj(i -> (Tuple) Row.of(a, 10 * i, new String[] {"col1", "col2"}, new Object[] {i})).iterator(), () -> bCloseCount.increment())),
+                MapUtils.entry("tableC",
+                        a -> op(ctx -> IntStream.of(1, 2, 3, 4, 5, 6, 7).mapToObj(i -> (Tuple) Row.of(a, 100 * i, new String[] {"col1", "col2"}, new Object[] {i, "val" + i})).iterator(),
+                                () -> cCloseCount.increment())));
+
+        Operator op = operator(query, opByTable);
+
+        assertTrue("A Nested loop should have been constructed", op instanceof NestedLoopJoin);
+        assertTrue("A Hash join should have been constructed as inner operator", ((NestedLoopJoin) op).getInner() instanceof HashJoin);
 
         int[] tableAPos = new int[] {4, 5};
         int[] tableBPos = new int[] {40, 50};
@@ -139,11 +128,18 @@ public class HashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(tableAPos[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
-            assertEquals(tableBPos[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
-            assertEquals(tableCPos[count], tuple.getValue(QualifiedName.of("c", "__pos"), 0));
+            assertEquals(tableAPos[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(tableBPos[count], tuple.getTuple(2).getValue("__pos"));
+            assertEquals(tableCPos[count], tuple.getTuple(3).getValue("__pos"));
             count++;
         }
+        it.close();
+
+        assertEquals(1, aCloseCount.intValue());
+        // B is opened 5 times since there are 5 rows in A
+        assertEquals(5, bCloseCount.intValue());
+        // C is cached and hence only closed one time
+        assertEquals(5, cCloseCount.intValue());
 
         assertEquals(2, count);
     }
@@ -151,51 +147,56 @@ public class HashJoinTest extends AOperatorTest
     @Test
     public void test_inner_join_populate()
     {
-        Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i - 1, new Object[] {i})).iterator());
-        Operator right = op(context -> IntStream.range(1, 20).mapToObj(i -> (Tuple) Row.of(b, i - 1, new Object[] {i % 10})).iterator());
-        HashJoin op = new HashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionHashFunction(asList(e("a.col1"))),
-                new ExpressionHashFunction(asList(e("b.col1"))),
-                new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                true,
-                false);
+        MutableInt leftClose = new MutableInt();
+
+        String query = "select * "
+            + "from range(1, 10) a "
+            + "inner join tableB b with (populate=true) "
+            + "  on b.Value = a.Value";
+
+        Map<String, Function<TableAlias, Operator>> opByTable = MapUtils.ofEntries(
+                MapUtils.entry("tableB", a -> op(context -> IntStream.range(1, 20).mapToObj(i -> (Tuple) Row.of(a, i - 1, new Object[] {i % 10})).iterator(), () -> leftClose.increment())));
+
+        Operator op = operator(query, opByTable);
+
+        assertTrue("A hash join should have been constructed", op instanceof HashJoin);
 
         RowIterator it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(count, tuple.getValue(QualifiedName.of("a", "__pos"), 0));
+            assertEquals(count, tuple.getTuple(0).getValue("__pos"));
 
             @SuppressWarnings("unchecked")
-            Collection<Tuple> col = (Collection<Tuple>) tuple.getValue(QualifiedName.of("b"), 0);
-            assertArrayEquals(new int[] {count + 0, count + 10}, col.stream().mapToInt(t -> (int) t.getValue(QualifiedName.of("__pos"), 0)).toArray());
+            Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
+            assertArrayEquals(new int[] {count, count + 10}, col.stream().mapToInt(t -> (int) t.getValue("__pos")).toArray());
             count++;
         }
+        it.close();
         assertFalse(it.hasNext());
         assertEquals(9, count);
+        assertEquals(1, leftClose.intValue());
     }
 
     @Test
     public void test_outer_join_no_populate()
     {
-        Operator left = op(context -> IntStream.range(0, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator());
-        Operator right = op(context -> IntStream.range(5, 15).mapToObj(i -> (Tuple) Row.of(b, i, new Object[] {i})).iterator());
+        MutableInt leftClose = new MutableInt();
+        MutableInt rightClose = new MutableInt();
 
-        HashJoin op = new HashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionHashFunction(asList(e("a.col1"))),
-                new ExpressionHashFunction(asList(e("b.col1"))),
-                new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                false,
-                true);
+        String query = "select * "
+            + "from tableA a "
+            + "left join tableB b "
+            + "  on b.Value = a.Value";
+
+        Map<String, Function<TableAlias, Operator>> opByTable = MapUtils.ofEntries(
+                MapUtils.entry("tableA", a -> op(context -> IntStream.range(0, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator(), () -> leftClose.increment())),
+                MapUtils.entry("tableB", a -> op(context -> IntStream.range(5, 15).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator(), () -> rightClose.increment())));
+
+        Operator op = operator(query, opByTable);
+
+        assertTrue("A hash join should have been constructed", op instanceof HashJoin);
 
         RowIterator it = op.open(new ExecutionContext(session));
 
@@ -206,30 +207,37 @@ public class HashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(tableAPos[count], tuple.getValue(QualifiedName.of("a", "__pos"), 0));
-            assertEquals(tableBPos[count], tuple.getValue(QualifiedName.of("b", "__pos"), 0));
+            assertEquals(tableAPos[count], tuple.getTuple(0).getValue("__pos"));
+
+            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue("__pos")).orElse(null);
+            assertEquals(tableBPos[count], val);
             count++;
         }
+        it.close();
 
         assertEquals(10, count);
+        assertEquals(1, leftClose.intValue());
+        assertEquals(1, rightClose.intValue());
     }
 
     @Test
     public void test_outer_join_populate()
     {
-        Operator left = op(context -> IntStream.range(0, 5).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator());
-        Operator right = op(context -> IntStream.range(5, 15).mapToObj(i -> (Tuple) Row.of(b, i - 1, new Object[] {i % 5 + 2})).iterator());
+        MutableInt leftClose = new MutableInt();
+        MutableInt rightClose = new MutableInt();
 
-        HashJoin op = new HashJoin(0,
-                "",
-                left,
-                right,
-                new ExpressionHashFunction(asList(e("a.col1"))),
-                new ExpressionHashFunction(asList(e("b.col1"))),
-                new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
-                true,
-                true);
+        String query = "select * "
+            + "from tableA a "
+            + "left join tableB b with (populate = true) "
+            + "  on b.Value = a.Value";
+
+        Map<String, Function<TableAlias, Operator>> opByTable = MapUtils.ofEntries(
+                MapUtils.entry("tableA", a -> op(context -> IntStream.range(0, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator(), () -> leftClose.increment())),
+                MapUtils.entry("tableB", a -> op(context -> IntStream.range(5, 15).mapToObj(i -> (Tuple) Row.of(a, i - 1, new Object[] {i % 5 + 2})).iterator(), () -> rightClose.increment())));
+
+        Operator op = operator(query, opByTable);
+
+        assertTrue("A hash join should have been constructed", op instanceof HashJoin);
 
         RowIterator it = op.open(new ExecutionContext(session));
 
@@ -245,23 +253,23 @@ public class HashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            int pos = (int) tuple.getValue(QualifiedName.of("a", "__pos"), 0);
+            int pos = (int) tuple.getTuple(0).getValue("__pos");
             assertEquals(count, pos);
 
             @SuppressWarnings("unchecked")
-            Collection<Tuple> col = (Collection<Tuple>) tuple.getValue(QualifiedName.of("b"), 0);
+            Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
 
-            if (pos >= 2)
+            if (pos >= 2 && pos <= 6)
             {
-                assertArrayEquals(tableBPos[count - 2], col.stream().mapToInt(t -> (int) t.getValue(QualifiedName.of("__pos"), 0)).toArray());
+                assertArrayEquals("Count: " + count, tableBPos[pos - 2], col.stream().mapToInt(t -> (int) t.getValue("__pos")).toArray());
             }
             else
             {
-                assertNull(col);
+                assertNull("Count: " + count, col);
             }
             count++;
         }
 
-        assertEquals(5, count);
+        assertEquals(10, count);
     }
 }

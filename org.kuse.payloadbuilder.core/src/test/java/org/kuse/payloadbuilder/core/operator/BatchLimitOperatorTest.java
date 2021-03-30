@@ -16,7 +16,7 @@ public class BatchLimitOperatorTest extends AOperatorTest
     @Test
     public void test()
     {
-        TableAlias alias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("a"), "a").build();
+        TableAlias alias = TableAliasBuilder.of(0, TableAlias.Type.TABLE, QualifiedName.of("a"), "a").build();
         MutableBoolean close = new MutableBoolean();
         Operator op = op(ctx -> IntStream.range(0, 10).mapToObj(i -> (Tuple) Row.of(alias, i, new Object[] {i})).iterator(), () -> close.setTrue());
         Operator limitOp = new BatchLimitOperator(0, op, LiteralExpression.create(5));
@@ -28,7 +28,7 @@ public class BatchLimitOperatorTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            int pos = (int) tuple.getValue(QualifiedName.of("a", "__pos"), 0);
+            int pos = (int) tuple.getTuple(0).getValue("__pos");
             assertEquals(count, pos);
             count++;
         }
@@ -42,7 +42,7 @@ public class BatchLimitOperatorTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            int pos = (int) tuple.getValue(QualifiedName.of("a", "__pos"), 0);
+            int pos = (int) tuple.getTuple(0).getValue("__pos");
             assertEquals(count, pos);
             count++;
         }

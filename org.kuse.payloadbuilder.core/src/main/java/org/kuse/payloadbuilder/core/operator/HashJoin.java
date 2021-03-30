@@ -107,14 +107,15 @@ class HashJoin extends AOperator
     public RowIterator open(ExecutionContext context)
     {
         Tuple contextOuter = context.getTuple();
-        Map<IntKey, List<TupleHolder>> table = hash(context);
+        final JoinTuple joinTuple = new JoinTuple(contextOuter);
+        Map<IntKey, List<TupleHolder>> table = hash(context, joinTuple);
         if (table.isEmpty())
         {
             return RowIterator.EMPTY;
         }
 
         boolean markOuterRows = populating || emitEmptyOuterRows;
-        RowIterator probeIterator = probeIterator(contextOuter, table, context, markOuterRows);
+        RowIterator probeIterator = probeIterator(joinTuple, table, context, markOuterRows);
 
         if (populating)
         {
@@ -123,7 +124,7 @@ class HashJoin extends AOperator
             {
                 probeIterator.next();
             }
-
+            probeIterator.close();
             return tableIterator(table, emitEmptyOuterRows ? TableIteratorType.BOTH : TableIteratorType.MATCHED);
         }
 
@@ -137,10 +138,13 @@ class HashJoin extends AOperator
         // 2. Probe non matched rows from table
         return RowIterator.wrap(new IteratorChain(
                 probeIterator,
-                tableIterator(table, TableIteratorType.NON_MATCHED)));
+                tableIterator(table, TableIteratorType.NON_MATCHED)), () ->
+                {
+                    probeIterator.close();
+                });
     };
 
-    private Map<IntKey, List<TupleHolder>> hash(ExecutionContext context)
+    private Map<IntKey, List<TupleHolder>> hash(ExecutionContext context, JoinTuple joinTuple)
     {
         IntKey key = new IntKey();
         Map<IntKey, List<TupleHolder>> table = new LinkedHashMap<>();
@@ -148,7 +152,8 @@ class HashJoin extends AOperator
         while (oi.hasNext())
         {
             Tuple tuple = oi.next();
-            key.key = outerHashFunction.applyAsInt(context, tuple);
+            joinTuple.setInner(tuple);
+            key.key = outerHashFunction.applyAsInt(context, joinTuple);
             List<TupleHolder> list = table.get(key);
             if (list == null)
             {
@@ -170,14 +175,12 @@ class HashJoin extends AOperator
     }
 
     private RowIterator probeIterator(
-            Tuple contextOuter,
+            JoinTuple joinTuple,
             Map<IntKey, List<TupleHolder>> table,
             ExecutionContext context,
             boolean markOuterRows)
     {
         final RowIterator ii = inner.open(context);
-        final JoinTuple joinTuple = new JoinTuple();
-        joinTuple.setContextOuter(contextOuter);
         //CSOFF
         return new RowIterator()
         //CSON
@@ -222,7 +225,7 @@ class HashJoin extends AOperator
                         currentInner = ii.next();
                         joinTuple.setInner(currentInner);
 
-                        key.key = innerHashFunction.applyAsInt(context, currentInner);
+                        key.key = innerHashFunction.applyAsInt(context, joinTuple);
                         List<TupleHolder> list = table.get(key);
                         if (list == null)
                         {

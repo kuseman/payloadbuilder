@@ -144,9 +144,7 @@ class BatchHashJoin extends AOperator
     //CSON
     public RowIterator open(ExecutionContext context)
     {
-        final Tuple contextOuter = context.getTuple();
-        final JoinTuple joinTuple = new JoinTuple();
-        joinTuple.setContextOuter(contextOuter);
+        final JoinTuple joinTuple = new JoinTuple(context.getTuple());
         Data data = context.getOperatorContext().getNodeData(nodeId, () -> new Data());
         executionCount++;
         final RowIterator outerIt = outer.open(context);
@@ -353,11 +351,14 @@ class BatchHashJoin extends AOperator
                 context.getOperatorContext().setOuterIndexValues(outerValuesIterator);
                 RowIterator it = inner.open(context);
 
+                joinTuple.setOuter(null);
+
                 // Hash batch
                 while (it.hasNext())
                 {
                     Tuple tuple = it.next();
-                    int hash = populateKeyValues(innerValuesExtractor, context, tuple);
+                    joinTuple.setInner(tuple);
+                    int hash = populateKeyValues(innerValuesExtractor, context, joinTuple);
                     TableValue tableValue = table.get(hash);
                     if (tableValue == null)
                     {
@@ -453,7 +454,10 @@ class BatchHashJoin extends AOperator
                             }
 
                             TupleHolder holder = outerTuples.get(outerRowsIndex++);
-                            int hash = populateKeyValues(outerValuesExtractor, context, holder.tuple);
+                            joinTuple.setOuter(null);
+                            joinTuple.setInner(holder.tuple);
+
+                            int hash = populateKeyValues(outerValuesExtractor, context, joinTuple);
                             // Cannot be null values in keys
                             if (contains(keyValues, null))
                             {

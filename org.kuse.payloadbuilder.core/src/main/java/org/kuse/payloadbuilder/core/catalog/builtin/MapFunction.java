@@ -6,10 +6,8 @@ import static java.util.Collections.singletonList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.function.Function;
 
 import org.apache.commons.collections.iterators.TransformIterator;
-import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.LambdaFunction;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
@@ -24,22 +22,25 @@ import org.kuse.payloadbuilder.core.utils.CollectionUtils;
 /** Map function. Maps input into another form */
 class MapFunction extends ScalarFunctionInfo implements LambdaFunction
 {
+    private static final List<LambdaBinding> LAMBDA_BINDINGS = singletonList(
+            new LambdaBinding(1, 0));
+
     MapFunction(Catalog catalog)
     {
         super(catalog, "map");
     }
 
     @Override
-    public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Expression> arguments, Function<Expression, Set<TableAlias>> aliasResolver)
+    public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Set<TableAlias>> argumentAliases)
     {
         // Map function has resulting alias as the mapping lambda
-        return aliasResolver.apply(arguments.get(1));
+        return argumentAliases.get(1);
     }
 
     @Override
-    public List<Pair<Expression, LambdaExpression>> getLambdaBindings(List<Expression> arguments)
+    public List<LambdaBinding> getLambdaBindings()
     {
-        return singletonList(Pair.of(arguments.get(0), (LambdaExpression) arguments.get(1)));
+        return LAMBDA_BINDINGS;
     }
 
     @Override

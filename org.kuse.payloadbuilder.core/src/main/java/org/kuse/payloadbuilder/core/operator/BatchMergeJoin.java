@@ -105,8 +105,7 @@ class BatchMergeJoin extends AOperator
     public RowIterator open(ExecutionContext context)
     {
         final RowIterator outerIt = outer.open(context);
-        final JoinTuple joinTuple = new JoinTuple();
-        joinTuple.setContextOuter(context.getTuple());
+        final JoinTuple joinTuple = new JoinTuple(context.getTuple());
         //CSOFF
         return new RowIterator()
         //CSON

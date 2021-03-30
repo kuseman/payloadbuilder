@@ -39,9 +39,11 @@ public interface Operator
         return "";
     }
 
-    /** Returns more detail properties of describe statement if {@link #getDescribeString()} is not enough.
+    /**
+     * Returns more detail properties of describe statement if {@link #getDescribeString()} is not enough.
+     *
      * @param context Execution context
-     * */
+     */
     default Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
         return emptyMap();
@@ -65,7 +67,15 @@ public interface Operator
         /** Wrap an {@link Iterator} of {@link Tuple} in a {@link RowIterator} */
         static RowIterator wrap(Iterator<Tuple> iterator)
         {
+            return wrap(iterator, null);
+        }
+
+        /** Wrap an {@link Iterator} of {@link Tuple} in a {@link RowIterator} */
+        static RowIterator wrap(Iterator<Tuple> iterator, Runnable close)
+        {
+            //CSOFF
             return new RowIterator()
+            //CSON
             {
                 @Override
                 public Tuple next()
@@ -77,6 +87,15 @@ public interface Operator
                 public boolean hasNext()
                 {
                     return iterator.hasNext();
+                }
+
+                @Override
+                public void close()
+                {
+                    if (close != null)
+                    {
+                        close.run();
+                    }
                 }
             };
         }

@@ -53,6 +53,42 @@
       ]
     },
     {
+      "name": "Subquery with a single table source",
+      "query": [
+        "select x.col1, x.col2 from (from source) x"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }],
+          [{ "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }]
+        ]
+      ]
+    },
+    {
+      "name": "Lambda functions'",
+      "query": [
+        "select r.Value, ",
+        " r1.map(x -> r.Value + x.Value) map, ",
+        " r1.filter(x -> (r.Value - x.Value) > 0).map(x -> x.Value) filter, ",
+        " r1.flatMap(x -> listOf(r.Value, x.Value)) flatMap, ",
+        " r1.any(x -> x.Value > 0) any,",
+        " r1.all(x -> r.Value - x.Value > 0) all, ",
+        " r1.none(x -> r.Value + x.Value > 10) none",
+        
+        "from range(1, 4) r ",
+        "inner join range(1, 11) r1 with (populate=true) ",
+        "  on r1.Value % 3 + 1 = r.Value"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "Value", "value": 1 },{ "key": "map", "value": [4,7,10] },	{ "key": "filter", "value": [] }, { "key": "flatMap", "value": [1, 3, 1, 6, 1, 9] },	   {"key":"any","value":true},{"key":"all","value":false},{"key":"none","value":true}],
+          [{ "key": "Value", "value": 2 },{ "key": "map", "value": [3,6,9,12] },{ "key": "filter", "value": [1] },{ "key": "flatMap", "value": [2, 1, 2, 4, 2, 7, 2, 10] },{"key":"any","value":true},{"key":"all","value":false},{"key":"none","value":false}],
+          [{ "key": "Value", "value": 3 },{ "key": "map", "value": [5,8,11] },	{ "key": "filter", "value": [2] },{ "key": "flatMap", "value": [3, 2, 3, 5, 3, 8] },	   {"key":"any","value":true},{"key":"all","value":false},{"key":"none","value":false}]
+        ]
+      ]
+    },
+    {
       "name": "Order by",
       "query": [
         "select col1 from source order by col2 desc"

@@ -92,7 +92,7 @@ public class DescribeUtils
         // Insert first columns
         describeColumns.addAll(0, asList("NodeId", "Name"));
         TableAlias alias = TableAliasBuilder
-                .of(TableAlias.Type.TABLE, QualifiedName.of("describe"), "d")
+                .of(-1, TableAlias.Type.TABLE, QualifiedName.of("describe"), "d")
                 .columns(describeColumns.toArray(EMPTY_STRING_ARRAY))
                 .build();
 
@@ -140,7 +140,7 @@ public class DescribeUtils
                 IntStream.range(0, columns.size()).mapToObj(index -> (Projection) (writer, ctx) ->
                 {
                     Tuple tuple = ctx.getTuple();
-                    writer.writeValue(tuple.getValue(QualifiedName.of(columns.get(index)), 0));
+                    writer.writeValue(tuple.getValue(columns.get(index)));
                 }).collect(toList()));
     }
 

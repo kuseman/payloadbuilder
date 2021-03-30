@@ -22,7 +22,7 @@ public class SortByOperatorTest extends AOperatorTest
     public void test()
     {
         Random rnd = new Random();
-        TableAlias alias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("table"), "a").columns(new String[] {"col1"}).build();
+        TableAlias alias = TableAliasBuilder.of(0, TableAlias.Type.TABLE, QualifiedName.of("table"), "a").columns(new String[] {"col1"}).build();
         MutableBoolean close = new MutableBoolean();
         Operator target = op(ctx -> IntStream.range(0, 100).mapToObj(i -> (Tuple) Row.of(alias, i, new Object[] {rnd.nextInt(100)})).iterator(), () -> close.setTrue());
         SortByOperator operator = new SortByOperator(
@@ -35,7 +35,7 @@ public class SortByOperatorTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            int val = (int) tuple.getValue(QualifiedName.of("col1"), 0);
+            int val = (int) tuple.getTuple(0).getValue("col1");
             if (prev != -1)
             {
                 assertTrue(prev <= val);

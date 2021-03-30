@@ -17,7 +17,7 @@ import org.kuse.payloadbuilder.core.utils.CollectionUtils;
 /** Operator that operates over an expression (that returns rows) */
 class ExpressionOperator extends AOperator
 {
-    private static final TableAlias MAP_ALIAS = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of(""), "").asteriskColumns().build();
+    private static final TableAlias MAP_ALIAS = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of(""), "").asteriskColumns().build();
     private final Expression expression;
 
     ExpressionOperator(int nodeId, Expression expression)

@@ -2,7 +2,6 @@ package org.kuse.payloadbuilder.core.catalog;
 
 import java.util.List;
 import java.util.Set;
-import java.util.function.Function;
 
 import org.apache.commons.lang3.NotImplementedException;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
@@ -32,14 +31,13 @@ public abstract class ScalarFunctionInfo extends FunctionInfo
      *
      * Example:
      * <b>aa.filter(aa, x -> x.sku_id > 0)</b>
-     * Resulting alias of a filter is the first arg alias ie. [aa]
+     * Resulting alias of a filter is the first arguments resulting alias ie. [aa]
      * </pre>
      *
      * @param parentAliases Parent aliases in context to this function
-     * @param arguments Argument expressions to this function
-     * @param aliasResolver Resolver for resolving arguments aliases
+     * @param argumentAliases Resulting aliases for earch function argument
      **/
-    public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Expression> arguments, Function<Expression, Set<TableAlias>> aliasResolver)
+    public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Set<TableAlias>> argumentAliases)
     {
         return parentAliases;
     }

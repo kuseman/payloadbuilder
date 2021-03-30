@@ -19,7 +19,7 @@ public class ExpressionTupleComparatorTest extends AOperatorTest
     @Test
     public void test()
     {
-        TableAlias alias = TableAliasBuilder.of(TableAlias.Type.TABLE, QualifiedName.of("table"), "a").columns(new String[] {"col1"}).build();
+        TableAlias alias = TableAliasBuilder.of(0, TableAlias.Type.TABLE, QualifiedName.of("table"), "a").columns(new String[] {"col1"}).build();
         Row a, b;
 
         a = Row.of(alias, 0, new Object[] {1});

@@ -56,19 +56,22 @@ public class QueryParserTest extends AParserTest
                         new QualifiedFunctionCallExpression(
                                 (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "flatMap").getValue(),
                                 asList(
-                                        new QualifiedReferenceExpression(QualifiedName.of("aa"), -1),
+                                        new QualifiedReferenceExpression(QualifiedName.of("aa"), -1, null),
                                         new LambdaExpression(
                                                 asList("x"),
-                                                new QualifiedReferenceExpression(QualifiedName.of("x", "ap"), 0),
-                                                new int[] {0}))),
+                                                new QualifiedReferenceExpression(QualifiedName.of("x", "ap"), 0, null),
+                                                new int[] {0})),
+                                null),
                         new LambdaExpression(
                                 asList("x"),
                                 new QualifiedFunctionCallExpression(
                                         (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "cast").getValue(),
                                         asList(
-                                                new QualifiedReferenceExpression(QualifiedName.of("x", "price_sales"), 0),
-                                                new LiteralStringExpression("FLOAT"))),
-                                new int[] {0})));
+                                                new QualifiedReferenceExpression(QualifiedName.of("x", "price_sales"), 0, null),
+                                                new LiteralStringExpression("FLOAT")),
+                                        null),
+                                new int[] {0})),
+                null);
 
         assertExpression("aa.flatMap(x -> x.ap).map(x -> cast(x.price_sales, float))", expected);
     }
@@ -93,36 +96,38 @@ public class QueryParserTest extends AParserTest
 
         ScalarFunctionInfo hashFunction = (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "hash").getValue();
 
-        assertExpression("a.b.c", new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1));
+        assertExpression("a.b.c", new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1, null));
         assertExpression("@list.filter(x -> x.value)",
                 new QualifiedFunctionCallExpression(
                         (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "filter").getValue(),
                         asList(
                                 new VariableExpression(QualifiedName.of("list")),
                                 new LambdaExpression(asList("x"),
-                                        new QualifiedReferenceExpression(QualifiedName.of("x", "value"), 0),
-                                        new int[] {0}))));
+                                        new QualifiedReferenceExpression(QualifiedName.of("x", "value"), 0, null),
+                                        new int[] {0})),
+                        null));
         assertExpression("a.hash()", new QualifiedFunctionCallExpression(
                 hashFunction,
-                asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1))));
+                asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1, null)), null));
         assertExpression("a.hash() + hash(a)",
                 new ArithmeticBinaryExpression(
                         Type.ADD,
-                        new QualifiedFunctionCallExpression(hashFunction, asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1))),
-                        new QualifiedFunctionCallExpression(hashFunction, asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1)))));
+                        new QualifiedFunctionCallExpression(hashFunction, asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1, null)), null),
+                        new QualifiedFunctionCallExpression(hashFunction, asList(new QualifiedReferenceExpression(QualifiedName.of("a"), -1, null)), null)));
         assertExpression("a.b.c.hash().value",
                 new DereferenceExpression(
-                        new QualifiedFunctionCallExpression(hashFunction, asList(new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1))),
-                        new QualifiedReferenceExpression(QualifiedName.of("value"), -1)));
+                        new QualifiedFunctionCallExpression(hashFunction, asList(new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1, null)), null),
+                        new QualifiedReferenceExpression(QualifiedName.of("value"), -1, null)));
         assertExpression("a.b.c.hash().hash()",
                 new QualifiedFunctionCallExpression(hashFunction,
-                        asList(new QualifiedFunctionCallExpression(hashFunction, asList(new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1))))));
+                        asList(new QualifiedFunctionCallExpression(hashFunction, asList(new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1, null)), null)), null));
         assertExpression("a.b.c.hash().hash(123)",
                 new QualifiedFunctionCallExpression(hashFunction,
                         asList(
                                 new QualifiedFunctionCallExpression(hashFunction, asList(
-                                        new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1))),
-                                new LiteralIntegerExpression(123))));
+                                        new QualifiedReferenceExpression(QualifiedName.of("a", "b", "c"), -1, null)), null),
+                                new LiteralIntegerExpression(123)),
+                        null));
     }
 
     @Test
@@ -182,8 +187,8 @@ public class QueryParserTest extends AParserTest
         assertExpression("col like 'hello' and col2 not like 'world'",
                 new LogicalBinaryExpression(
                         LogicalBinaryExpression.Type.AND,
-                        new LikeExpression(new QualifiedReferenceExpression(QualifiedName.of("col"), -1), new LiteralStringExpression("hello"), false, null),
-                        new LikeExpression(new QualifiedReferenceExpression(QualifiedName.of("col2"), -1), new LiteralStringExpression("world"), true, null)));
+                        new LikeExpression(new QualifiedReferenceExpression(QualifiedName.of("col"), -1, null), new LiteralStringExpression("hello"), false, null),
+                        new LikeExpression(new QualifiedReferenceExpression(QualifiedName.of("col2"), -1, null), new LiteralStringExpression("world"), true, null)));
     }
 
     @Test
