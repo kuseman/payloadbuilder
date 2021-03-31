@@ -103,7 +103,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         Map<TableAlias, Set<String>> columnsByAlias = new THashMap<>();
 
         /** Resulting operator */
-        private Operator operator;
+        private Operator operatorResult;
 
         /** Resulting projection */
         private Projection projection;
@@ -117,12 +117,47 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         /** Sort items. Sent to catalog to for usage if supported. */
         private List<SortItem> sortItems;
 
+        /**
+         * Analyze mode. If true a intercepting operator will be inserted in front of each operator that analyzes and performs measurement etc.
+         */
+        private boolean analyze;
+
         /** Acquire next unique node id */
         private int acquireNodeId()
         {
             int result = nodeId;
             nodeId++;
             return result;
+        }
+
+        /** Set current operator */
+        private void setOperator(Operator operator)
+        {
+            if (analyze && !(operator instanceof AnalyzeOperator))
+            {
+                this.operatorResult = new AnalyzeOperator(acquireNodeId(), operator);
+            }
+            else
+            {
+                this.operatorResult = operator;
+            }
+        }
+
+        /** Wrap operator if needed */
+        private Operator wrap(Operator operator)
+        {
+            if (analyze && !(operator instanceof AnalyzeOperator))
+            {
+                return new AnalyzeOperator(acquireNodeId(), operator);
+            }
+
+            return operator;
+        }
+
+        /** Get current operator */
+        private Operator getOperator()
+        {
+            return operatorResult;
         }
 
         /** Appends push down predicate for provided alias */
@@ -139,7 +174,14 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     /** Create operator */
     public static Pair<Operator, Projection> create(QuerySession session, Select select)
     {
+        return create(session, select, false);
+    }
+
+    /** Create operator */
+    public static Pair<Operator, Projection> create(QuerySession session, Select select, boolean analyze)
+    {
         Context context = new Context();
+        context.analyze = analyze;
         context.session = session;
         context.registry = session.getCatalogRegistry();
         select.accept(VISITOR, context);
@@ -151,7 +193,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             }
         });
 
-        return Pair.of(context.operator, context.projection);
+        return Pair.of(context.getOperator(), context.projection);
     }
 
     //CSOFF
@@ -216,7 +258,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 if (predicate != null)
                 //CSON
                 {
-                    context.operator = new FilterOperator(context.acquireNodeId(), context.operator, new ExpressionPredicate(predicate));
+                    context.setOperator(new FilterOperator(context.acquireNodeId(), context.getOperator(), new ExpressionPredicate(predicate)));
                 }
             }
         }
@@ -224,7 +266,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         if (batchLimitOption != null)
         {
             batchLimitId = context.acquireNodeId();
-            context.operator = new BatchLimitOperator(batchLimitId, context.operator, batchLimitOption.getValueExpression());
+            context.setOperator(new BatchLimitOperator(batchLimitId, context.getOperator(), batchLimitOption.getValueExpression()));
         }
 
         for (int i = 0; i < joinSize; i++)
@@ -238,7 +280,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         if (where != null)
         {
-            context.operator = new FilterOperator(context.acquireNodeId(), context.operator, new ExpressionPredicate(where));
+            context.setOperator(new FilterOperator(context.acquireNodeId(), context.getOperator(), new ExpressionPredicate(where)));
             visit(where, context);
         }
 
@@ -246,24 +288,24 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         if (!select.getGroupBy().isEmpty())
         {
             groupBys.forEach(e -> visit(e, context));
-            context.operator = createGroupBy(context.acquireNodeId(), groupBys, context.operator);
+            context.setOperator(createGroupBy(context.acquireNodeId(), groupBys, context.getOperator()));
         }
 
         if (batchLimitOption != null)
         {
-            context.operator = new BatchRepeatOperator(context.acquireNodeId(), batchLimitId, context.operator);
+            context.setOperator(new BatchRepeatOperator(context.acquireNodeId(), batchLimitId, context.getOperator()));
         }
 
         if (!sortItems.isEmpty())
         {
             sortItems.forEach(si -> si.accept(this, context));
-            context.operator = new OrderByOperator(context.acquireNodeId(), context.operator, new ExpressionTupleComparator(sortItems));
+            context.setOperator(new OrderByOperator(context.acquireNodeId(), context.getOperator(), new ExpressionTupleComparator(sortItems)));
         }
 
         if (select.getTopExpression() != null)
         {
             visit(select.getTopExpression(), context);
-            context.operator = new TopOperator(context.acquireNodeId(), context.operator, select.getTopExpression());
+            context.setOperator(new TopOperator(context.acquireNodeId(), context.getOperator(), select.getTopExpression()));
         }
 
         context.currentTableAlias = tsj != null ? tsj.getTableSource().getTableAlias() : null;
@@ -417,9 +459,11 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             else
             {
                 alias.setAsteriskColumns();
-                for (TableAlias childAlias : alias.getChildAliases())
+                List<TableAlias> siblingAliases = alias.getSiblingAliases();
+
+                for (TableAlias siblingAliase : siblingAliases)
                 {
-                    childAlias.setAsteriskColumns();
+                    siblingAliase.setAsteriskColumns();
                 }
             }
         }
@@ -521,7 +565,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         {
             Expression predicate = new AnalyzeResult(pairs).getPredicate();
             visit(predicate, context);
-            context.operator = new FilterOperator(context.acquireNodeId(), context.operator, new ExpressionPredicate(predicate));
+            context.setOperator(new FilterOperator(context.acquireNodeId(), context.getOperator(), new ExpressionPredicate(predicate)));
         }
 
         // Child joins
@@ -531,19 +575,19 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         if (where != null)
         {
             visit(where, context);
-            context.operator = new FilterOperator(context.acquireNodeId(), context.operator, new ExpressionPredicate(where));
+            context.setOperator(new FilterOperator(context.acquireNodeId(), context.getOperator(), new ExpressionPredicate(where)));
         }
         List<Expression> groupBys = tableSource.getGroupBy();
         if (!groupBys.isEmpty())
         {
             groupBys.forEach(e -> visit(e, context));
-            context.operator = createGroupBy(context.acquireNodeId(), groupBys, context.operator);
+            context.setOperator(createGroupBy(context.acquireNodeId(), groupBys, context.getOperator()));
         }
         List<SortItem> sortBys = tableSource.getOrderBy();
         if (!sortBys.isEmpty())
         {
             sortBys.forEach(si -> si.accept(this, context));
-            context.operator = new OrderByOperator(context.acquireNodeId(), context.operator, new ExpressionTupleComparator(sortBys));
+            context.setOperator(new OrderByOperator(context.acquireNodeId(), context.getOperator(), new ExpressionTupleComparator(sortBys)));
         }
 
         // Restore prev alias
@@ -557,7 +601,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     {
         if (table.isTempTable())
         {
-            context.operator = new TemporaryTableScanOperator(context.acquireNodeId(), table);
+            context.setOperator(new TemporaryTableScanOperator(context.acquireNodeId(), table));
             return null;
         }
 
@@ -568,7 +612,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         List<AnalyzePair> predicatePairs = ObjectUtils.defaultIfNull(context.pushDownPredicateByAlias.get(alias), emptyList());
         if (context.index != null)
         {
-            context.operator = pair.getValue()
+            context.setOperator(pair.getValue()
                     .getIndexOperator(new OperatorData(
                             context.session,
                             nodeId,
@@ -577,12 +621,12 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                             predicatePairs,
                             emptyList(),
                             table.getOptions()),
-                            context.index);
+                            context.index));
             context.index = null;
         }
         else
         {
-            context.operator = pair.getValue()
+            context.setOperator(pair.getValue()
                     .getScanOperator(new OperatorData(
                             context.session,
                             nodeId,
@@ -590,7 +634,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                             table.getTableAlias(),
                             predicatePairs,
                             context.sortItems,
-                            table.getOptions()));
+                            table.getOptions())));
         }
 
         // No pairs left, remove from context
@@ -608,7 +652,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         context.currentTableAlias = tableFunction.getTableAlias();
         context.currentTableAlias.setColumns(functionInfo.getColumns());
         tableFunction.getArguments().forEach(a -> visit(a, context));
-        context.operator = new TableFunctionOperator(context.acquireNodeId(), tableFunction.getCatalogAlias(), tableFunction.getTableAlias(), functionInfo, tableFunction.getArguments());
+        context.setOperator(new TableFunctionOperator(context.acquireNodeId(), tableFunction.getCatalogAlias(), tableFunction.getTableAlias(), functionInfo, tableFunction.getArguments()));
         return null;
     }
 
@@ -644,7 +688,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     {
         // No FROM or no sort or assignment select then drop out
         // cause
-        if (context.operator == null
+        if (context.getOperator() == null
             || context.sortItems.isEmpty()
             || select.getSelectItems().stream().anyMatch(i -> i.getAssignmentName() != null))
         {
@@ -736,7 +780,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         if (computedExpressions != null)
         {
-            context.operator = new ComputedColumnsOperator(context.acquireNodeId(), context.operator, columns, computedExpressions);
+            context.setOperator(new ComputedColumnsOperator(context.acquireNodeId(), context.getOperator(), columns, computedExpressions));
         }
 
         return Pair.of(selectItems, sortItems);
@@ -762,8 +806,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             Expression condition,
             boolean emitEmptyOuterRows)
     {
-        Operator outer = context.operator;
-        context.operator = null;
+        Operator outer = context.getOperator();
+        context.setOperator(null);
 
         boolean isCorrelated = correlatedDetector.isCorrelated(context, join);
 
@@ -775,7 +819,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 condition,
                 emitEmptyOuterRows,
                 isCorrelated);
-        context.operator = joinOperator;
+        context.setOperator(joinOperator);
     }
 
     //CSOFF
@@ -853,20 +897,20 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 throw new RuntimeException("Index " + index + " should have been consumed by " + innerTableSource.getTable());
             }
 
-            Operator inner = wrapWithPushDown(context, context.operator, innerTableSource.getTableAlias());
+            Operator inner = wrapWithPushDown(context, context.getOperator(), innerTableSource.getTableAlias());
 
             // Cache inner operator if this is a regular nested loop
             // and it's not a temp table.
             if (!isCorrelated && !innerIsTempTable)
             {
-                inner = new CachingOperator(context.acquireNodeId(), inner);
+                inner = context.wrap(new CachingOperator(context.acquireNodeId(), inner));
             }
             // If we have a correlated query and a inner index
             // wrap inner operator with an outer values operator to
             // let the inner utilize each nested loops outer rows index values
             else if (hasIndex)
             {
-                inner = new OuterValuesOperator(context.acquireNodeId(), inner, foundation.outerValueExpressions);
+                inner = context.wrap(new OuterValuesOperator(context.acquireNodeId(), inner, foundation.outerValueExpressions));
             }
 
             return new NestedLoopJoin(
@@ -884,7 +928,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         if (index == null)
         {
             innerTableSource.accept(this, context);
-            Operator inner = wrapWithPushDown(context, context.operator, innerTableSource.getTableAlias());
+            Operator inner = wrapWithPushDown(context, context.getOperator(), innerTableSource.getTableAlias());
             // TODO: implement hash of inner and probe of outer
             // Option hashInner = getOption(innerTableSource, HASH_INNER);
             return new HashJoin(
@@ -908,7 +952,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         {
             throw new RuntimeException("Index " + index + " should have been consumed by " + innerTableSource.getTable());
         }
-        Operator inner = wrapWithPushDown(context, context.operator, innerTableSource.getTableAlias());
+        Operator inner = wrapWithPushDown(context, context.getOperator(), innerTableSource.getTableAlias());
 
         constantalizeValueExtractors(foundation.outerValueExpressions, foundation.innerValueExpressions);
         ExpressionValuesExtractor outerValuesExtractor = new ExpressionValuesExtractor(foundation.outerValueExpressions);
@@ -998,7 +1042,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             Expression pushDownPredicate = new AnalyzeResult(pushDownPairs).getPredicate();
             context.currentTableAlias = tableAlias;
             visit(pushDownPredicate, context);
-            return new FilterOperator(context.acquireNodeId(), operator, new ExpressionPredicate(pushDownPredicate));
+            return context.wrap(new FilterOperator(context.acquireNodeId(), operator, new ExpressionPredicate(pushDownPredicate)));
         }
         return operator;
     }

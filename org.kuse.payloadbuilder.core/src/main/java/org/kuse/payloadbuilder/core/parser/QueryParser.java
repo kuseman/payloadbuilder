@@ -41,6 +41,7 @@ import org.kuse.payloadbuilder.core.parser.Apply.ApplyType;
 import org.kuse.payloadbuilder.core.parser.CaseExpression.WhenClause;
 import org.kuse.payloadbuilder.core.parser.ComparisonExpression.Type;
 import org.kuse.payloadbuilder.core.parser.Join.JoinType;
+import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.AnalyzeStatementContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ArithmeticBinaryContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ArithmeticUnaryContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.CaseExpressionContext;
@@ -236,6 +237,12 @@ public class QueryParser
             }
 
             return new DescribeSelectStatement((SelectStatement) visit(ctx.selectStatement()));
+        }
+
+        @Override
+        public Object visitAnalyzeStatement(AnalyzeStatementContext ctx)
+        {
+            return new AnalyzeStatement((SelectStatement) visit(ctx.selectStatement()));
         }
 
         @Override

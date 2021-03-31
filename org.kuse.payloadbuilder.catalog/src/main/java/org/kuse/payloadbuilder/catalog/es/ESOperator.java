@@ -29,15 +29,17 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.CountingInputStream;
 import org.apache.commons.io.output.CountingOutputStream;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.commons.lang3.mutable.MutableObject;
+import org.apache.commons.lang3.time.DurationFormatUtils;
+import org.apache.commons.lang3.time.StopWatch;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
@@ -157,6 +159,16 @@ class ESOperator extends AOperator
         {
             result.put(INDEX, index);
         }
+
+        Data data = context.getOperatorContext().getNodeData(nodeId);
+        if (data != null)
+        {
+            result.put("Request count", data.requestCount);
+            result.put("Bytes sent", FileUtils.byteCountToDisplaySize(data.bytesSent));
+            result.put("Bytes received", FileUtils.byteCountToDisplaySize(data.bytesReceived));
+            result.put("Request and deserialization time", DurationFormatUtils.formatDurationHMS(data.requestTime.getTime(TimeUnit.MILLISECONDS)));
+        }
+
         return result;
     }
 
@@ -165,12 +177,7 @@ class ESOperator extends AOperator
     {
         ESType esType = ESType.of(context.getSession(), catalogAlias, tableAlias.getTable());
 
-        // TODO: turn on only in analyze mode
-        NodeData nodeData = context.getOperatorContext().getNodeData(nodeId, NodeData::new);
-        AtomicLong sentBytes = (AtomicLong) nodeData.properties.computeIfAbsent("sentCount", k -> new AtomicLong());
-        AtomicLong receivedBytes = (AtomicLong) nodeData.properties.computeIfAbsent("receivedCount", k -> new AtomicLong());
-        AtomicInteger scrollCount = (AtomicInteger) nodeData.properties.computeIfAbsent("scrollCount", k -> new AtomicInteger());
-
+        Data data = context.getOperatorContext().getNodeData(nodeId, Data::new);
         if (index instanceof IdIndex)
         {
             boolean isSingleType = SINGLE_TYPE_TABLE_NAME.equals(esType.type);
@@ -181,18 +188,19 @@ class ESOperator extends AOperator
                     index,
                     isSingleType);
 
-            DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getOperatorContext(), sentBytes);
+            DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getOperatorContext(), data);
             MutableBoolean doRequest = new MutableBoolean(true);
             return getIterator(
                     context,
                     tableAlias,
                     esType.endpoint,
                     ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(esType.type),
-                    receivedBytes,
+                    data,
                     scrollId ->
                     {
                         if (doRequest.isTrue())
                         {
+                            data.bytesSent += mgetUrl.length();
                             HttpPost post = new HttpPost(mgetUrl);
                             post.setEntity(entity);
                             doRequest.setFalse();
@@ -246,13 +254,12 @@ class ESOperator extends AOperator
                 tableAlias,
                 esType.endpoint,
                 isSingleType,
-                receivedBytes,
+                data,
                 scrollId ->
                 {
-                    scrollCount.incrementAndGet();
                     if (scrollId.getValue() == null)
                     {
-                        sentBytes.addAndGet(searchUrl.length() + actualBody.length());
+                        data.bytesSent += searchUrl.length() + actualBody.length();
                         HttpPost post = new HttpPost(searchUrl);
                         post.setEntity(new StringEntity(actualBody, UTF_8));
                         return post;
@@ -260,6 +267,7 @@ class ESOperator extends AOperator
                     else
                     {
                         String id = scrollId.getValue();
+                        data.bytesSent += scrollUrl.length() + actualBody.length();
                         scrollId.setValue(null);
                         HttpPost post = new HttpPost(scrollUrl);
                         if (isSingleType)
@@ -391,7 +399,7 @@ class ESOperator extends AOperator
             TableAlias tableAlias,
             String endpoint,
             boolean isSingleType,
-            AtomicLong receivedBytes,
+            Data data,
             Function<MutableObject<String>, HttpUriRequest> requestSupplier)
     {
         //CSOFF
@@ -427,6 +435,7 @@ class ESOperator extends AOperator
                 if (!isBlank(scrollId.getValue()))
                 {
                     closed = true;
+                    data.requestCount++;
                     HttpDeleteWithBody delete = new HttpDeleteWithBody(endpoint + "/_search/scroll");
                     if (isSingleType)
                     {
@@ -474,6 +483,8 @@ class ESOperator extends AOperator
                         }
 
                         ESResponse esReponse;
+                        data.requestCount++;
+                        data.requestTime.resume();
                         try (CloseableHttpResponse response = CLIENT.execute(request);)
                         {
                             if (response.getStatusLine().getStatusCode() != HttpStatus.SC_OK)
@@ -482,11 +493,15 @@ class ESOperator extends AOperator
                             }
                             CountingInputStream cis = new CountingInputStream(response.getEntity().getContent());
                             esReponse = READER.withAttribute(FIELDS, columns).readValue(cis);
-                            receivedBytes.addAndGet(cis.getByteCount());
+                            data.bytesReceived += cis.getByteCount();
                         }
                         catch (IOException e)
                         {
                             throw new RuntimeException("Error query", e);
+                        }
+                        finally
+                        {
+                            data.requestTime.suspend();
                         }
 
                         scrollId.setValue(esReponse.scrollId);
@@ -670,6 +685,21 @@ class ESOperator extends AOperator
         return String.format("ID: %d, %s", nodeId, (index != null ? "index" : "scan") + " (" + tableAlias.toString() + ")");
     }
 
+    /** Node data with stats */
+    static class Data extends NodeData
+    {
+        StopWatch requestTime = new StopWatch();
+        int requestCount;
+        long bytesSent;
+        long bytesReceived;
+
+        Data()
+        {
+            requestTime.start();
+            requestTime.suspend();
+        }
+    }
+
     /** Entity support for DELETE */
     private static class HttpDeleteWithBody extends HttpEntityEnclosingRequestBase
     {
@@ -698,12 +728,12 @@ class ESOperator extends AOperator
         private static final Header APPLICATION_JSON = new BasicHeader("Content-Type", "application/json");
 
         private final OperatorContext context;
-        private final AtomicLong sentBytes;
+        private final Data data;
 
-        private DocIdStreamingEntity(OperatorContext context, AtomicLong sentBytes)
+        private DocIdStreamingEntity(OperatorContext context, Data data)
         {
             this.context = context;
-            this.sentBytes = sentBytes;
+            this.data = data;
         }
 
         @Override
@@ -765,7 +795,7 @@ class ESOperator extends AOperator
                 }
 
                 bos.write(FOOTER_BYTES);
-                sentBytes.addAndGet(bos.getByteCount());
+                data.bytesSent += bos.getByteCount();
             }
         }
 

@@ -19,6 +19,19 @@ public interface Operator
     /** Get node id of operator */
     int getNodeId();
 
+    /**
+     * Return the actual node id of this operator.
+     *
+     * <pre>
+     * If this operator is intercepted the {@link #getNodeId()} won't return
+     * the "real" nodeId for this operator but rather the intercepted operators node id
+     * </pre>
+     */
+    default int getActualNodeId()
+    {
+        return getNodeId();
+    }
+
     /** Return child operators if any */
     default List<Operator> getChildOperators()
     {

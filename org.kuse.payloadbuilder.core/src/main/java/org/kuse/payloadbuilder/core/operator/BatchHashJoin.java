@@ -6,11 +6,14 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.ArrayUtils.contains;
 import static org.kuse.payloadbuilder.core.DescribeUtils.BATCH_SIZE;
 import static org.kuse.payloadbuilder.core.DescribeUtils.INDEX;
+import static org.kuse.payloadbuilder.core.DescribeUtils.INNER_HASH_TIME;
 import static org.kuse.payloadbuilder.core.DescribeUtils.INNER_VALUES;
 import static org.kuse.payloadbuilder.core.DescribeUtils.LOGICAL_OPERATOR;
+import static org.kuse.payloadbuilder.core.DescribeUtils.OUTER_HASH_TIME;
 import static org.kuse.payloadbuilder.core.DescribeUtils.OUTER_VALUES;
 import static org.kuse.payloadbuilder.core.DescribeUtils.POPULATING;
 import static org.kuse.payloadbuilder.core.DescribeUtils.PREDICATE;
+import static org.kuse.payloadbuilder.core.DescribeUtils.PREDICATE_TIME;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
@@ -21,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiPredicate;
 
 import org.apache.commons.lang3.StringUtils;
@@ -66,12 +69,9 @@ class BatchHashJoin extends AOperator
     private final int valuesSize;
     private final Option batchSizeOption;
 
-    /* Statistics */
-    private int executionCount;
-
     //CSOFF
     BatchHashJoin(
-    //CSON
+            //CSON
             int nodeId,
             String logicalOperator,
             Operator outer,
@@ -115,7 +115,9 @@ class BatchHashJoin extends AOperator
     @Override
     public Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
-        return ofEntries(true,
+        Data data = context.getOperatorContext().getNodeData(nodeId);
+
+        Map<String, Object> result = ofEntries(true,
                 entry(LOGICAL_OPERATOR, logicalOperator),
                 entry(POPULATING, populating),
                 entry(BATCH_SIZE, batchSizeOption != null ? batchSizeOption.getValueExpression().toString() : innerIndex.getBatchSize()),
@@ -123,20 +125,15 @@ class BatchHashJoin extends AOperator
                 entry(INDEX, innerIndex),
                 entry(OUTER_VALUES, outerValuesExtractor),
                 entry(INNER_VALUES, innerValuesExtractor));
-    }
 
-    /** Node data */
-    class Data extends NodeData
-    {
-        AtomicLong time = new AtomicLong();
-        long innerHashTime;
-        long outerHashTime;
-
-        @Override
-        public String toString()
+        if (data != null)
         {
-            return "Time (" + innerIndex.toString() + ", innerTime: " + innerHashTime + ", outerTime: " + outerHashTime + "): " + DurationFormatUtils.formatDurationHMS(time.get());
+            result.put(INNER_HASH_TIME, DurationFormatUtils.formatDurationHMS(data.innerHashTime.getTime(TimeUnit.MILLISECONDS)));
+            result.put(OUTER_HASH_TIME, DurationFormatUtils.formatDurationHMS(data.outerHashTime.getTime(TimeUnit.MILLISECONDS)));
+            result.put(PREDICATE_TIME, DurationFormatUtils.formatDurationHMS(data.predicateTime.getTime(TimeUnit.MILLISECONDS)));
         }
+
+        return result;
     }
 
     //CSOFF
@@ -145,8 +142,7 @@ class BatchHashJoin extends AOperator
     public RowIterator open(ExecutionContext context)
     {
         final JoinTuple joinTuple = new JoinTuple(context.getTuple());
-        Data data = context.getOperatorContext().getNodeData(nodeId, () -> new Data());
-        executionCount++;
+        final Data data = context.getOperatorContext().getNodeData(nodeId, Data::new);
         final RowIterator outerIt = outer.open(context);
         int temp = innerIndex.getBatchSize();
         if (batchSizeOption != null)
@@ -158,7 +154,6 @@ class BatchHashJoin extends AOperator
             }
             temp = (int) obj;
         }
-        final StopWatch sw = new StopWatch();
         final int batchSize = temp;
         //CSOFF
         return new RowIterator()
@@ -195,10 +190,6 @@ class BatchHashJoin extends AOperator
             @Override
             public boolean hasNext()
             {
-                if (sw.isStopped())
-                {
-                    sw.start();
-                }
                 return setNext();
             }
 
@@ -225,10 +216,6 @@ class BatchHashJoin extends AOperator
                         if (outerTuples.isEmpty())
                         {
                             verifyOuterValuesIterator();
-                            sw.stop();
-                            data.time.addAndGet(sw.getTime());
-                            sw.reset();
-
                             return false;
                         }
 
@@ -293,14 +280,13 @@ class BatchHashJoin extends AOperator
                     Tuple innerRow = innerTuples.get(innerRowIndex++);
                     joinTuple.setInner(innerRow);
 
-                    if (predicate.test(context, joinTuple))
-                    {
-                        sw1.start();
+                    data.predicateTime.resume();
+                    boolean result = predicate.test(context, joinTuple);
+                    data.predicateTime.suspend();
 
+                    if (result)
+                    {
                         next = rowMerger.merge(outerTuple.tuple, innerRow, populating, nodeId);
-                        sw1.stop();
-                        data.innerHashTime += sw1.getTime();
-                        sw1.reset();
 
                         if (populating)
                         {
@@ -312,8 +298,6 @@ class BatchHashJoin extends AOperator
                 }
                 return true;
             }
-
-            StopWatch sw1 = new StopWatch();
 
             /** Batch outer rows and generate outer keys */
             private void batchOuterRows()
@@ -358,14 +342,22 @@ class BatchHashJoin extends AOperator
                 {
                     Tuple tuple = it.next();
                     joinTuple.setInner(tuple);
-                    int hash = populateKeyValues(innerValuesExtractor, context, joinTuple);
-                    TableValue tableValue = table.get(hash);
-                    if (tableValue == null)
+                    data.innerHashTime.resume();
+                    try
                     {
-                        // No outer row exists for this inner rows hash, no need to add it
-                        continue;
+                        int hash = populateKeyValues(innerValuesExtractor, context, joinTuple);
+                        TableValue tableValue = table.get(hash);
+                        if (tableValue == null)
+                        {
+                            // No outer row exists for this inner rows hash, no need to add it
+                            continue;
+                        }
+                        tableValue.addRow(tuple);
                     }
-                    tableValue.addRow(tuple);
+                    finally
+                    {
+                        data.innerHashTime.suspend();
+                    }
                 }
                 it.close();
 
@@ -453,28 +445,35 @@ class BatchHashJoin extends AOperator
                                 return false;
                             }
 
+                            data.outerHashTime.resume();
                             TupleHolder holder = outerTuples.get(outerRowsIndex++);
                             joinTuple.setOuter(null);
                             joinTuple.setInner(holder.tuple);
+                            try
+                            {
+                                int hash = populateKeyValues(outerValuesExtractor, context, joinTuple);
+                                // Cannot be null values in keys
+                                if (contains(keyValues, null))
+                                {
+                                    continue;
+                                }
+                                holder.hash = hash;
+                                TableValue tableValue = table.get(holder.hash);
+                                if (tableValue == null)
+                                {
+                                    tableValue = new TableValue();
+                                    table.put(holder.hash, tableValue);
+                                }
 
-                            int hash = populateKeyValues(outerValuesExtractor, context, joinTuple);
-                            // Cannot be null values in keys
-                            if (contains(keyValues, null))
-                            {
-                                continue;
+                                if (!tableValue.addInnterValues(keyValues))
+                                {
+                                    // Value already present, no need to push values to downstream
+                                    continue;
+                                }
                             }
-                            holder.hash = hash;
-                            TableValue tableValue = table.get(holder.hash);
-                            if (tableValue == null)
+                            finally
                             {
-                                tableValue = new TableValue();
-                                table.put(holder.hash, tableValue);
-                            }
-
-                            if (!tableValue.addInnterValues(keyValues))
-                            {
-                                // Value already present, no need to push values to downstream
-                                continue;
+                                data.outerHashTime.suspend();
                             }
 
                             nextArray = keyValues;
@@ -549,12 +548,11 @@ class BatchHashJoin extends AOperator
     {
         String indentString = StringUtils.repeat("  ", indent);
         String description = String.format(
-                "BATCH HASH JOIN (%s) (ID: %d, POPULATING: %s, OUTER: %s, EXECUTION COUNT: %s, BATCH SIZE: %s, INDEX: %s, OUTER VALUES: %s, INNER VALUES: %s, PREDICATE: %s)",
+                "BATCH HASH JOIN (%s) (ID: %d, POPULATING: %s, OUTER: %s, BATCH SIZE: %s, INDEX: %s, OUTER VALUES: %s, INNER VALUES: %s, PREDICATE: %s)",
                 logicalOperator,
                 nodeId,
                 populating,
                 emitEmptyOuterRows,
-                executionCount,
                 batchSizeOption != null ? batchSizeOption.getValueExpression().toString() : innerIndex.getBatchSize(),
                 innerIndex,
                 outerValuesExtractor,
@@ -563,6 +561,26 @@ class BatchHashJoin extends AOperator
         return description + System.lineSeparator()
             + indentString + outer.toString(indent + 1) + System.lineSeparator()
             + indentString + inner.toString(indent + 1);
+    }
+
+    /** Node data */
+    private static class Data extends NodeData
+    {
+        StopWatch predicateTime = new StopWatch();
+        StopWatch innerHashTime = new StopWatch();
+        StopWatch outerHashTime = new StopWatch();
+
+        Data()
+        {
+            predicateTime.start();
+            predicateTime.suspend();
+
+            innerHashTime.start();
+            innerHashTime.suspend();
+
+            outerHashTime.start();
+            outerHashTime.suspend();
+        }
     }
 
     /** Tuple holder */

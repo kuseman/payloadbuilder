@@ -13,10 +13,12 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
+import org.apache.commons.lang3.time.StopWatch;
 import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
@@ -25,11 +27,13 @@ import org.kuse.payloadbuilder.core.operator.ObjectProjection;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.operator.OperatorBuilder;
+import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
 import org.kuse.payloadbuilder.core.operator.Projection;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.operator.Tuple;
+import org.kuse.payloadbuilder.core.parser.AnalyzeStatement;
 import org.kuse.payloadbuilder.core.parser.DescribeSelectStatement;
 import org.kuse.payloadbuilder.core.parser.DescribeTableStatement;
 import org.kuse.payloadbuilder.core.parser.DropTableStatement;
@@ -143,7 +147,31 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     @Override
     public Void visit(DescribeSelectStatement statement, Void ctx)
     {
-        currentSelect = DescribeUtils.getDescribeSelect(context, statement.getSelectStatement().getSelect());
+        Pair<Operator, Projection> pair = OperatorBuilder.create(session, statement.getSelectStatement().getSelect());
+        currentSelect = DescribeUtils.getDescribeSelect(context, pair.getKey());
+        return null;
+    }
+
+    @Override
+    public Void visit(AnalyzeStatement statement, Void ctx)
+    {
+        Pair<Operator, Projection> pair = OperatorBuilder.create(session, statement.getSelectStatement().getSelect(), true);
+        // Write the operator to a noop-writer to collect statistics
+
+        StopWatch sw = StopWatch.createStarted();
+        writeInternal(pair.getKey(), pair.getValue(), OutputWriterAdapter.NO_OP_WRITER);
+        sw.stop();
+
+        Map<Integer, ? extends NodeData> nodeData = context.getOperatorContext().getNodeData();
+
+        // Extract the root nodes total time which is the total query time
+        long totalQueryTime = sw.getTime(TimeUnit.MILLISECONDS);
+        for (NodeData data : nodeData.values())
+        {
+            data.setTotalQueryTime(totalQueryTime);
+        }
+
+        currentSelect = DescribeUtils.getDescribeSelect(context, pair.getKey());
         return null;
     }
 

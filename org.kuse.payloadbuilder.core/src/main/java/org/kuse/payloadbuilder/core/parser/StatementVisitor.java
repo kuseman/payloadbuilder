@@ -23,6 +23,8 @@ public interface StatementVisitor<TR, TC>
 
     TR visit(DescribeSelectStatement statement, TC context);
 
+    TR visit(AnalyzeStatement statement, TC context);
+
     TR visit(ShowStatement statement, TC context);
 
     /* DML nodes */

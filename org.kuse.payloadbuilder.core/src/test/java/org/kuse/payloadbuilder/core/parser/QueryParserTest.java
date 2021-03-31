@@ -42,6 +42,13 @@ public class QueryParserTest extends AParserTest
     }
 
     @Test
+    public void test_describe()
+    {
+        assertQuery("describe select * from table");
+        assertQuery("analyze select * from table");
+    }
+
+    @Test
     public void test_functions()
     {
         assertExpression("isnull(null, 1+1.1)");

@@ -1,10 +1,12 @@
 package org.kuse.payloadbuilder.core.operator;
 
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+
+import org.apache.commons.lang3.time.StopWatch;
 
 /** Context used during selection of operator tree */
 public class OperatorContext
@@ -48,24 +50,77 @@ public class OperatorContext
     @SuppressWarnings("unchecked")
     public <T extends NodeData> T getNodeData(int nodeId, Supplier<T> creator)
     {
-        return (T) nodeDataById.compute(nodeId, (k, v) ->
-        {
-            if (v == null)
-            {
-                v = creator.get();
-            }
-            v.executionCount++;
-            return v;
-        });
+        return (T) nodeDataById.computeIfAbsent(nodeId, k -> creator.get());
     }
 
     /** Base class for node data. */
     //CSOFF
     public static class NodeData
     {
-        public int executionCount;
-        /** Operator specific properties. Bytes fetched etc. */
-        public Map<String, Object> properties = new HashMap<>();
+        private final StopWatch nodeTime = new StopWatch();
+        private int executionCount;
+        private long rowCount;
+        /** <pre> 
+         * Time that is set on all nodes after query is run to be 
+         *  able to calculate a percentage when {@link Operator#getDescribeProperties} is called 
+         *  </pre>
+         */
+        private long totalQueryTime;
+        
+        protected NodeData()
+        {
+            nodeTime.start();
+            nodeTime.suspend();
+        }
+        
+        public long getTotalQueryTime()
+        {
+            return totalQueryTime;
+        }
+        
+        public void setTotalQueryTime(long totalQueryTime)
+        {
+            this.totalQueryTime = totalQueryTime;
+        }
+        
+        /** Resumes node time stop watch */
+        public void resumeNodeTime()
+        {
+            nodeTime.resume();
+        }
+        
+        /** Suspend node time stop watch */
+        public void suspenNodeTime()
+        {
+            nodeTime.suspend();
+        }
+        
+        /** Return the node time */
+        public long getNodeTime(TimeUnit timeUnit)
+        {
+            return nodeTime.getTime(timeUnit);
+        }
+        
+        public int getExecutionCount()
+        {
+            return executionCount;
+        }
+        
+        /** Increase execution count */
+        public void increaseExecutionCount()
+        {
+            executionCount++;
+        }
+        
+        public long getRowCount()
+        {
+            return rowCount;
+        }
+        
+        public void increaseRowCount()
+        {
+            rowCount++;
+        }
     }
     //CSON
 }

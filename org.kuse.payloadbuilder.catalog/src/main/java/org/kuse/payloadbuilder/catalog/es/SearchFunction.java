@@ -1,8 +1,8 @@
 package org.kuse.payloadbuilder.catalog.es;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.isBlank;
-import static org.kuse.payloadbuilder.catalog.es.ESOperator.UTF_8;
 
 import java.io.IOException;
 import java.util.List;
@@ -143,7 +143,7 @@ class SearchFunction extends TableFunctionInfo
                 tableAlias,
                 endpoint,
                 ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(type),
-                new AtomicLong(),
+                new ESOperator.Data(),
                 scrollId ->
                 {
                     if (doRequest.getValue())

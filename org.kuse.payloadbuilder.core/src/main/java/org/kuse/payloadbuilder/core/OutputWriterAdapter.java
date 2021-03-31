@@ -3,6 +3,8 @@ package org.kuse.payloadbuilder.core;
 /** Adapter for {@link OutputWriter} */
 public class OutputWriterAdapter implements OutputWriter
 {
+    public static final OutputWriter NO_OP_WRITER = new OutputWriterAdapter();
+
     @Override
     public void writeFieldName(String name)
     {

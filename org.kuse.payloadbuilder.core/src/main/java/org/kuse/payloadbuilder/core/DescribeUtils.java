@@ -15,7 +15,6 @@ import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.operator.ObjectProjection;
 import org.kuse.payloadbuilder.core.operator.Operator;
-import org.kuse.payloadbuilder.core.operator.OperatorBuilder;
 import org.kuse.payloadbuilder.core.operator.Projection;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
@@ -24,7 +23,6 @@ import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.DescribeTableStatement;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
-import org.kuse.payloadbuilder.core.parser.Select;
 
 /** Utility class for building a describe result set */
 public class DescribeUtils
@@ -37,6 +35,12 @@ public class DescribeUtils
     public static final String OUTER_VALUES = "Outer values";
     public static final String INNER_VALUES = "Inner values";
     public static final String CATALOG = "Catalog";
+    public static final String TIME_SPENT = "Time spent";
+    public static final String EXECUTION_COUNT = "Execution count";
+    public static final String PROCESSED_ROWS = "Processed rows";
+    public static final String PREDICATE_TIME = "Predicate time";
+    public static final String OUTER_HASH_TIME = "Outer hash time";
+    public static final String INNER_HASH_TIME = "Inner hash time";
 
     private DescribeUtils()
     {
@@ -58,13 +62,10 @@ public class DescribeUtils
     }
 
     /** Build describe select from provided select */
-    static Pair<Operator, Projection> getDescribeSelect(ExecutionContext context, Select select)
+    static Pair<Operator, Projection> getDescribeSelect(ExecutionContext context, Operator operator)
     {
-        Pair<Operator, Projection> pair = OperatorBuilder.create(context.getSession(), select);
-        Operator root = pair.getKey();
-
         final List<DescribeOperatorRow> describeRows = new ArrayList<>();
-        collectOperatorDescribeRows(context, describeRows, root, 0, "", false);
+        collectOperatorDescribeRows(context, describeRows, operator, 0, "", false);
 
         List<String> describeColumns = new ArrayList<>();
         Map<String, MutableInt> countByColumn = new HashMap<>();

@@ -3,11 +3,14 @@ package org.kuse.payloadbuilder.core.operator;
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
+import static org.kuse.payloadbuilder.core.DescribeUtils.INNER_HASH_TIME;
 import static org.kuse.payloadbuilder.core.DescribeUtils.INNER_VALUES;
 import static org.kuse.payloadbuilder.core.DescribeUtils.LOGICAL_OPERATOR;
+import static org.kuse.payloadbuilder.core.DescribeUtils.OUTER_HASH_TIME;
 import static org.kuse.payloadbuilder.core.DescribeUtils.OUTER_VALUES;
 import static org.kuse.payloadbuilder.core.DescribeUtils.POPULATING;
 import static org.kuse.payloadbuilder.core.DescribeUtils.PREDICATE;
+import static org.kuse.payloadbuilder.core.DescribeUtils.PREDICATE_TIME;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
@@ -16,13 +19,14 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiPredicate;
 import java.util.function.ToIntBiFunction;
 
 import org.apache.commons.collections.iterators.IteratorChain;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
+import org.apache.commons.lang3.time.StopWatch;
 import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 
@@ -80,26 +84,23 @@ class HashJoin extends AOperator
     @Override
     public Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
-        return ofEntries(true,
+        Data data = context.getOperatorContext().getNodeData(nodeId);
+
+        Map<String, Object> result = ofEntries(true,
                 entry(LOGICAL_OPERATOR, logicalOperator),
                 entry(POPULATING, populating),
                 entry(PREDICATE, predicate),
                 entry(OUTER_VALUES, outerHashFunction),
                 entry(INNER_VALUES, innerHashFunction));
-    }
 
-    /** Node data */
-    class Data extends NodeData
-    {
-        AtomicLong time = new AtomicLong();
-        long innerHashTime;
-        long outerHashTime;
-
-        @Override
-        public String toString()
+        if (data != null)
         {
-            return "Timings. innerTime: " + innerHashTime + ", outerTime: " + outerHashTime + "): " + DurationFormatUtils.formatDurationHMS(time.get());
+            result.put(INNER_HASH_TIME, DurationFormatUtils.formatDurationHMS(data.innerHashTime.getTime(TimeUnit.MILLISECONDS)));
+            result.put(OUTER_HASH_TIME, DurationFormatUtils.formatDurationHMS(data.outerHashTime.getTime(TimeUnit.MILLISECONDS)));
+            result.put(PREDICATE_TIME, DurationFormatUtils.formatDurationHMS(data.predicateTime.getTime(TimeUnit.MILLISECONDS)));
         }
+
+        return result;
     }
 
     @SuppressWarnings("unchecked")
@@ -107,15 +108,16 @@ class HashJoin extends AOperator
     public RowIterator open(ExecutionContext context)
     {
         Tuple contextOuter = context.getTuple();
-        final JoinTuple joinTuple = new JoinTuple(contextOuter);
-        Map<IntKey, List<TupleHolder>> table = hash(context, joinTuple);
+        JoinTuple joinTuple = new JoinTuple(contextOuter);
+        Data data = context.getOperatorContext().getNodeData(nodeId, Data::new);
+        Map<IntKey, List<TupleHolder>> table = hash(context, joinTuple, data);
         if (table.isEmpty())
         {
             return RowIterator.EMPTY;
         }
 
         boolean markOuterRows = populating || emitEmptyOuterRows;
-        RowIterator probeIterator = probeIterator(joinTuple, table, context, markOuterRows);
+        RowIterator probeIterator = probeIterator(joinTuple, table, context, data, markOuterRows);
 
         if (populating)
         {
@@ -144,7 +146,7 @@ class HashJoin extends AOperator
                 });
     };
 
-    private Map<IntKey, List<TupleHolder>> hash(ExecutionContext context, JoinTuple joinTuple)
+    private Map<IntKey, List<TupleHolder>> hash(ExecutionContext context, JoinTuple joinTuple, Data data)
     {
         IntKey key = new IntKey();
         Map<IntKey, List<TupleHolder>> table = new LinkedHashMap<>();
@@ -153,22 +155,30 @@ class HashJoin extends AOperator
         {
             Tuple tuple = oi.next();
             joinTuple.setInner(tuple);
-            key.key = outerHashFunction.applyAsInt(context, joinTuple);
-            List<TupleHolder> list = table.get(key);
-            if (list == null)
+            data.outerHashTime.resume();
+            try
             {
-                // Start with singleton list
-                list = singletonList(new TupleHolder(tuple));
-                table.put(key, list);
-                continue;
+                key.key = outerHashFunction.applyAsInt(context, joinTuple);
+                List<TupleHolder> list = table.get(key);
+                if (list == null)
+                {
+                    // Start with singleton list
+                    list = singletonList(new TupleHolder(tuple));
+                    table.put(key, list);
+                    continue;
+                }
+                else if (list.size() == 1)
+                {
+                    // Convert to array list
+                    list = new ArrayList<>(list);
+                    table.put(key, list);
+                }
+                list.add(new TupleHolder(tuple));
             }
-            else if (list.size() == 1)
+            finally
             {
-                // Convert to array list
-                list = new ArrayList<>(list);
-                table.put(key, list);
+                data.outerHashTime.suspend();
             }
-            list.add(new TupleHolder(tuple));
         }
         oi.close();
         return table;
@@ -178,6 +188,7 @@ class HashJoin extends AOperator
             JoinTuple joinTuple,
             Map<IntKey, List<TupleHolder>> table,
             ExecutionContext context,
+            Data data,
             boolean markOuterRows)
     {
         final RowIterator ii = inner.open(context);
@@ -225,8 +236,10 @@ class HashJoin extends AOperator
                         currentInner = ii.next();
                         joinTuple.setInner(currentInner);
 
+                        data.innerHashTime.resume();
                         key.key = innerHashFunction.applyAsInt(context, joinTuple);
                         List<TupleHolder> list = table.get(key);
+                        data.innerHashTime.suspend();
                         if (list == null)
                         {
                             currentInner = null;
@@ -246,7 +259,12 @@ class HashJoin extends AOperator
 
                     TupleHolder currentOuter = outerList.get(outerIndex++);
                     joinTuple.setOuter(currentOuter.tuple);
-                    if (predicate.test(context, joinTuple))
+
+                    data.predicateTime.resume();
+                    boolean result = predicate.test(context, joinTuple);
+                    data.predicateTime.suspend();
+
+                    if (result)
                     {
                         next = rowMerger.merge(currentOuter.tuple, currentInner, populating, nodeId);
                         if (populating)
@@ -376,6 +394,26 @@ class HashJoin extends AOperator
         MATCHED,
         NON_MATCHED,
         BOTH;
+    }
+
+    /** Node data */
+    private static class Data extends NodeData
+    {
+        StopWatch predicateTime = new StopWatch();
+        StopWatch innerHashTime = new StopWatch();
+        StopWatch outerHashTime = new StopWatch();
+
+        Data()
+        {
+            predicateTime.start();
+            predicateTime.suspend();
+
+            innerHashTime.start();
+            innerHashTime.suspend();
+
+            outerHashTime.start();
+            outerHashTime.suspend();
+        }
     }
 
     @Override

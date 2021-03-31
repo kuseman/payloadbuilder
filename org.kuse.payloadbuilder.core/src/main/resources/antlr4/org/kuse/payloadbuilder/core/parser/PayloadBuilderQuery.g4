@@ -28,6 +28,7 @@ miscStatement
  : setStatement
  | useStatement
  | describeStatement
+ | analyzeStatement
  | showStatement
  ;
 
@@ -37,6 +38,10 @@ setStatement
  
 useStatement
  : USE qname (EQUALS expression)?
+ ;
+
+analyzeStatement
+ : ANALYZE selectStatement
  ;
  
 describeStatement
@@ -284,6 +289,7 @@ nonReserved
 // Tokens
 
 AND		     : A N D;
+ANALYZE      : A N A L Y Z E;
 ARRAY	     : A R R A Y;
 AS		     : A S;
 ASC		     : A S C;

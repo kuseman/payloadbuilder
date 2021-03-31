@@ -11,7 +11,10 @@ import java.util.Objects;
 import java.util.function.BiPredicate;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.time.DurationFormatUtils;
+import org.apache.commons.lang3.time.StopWatch;
 import org.kuse.payloadbuilder.core.DescribeUtils;
+import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 
 /** Operator the join two other operators using nested loop */
@@ -24,10 +27,6 @@ class NestedLoopJoin extends AOperator
     private final TupleMerger rowMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
-
-    /* TODO: need to put this into context, state here wont work when the query plan will be cached */
-    /* Statistics */
-    private int executionCount;
 
     NestedLoopJoin(
             int nodeId,
@@ -69,25 +68,25 @@ class NestedLoopJoin extends AOperator
     @Override
     public Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
-        return ofEntries(
+        Data data = context.getOperatorContext().getNodeData(nodeId);
+        Map<String, Object> result = ofEntries(
                 entry(DescribeUtils.PREDICATE, predicate == null ? "" : predicate.toString()),
                 entry(DescribeUtils.POPULATING, populating));
+
+        if (data != null)
+        {
+            result.put(DescribeUtils.PREDICATE_TIME, DurationFormatUtils.formatDurationHMS(data.predicateTime.getTime()));
+        }
+        return result;
     }
 
     @Override
     public RowIterator open(ExecutionContext context)
     {
-        /*
-         * from tableA a
-         * inner join tableB b
-         *   on ...
-         */
-
+        final Data data = context.getOperatorContext().getNodeData(nodeId, Data::new);
         final Tuple contextParent = context.getTuple();
         final JoinTuple joinTuple = new JoinTuple(contextParent);
-
         final RowIterator it = outer.open(context);
-        executionCount++;
         //CSOFF
         return new RowIterator()
         //CSON
@@ -160,7 +159,12 @@ class NestedLoopJoin extends AOperator
 
                     Tuple currentInner = ii.next();
                     joinTuple.setInner(currentInner);
-                    if (predicate == null || predicate.test(context, joinTuple))
+
+                    data.predicateTime.resume();
+                    boolean result = predicate == null || predicate.test(context, joinTuple);
+                    data.predicateTime.suspend();
+
+                    if (result)
                     {
                         next = rowMerger.merge(currentOuter, currentInner, populating, nodeId);
                         if (populating)
@@ -175,6 +179,18 @@ class NestedLoopJoin extends AOperator
                 return true;
             }
         };
+    }
+
+    /** Node data for nested loop */
+    private static class Data extends NodeData
+    {
+        private final StopWatch predicateTime = new StopWatch();
+
+        Data()
+        {
+            predicateTime.start();
+            predicateTime.suspend();
+        }
     }
 
     @Override
@@ -209,12 +225,11 @@ class NestedLoopJoin extends AOperator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        String description = String.format("NESTED LOOP (%s) (ID: %d, POPULATING: %s, OUTER: %s, EXECUTION COUNT: %s, PREDICATE: %s)",
+        String description = String.format("NESTED LOOP (%s) (ID: %d, POPULATING: %s, OUTER: %s, PREDICATE: %s)",
                 logicalOperator,
                 nodeId,
                 populating,
                 emitEmptyOuterRows,
-                executionCount,
                 predicate);
         return description + System.lineSeparator()
             +

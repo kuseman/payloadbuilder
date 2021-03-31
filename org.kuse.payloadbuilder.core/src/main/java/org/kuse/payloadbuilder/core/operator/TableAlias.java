@@ -1,5 +1,6 @@
 package org.kuse.payloadbuilder.core.operator;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 
@@ -122,6 +123,17 @@ public class TableAlias
             return null;
         }
         return current.getChildAlias(alias);
+    }
+
+    /** Return sibling aliases */
+    List<TableAlias> getSiblingAliases()
+    {
+        TableAlias current = this.parent;
+        if (current == null)
+        {
+            return emptyList();
+        }
+        return unmodifiableList(current.childAliases);
     }
 
     /**
