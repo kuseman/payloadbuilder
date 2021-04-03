@@ -3,34 +3,41 @@ package org.kuse.payloadbuilder.core.operator;
 /** Merges outer and inner tuple */
 class DefaultTupleMerger implements TupleMerger
 {
-    /** Default merger. Merges inner row into outer */
-    public static final DefaultTupleMerger DEFAULT = new DefaultTupleMerger(-1);
-
     /** Limit number of merged rows */
     private final int limit;
+    private final int innerTupleOrdinal;
 
-    DefaultTupleMerger(int limit)
+    DefaultTupleMerger(int limit, int innerTupleOrdinal)
     {
         this.limit = limit;
+        this.innerTupleOrdinal = innerTupleOrdinal;
     }
 
     @Override
-    public Tuple merge(Tuple outer, Tuple inner, boolean populating, int nodeId)
+    public Tuple merge(Tuple outer, Tuple inner, boolean populating)
     {
         // No populating merge, create/or merge a composite tuple
         if (!populating)
         {
-            // Outer is already a composite tuple
-            // make a copy and add merge inner to get a flat structure
-            if (outer instanceof CompositeTuple)
+            if (!(outer instanceof CompositeTuple))
             {
-                CompositeTuple tuple = (CompositeTuple) outer;
-                CompositeTuple newTuple = new CompositeTuple(tuple);
-                newTuple.add(inner);
-                return newTuple;
+                return new CompositeTuple(outer, inner);
             }
 
-            return new CompositeTuple(outer, inner);
+            CompositeTuple outerTuple = (CompositeTuple) outer;
+
+            // Unwrap the inner tuples and add to outer to
+            // get a flat structure
+            if (inner instanceof CompositeTuple)
+            {
+                outerTuple.addAll((CompositeTuple) inner);
+            }
+            else
+            {
+                outerTuple.add(inner);
+            }
+
+            return outerTuple;
         }
 
         CompositeTuple outerTuple;
@@ -44,13 +51,21 @@ class DefaultTupleMerger implements TupleMerger
         outerTuple = (CompositeTuple) outer;
 
         // Fetch the populating tuple from the outer
-        Tuple tuple = outerTuple.getTuple(inner.getTupleOrdinal());
+        Tuple tuple = outerTuple.getTuple(innerTupleOrdinal);
 
-        if (!(tuple instanceof CollectionTuple))
+        // No ordinal found in outer => first tuple of this ordinal
+        // create a collection tuple and add it to outer
+        if (tuple == null)
         {
-            throw new RuntimeException("Expected a populating tuple but got: " + tuple);
+            tuple = new CollectionTuple(innerTupleOrdinal);
+            outerTuple.add(tuple);
+        }
+        else if (!(tuple instanceof CollectionTuple))
+        {
+            throw new RuntimeException("Expected a collection tuple but got: " + tuple);
         }
 
+        // Append the inner to the collection
         ((CollectionTuple) tuple).add(inner);
 
         return outerTuple;
@@ -67,14 +82,10 @@ class DefaultTupleMerger implements TupleMerger
     {
         if (obj instanceof DefaultTupleMerger)
         {
-            return limit == ((DefaultTupleMerger) obj).limit;
+            DefaultTupleMerger that = (DefaultTupleMerger) obj;
+            return limit == that.limit
+                && innerTupleOrdinal == that.innerTupleOrdinal;
         }
         return false;
-    }
-
-    /** Create a limiting row merger */
-    static DefaultTupleMerger limit(int limit)
-    {
-        return new DefaultTupleMerger(limit);
     }
 }

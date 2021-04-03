@@ -84,13 +84,7 @@ public abstract class ASelectVisitor<TR, TC> implements SelectVisitor<TR, TC>
     @Override
     public TR visit(SubQueryTableSource tableSource, TC context)
     {
-        tableSource.getFrom().accept(this, context);
-        if (tableSource.getWhere() != null)
-        {
-            visit(tableSource.getWhere(), context);
-        }
-        tableSource.getGroupBy().forEach(e -> visit(e, context));
-        tableSource.getOrderBy().forEach(o -> o.accept(this, context));
+        tableSource.getSelect().accept(this, context);
         return null;
     }
 

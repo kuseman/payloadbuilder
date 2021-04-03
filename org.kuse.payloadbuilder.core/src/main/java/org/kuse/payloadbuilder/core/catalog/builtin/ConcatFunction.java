@@ -9,6 +9,7 @@ import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
+import org.kuse.payloadbuilder.core.operator.EvalUtils;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
@@ -35,7 +36,7 @@ class ConcatFunction extends ScalarFunctionInfo
             Object object = arg.eval(context);
             if (object != null)
             {
-                sb.append(object);
+                sb.append(EvalUtils.unwrap(object));
             }
         }
         return sb.toString();

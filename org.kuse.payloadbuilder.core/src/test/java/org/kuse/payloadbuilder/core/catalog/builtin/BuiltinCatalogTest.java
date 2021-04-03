@@ -85,6 +85,24 @@ public class BuiltinCatalogTest extends AParserTest
     }
 
     @Test
+    public void test_function_contains() throws Exception
+    {
+        Map<String, Object> values = new HashMap<>();
+        values.put("a", asList(-1, -2, -3, 0, 1, 2, 3));
+        values.put("b", null);
+        values.put("c", asList(-1, -2, -3, 0, 1, 2, 3).iterator());
+
+        assertExpression(false, values, "contains(null, 1)");
+        assertExpression(false, values, "contains(a, 10)");
+        assertExpression(true, values, "contains(a, -2)");
+        assertExpression(false, values, "contains(c, 10)");
+
+        values.put("c", asList(-1, -2, -3, 0, 1, 2, 3).iterator());
+
+        assertExpression(true, values, "contains(c, -2)");
+    }
+
+    @Test
     public void test_function_match() throws Exception
     {
         Map<String, Object> values = new HashMap<>();

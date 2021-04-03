@@ -7,6 +7,7 @@ import java.util.List;
 
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
+import org.kuse.payloadbuilder.core.operator.EvalUtils;
 import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
@@ -36,7 +37,8 @@ class ListOfFunction extends ScalarFunctionInfo
         List<Object> result = new ArrayList<>(size);
         for (int i = 0; i < size; i++)
         {
-            result.add(arguments.get(i).eval(context));
+            Object object = arguments.get(i).eval(context);
+            result.add(EvalUtils.unwrap(object));
         }
         return result;
     }

@@ -56,6 +56,7 @@ class OrderByOperator extends AOperator
         }
         it.close();
         Collections.sort(tuples, (a, b) -> comparator.compare(context, a, b));
+        context.setTuple(null);
         return RowIterator.wrap(tuples.iterator());
     }
 

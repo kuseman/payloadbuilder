@@ -201,15 +201,8 @@ public class AStatementVisitor<TR, TC> implements StatementVisitor<TR, TC>, Sele
     @Override
     public TR visit(SubQueryTableSource tableSource, TC context)
     {
-        tableSource.getFrom().accept(this, context);
+        tableSource.getSelect().accept(this, context);
         tableSource.getOptions().forEach(to -> visitExpression(context, to.getValueExpression()));
-
-        if (tableSource.getWhere() != null)
-        {
-            visitExpression(context, tableSource.getWhere());
-        }
-        tableSource.getGroupBy().forEach(g -> visitExpression(context, g));
-        tableSource.getOrderBy().forEach(o -> o.accept(this, context));
         return null;
     }
 

@@ -47,7 +47,7 @@ public class TestHarnessRunner
     private final TestCase testCase;
 
     @Parameterized.Parameters(name = "{2}")
-    public static List<Object[]> testHarnesses() throws IOException
+    public static List<Object[]> testHarnesses()
     {
         List<String> testFiles = asList(
                 "BaseContructs.json",
@@ -64,7 +64,14 @@ public class TestHarnessRunner
             {
                 Assert.fail("No harness resouce found: " + resource);
             }
-            harnesses.add(MAPPER.readValue(stream, TestHarness.class));
+            try
+            {
+                harnesses.add(MAPPER.readValue(stream, TestHarness.class));
+            }
+            catch (IOException e)
+            {
+                throw new RuntimeException("Error reading harness file " + file, e);
+            }
         }
 
         return harnesses.stream()

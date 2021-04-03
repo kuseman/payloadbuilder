@@ -40,6 +40,7 @@ class ExpressionHashFunction implements ToIntBiFunction<ExecutionContext, Tuple>
             }
             hash = hash * HASH_MULTIPLIER + (result != null ? result.hashCode() : 0);
         }
+        context.setTuple(null);
         return hash;
     }
 

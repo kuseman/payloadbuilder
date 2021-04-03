@@ -166,7 +166,7 @@ class NestedLoopJoin extends AOperator
 
                     if (result)
                     {
-                        next = rowMerger.merge(currentOuter, currentInner, populating, nodeId);
+                        next = rowMerger.merge(currentOuter, currentInner, populating);
                         if (populating)
                         {
                             currentOuter = next;

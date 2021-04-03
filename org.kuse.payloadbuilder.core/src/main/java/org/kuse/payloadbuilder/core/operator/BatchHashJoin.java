@@ -116,7 +116,6 @@ class BatchHashJoin extends AOperator
     public Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
         Data data = context.getOperatorContext().getNodeData(nodeId);
-
         Map<String, Object> result = ofEntries(true,
                 entry(LOGICAL_OPERATOR, logicalOperator),
                 entry(POPULATING, populating),
@@ -286,7 +285,7 @@ class BatchHashJoin extends AOperator
 
                     if (result)
                     {
-                        next = rowMerger.merge(outerTuple.tuple, innerRow, populating, nodeId);
+                        next = rowMerger.merge(outerTuple.tuple, innerRow, populating);
 
                         if (populating)
                         {
@@ -504,7 +503,7 @@ class BatchHashJoin extends AOperator
             }
 
             //CSOFF
-            result = result * 37 + (value == null ? 0 : value.hashCode());
+            result = 31 * result  + (value == null ? 0 : value.hashCode());
             //CSON
         }
         return result;

@@ -21,7 +21,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("s.art_id = a.art_id")),
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 1),
                 false,
                 false);
 
@@ -52,7 +52,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 1),
                 true,
                 false);
 
@@ -83,7 +83,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("s.art_id = a.art_id")),
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 1),
                 false,
                 true);
 
@@ -116,7 +116,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
                         new ExpressionHashFunction(asList(e("s.art_id"))),
                         new ExpressionHashFunction(asList(e("a.art_id"))),
                         new ExpressionPredicate(e("s.art_id = a.art_id")),
-                        DefaultTupleMerger.DEFAULT,
+                        new DefaultTupleMerger(-1, 1),
                         false,
                         true),
                 new ExpressionPredicate(e("a.value is null")));
@@ -148,7 +148,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("s.art_id = a.art_id")),
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 1),
                 true,
                 true);
 
@@ -176,7 +176,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id ")),
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 1),
                 true,
                 false);
 

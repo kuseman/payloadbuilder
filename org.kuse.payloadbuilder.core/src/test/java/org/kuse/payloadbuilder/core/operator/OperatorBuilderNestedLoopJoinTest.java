@@ -26,7 +26,7 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorTest
                 result.tableOperators.get(0),
                 new TemporaryTableScanOperator(1, new Table(null, tempAlias, emptyList(), null)),
                 new ExpressionPredicate(e("t1.col = s.id3 or active")),
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 1),
                 false,
                 false);
 
@@ -54,7 +54,7 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorTest
                 result.tableOperators.get(0),
                 new CachingOperator(3, new FilterOperator(2, result.tableOperators.get(1), new ExpressionPredicate(e("a.active_flg = true")))),
                 new ExpressionPredicate(e("a.art_id = s.art_id or s.id1 > 0")),
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 1),
                 false,
                 false);
 
@@ -83,7 +83,7 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorTest
                 new CachingOperator(3,
                         new FilterOperator(2, result.tableOperators.get(1), new ExpressionPredicate(e("a.internet_flg = true AND a.active_flg = true")))),
                 new ExpressionPredicate(e("a.art_id = s.art_id or s.id1 > 0")),
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 1),
                 true,
                 false);
 

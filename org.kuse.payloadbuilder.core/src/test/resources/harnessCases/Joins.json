@@ -14,12 +14,50 @@
           ]
         },
         {
-          "name": "article",
-          "columns": [ "col1", "col2", "col3" ],
+          "name": "table",
+          "columns": [ "col1", "row_id" ],
           "rows": [
-            [1, 2, "row1"],
-            [3, 4, "row2"],
-            [7, 8, "row3"]
+            [1, 1],
+            [1, 2],
+            [3, 3],
+            [3, 4],
+            [3, 5],
+            [5, 6],
+            [7, 7]
+          ]
+        },
+        {
+          "name": "article",
+          "columns": [ "col1", "col2", "col3", "art_id" ],
+          "rows": [
+            [1, 2, "row1", 1],
+            [3, 4, "row2", 2],
+            [7, 8, "row3", 3],
+            [6, 9, "row4", 4]
+          ]
+        },
+        {
+          "name": "article_property",
+          "columns": ["art_id", "propertykey_id", "propertyvalue_id"],
+          "rows": [
+            [1, 1, 1],
+            [1, 1, 2],
+            [3, 1, 1]
+          ]
+        },
+        {
+          "name": "propertykey",
+          "columns": ["propertykey_id", "name"],
+          "rows": [
+            [1, "key_name_1"]
+          ]
+        },
+        {
+          "name": "propertyvalue",
+          "columns": ["propertyvalue_id", "value"],
+          "rows": [
+            [1, "value_1"],
+            [2, "value_2"]
           ]
         },
         {
@@ -51,8 +89,8 @@
       ],
       "expectedResultSets": [
         [
-          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col3", "value": "row1" }],
-          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col3", "value": "row2" }]
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col3", "value": "row1" }, { "key": "art_id", "value": 1 }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col3", "value": "row2" }, { "key": "art_id", "value": 2 }]
         ]
       ]
     },
@@ -60,6 +98,43 @@
       "name": "Self join 3, asterisk select",
       "query": [
         "select * from source s inner join source s1 on s1.col1 = s.col1 inner join source s2 on s2.col1 = s1.col1"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }],
+          [{ "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }, { "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }, { "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }]
+        ]
+      ]
+    },
+    {
+      "name": "Self Join sub query",
+      "query": [
+        "select * ",
+        "from source s ",
+        "inner join source s1 ",
+        "  on s1.col1 = s.col1 ",
+        "inner join ",
+        "( ",
+        "  select ** ",
+        "  from source s2 ",
+        "  inner join source s3 ",
+        "    on s3.col1 = s2.col1 ",
+        ") s4 ",
+        "  on s4.col1 = s.col1"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }],
+          [{ "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }, { "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }, { "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }, { "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }]
+        ]
+      ]
+    },
+    {
+      "name": "Self join 3, asterisk select, populate",
+      "query": [
+        "select * from source s inner join source s1 with(populate=true) on s1.col1 = s.col1 inner join source s2 with(populate=true) on s2.col1 = s1.col1"
       ],
       "expectedResultSets": [
         [
@@ -82,14 +157,97 @@
       ]
     },
     {
+      "name": "Left join with grouped by sub query",
+      "query": [
+        "select a.art_id, ap.map(x -> listOf(x.pk.name[0], x.pv.map(y -> y.value))) properties",
+        "from article a",
+        "left join ",
+        "( ",
+        "  select ** ",
+        "  from article_property ap ",
+        "  inner join propertykey pk ",
+        "    on pk.propertykey_id = ap.propertykey_id ",
+        "  inner join propertyvalue pv ",
+        "    on pv.propertyvalue_id = ap.propertyvalue_id ",
+        "  group by ap.art_id, ap.propertykey_id ",
+        ") ap ",
+        "  on ap.art_id = a.art_id ",
+        "order by a.art_id "
+      ],
+      "expectedResultSets": [
+        [
+           [{ "key": "art_id", "value": 1 }, { "key": "properties", "value": [["key_name_1", ["value_1", "value_2"]]] }],
+           [{ "key": "art_id", "value": 2 }, { "key": "properties", "value": null }],
+           [{ "key": "art_id", "value": 3 }, { "key": "properties", "value": [["key_name_1", ["value_1"]]] }],
+           [{ "key": "art_id", "value": 4 }, { "key": "properties", "value": null }]
+        ]
+      ]
+    },
+    {
+      "name": "Inner join, with dereference and subscript",
+      "query": [
+        "select s.col1, ",
+        "x.row_id row_id_1,   -- first joined row ",
+        "x.a.col3 col3_1,     -- first joined rows sub alias ",
+        "x[1].row_id row_id_2,-- second joined row ",
+        "x[1].a.col3 col3_2   -- second joined rows sub alias ",
+        "from source s ",
+        "inner join ",
+        "(",
+        "  select ** ",
+        "  from table t ",
+        "  left join article a ",
+        "    on a.col1 = t.row_id ",
+        ") x with (populate=true) ",
+        "  on x.col1 = s.col1"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "row_id_1", "value": 1 }, { "key": "col3_1", "value": "row1" }, { "key": "row_id_2", "value": 2 }   , { "key": "col3_2", "value": null }],
+          [{ "key": "col1", "value": 3 }, { "key": "row_id_1", "value": 3 }, { "key": "col3_1", "value": "row2" }, { "key": "row_id_2", "value": 4 }   , { "key": "col3_2", "value": null }],
+          [{ "key": "col1", "value": 5 }, { "key": "row_id_1", "value": 6 }, { "key": "col3_1", "value": "row4" }, { "key": "row_id_2", "value": null }, { "key": "col3_2", "value": null }]
+        ]
+      ]
+    },
+    {
+      "name": "Inner join, with 2 sub queries",
+      "query": [
+        "select s.col1, x.col1, x.a.col3, x1.col1, x1.a.col3 ",
+        "from source s ",
+        "inner join ",
+        "(",
+        "  select ** ",
+        "  from table t ",
+        "  left join article a ",
+        "    on a.col1 = t.row_id ",
+        ") x with (populate=true) ",
+        "  on x.col1 = s.col1 ",
+        "inner join ",
+        "(",
+        "  select ** ",
+        "  from table t ",
+        "  left join article a ",
+        "    on a.col1 = t.row_id ",
+        ") x1 with (populate=true) ",
+        "  on x1.col1 = s.col1"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col1", "value": 1 }, { "key": "col3", "value": "row1" }, { "key": "col1", "value": 1 }, { "key": "col3", "value": "row1" }],
+          [{ "key": "col1", "value": 3 }, { "key": "col1", "value": 3 }, { "key": "col3", "value": "row2" }, { "key": "col1", "value": 3 }, { "key": "col3", "value": "row2" }],
+          [{ "key": "col1", "value": 5 }, { "key": "col1", "value": 5 }, { "key": "col3", "value": "row4" }, { "key": "col1", "value": 5 }, { "key": "col3", "value": "row4" }]
+        ]
+      ]
+    },
+    {
       "name": "Left join, asterisk select",
       "query": [
         "select * from source s left join article a on a.col1 = s.col1"
       ],
       "expectedResultSets": [
         [
-          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col3", "value": "row1" }],
-          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col3", "value": "row2" }],
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col3", "value": "row1" }, { "key": "art_id", "value": 1 }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col3", "value": "row2" }, { "key": "art_id", "value": 2 }],
           [{ "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }]
         ]
       ]
@@ -149,7 +307,7 @@
     {
       "name": "Subquery with group by",
       "query": [
-        "select reservation.rs.index, reservation.rs.id, reservation.sh.wareh_id ",
+        "select reservation.index, reservation.id, reservation.sh.wareh_id ",
         "from ",
         "( ",
         "  select ** ",

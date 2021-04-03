@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 
 import java.lang.reflect.Array;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 /** Subscript. index acces etc. ie "array[0]" */
@@ -60,6 +61,12 @@ public class SubscriptExpression extends Expression
         if (value instanceof Iterator)
         {
             return getFromIterator((Iterator<Object>) value, subscript);
+        }
+        else if (value instanceof List)
+        {
+            int index = getInt(subscript);
+            List<Object> list = (List<Object>) value;
+            return index >= 0 && index < list.size() ? list.get(index) : null;
         }
         else if (value instanceof Iterable)
         {

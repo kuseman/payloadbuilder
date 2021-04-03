@@ -7,18 +7,24 @@ import java.util.NoSuchElementException;
 /** Tuple that is composed of other tuples */
 class CompositeTuple extends ArrayList<Tuple> implements Tuple
 {
+    private static final int INITIAL_CAPACITY = 10;
     private final int tupleOrdinal;
-
-    CompositeTuple(CompositeTuple source)
-    {
-        addAll(source);
-        this.tupleOrdinal = source.tupleOrdinal;
-    }
 
     CompositeTuple(Tuple outer, Tuple inner)
     {
+        super(INITIAL_CAPACITY);
+
         add(outer);
-        add(inner);
+
+        // Unwrap inner to get a flat structure
+        if (inner instanceof CompositeTuple)
+        {
+            addAll((CompositeTuple) inner);
+        }
+        else
+        {
+            add(inner);
+        }
         // A compsite's ordinal is always the outer tuples ordinal minus one
         // this to keep the hierarchy tree intact regaring a tulpes ordinal
         // should always be lower that all it's descendants
@@ -47,33 +53,51 @@ class CompositeTuple extends ArrayList<Tuple> implements Tuple
          *
          * Wanted ordinal is 3 that isn't located in this tuple
          * but in one of it's children
-         *
          */
 
-        // Ordinal pointing to this composite
-        // Then return first child
-        if (ordinal == tupleOrdinal)
-        {
-            return get(0);
-        }
+        /*
+         * select x.id     <- ordinal 2
+         * ,      y.id     <- ordinal 4
+         * from tableA
+         * inner join
+         * () x with (pop)
+         *   on ...
+         * inner join
+         * () y with (pop)
+         *   on ...
+         * 
+         * CompositeTuple
+         *   Row (a)            or = 0
+         *   Collection (x)     or = 1
+         *   Collection (y)     or = 3
+         */
 
         // Start from bottom to see if we should delegate
         int size = size();
-        for (int i = size - 1; i >= 0; i--)
+        Tuple prevTuple = null;
+        int prevTupleOrdinal = -1;
+        for (int i = 0; i < size; i++)
         {
             Tuple tuple = get(i);
             int tupleOrdinal = tuple.getTupleOrdinal();
-            if (ordinal > tupleOrdinal)
-            {
-                return tuple.getTuple(ordinal);
-            }
-            else if (ordinal == tupleOrdinal)
+            if (ordinal == tupleOrdinal)
             {
                 return tuple;
             }
+            // If we passed the ordinal wanted, it's a child of previous tuple
+            else if (tupleOrdinal > ordinal
+                    && prevTupleOrdinal < ordinal)
+            {
+                return prevTuple.getTuple(ordinal);
+            }
+
+            prevTuple = tuple;
+            prevTupleOrdinal = tupleOrdinal;
         }
 
-        return null;
+        // If we came here the wanted tuple ordinal doesn't exits or is a child of
+        // the last tuple, delegate
+        return prevTuple.getTuple(ordinal);
     }
 
     @Override

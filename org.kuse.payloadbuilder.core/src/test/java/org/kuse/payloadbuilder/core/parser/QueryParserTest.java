@@ -2,6 +2,8 @@ package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Arrays.asList;
 
+import java.util.List;
+
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
@@ -138,6 +140,25 @@ public class QueryParserTest extends AParserTest
     }
 
     @Test
+    public void test_subquery()
+    {
+        // Only recursive asterisk's is supported atm.
+        assertQueryFail(ParseException.class, "Only a recursive asterisk select (**) is supporte for sub queries", "select * from (select 1,2 from tableA) x");
+        // No assignment selects
+        assertQueryFail(ParseException.class, "Assignment selects is not allowed in sub query context", "select * from (select @a=1 from tableA) x");
+        // No select intos
+        assertQueryFail(ParseException.class, "SELECT INTO is not allowed in sub query context", "select * from (select 1,2 into #temp from tableA) x");
+
+        SelectStatement selectStm = (SelectStatement) assertQuery("select * from tableA a inner join (select ** from tableB b) x with (populate=true, batch_size=1000) on x.id = a.id").getStatements().get(0);
+
+        List<Option> joinOptions = selectStm.getSelect().getFrom().getJoins().get(0).getTableSource().getOptions();
+        assertEquals(asList(
+                new Option(QualifiedName.of("populate"), e("true")),
+                new Option(QualifiedName.of("batch_size"), e("1000"))),
+                joinOptions);
+    }
+
+    @Test
     public void test_control_flow()
     {
         assertQuery("if true then print 'hello' else print 'world' end if");
@@ -152,7 +173,12 @@ public class QueryParserTest extends AParserTest
         assertQueryFail(ParseException.class, "Invalid table source reference 'b'", "select art_id from article a where b.art_id > 10");
         assertQueryFail(ParseException.class, "Alias is mandatory", "select * from tableA inner join tableB b on b.art_id = art_id");
         assertQueryFail(ParseException.class, "Alias is mandatory", "select * from tableA a inner join tableB on b.art_id = art_id");
-        assertQueryFail(ParseException.class, "Invalid table source reference 'q'", "select art_id from article a inner join (select ** from tableB where id= 1 and q.id = 10) b on b.id = a.id");
+        assertQueryFail(ParseException.class, "Invalid table source reference 'q'", "select art_id from article a inner join (select ** from tableB b where id= 1 and q.id = 10) b on b.id = a.id");
+        // Test reference to a parent is ok
+        assertQuery("select art_id from article a inner join (select ** from tableB b where id= 1 and a.id = 10) b on b.id = a.id");
+        // c is not allowed since it's defined later that current context alias
+        assertQueryFail(ParseException.class, "Invalid table source reference 'c'",
+                "select art_id from article a inner join (select ** from tableB b where id= 1 and c.id = 10) b on b.id = a.id inner join tableC c on c.id = b.id");
     }
 
     @Test
@@ -175,7 +201,8 @@ public class QueryParserTest extends AParserTest
         assertQuery("select art_id from article a left join articleAttribute aa with (populate=true) on art_id = a.art_id ");
 
         // Nested
-        assertQuery("select art_id from article a inner join (select ** from articleAttribute aa  inner join articlePrice ap on ap.sku_id = aa.sku_id) aa with (populate=true) on aa.art_id = a.art_id ");
+        assertQuery(
+                "select art_id from article a inner join (select ** from articleAttribute aa  inner join articlePrice ap on ap.sku_id = aa.sku_id) aa with (populate=true) on aa.art_id = a.art_id ");
         assertQuery(
                 "select art_id from article a inner join (select ** from articleAttribute aa  left join articlePrice ap with (populate=true) on ap.sku_id = aa.sku_id) aa with (populate=true) on aa.art_id = a.art_id ");
 

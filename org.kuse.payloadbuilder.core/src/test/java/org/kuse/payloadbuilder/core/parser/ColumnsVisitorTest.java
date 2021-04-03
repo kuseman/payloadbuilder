@@ -32,19 +32,21 @@ public class ColumnsVisitorTest extends Assert
                         TableAliasBuilder.of(1, TableAlias.Type.TABLE, QualifiedName.of("article"), "a"),
                         TableAliasBuilder.of(2, TableAlias.Type.SUBQUERY, QualifiedName.of("SubQuery"), "aa")
                                 .children(asList(
-                                        TableAliasBuilder.of(3, TableAlias.Type.TABLE, QualifiedName.of("articleAttribute"), "aa"),
-                                        TableAliasBuilder.of(4, TableAlias.Type.TABLE, QualifiedName.of("articlePrice"), "ap"),
-                                        TableAliasBuilder.of(5, TableAlias.Type.TABLE, QualifiedName.of("articleBalance"), "ab")
+                                        TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
+                                                .children(asList(
+                                                        TableAliasBuilder.of(3, TableAlias.Type.TABLE, QualifiedName.of("articleAttribute"), "aa"),
+                                                        TableAliasBuilder.of(4, TableAlias.Type.TABLE, QualifiedName.of("articlePrice"), "ap"),
+                                                        TableAliasBuilder.of(5, TableAlias.Type.TABLE, QualifiedName.of("articleBalance"), "ab")
 
-                                )),
+                                                )))),
                         TableAliasBuilder.of(6, TableAlias.Type.TABLE, QualifiedName.of("aricleBrand"), "aBrand")))
                 .build();
 
         TableAlias source = root.getChildAliases().get(0);
         TableAlias article = root.getChildAliases().get(1);
         TableAlias subArticleAttribute = root.getChildAliases().get(2);
-        TableAlias articleAttribute = subArticleAttribute.getChildAliases().get(0);
-        TableAlias articlePrice = subArticleAttribute.getChildAliases().get(1);
+        TableAlias articleAttribute = subArticleAttribute.getChildAliases().get(0).getChildAliases().get(0);
+        TableAlias articlePrice = subArticleAttribute.getChildAliases().get(0).getChildAliases().get(1);
         TableAlias articleBrand = root.getChildAliases().get(3);
 
         Set<TableAlias> actual;

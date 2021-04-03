@@ -38,7 +38,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("b.col1 = a.col1")),
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 0),
                 false,
                 false,
                 index,

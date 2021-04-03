@@ -55,42 +55,24 @@ class JoinTuple implements Tuple
          *   tableC                 (to = 2, outer)
          *     tabbleD              (to = 3)
          *   tableE                 (to = 4, inner)
-         *
          */
 
-        // In joins we're always work at the bottom of the tree
-        // so no need to traverse the inner
-        if (ordinal > inner.getTupleOrdinal())
+        int innerTupleOrdinal = inner.getTupleOrdinal();
+
+        // A tuple higher up in hierarchy is wanted
+        if (contextOuter != null && ordinal <= contextOuter.getTupleOrdinal())
         {
-            return inner.getTuple(ordinal);
-        }
-        else if (ordinal == inner.getTupleOrdinal())
-        {
-            return inner;
+            return contextOuter.getTuple(ordinal);
         }
         else if (outer != null)
         {
-            if (ordinal == outer.getTupleOrdinal())
-            {
-                return outer;
-            }
-            else if (ordinal > outer.getTupleOrdinal())
+            if (ordinal <= outer.getTupleOrdinal() || ordinal < innerTupleOrdinal)
             {
                 return outer.getTuple(ordinal);
             }
         }
 
-        if (contextOuter != null)
-        {
-            if (ordinal == contextOuter.getTupleOrdinal())
-            {
-                return contextOuter;
-            }
-
-            return contextOuter.getTuple(ordinal);
-        }
-
-        return null;
+        return inner.getTuple(ordinal);
     }
 
     @Override

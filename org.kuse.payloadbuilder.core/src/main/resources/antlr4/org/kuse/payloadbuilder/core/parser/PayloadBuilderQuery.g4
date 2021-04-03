@@ -88,7 +88,7 @@ ddlStatement
 topSelect
  : selectStatement EOF
  ;
-
+ 
 selectStatement
  : SELECT (TOP topCount)? selectItem (',' selectItem)*
    (INTO into=tableName intoOptions=tableSourceOptions?)?
@@ -130,13 +130,13 @@ tableSourceJoined
  ;
 
 tableSource
- : tableName			identifier? tableSourceOptions?
- | functionCall			identifier? tableSourceOptions?
- | subQuery				identifier? tableSourceOptions?
+ : tableName				identifier? tableSourceOptions?
+ | functionCall				identifier? tableSourceOptions?
+ | '(' selectStatement ')'	identifier? tableSourceOptions?
  ;
 
 tableSourceOptions
- : WITH '(' options+=tableSourceOption (',' tableOptions+=tableSourceOption)* ')'
+ : WITH '(' options+=tableSourceOption (',' options+=tableSourceOption)* ')'
  ;
 
 tableSourceOption
@@ -152,16 +152,6 @@ joinPart
  : (INNER | LEFT) JOIN tableSource ON expression
  | (CROSS | OUTER) APPLY tableSource
 ;
-
-subQuery
- : '('
-   SELECT (TOP topCount)? selectItem (',' selectItem)*
-   (FROM tableSourceJoined)?
-   (WHERE where=expression)?
-   (GROUPBY groupBy+=expression (',' groupBy+=expression)*)?
-   (ORDERBY sortItem (',' sortItem)*)?
-   ')'
- ;
 
 sortItem
  : expression order=(ASC | DESC)? 

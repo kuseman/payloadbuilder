@@ -274,7 +274,7 @@ class BatchMergeJoin extends AOperator
 
                     if (predicate.test(context, joinTuple))
                     {
-                        next = rowMerger.merge(outerRow.tuple, innerRow, populating, nodeId);
+                        next = rowMerger.merge(outerRow.tuple, innerRow, populating);
                         outerRow.match = true;
                         if (populating)
                         {

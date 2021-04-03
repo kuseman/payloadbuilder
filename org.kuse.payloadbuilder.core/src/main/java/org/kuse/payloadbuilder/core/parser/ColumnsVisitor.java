@@ -5,12 +5,12 @@ import static java.util.Collections.emptySet;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
 import static org.apache.commons.collections.CollectionUtils.isEmpty;
+import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 
 import org.antlr.v4.runtime.Token;
@@ -122,6 +122,21 @@ public class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsV
     }
 
     @Override
+    public Set<TableAlias> visit(SubscriptExpression expression, Context context)
+    {
+        // A subscripts resulting aliases the the result of the value's aliases
+        return expression.getValue().accept(this, context);
+    }
+
+    @Override
+    public Set<TableAlias> visit(DereferenceExpression expression, Context context)
+    {
+        // Set left sides aliases in context before visiting right side
+        context.parentAliases = expression.getLeft().accept(this, context);
+        return expression.getRight().accept(this, context);
+    }
+
+    @Override
     public Set<TableAlias> visit(QualifiedReferenceExpression expression, Context context)
     {
         Set<TableAlias> tableAliases = context.parentAliases;
@@ -191,7 +206,24 @@ public class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsV
             // Push sub query columns into first child
             if (pathAlias.getType() == Type.SUBQUERY && pathAlias.getChildAliases().size() > 0)
             {
-                pathAlias = pathAlias.getChildAliases().get(0);
+                // This is a sub query which means we should set columns on the actual
+                // table aliases
+                /*
+                 * from
+                 * (
+                 *   select *
+                 *   from article
+                 * ) x                  <-- set columns here should actually set it on article
+                 *
+                 */
+                // Set columns on the first alias under ROOT
+                // TODO: this needs some rewrite when a sub query can contain composite queries
+                // like unions etc. then we should push columns for each ROOT aliases
+                pathAlias = pathAlias
+                        .getChildAliases()
+                        .get(0)
+                        .getChildAliases()
+                        .get(0);
             }
 
             Set<String> columns = context.columnsByAlias.computeIfAbsent(pathAlias, key -> new THashSet<>());
@@ -337,7 +369,7 @@ public class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsV
             String part = parts.get(0);
 
             // 1. Alias match, move on
-            if (Objects.equals(part, current.getAlias()))
+            if (equalsIgnoreCase(part, current.getAlias()))
             {
                 result = current;
                 parts.remove(0);
@@ -347,16 +379,11 @@ public class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsV
             // 2. Child alias
             // TODO: not valid in join-predicates
             TableAlias alias = current.getChildAlias(part);
-            if (alias != null)
+            if (alias == null)
             {
-                parts.remove(0);
-                result = alias;
-                current = alias;
-                continue;
+                // 3. Sibling alias
+                alias = current.getSiblingAlias(part);
             }
-
-            // 3. Sibling alias
-            alias = current.getSiblingAlias(part);
             if (alias != null)
             {
                 parts.remove(0);
@@ -367,6 +394,66 @@ public class ColumnsVisitor extends AExpressionVisitor<Set<TableAlias>, ColumnsV
 
             // 4. Parent alias match upwards
             current = current.getParent();
+        }
+
+        /* If the result is a sub query this means we need to dig down to
+         * the actual table source alias
+         * select b.map(....)
+         * from tableA a            ordinal = 0
+         * inner join
+         * (                        ordinal = 1
+         *   select **
+         *   from tableB b          ordinal = 2
+         * ) b
+         *   on b.id = a.id
+         *
+         * CompositeTuple
+         *   Row (a)    ordinal = 0
+         *   Row (b)    ordinal = 2
+         *
+         * b.id here will have target subquery b with ordinal 1
+         * But since tuple streams never return any subquery tuples
+         * we point it to tableB ordinal = 2
+         *
+         * However the QRE 'b' in b.map(...) is pointing to the
+         * subquery alias and should not be delegated any deeper
+         *
+         */
+        if (result.getType() == Type.SUBQUERY)
+        {
+            // TODO: need to rewrite when composite queries comes into play
+            // then there will be multiple roots here
+            TableAlias subQueryRoot = result
+                    .getChildAliases()
+                    .get(0);   // ROOT in sub query
+
+            // If there are unresolved parts left in qualifier
+            // then we need to set target tuple ordinal to the inner table alias
+            /*
+             * Tuple stream will look like
+             * CompositeTuple
+             *   Row (a)                (ordinal = 0)
+             *   CompositeTuple         (subquery ordinal = 1)      <--- Result
+             *     Row (b)              (ordinal = 2)               <--- Set target to this
+             *     Row (c)              (ordinal = 3)
+             */
+            // A corner case is when the sub query only has one child alias
+            // then the tuple stream will look like
+            /*
+             * CompositeTuple
+             *   Row (a)                (ordinal = 0)
+             *                                          <---- Sub query won't yield any result here
+             *   Row (b)                (ordinal = 2)   <---- And hence we need to set target to this
+             *
+             */
+
+            if (parts.size() > 0 || subQueryRoot.getChildAliases().size() == 1)
+            {
+                // like union all etc.
+                result = subQueryRoot
+                        .getChildAliases()
+                        .get(0);  // First table source in sub query
+            }
         }
 
         return result;

@@ -316,6 +316,10 @@ public final class ExpressionMath
         {
             return ((Boolean) left).booleanValue() == ((Boolean) right).booleanValue();
         }
+        else if (left == null || right == null)
+        {
+            return left == null && right == null;
+        }
 
         if (left.getClass() != right.getClass() || !(left instanceof Comparable))
         {

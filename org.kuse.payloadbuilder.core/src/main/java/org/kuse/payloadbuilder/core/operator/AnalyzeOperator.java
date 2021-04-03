@@ -62,6 +62,7 @@ class AnalyzeOperator extends AOperator
             properties = new LinkedHashMap<>();
         }
 
+        long totalAcc = 0;
         long total = 0;
         float percentageTime = 0;
         int executionCount = 0;
@@ -73,6 +74,7 @@ class AnalyzeOperator extends AOperator
             executionCount = data.getExecutionCount();
             rowCount = data.getRowCount();
             total = data.getNodeTime(TimeUnit.MILLISECONDS);
+            totalAcc = total;
             // Remove the children times to get the actual time spent in this node
             List<Operator> children = getChildOperators();
             for (Operator child : children)
@@ -88,7 +90,8 @@ class AnalyzeOperator extends AOperator
         }
 
         // Append statistics to target nodes properties
-        String timeSpent = String.format("%s (%.2f %%)", DurationFormatUtils.formatDurationHMS(total), percentageTime);
+        String timeSpent = String.format("%s (%.2f %%)", DurationFormatUtils.formatDurationHMS(Math.max(0, total)), percentageTime);
+        properties.put(DescribeUtils.TIME_SPENT_ACC, DurationFormatUtils.formatDurationHMS(totalAcc));
         properties.put(DescribeUtils.TIME_SPENT, timeSpent);
         properties.put(DescribeUtils.EXECUTION_COUNT, executionCount);
         properties.put(DescribeUtils.PROCESSED_ROWS, rowCount);
@@ -101,7 +104,9 @@ class AnalyzeOperator extends AOperator
     {
         final NodeData data = context.getOperatorContext().getNodeData(nodeId, NodeData::new);
         data.increaseExecutionCount();
+        data.resumeNodeTime();
         final RowIterator it = target.open(context);
+        data.suspenNodeTime();
         //CSOFF
         return new RowIterator()
         //CSON

@@ -19,7 +19,7 @@ public class OperatorBuilderApplyTest extends AOperatorTest
                 result.tableOperators.get(0),
                 new CachingOperator(2, result.tableOperators.get(1)),
                 null,
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 1),
                 false,
                 false);
 
@@ -45,7 +45,7 @@ public class OperatorBuilderApplyTest extends AOperatorTest
                 result.tableOperators.get(0),
                 new CachingOperator(2, result.tableOperators.get(1)),
                 null,
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 1),
                 true,
                 false);
 
@@ -74,7 +74,7 @@ public class OperatorBuilderApplyTest extends AOperatorTest
                 result.tableOperators.get(0),
                 new CachingOperator(2, result.tableOperators.get(1)),
                 null,
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 1),
                 false,
                 true);
 
@@ -105,7 +105,7 @@ public class OperatorBuilderApplyTest extends AOperatorTest
                                 result.tableOperators.get(1),
                                 new ExpressionPredicate(e("a.active_flg = true")))),
                 null,
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 1),
                 false,
                 true);
 
@@ -141,7 +141,7 @@ public class OperatorBuilderApplyTest extends AOperatorTest
                                         result.tableOperators.get(1),
                                         new ExpressionPredicate(e("a.active_flg = true")))),
                         null,
-                        DefaultTupleMerger.DEFAULT,
+                        new DefaultTupleMerger(-1, 1),
                         false,
                         true),
                 new ExpressionPredicate(e("a.value is null")));
@@ -171,7 +171,7 @@ public class OperatorBuilderApplyTest extends AOperatorTest
                 result.tableOperators.get(0),
                 new CachingOperator(2, result.tableOperators.get(1)),
                 null,
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 1),
                 true,
                 true);
 

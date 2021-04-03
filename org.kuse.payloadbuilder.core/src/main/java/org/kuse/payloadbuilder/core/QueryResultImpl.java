@@ -147,6 +147,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     @Override
     public Void visit(DescribeSelectStatement statement, Void ctx)
     {
+        context.clear();
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, statement.getSelectStatement().getSelect());
         currentSelect = DescribeUtils.getDescribeSelect(context, pair.getKey());
         return null;
@@ -155,6 +156,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     @Override
     public Void visit(AnalyzeStatement statement, Void ctx)
     {
+        context.clear();
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, statement.getSelectStatement().getSelect(), true);
         // Write the operator to a noop-writer to collect statistics
 
@@ -297,6 +299,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     @Override
     public Void visit(SelectStatement statement, Void ctx)
     {
+        context.clear();
         if (statement.isAssignmentSelect())
         {
             applyAssignmentSelect(statement.getSelect());
@@ -500,6 +503,8 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             RowIterator iterator = null;
             try
             {
+                // Clear context before opening operator
+                context.setTuple(null);
                 iterator = operator.open(context);
                 while (iterator.hasNext())
                 {

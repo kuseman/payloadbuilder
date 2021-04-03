@@ -66,7 +66,7 @@
       ]
     },
     {
-      "name": "Lambda functions'",
+      "name": "Lambda functions",
       "query": [
         "select r.Value, ",
         " r1.map(x -> r.Value + x.Value) map, ",
@@ -114,6 +114,22 @@
           [{ "key": "newCol", "value": 0 }],
           [{ "key": "newCol", "value": 0 }],
           [{ "key": "newCol", "value": -1 }]
+        ]
+      ]
+    },
+    {
+      "name": "Order by expression function",
+      "query": [
+        "select hash(id, row_id) newCol from data order by newcol desc"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "newCol", "value": 1057 }],
+          [{ "key": "newCol", "value": 1056 }],
+          [{ "key": "newCol", "value": 1055 }],
+          [{ "key": "newCol", "value": 1024 }],
+          [{ "key": "newCol", "value": 994 }],
+          [{ "key": "newCol", "value": 993 }]
         ]
       ]
     },

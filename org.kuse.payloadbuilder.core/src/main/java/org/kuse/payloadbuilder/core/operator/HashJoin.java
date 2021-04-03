@@ -266,7 +266,7 @@ class HashJoin extends AOperator
 
                     if (result)
                     {
-                        next = rowMerger.merge(currentOuter.tuple, currentInner, populating, nodeId);
+                        next = rowMerger.merge(currentOuter.tuple, currentInner, populating);
                         if (populating)
                         {
                             currentOuter.tuple = next;

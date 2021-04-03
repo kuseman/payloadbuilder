@@ -36,6 +36,7 @@ public class DescribeUtils
     public static final String INNER_VALUES = "Inner values";
     public static final String CATALOG = "Catalog";
     public static final String TIME_SPENT = "Time spent";
+    public static final String TIME_SPENT_ACC = "Time spent (acc)";
     public static final String EXECUTION_COUNT = "Execution count";
     public static final String PROCESSED_ROWS = "Processed rows";
     public static final String PREDICATE_TIME = "Predicate time";

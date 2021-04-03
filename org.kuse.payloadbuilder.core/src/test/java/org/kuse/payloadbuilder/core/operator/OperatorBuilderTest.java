@@ -71,7 +71,7 @@ public class OperatorBuilderTest extends AOperatorTest
                         new ExpressionHashFunction(asList(e("s.art_id"))),
                         new ExpressionHashFunction(asList(e("a.art_id"))),
                         new ExpressionPredicate(e("a.art_id = s.art_id")),
-                        DefaultTupleMerger.DEFAULT,
+                        new DefaultTupleMerger(-1, 1),
                         false,
                         false));
 
@@ -116,8 +116,8 @@ public class OperatorBuilderTest extends AOperatorTest
                         Order.ASC,
                         NullOrder.UNDEFINED, null))));
 
-//                        System.out.println(queryResult.operator.toString(1));
-//                        System.err.println(expected.toString(1));
+        //                        System.out.println(queryResult.operator.toString(1));
+        //                        System.err.println(expected.toString(1));
 
         assertEquals(expected, queryResult.operator);
 
@@ -188,19 +188,20 @@ public class OperatorBuilderTest extends AOperatorTest
                                 new ExpressionHashFunction(asList(e("a.art_id"))),
                                 new ExpressionHashFunction(asList(e("ab.art_id"))),
                                 new ExpressionPredicate(e("ab.art_id = a.art_id")),
-                                DefaultTupleMerger.DEFAULT,
+                                new DefaultTupleMerger(-1, 3),
                                 true,
                                 false),
                         new ExpressionHashFunction(asList(e("s.art_id"))),
                         new ExpressionHashFunction(asList(e("a.art_id"))),
                         new ExpressionPredicate(e("a.art_id = s.art_id")),
-                        DefaultTupleMerger.DEFAULT,
+                        new DefaultTupleMerger(-1, 1),
                         true,
                         false),
                 new ExpressionPredicate(e("a.ab.active_flg = true")));
 
-        //        System.out.println(queryResult.operator.toString(1));
-        //        System.err.println(expected.toString(1));
+        //                System.out.println(queryResult.operator.toString(1));
+        //                System.out.println();
+        //                System.err.println(expected.toString(1));
 
         assertEquals(expected, queryResult.operator);
     }
@@ -229,14 +230,14 @@ public class OperatorBuilderTest extends AOperatorTest
                         new ExpressionHashFunction(asList(e("s.art_id"))),
                         new ExpressionHashFunction(asList(e("a.art_id"))),
                         new ExpressionPredicate(e("a.art_id = s.art_id")),
-                        DefaultTupleMerger.DEFAULT,
+                        new DefaultTupleMerger(-1, 1),
                         false,
                         false),
                 queryResult.tableOperators.get(2),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionHashFunction(asList(e("raa.art_id"))),
                 new ExpressionPredicate(e("raa.art_id = a.art_id AND a.articleType = 'type'")),
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 2),
                 false,
                 true);
 
@@ -260,7 +261,7 @@ public class OperatorBuilderTest extends AOperatorTest
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 1),
                 false,
                 false);
 
@@ -284,7 +285,7 @@ public class OperatorBuilderTest extends AOperatorTest
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 1),
                 false,
                 true);
 
@@ -325,7 +326,7 @@ public class OperatorBuilderTest extends AOperatorTest
                         new CachingOperator(2, new TableFunctionOperator(1, "", r1, range, asList(
                                 e("randomInt(100)")))),
                         new ExpressionPredicate(e("r1.Value <= r.Value")),
-                        DefaultTupleMerger.DEFAULT,
+                        new DefaultTupleMerger(-1, 1),
                         true,
                         false),
                 new TableFunctionOperator(4, "", r2, range, asList(
@@ -334,7 +335,7 @@ public class OperatorBuilderTest extends AOperatorTest
                 new ExpressionHashFunction(asList(e("r.Value"))),
                 new ExpressionHashFunction(asList(e("r2.Value"))),
                 new ExpressionPredicate(e("r2.Value = r.Value")),
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 2),
                 false,
                 false);
 
@@ -381,21 +382,23 @@ public class OperatorBuilderTest extends AOperatorTest
 
         QueryResult queryResult = getQueryResult(query);
 
-        TableAlias root = TableAliasBuilder.of(-1, Type.TABLE, of("ROOT"), "ROOT")
+        TableAlias root = TableAliasBuilder.of(-1, Type.ROOT, of("ROOT"), "ROOT")
                 .children(asList(
                         TableAliasBuilder.of(0, Type.TABLE, of("source"), "s").columns(new String[] {"art_id"}),
                         TableAliasBuilder.of(1, Type.TABLE, of("article"), "a").columns(new String[] {"art_id"}),
                         TableAliasBuilder.of(2, Type.SUBQUERY, of("SubQuery"), "aa")
                                 .children(asList(
-                                        TableAliasBuilder.of(3, Type.TABLE, of("articleAttribute"), "aa").columns(new String[] {"sku_id", "attr1_id", "art_id", "active_flg"}),
-                                        TableAliasBuilder.of(4, Type.TABLE, of("articlePrice"), "ap").columns(new String[] {"price_sales", "sku_id"}),
-                                        TableAliasBuilder.of(5, Type.TABLE, of("attribute1"), "a1").columns(new String[] {"attr1_id"})))))
+                                        TableAliasBuilder.of(-1, Type.ROOT, of("ROOT"), "ROOT")
+                                                .children(asList(
+                                                        TableAliasBuilder.of(3, Type.TABLE, of("articleAttribute"), "aa").columns(new String[] {"sku_id", "attr1_id", "art_id", "active_flg"}),
+                                                        TableAliasBuilder.of(4, Type.TABLE, of("articlePrice"), "ap").columns(new String[] {"price_sales", "sku_id"}),
+                                                        TableAliasBuilder.of(5, Type.TABLE, of("attribute1"), "a1").columns(new String[] {"attr1_id"})))))))
                 .build();
 
         TableAlias source = root.getChildAliases().get(0);
 
-        //                                                        System.out.println(source.getParent().printHierarchy(0));
-        //                                                        System.out.println(queryResult.alias.printHierarchy(0));
+        //                                                                System.out.println(source.getParent().printHierarchy(0));
+        //                                                                System.out.println(queryResult.alias.printHierarchy(0));
 
         assertTrue("Alias hierarchy should be equal", source.getParent().isEqual(queryResult.alias));
 
@@ -410,7 +413,7 @@ public class OperatorBuilderTest extends AOperatorTest
                         new ExpressionHashFunction(asList(e("s.art_id"))),
                         new ExpressionHashFunction(asList(e("a.art_id"))),
                         new ExpressionPredicate(e("a.art_id = s.art_id")),
-                        DefaultTupleMerger.DEFAULT,
+                        new DefaultTupleMerger(-1, 1),
                         true,
                         false),
                 new HashJoin(
@@ -424,20 +427,20 @@ public class OperatorBuilderTest extends AOperatorTest
                                 new ExpressionHashFunction(asList(e("aa.sku_id"))),
                                 new ExpressionHashFunction(asList(e("ap.sku_id"))),
                                 new ExpressionPredicate(e("ap.sku_id = aa.sku_id")),
-                                DefaultTupleMerger.DEFAULT,
+                                new DefaultTupleMerger(-1, 4),
                                 false,
                                 false),
                         queryResult.tableOperators.get(4),
                         new ExpressionHashFunction(asList(e("aa.attr1_id"))),
                         new ExpressionHashFunction(asList(e("a1.attr1_id"))),
                         new ExpressionPredicate(e("a1.attr1_id = aa.attr1_id")),
-                        DefaultTupleMerger.DEFAULT,
+                        new DefaultTupleMerger(-1, 5),
                         true,
                         false),
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("aa.art_id"))),
                 new ExpressionPredicate(e("aa.art_id = s.art_id")),
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 2),
                 true,
                 false);
 
@@ -531,27 +534,40 @@ public class OperatorBuilderTest extends AOperatorTest
         QueryResult result = getQueryResult(query);
 
         TableAlias root = TableAliasBuilder
-                .of(-1, TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
+                .of(-1, TableAlias.Type.ROOT, QualifiedName.of("ROOT"), "ROOT")
                 .children(asList(
                         TableAliasBuilder.of(0, TableAlias.Type.TABLE, of("article"), "a").columns(new String[] {"stamp_dat_cr", "art_id", "add_on_flg", "articleType", "note_id", "idx_id"}),
                         TableAliasBuilder.of(1, TableAlias.Type.SUBQUERY, of("SubQuery"), "aa")
                                 .children(asList(
-                                        TableAliasBuilder.of(2, TableAlias.Type.TABLE, of("articleAttribute"), "aa")
-                                                .columns(new String[] {"internet_flg", "internet_date_start", "sku_id", "attr1_id", "art_id", "pluno", "active_flg", "ean13", "attr3_id", "note_id",
-                                                        "attr2_id"}),
-                                        TableAliasBuilder.of(3, TableAlias.Type.TABLE, of("articlePrice"), "ap").columns(new String[] {"price_sales", "sku_id", "art_id", "price_org", "note_id"}),
-                                        TableAliasBuilder.of(4, TableAlias.Type.TABLE, of("attribute1"), "a1")
-                                                .columns(new String[] {"colorGroup", "attr1_id", "rgb_code", "lang_id", "group_flg"}),
-                                        TableAliasBuilder.of(5, TableAlias.Type.TABLE, of("attribute2"), "a2").columns(new String[] {"attr2_code", "lang_id", "attr2_no", "attr2_id"}),
-                                        TableAliasBuilder.of(6, TableAlias.Type.TABLE, of("attribute3"), "a3").columns(new String[] {"lang_id", "attr3_id"}))),
+                                        TableAliasBuilder
+                                                .of(-1, TableAlias.Type.ROOT, QualifiedName.of("ROOT"), "ROOT")
+                                                .children(asList(
+
+                                                        TableAliasBuilder.of(2, TableAlias.Type.TABLE, of("articleAttribute"), "aa")
+                                                                .columns(new String[] {"internet_flg", "internet_date_start", "sku_id", "attr1_id", "art_id", "pluno", "active_flg", "ean13",
+                                                                        "attr3_id", "note_id",
+                                                                        "attr2_id"}),
+                                                        TableAliasBuilder.of(3, TableAlias.Type.TABLE, of("articlePrice"), "ap")
+                                                                .columns(new String[] {"price_sales", "sku_id", "art_id", "price_org", "note_id"}),
+                                                        TableAliasBuilder.of(4, TableAlias.Type.TABLE, of("attribute1"), "a1")
+                                                                .columns(new String[] {"colorGroup", "attr1_id", "rgb_code", "lang_id", "group_flg"}),
+                                                        TableAliasBuilder.of(5, TableAlias.Type.TABLE, of("attribute2"), "a2").columns(new String[] {"attr2_code", "lang_id", "attr2_no", "attr2_id"}),
+                                                        TableAliasBuilder.of(6, TableAlias.Type.TABLE, of("attribute3"), "a3").columns(new String[] {"lang_id", "attr3_id"}))))),
+
                         TableAliasBuilder.of(7, TableAlias.Type.SUBQUERY, of("SubQuery"), "ap")
                                 .children(asList(
-                                        TableAliasBuilder.of(8, TableAlias.Type.TABLE, of("articleProperty"), "").columns(new String[] {"propertykey_id", "art_id"}))),
+                                        TableAliasBuilder
+                                                .of(-1, TableAlias.Type.ROOT, QualifiedName.of("ROOT"), "ROOT")
+                                                .children(asList(
+                                                        TableAliasBuilder.of(8, TableAlias.Type.TABLE, of("articleProperty"), "").columns(new String[] {"propertykey_id", "art_id"}))))),
                         TableAliasBuilder.of(9, TableAlias.Type.SUBQUERY, of("SubQuery"), "r")
                                 .children(asList(
-                                        TableAliasBuilder.of(10, TableAlias.Type.FUNCTION, of("range"), "r")
-                                                .columns(new String[] {"Value"}),
-                                        TableAliasBuilder.of(11, TableAlias.Type.TABLE, of("attribute1"), "a1").columns(new String[] {"someId", "attr1_code"})))))
+                                        TableAliasBuilder
+                                                .of(-1, TableAlias.Type.ROOT, QualifiedName.of("ROOT"), "ROOT")
+                                                .children(asList(
+                                                        TableAliasBuilder.of(10, TableAlias.Type.FUNCTION, of("range"), "r")
+                                                                .columns(new String[] {"Value"}),
+                                                        TableAliasBuilder.of(11, TableAlias.Type.TABLE, of("attribute1"), "a1").columns(new String[] {"someId", "attr1_code"})))))))
                 .build();
 
         //        System.out.println(root.printHierarchy(1));
@@ -566,13 +582,13 @@ public class OperatorBuilderTest extends AOperatorTest
         String query = "select s.id1, s.id2 from source s";
         QueryResult result = getQueryResult(query);
 
-        TableAlias root = TableAliasBuilder.of(-1, Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
+        TableAlias root = TableAliasBuilder.of(-1, Type.ROOT, QualifiedName.of("ROOT"), "ROOT")
                 .children(asList(
                         TableAliasBuilder.of(0, TableAlias.Type.TABLE, QualifiedName.of("source"), "s").columns(new String[] {"id2", "id1"})))
                 .build();
 
-        //        System.out.println(root.printHierarchy(1));
-        //        System.out.println(result.alias.printHierarchy(1));
+        //                System.out.println(root.printHierarchy(1));
+        //                System.out.println(result.alias.printHierarchy(1));
 
         assertTrue(root.isEqual(result.alias));
 
@@ -684,7 +700,7 @@ public class OperatorBuilderTest extends AOperatorTest
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 1),
                 true,
                 false);
 
@@ -738,11 +754,61 @@ public class OperatorBuilderTest extends AOperatorTest
                                 new ExpressionHashFunction(asList(e("a.art_id"))),
                                 new ExpressionHashFunction(asList(e("aa.art_id"))),
                                 new ExpressionPredicate(e("aa.art_id = a.art_id AND s.id = true")),
-                                DefaultTupleMerger.DEFAULT,
+                                new DefaultTupleMerger(-1, 3),
                                 true,
                                 false),
                         new ExpressionPredicate(e("a.art_id = s.art_id")),
-                        DefaultTupleMerger.DEFAULT,
+                        new DefaultTupleMerger(-1, 1),
+                        true,
+                        false);
+
+        //        System.err.println(expected.toString(1));
+        //        System.out.println(result.operator.toString(1));
+
+        assertEquals(expected, result.operator);
+
+        assertEquals(
+                new ObjectProjection(asList("art_id"),
+                        asList(new ExpressionProjection(e("s.art_id")))),
+                result.projection);
+    }
+
+    @Test
+    public void test_not_correlated_when_a_sibling_alias_has_the_same_alias_as_a_parent()
+    {
+        String query = "SELECT s.art_id "
+            + "FROM source s "
+            + "INNER JOIN "
+            + "("
+            + "  select ** "
+            + "  from article a"
+            + "  INNER JOIN articleAttribute aa with(populate=true)"
+            + "    ON aa.art_id = a.art_id "
+            + "    AND s.id "
+            + ") a with(populate=true)"
+            + "  ON a.art_id = s.art_id";
+
+        QueryResult result = getQueryResult(query);
+
+        Operator expected =
+                // Correlated => nested loop
+                new NestedLoopJoin(
+                        4,
+                        "INNER JOIN",
+                        result.tableOperators.get(0),
+                        new HashJoin(
+                                3,
+                                "INNER JOIN",
+                                result.tableOperators.get(1),
+                                result.tableOperators.get(2),
+                                new ExpressionHashFunction(asList(e("a.art_id"))),
+                                new ExpressionHashFunction(asList(e("aa.art_id"))),
+                                new ExpressionPredicate(e("aa.art_id = a.art_id AND s.id = true")),
+                                new DefaultTupleMerger(-1, 3),
+                                true,
+                                false),
+                        new ExpressionPredicate(e("a.art_id = s.art_id")),
+                        new DefaultTupleMerger(-1, 1),
                         true,
                         false);
 

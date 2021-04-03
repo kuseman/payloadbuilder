@@ -27,6 +27,7 @@ class ExpressionValuesExtractor implements ValuesExtractor
         {
             values[i] = expressions.get(i).eval(context);
         }
+        context.setTuple(null);
     }
 
     @Override

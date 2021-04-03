@@ -23,6 +23,7 @@ class ExpressionPredicate implements BiPredicate<ExecutionContext, Tuple>
     {
         context.setTuple(tuple);
         boolean result = BooleanUtils.isTrue((Boolean) predicate.eval(context));
+        context.setTuple(null);
         return result;
     }
 

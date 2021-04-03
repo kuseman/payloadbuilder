@@ -72,7 +72,6 @@ import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SetStatemen
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ShowStatementContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SortItemContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.StatementContext;
-import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SubQueryContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.SubscriptContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableNameContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceContext;
@@ -163,19 +162,24 @@ public class QueryParser
         {
             this.registry = registry;
             this.validateQualifiedReferences = validateQualifiedReferences;
-            clear();
+            clear(null);
         }
 
-        private void clear()
+        private void clear(TableAlias parent)
         {
             tupleOrdinal = -1;
-            parentTableAlias = TableAliasBuilder.of(tupleOrdinal++, TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT").build();
+            TableAliasBuilder builder = TableAliasBuilder.of(this.tupleOrdinal++, TableAlias.Type.ROOT, QualifiedName.of("ROOT"), "ROOT");
+            if (parent != null)
+            {
+                builder.parent(parent);
+            }
+            parentTableAlias = builder.build();
         }
 
         @Override
         public Object visitStatement(StatementContext ctx)
         {
-            clear();
+            clear(null);
             return super.visitStatement(ctx);
         }
 
@@ -504,31 +508,49 @@ public class QueryParser
                         options,
                         ctx.functionCall().start);
             }
-            else if (ctx.subQuery() != null)
+            else if (ctx.selectStatement() != null)
             {
+                Token token = ctx.selectStatement().start;
+
                 if (isBlank(alias))
                 {
-                    throw new ParseException("Sub query must have an alias", ctx.subQuery().start);
+                    throw new ParseException("Sub query must have an alias", token);
                 }
 
-                SubQueryContext subQueryCtx = ctx.subQuery();
-
-                List<SelectItem> selectItems = subQueryCtx.selectItem().stream().map(s -> (SelectItem) visit(s)).collect(toList());
+                /*  When visiting a sub query we want to build a new table alias hierarchy
+                    Since this is a complete query.
+                    However since this is contained in another query we must start the tuple ordinal
+                    at the previous one
+                */
                 TableAlias prevParent = parentTableAlias;
-                TableAlias tableAlias = TableAliasBuilder
-                        .of(tupleOrdinal++, TableAlias.Type.SUBQUERY, QualifiedName.of("SubQuery"), alias, subQueryCtx.start)
-                        .parent(getParentTableAlias())
-                        .build();
-                parentTableAlias = tableAlias;
 
-                TableSourceJoined from = (TableSourceJoined) visit(subQueryCtx.tableSourceJoined());
-                Expression where = subQueryCtx.where != null ? getExpression(subQueryCtx.where) : null;
-                List<Expression> groupBy = subQueryCtx.groupBy != null ? subQueryCtx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
-                List<SortItem> orderBy = subQueryCtx.sortItem() != null ? subQueryCtx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
+                TableAlias tableAlias = TableAliasBuilder
+                        .of(tupleOrdinal++, TableAlias.Type.SUBQUERY, QualifiedName.of("SubQuery"), alias, token)
+                        .parent(parentTableAlias)
+                        .build();
+
+                // Store previous parent table alias
+                int prevTupleOrdinal = tupleOrdinal;
+                // Start a new alias tree with subquery as parent
+                clear(tableAlias);
+                // Restore tuple ordinal counter since clear resets it
+                tupleOrdinal = prevTupleOrdinal;
+
+                if (ctx.selectStatement().into != null)
+                {
+                    throw new ParseException("SELECT INTO is not allowed in sub query context", token);
+                }
+
+                SelectStatement selectStatement = (SelectStatement) visit(ctx.selectStatement());
+
+                if (selectStatement.isAssignmentSelect())
+                {
+                    throw new ParseException("Assignment selects is not allowed in sub query context", token);
+                }
 
                 parentTableAlias = prevParent;
 
-                return new SubQueryTableSource(selectItems, tableAlias, options, from, where, groupBy, orderBy, ctx.subQuery().start);
+                return new SubQueryTableSource(tableAlias, selectStatement.getSelect(), options, token);
             }
 
             TableName tableName = (TableName) visit(ctx.tableName());
@@ -742,17 +764,7 @@ public class QueryParser
             {
                 List<String> parts = new ArrayList<>();
                 parts.add(getIdentifier(ctx.identifier()));
-                //                if (left instanceof QualifiedReferenceExpression)
-                //                {
-                //                    QualifiedReferenceExpression qfe = (QualifiedReferenceExpression) left;
-                //                    parts.addAll(0, qfe.getQname().getParts());
-                //                    result = new QualifiedReferenceExpression(new QualifiedName(parts), qfe.getLambdaId());
-                //                    validateQualifiedReference(ctx, (QualifiedReferenceExpression) result);
-                //                }
-                //                else
-                //                {
                 result = new DereferenceExpression(left, new QualifiedReferenceExpression(new QualifiedName(parts), -1, ctx.start));
-                //                }
             }
             // Dereferenced function call
             else
@@ -898,12 +910,41 @@ public class QueryParser
                 return;
             }
 
+            // Sibling reference
+            if (parentTableAlias.getSiblingAlias(aliasRef) != null)
+            {
+                return;
+            }
+
+            // TODO: If join check we can traverse upwards
+            // but only check parents children with a lower index then we came from
+            /*
+             * from tableA a
+             * inner join
+             * (
+             *   select **
+             *   from tableB b
+             *   where c.id > 10            <--- Invalid reference since it's defined later that "this"
+             * ) b
+             *   on b..
+             * inner join tableC c
+             *   on c...
+             *
+             */
+
             // Traverse parents and try to find match
             TableAlias current = parentTableAlias.getParent();
 
             while (current != null)
             {
-                if (current.getChildAlias(aliasRef) != null)
+                if (equalsIgnoreCase(aliasRef, current.getAlias()))
+                {
+                    return;
+                }
+                // This might return false positives since
+                // we might reference an invalid alias further down that we are not
+                // this is ok in a Select item expression but not in a join condition
+                else if (current.getSiblingAlias(aliasRef) != null)
                 {
                     return;
                 }

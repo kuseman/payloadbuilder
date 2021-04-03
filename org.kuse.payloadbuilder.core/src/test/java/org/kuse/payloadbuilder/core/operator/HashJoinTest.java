@@ -27,7 +27,7 @@ public class HashJoinTest extends AOperatorTest
                 (c, tuple) -> 0,
                 (c, tuple) -> 0,
                 (ctx, row) -> false,
-                DefaultTupleMerger.DEFAULT,
+                new DefaultTupleMerger(-1, 1),
                 false,
                 false);
         RowIterator it = op.open(new ExecutionContext(session));

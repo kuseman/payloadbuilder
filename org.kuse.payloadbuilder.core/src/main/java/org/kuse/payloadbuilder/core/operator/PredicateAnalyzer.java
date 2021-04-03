@@ -4,6 +4,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
+import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
 import static org.kuse.payloadbuilder.core.utils.CollectionUtils.asSet;
 
 import java.util.ArrayList;
@@ -34,6 +35,37 @@ import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
  * <pre>
  * Splits join condition by AND and analyzes
  * equal expressions be their alias and columns
+ * 
+ * 
+ * from tableA a
+ * inner join
+ * (
+ *   select **
+ *   from tableB b
+ *   union all
+ *   select **
+ *   from tableC c
+ * ) x
+ *   on x.id = a.id
+ *   and x.value = 10
+ * 
+ * x.id = a.id
+ * Equal comparison
+ * 
+ * x.id -> TableAliases = (b, c)
+ * a.id -> TableAliases = (a)
+ * 
+ * Which aliases is referenced in a pair (x, a)
+ * 
+ * 
+ * x.value = 10
+ * Equal comparison
+ * 
+ * x.value -> TableAliases = (b, c)
+ * is push down x => true => push down to b and c
+ * 
+ * 
+ * 
  * </pre>
  **/
 public class PredicateAnalyzer
@@ -108,7 +140,7 @@ public class PredicateAnalyzer
         /**
          * <pre>
          * Extracts push down predicate for provided alias.
-         * &#64;param isNullAllowed True if is null predicate is allowed or not
+         * @param isNullAllowed True if is null predicate is allowed or not
          * </pre>
          */
         Pair<List<AnalyzePair>, AnalyzeResult> extractPushdownPairs(String alias, boolean isNullAllowed)
@@ -191,7 +223,8 @@ public class PredicateAnalyzer
         }
     }
 
-    /** Analyzed pair. A binary operator with left and right analyzed items */
+    /** Analyzed pair. A binary operator with left and right analyzed items
+     */
     public static class AnalyzePair
     {
         private static final Set<String> EMPTY_ALIASES = asSet("");
@@ -370,11 +403,11 @@ public class PredicateAnalyzer
          *
          * from source s
          * inner join
-         * [
+         * (
          *   article_attribute aa
-         *   inner join [attribute1] a1
+         *   inner join attribute1 a1 with (populate=true)
          *     on a1.attr1_id = aa.attr1_id
-         * ] aa
+         * ) aa with (populate = true)
          *   on aa.art_id = s.art_id
          * where count(aa.a1) > 0               <--- this one cannot be pushed down onto article_attribute table.
          *                                           Since it's referencing a sub alias which won't be loaded yet if pushed down
@@ -748,18 +781,20 @@ public class PredicateAnalyzer
             List<String> parts = qname.getParts();
             String alias;
             String subAlias = null;
+            String part = parts.get(0);
             // First part is the current alias
-            if (tableAlias.getAlias().equals(parts.get(0)))
+            if (equalsIgnoreCase(tableAlias.getAlias(), part))
             {
-                alias = parts.get(0);
+                alias = part;
                 if (parts.size() > 1)
                 {
-                    TableAlias temp = tableAlias.getChildAlias(parts.get(1));
+                    part = parts.get(1);
+                    TableAlias temp = tableAlias.getChildAlias(part);
                     //CSOFF
                     if (temp != null)
                     //CSON
                     {
-                        return Pair.of(alias, parts.get(1));
+                        return Pair.of(alias, part);
                     }
                 }
                 // Alias access, not allowed as a predicate, return a non existent alias
@@ -773,6 +808,12 @@ public class PredicateAnalyzer
 
             // Try child alias
             TableAlias temp = tableAlias.getChildAlias(parts.get(0));
+            if (temp == null)
+            {
+                // Sibling alias
+                temp = tableAlias.getSiblingAlias(parts.get(0));
+            }
+
             if (temp != null)
             {
                 alias = parts.get(0);

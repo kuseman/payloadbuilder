@@ -3,6 +3,7 @@ package org.kuse.payloadbuilder.core.operator;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,7 +18,72 @@ import org.apache.commons.lang3.StringUtils;
 import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
-/** Domain of a table alias */
+/**
+ * Domain of a table alias
+ *
+ * <pre>
+ *  Table alias is a representation of a all table sources
+ *  and their info for a query.
+ *
+ *  ie.
+ *
+ *  select *
+ *  from tableA a
+ *  inner join
+ *  (
+ *    select **
+ *    from tableC c
+ *    where c.id > 10
+ *  ) b
+ *    on b.id = a.id
+ *
+ *  Alias hierarchy:
+ *
+ *  ROOT
+ *    tableA (a)   (ordinal = 0)
+ *    SubQuery (b) (ordinal = 1)
+ *      ROOT        (Each sub query is a new query and hence a ROOT node)
+ *        tableC   (ordinal 0 + start ordinal = 2)       (ordinal is reset for each query tree
+ *                                                        but with an initial counter to keep uniqueness through out whole query)
+ *
+ *  ie.
+ *
+ *  select *
+ *  from tableA a
+ *  inner join
+ *  (
+ *    select **
+ *    from tableC c
+ *    where c.id > 10
+ *
+ *    union all         (Not implemented yet, but used for demonstrating alias hierarchy)
+ *
+ *    select **
+ *    from tableD c
+ *    where c.id > 10
+ *
+ *  ) b
+ *    on b.id = a.id
+ *  inner join tableE e
+ *    on e.id = a.id
+ *
+ *  Alias hierarchy:
+ *
+ *  ROOT
+ *    tableA (a)   (ordinal = 0)
+ *    SubQuery (b) (ordinal = 1)
+ *      ROOT
+ *        tableC   (ordinal 0 + start ordinal = 2)
+ *      ROOT
+ *        tableB   (ordinal 0 + start ordinal = 2)
+ *    tableE  (e)  (ordinal = 3)                    (max ordinal of prev subquery was 2)
+ *
+ *  CompositeTuple
+ *    Row (a)                   (ordinal = 0)
+ *    Row (tableC or tableD)    (ordinal = 2)
+ *    Row (tableE)              (ordinal = 3)
+ * </pre>
+ **/
 public class TableAlias
 {
     private static final String[] NOT_SET = ArrayUtils.EMPTY_STRING_ARRAY;
@@ -26,11 +92,13 @@ public class TableAlias
     private final QualifiedName table;
     private final String alias;
     private final List<TableAlias> childAliases = new ArrayList<>();
-    /** Unique ordinal of this alias
+    /**
+     * Unique ordinal of this alias
+     *
      * <pre>
      * Each table source in a select query gets assigned
      * a unique ordinal for fast access
-     *  </pre>
+     * </pre>
      **/
     private final int tupleOrdinal;
     private final Type type;
@@ -101,11 +169,24 @@ public class TableAlias
         {
             return null;
         }
-        int size = childAliases.size();
+
+        List<TableAlias> children = childAliases;
+        // This is a sub query then first child
+        // is ROOT, search in it's children
+        if (type == Type.SUBQUERY)
+        {
+            if (children.size() == 0)
+            {
+                return null;
+            }
+            children = children.get(0).childAliases;
+        }
+
+        int size = children.size();
         for (int i = 0; i < size; i++)
         {
-            TableAlias child = childAliases.get(i);
-            if (Objects.equals(child.alias, alias))
+            TableAlias child = children.get(i);
+            if (equalsIgnoreCase(child.alias, alias))
             {
                 return child;
             }
@@ -126,7 +207,7 @@ public class TableAlias
     }
 
     /** Return sibling aliases */
-    List<TableAlias> getSiblingAliases()
+    public List<TableAlias> getSiblingAliases()
     {
         TableAlias current = this.parent;
         if (current == null)
@@ -155,6 +236,7 @@ public class TableAlias
         {
             throw new IllegalArgumentException("Cannot modify coulumns when set.");
         }
+
         this.columns = ObjectUtils.defaultIfNull(columns, ArrayUtils.EMPTY_STRING_ARRAY);
     }
 
@@ -223,6 +305,7 @@ public class TableAlias
     /** Alias type */
     public enum Type
     {
+        ROOT,
         TEMPORARY_TABLE,
         TABLE,
         FUNCTION,
