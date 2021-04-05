@@ -10,7 +10,6 @@ import org.junit.Test;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.operator.Tuple.ComputedTuple;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Test of {@link ComputedColumnsOperator} */
@@ -27,7 +26,7 @@ public class ComputedColumnsOperatorTest extends AOperatorTest
                 0,
                 target,
                 asList("newCol"),
-                asList( e("concat('v-', col1)")));
+                asList(e("concat('v-', col1)")));
 
         RowIterator it = operator.open(new ExecutionContext(session));
         while (it.hasNext())

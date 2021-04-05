@@ -11,6 +11,7 @@ import java.util.Objects;
 import org.antlr.v4.runtime.Token;
 import org.apache.commons.lang3.ObjectUtils;
 import org.kuse.payloadbuilder.core.OutputWriter;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.Projection;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.operator.Tuple.TupleColumn;

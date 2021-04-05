@@ -2,9 +2,8 @@ package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Objects.requireNonNull;
 
-import org.apache.commons.lang3.NotImplementedException;
-import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
-import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+import org.kuse.payloadbuilder.core.utils.ExpressionMath;
 
 /** Arithmetic unary expression */
 public class ArithmeticUnaryExpression extends Expression
@@ -32,12 +31,6 @@ public class ArithmeticUnaryExpression extends Expression
     public Expression getExpression()
     {
         return expression;
-    }
-
-    @Override
-    public boolean isNullable()
-    {
-        return expression.isNullable();
     }
 
     @Override
@@ -73,43 +66,43 @@ public class ArithmeticUnaryExpression extends Expression
         return result != null ? ExpressionMath.negate(result) : null;
     }
 
-    @Override
-    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
-    {
-        ExpressionCode childCode = expression.generateCode(context, parentCode);
-        ExpressionCode code = ExpressionCode.code(context);
-
-        String method = null;
-        //CSOFF
-        switch (type)
-        //CSON
-        {
-            case MINUS:
-                method = "ExpressionMath.negate";
-                break;
-            case PLUS:
-                throw new NotImplementedException("unary plus");
-        }
-
-        String template = "%s"
-            + "Object %s = null;\n"
-            + "boolean %s = true;\n"
-            + "if (!%s)\n"
-            + "{\n"
-            + "  %s = %s(%s);\n"
-            + "  %s = false;\n"
-            + "}\n";
-
-        code.setCode(String.format(template,
-                childCode.getCode(),
-                code.getResVar(),
-                code.getIsNull(),
-                childCode.getIsNull(),
-                code.getResVar(), method, childCode.getResVar(),
-                code.getIsNull()));
-
-        return code;
-    }
+    //    @Override
+    //    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
+    //    {
+    //        ExpressionCode childCode = expression.generateCode(context, parentCode);
+    //        ExpressionCode code = ExpressionCode.code(context);
+    //
+    //        String method = null;
+    //        //CSOFF
+    //        switch (type)
+    //        //CSON
+    //        {
+    //            case MINUS:
+    //                method = "ExpressionMath.negate";
+    //                break;
+    //            case PLUS:
+    //                throw new NotImplementedException("unary plus");
+    //        }
+    //
+    //        String template = "%s"
+    //            + "Object %s = null;\n"
+    //            + "boolean %s = true;\n"
+    //            + "if (!%s)\n"
+    //            + "{\n"
+    //            + "  %s = %s(%s);\n"
+    //            + "  %s = false;\n"
+    //            + "}\n";
+    //
+    //        code.setCode(String.format(template,
+    //                childCode.getCode(),
+    //                code.getResVar(),
+    //                code.getIsNull(),
+    //                childCode.getIsNull(),
+    //                code.getResVar(), method, childCode.getResVar(),
+    //                code.getIsNull()));
+    //
+    //        return code;
+    //    }
 
     @Override
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)

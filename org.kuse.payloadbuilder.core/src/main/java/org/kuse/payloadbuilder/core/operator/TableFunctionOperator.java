@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Operator handling TVF's */

@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 
 /**
  * Operator that executes downstream operator in batches. Continues to open down stream multiple times until end is reached after opening Is used in

@@ -8,8 +8,8 @@ import static org.kuse.payloadbuilder.core.parser.LiteralNullExpression.NULL_LIT
 
 import java.util.List;
 
-import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
-import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+import org.kuse.payloadbuilder.core.utils.ExpressionMath;
 
 /** In expression */
 public class InExpression extends Expression
@@ -107,52 +107,46 @@ public class InExpression extends Expression
         }
         return not ? true : false;
     }
-
-    @Override
-    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
-    {
-        ExpressionCode childCode = expression.generateCode(context, parentCode);
-        ExpressionCode code = ExpressionCode.code(context);
-
-        int size = arguments.size();
-        // Generate code for
-        StringBuilder sb = new StringBuilder();
-        sb.append(childCode.getCode());
-
-        sb.append("boolean ").append(code.getResVar()).append(" = false;\n");
-        sb.append("boolean ").append(code.getIsNull()).append(" = ").append(childCode.getIsNull()).append(";\n");
-
-        String template = "if (!%s && !%s)\n"
-            + "{\n"
-            + "  %s\n"
-            + "  if (!%s)\n"
-            + "  {\n"
-            + "    %s = ExpressionMath.inValue(%s, %s);\n"
-            + "    %s = false;\n"
-            + "  }\n"
-            + "}\n";
-
-        for (int i = 0; i < size; i++)
-        {
-            Expression arg = arguments.get(i);
-            ExpressionCode argCode = arg.generateCode(context, parentCode);
-            sb.append(String.format(template,
-                    code.getIsNull(), code.getResVar(),
-                    argCode.getCode(),
-                    argCode.getIsNull(),
-                    code.getResVar(), childCode.getResVar(), argCode.getResVar(),
-                    code.getIsNull()));
-        }
-
-        code.setCode(sb.toString());
-        return code;
-    }
-
-    @Override
-    public boolean isNullable()
-    {
-        return expression.isNullable() || arguments.stream().anyMatch(Expression::isNullable);
-    }
+    //
+    //    @Override
+    //    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
+    //    {
+    //        ExpressionCode childCode = expression.generateCode(context, parentCode);
+    //        ExpressionCode code = ExpressionCode.code(context);
+    //
+    //        int size = arguments.size();
+    //        // Generate code for
+    //        StringBuilder sb = new StringBuilder();
+    //        sb.append(childCode.getCode());
+    //
+    //        sb.append("boolean ").append(code.getResVar()).append(" = false;\n");
+    //        sb.append("boolean ").append(code.getIsNull()).append(" = ").append(childCode.getIsNull()).append(";\n");
+    //
+    //        String template = "if (!%s && !%s)\n"
+    //            + "{\n"
+    //            + "  %s\n"
+    //            + "  if (!%s)\n"
+    //            + "  {\n"
+    //            + "    %s = ExpressionMath.inValue(%s, %s);\n"
+    //            + "    %s = false;\n"
+    //            + "  }\n"
+    //            + "}\n";
+    //
+    //        for (int i = 0; i < size; i++)
+    //        {
+    //            Expression arg = arguments.get(i);
+    //            ExpressionCode argCode = arg.generateCode(context, parentCode);
+    //            sb.append(String.format(template,
+    //                    code.getIsNull(), code.getResVar(),
+    //                    argCode.getCode(),
+    //                    argCode.getIsNull(),
+    //                    code.getResVar(), childCode.getResVar(), argCode.getResVar(),
+    //                    code.getIsNull()));
+    //        }
+    //
+    //        code.setCode(sb.toString());
+    //        return code;
+    //    }
 
     @Override
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
@@ -163,7 +157,7 @@ public class InExpression extends Expression
     @Override
     public int hashCode()
     {
-      //CSOFF
+        //CSOFF
         int hashCode = 17;
         hashCode = hashCode * 37 + expression.hashCode();
         hashCode = hashCode * 37 + arguments.hashCode();

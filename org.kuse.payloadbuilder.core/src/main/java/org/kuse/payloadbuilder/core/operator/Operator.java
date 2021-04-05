@@ -8,8 +8,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
-
 /** Definition of a selection operator */
 public interface Operator
 {

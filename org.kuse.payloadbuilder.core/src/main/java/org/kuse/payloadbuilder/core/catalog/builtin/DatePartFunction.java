@@ -12,7 +12,7 @@ import java.util.List;
 import org.apache.commons.lang3.EnumUtils;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.LiteralStringExpression;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;

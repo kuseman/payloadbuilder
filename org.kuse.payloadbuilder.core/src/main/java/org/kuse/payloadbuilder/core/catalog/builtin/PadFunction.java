@@ -5,7 +5,7 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Left and -right pad function */
@@ -23,10 +23,10 @@ class PadFunction extends ScalarFunctionInfo
     public String getDescription()
     {
         return "Returns " + (left ? "left" : "right") + " padded string of first argument." + System.lineSeparator()
-        + "with length of second argument." + System.lineSeparator()
-        + "A optional third argument can be supplied for pad string (defaults to single white space). " + System.lineSeparator()
-        + "Ex. " + (left ? "left" : "right") + "pad(expression, integerExpression [, expression])" + System.lineSeparator()
-        + "NOTE! First argument is converted to a string.";
+            + "with length of second argument." + System.lineSeparator()
+            + "A optional third argument can be supplied for pad string (defaults to single white space). " + System.lineSeparator()
+            + "Ex. " + (left ? "left" : "right") + "pad(expression, integerExpression [, expression])" + System.lineSeparator()
+            + "NOTE! First argument is converted to a string.";
     }
 
     @Override

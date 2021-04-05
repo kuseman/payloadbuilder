@@ -5,10 +5,12 @@ import static java.util.Arrays.asList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.codehaus.janino.ClassBodyEvaluator;
-import org.kuse.payloadbuilder.core.operator.TableAlias;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /**
@@ -18,43 +20,41 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 public class CodeGenerator
 {
     private static final String PREDICATE = System.lineSeparator()
-        + "public boolean test(Object __row) " + System.lineSeparator()
+        + "public boolean test(Object __ctx) " + System.lineSeparator()
         + "{ " + System.lineSeparator()
-        + "  final Row row = (Row) __row;" + System.lineSeparator()
+        + "  final Tuple tuple = ((ExecutionContext) __ctx).getTuple();" + System.lineSeparator()
         + "  %s" + System.lineSeparator()
-        + "  return !%s && %s;" + System.lineSeparator()
+        + "  return %s != null && (Boolean) %s;" + System.lineSeparator()
         + "}";
 
     private static final String FUNCTION = System.lineSeparator()
-        + "public Object apply(Object __row) " + System.lineSeparator()
+        + "public Object apply(Object __ctx) " + System.lineSeparator()
         + "{ " + System.lineSeparator()
-        + "  final Row row = (Row) __row;" + System.lineSeparator()
+        + "  final Tuple tuple = ((ExecutionContext) __ctx).getTuple();" + System.lineSeparator()
         + "  %s" + System.lineSeparator()
-        + "  return %s ? null : %s;" + System.lineSeparator()
+        + "  return %s;" + System.lineSeparator()
         + "}";
 
     /** Generate a predicate. Used filters */
-    public BasePredicate generatePredicate(TableAlias tableAlias, Expression expression)
+    public Predicate<ExecutionContext> generatePredicate(Expression expression)
     {
-        ExpressionCode code = generate(expression, tableAlias);
-        String generatedCode = String.format(PREDICATE, code.getCode(), code.getIsNull(), code.getResVar());
-        return compile(code.getImports(), generatedCode, BasePredicate.class, "Predicate");
+        CodeGeneratorContext context = new CodeGeneratorContext();
+        ExpressionCode code = expression.generateCode(context);
+        String generatedCode = String.format(PREDICATE, code.getCode(), code.getResVar(), code.getResVar());
+        BasePredicate predicate = compile(context.getImports(), generatedCode, BasePredicate.class, "Predicate");
+        predicate.setExpression(expression);
+        return predicate;
     }
 
     /** Generate a function. Used in expression projections etc. */
-    public BaseFunction generateFunction(TableAlias tableAlias, Expression expression)
-    {
-        ExpressionCode code = generate(expression, tableAlias);
-        String generatedCode = String.format(FUNCTION, code.getCode(), code.getIsNull(), code.getResVar());
-        return compile(code.getImports(), generatedCode, BaseFunction.class, "Function");
-    }
-
-    /** Generate code for expression */
-    private ExpressionCode generate(Expression expression, TableAlias tableAlias)
+    public Function<ExecutionContext, Object> generateFunction(Expression expression)
     {
         CodeGeneratorContext context = new CodeGeneratorContext();
-        context.setTableAlias(tableAlias);
-        return expression.generateCode(context, null);
+        ExpressionCode code = expression.generateCode(context);
+        String generatedCode = String.format(FUNCTION, code.getCode(), code.getResVar());
+        BaseFunction function = compile(context.getImports(), generatedCode, BaseFunction.class, "Function");
+        function.setExpression(expression);
+        return function;
     }
 
     @SuppressWarnings("unchecked")
@@ -66,8 +66,9 @@ public class CodeGenerator
 
         List<String> usedImports = new ArrayList<>();
         usedImports.addAll(asList(
-                "org.kuse.payloadbuilder.operator.Row",
-                "org.kuse.payloadbuilder.parser.ExpressionMath"));
+                "org.kuse.payloadbuilder.core.operator.Tuple",
+                "org.kuse.payloadbuilder.core.utils.ExpressionMath",
+                "org.kuse.payloadbuilder.core.operator.ExecutionContext"));
         usedImports.addAll(imports);
 
         cbe.setDefaultImports(usedImports.toArray(ArrayUtils.EMPTY_STRING_ARRAY));

@@ -6,6 +6,7 @@ import static org.kuse.payloadbuilder.core.parser.LiteralBooleanExpression.TRUE_
 
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 
 /** Logical binary expression */
 public class LogicalBinaryExpression extends Expression
@@ -85,12 +86,6 @@ public class LogicalBinaryExpression extends Expression
         return this;
     }
 
-    @Override
-    public boolean isNullable()
-    {
-        return left.isNullable() || right.isNullable();
-    }
-
     //CSOFF
     @Override
     public Object eval(ExecutionContext context)
@@ -143,132 +138,54 @@ public class LogicalBinaryExpression extends Expression
     }
 
     @Override
-    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
+    public boolean isCodeGenSupported()
     {
-        ExpressionCode leftCode = left.generateCode(context, parentCode);
-        ExpressionCode rightCode = right.generateCode(context, parentCode);
+        return left.isCodeGenSupported() && right.isCodeGenSupported();
+    }
 
-        ExpressionCode code = ExpressionCode.code(context);
+    @Override
+    public ExpressionCode generateCode(CodeGeneratorContext context)
+    {
+        ExpressionCode code = context.getCode();
+
+        ExpressionCode leftCode = left.generateCode(context);
+        ExpressionCode rightCode = right.generateCode(context);
 
         if (type == LogicalBinaryExpression.Type.AND)
         {
-            // false if left or right is false no matter of null
-            if (!left.isNullable() && !right.isNullable())
-            {
-                String template = "%s"
-                    + "boolean %s = false;\n"
-                    + "boolean %s = false;\n"
-                    + "if (%s)\n"
-                    + "{\n"
-                    + "  %s"
-                    + "  %s = %s;\n"
-                    + "}\n";
+            /* False if either side is false or null */
+            String template = "%s"
+                + "Boolean %s = false;\n"
+                + "if (%s != null && (Boolean) %s)\n"
+                + "{\n"
+                + "  %s"
+                + "  %s = %s != null && (Boolean) %s;\n"
+                + "}\n";
 
-                code.setCode(String.format(template,
-                        leftCode.getCode(),
-                        code.getResVar(),
-                        code.getIsNull(),
-                        leftCode.getResVar(),
-                        rightCode.getCode(),
-                        code.getResVar(), rightCode.getResVar()));
-            }
-            else
-            {
-                boolean addLeftCast = !Boolean.class.isAssignableFrom(left.getDataType());
-                boolean addRightCast = !Boolean.class.isAssignableFrom(right.getDataType());
-
-                String castedLeftVar = addLeftCast ? "(Boolean)" + leftCode.getResVar() : leftCode.getResVar();
-                String castedRightVar = addRightCast ? "(Boolean)" + rightCode.getResVar() : rightCode.getResVar();
-
-                String template = "%s"
-                    + "boolean %s = false;\n"
-                    + "boolean %s = false;\n"
-                    + "if (!%s && !%s) {}\n"
-                    + "else\n"
-                    + "{\n"
-                    + "  %s"
-                    + "  if (!%s && !%s) {}\n"
-                    + "  else if (!%s && !%s)\n"
-                    + "  {\n"
-                    + "    %s = true;\n"
-                    + "  }\n"
-                    + "  else\n"
-                    + "  {\n"
-                    + "    %s = true;\n"
-                    + "  }\n"
-                    + "}\n";
-
-                code.setCode(String.format(template,
-                        leftCode.getCode(),
-                        code.getResVar(),
-                        code.getIsNull(),
-                        leftCode.getIsNull(), castedLeftVar,
-                        rightCode.getCode(),
-                        rightCode.getIsNull(), castedRightVar,
-                        leftCode.getIsNull(), rightCode.getIsNull(),
-                        code.getResVar(),
-                        code.getIsNull()));
-            }
+            code.setCode(String.format(template,
+                    leftCode.getCode(),
+                    code.getResVar(),
+                    leftCode.getResVar(), leftCode.getResVar(),
+                    rightCode.getCode(),
+                    code.getResVar(), rightCode.getResVar(), rightCode.getResVar()));
         }
         else    // OR
         {
             // true if left or right is true no matter of null
-            if (!left.isNullable() && !right.isNullable())
-            {
-                String template = "%s"
-                    + "boolean %s = true;\n"
-                    + "boolean %s = false;\n"
-                    + "if (!%s)\n"
-                    + "{\n"
-                    + "  %s"
-                    + "  %s = %s;\n"
-                    + "}\n";
+            String template = "%s"
+                + "Boolean %s = true;\n"
+                + "if (%s == null || !(Boolean) %s)\n"
+                + "{\n"
+                + "  %s"
+                + "  %s = %s != null && (Boolean) %s;\n"
+                + "}\n";
 
-                code.setCode(String.format(template,
-                        leftCode.getCode(),
-                        code.getResVar(),
-                        code.getIsNull(),
-                        leftCode.getResVar(),
-                        rightCode.getCode(),
-                        code.getResVar(), rightCode.getResVar()));
-            }
-            else
-            {
-                boolean addLeftCast = !Boolean.class.isAssignableFrom(left.getDataType());
-                boolean addRightCast = !Boolean.class.isAssignableFrom(right.getDataType());
-
-                String castedLeftVar = addLeftCast ? "(Boolean)" + leftCode.getResVar() : leftCode.getResVar();
-                String castedRightVar = addRightCast ? "(Boolean)" + rightCode.getResVar() : rightCode.getResVar();
-
-                String template = "%s"
-                    + "boolean %s = true;\n"
-                    + "boolean %s = false;\n"
-                    + "if (!%s && %s){}\n"
-                    + "else\n"
-                    + "{\n"
-                    + "  %s"
-                    + "  if (!%s && %s){}\n"
-                    + "  else if (!%s && !%s)\n"
-                    + "  {\n"
-                    + "    %s = false;\n"
-                    + "  }\n"
-                    + "  else\n"
-                    + "  {\n"
-                    + "    %s = true;\n"
-                    + "  }\n"
-                    + "}\n";
-
-                code.setCode(String.format(template,
-                        leftCode.getCode(),
-                        code.getResVar(),
-                        code.getIsNull(),
-                        leftCode.getIsNull(), castedLeftVar,
-                        rightCode.getCode(),
-                        rightCode.getIsNull(), castedRightVar,
-                        leftCode.getIsNull(), rightCode.getIsNull(),
-                        code.getResVar(),
-                        code.getIsNull()));
-            }
+            code.setCode(String.format(template,
+                    leftCode.getCode(),
+                    code.getResVar(),
+                    leftCode.getResVar(), leftCode.getResVar(),
+                    rightCode.getCode(),
+                    code.getResVar(), rightCode.getResVar(), rightCode.getResVar()));
         }
 
         return code;
@@ -299,7 +216,7 @@ public class LogicalBinaryExpression extends Expression
     @Override
     public int hashCode()
     {
-      //CSOFF
+        //CSOFF
         int hashCode = 17;
         hashCode = hashCode * 37 + left.hashCode();
         hashCode = hashCode * 37 + right.hashCode();

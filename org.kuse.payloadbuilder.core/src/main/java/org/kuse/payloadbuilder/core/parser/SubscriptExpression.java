@@ -7,6 +7,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+
 /** Subscript. index acces etc. ie "array[0]" */
 public class SubscriptExpression extends Expression
 {
@@ -33,12 +35,6 @@ public class SubscriptExpression extends Expression
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
-    }
-
-    @Override
-    public boolean isNullable()
-    {
-        return value.isNullable() && subscript.isNullable();
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

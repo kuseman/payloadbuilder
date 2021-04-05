@@ -3,6 +3,7 @@ package org.kuse.payloadbuilder.core.parser;
 import static java.util.Objects.requireNonNull;
 
 import org.antlr.v4.runtime.Token;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 
 /** Base class for select items */
 //CSOFF

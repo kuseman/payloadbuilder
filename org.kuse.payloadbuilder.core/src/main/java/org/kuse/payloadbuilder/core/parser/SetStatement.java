@@ -8,11 +8,18 @@ public class SetStatement extends Statement
 {
     private final String name;
     private final Expression expression;
+    private final boolean systemProperty;
 
-    SetStatement(QualifiedName qname, Expression expression)
+    SetStatement(QualifiedName qname, Expression expression, boolean systemProperty)
     {
         this.name = join(qname.getParts(), ".");
         this.expression = requireNonNull(expression, "expression");
+        this.systemProperty = systemProperty;
+    }
+
+    public boolean isSystemProperty()
+    {
+        return systemProperty;
     }
 
     public String getName()

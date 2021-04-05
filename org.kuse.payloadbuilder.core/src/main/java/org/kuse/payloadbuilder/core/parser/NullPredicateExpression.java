@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 
 /** Expression for is null / is not null */
 public class NullPredicateExpression extends Expression
@@ -60,28 +61,30 @@ public class NullPredicateExpression extends Expression
     }
 
     @Override
-    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
+    public boolean isCodeGenSupported()
     {
-        ExpressionCode childCode = expression.generateCode(context, parentCode);
-        ExpressionCode code = ExpressionCode.code(context);
+        return expression.isCodeGenSupported();
+    }
+
+    @Override
+    public ExpressionCode generateCode(CodeGeneratorContext context)
+    {
+        ExpressionCode code = context.getCode();
+        ExpressionCode childCode = expression.generateCode(context);
 
         /*
-         * Object res0;
-         * boolean isNull0;
-         *
-         * boolean res1 = !isNull0;
-         * boolean isNull1 = false;
-         *
-         */
+        * Boolean res0 = false;
+        * Object res1 = res0 == null / res0 != null
+        *
+        */
 
-        String template = "%s"
-            + "boolean %s = %s%s;\n"
-            + "boolean %s = false;\n";
+        String template = "//%s\n%s"
+            + "Boolean %s = %s %s= null;\n";
 
         code.setCode(String.format(template,
+                toString(),
                 childCode.getCode(),
-                code.getResVar(), isNot() ? "!" : "", childCode.getIsNull(),
-                code.getIsNull()));
+                code.getResVar(), childCode.getResVar(), not ? "!" : "="));
 
         return code;
     }
@@ -90,12 +93,6 @@ public class NullPredicateExpression extends Expression
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
-    }
-
-    @Override
-    public boolean isNullable()
-    {
-        return false;
     }
 
     @Override

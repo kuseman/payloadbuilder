@@ -8,14 +8,13 @@ import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.BiPredicate;
+import java.util.function.Predicate;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.lang3.time.StopWatch;
 import org.kuse.payloadbuilder.core.DescribeUtils;
 import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 
 /** Operator the join two other operators using nested loop */
 class NestedLoopJoin extends AOperator
@@ -23,7 +22,7 @@ class NestedLoopJoin extends AOperator
     private final String logicalOperator;
     private final Operator outer;
     private final Operator inner;
-    private final BiPredicate<ExecutionContext, Tuple> predicate;
+    private final Predicate<ExecutionContext> predicate;
     private final TupleMerger rowMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
@@ -33,7 +32,7 @@ class NestedLoopJoin extends AOperator
             String logicalOperator,
             Operator outer,
             Operator inner,
-            BiPredicate<ExecutionContext, Tuple> predicate,
+            Predicate<ExecutionContext> predicate,
             TupleMerger rowMerger,
             boolean populating,
             boolean emitEmptyOuterRows)
@@ -161,7 +160,9 @@ class NestedLoopJoin extends AOperator
                     joinTuple.setInner(currentInner);
 
                     data.predicateTime.resume();
-                    boolean result = predicate == null || predicate.test(context, joinTuple);
+                    context.setTuple(joinTuple);
+                    boolean result = predicate == null || predicate.test(context);
+                    context.setTuple(null);
                     data.predicateTime.suspend();
 
                     if (result)

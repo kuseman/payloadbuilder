@@ -6,7 +6,6 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.kuse.payloadbuilder.core.OutputWriter;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 
 /** Array projection. Projects a list of sub projections over a selection */
 class ArrayProjection implements Projection

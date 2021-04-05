@@ -17,7 +17,6 @@ import org.apache.commons.lang3.mutable.MutableInt;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Test {@link BatchHashJoin} */
@@ -38,7 +37,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 new ExpressionValuesExtractor(asList(e("a.col1"))),
                 new ExpressionValuesExtractor(asList(e("b.col1"))),
                 new ExpressionPredicate(e("b.col1 = a.col1")),
-                new DefaultTupleMerger(-1, 0),
+                new DefaultTupleMerger(-1, 0, 2),
                 false,
                 false,
                 index,
@@ -1240,82 +1239,82 @@ public class BatchHashJoinTest extends AOperatorTest
     }
 
     //        @Ignore
-//    @Test
-//    public void test_inner_join_large()
-//    {
-//        Random rnd = new Random();
-//        //            TableAlias a = TableAlias.of(null, "tableA", "a");
-//        //            TableAlias b = TableAlias.of(a, "tableB", "b");
-//        //            TableAlias c = TableAlias.of(b, "tableC", "c");
-//
-//        MutableInt bPos = new MutableInt();
-//        MutableInt cPos = new MutableInt();
-//        Index indexB = new Index(QualifiedName.of("tableB"), asList("col1"), 250);
-//        Index indexC = new Index(QualifiedName.of("tableC"), asList("col1"), 250);
-//
-//        String query = "select * "
-//            + "from tableA a "
-//            + "inner join tableB b "
-//            + "  on b.col1 = a.col1 "
-//            + "  and b.col2 "
-//            + "inner join tableC c "
-//            + "  on c.col1 = b.col1 "
-//            + "  and c.col2 "
-//            + "where a.col2 ";
-//
-//        Operator op = operator(query,
-//                MapUtils.ofEntries(
-//                        MapUtils.entry("tableB", indexB),
-//                        MapUtils.entry("tableC", indexC)),
-//                MapUtils.ofEntries(
-//                        MapUtils.entry("tableB", a -> op(context ->
-//                        {
-//                            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-//                            return StreamSupport.stream(it.spliterator(), false)
-//                                    .map(ar -> (Integer) ar[0])
-//                                    .flatMap(val -> asList(
-//                                            new Object[] {val, 1, rnd.nextBoolean()},
-//                                            new Object[] {val, 2, rnd.nextBoolean()},
-//                                            new Object[] {val, 3, rnd.nextBoolean()},
-//                                            new Object[] {val, 4, rnd.nextBoolean()}).stream())
-//                                    .map(ar2 -> (Tuple) Row.of(a, bPos.getAndIncrement(), new String[] {"col1", "col2"}, ar2))
-//                                    .iterator();
-//                        })),
-//                        MapUtils.entry("tableC", a -> op(context ->
-//                        {
-//                            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
-//                            return StreamSupport.stream(it.spliterator(), false)
-//                                    .map(ar -> (Integer) ar[0])
-//                                    .flatMap(val -> asList(
-//                                            new Object[] {val, 1, "Val" + val},
-//                                            new Object[] {val, 4, rnd.nextBoolean()}).stream())
-//                                    .map(ar -> (Tuple) Row.of(a, cPos.getAndIncrement(), ar))
-//                                    .iterator();
-//                        }))),
-//                MapUtils.ofEntries(
-//                        MapUtils.entry("tableA",
-//                                a -> op(ctx -> IntStream.range(1, 10000000)
-//                                        .mapToObj(i -> (Tuple) Row.of(a, i, new String[] {"col1", "col2"}, new Object[] {rnd.nextInt(10000), rnd.nextBoolean()}))
-//                                        .iterator()))));
-//
-//        for (int i = 0; i < 150; i++)
-//        {
-//            StopWatch sw = new StopWatch();
-//            sw.start();
-//            Iterator<Tuple> it = op.open(new ExecutionContext(session));
-//            int count = 0;
-//            while (it.hasNext())
-//            {
-//                Tuple tuple = it.next();
-//                //                assertEquals(4, row.getChildRows(0).size());
-//                //                                                                System.out.println(row + " " + row.getChildRows(0).stream().map(r -> r.toString() + " " + r.getChildRows(0)).collect(joining(", ")) );
-//                //            assertEquals("Val" + row.getObject(0), row.getChildRows(0).get(0).getObject(1));
-//                count++;
-//            }
-//            sw.stop();
-//            long mem = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-//            System.out.println("Time: " + sw.toString() + " rows: " + count + " mem: " + FileUtils.byteCountToDisplaySize(mem));
-//        }
-        //        assertEquals(5, count);
-//    }
+    //    @Test
+    //    public void test_inner_join_large()
+    //    {
+    //        Random rnd = new Random();
+    //        //            TableAlias a = TableAlias.of(null, "tableA", "a");
+    //        //            TableAlias b = TableAlias.of(a, "tableB", "b");
+    //        //            TableAlias c = TableAlias.of(b, "tableC", "c");
+    //
+    //        MutableInt bPos = new MutableInt();
+    //        MutableInt cPos = new MutableInt();
+    //        Index indexB = new Index(QualifiedName.of("tableB"), asList("col1"), 250);
+    //        Index indexC = new Index(QualifiedName.of("tableC"), asList("col1"), 250);
+    //
+    //        String query = "select * "
+    //            + "from tableA a "
+    //            + "inner join tableB b "
+    //            + "  on b.col1 = a.col1 "
+    //            + "  and b.col2 "
+    //            + "inner join tableC c "
+    //            + "  on c.col1 = b.col1 "
+    //            + "  and c.col2 "
+    //            + "where a.col2 ";
+    //
+    //        Operator op = operator(query,
+    //                MapUtils.ofEntries(
+    //                        MapUtils.entry("tableB", indexB),
+    //                        MapUtils.entry("tableC", indexC)),
+    //                MapUtils.ofEntries(
+    //                        MapUtils.entry("tableB", a -> op(context ->
+    //                        {
+    //                            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+    //                            return StreamSupport.stream(it.spliterator(), false)
+    //                                    .map(ar -> (Integer) ar[0])
+    //                                    .flatMap(val -> asList(
+    //                                            new Object[] {val, 1, rnd.nextBoolean()},
+    //                                            new Object[] {val, 2, rnd.nextBoolean()},
+    //                                            new Object[] {val, 3, rnd.nextBoolean()},
+    //                                            new Object[] {val, 4, rnd.nextBoolean()}).stream())
+    //                                    .map(ar2 -> (Tuple) Row.of(a, bPos.getAndIncrement(), new String[] {"col1", "col2"}, ar2))
+    //                                    .iterator();
+    //                        })),
+    //                        MapUtils.entry("tableC", a -> op(context ->
+    //                        {
+    //                            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+    //                            return StreamSupport.stream(it.spliterator(), false)
+    //                                    .map(ar -> (Integer) ar[0])
+    //                                    .flatMap(val -> asList(
+    //                                            new Object[] {val, 1, "Val" + val},
+    //                                            new Object[] {val, 4, rnd.nextBoolean()}).stream())
+    //                                    .map(ar -> (Tuple) Row.of(a, cPos.getAndIncrement(), ar))
+    //                                    .iterator();
+    //                        }))),
+    //                MapUtils.ofEntries(
+    //                        MapUtils.entry("tableA",
+    //                                a -> op(ctx -> IntStream.range(1, 10000000)
+    //                                        .mapToObj(i -> (Tuple) Row.of(a, i, new String[] {"col1", "col2"}, new Object[] {rnd.nextInt(10000), rnd.nextBoolean()}))
+    //                                        .iterator()))));
+    //
+    //        for (int i = 0; i < 150; i++)
+    //        {
+    //            StopWatch sw = new StopWatch();
+    //            sw.start();
+    //            Iterator<Tuple> it = op.open(new ExecutionContext(session));
+    //            int count = 0;
+    //            while (it.hasNext())
+    //            {
+    //                Tuple tuple = it.next();
+    //                //                assertEquals(4, row.getChildRows(0).size());
+    //                //                                                                System.out.println(row + " " + row.getChildRows(0).stream().map(r -> r.toString() + " " + r.getChildRows(0)).collect(joining(", ")) );
+    //                //            assertEquals("Val" + row.getObject(0), row.getChildRows(0).get(0).getObject(1));
+    //                count++;
+    //            }
+    //            sw.stop();
+    //            long mem = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
+    //            System.out.println("Time: " + sw.toString() + " rows: " + count + " mem: " + FileUtils.byteCountToDisplaySize(mem));
+    //        }
+    //        assertEquals(5, count);
+    //    }
 }

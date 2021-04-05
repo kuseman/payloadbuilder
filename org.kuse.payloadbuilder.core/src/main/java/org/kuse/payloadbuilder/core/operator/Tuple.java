@@ -53,8 +53,8 @@ public interface Tuple
     Object getValue(String column);
 
     /**
-     * Return an iterator with all values for provided ordinal
-     * NOTE! Value returned iterator might be a singleton if implementers chooses to.
+     * Return an iterator with all values for provided ordinal NOTE! Value returned iterator might be a singleton if implementers chooses to.
+     *
      * @param tupleOrdinal Ordinal to stream values for or -1 to stream all tuples values
      */
     default Iterator<TupleColumn> getColumns(int tupleOrdinal)
@@ -74,7 +74,7 @@ public interface Tuple
         String getColumn();
     }
 
-    /** Marker interface for a tuple which contains computed values  */
+    /** Marker interface for a tuple which contains computed values */
     interface ComputedTuple extends Tuple
     {
         /** Get computed value for provided ordinal */

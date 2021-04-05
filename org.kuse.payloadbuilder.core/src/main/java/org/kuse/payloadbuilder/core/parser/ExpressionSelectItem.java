@@ -5,6 +5,7 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.join;
 
 import org.antlr.v4.runtime.Token;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 
 /** Select item that is built from an expression */
 public class ExpressionSelectItem extends SelectItem

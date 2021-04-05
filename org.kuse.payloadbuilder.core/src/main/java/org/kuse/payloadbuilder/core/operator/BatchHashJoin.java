@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BiPredicate;
+import java.util.function.Predicate;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
@@ -33,7 +33,6 @@ import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.lang3.time.StopWatch;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Option;
 
 import gnu.trove.map.TIntObjectMap;
@@ -61,7 +60,7 @@ class BatchHashJoin extends AOperator
     private final Operator inner;
     private final ValuesExtractor outerValuesExtractor;
     private final ValuesExtractor innerValuesExtractor;
-    private final BiPredicate<ExecutionContext, Tuple> predicate;
+    private final Predicate<ExecutionContext> predicate;
     private final TupleMerger rowMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
@@ -78,7 +77,7 @@ class BatchHashJoin extends AOperator
             Operator inner,
             ValuesExtractor outerValuesExtractor,
             ValuesExtractor innerValuesExtractor,
-            BiPredicate<ExecutionContext, Tuple> predicate,
+            Predicate<ExecutionContext> predicate,
             TupleMerger rowMerger,
             boolean populating,
             boolean emitEmptyOuterRows,
@@ -135,14 +134,8 @@ class BatchHashJoin extends AOperator
         return result;
     }
 
-    //CSOFF
-    @Override
-    //CSON
-    public RowIterator open(ExecutionContext context)
+    private int getBatchSize(ExecutionContext context)
     {
-        final JoinTuple joinTuple = new JoinTuple(context.getTuple());
-        final Data data = context.getOperatorContext().getNodeData(nodeId, Data::new);
-        final RowIterator outerIt = outer.open(context);
         int temp = innerIndex.getBatchSize();
         if (batchSizeOption != null)
         {
@@ -153,7 +146,18 @@ class BatchHashJoin extends AOperator
             }
             temp = (int) obj;
         }
-        final int batchSize = temp;
+        return temp;
+    }
+
+    //CSOFF
+    @Override
+    //CSON
+    public RowIterator open(ExecutionContext context)
+    {
+        final JoinTuple joinTuple = new JoinTuple(context.getTuple());
+        final Data data = context.getOperatorContext().getNodeData(nodeId, Data::new);
+        final RowIterator outerIt = outer.open(context);
+        final int batchSize = getBatchSize(context);
         //CSOFF
         return new RowIterator()
         //CSON
@@ -280,7 +284,9 @@ class BatchHashJoin extends AOperator
                     joinTuple.setInner(innerRow);
 
                     data.predicateTime.resume();
-                    boolean result = predicate.test(context, joinTuple);
+                    context.setTuple(joinTuple);
+                    boolean result = predicate.test(context);
+                    context.setTuple(null);
                     data.predicateTime.suspend();
 
                     if (result)
@@ -503,7 +509,7 @@ class BatchHashJoin extends AOperator
             }
 
             //CSOFF
-            result = 31 * result  + (value == null ? 0 : value.hashCode());
+            result = 31 * result + (value == null ? 0 : value.hashCode());
             //CSON
         }
         return result;

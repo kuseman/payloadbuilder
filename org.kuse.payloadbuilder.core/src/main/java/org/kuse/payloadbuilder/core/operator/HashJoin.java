@@ -20,7 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BiPredicate;
+import java.util.function.Predicate;
 import java.util.function.ToIntBiFunction;
 
 import org.apache.commons.collections.iterators.IteratorChain;
@@ -28,7 +28,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.lang3.time.StopWatch;
 import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 
 /**
  * Hash match operator. Hashes outer operator and probes the inner operator
@@ -40,7 +39,7 @@ class HashJoin extends AOperator
     private final Operator inner;
     private final ToIntBiFunction<ExecutionContext, Tuple> outerHashFunction;
     private final ToIntBiFunction<ExecutionContext, Tuple> innerHashFunction;
-    private final BiPredicate<ExecutionContext, Tuple> predicate;
+    private final Predicate<ExecutionContext> predicate;
     private final TupleMerger rowMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
@@ -52,7 +51,7 @@ class HashJoin extends AOperator
             Operator inner,
             ToIntBiFunction<ExecutionContext, Tuple> outerHashFunction,
             ToIntBiFunction<ExecutionContext, Tuple> innerHashFunction,
-            BiPredicate<ExecutionContext, Tuple> predicate,
+            Predicate<ExecutionContext> predicate,
             TupleMerger rowMerger,
             boolean populating,
             boolean emitEmptyOuterRows)
@@ -261,7 +260,9 @@ class HashJoin extends AOperator
                     joinTuple.setOuter(currentOuter.tuple);
 
                     data.predicateTime.resume();
-                    boolean result = predicate.test(context, joinTuple);
+                    context.setTuple(joinTuple);
+                    boolean result = predicate.test(context);
+                    context.setTuple(null);
                     data.predicateTime.suspend();
 
                     if (result)

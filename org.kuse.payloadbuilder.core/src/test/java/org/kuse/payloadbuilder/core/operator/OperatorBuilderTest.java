@@ -71,7 +71,7 @@ public class OperatorBuilderTest extends AOperatorTest
                         new ExpressionHashFunction(asList(e("s.art_id"))),
                         new ExpressionHashFunction(asList(e("a.art_id"))),
                         new ExpressionPredicate(e("a.art_id = s.art_id")),
-                        new DefaultTupleMerger(-1, 1),
+                        new DefaultTupleMerger(-1, 1, 2),
                         false,
                         false));
 
@@ -171,7 +171,18 @@ public class OperatorBuilderTest extends AOperatorTest
     @Test
     public void test_no_push_down_from_where_to_join_when_accessing_nested_alias()
     {
-        String query = "select * from source s inner join (select ** from article a inner join articleBrand ab with(populate=true) on ab.art_id = a.art_id) a with(populate=true) on a.art_id = s.art_id where a.ab.active_flg";
+        String query = "select * "
+            + "from source s "
+            + "inner join "
+            + "("
+            + "  select ** "
+            + "  from article a "
+            + "  inner join articleBrand ab with(populate=true) "
+            + "    on ab.art_id = a.art_id"
+            + ") a with(populate=true) "
+            + "  on a.art_id = s.art_id "
+            + "where a.ab.active_flg";
+
         QueryResult queryResult = getQueryResult(query);
 
         Operator expected = new FilterOperator(
@@ -188,13 +199,13 @@ public class OperatorBuilderTest extends AOperatorTest
                                 new ExpressionHashFunction(asList(e("a.art_id"))),
                                 new ExpressionHashFunction(asList(e("ab.art_id"))),
                                 new ExpressionPredicate(e("ab.art_id = a.art_id")),
-                                new DefaultTupleMerger(-1, 3),
+                                new DefaultTupleMerger(-1, 3, 2),
                                 true,
                                 false),
                         new ExpressionHashFunction(asList(e("s.art_id"))),
                         new ExpressionHashFunction(asList(e("a.art_id"))),
                         new ExpressionPredicate(e("a.art_id = s.art_id")),
-                        new DefaultTupleMerger(-1, 1),
+                        new DefaultTupleMerger(-1, 1, 2),
                         true,
                         false),
                 new ExpressionPredicate(e("a.ab.active_flg = true")));
@@ -230,14 +241,14 @@ public class OperatorBuilderTest extends AOperatorTest
                         new ExpressionHashFunction(asList(e("s.art_id"))),
                         new ExpressionHashFunction(asList(e("a.art_id"))),
                         new ExpressionPredicate(e("a.art_id = s.art_id")),
-                        new DefaultTupleMerger(-1, 1),
+                        new DefaultTupleMerger(-1, 1, 3),
                         false,
                         false),
                 queryResult.tableOperators.get(2),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionHashFunction(asList(e("raa.art_id"))),
                 new ExpressionPredicate(e("raa.art_id = a.art_id AND a.articleType = 'type'")),
-                new DefaultTupleMerger(-1, 2),
+                new DefaultTupleMerger(-1, 2, 3),
                 false,
                 true);
 
@@ -261,7 +272,7 @@ public class OperatorBuilderTest extends AOperatorTest
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
-                new DefaultTupleMerger(-1, 1),
+                new DefaultTupleMerger(-1, 1, 2),
                 false,
                 false);
 
@@ -285,7 +296,7 @@ public class OperatorBuilderTest extends AOperatorTest
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
-                new DefaultTupleMerger(-1, 1),
+                new DefaultTupleMerger(-1, 1, 2),
                 false,
                 true);
 
@@ -298,7 +309,12 @@ public class OperatorBuilderTest extends AOperatorTest
     @Test
     public void test_table_function()
     {
-        String query = "select r.Value * r1.Value * r2.Value mul, r.Value r, r1.filter(x -> x.Value > 10).map(x -> x.Value) r1, r2.Value r2, array(Value from r1) r1A from range(randomInt(100), randomInt(100) + 100) r inner join range(randomInt(100)) r1 with (populate=true) on r1.Value <= r.Value inner join range(randomInt(100), randomInt(100) + 100) r2 on r2.Value = r.Value";
+        String query = "select r.Value * r1.Value * r2.Value mul, r.Value r, r1.filter(x -> x.Value > 10).map(x -> x.Value) r1, r2.Value r2, array(Value from r1) r1A "
+            + "from range(randomInt(100), randomInt(100) + 100) r "
+            + "inner join range(randomInt(100)) r1 with (populate=true) "
+            + "  on r1.Value <= r.Value "
+            + "inner join range(randomInt(100), randomInt(100) + 100) r2 "
+            + "  on r2.Value = r.Value";
         QueryResult queryResult = getQueryResult(query);
 
         TableFunctionInfo range = (TableFunctionInfo) session.getCatalogRegistry().getBuiltin().getFunction("range");
@@ -326,7 +342,7 @@ public class OperatorBuilderTest extends AOperatorTest
                         new CachingOperator(2, new TableFunctionOperator(1, "", r1, range, asList(
                                 e("randomInt(100)")))),
                         new ExpressionPredicate(e("r1.Value <= r.Value")),
-                        new DefaultTupleMerger(-1, 1),
+                        new DefaultTupleMerger(-1, 1, 3),
                         true,
                         false),
                 new TableFunctionOperator(4, "", r2, range, asList(
@@ -335,7 +351,7 @@ public class OperatorBuilderTest extends AOperatorTest
                 new ExpressionHashFunction(asList(e("r.Value"))),
                 new ExpressionHashFunction(asList(e("r2.Value"))),
                 new ExpressionPredicate(e("r2.Value = r.Value")),
-                new DefaultTupleMerger(-1, 2),
+                new DefaultTupleMerger(-1, 2, 3),
                 false,
                 false);
 
@@ -413,7 +429,7 @@ public class OperatorBuilderTest extends AOperatorTest
                         new ExpressionHashFunction(asList(e("s.art_id"))),
                         new ExpressionHashFunction(asList(e("a.art_id"))),
                         new ExpressionPredicate(e("a.art_id = s.art_id")),
-                        new DefaultTupleMerger(-1, 1),
+                        new DefaultTupleMerger(-1, 1, 3),
                         true,
                         false),
                 new HashJoin(
@@ -427,20 +443,20 @@ public class OperatorBuilderTest extends AOperatorTest
                                 new ExpressionHashFunction(asList(e("aa.sku_id"))),
                                 new ExpressionHashFunction(asList(e("ap.sku_id"))),
                                 new ExpressionPredicate(e("ap.sku_id = aa.sku_id")),
-                                new DefaultTupleMerger(-1, 4),
+                                new DefaultTupleMerger(-1, 4, 3),
                                 false,
                                 false),
                         queryResult.tableOperators.get(4),
                         new ExpressionHashFunction(asList(e("aa.attr1_id"))),
                         new ExpressionHashFunction(asList(e("a1.attr1_id"))),
                         new ExpressionPredicate(e("a1.attr1_id = aa.attr1_id")),
-                        new DefaultTupleMerger(-1, 5),
+                        new DefaultTupleMerger(-1, 5, 3),
                         true,
                         false),
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("aa.art_id"))),
                 new ExpressionPredicate(e("aa.art_id = s.art_id")),
-                new DefaultTupleMerger(-1, 2),
+                new DefaultTupleMerger(-1, 2, 3),
                 true,
                 false);
 
@@ -700,7 +716,7 @@ public class OperatorBuilderTest extends AOperatorTest
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
-                new DefaultTupleMerger(-1, 1),
+                new DefaultTupleMerger(-1, 1, 2),
                 true,
                 false);
 
@@ -754,11 +770,11 @@ public class OperatorBuilderTest extends AOperatorTest
                                 new ExpressionHashFunction(asList(e("a.art_id"))),
                                 new ExpressionHashFunction(asList(e("aa.art_id"))),
                                 new ExpressionPredicate(e("aa.art_id = a.art_id AND s.id = true")),
-                                new DefaultTupleMerger(-1, 3),
+                                new DefaultTupleMerger(-1, 3, 2),
                                 true,
                                 false),
                         new ExpressionPredicate(e("a.art_id = s.art_id")),
-                        new DefaultTupleMerger(-1, 1),
+                        new DefaultTupleMerger(-1, 1, 2),
                         true,
                         false);
 
@@ -804,11 +820,11 @@ public class OperatorBuilderTest extends AOperatorTest
                                 new ExpressionHashFunction(asList(e("a.art_id"))),
                                 new ExpressionHashFunction(asList(e("aa.art_id"))),
                                 new ExpressionPredicate(e("aa.art_id = a.art_id AND s.id = true")),
-                                new DefaultTupleMerger(-1, 3),
+                                new DefaultTupleMerger(-1, 3, 2),
                                 true,
                                 false),
                         new ExpressionPredicate(e("a.art_id = s.art_id")),
-                        new DefaultTupleMerger(-1, 1),
+                        new DefaultTupleMerger(-1, 1, 2),
                         true,
                         false);
 

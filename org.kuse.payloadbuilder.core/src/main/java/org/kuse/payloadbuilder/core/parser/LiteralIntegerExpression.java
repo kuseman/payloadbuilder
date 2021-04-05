@@ -25,12 +25,11 @@ public class LiteralIntegerExpression extends LiteralExpression
     }
 
     @Override
-    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
+    public ExpressionCode generateCode(CodeGeneratorContext context)
     {
-        ExpressionCode code = ExpressionCode.code(context);
-        String template = "int %s = %s;\n"
-            + "boolean %s = false;\n";
-        code.setCode(String.format(template, code.getResVar(), value, code.getIsNull()));
+        ExpressionCode code = context.getCode();
+        String template = "Integer %s = %s;\n";
+        code.setCode(String.format(template, code.getResVar(), value));
         return code;
     }
 

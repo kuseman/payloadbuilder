@@ -23,7 +23,7 @@ public interface LambdaFunction
     /** A lambda binding */
     class LambdaBinding
     {
-        /** The index of the lambda argument*/
+        /** The index of the lambda argument */
         private final int lambdaArg;
         /** The index of the destination argument */
         private final int toArg;

@@ -1,4 +1,4 @@
-package org.kuse.payloadbuilder.core.parser;
+package org.kuse.payloadbuilder.core.utils;
 
 import static java.util.Arrays.asList;
 
@@ -60,6 +60,7 @@ public class ExpressionMathTest extends Assert
             fail();
         }
         catch (IllegalArgumentException e)
-        {}
+        {
+        }
     }
 }

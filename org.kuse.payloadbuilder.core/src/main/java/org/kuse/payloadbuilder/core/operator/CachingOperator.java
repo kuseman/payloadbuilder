@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 
 /** Caches provided operator to allow rewinds (Used in inner operator for nested loop) */
 class CachingOperator extends AOperator

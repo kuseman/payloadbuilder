@@ -1,7 +1,5 @@
 package org.kuse.payloadbuilder.core.operator;
 
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
-
 /**
  * Definition of a values extractor. Extracts values from a {@link Tuple} into an Object array
  */

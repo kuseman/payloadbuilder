@@ -11,7 +11,6 @@ import java.util.stream.IntStream;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
 
 /** Test {@link HashJoin} */
@@ -26,8 +25,8 @@ public class HashJoinTest extends AOperatorTest
                 op(c -> emptyIterator()),
                 (c, tuple) -> 0,
                 (c, tuple) -> 0,
-                (ctx, row) -> false,
-                new DefaultTupleMerger(-1, 1),
+                ctx -> false,
+                new DefaultTupleMerger(-1, 1, 2),
                 false,
                 false);
         RowIterator it = op.open(new ExecutionContext(session));

@@ -9,7 +9,6 @@ import java.util.Set;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.utils.CollectionUtils;

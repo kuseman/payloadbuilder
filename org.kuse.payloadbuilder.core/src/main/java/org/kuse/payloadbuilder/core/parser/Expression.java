@@ -3,6 +3,7 @@ package org.kuse.payloadbuilder.core.parser;
 import org.apache.commons.lang3.NotImplementedException;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 
 /** Base class for expressions */
 //CSOFF
@@ -11,12 +12,6 @@ public abstract class Expression
 {
     /** Visitor accept definition */
     public abstract <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context);
-
-    /** Returns true if the result from this expression is nullable. Primitive result or not */
-    public boolean isNullable()
-    {
-        return false;
-    }
 
     public Class<?> getDataType()
     {
@@ -35,13 +30,18 @@ public abstract class Expression
         return false;
     }
 
+    /** Returns true if this expression supports code generation */
+    public boolean isCodeGenSupported()
+    {
+        return false;
+    }
+
     /**
      * Generate code for this expression
      *
      * @param context Context used during code generation
-     * @param parentCode Code generated from parent expression
      **/
-    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
+    public ExpressionCode generateCode(CodeGeneratorContext context)
     {
         throw new NotImplementedException("code gen: " + getClass().getSimpleName());
     }

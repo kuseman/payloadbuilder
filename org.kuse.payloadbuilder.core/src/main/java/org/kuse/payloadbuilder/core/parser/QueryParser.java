@@ -212,7 +212,8 @@ public class QueryParser
         @Override
         public Object visitSetStatement(SetStatementContext ctx)
         {
-            return new SetStatement(getQualifiedName(ctx.qname()), getExpression(ctx.expression()));
+            boolean systemProperty = ctx.AT() == null;
+            return new SetStatement(getQualifiedName(ctx.qname()), getExpression(ctx.expression()), systemProperty);
         }
 
         @Override

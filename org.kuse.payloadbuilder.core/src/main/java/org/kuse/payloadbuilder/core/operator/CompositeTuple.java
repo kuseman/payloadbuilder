@@ -5,15 +5,13 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 /** Tuple that is composed of other tuples */
-class CompositeTuple extends ArrayList<Tuple> implements Tuple
+public class CompositeTuple extends ArrayList<Tuple> implements Tuple
 {
-    private static final int INITIAL_CAPACITY = 10;
     private final int tupleOrdinal;
 
-    CompositeTuple(Tuple outer, Tuple inner)
+    public CompositeTuple(Tuple outer, Tuple inner, int capacity)
     {
-        super(INITIAL_CAPACITY);
-
+        super(capacity);
         add(outer);
 
         // Unwrap inner to get a flat structure
@@ -65,7 +63,7 @@ class CompositeTuple extends ArrayList<Tuple> implements Tuple
          * inner join
          * () y with (pop)
          *   on ...
-         * 
+         *
          * CompositeTuple
          *   Row (a)            or = 0
          *   Collection (x)     or = 1
@@ -75,7 +73,7 @@ class CompositeTuple extends ArrayList<Tuple> implements Tuple
         // Start from bottom to see if we should delegate
         int size = size();
         Tuple prevTuple = null;
-        int prevTupleOrdinal = -1;
+        int prevTupleOrdinal = Integer.MAX_VALUE;
         for (int i = 0; i < size; i++)
         {
             Tuple tuple = get(i);
@@ -86,7 +84,7 @@ class CompositeTuple extends ArrayList<Tuple> implements Tuple
             }
             // If we passed the ordinal wanted, it's a child of previous tuple
             else if (tupleOrdinal > ordinal
-                    && prevTupleOrdinal < ordinal)
+                && prevTupleOrdinal < ordinal)
             {
                 return prevTuple.getTuple(ordinal);
             }
@@ -175,7 +173,7 @@ class CompositeTuple extends ArrayList<Tuple> implements Tuple
                          *
                          */
                                 ((tupleOrdinal == CompositeTuple.this.tupleOrdinal
-                                // All descendant ordinals are larger than the parents
+                                    // All descendant ordinals are larger than the parents
                                     && tupleOrdinal < tuple.getTupleOrdinal())
                                     ||
                         // A tuple ordinal match

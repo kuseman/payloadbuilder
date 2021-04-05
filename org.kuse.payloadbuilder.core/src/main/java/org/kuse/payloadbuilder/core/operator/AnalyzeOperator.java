@@ -8,7 +8,6 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.kuse.payloadbuilder.core.DescribeUtils;
 import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 
 /** Analyze operator that measures things like time spent, execution count. etc. */
 class AnalyzeOperator extends AOperator

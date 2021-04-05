@@ -3,7 +3,6 @@ package org.kuse.payloadbuilder.core.operator;
 import static java.util.Objects.requireNonNull;
 
 import org.kuse.payloadbuilder.core.OutputWriter;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Projection that operates over an {@link Expression} */

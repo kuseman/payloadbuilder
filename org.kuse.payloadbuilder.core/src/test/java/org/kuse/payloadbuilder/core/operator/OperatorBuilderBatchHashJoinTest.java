@@ -15,7 +15,6 @@ import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.Select;
 
@@ -60,12 +59,12 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                                 new ExpressionHashFunction(asList(e("a.art_id"))),
                                 new ExpressionHashFunction(asList(e("aa.art_id"))),
                                 new ExpressionPredicate(e("aa.art_id = a.art_id AND s.id = true")),
-                                new DefaultTupleMerger(-1, 3),
+                                new DefaultTupleMerger(-1, 3, 2),
                                 true,
                                 false),
                         asList(e("s.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
-                new DefaultTupleMerger(-1, 1),
+                new DefaultTupleMerger(-1, 1, 2),
                 true,
                 false);
 
@@ -115,7 +114,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                         new ExpressionValuesExtractor(asList(e("a.art_id"))),
                         new ExpressionValuesExtractor(asList(e("aa.art_id"))),
                         new ExpressionPredicate(e("aa.art_id = a.art_id")),
-                        new DefaultTupleMerger(-1, 3),
+                        new DefaultTupleMerger(-1, 3, 2),
                         false,
                         false,
                         c.getIndices(session, "", QualifiedName.of("article_attribute")).get(0),
@@ -123,7 +122,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("s.art_id"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
-                new DefaultTupleMerger(-1, 1),
+                new DefaultTupleMerger(-1, 1, 2),
                 true,
                 false,
                 c.getIndices(session, "", QualifiedName.of("article")).get(0),
@@ -167,7 +166,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("s.art_id"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
-                new DefaultTupleMerger(-1, 1),
+                new DefaultTupleMerger(-1, 1, 2),
                 false,
                 false,
                 c.getIndices(session, "", QualifiedName.of("article")).get(0),
@@ -211,7 +210,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("s.art_id"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
-                new DefaultTupleMerger(-1, 1),
+                new DefaultTupleMerger(-1, 1, 2),
                 true,
                 false,
                 c.getIndices(session, "", QualifiedName.of("article")).get(0),
@@ -261,7 +260,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("s.art_id"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id AND s.flag = true")),
-                new DefaultTupleMerger(-1, 1),
+                new DefaultTupleMerger(-1, 1, 2),
                 true,
                 true,
                 c.getIndices(session, "", QualifiedName.of("article")).get(0),
@@ -305,7 +304,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("s.art_id"))),
                 new ExpressionValuesExtractor(asList(e("1460"), e("0"), e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
-                new DefaultTupleMerger(-1, 1),
+                new DefaultTupleMerger(-1, 1, 2),
                 false,
                 true,
                 c.getIndices(session, "", QualifiedName.of("article")).get(0),

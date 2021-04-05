@@ -8,11 +8,10 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.function.BiPredicate;
+import java.util.function.Predicate;
 
 import org.apache.commons.lang3.StringUtils;
 import org.kuse.payloadbuilder.core.catalog.Index;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 
 /**
  * <pre>
@@ -57,7 +56,7 @@ class BatchMergeJoin extends AOperator
     private final Operator inner;
     private final ValuesExtractor outerValuesExtractor;
     private final ValuesExtractor innerValuesExtractor;
-    private final BiPredicate<ExecutionContext, Tuple> predicate;
+    private final Predicate<ExecutionContext> predicate;
     private final TupleMerger rowMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
@@ -70,14 +69,14 @@ class BatchMergeJoin extends AOperator
 
     //CSOFF
     BatchMergeJoin(
-    //CSON
+            //CSON
             int nodeId,
             String logicalOperator,
             Operator outer,
             Operator inner,
             ValuesExtractor outerValuesExtractor,
             ValuesExtractor innerValuesExtractor,
-            BiPredicate<ExecutionContext, Tuple> predicate,
+            Predicate<ExecutionContext> predicate,
             TupleMerger rowMerger,
             boolean populating,
             boolean emitEmptyOuterRows,
@@ -272,7 +271,11 @@ class BatchMergeJoin extends AOperator
                     joinTuple.setOuter(outerRow.tuple);
                     joinTuple.setInner(innerRow);
 
-                    if (predicate.test(context, joinTuple))
+                    context.setTuple(joinTuple);
+                    boolean result = predicate.test(context);
+                    context.setTuple(null);
+
+                    if (result)
                     {
                         next = rowMerger.merge(outerRow.tuple, innerRow, populating);
                         outerRow.match = true;

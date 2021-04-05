@@ -12,10 +12,8 @@ import org.apache.commons.collections.iterators.ObjectGraphIterator;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.LambdaFunction;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
-import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
-import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.LambdaExpression;
 import org.kuse.payloadbuilder.core.utils.CollectionUtils;
@@ -97,63 +95,63 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
                 });
     }
 
-    @Override
-    public ExpressionCode generateCode(
-            CodeGeneratorContext context,
-            ExpressionCode parentCode,
-            List<Expression> arguments)
-    {
-        ExpressionCode inputCode = arguments.get(0).generateCode(context, parentCode);
-        ExpressionCode code = ExpressionCode.code(context, inputCode);
-        code.addImport("org.kuse.payloadbuilder.core.utils.CollectionUtils");
-        code.addImport("java.util.Iterator");
-        code.addImport("org.apache.commons.collections.iterators.ObjectGraphIterator");
-        code.addImport("org.apache.commons.collections.Transformer");
-
-        LambdaExpression le = (LambdaExpression) arguments.get(1);
-
-        context.addLambdaParameters(le.getIdentifiers());
-        ExpressionCode lambdaCode = le.getExpression().generateCode(context, parentCode);
-        context.removeLambdaParameters(le.getIdentifiers());
-
-        String template = "%s"
-            + "boolean %s = true;\n"
-            + "Iterator %s = null;\n"
-            + "if (!%s)\n"
-            + "{\n"
-            + "  %s = new ObjectGraphIterator(IteratorUtils.getIterator(%s), new Transformer()\n"
-            + "  {\n"
-            + "    Iterator<Object> it;\n"
-            + "    public Object transform(Object input)\n"
-            + "    {\n"
-            + "      if (it == null)\n"
-            + "      {\n"
-            + "        Object %s = input;\n"
-            + "        %s"
-            + "        it = IteratorUtils.getIterator(%s);\n"
-            + "        return it;\n"
-            + "      }\n"
-            + "      else if (!it.hasNext())\n"
-            + "      {\n"
-            + "        it=null;\n"
-            + "      }\n"
-            + "      return input;\n"
-            + "    }\n"
-            + "  });\n"
-            + "  %s = false;\n"
-            + "}\n";
-
-        code.setCode(String.format(template,
-                inputCode.getCode(),
-                code.getIsNull(),
-                code.getResVar(),
-                inputCode.getIsNull(),
-                code.getResVar(), inputCode.getResVar(),
-                le.getIdentifiers().get(0),
-                lambdaCode.getCode(),
-                lambdaCode.getResVar(),
-                code.getIsNull()));
-
-        return code;
-    }
+    //    @Override
+    //    public ExpressionCode generateCode(
+    //            CodeGeneratorContext context,
+    //            ExpressionCode parentCode,
+    //            List<Expression> arguments)
+    //    {
+    //        ExpressionCode inputCode = arguments.get(0).generateCode(context, parentCode);
+    //        ExpressionCode code = ExpressionCode.code(context, inputCode);
+    //        code.addImport("org.kuse.payloadbuilder.core.utils.CollectionUtils");
+    //        code.addImport("java.util.Iterator");
+    //        code.addImport("org.apache.commons.collections.iterators.ObjectGraphIterator");
+    //        code.addImport("org.apache.commons.collections.Transformer");
+    //
+    //        LambdaExpression le = (LambdaExpression) arguments.get(1);
+    //
+    //        context.addLambdaParameters(le.getIdentifiers());
+    //        ExpressionCode lambdaCode = le.getExpression().generateCode(context, parentCode);
+    //        context.removeLambdaParameters(le.getIdentifiers());
+    //
+    //        String template = "%s"
+    //            + "boolean %s = true;\n"
+    //            + "Iterator %s = null;\n"
+    //            + "if (!%s)\n"
+    //            + "{\n"
+    //            + "  %s = new ObjectGraphIterator(IteratorUtils.getIterator(%s), new Transformer()\n"
+    //            + "  {\n"
+    //            + "    Iterator<Object> it;\n"
+    //            + "    public Object transform(Object input)\n"
+    //            + "    {\n"
+    //            + "      if (it == null)\n"
+    //            + "      {\n"
+    //            + "        Object %s = input;\n"
+    //            + "        %s"
+    //            + "        it = IteratorUtils.getIterator(%s);\n"
+    //            + "        return it;\n"
+    //            + "      }\n"
+    //            + "      else if (!it.hasNext())\n"
+    //            + "      {\n"
+    //            + "        it=null;\n"
+    //            + "      }\n"
+    //            + "      return input;\n"
+    //            + "    }\n"
+    //            + "  });\n"
+    //            + "  %s = false;\n"
+    //            + "}\n";
+    //
+    //        code.setCode(String.format(template,
+    //                inputCode.getCode(),
+    //                code.getIsNull(),
+    //                code.getResVar(),
+    //                inputCode.getIsNull(),
+    //                code.getResVar(), inputCode.getResVar(),
+    //                le.getIdentifiers().get(0),
+    //                lambdaCode.getCode(),
+    //                lambdaCode.getResVar(),
+    //                code.getIsNull()));
+    //
+    //        return code;
+    //    }
 }

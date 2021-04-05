@@ -1,18 +1,18 @@
 package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyMap;
 
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 
 /** Test of various expression evaluations */
 public class ExpressionTest extends AParserTest
@@ -108,13 +108,11 @@ public class ExpressionTest extends AParserTest
         utils.registerFunction(new ScalarFunctionInfo(utils, "uuid")
         {
             @Override
-            public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode, List<Expression> arguments)
+            public ExpressionCode generateCode(CodeGeneratorContext context, List<Expression> arguments)
             {
-                ExpressionCode code = ExpressionCode.code(context);
-                code.setCode(String.format(
-                        "boolean %s = false;\n"
-                            + "String %s = java.util.UUID.randomUUID().toString();\n",
-                        code.getIsNull(), code.getResVar()));
+                ExpressionCode code = context.getCode();
+                code.setCode(String.format("String %s = java.util.UUID.randomUUID().toString();\n",
+                        code.getResVar()));
                 return code;
             }
 
@@ -126,7 +124,7 @@ public class ExpressionTest extends AParserTest
         });
         session.getCatalogRegistry().registerCatalog("UTILS", utils);
 
-        assertExpression(true, null, "UTILS#uuid() is not null");
+        assertFunction(true, emptyMap(), "UTILS#uuid() is not null");
     }
 
     @Test
@@ -186,16 +184,14 @@ public class ExpressionTest extends AParserTest
     @Test
     public void test_functions() throws Exception
     {
-        assertExpression(10, null, "isnull(null, 10)");
-        assertExpression(10, null, "isnull(10, var)");
-        assertExpression(6, null, "coalesce(null, null, 1+2+3)");
-        assertExpressionFail(ParseException.class, "expected 2 parameters", null, "isnull(10, var, 1)");
-    }
+        Map<String, Object> values = new HashMap<>();
+        values.put("a", 1);
+        values.put("b", null);
 
-    @SuppressWarnings("unchecked")
-    public <T> Set<T> asSet(T... items)
-    {
-        return new HashSet<>(asList(items));
+        assertFunction(10, values, "isnull(b, 10)");
+        assertFunction(10, values, "isnull(10, var)");
+        assertExpression(6, values, "coalesce(null, null, 1+2+3)");
+        assertExpressionFail(ParseException.class, "expected 2 parameters", null, "isnull(10, var, 1)");
     }
 
     @Test
@@ -435,12 +431,12 @@ public class ExpressionTest extends AParserTest
             {
                 for (String o : operators)
                 {
-                    assertExpression(results[index++], values, l + " " + o + " " + r);
+                    assertFunction(results[index++], values, l + " " + o + " " + r);
                 }
             }
         }
 
-        assertExpression("hello world", values, "'hello' + ' world'");
+        assertFunction("hello world", values, "'hello' + ' world'");
 
         // Test different types
         assertExpressionFail(ArithmeticException.class, "Cannot subtract true", null, "true - 10");

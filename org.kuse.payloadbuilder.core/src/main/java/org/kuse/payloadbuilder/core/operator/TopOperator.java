@@ -6,7 +6,6 @@ import static java.util.Objects.requireNonNull;
 import java.util.List;
 import java.util.Map;
 
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
 

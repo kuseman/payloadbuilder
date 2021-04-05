@@ -58,19 +58,13 @@ public class LambdaExpression extends Expression
     }
 
     @Override
-    public boolean isNullable()
-    {
-        throw new IllegalArgumentException("Labmda expressions");
-    }
-
-    @Override
     public Class<?> getDataType()
     {
         throw new IllegalArgumentException("Labmda expressions");
     }
 
     @Override
-    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
+    public ExpressionCode generateCode(CodeGeneratorContext context)
     {
         throw new IllegalArgumentException("Labmda expressions");
     }

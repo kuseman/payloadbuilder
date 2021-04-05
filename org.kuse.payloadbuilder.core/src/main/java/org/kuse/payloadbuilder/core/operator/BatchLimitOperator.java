@@ -13,7 +13,6 @@ import org.apache.commons.lang3.mutable.MutableInt;
 import org.kuse.payloadbuilder.core.DescribeUtils;
 import org.kuse.payloadbuilder.core.operator.BatchRepeatOperator.BatchLimitData;
 import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /**

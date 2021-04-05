@@ -9,7 +9,11 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.antlr.v4.runtime.Token;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
+import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
+import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.operator.Tuple.ComputedTuple;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
@@ -204,9 +208,38 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
     }
 
     @Override
-    public boolean isNullable()
+    public boolean isCodeGenSupported()
     {
-        return true;
+        return resolvePaths == null
+            ||
+            (resolvePaths.size() == 1
+                &&
+                resolvePaths.get(0).unresolvedPath.size() == 1);
+    }
+
+    @Override
+    public ExpressionCode generateCode(CodeGeneratorContext context)
+    {
+        ExpressionCode code = context.getCode();
+
+        // TODO: lambda
+        // TODO: only supported for single source tuple ordinals for now
+        // TODO: map access etc.
+
+        int targetOrdinal = -1;
+        String column = qname.toString();
+        if (!CollectionUtils.isEmpty(resolvePaths))
+        {
+            targetOrdinal = resolvePaths.get(0).targetTupleOrdinal;
+            column = resolvePaths.get(0).unresolvedPath.get(0);
+        }
+
+        code.setCode(String.format("// %s\nObject %s = tuple%s%s;\n",
+                qname,
+                code.getResVar(),
+                targetOrdinal >= 0 ? (".getTuple(" + targetOrdinal + ")") : "",
+                ".getValue(\"" + column + "\")"));
+        return code;
     }
 
     @Override

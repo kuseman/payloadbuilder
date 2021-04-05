@@ -1,14 +1,15 @@
 package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Objects.requireNonNull;
-import static org.kuse.payloadbuilder.core.parser.ExpressionMath.eq;
-import static org.kuse.payloadbuilder.core.parser.ExpressionMath.gt;
-import static org.kuse.payloadbuilder.core.parser.ExpressionMath.gte;
-import static org.kuse.payloadbuilder.core.parser.ExpressionMath.lt;
-import static org.kuse.payloadbuilder.core.parser.ExpressionMath.lte;
+import static org.kuse.payloadbuilder.core.utils.ExpressionMath.eq;
+import static org.kuse.payloadbuilder.core.utils.ExpressionMath.gt;
+import static org.kuse.payloadbuilder.core.utils.ExpressionMath.gte;
+import static org.kuse.payloadbuilder.core.utils.ExpressionMath.lt;
+import static org.kuse.payloadbuilder.core.utils.ExpressionMath.lte;
 
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 
 /** Comparison expression */
 public class ComparisonExpression extends Expression
@@ -70,12 +71,18 @@ public class ComparisonExpression extends Expression
     }
 
     @Override
-    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
+    public boolean isCodeGenSupported()
     {
-        ExpressionCode leftCode = left.generateCode(context, parentCode);
-        ExpressionCode rightCode = right.generateCode(context, parentCode);
+        return left.isCodeGenSupported() && right.isCodeGenSupported();
+    }
 
-        ExpressionCode code = ExpressionCode.code(context);
+    @Override
+    public ExpressionCode generateCode(CodeGeneratorContext context)
+    {
+        ExpressionCode code = context.getCode();
+
+        ExpressionCode leftCode = left.generateCode(context);
+        ExpressionCode rightCode = right.generateCode(context);
 
         String cmpOp = null;
         //CSOFF
@@ -102,27 +109,27 @@ public class ComparisonExpression extends Expression
                 break;
         }
 
+        //        * Object v1 = tuple.getTuple(1).getValue("country_id");
+        //        * Boolean v3 = false;
+        //        * if (v1 != null)
+        //        * {
+        //        *   Object v2 = tuple.getTuple(0).getValue("country_id");
+        //        *   v3 = v2 != null && ExpressionMath.eq(v1, v2);
+        //        * }
+
         code.setCode(String.format(
-                "%s"
-                    + "boolean %s = true;\n"
-                    + "boolean %s = false;\n"
-                    + "if (!%s)\n"
+                "%s"                                      // Leftcode
+                    + "Boolean %s = false;\n"                 // This result var
+                    + "if (%s != null)\n"                     // Left res var
                     + "{\n"
-                    + "  %s"
-                    + "  if (!%s)\n"
-                    + "  {\n"
-                    + "    %s = %s(%s, %s);\n"
-                    + "    %s = false;\n"
-                    + "  }\n"
+                    + "  %s"                                  // Right code
+                    + "  %s = %s != null && %s(%s, %s);\n"    // ExpressionMath-function
                     + "}\n",
                 leftCode.getCode(),
-                code.getIsNull(),
                 code.getResVar(),
-                leftCode.getIsNull(),
+                leftCode.getResVar(),
                 rightCode.getCode(),
-                rightCode.getIsNull(),
-                code.getResVar(), cmpOp, leftCode.getResVar(), rightCode.getResVar(),
-                code.getIsNull()));
+                code.getResVar(), rightCode.getResVar(), cmpOp, leftCode.getResVar(), rightCode.getResVar()));
 
         return code;
     }
@@ -131,12 +138,6 @@ public class ComparisonExpression extends Expression
     public Class<?> getDataType()
     {
         return Boolean.class;
-    }
-
-    @Override
-    public boolean isNullable()
-    {
-        return left.isNullable() || right.isNullable();
     }
 
     private Object evalInternal(Object leftResult, Object rightResult)
@@ -174,7 +175,7 @@ public class ComparisonExpression extends Expression
     @Override
     public int hashCode()
     {
-      //CSOFF
+        //CSOFF
         int hashCode = 17;
         hashCode = hashCode * 37 + left.hashCode();
         hashCode = hashCode * 37 + right.hashCode();

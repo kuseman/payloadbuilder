@@ -1,7 +1,5 @@
 package org.kuse.payloadbuilder.core.operator;
 
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
-
 /** Definition of a comparator that compares two {@link Tuples} */
 interface TupleComparator
 {

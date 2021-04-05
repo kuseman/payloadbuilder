@@ -7,6 +7,7 @@ import static org.kuse.payloadbuilder.core.parser.LiteralNullExpression.NULL_LIT
 
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 
 /** Logical not */
 public class LogicalNotExpression extends Expression
@@ -46,12 +47,6 @@ public class LogicalNotExpression extends Expression
     }
 
     @Override
-    public boolean isNullable()
-    {
-        return expression.isNullable();
-    }
-
-    @Override
     public Class<?> getDataType()
     {
         return expression.getDataType();
@@ -65,36 +60,29 @@ public class LogicalNotExpression extends Expression
     }
 
     @Override
-    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
+    public boolean isCodeGenSupported()
     {
-        ExpressionCode childCode = expression.generateCode(context, parentCode);
+        return expression.isCodeGenSupported();
+    }
 
-        if (expression.isNullable())
-        {
-            boolean addCast = !Boolean.class.isAssignableFrom(expression.getDataType());
+    @Override
+    public ExpressionCode generateCode(CodeGeneratorContext context)
+    {
+        ExpressionCode childCode = expression.generateCode(context);
 
-            String template = "%s\n"
-                + "if (!%s)\n"
-                + "{\n"
-                + "  %s = !%s%s;\n"
-                + "}\n";
+        /*
+         * Object v1 = null;
+         * v1 = v1 != null ? !(Boolean) v1 : false;
+         *
+         */
 
-            childCode.setCode(String.format(template,
-                    childCode.getCode(),
-                    childCode.getIsNull(),
-                    childCode.getResVar(),
-                    addCast ? "(Boolean)" : "", childCode.getResVar()));
-        }
-        else
-        {
-            String template = "%s\n"
-                + "%s = !%s;\n";
-            childCode.setCode(String.format(template,
-                    childCode.getCode(),
-                    childCode.getResVar(), childCode.getResVar()));
-        }
+        String template = "// NOT\n%s\n"
+            + "%s = %s != null ? !(Boolean)%s : null;\n";
 
-        childCode.setCode("// NOT\n" + childCode.getCode());
+        childCode.setCode(String.format(template,
+                childCode.getCode(),
+                childCode.getResVar(), childCode.getResVar(), childCode.getResVar()));
+
         return childCode;
     }
 

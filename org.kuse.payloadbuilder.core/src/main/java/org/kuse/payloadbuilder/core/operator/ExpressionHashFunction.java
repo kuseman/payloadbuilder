@@ -7,7 +7,6 @@ import java.util.function.ToIntBiFunction;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.math.NumberUtils;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Function that generates a hash from provided expressions */

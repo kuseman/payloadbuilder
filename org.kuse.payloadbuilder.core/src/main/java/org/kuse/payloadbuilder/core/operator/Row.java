@@ -42,14 +42,14 @@ public class Row implements Tuple
         // but wrapped in a sub query etc. so the ordinal will be one level up
         /*
          * ie
-         * 
+         *
          * select x.col1,               <- target ordinal 0
          *        x.col2                <- target ordinal 0
          * from                         <- ordinal 0
          * (
          *   from table                 <- ordinal 1
          * ) x
-         * 
+         *
          */
         if (ordinal <= tableAlias.getTupleOrdinal())
         {

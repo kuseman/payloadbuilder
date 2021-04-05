@@ -2,6 +2,8 @@ package org.kuse.payloadbuilder.core.parser;
 
 import java.util.Objects;
 
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+
 /** Base literal expression */
 //CSOFF
 public abstract class LiteralExpression extends Expression
@@ -20,6 +22,12 @@ public abstract class LiteralExpression extends Expression
     }
 
     @Override
+    public boolean isCodeGenSupported()
+    {
+        return true;
+    }
+
+    @Override
     public boolean isConstant()
     {
         return true;
@@ -29,12 +37,6 @@ public abstract class LiteralExpression extends Expression
     public Object eval(ExecutionContext context)
     {
         return objectValue;
-    }
-
-    @Override
-    public boolean isNullable()
-    {
-        return objectValue == null;
     }
 
     @Override

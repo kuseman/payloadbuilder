@@ -4,21 +4,23 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 
-import java.io.Reader;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 import org.apache.commons.collections.IteratorUtils;
-import org.apache.commons.io.IOUtils;
 import org.junit.Assert;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.Index;
+import org.kuse.payloadbuilder.core.codegen.CodeGenerator;
+import org.kuse.payloadbuilder.core.operator.EvalUtils;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.OperatorBuilder;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
@@ -27,6 +29,7 @@ import org.kuse.payloadbuilder.core.operator.Tuple;
 /** Base class for parser tests */
 public abstract class AParserTest extends Assert
 {
+    private static final CodeGenerator CODE_GENERATOR = new CodeGenerator();
     private final QueryParser p = new QueryParser();
     protected final QuerySession session = new QuerySession(new CatalogRegistry());
     protected final ExecutionContext context = new ExecutionContext(session);
@@ -138,8 +141,24 @@ public abstract class AParserTest extends Assert
         }
     }
 
-    @SuppressWarnings("unchecked")
-    protected void assertExpression(Object value, Map<String, Object> values, String expression) throws Exception
+    /** Tests both eval and code gen for a function expression */
+    protected void assertFunction(Object expected, Map<String, Object> values, String expression) throws Exception
+    {
+        assertExpression(expected, values, expression, false, true);
+    }
+
+    protected void assertExpression(Object expected, Map<String, Object> values, String expression) throws Exception
+    {
+        assertExpression(expected, values, expression, false, false);
+    }
+
+    /** Tests both eval and code gen for a predicate expression */
+    protected void assertPredicate(Boolean expected, Map<String, Object> values, String expression) throws Exception
+    {
+        assertExpression(expected, values, expression, true, false);
+    }
+
+    protected void assertExpression(Object expected, Map<String, Object> values, String expression, boolean predicate, boolean function) throws Exception
     {
         try
         {
@@ -149,6 +168,8 @@ public abstract class AParserTest extends Assert
             {
                 context.setTuple(new Tuple()
                 {
+                    Map<String, Object> iteratorCache = new HashMap<>();
+
                     @Override
                     public int getTupleOrdinal()
                     {
@@ -158,7 +179,23 @@ public abstract class AParserTest extends Assert
                     @Override
                     public Object getValue(String column)
                     {
-                        return values.get(column);
+                        Object v = iteratorCache.get(column);
+                        if (v == null)
+                        {
+                            v = values.get(column);
+                        }
+
+                        // To be able to test an iterator multiple times, store the
+                        // iterator and rewind
+                        if (v instanceof Iterator)
+                        {
+                            @SuppressWarnings("unchecked")
+                            List<Object> l = IteratorUtils.toList((Iterator<Object>) v);
+                            iteratorCache.put(column, l.iterator());
+                            v = l.iterator();
+                        }
+
+                        return v;
                     }
 
                     @Override
@@ -169,18 +206,26 @@ public abstract class AParserTest extends Assert
                 });
             }
 
-            Object expected = expr.eval(context);
-
-            if (expected instanceof Iterator)
+            Object actual = EvalUtils.unwrap(expr.eval(context));
+            if (predicate)
             {
-                expected = IteratorUtils.toList((Iterator<Object>) expected);
+                assertEquals("Eval: " + expression, expected, actual == null ? false : actual);
             }
-            else if (expected instanceof Reader)
+            else
             {
-                expected = IOUtils.toString((Reader) expected);
+                assertEquals("Eval: " + expression, expected, actual);
             }
 
-            assertEquals("Eval: " + expression, value, expected);
+            if (predicate)
+            {
+                Predicate<ExecutionContext> p = CODE_GENERATOR.generatePredicate(expr);
+                assertEquals("Code gen: " + expression, expected, p.test(context));
+            }
+            else if (function)
+            {
+                Function<ExecutionContext, Object> f = CODE_GENERATOR.generateFunction(expr);
+                assertEquals("Code gen: " + expression, expected, f.apply(context));
+            }
         }
         catch (Exception e)
         {

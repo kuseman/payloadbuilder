@@ -7,19 +7,18 @@ import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiPredicate;
+import java.util.function.Predicate;
 
 import org.apache.commons.lang3.StringUtils;
 import org.kuse.payloadbuilder.core.DescribeUtils;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 
 /** Filtering operator */
 class FilterOperator extends AOperator
 {
     private final Operator operator;
-    private final BiPredicate<ExecutionContext, Tuple> predicate;
+    private final Predicate<ExecutionContext> predicate;
 
-    FilterOperator(int nodeId, Operator operator, BiPredicate<ExecutionContext, Tuple> predicate)
+    FilterOperator(int nodeId, Operator operator, Predicate<ExecutionContext> predicate)
     {
         super(nodeId);
         this.operator = requireNonNull(operator);
@@ -85,10 +84,12 @@ class FilterOperator extends AOperator
                     }
 
                     Tuple tuple = iterator.next();
-                    if (predicate.test(context, tuple))
+                    context.setTuple(tuple);
+                    if (predicate.test(context))
                     {
                         next = tuple;
                     }
+                    context.setTuple(null);
                 }
                 return true;
             }

@@ -4,7 +4,7 @@ import java.util.List;
 
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Substring function */
@@ -19,7 +19,7 @@ class SubstringFunction extends ScalarFunctionInfo
     public String getDescription()
     {
         return "Returns part of a string according to provided arguments." + System.lineSeparator()
-        + "Ex. substring(<expression>, <start expression> [, <length expression>] ) ";
+            + "Ex. substring(<expression>, <start expression> [, <length expression>] ) ";
     }
 
     @Override

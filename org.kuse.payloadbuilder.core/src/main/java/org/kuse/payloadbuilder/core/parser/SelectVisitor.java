@@ -1,9 +1,11 @@
 package org.kuse.payloadbuilder.core.parser;
 
-/** Visitor definition of tree
+/**
+ * Visitor definition of tree
+ *
  * @param <TR> Return type
  * @param <TC> Context type
- * */
+ */
 public interface SelectVisitor<TR, TC>
 {
     //CSOFF

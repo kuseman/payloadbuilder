@@ -13,6 +13,13 @@ import org.kuse.payloadbuilder.core.parser.ArithmeticBinaryExpression.Type;
 public class QueryParserTest extends AParserTest
 {
     @Test
+    public void test_set()
+    {
+        assertQuery("set @var = 10");
+        assertQuery("set system.prop = false");
+    }
+
+    @Test
     public void test_selectItems_failures()
     {
         assertQueryFail(ParseException.class, "Select items inside an ARRAY", "select array(10 col1, 20 col2 from s) col from source s");
@@ -149,7 +156,8 @@ public class QueryParserTest extends AParserTest
         // No select intos
         assertQueryFail(ParseException.class, "SELECT INTO is not allowed in sub query context", "select * from (select 1,2 into #temp from tableA) x");
 
-        SelectStatement selectStm = (SelectStatement) assertQuery("select * from tableA a inner join (select ** from tableB b) x with (populate=true, batch_size=1000) on x.id = a.id").getStatements().get(0);
+        SelectStatement selectStm = (SelectStatement) assertQuery("select * from tableA a inner join (select ** from tableB b) x with (populate=true, batch_size=1000) on x.id = a.id").getStatements()
+                .get(0);
 
         List<Option> joinOptions = selectStm.getSelect().getFrom().getJoins().get(0).getTableSource().getOptions();
         assertEquals(asList(

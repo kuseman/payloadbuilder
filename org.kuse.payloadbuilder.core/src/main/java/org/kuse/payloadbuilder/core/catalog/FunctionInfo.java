@@ -62,12 +62,6 @@ public abstract class FunctionInfo
         return Object.class;
     }
 
-    /** Is the return value of this function nullable */
-    public boolean isNullable()
-    {
-        return true;
-    }
-
     /**
      * Fold arguments. Is called upon parsing to let functions fold it's arguments. Ie. Replace arguments with other values etc.
      */

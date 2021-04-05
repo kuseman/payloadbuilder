@@ -5,7 +5,7 @@ import static java.util.Arrays.asList;
 import java.util.List;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 
 /** Utils for ESCatalog */
 final class ESUtils

@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 
 /** Nested expression */
 public class NestedExpression extends Expression
@@ -33,12 +34,6 @@ public class NestedExpression extends Expression
     }
 
     @Override
-    public boolean isNullable()
-    {
-        return expression.isNullable();
-    }
-
-    @Override
     public Class<?> getDataType()
     {
         return expression.getDataType();
@@ -51,9 +46,9 @@ public class NestedExpression extends Expression
     }
 
     @Override
-    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
+    public ExpressionCode generateCode(CodeGeneratorContext context)
     {
-        return expression.generateCode(context, parentCode);
+        return expression.generateCode(context);
     }
 
     @Override

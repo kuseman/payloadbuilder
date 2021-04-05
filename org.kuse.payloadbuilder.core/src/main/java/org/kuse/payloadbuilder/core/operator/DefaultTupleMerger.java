@@ -6,11 +6,16 @@ class DefaultTupleMerger implements TupleMerger
     /** Limit number of merged rows */
     private final int limit;
     private final int innerTupleOrdinal;
+    /**
+     * Size of composite tuple to create. This is the size of the table aliases the same level
+     */
+    private final int compositeTupleCount;
 
-    DefaultTupleMerger(int limit, int innerTupleOrdinal)
+    DefaultTupleMerger(int limit, int innerTupleOrdinal, int compositeTupleCount)
     {
         this.limit = limit;
         this.innerTupleOrdinal = innerTupleOrdinal;
+        this.compositeTupleCount = compositeTupleCount;
     }
 
     @Override
@@ -21,7 +26,7 @@ class DefaultTupleMerger implements TupleMerger
         {
             if (!(outer instanceof CompositeTuple))
             {
-                return new CompositeTuple(outer, inner);
+                return new CompositeTuple(outer, inner, compositeTupleCount);
             }
 
             CompositeTuple outerTuple = (CompositeTuple) outer;
@@ -45,7 +50,7 @@ class DefaultTupleMerger implements TupleMerger
         if (!(outer instanceof CompositeTuple))
         {
             populatingTuple = new CollectionTuple(inner);
-            return new CompositeTuple(outer, populatingTuple);
+            return new CompositeTuple(outer, populatingTuple, compositeTupleCount);
         }
 
         outerTuple = (CompositeTuple) outer;
@@ -84,7 +89,8 @@ class DefaultTupleMerger implements TupleMerger
         {
             DefaultTupleMerger that = (DefaultTupleMerger) obj;
             return limit == that.limit
-                && innerTupleOrdinal == that.innerTupleOrdinal;
+                && innerTupleOrdinal == that.innerTupleOrdinal
+                && compositeTupleCount == that.compositeTupleCount;
         }
         return false;
     }

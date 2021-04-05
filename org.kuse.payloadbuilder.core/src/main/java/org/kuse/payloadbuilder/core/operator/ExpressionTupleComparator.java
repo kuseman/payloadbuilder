@@ -4,12 +4,11 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
-import org.kuse.payloadbuilder.core.parser.ExpressionMath;
 import org.kuse.payloadbuilder.core.parser.SortItem;
 import org.kuse.payloadbuilder.core.parser.SortItem.NullOrder;
 import org.kuse.payloadbuilder.core.parser.SortItem.Order;
+import org.kuse.payloadbuilder.core.utils.ExpressionMath;
 
 /** Interpreter based row comparator */
 class ExpressionTupleComparator implements TupleComparator

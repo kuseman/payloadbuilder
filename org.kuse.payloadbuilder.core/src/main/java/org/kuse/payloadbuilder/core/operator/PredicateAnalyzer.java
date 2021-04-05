@@ -35,8 +35,8 @@ import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
  * <pre>
  * Splits join condition by AND and analyzes
  * equal expressions be their alias and columns
- * 
- * 
+ *
+ *
  * from tableA a
  * inner join
  * (
@@ -48,24 +48,21 @@ import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
  * ) x
  *   on x.id = a.id
  *   and x.value = 10
- * 
+ *
  * x.id = a.id
  * Equal comparison
- * 
+ *
  * x.id -> TableAliases = (b, c)
  * a.id -> TableAliases = (a)
- * 
+ *
  * Which aliases is referenced in a pair (x, a)
- * 
- * 
+ *
+ *
  * x.value = 10
  * Equal comparison
- * 
+ *
  * x.value -> TableAliases = (b, c)
  * is push down x => true => push down to b and c
- * 
- * 
- * 
  * </pre>
  **/
 public class PredicateAnalyzer
@@ -140,7 +137,7 @@ public class PredicateAnalyzer
         /**
          * <pre>
          * Extracts push down predicate for provided alias.
-         * @param isNullAllowed True if is null predicate is allowed or not
+         * &#64;param isNullAllowed True if is null predicate is allowed or not
          * </pre>
          */
         Pair<List<AnalyzePair>, AnalyzeResult> extractPushdownPairs(String alias, boolean isNullAllowed)
@@ -223,7 +220,8 @@ public class PredicateAnalyzer
         }
     }
 
-    /** Analyzed pair. A binary operator with left and right analyzed items
+    /**
+     * Analyzed pair. A binary operator with left and right analyzed items
      */
     public static class AnalyzePair
     {

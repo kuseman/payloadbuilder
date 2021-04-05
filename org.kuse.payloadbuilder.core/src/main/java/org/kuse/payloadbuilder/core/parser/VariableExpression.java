@@ -3,6 +3,8 @@ package org.kuse.payloadbuilder.core.parser;
 import static org.apache.commons.lang3.StringUtils.join;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
 
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+
 /** A variable (@var) */
 public class VariableExpression extends Expression implements HasIdentifier
 {
@@ -35,12 +37,6 @@ public class VariableExpression extends Expression implements HasIdentifier
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
-    }
-
-    @Override
-    public boolean isNullable()
-    {
-        return true;
     }
 
     @Override

@@ -10,7 +10,6 @@ import java.util.Map;
 
 import org.apache.commons.collections.iterators.SingletonIterator;
 import org.apache.commons.lang3.StringUtils;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /**

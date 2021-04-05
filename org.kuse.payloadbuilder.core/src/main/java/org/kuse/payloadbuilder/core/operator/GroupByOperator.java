@@ -14,7 +14,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 
 /** Operator that groups by a bucket function */
 class GroupByOperator extends AOperator

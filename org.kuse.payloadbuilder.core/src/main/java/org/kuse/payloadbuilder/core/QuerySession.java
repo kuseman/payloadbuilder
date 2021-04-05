@@ -3,6 +3,7 @@ package org.kuse.payloadbuilder.core;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.StringUtils.lowerCase;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -30,6 +31,7 @@ public class QuerySession
     private Writer printWriter;
     private BooleanSupplier abortSupplier;
     private Map<QualifiedName, List<Tuple>> temporaryTables;
+    private Map<String, Object> systemProperties;
 
     public QuerySession(CatalogRegistry catalogRegistry)
     {
@@ -42,7 +44,7 @@ public class QuerySession
         this.variables = requireNonNull(variables, "variables");
     }
 
-    /** Get current print writer*/
+    /** Get current print writer */
     public Writer getPrintWriter()
     {
         return printWriter;
@@ -101,7 +103,7 @@ public class QuerySession
         List<Tuple> rows;
         //CSOFF
         if (temporaryTables == null
-                || (rows = temporaryTables.get(table)) == null)
+            || (rows = temporaryTables.get(table)) == null)
         //CSON
         {
             throw new QueryException("No temporary table found with name #" + table);
@@ -129,7 +131,7 @@ public class QuerySession
     public void dropTemporaryTable(QualifiedName table, boolean lenient)
     {
         if (!lenient
-                && (temporaryTables == null
+            && (temporaryTables == null
                 || !temporaryTables.containsKey(table)))
         {
             throw new QueryException("No temporary table found with name #" + table);
@@ -173,4 +175,21 @@ public class QuerySession
 
         return catalogProperties.getOrDefault(alias, emptyMap()).get(key);
     }
+
+    /** Set system property */
+    public void setSystemProperty(String name, Object value)
+    {
+        if (systemProperties == null)
+        {
+            systemProperties = new HashMap<>();
+        }
+        systemProperties.put(name, value);
+    }
+
+    /** Get system property */
+    public Object getSystemProperty(String name)
+    {
+        return systemProperties != null ? systemProperties.get(lowerCase(name)) : null;
+    }
+
 }

@@ -12,7 +12,6 @@ import org.apache.commons.collections.iterators.TransformIterator;
  **/
 class CollectionTuple extends ArrayList<Tuple> implements Tuple
 {
-    private static final int INITIAL_CAPACITY = 10;
     private final int tupleOrdinal;
     private final Set<String> singleValueColumns;
 
@@ -41,7 +40,6 @@ class CollectionTuple extends ArrayList<Tuple> implements Tuple
     /** Create a collection tuple based on another tuple */
     CollectionTuple(Tuple tuple)
     {
-        super(INITIAL_CAPACITY);
         add(tuple);
         this.tupleOrdinal = tuple.getTupleOrdinal();
         this.targetOrdinal = -1;
@@ -51,7 +49,6 @@ class CollectionTuple extends ArrayList<Tuple> implements Tuple
     /** Create a collection tuple based on a tuple ordinal */
     CollectionTuple(int tupleOrdinal)
     {
-        super(INITIAL_CAPACITY);
         this.tupleOrdinal = tupleOrdinal;
         this.targetOrdinal = -1;
         this.singleValueColumns = null;

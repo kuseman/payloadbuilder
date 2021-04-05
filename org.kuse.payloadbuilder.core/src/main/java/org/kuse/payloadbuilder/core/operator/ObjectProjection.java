@@ -9,7 +9,6 @@ import java.util.Objects;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.kuse.payloadbuilder.core.OutputWriter;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 
 /** Projection that projects an object output */
 public class ObjectProjection implements Projection

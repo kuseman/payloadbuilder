@@ -4,7 +4,7 @@ import java.util.List;
 
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Length of string function */
@@ -19,8 +19,8 @@ class LengthFunction extends ScalarFunctionInfo
     public String getDescription()
     {
         return "Returns length of provided arguemtn in string form." + System.lineSeparator()
-        + "Ex. length(<expression>) " + System.lineSeparator()
-        + "NOTE! First argument is converted to a string.";
+            + "Ex. length(<expression>) " + System.lineSeparator()
+            + "NOTE! First argument is converted to a string.";
     }
 
     @Override

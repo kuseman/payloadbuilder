@@ -33,7 +33,7 @@ miscStatement
  ;
 
 setStatement
- : SET '@' qname EQUALS expression
+ : SET AT? qname EQUALS expression
  ;
  
 useStatement
@@ -335,6 +335,7 @@ WITH         : W I T H;
 WHERE	     : W H E R E;
 
 ASTERISK			: '*';
+AT					: '@';
 COLON				: ':';
 EQUALS				: '=';
 EXCLAMATION			: '!';

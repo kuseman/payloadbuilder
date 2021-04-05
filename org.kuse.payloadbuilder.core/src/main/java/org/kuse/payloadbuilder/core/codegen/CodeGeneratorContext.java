@@ -7,36 +7,23 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.kuse.payloadbuilder.core.operator.TableAlias;
-
 /** Context used during code generation */
 public class CodeGeneratorContext
 {
     private final Map<String, AtomicInteger> varCountByPreix = new HashMap<>();
-    private TableAlias tableAlias;
-    private final long now = System.currentTimeMillis();
-    private final String rowVarName = "row";
     // Current lambda parameters in scope
     private final Set<String> lambdaParameters = new HashSet<>();
+    private final Set<String> imports = new HashSet<>();
 
-    public long getNow()
+    /** Add import to code */
+    public void addImport(String imp)
     {
-        return now;
+        imports.add(imp);
     }
 
-    public String getRowVarName()
+    public Set<String> getImports()
     {
-        return rowVarName;
-    }
-
-    public TableAlias getTableAlias()
-    {
-        return tableAlias;
-    }
-
-    public void setTableAlias(TableAlias tableAlias)
-    {
-        this.tableAlias = tableAlias;
+        return imports;
     }
 
     /** Allocate a new unique variable name */
@@ -62,5 +49,13 @@ public class CodeGeneratorContext
     public boolean containsLambda(String identifier)
     {
         return lambdaParameters.contains(identifier);
+    }
+
+    /**
+     * Create a new code from context
+     **/
+    public ExpressionCode getCode()
+    {
+        return new ExpressionCode(newVar("v"));
     }
 }

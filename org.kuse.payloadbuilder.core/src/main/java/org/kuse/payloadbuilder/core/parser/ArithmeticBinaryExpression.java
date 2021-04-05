@@ -1,15 +1,16 @@
 package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Objects.requireNonNull;
-import static org.kuse.payloadbuilder.core.parser.ExpressionMath.add;
-import static org.kuse.payloadbuilder.core.parser.ExpressionMath.divide;
-import static org.kuse.payloadbuilder.core.parser.ExpressionMath.modulo;
-import static org.kuse.payloadbuilder.core.parser.ExpressionMath.multiply;
-import static org.kuse.payloadbuilder.core.parser.ExpressionMath.subtract;
 import static org.kuse.payloadbuilder.core.parser.LiteralNullExpression.NULL_LITERAL;
+import static org.kuse.payloadbuilder.core.utils.ExpressionMath.add;
+import static org.kuse.payloadbuilder.core.utils.ExpressionMath.divide;
+import static org.kuse.payloadbuilder.core.utils.ExpressionMath.modulo;
+import static org.kuse.payloadbuilder.core.utils.ExpressionMath.multiply;
+import static org.kuse.payloadbuilder.core.utils.ExpressionMath.subtract;
 
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 
 /** Arithmetic binary expression */
 public class ArithmeticBinaryExpression extends Expression
@@ -74,12 +75,6 @@ public class ArithmeticBinaryExpression extends Expression
     }
 
     @Override
-    public boolean isNullable()
-    {
-        return left.isNullable() || right.isNullable();
-    }
-
-    @Override
     public Class<?> getDataType()
     {
         return left.getDataType();
@@ -118,11 +113,17 @@ public class ArithmeticBinaryExpression extends Expression
     }
 
     @Override
-    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
+    public boolean isCodeGenSupported()
     {
-        ExpressionCode leftCode = left.generateCode(context, parentCode);
-        ExpressionCode rightCode = right.generateCode(context, parentCode);
-        ExpressionCode code = ExpressionCode.code(context);
+        return left.isCodeGenSupported() && right.isCodeGenSupported();
+    }
+
+    @Override
+    public ExpressionCode generateCode(CodeGeneratorContext context)
+    {
+        ExpressionCode code = context.getCode();
+        ExpressionCode leftCode = left.generateCode(context);
+        ExpressionCode rightCode = right.generateCode(context);
 
         String method = null;
         //CSOFF
@@ -146,28 +147,20 @@ public class ArithmeticBinaryExpression extends Expression
                 break;
         }
 
-        String template = "%s"
-            + "Object %s = null;\n"
-            + "boolean %s = true;\n"
-            + "if (!%s)\n"
-            + "{\n"
-            + "  %s"
-            + "  if (!%s)\n"
-            + "  {"
-            + "    %s = %s(%s, %s);\n"
-            + "    %s = false;\n"
-            + "  }\n"
-            + "}\n";
+        //      * Object v1 = tuple.getTuple(1).getValue("country_id");
+        //      * Boolean v3 = false;
+        //      * if (v1 != null)
+        //      * {
+        //      *   Object v2 = tuple.getTuple(0).getValue("country_id");
+        //      *   v3 = v2 != null && ExpressionMath.add(v1, v2);
+        //      * }
 
-        code.setCode(String.format(template,
-                leftCode.getCode(),
+        code.setCode(String.format(
+                "%s%s"                                    // Leftcode/rightcode
+                    + "Object %s = %s(%s, %s);\n",            // This result var
+                leftCode.getCode(), rightCode.getCode(),
                 code.getResVar(),
-                code.getIsNull(),
-                leftCode.getIsNull(),
-                rightCode.getCode(),
-                rightCode.getIsNull(),
-                code.getResVar(), method, leftCode.getResVar(), rightCode.getResVar(),
-                code.getIsNull()));
+                method, leftCode.getResVar(), rightCode.getResVar()));
 
         return code;
     }

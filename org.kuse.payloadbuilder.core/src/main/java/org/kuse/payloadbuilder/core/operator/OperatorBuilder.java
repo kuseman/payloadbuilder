@@ -20,9 +20,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import org.antlr.v4.runtime.Token;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.QuerySession;
@@ -31,6 +33,7 @@ import org.kuse.payloadbuilder.core.catalog.Catalog.OperatorData;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
+import org.kuse.payloadbuilder.core.codegen.CodeGenerator;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzeResult;
 import org.kuse.payloadbuilder.core.parser.AExpressionVisitor;
@@ -72,6 +75,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     private static final String BATCH_LIMIT = "batch_limit";
     private static final String BATCH_SIZE = "batch_size";
     private static final String POPULATE = "populate";
+
+    private static final CodeGenerator CODE_GENERATOR = new CodeGenerator();
 
     //    private static final String HASH_INNER = "hash_inner";
     private static final OperatorBuilder VISITOR = new OperatorBuilder();
@@ -260,7 +265,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 if (predicate != null)
                 //CSON
                 {
-                    context.setOperator(new FilterOperator(context.acquireNodeId(), context.getOperator(), new ExpressionPredicate(predicate)));
+                    context.setOperator(new FilterOperator(context.acquireNodeId(), context.getOperator(), getPredicate(context.session, predicate)));
                 }
             }
         }
@@ -787,7 +792,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         String catalogAlias = innerTableSource.getCatalogAlias();
         QualifiedName table = innerTableSource.getTable();
         List<Index> indices = emptyList();
-        boolean innerIsTempTable = false;
+        int compositeTupleCountOnLevel = innerTableSource.getTableAlias().getParent().getChildAliases().size();
 
         // Sub query, use the inner table sources table and catalog when resolving indices
         if (innerTableSource instanceof SubQueryTableSource)
@@ -796,10 +801,6 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             SubQueryTableSource subQuery = (SubQueryTableSource) innerTableSource;
             catalogAlias = subQuery.getSelect().getFrom().getTableSource().getCatalogAlias();
             table = subQuery.getSelect().getFrom().getTableSource().getTable();
-        }
-        else if (innerTableSource instanceof Table)
-        {
-            innerIsTempTable = ((Table) innerTableSource).isTempTable();
         }
 
         if (table != null)
@@ -835,6 +836,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         context.currentTableAlias = innerTableSource.getTableAlias();
         visit(condition, context);
 
+        Predicate<ExecutionContext> predicate = getPredicate(context.session, condition);
+
         /* No equi items in condition or a correlated query => NestedLoop */
         if (isCorrelated || !foundation.isEqui())
         {
@@ -849,8 +852,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             Operator inner = wrapWithPushDown(context, context.getOperator(), innerTableSource.getTableAlias());
 
             // Cache inner operator if this is a regular nested loop
-            // and it's not a temp table.
-            if (!isCorrelated && !innerIsTempTable)
+            // and it's not an un-filtered temp table.
+            if (!isCorrelated && !(inner instanceof TemporaryTableScanOperator))
             {
                 inner = context.wrap(new CachingOperator(context.acquireNodeId(), inner));
             }
@@ -867,14 +870,14 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                     logicalOperator,
                     outer,
                     inner,
-                    condition != null ? new ExpressionPredicate(condition) : null,
-                    new DefaultTupleMerger(-1, innerTableSource.getTableAlias().getTupleOrdinal()),
+                    predicate,
+                    new DefaultTupleMerger(-1, innerTableSource.getTableAlias().getTupleOrdinal(), compositeTupleCountOnLevel),
                     populating,
                     emitEmptyOuterRows);
         }
 
         // No indices for inner -> HashJoin
-        if (index == null)
+        if (index == null || forceHashJoin(context.session))
         {
             innerTableSource.accept(this, context);
             Operator inner = wrapWithPushDown(context, context.getOperator(), innerTableSource.getTableAlias());
@@ -889,8 +892,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                     new ExpressionHashFunction(foundation.outerValueExpressions),
                     // Collect inner hash expression
                     new ExpressionHashFunction(foundation.innerValueExpressions),
-                    new ExpressionPredicate(condition),
-                    new DefaultTupleMerger(-1, innerTableSource.getTableAlias().getTupleOrdinal()),
+                    predicate,
+                    new DefaultTupleMerger(-1, innerTableSource.getTableAlias().getTupleOrdinal(), compositeTupleCountOnLevel),
                     populating,
                     emitEmptyOuterRows);
         }
@@ -917,12 +920,35 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 inner,
                 outerValuesExtractor,
                 innerValuesExtractor,
-                condition != null ? new ExpressionPredicate(condition) : (ctx, row) -> true,
-                new DefaultTupleMerger(-1, innerTableSource.getTableAlias().getTupleOrdinal()),
+                predicate != null ? predicate : ctx -> true,
+                new DefaultTupleMerger(-1, innerTableSource.getTableAlias().getTupleOrdinal(), compositeTupleCountOnLevel),
                 populating,
                 emitEmptyOuterRows,
                 index,
                 batchSizeOption);
+    }
+
+    private boolean forceHashJoin(QuerySession session)
+    {
+        return BooleanUtils.isTrue((Boolean) session.getSystemProperty("force.hash_join"));
+    }
+
+    private Predicate<ExecutionContext> getPredicate(QuerySession session, Expression predicate)
+    {
+        if (predicate == null)
+        {
+            return null;
+        }
+
+        if (BooleanUtils.isTrue((Boolean) session.getSystemProperty("codegen.enabled")))
+        {
+            if (predicate.isCodeGenSupported())
+            {
+                return CODE_GENERATOR.generatePredicate(predicate);
+            }
+        }
+
+        return new ExpressionPredicate(predicate);
     }
 
     /** Fetch index from provided equi pairs and indices list */
@@ -991,7 +1017,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             Expression pushDownPredicate = new AnalyzeResult(pushDownPairs).getPredicate();
             context.currentTableAlias = tableAlias;
             visit(pushDownPredicate, context);
-            return context.wrap(new FilterOperator(context.acquireNodeId(), operator, new ExpressionPredicate(pushDownPredicate)));
+            return context.wrap(new FilterOperator(context.acquireNodeId(), operator, getPredicate(context.session, pushDownPredicate)));
         }
         return operator;
     }

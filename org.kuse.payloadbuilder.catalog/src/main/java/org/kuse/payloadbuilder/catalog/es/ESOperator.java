@@ -60,11 +60,11 @@ import org.kuse.payloadbuilder.catalog.es.ESCatalog.IdIndex;
 import org.kuse.payloadbuilder.catalog.es.ESCatalog.ParentIndex;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.AOperator;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.OperatorContext;
 import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.utils.ObjectUtils;
 
 import com.fasterxml.jackson.annotation.JsonProperty;

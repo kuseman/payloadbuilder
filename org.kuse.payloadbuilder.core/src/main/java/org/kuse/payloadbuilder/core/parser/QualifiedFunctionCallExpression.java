@@ -7,6 +7,9 @@ import java.util.List;
 
 import org.antlr.v4.runtime.Token;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
+import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
+import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 
 /** Scalar function call */
 public class QualifiedFunctionCallExpression extends Expression
@@ -47,6 +50,18 @@ public class QualifiedFunctionCallExpression extends Expression
     }
 
     @Override
+    public boolean isCodeGenSupported()
+    {
+        return functionInfo.isCodeGenSupported(arguments);
+    }
+
+    @Override
+    public ExpressionCode generateCode(CodeGeneratorContext context)
+    {
+        return functionInfo.generateCode(context, arguments);
+    }
+
+    @Override
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
@@ -59,15 +74,9 @@ public class QualifiedFunctionCallExpression extends Expression
     }
 
     @Override
-    public boolean isNullable()
-    {
-        return functionInfo.isNullable();
-    }
-
-    @Override
     public int hashCode()
     {
-      //CSOFF
+        //CSOFF
         int hashCode = 17;
         hashCode = hashCode * 37 + functionInfo.hashCode();
         hashCode = hashCode * 37 + arguments.hashCode();

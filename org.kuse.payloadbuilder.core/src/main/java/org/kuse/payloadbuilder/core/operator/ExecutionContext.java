@@ -1,4 +1,4 @@
-package org.kuse.payloadbuilder.core.parser;
+package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
@@ -13,8 +13,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.kuse.payloadbuilder.core.QuerySession;
-import org.kuse.payloadbuilder.core.operator.OperatorContext;
-import org.kuse.payloadbuilder.core.operator.Tuple;
 
 /** Context used during execution of a query */
 public class ExecutionContext
@@ -23,6 +21,7 @@ public class ExecutionContext
     /** Holder for lambda references during evaluation */
     private List<Object> lambdaValues;
     private Map<String, Object> variables;
+
     private final ZonedDateTime now = ZonedDateTime.now();
     private final OperatorContext operatorContext = new OperatorContext();
 

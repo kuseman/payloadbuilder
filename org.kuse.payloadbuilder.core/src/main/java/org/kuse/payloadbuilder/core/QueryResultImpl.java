@@ -23,6 +23,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.FunctionInfo;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.ObjectProjection;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
@@ -37,7 +38,6 @@ import org.kuse.payloadbuilder.core.parser.AnalyzeStatement;
 import org.kuse.payloadbuilder.core.parser.DescribeSelectStatement;
 import org.kuse.payloadbuilder.core.parser.DescribeTableStatement;
 import org.kuse.payloadbuilder.core.parser.DropTableStatement;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.IfStatement;
 import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.PrintStatement;
@@ -118,7 +118,14 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     public Void visit(SetStatement statement, Void ctx)
     {
         Object value = statement.getExpression().eval(context);
-        context.setVariable(statement.getName(), value);
+        if (statement.isSystemProperty())
+        {
+            session.setSystemProperty(statement.getName(), value);
+        }
+        else
+        {
+            context.setVariable(statement.getName(), value);
+        }
         return null;
     }
 

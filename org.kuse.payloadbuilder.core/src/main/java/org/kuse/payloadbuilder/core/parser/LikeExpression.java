@@ -5,6 +5,8 @@ import static java.util.Objects.requireNonNull;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+
 /** Like expression */
 public class LikeExpression extends Expression
 {
@@ -57,12 +59,6 @@ public class LikeExpression extends Expression
         return expression.isConstant()
             && patternExpression.isConstant()
             && (escapeCharacterExpression == null || escapeCharacterExpression.isConstant());
-    }
-
-    @Override
-    public boolean isNullable()
-    {
-        return false;
     }
 
     @Override

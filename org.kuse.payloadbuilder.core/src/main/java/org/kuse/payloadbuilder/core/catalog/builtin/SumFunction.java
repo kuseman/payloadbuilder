@@ -5,9 +5,9 @@ import java.util.List;
 
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
-import org.kuse.payloadbuilder.core.parser.ExpressionMath;
+import org.kuse.payloadbuilder.core.utils.ExpressionMath;
 
 /** Sums input */
 class SumFunction extends ScalarFunctionInfo

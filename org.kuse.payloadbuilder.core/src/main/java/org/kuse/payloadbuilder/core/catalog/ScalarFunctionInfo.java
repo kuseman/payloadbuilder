@@ -6,8 +6,8 @@ import java.util.Set;
 import org.apache.commons.lang3.NotImplementedException;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
-import org.kuse.payloadbuilder.core.parser.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Definition of a scalar function */
@@ -50,13 +50,22 @@ public abstract class ScalarFunctionInfo extends FunctionInfo
     }
 
     /**
+     * Returns true if this function supports code generation
+     *
+     * @param arguments Function arguments
+     */
+    public boolean isCodeGenSupported(List<Expression> arguments)
+    {
+        return false;
+    }
+
+    /**
      * Generate code for this function. Default is fallback to eval.
      *
      * @param context Context used during evaluation
-     * @param parentCode Expression code from parent node
      * @param arguments Arguments to function
      **/
-    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode, List<Expression> arguments)
+    public ExpressionCode generateCode(CodeGeneratorContext context, List<Expression> arguments)
     {
         Class<?> clazz = getClass();
         if (clazz.isAnonymousClass())

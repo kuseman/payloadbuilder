@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Objects;
 
 import org.apache.commons.lang3.BooleanUtils;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 
 /** CASE WHEN expression */
 class CaseExpression extends Expression
@@ -33,7 +34,7 @@ class CaseExpression extends Expression
     public boolean isConstant()
     {
         return whenClauses.stream().allMatch(w -> w.isConstant())
-                && (elseExpression == null || elseExpression.isConstant());
+            && (elseExpression == null || elseExpression.isConstant());
     }
 
     @Override
@@ -89,7 +90,7 @@ class CaseExpression extends Expression
         boolean isConstant()
         {
             return condition.isConstant()
-                    && result.isConstant();
+                && result.isConstant();
         }
 
         @Override

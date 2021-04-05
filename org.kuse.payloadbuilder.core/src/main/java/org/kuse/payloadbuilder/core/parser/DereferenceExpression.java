@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.Map;
 
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 
 /** Dereference expression */
@@ -64,12 +65,6 @@ public class DereferenceExpression extends Expression implements HasIdentifier
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
-    }
-
-    @Override
-    public boolean isNullable()
-    {
-        return left.isNullable() && left.isNullable();
     }
 
     @Override

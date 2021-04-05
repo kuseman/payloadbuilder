@@ -60,63 +60,65 @@ public class OperatorContext
         private final StopWatch nodeTime = new StopWatch();
         private int executionCount;
         private long rowCount;
-        /** <pre> 
-         * Time that is set on all nodes after query is run to be 
-         *  able to calculate a percentage when {@link Operator#getDescribeProperties} is called 
-         *  </pre>
+        /**
+         * <pre>
+         *  
+          * Time that is set on all nodes after query is run to be 
+          *  able to calculate a percentage when {@link Operator#getDescribeProperties} is called
+         * </pre>
          */
         private long totalQueryTime;
-        
+
         protected NodeData()
         {
             nodeTime.start();
             nodeTime.suspend();
         }
-        
+
         public long getTotalQueryTime()
         {
             return totalQueryTime;
         }
-        
+
         public void setTotalQueryTime(long totalQueryTime)
         {
             this.totalQueryTime = totalQueryTime;
         }
-        
+
         /** Resumes node time stop watch */
         public void resumeNodeTime()
         {
             nodeTime.resume();
         }
-        
+
         /** Suspend node time stop watch */
         public void suspenNodeTime()
         {
             nodeTime.suspend();
         }
-        
+
         /** Return the node time */
         public long getNodeTime(TimeUnit timeUnit)
         {
             return nodeTime.getTime(timeUnit);
         }
-        
+
         public int getExecutionCount()
         {
             return executionCount;
         }
-        
+
         /** Increase execution count */
         public void increaseExecutionCount()
         {
             executionCount++;
         }
-        
+
         public long getRowCount()
         {
             return rowCount;
         }
-        
+
         public void increaseRowCount()
         {
             rowCount++;
