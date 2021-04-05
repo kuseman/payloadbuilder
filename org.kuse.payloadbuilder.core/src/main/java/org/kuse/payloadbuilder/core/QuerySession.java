@@ -191,5 +191,4 @@ public class QuerySession
     {
         return systemProperties != null ? systemProperties.get(lowerCase(name)) : null;
     }
-
 }
