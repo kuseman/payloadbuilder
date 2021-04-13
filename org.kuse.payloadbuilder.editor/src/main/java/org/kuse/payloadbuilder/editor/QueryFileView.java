@@ -1,8 +1,6 @@
 package org.kuse.payloadbuilder.editor;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
-import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
-import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -58,8 +56,6 @@ import org.fife.ui.rsyntaxtextarea.TextEditorPane;
 import org.fife.ui.rtextarea.RTextScrollPane;
 import org.kordamp.ikonli.fontawesome.FontAwesome;
 import org.kordamp.ikonli.swing.FontIcon;
-import org.kuse.payloadbuilder.core.operator.Row;
-import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.editor.QueryFileModel.Output;
 import org.kuse.payloadbuilder.editor.QueryFileModel.State;
 
@@ -422,14 +418,7 @@ class QueryFileView extends JPanel
             {
                 Object value = val;
 
-                if (value instanceof Row)
-                {
-                    Row pbRow = (Row) value;
-                    TableAlias alias = pbRow.getTableAlias();
-                    value = ofEntries(
-                            entry("table", alias.getTable().toString()));
-                }
-                else if (value != null && value.getClass().isArray())
+                if (value != null && value.getClass().isArray())
                 {
                     StringBuilder sb = new StringBuilder();
                     int length = Array.getLength(value);

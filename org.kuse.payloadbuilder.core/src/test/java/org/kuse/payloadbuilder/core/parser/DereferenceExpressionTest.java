@@ -42,11 +42,33 @@ public class DereferenceExpressionTest extends AParserTest
             }
 
             @Override
-            public Object getValue(String column)
+            public int getColumnCount()
+            {
+                return 1;
+            }
+
+            @Override
+            public String getColumn(int ordinal)
+            {
+                return "elite";
+            }
+
+            @Override
+            public int getColmnOrdinal(String column)
             {
                 if ("elite".equals(column))
                 {
                     return 1337;
+                }
+                return -1;
+            }
+
+            @Override
+            public Object getValue(int ordinal)
+            {
+                if (ordinal == 1337)
+                {
+                    return ordinal;
                 }
                 return null;
             }

@@ -31,7 +31,7 @@ import org.kuse.payloadbuilder.core.parser.QualifiedName;
  *  from tableA a
  *  inner join
  *  (
- *    select **
+ *    select *
  *    from tableC c
  *    where c.id > 10
  *  ) b
@@ -52,13 +52,13 @@ import org.kuse.payloadbuilder.core.parser.QualifiedName;
  *  from tableA a
  *  inner join
  *  (
- *    select **
+ *    select *
  *    from tableC c
  *    where c.id > 10
  *
  *    union all         (Not implemented yet, but used for demonstrating alias hierarchy)
  *
- *    select **
+ *    select *
  *    from tableD c
  *    where c.id > 10
  *
@@ -92,6 +92,7 @@ public class TableAlias
     private final QualifiedName table;
     private final String alias;
     private final List<TableAlias> childAliases = new ArrayList<>();
+
     /**
      * Unique ordinal of this alias
      *
@@ -102,6 +103,26 @@ public class TableAlias
      **/
     private final int tupleOrdinal;
     private final Type type;
+
+    /**
+     * Select items for this alias
+     *
+     * <pre>
+     * ie.
+     *
+     *   select *
+     *   from
+     *   (
+     *          select col1
+     *          ,      col2
+     *          ,      col3 + col4 calc
+     *   ) x
+     *
+     *   Here we have 3 select items (col1, col2, calc)
+     *   And output columns needed from operator is (col1, col2, col3)
+     * </pre>
+     **/
+//    private List<SelectItem> selectItems;
 
     private String[] columns;
     /** Is all columns wanted for this table alias. */
@@ -155,6 +176,12 @@ public class TableAlias
     public TableAlias getParent()
     {
         return parent;
+    }
+
+    /** Returns true if this allias has defined columns */
+    public boolean hasDefinedColumns()
+    {
+        return type == Type.SUBQUERY;
     }
 
     public List<TableAlias> getChildAliases()
@@ -218,11 +245,11 @@ public class TableAlias
     }
 
     /**
+     * Get output columns needed from operator.
+     *
      * <pre>
-     * Returns columns defined to for this table
-     * If not empty these columns should be used when constructing {@link Row}'s
-     * NOTE! If this is not empty values MUST come in the same order as in the array.
-     * This is because the core plans references to index:es for faster access
+     * A optimized catalog should look at this and only
+     * return columns specified here to not return data that is not needed.
      * </pre>
      */
     public String[] getColumns()
@@ -230,6 +257,7 @@ public class TableAlias
         return columns;
     }
 
+    @Deprecated
     void setColumns(String[] columns)
     {
         if (this.columns != NOT_SET)
@@ -245,14 +273,13 @@ public class TableAlias
         return asteriskColumns;
     }
 
-    void setAsteriskColumns()
+    /**
+     * Mark alias as asterisk A temporary mutator until a 2 phase query build is in place
+     */
+    @Deprecated
+    public void setAsteriskColumns()
     {
         this.asteriskColumns = true;
-        // Propagate to child aliases
-        if (type == Type.SUBQUERY)
-        {
-            childAliases.forEach(a -> a.setAsteriskColumns());
-        }
     }
 
     public int getTupleOrdinal()

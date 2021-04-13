@@ -20,13 +20,6 @@ public class SubQueryTableSource extends TableSource
     {
         super(tableAlias, options, token);
         this.select = requireNonNull(select, "select");
-
-        if (select.getSelectItems().size() != 1
-            || !(select.getSelectItems().get(0) instanceof AsteriskSelectItem)
-            || !((AsteriskSelectItem) select.getSelectItems().get(0)).isRecursive())
-        {
-            throw new ParseException("Only a recursive asterisk select (**) is supporte for sub queries", token);
-        }
     }
 
     public Select getSelect()

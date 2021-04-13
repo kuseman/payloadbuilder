@@ -27,7 +27,7 @@ public class BatchLimitOperatorTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            int pos = (int) tuple.getTuple(0).getValue("__pos");
+            int pos = (int) tuple.getTuple(0).getValue(Row.POS_ORDINAL);
             assertEquals(count, pos);
             count++;
         }
@@ -41,7 +41,7 @@ public class BatchLimitOperatorTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            int pos = (int) tuple.getTuple(0).getValue("__pos");
+            int pos = (int) tuple.getTuple(0).getValue(Row.POS_ORDINAL);
             assertEquals(count, pos);
             count++;
         }

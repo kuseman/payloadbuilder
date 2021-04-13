@@ -6,14 +6,12 @@ import java.util.List;
 import java.util.function.ToIntBiFunction;
 import java.util.stream.Collectors;
 
-import org.apache.commons.lang3.math.NumberUtils;
 import org.kuse.payloadbuilder.core.parser.Expression;
+import org.kuse.payloadbuilder.core.utils.ObjectUtils;
 
 /** Function that generates a hash from provided expressions */
 class ExpressionHashFunction implements ToIntBiFunction<ExecutionContext, Tuple>
 {
-    private static final int HASH_MULTIPLIER = 37;
-    private static final int HASH_CONSTANT = 17;
     private final List<Expression> expressions;
 
     ExpressionHashFunction(List<Expression> expressions)
@@ -25,19 +23,11 @@ class ExpressionHashFunction implements ToIntBiFunction<ExecutionContext, Tuple>
     public int applyAsInt(ExecutionContext context, Tuple tuple)
     {
         context.setTuple(tuple);
-        int hash = HASH_CONSTANT;
+        int hash = ObjectUtils.HASH_CONSTANT;
         for (Expression expression : expressions)
         {
             Object result = expression.eval(context);
-
-            // If value is string and is digits, use the intvalue as
-            // hash instead of string to be able to compare ints and strings
-            // on left/right side of join
-            if (result instanceof String && NumberUtils.isDigits((String) result))
-            {
-                result = Integer.parseInt((String) result);
-            }
-            hash = hash * HASH_MULTIPLIER + (result != null ? result.hashCode() : 0);
+            hash = hash * ObjectUtils.HASH_MULTIPLIER + ObjectUtils.hash(result);
         }
         context.setTuple(null);
         return hash;

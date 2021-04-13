@@ -185,8 +185,8 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
             count++;
         }
 
@@ -246,8 +246,8 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
             count++;
         }
 
@@ -303,8 +303,8 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
             count++;
         }
 
@@ -364,8 +364,8 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
             count++;
         }
 
@@ -424,8 +424,8 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
             count++;
         }
 
@@ -493,8 +493,8 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
             count++;
         }
 
@@ -560,8 +560,8 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
             count++;
         }
 
@@ -630,8 +630,8 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
             count++;
         }
 
@@ -688,12 +688,12 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
 
-            assertEquals("" + count, expectedInnerPositions.get(count), col.stream().map(t -> (int) t.getValue("__pos")).collect(toList()));
+            assertEquals("" + count, expectedInnerPositions.get(count), col.stream().map(t -> (int) t.getValue(Row.POS_ORDINAL)).collect(toList()));
             count++;
         }
 
@@ -754,12 +754,12 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
 
-            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue("__pos")).collect(toList()) : null);
+            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue(Row.POS_ORDINAL)).collect(toList()) : null);
             count++;
         }
 
@@ -815,12 +815,12 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
 
-            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue("__pos")).collect(toList()) : null);
+            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue(Row.POS_ORDINAL)).collect(toList()) : null);
             count++;
         }
 
@@ -883,12 +883,12 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
 
-            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue("__pos")).collect(toList()) : null);
+            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue(Row.POS_ORDINAL)).collect(toList()) : null);
             count++;
         }
 
@@ -949,12 +949,12 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
 
-            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue("__pos")).collect(toList()) : null);
+            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue(Row.POS_ORDINAL)).collect(toList()) : null);
             count++;
         }
         assertEquals(6, batchCount.intValue());
@@ -1025,12 +1025,12 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
 
-            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue("__pos")).collect(toList()) : null);
+            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue(Row.POS_ORDINAL)).collect(toList()) : null);
             count++;
         }
 

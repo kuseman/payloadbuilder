@@ -15,6 +15,7 @@ import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.operator.TableAlias.Type;
+import org.kuse.payloadbuilder.core.parser.AsteriskSelectItem;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -49,6 +50,65 @@ public class OperatorBuilderTest extends AOperatorTest
         {
             assertTrue(e.getMessage(), e.getMessage().contains("Alias b already exists in scope."));
         }
+    }
+
+    @Test
+    public void test_aggregating_select_items()
+    {
+        String query = "\r\n" +
+            "select  *\r\n" +
+            ",       col2  \r\n" +
+            "from \r\n" +
+            "(\r\n" +
+            "    select  col2    \r\n" +
+            "    ,       col1\r\n" +
+            "    ,       *\r\n" +
+            "    ,       col3    \r\n" +
+            "    from \r\n" +
+            "    (\r\n" +
+            "        select  *\r\n" +
+            "        ,       col4\r\n" +
+            "        ,       col10 + col11 calc\r\n" +
+            "        ,       col5\r\n" +
+            "        ,       col6\r\n" +
+            "        from table\r\n" +
+            "    ) y\r\n" +
+            ") x";
+
+        //        col2
+        //        col1
+        //        *
+        //        col4
+        //        col10 + col11 calc
+        //        col5
+        //        col6
+        //        col3
+        //        col2
+        //
+
+        QueryResult queryResult = getQueryResult(query);
+        assertEquals(new ComputedColumnsOperator(
+                1,
+                0,
+                queryResult.tableOperators.get(0),
+                asList("calc"),
+                asList(e("col10 + col11"))),
+                queryResult.operator);
+
+        ObjectProjection expected = new ObjectProjection(
+                asList("col2", "col1", "", "col4", "calc", "col5", "col6", "col3", "col2"),
+                asList(
+                        new ExpressionProjection(e("col2")),
+                        new ExpressionProjection(e("col1")),
+                        new AsteriskSelectItem(null, null),
+                        new ExpressionProjection(e("col4")),
+                        new ExpressionProjection(e("calc")),
+                        new ExpressionProjection(e("col5")),
+                        new ExpressionProjection(e("col6")),
+                        new ExpressionProjection(e("col3")),
+                        new ExpressionProjection(e("col2"))));
+
+        assertEquals(expected, queryResult.projection);
     }
 
     @Test
@@ -108,6 +168,7 @@ public class OperatorBuilderTest extends AOperatorTest
                 2,
                 new ComputedColumnsOperator(
                         1,
+                        0,
                         queryResult.tableOperators.get(0),
                         asList("newCol"),
                         asList(e("art_id * 10"))),
@@ -116,8 +177,8 @@ public class OperatorBuilderTest extends AOperatorTest
                         Order.ASC,
                         NullOrder.UNDEFINED, null))));
 
-        //                        System.out.println(queryResult.operator.toString(1));
-        //                        System.err.println(expected.toString(1));
+        //                                                System.out.println(queryResult.operator.toString(1));
+        //                                                System.err.println(expected.toString(1));
 
         assertEquals(expected, queryResult.operator);
 
@@ -175,7 +236,7 @@ public class OperatorBuilderTest extends AOperatorTest
             + "from source s "
             + "inner join "
             + "("
-            + "  select ** "
+            + "  select * "
             + "  from article a "
             + "  inner join articleBrand ab with(populate=true) "
             + "    on ab.art_id = a.art_id"
@@ -210,9 +271,9 @@ public class OperatorBuilderTest extends AOperatorTest
                         false),
                 new ExpressionPredicate(e("a.ab.active_flg = true")));
 
-        //                System.out.println(queryResult.operator.toString(1));
-        //                System.out.println();
-        //                System.err.println(expected.toString(1));
+        //                        System.out.println(queryResult.operator.toString(1));
+        //                        System.out.println();
+        //                        System.err.println(expected.toString(1));
 
         assertEquals(expected, queryResult.operator);
     }
@@ -355,8 +416,8 @@ public class OperatorBuilderTest extends AOperatorTest
                 false,
                 false);
 
-        //                                                        System.err.println(expected.toString(1));
-        //                                                        System.out.println(queryResult.operator.toString(1));
+        //                                                                System.err.println(expected.toString(1));
+        //                                                                System.out.println(queryResult.operator.toString(1));
 
         assertEquals(expected, queryResult.operator);
 
@@ -383,7 +444,7 @@ public class OperatorBuilderTest extends AOperatorTest
             + "  on a.art_id = s.art_id "
             + "inner join "
             + "("
-            + "  select ** "
+            + "  select * "
             + "  from articleAttribute aa"
             + "  inner join articlePrice ap"
             + "    on ap.sku_id = aa.sku_id"
@@ -406,15 +467,15 @@ public class OperatorBuilderTest extends AOperatorTest
                                 .children(asList(
                                         TableAliasBuilder.of(-1, Type.ROOT, of("ROOT"), "ROOT")
                                                 .children(asList(
-                                                        TableAliasBuilder.of(3, Type.TABLE, of("articleAttribute"), "aa").columns(new String[] {"sku_id", "attr1_id", "art_id", "active_flg"}),
-                                                        TableAliasBuilder.of(4, Type.TABLE, of("articlePrice"), "ap").columns(new String[] {"price_sales", "sku_id"}),
+                                                        TableAliasBuilder.of(3, Type.TABLE, of("articleAttribute"), "aa").columns(new String[] {"sku_id", "attr1_id", "active_flg", "art_id"}),
+                                                        TableAliasBuilder.of(4, Type.TABLE, of("articlePrice"), "ap").columns(new String[] {"sku_id", "price_sales"}),
                                                         TableAliasBuilder.of(5, Type.TABLE, of("attribute1"), "a1").columns(new String[] {"attr1_id"})))))))
                 .build();
 
         TableAlias source = root.getChildAliases().get(0);
 
-        //                                                                System.out.println(source.getParent().printHierarchy(0));
-        //                                                                System.out.println(queryResult.alias.printHierarchy(0));
+        //                                                                        System.out.println(source.getParent().printHierarchy(0));
+        //                                                                        System.out.println(queryResult.alias.printHierarchy(0));
 
         assertTrue("Alias hierarchy should be equal", source.getParent().isEqual(queryResult.alias));
 
@@ -509,7 +570,7 @@ public class OperatorBuilderTest extends AOperatorTest
             + "from article a "
             + "inner join "
             + "("
-            + "  select ** "
+            + "  select * "
             + "  from articleAttribute aa "
             + "  inner join articlePrice ap with(populate=true) "
             + "    on ap.sku_id = aa.sku_id "
@@ -531,14 +592,14 @@ public class OperatorBuilderTest extends AOperatorTest
             + "  and aa.internet_flg "
             + "inner join "
             + "("
-            + "  select ** "
+            + "  select * "
             + "  from articleProperty "
             + "  group by propertykey_id "
             + ") ap with(populate=true) "
             + "  on ap.art_id = a.art_id "
             + "cross apply "
             + "("
-            + "  select ** "
+            + "  select * "
             + "  from range(10) r "
             + "  inner join attribute1 a1 with(populate=true)"
             + "      on a1.someId = r.Value "
@@ -552,7 +613,7 @@ public class OperatorBuilderTest extends AOperatorTest
         TableAlias root = TableAliasBuilder
                 .of(-1, TableAlias.Type.ROOT, QualifiedName.of("ROOT"), "ROOT")
                 .children(asList(
-                        TableAliasBuilder.of(0, TableAlias.Type.TABLE, of("article"), "a").columns(new String[] {"stamp_dat_cr", "art_id", "add_on_flg", "articleType", "note_id", "idx_id"}),
+                        TableAliasBuilder.of(0, TableAlias.Type.TABLE, of("article"), "a").columns(new String[] {"art_id", "add_on_flg", "articleType", "note_id", "stamp_dat_cr", "idx_id"}),
                         TableAliasBuilder.of(1, TableAlias.Type.SUBQUERY, of("SubQuery"), "aa")
                                 .children(asList(
                                         TableAliasBuilder
@@ -560,15 +621,15 @@ public class OperatorBuilderTest extends AOperatorTest
                                                 .children(asList(
 
                                                         TableAliasBuilder.of(2, TableAlias.Type.TABLE, of("articleAttribute"), "aa")
-                                                                .columns(new String[] {"internet_flg", "internet_date_start", "sku_id", "attr1_id", "art_id", "pluno", "active_flg", "ean13",
-                                                                        "attr3_id", "note_id",
-                                                                        "attr2_id"}),
+                                                                .columns(new String[] {"sku_id", "attr1_id", "attr2_id", "attr3_id", "art_id", "active_flg", "internet_flg", "pluno",
+                                                                        "internet_date_start", "ean13",
+                                                                        "note_id"}),
                                                         TableAliasBuilder.of(3, TableAlias.Type.TABLE, of("articlePrice"), "ap")
-                                                                .columns(new String[] {"price_sales", "sku_id", "art_id", "price_org", "note_id"}),
+                                                                .columns(new String[] {"sku_id", "price_sales", "price_org", "art_id", "note_id"}),
                                                         TableAliasBuilder.of(4, TableAlias.Type.TABLE, of("attribute1"), "a1")
-                                                                .columns(new String[] {"colorGroup", "attr1_id", "rgb_code", "lang_id", "group_flg"}),
-                                                        TableAliasBuilder.of(5, TableAlias.Type.TABLE, of("attribute2"), "a2").columns(new String[] {"attr2_code", "lang_id", "attr2_no", "attr2_id"}),
-                                                        TableAliasBuilder.of(6, TableAlias.Type.TABLE, of("attribute3"), "a3").columns(new String[] {"lang_id", "attr3_id"}))))),
+                                                                .columns(new String[] {"attr1_id", "lang_id", "rgb_code", "colorGroup", "group_flg"}),
+                                                        TableAliasBuilder.of(5, TableAlias.Type.TABLE, of("attribute2"), "a2").columns(new String[] {"attr2_id", "lang_id", "attr2_no", "attr2_code"}),
+                                                        TableAliasBuilder.of(6, TableAlias.Type.TABLE, of("attribute3"), "a3").columns(new String[] {"attr3_id", "lang_id"}))))),
 
                         TableAliasBuilder.of(7, TableAlias.Type.SUBQUERY, of("SubQuery"), "ap")
                                 .children(asList(
@@ -586,8 +647,8 @@ public class OperatorBuilderTest extends AOperatorTest
                                                         TableAliasBuilder.of(11, TableAlias.Type.TABLE, of("attribute1"), "a1").columns(new String[] {"someId", "attr1_code"})))))))
                 .build();
 
-        //        System.out.println(root.printHierarchy(1));
-        //        System.out.println(result.alias.printHierarchy(1));
+        //                System.out.println(root.printHierarchy(1));
+        //                System.out.println(result.alias.printHierarchy(1));
 
         assertTrue("Alias hierarchy should be equal", root.isEqual(result.alias));
     }
@@ -600,7 +661,7 @@ public class OperatorBuilderTest extends AOperatorTest
 
         TableAlias root = TableAliasBuilder.of(-1, Type.ROOT, QualifiedName.of("ROOT"), "ROOT")
                 .children(asList(
-                        TableAliasBuilder.of(0, TableAlias.Type.TABLE, QualifiedName.of("source"), "s").columns(new String[] {"id2", "id1"})))
+                        TableAliasBuilder.of(0, TableAlias.Type.TABLE, QualifiedName.of("source"), "s").columns(new String[] {"id1", "id2"})))
                 .build();
 
         //                System.out.println(root.printHierarchy(1));
@@ -705,7 +766,7 @@ public class OperatorBuilderTest extends AOperatorTest
     @Test
     public void test_select_item_with_filter()
     {
-        String query = "select object(s.id1, a.id2 from s where s.id4 > 0) arr from source s inner join (select ** from article where note_id > 0) a with(populate=true) on a.art_id = s.art_id and a.active_flg where s.id3 > 0";
+        String query = "select object(s.id1, a.id2 from s where s.id4 > 0) arr from source s inner join (select * from article where note_id > 0) a with(populate=true) on a.art_id = s.art_id and a.active_flg where s.id3 > 0";
         QueryResult result = getQueryResult(query);
 
         Operator expected = new HashJoin(
@@ -746,7 +807,7 @@ public class OperatorBuilderTest extends AOperatorTest
             + "FROM source s "
             + "INNER JOIN "
             + "("
-            + "  select ** "
+            + "  select * "
             + "  from article a"
             + "  INNER JOIN articleAttribute aa with(populate=true)"
             + "    ON aa.art_id = a.art_id "
@@ -796,7 +857,7 @@ public class OperatorBuilderTest extends AOperatorTest
             + "FROM source s "
             + "INNER JOIN "
             + "("
-            + "  select ** "
+            + "  select * "
             + "  from article a"
             + "  INNER JOIN articleAttribute aa with(populate=true)"
             + "    ON aa.art_id = a.art_id "

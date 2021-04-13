@@ -394,7 +394,9 @@ class ESOperator extends AOperator
         return sb.toString();
     }
 
+    //CSOFF
     static RowIterator getIterator(
+            //CSON
             ExecutionContext context,
             TableAlias tableAlias,
             String endpoint,
@@ -529,14 +531,15 @@ class ESOperator extends AOperator
                     {
                         if (addedColumns == null)
                         {
+                            Set<String> keySet = doc.source.keySet();
                             //CSOFF
-                            addedColumns = new LinkedHashSet<>(doc.source.keySet().size() + 4);
+                            addedColumns = new LinkedHashSet<>(keySet.size() + 4);
                             //CSON
                             addedColumns.add(INDEX);
                             addedColumns.add(TYPE);
                             addedColumns.add(DOCID);
                             addedColumns.add(PARENTID);
-                            addedColumns.addAll(doc.source.keySet());
+                            addedColumns.addAll(keySet);
                             rowColumns = addedColumns.toArray(EMPTY_STRING_ARRAY);
                         }
                         else if (addedColumns.addAll(doc.source.keySet()))
@@ -545,7 +548,7 @@ class ESOperator extends AOperator
                         }
                     }
 
-                    next = Row.of(tableAlias, rowPos++, rowColumns, new DocValues(doc, rowColumns));
+                    next = Row.of(tableAlias, rowPos++, rowColumns, new DocValues(doc, rowColumns, tableAlias.isAsteriskColumns()));
                 }
                 return true;
             }
@@ -553,39 +556,48 @@ class ESOperator extends AOperator
     }
 
     /** DocValues. Wrapping a {@link Doc} to support index,type,id besides source fields */
-    private static class DocValues implements Row.Values
+    private static class DocValues implements Row.RowValues
     {
         private final Doc doc;
         private final String[] columns;
+        private final boolean asterisk;
 
-        DocValues(Doc doc, String[] columns)
+        DocValues(Doc doc, String[] columns, boolean asterisk)
         {
             this.doc = doc;
             this.columns = columns;
+            this.asterisk = asterisk;
         }
 
         @Override
-        public Object get(int ordinal)
+        public Object getValue(int ordinal)
         {
-            String column = columns[ordinal];
-            if (INDEX.equals(column))
+            if (ordinal == -1)
             {
-                return doc.index;
+                return null;
             }
-            else if (TYPE.equals(column))
+            // Asterisk column then meta fields are located in the first ordinals
+            if (asterisk)
             {
-                return doc.type;
-            }
-            else if (DOCID.equals(column))
-            {
-                return doc.docId;
-            }
-            else if (PARENTID.equals(column))
-            {
-                return doc.fields != null ? doc.fields.get("_parent") : null;
+                if (ordinal == 0)
+                {
+                    return doc.index;
+                }
+                else if (ordinal == 1)
+                {
+                    return doc.type;
+                }
+                else if (ordinal == 2)
+                {
+                    return doc.docId;
+                }
+                else if (ordinal == 3)
+                {
+                    return doc.fields != null ? doc.fields.get("_parent") : null;
+                }
             }
 
-            return doc.source.get(column);
+            return doc.source.get(columns[ordinal]);
         }
     }
 

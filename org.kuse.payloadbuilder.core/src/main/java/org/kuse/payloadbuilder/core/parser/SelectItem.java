@@ -2,8 +2,11 @@ package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Objects.requireNonNull;
 
+import java.util.List;
+
 import org.antlr.v4.runtime.Token;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression.ResolvePath;
 
 /** Base class for select items */
 //CSOFF
@@ -40,6 +43,24 @@ public abstract class SelectItem extends ASelectNode
 
     /** Name of assignment variable if any */
     public String getAssignmentName()
+    {
+        return null;
+    }
+
+    /** Returns true if this item is an asterisk one */
+    public boolean isAsterisk()
+    {
+        return false;
+    }
+
+    /** Returns true if this select item is a computed item. Expression or a sub query */
+    public boolean isComputed()
+    {
+        return false;
+    }
+
+    /** Return resolve paths for item if any.  */
+    public List<ResolvePath> getResolvePaths()
     {
         return null;
     }

@@ -1,12 +1,14 @@
 package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Arrays.asList;
-import static java.util.Collections.emptyList;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.Test;
@@ -69,6 +71,7 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         }
     }
 
+    @SuppressWarnings("deprecation")
     @Test
     public void test_resolve_path_no_lambda()
     {
@@ -81,7 +84,9 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         assertNull(e.eval(context));
 
         Map<Integer, Tuple> tupleByOrdinal = new HashMap<>();
-        Map<String, Object> valueByColumn = new HashMap<>();
+        List<String> columns = new ArrayList<>();
+        List<Object> values = new ArrayList<>();
+
         Tuple tuple = new Tuple()
         {
             @Override
@@ -97,9 +102,31 @@ public class QualifiedReferenceExpressionTest extends AParserTest
             }
 
             @Override
-            public Object getValue(String column)
+            public int getColumnCount()
             {
-                return valueByColumn.get(column);
+                return columns.size();
+            }
+
+            @Override
+            public String getColumn(int ordinal)
+            {
+                return columns.get(ordinal);
+            }
+
+            @Override
+            public int getColmnOrdinal(String column)
+            {
+                return Collections.binarySearch(columns, column);
+            }
+
+            @Override
+            public Object getValue(int ordinal)
+            {
+                if (ordinal <= -1)
+                {
+                    return null;
+                }
+                return values.get(ordinal);
             }
         };
 
@@ -121,8 +148,8 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         assertNull(e.eval(context));
 
         Map<String, Object> map = MapUtils.ofEntries(MapUtils.entry("subkey", 1337));
-        valueByColumn.put("col", map);
-        valueByColumn.put("date", new Date());
+        columns.addAll(asList("col", "date"));
+        values.addAll(asList(map, new Date()));
 
         assertEquals(map, e.eval(context));
 
@@ -145,50 +172,9 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         {
             assertTrue(ee.getMessage().contains("Cannot dereference value "));
         }
-
-        // Computed column index access
-        e = new QualifiedReferenceExpression(QualifiedName.of(), -1, null);
-        e.setResolvePaths(asList(new ResolvePath(-1, -1, emptyList(), 0)));
-
-        try
-        {
-            e.eval(context);
-        }
-        catch (IllegalArgumentException ee)
-        {
-            assertTrue(ee.getMessage(), ee.getMessage().contains("Expected a computed tuple but got "));
-        }
-
-        context.setTuple(new Tuple.ComputedTuple()
-        {
-            @Override
-            public Object getValue(String column)
-            {
-                return null;
-            }
-
-            @Override
-            public int getTupleOrdinal()
-            {
-                return 0;
-            }
-
-            @Override
-            public Tuple getTuple(int tupleOrdinal)
-            {
-                return null;
-            }
-
-            @Override
-            public Object getComputedValue(int ordinal)
-            {
-                return "computed value";
-            }
-        });
-
-        assertEquals("computed value", e.eval(context));
     }
 
+    @SuppressWarnings("deprecation")
     @Test
     public void test_resolve_path_with_lambda()
     {
@@ -219,7 +205,8 @@ public class QualifiedReferenceExpressionTest extends AParserTest
 
         // Set up tuple
         Map<Integer, Tuple> tupleByOrdinal = new HashMap<>();
-        Map<String, Object> valueByColumn = new HashMap<>();
+        List<String> columns = new ArrayList<>();
+        List<Object> values = new ArrayList<>();
         Tuple tuple = new Tuple()
         {
             @Override
@@ -235,9 +222,31 @@ public class QualifiedReferenceExpressionTest extends AParserTest
             }
 
             @Override
-            public Object getValue(String column)
+            public int getColumnCount()
             {
-                return valueByColumn.get(column);
+                return columns.size();
+            }
+
+            @Override
+            public String getColumn(int ordinal)
+            {
+                return columns.get(ordinal);
+            }
+
+            @Override
+            public int getColmnOrdinal(String column)
+            {
+                return Collections.binarySearch(columns, column);
+            }
+
+            @Override
+            public Object getValue(int ordinal)
+            {
+                if (ordinal == -1)
+                {
+                    return null;
+                }
+                return values.get(ordinal);
             }
         };
 
@@ -262,7 +271,8 @@ public class QualifiedReferenceExpressionTest extends AParserTest
 
         assertNull(e.eval(context));
 
-        valueByColumn.put("col", 666);
+        columns.add("col");
+        values.add(666);
 
         assertEquals(666, e.eval(context));
     }

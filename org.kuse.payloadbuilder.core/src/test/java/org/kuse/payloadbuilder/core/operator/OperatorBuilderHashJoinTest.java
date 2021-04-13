@@ -165,7 +165,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
     @Test
     public void test_inner_hash_join_with_filter()
     {
-        String query = "select s.id1, a.id2 from source s inner join (select ** from article where note_id > 0) a with (populate=true) on a.art_id = s.art_id and a.active_flg where s.id3 > 0 and a.id2 = 10";
+        String query = "select s.id1, a.id2 from source s inner join (select * from article where note_id > 0) a with (populate=true) on a.art_id = s.art_id and a.active_flg where s.id3 > 0 and a.id2 = 10";
         QueryResult result = getQueryResult(query);
 
         Operator expected = new HashJoin(

@@ -55,7 +55,7 @@
     {
       "name": "Subquery with a single table source",
       "query": [
-        "select x.col1, x.col2 from (select ** from source) x"
+        "select x.col1, x.col2 from (select * from source) x"
       ],
       "expectedResultSets": [
         [
@@ -150,6 +150,38 @@
       ]
     },
     {
+      "name": "Order by ordinal non computed",
+      "query": [
+        "select id newCol from data order by 1 desc"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "newCol", "value": 3 }],
+          [{ "key": "newCol", "value": 3 }],
+          [{ "key": "newCol", "value": 3 }],
+          [{ "key": "newCol", "value": 2 }],
+          [{ "key": "newCol", "value": 1 }],
+          [{ "key": "newCol", "value": 1 }]
+        ]
+      ]
+    },
+    {
+      "name": "Order by column non computed",
+      "query": [
+        "select id newCol from data order by newCol desc"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "newCol", "value": 3 }],
+          [{ "key": "newCol", "value": 3 }],
+          [{ "key": "newCol", "value": 3 }],
+          [{ "key": "newCol", "value": 2 }],
+          [{ "key": "newCol", "value": 1 }],
+          [{ "key": "newCol", "value": 1 }]
+        ]
+      ]
+    },
+    {
       "name": "Order by ordinal, out of range",
       "query": [
         "select id - row_id newCol from data order by 10 desc"
@@ -163,7 +195,7 @@
         "select * from data order by 1 desc"
       ],
       "expectedException": "org.kuse.payloadbuilder.core.parser.ParseException",
-      "expectedMessageContains": "ORDER BY position is not supported for asterisk"
+      "expectedMessageContains": "ORDER BY position is not supported for non expression select items"
     },
     {
       "name": "Where",
@@ -286,6 +318,106 @@
           [{ "key": "Var1", "value": 30 }, { "key": "Var2", "value": 11 }, { "key": "Var3", "value": 3 }]
         ]
       ]
+    },
+    {
+      "name": "Calculated value",
+      "query": [
+        "select id + row_id calc ",
+        "from data "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "calc", "value": 2 }],
+          [{ "key": "calc", "value": 3 }],
+          [{ "key": "calc", "value": 3 }],
+          [{ "key": "calc", "value": 4 }],
+          [{ "key": "calc", "value": 5 }],
+          [{ "key": "calc", "value": 6 }]          
+        ]
+      ]
+    },
+    {
+      "name": "Calculated value in sub query",
+      "query": [
+        "select calc ",
+        "from ",
+        "( ",
+        "  select id + row_id calc ",
+        "  from data ",
+        ") x"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "calc", "value": 2 }],
+          [{ "key": "calc", "value": 3 }],
+          [{ "key": "calc", "value": 3 }],
+          [{ "key": "calc", "value": 4 }],
+          [{ "key": "calc", "value": 5 }],
+          [{ "key": "calc", "value": 6 }]          
+        ]
+      ]
+    },
+    {
+      "name": "Calculated value in sub query with join",
+      "description": [
+        "Here we select columns from the sub query table source and hence, ",
+        "we should not get values from 'data' here for the single part columns.",
+        "However for the multipart items we should still dig down to the correct sub alias"
+      ],
+      "query": [
+        "select id, col2, calc, x.d.data ",
+        "from ",
+        "( ",
+        "  select d.id, s.col2, d.id + s.col2 calc ",
+        "  from data d ",
+        "  inner join source s ",
+        "    on s.col1 = d.row_id ",
+        ") x"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 1 },{ "key": "col2", "value": 2 },{ "key": "calc", "value": 3 },{ "key": "data", "value": "1_1" }],
+          [{ "key": "id", "value": 2 },{ "key": "col2", "value": 2 },{ "key": "calc", "value": 4 },{ "key": "data", "value": "2_1" }],
+          [{ "key": "id", "value": 3 },{ "key": "col2", "value": 2 },{ "key": "calc", "value": 5 },{ "key": "data", "value": "3_1" }],
+          [{ "key": "id", "value": 3 },{ "key": "col2", "value": 4 },{ "key": "calc", "value": 7 },{ "key": "data", "value": "3_3" }]          
+        ]
+      ]
+    },
+    {
+      "name": "Join on a calculated column",
+      "description": [
+        "Make sure that the calculated column inside subquery in used in the join predicate"
+      ],
+      "query": [
+        "select *",
+        "from source s",
+        "inner join ",
+        "( ",
+        "  select id + row_id id, d.data",
+        "  from data d ",
+        ") x ",
+        "  on x.id = s.col1 "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 3 },{ "key": "col2", "value": 4 },{ "key": "id", "value": 3 },{ "key": "data", "value": "1_2" }],
+          [{ "key": "col1", "value": 3 },{ "key": "col2", "value": 4 },{ "key": "id", "value": 3 },{ "key": "data", "value": "2_1" }],
+          [{ "key": "col1", "value": 5 },{ "key": "col2", "value": 6 },{ "key": "id", "value": 5 },{ "key": "data", "value": "3_2" }]
+        ]
+      ]
+    },
+    {
+      "name": "Reference to non-existing fields in subquery",
+      "query": [
+        "select col ",
+        "from ",
+        "( ",
+        "  select id ",
+        "  from data d ",
+        ") x"
+      ],
+      "expectedException": "org.kuse.payloadbuilder.core.parser.ParseException",
+      "expectedMessageContains": "No column defined with name col for alias x"
     }
   ]
 }

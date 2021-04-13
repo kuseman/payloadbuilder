@@ -48,6 +48,12 @@ public abstract class ASelectVisitor<TR, TC> implements SelectVisitor<TR, TC>
     }
 
     @Override
+    public TR visit(AsteriskSelectItem selectItem, TC context)
+    {
+        return null;
+    }
+
+    @Override
     public TR visit(ExpressionSelectItem expressionSelectItem, TC context)
     {
         visit(expressionSelectItem.getExpression(), context);

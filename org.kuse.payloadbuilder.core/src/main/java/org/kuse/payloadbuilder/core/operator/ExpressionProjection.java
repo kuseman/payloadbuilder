@@ -37,4 +37,10 @@ class ExpressionProjection implements Projection
         }
         return false;
     }
+
+    @Override
+    public String toString()
+    {
+        return expression.toString();
+    }
 }

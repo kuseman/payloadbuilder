@@ -42,7 +42,7 @@ public class NestedLoopJoinTest extends AOperatorTest
 
         String query = "select * from tableA a " +
             "inner join (" +
-            "  select ** " +
+            "  select * " +
             "  from tableB b " +
             "  inner join tableC c " +
             "     on col2 = a.col2 " +
@@ -77,9 +77,9 @@ public class NestedLoopJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(tableAPos[count], tuple.getTuple(0).getValue("__pos"));
-            assertEquals(tableBPos[count], tuple.getTuple(2).getValue("__pos"));
-            assertEquals(tableCPos[count], tuple.getTuple(3).getValue("__pos"));
+            assertEquals(tableAPos[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(tableBPos[count], tuple.getTuple(2).getValue(Row.POS_ORDINAL));
+            assertEquals(tableCPos[count], tuple.getTuple(3).getValue(Row.POS_ORDINAL));
             count++;
         }
         it.close();
@@ -119,8 +119,8 @@ public class NestedLoopJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(tableAPos[count], tuple.getTuple(0).getValue("__pos"));
-            assertEquals(tableBPos[count], tuple.getTuple(1).getValue("__pos"));
+            assertEquals(tableAPos[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(tableBPos[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
             count++;
         }
         it.close();
@@ -154,10 +154,10 @@ public class NestedLoopJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(count, tuple.getTuple(0).getValue("__pos"));
+            assertEquals(count, tuple.getTuple(0).getValue(Row.POS_ORDINAL));
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
-            assertArrayEquals(new int[] {0, 1}, col.stream().mapToInt(t -> (int) t.getValue("__pos")).toArray());
+            assertArrayEquals(new int[] {0, 1}, col.stream().mapToInt(t -> (int) t.getValue(Row.POS_ORDINAL)).toArray());
             count++;
         }
         it.close();
@@ -191,7 +191,7 @@ public class NestedLoopJoinTest extends AOperatorTest
         {
             Tuple tuple = it.next();
 
-            assertEquals(count, tuple.getTuple(0).getValue("__pos"));
+            assertEquals(count, tuple.getTuple(0).getValue(Row.POS_ORDINAL));
             // Outer apply, no b rows should be present
             assertNull(tuple.getTuple(1));
             count++;
@@ -231,9 +231,9 @@ public class NestedLoopJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(tableAPos[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(tableAPos[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
 
-            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue("__pos")).orElse(null);
+            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue(Row.POS_ORDINAL)).orElse(null);
             assertEquals("Count: " + count, tableBPos[count], val);
             count++;
         }
@@ -270,13 +270,13 @@ public class NestedLoopJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            int pos = (int) tuple.getTuple(0).getValue("__pos");
+            int pos = (int) tuple.getTuple(0).getValue(Row.POS_ORDINAL);
             assertEquals(count, pos);
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
             if (pos % 2 == 0)
             {
-                assertArrayEquals(new int[] {0, 1}, col.stream().mapToInt(t -> (int) t.getValue("__pos")).toArray());
+                assertArrayEquals(new int[] {0, 1}, col.stream().mapToInt(t -> (int) t.getValue(Row.POS_ORDINAL)).toArray());
             }
             else
             {
@@ -305,6 +305,7 @@ public class NestedLoopJoinTest extends AOperatorTest
             this.to = to;
         }
 
+        @SuppressWarnings("deprecation")
         @Override
         public RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
         {

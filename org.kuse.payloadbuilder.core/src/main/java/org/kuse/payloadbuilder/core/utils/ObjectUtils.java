@@ -4,10 +4,14 @@ import java.util.Collection;
 import java.util.Iterator;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.math.NumberUtils;
 
 /** Object utils */
 public final class ObjectUtils
 {
+    public static final int HASH_MULTIPLIER = 37;
+    public static final int HASH_CONSTANT = 17;
+
     private ObjectUtils()
     {
     }
@@ -46,5 +50,19 @@ public final class ObjectUtils
         }
 
         return false;
+    }
+
+    /** Get hash value from provided object */
+    public static int hash(Object object)
+    {
+        Object obj = object;
+        // If value is string and is digits, use the intvalue as
+        // hash instead of string to be able to compare ints and strings
+        // on left/right side of join
+        if (obj instanceof String && NumberUtils.isDigits((String) obj))
+        {
+            obj = Integer.parseInt((String) obj);
+        }
+        return obj != null ? obj.hashCode() : 0;
     }
 }

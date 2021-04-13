@@ -9,6 +9,7 @@ import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -33,6 +34,7 @@ import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.test.TestCase.ColumnValue;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import junit.textui.TestRunner;
@@ -41,7 +43,8 @@ import junit.textui.TestRunner;
 @RunWith(Parameterized.class)
 public class TestHarnessRunner
 {
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     private final TestHarness harness;
     private final TestCase testCase;
@@ -89,6 +92,12 @@ public class TestHarnessRunner
     @Test
     public void test()
     {
+        testInternal(false);
+        testInternal(true);
+    }
+
+    private void testInternal(boolean codeGen)
+    {
         CatalogRegistry registry = new CatalogRegistry();
         for (TestCatalog catalog : harness.getCatalogs())
         {
@@ -97,6 +106,13 @@ public class TestHarnessRunner
 
         ResultWriter writer = new ResultWriter();
         QuerySession session = new QuerySession(registry);
+        session.setPrintWriter(new PrintWriter(System.out));
+
+        if (codeGen)
+        {
+            session.setSystemProperty(QuerySession.CODEGEN_ENABLED, true);
+        }
+
         // Set first catalog as default
         session.getCatalogRegistry().setDefaultCatalog(harness.getCatalogs().get(0).getAlias());
         List<List<List<ColumnValue>>> actualResultSets = new ArrayList<>();

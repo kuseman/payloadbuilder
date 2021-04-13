@@ -3,6 +3,7 @@ package org.kuse.payloadbuilder.core.parser;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
+import static org.apache.commons.lang3.StringUtils.lowerCase;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -13,6 +14,8 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 import org.apache.commons.collections.IteratorUtils;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.mutable.MutableInt;
 import org.junit.Assert;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
@@ -23,6 +26,7 @@ import org.kuse.payloadbuilder.core.operator.EvalUtils;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.OperatorBuilder;
+import org.kuse.payloadbuilder.core.operator.SelectResolver;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 
@@ -101,42 +105,77 @@ public abstract class AParserTest extends Assert
     {
         Expression e = e(expression);
         // Resolve expression with provided alias
-        ColumnsVisitor.getColumnsByAlias(session, new HashMap<>(), alias, e);
+        SelectResolver.resolve(e, alias);
         return e;
     }
 
-    protected void assertExpressionFail(Class<? extends Exception> e, String messageContains, Map<String, Object> values, String expression)
+    protected void assertExpressionFail(Class<? extends Exception> e, String messageContains, Map<String, Object> mapValues, String expression)
     {
         try
         {
             Expression expr = p.parseExpression(session.getCatalogRegistry(), expression);
             ExecutionContext context = new ExecutionContext(session);
-            context.setTuple(new Tuple()
+            if (mapValues != null)
             {
-                @Override
-                public int getTupleOrdinal()
-                {
-                    return 0;
-                }
+                String[] columns = new String[mapValues.size()];
+                Object[] values = new Object[mapValues.size()];
 
-                @Override
-                public Object getValue(String column)
+                MutableInt index = new MutableInt();
+                mapValues.entrySet().stream().forEach(en ->
                 {
-                    return values.get(column);
-                }
+                    columns[index.intValue()] = lowerCase(en.getKey());
+                    values[index.getAndIncrement()] = en.getValue();
+                });
 
-                @Override
-                public Tuple getTuple(int ordinal)
+                context.setTuple(new Tuple()
                 {
-                    return null;
-                }
-            });
+                    @Override
+                    public int getTupleOrdinal()
+                    {
+                        return 0;
+                    }
+
+                    @Override
+                    public int getColumnCount()
+                    {
+                        return columns.length;
+                    }
+
+                    @Override
+                    public String getColumn(int ordinal)
+                    {
+                        return columns[ordinal];
+                    }
+
+                    @Override
+                    public int getColmnOrdinal(String column)
+                    {
+                        return ArrayUtils.indexOf(columns, column);
+                    }
+
+                    @Override
+                    public Object getValue(int ordinal)
+                    {
+                        return values[ordinal];
+                    }
+
+                    @Override
+                    public Tuple getTuple(int ordinal)
+                    {
+                        return null;
+                    }
+                });
+            }
             expr.eval(context);
             fail(expression + " should fail.");
         }
         catch (Exception ee)
         {
-            assertEquals(e, ee.getClass());
+            if (!ee.getClass().isAssignableFrom(e))
+            {
+                throw ee;
+            }
+
             assertTrue("Expected exception message to contain " + messageContains + " but was: " + ee.getMessage(), ee.getMessage().contains(messageContains));
         }
     }
@@ -158,17 +197,27 @@ public abstract class AParserTest extends Assert
         assertExpression(expected, values, expression, true, false);
     }
 
-    protected void assertExpression(Object expected, Map<String, Object> values, String expression, boolean predicate, boolean function) throws Exception
+    protected void assertExpression(Object expected, Map<String, Object> mapValues, String expression, boolean predicate, boolean function) throws Exception
     {
         try
         {
             Expression expr = p.parseExpression(session.getCatalogRegistry(), expression);
             ExecutionContext context = new ExecutionContext(session);
-            if (values != null)
+            if (mapValues != null)
             {
+                String[] columns = new String[mapValues.size()];
+                Object[] values = new Object[mapValues.size()];
+
+                MutableInt index = new MutableInt();
+                mapValues.entrySet().stream().forEach(en ->
+                {
+                    columns[index.intValue()] = lowerCase(en.getKey());
+                    values[index.getAndIncrement()] = en.getValue();
+                });
+
                 context.setTuple(new Tuple()
                 {
-                    Map<String, Object> iteratorCache = new HashMap<>();
+                    Map<Integer, Object> iteratorCache = new HashMap<>();
 
                     @Override
                     public int getTupleOrdinal()
@@ -177,12 +226,30 @@ public abstract class AParserTest extends Assert
                     }
 
                     @Override
-                    public Object getValue(String column)
+                    public int getColumnCount()
                     {
-                        Object v = iteratorCache.get(column);
+                        return columns.length;
+                    }
+
+                    @Override
+                    public String getColumn(int ordinal)
+                    {
+                        return columns[ordinal];
+                    }
+
+                    @Override
+                    public int getColmnOrdinal(String column)
+                    {
+                        return ArrayUtils.indexOf(columns, column);
+                    }
+
+                    @Override
+                    public Object getValue(int ordinal)
+                    {
+                        Object v = iteratorCache.get(ordinal);
                         if (v == null)
                         {
-                            v = values.get(column);
+                            v = values[ordinal];
                         }
 
                         // To be able to test an iterator multiple times, store the
@@ -191,7 +258,7 @@ public abstract class AParserTest extends Assert
                         {
                             @SuppressWarnings("unchecked")
                             List<Object> l = IteratorUtils.toList((Iterator<Object>) v);
-                            iteratorCache.put(column, l.iterator());
+                            iteratorCache.put(ordinal, l.iterator());
                             v = l.iterator();
                         }
 

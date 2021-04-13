@@ -39,6 +39,7 @@ class OperatorBuilderUtils
                 .filter(e -> e.getQname().getParts().size() <= 2)
                 .map(e ->
                 {
+                    @SuppressWarnings("deprecation")
                     List<ResolvePath> paths = e.getResolvePaths();
                     if (paths.isEmpty())
                     {

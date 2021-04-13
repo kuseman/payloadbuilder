@@ -5,7 +5,6 @@ import static java.util.stream.Collectors.toMap;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.stream.Stream;
@@ -45,12 +44,6 @@ public class MapUtils
         return new SimpleEntry<>(key, value);
     }
 
-    /** Traverse map out of provided parts */
-    public static Object traverse(Map<Object, Object> map, List<String> parts)
-    {
-        return traverse(map, 0, parts);
-    }
-
     /**
      * <pre>
      * Traverses a map by keys provided. Assumes map type all the way down to parts.size - 1, if not null is returned
@@ -61,13 +54,13 @@ public class MapUtils
      * @param parts Parts to traverse
      */
     @SuppressWarnings("unchecked")
-    public static Object traverse(Map<Object, Object> map, int startIndex, List<String> parts)
+    public static Object traverse(Map<Object, Object> map, int startIndex, String[] parts)
     {
         Map<Object, Object> current = map;
-        int size = parts.size();
+        int size = parts.length;
         for (int i = startIndex; i < size - 1; i++)
         {
-            Object o = current.get(parts.get(i));
+            Object o = current.get(parts[i]);
             if (!(o instanceof Map))
             {
                 return null;
@@ -75,6 +68,6 @@ public class MapUtils
             current = (Map<Object, Object>) o;
         }
 
-        return current.get(parts.get(size - 1));
+        return current.get(parts[size - 1]);
     }
 }

@@ -440,8 +440,7 @@ public class QueryParser
                 {
                     alias = getIdentifier(ctx.alias);
                 }
-                boolean recursive = ctx.ASTERISK().size() > 1;
-                return new AsteriskSelectItem(alias, recursive, ctx.start);
+                return new AsteriskSelectItem(alias, ctx.start);
             }
 
             throw new ParseException("Caould no create a select item.", ctx.start);
@@ -515,8 +514,10 @@ public class QueryParser
 
                 if (isBlank(alias))
                 {
-                    throw new ParseException("Sub query must have an alias", token);
+                    throw new ParseException("Sub query must have an alias", ctx.PARENC().getSymbol());
                 }
+
+                validateSubQuery(ctx.selectStatement());
 
                 /*  When visiting a sub query we want to build a new table alias hierarchy
                     Since this is a complete query.
@@ -537,16 +538,19 @@ public class QueryParser
                 // Restore tuple ordinal counter since clear resets it
                 tupleOrdinal = prevTupleOrdinal;
 
-                if (ctx.selectStatement().into != null)
-                {
-                    throw new ParseException("SELECT INTO is not allowed in sub query context", token);
-                }
-
                 SelectStatement selectStatement = (SelectStatement) visit(ctx.selectStatement());
 
-                if (selectStatement.isAssignmentSelect())
+                SelectItem noIdentifierItem = selectStatement
+                        .getSelect()
+                        .getSelectItems()
+                        .stream()
+                        .filter(i -> !(i instanceof AsteriskSelectItem) && isBlank(i.getIdentifier()))
+                        .findAny()
+                        .orElse(null);
+
+                if (noIdentifierItem != null)
                 {
-                    throw new ParseException("Assignment selects is not allowed in sub query context", token);
+                    throw new ParseException("Missing identifier for select item", noIdentifierItem.getToken());
                 }
 
                 parentTableAlias = prevParent;
@@ -886,6 +890,49 @@ public class QueryParser
             return new LiteralStringExpression(text);
         }
 
+        /**
+         * Select items of a sub query
+         *
+         * <pre>
+         * Valid select items in a sub query
+         *  - One or zero NON alias asterisk selects
+         *  - No sub query select items
+         * </pre>
+         */
+        private void validateSubQuery(SelectStatementContext ctx)
+        {
+            if (ctx.into != null)
+            {
+                throw new ParseException("SELECT INTO are not allowed in sub query context", ctx.into.start);
+            }
+            
+            boolean foundAsteriskSelect = false;
+            for (SelectItemContext item : ctx.selectItem())
+            {
+                if (item.ASTERISK() != null)
+                {
+                    if (foundAsteriskSelect)
+                    {
+                        throw new ParseException("Only a single asterisk select (*) are supported in sub queries", item.start);
+                    }
+                    else if (item.alias != null)
+                    {
+                        throw new ParseException("Only non alias asterisk select (*) are supported in sub queries", item.start);
+                    }
+                    
+                    foundAsteriskSelect = true;
+                }
+                else if (item.variable() != null)
+                {
+                    throw new ParseException("Assignment selects are not allowed in sub query context", item.start);
+                }
+                else if (item.OBJECT() != null || item.ARRAY() != null)
+                {
+                    throw new ParseException("Nested selects are not allowed in sub query context", item.start);
+                }
+            }
+        }
+
         /** Validate alias in QRE is pointing to an existing table alias */
         private void validateQualifiedReference(ParserRuleContext ctx, QualifiedReferenceExpression qfe)
         {
@@ -923,7 +970,7 @@ public class QueryParser
              * from tableA a
              * inner join
              * (
-             *   select **
+             *   select *
              *   from tableB b
              *   where c.id > 10            <--- Invalid reference since it's defined later that "this"
              * ) b

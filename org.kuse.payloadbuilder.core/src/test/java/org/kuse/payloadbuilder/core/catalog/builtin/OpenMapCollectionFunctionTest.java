@@ -30,18 +30,18 @@ public class OpenMapCollectionFunctionTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            int pos = (int) tuple.getValue("__pos");
+            int pos = (int) tuple.getValue(tuple.getColmnOrdinal("__pos"));
 
             if (pos == 0)
             {
-                assertEquals(10, tuple.getValue("key"));
-                assertEquals(20, tuple.getValue("count"));
+                assertEquals(10, tuple.getValue(tuple.getColmnOrdinal("key")));
+                assertEquals(20, tuple.getValue(tuple.getColmnOrdinal("count")));
             }
             else
             {
-                assertEquals(11, tuple.getValue("key"));
-                assertEquals(15, tuple.getValue("count"));
-                assertEquals("value", tuple.getValue("id"));
+                assertEquals(11, tuple.getValue(tuple.getColmnOrdinal("key")));
+                assertEquals(15, tuple.getValue(tuple.getColmnOrdinal("count")));
+                assertEquals("value", tuple.getValue(tuple.getColmnOrdinal("id")));
             }
             count++;
         }

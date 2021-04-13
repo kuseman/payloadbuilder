@@ -23,6 +23,12 @@ import org.kuse.payloadbuilder.core.parser.VariableExpression;
  **/
 public class QuerySession
 {
+    /* System properties */
+    /** Enable code gen for query. Will try to precompile every expression that supports code gen.
+     * NOTE! Will be default in the future and this property will be removed */
+    public static final String CODEGEN_ENABLED = "codegen.enabled";
+    /* End system properties */
+
     private final CatalogRegistry catalogRegistry;
     /** Variable values for {@link VariableExpression}'s */
     private final Map<String, Object> variables;
@@ -89,6 +95,7 @@ public class QuerySession
             {
                 printWriter.append(String.valueOf(value));
                 printWriter.append(System.lineSeparator());
+                printWriter.flush();
             }
             catch (IOException e)
             {

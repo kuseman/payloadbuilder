@@ -9,7 +9,6 @@ import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
-import org.kuse.payloadbuilder.core.operator.Tuple.ComputedTuple;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Test of {@link ComputedColumnsOperator} */
@@ -24,6 +23,7 @@ public class ComputedColumnsOperatorTest extends AOperatorTest
         Operator target = op(ctx -> IntStream.range(0, 100).mapToObj(i -> (Tuple) Row.of(alias, i, new Object[] {rnd.nextInt(100)})).iterator(), () -> close.setTrue());
         ComputedColumnsOperator operator = new ComputedColumnsOperator(
                 0,
+                -1,
                 target,
                 asList("newCol"),
                 asList(e("concat('v-', col1)")));
@@ -33,10 +33,8 @@ public class ComputedColumnsOperatorTest extends AOperatorTest
         {
             Tuple tuple = it.next();
 
-            assertTrue("ComputedColumnsOperator should produce computed tuples", tuple instanceof ComputedTuple);
-
-            int val = (int) tuple.getValue("col1");
-            Object actual = ((ComputedTuple) tuple).getComputedValue(0);
+            int val = (int) tuple.getValue(tuple.getColmnOrdinal("col1"));
+            Object actual = tuple.getValue(tuple.getColmnOrdinal("newCol"));
             assertEquals("v-" + val, actual);
         }
         it.close();

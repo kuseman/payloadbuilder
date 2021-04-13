@@ -60,8 +60,8 @@ public class HashJoinTest extends AOperatorTest
         {
             Tuple tuple = it.next();
 
-            assertEquals(tableAPos[count], tuple.getTuple(0).getValue("col1"));
-            assertEquals(tableBPos[count], tuple.getTuple(1).getValue("Value"));
+            assertEquals(tableAPos[count], tuple.getTuple(0).getValue(tuple.getTuple(0).getColmnOrdinal("col1")));
+            assertEquals(tableBPos[count], tuple.getTuple(1).getValue(tuple.getTuple(1).getColmnOrdinal("Value")));
             count++;
         }
         it.close();
@@ -92,7 +92,7 @@ public class HashJoinTest extends AOperatorTest
 
         String query = "select * from tableA a " +
             "inner join (" +
-            "  select ** " +
+            "  select * " +
             "  from tableB b " +
             "  inner join tableC c " +
             "     on col2 = a.col2 " +
@@ -128,9 +128,9 @@ public class HashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(tableAPos[count], tuple.getTuple(0).getValue("__pos"));
-            assertEquals(tableBPos[count], tuple.getTuple(2).getValue("__pos"));
-            assertEquals(tableCPos[count], tuple.getTuple(3).getValue("__pos"));
+            assertEquals(tableAPos[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(tableBPos[count], tuple.getTuple(2).getValue(Row.POS_ORDINAL));
+            assertEquals(tableCPos[count], tuple.getTuple(3).getValue(Row.POS_ORDINAL));
             count++;
         }
         it.close();
@@ -166,11 +166,11 @@ public class HashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(count, tuple.getTuple(0).getValue("__pos"));
+            assertEquals(count, tuple.getTuple(0).getValue(Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
-            assertArrayEquals(new int[] {count, count + 10}, col.stream().mapToInt(t -> (int) t.getValue("__pos")).toArray());
+            assertArrayEquals(new int[] {count, count + 10}, col.stream().mapToInt(t -> (int) t.getValue(Row.POS_ORDINAL)).toArray());
             count++;
         }
         it.close();
@@ -207,9 +207,9 @@ public class HashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(tableAPos[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(tableAPos[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
 
-            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue("__pos")).orElse(null);
+            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue(Row.POS_ORDINAL)).orElse(null);
             assertEquals(tableBPos[count], val);
             count++;
         }
@@ -253,7 +253,7 @@ public class HashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            int pos = (int) tuple.getTuple(0).getValue("__pos");
+            int pos = (int) tuple.getTuple(0).getValue(Row.POS_ORDINAL);
             assertEquals(count, pos);
 
             @SuppressWarnings("unchecked")
@@ -261,7 +261,7 @@ public class HashJoinTest extends AOperatorTest
 
             if (pos >= 2 && pos <= 6)
             {
-                assertArrayEquals("Count: " + count, tableBPos[pos - 2], col.stream().mapToInt(t -> (int) t.getValue("__pos")).toArray());
+                assertArrayEquals("Count: " + count, tableBPos[pos - 2], col.stream().mapToInt(t -> (int) t.getValue(Row.POS_ORDINAL)).toArray());
             }
             else
             {

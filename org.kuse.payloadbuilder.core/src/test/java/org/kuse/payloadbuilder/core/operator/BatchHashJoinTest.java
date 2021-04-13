@@ -204,7 +204,7 @@ public class BatchHashJoinTest extends AOperatorTest
 
         String query = "select * from tableA a " +
             "inner join (" +
-            "  select ** " +
+            "  select * " +
             "  from tableB b " +
             "  inner join tableC c " +
             "     on col2 = a.col2 " +
@@ -251,9 +251,9 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(tableAPos[count], tuple.getTuple(0).getValue("__pos"));
-            assertEquals(tableBPos[count], tuple.getTuple(2).getValue("__pos"));
-            assertEquals(tableCPos[count], tuple.getTuple(3).getValue("__pos"));
+            assertEquals(tableAPos[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(tableBPos[count], tuple.getTuple(2).getValue(Row.POS_ORDINAL));
+            assertEquals(tableCPos[count], tuple.getTuple(3).getValue(Row.POS_ORDINAL));
             count++;
         }
         it.close();
@@ -319,8 +319,8 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
             count++;
         }
         it.close();
@@ -385,9 +385,9 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
 
-            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue("__pos")).orElse(null);
+            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue(Row.POS_ORDINAL)).orElse(null);
             assertEquals(expectedInnerPositions[count], val);
             count++;
         }
@@ -448,8 +448,8 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
             count++;
         }
         it.close();
@@ -512,9 +512,9 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
 
-            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue("__pos")).orElse(null);
+            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue(Row.POS_ORDINAL)).orElse(null);
             assertEquals(expectedInnerPositions[count], val);
             count++;
         }
@@ -578,8 +578,8 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
             count++;
         }
         it.close();
@@ -652,9 +652,9 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
 
-            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue("__pos")).orElse(null);
+            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue(Row.POS_ORDINAL)).orElse(null);
             assertEquals(expectedInnerPositions[count], val);
             count++;
         }
@@ -722,8 +722,8 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
             count++;
         }
         it.close();
@@ -798,9 +798,9 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals("Count :" + count, expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals("Count :" + count, expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
 
-            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue("__pos")).orElse(null);
+            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue(Row.POS_ORDINAL)).orElse(null);
             assertEquals("Count: " + count, expectedInnerPositions[count], val);
             count++;
         }
@@ -862,11 +862,11 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals("Count: " + count, expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals("Count: " + count, expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
-            assertArrayEquals("Count: " + count, new int[] {expectedInnerPositions[count]}, col.stream().mapToInt(t -> (int) t.getValue("__pos")).toArray());
+            assertArrayEquals("Count: " + count, new int[] {expectedInnerPositions[count]}, col.stream().mapToInt(t -> (int) t.getValue(Row.POS_ORDINAL)).toArray());
             count++;
         }
         it.close();
@@ -932,12 +932,12 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
 
-            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue("__pos")).collect(toList()) : null);
+            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue(Row.POS_ORDINAL)).collect(toList()) : null);
             count++;
         }
         it.close();
@@ -998,12 +998,12 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
 
-            assertArrayEquals("" + count, expectedInnerPositions[count], col.stream().mapToInt(t -> (int) t.getValue("__pos")).toArray());
+            assertArrayEquals("" + count, expectedInnerPositions[count], col.stream().mapToInt(t -> (int) t.getValue(Row.POS_ORDINAL)).toArray());
             count++;
         }
         it.close();
@@ -1074,12 +1074,12 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
 
-            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue("__pos")).collect(toList()) : null);
+            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue(Row.POS_ORDINAL)).collect(toList()) : null);
             count++;
         }
         it.close();
@@ -1145,12 +1145,12 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals("Count: " + count, expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals("Count: " + count, expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
 
-            assertArrayEquals("Count: " + count, expectedInnerPositions[count], col.stream().mapToInt(t -> (int) t.getValue("__pos")).toArray());
+            assertArrayEquals("Count: " + count, expectedInnerPositions[count], col.stream().mapToInt(t -> (int) t.getValue(Row.POS_ORDINAL)).toArray());
             count++;
         }
         it.close();
@@ -1223,12 +1223,12 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue("__pos"));
+            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
 
-            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue("__pos")).collect(toList()) : null);
+            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue(Row.POS_ORDINAL)).collect(toList()) : null);
             count++;
         }
         it.close();

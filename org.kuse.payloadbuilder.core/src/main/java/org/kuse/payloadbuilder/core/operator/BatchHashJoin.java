@@ -28,12 +28,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.lang3.time.StopWatch;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
 import org.kuse.payloadbuilder.core.parser.Option;
+import org.kuse.payloadbuilder.core.utils.ObjectUtils;
 
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
@@ -132,21 +132,6 @@ class BatchHashJoin extends AOperator
         }
 
         return result;
-    }
-
-    private int getBatchSize(ExecutionContext context)
-    {
-        int temp = innerIndex.getBatchSize();
-        if (batchSizeOption != null)
-        {
-            Object obj = batchSizeOption.getValueExpression().eval(context);
-            if (!(obj instanceof Integer) || (Integer) obj < 0)
-            {
-                throw new OperatorException("Batch size expression " + batchSizeOption.getValueExpression() + " should return a positive Integer. Got: " + obj);
-            }
-            temp = (int) obj;
-        }
-        return temp;
     }
 
     //CSOFF
@@ -491,26 +476,30 @@ class BatchHashJoin extends AOperator
         };
     }
 
+    private int getBatchSize(ExecutionContext context)
+    {
+        int temp = innerIndex.getBatchSize();
+        if (batchSizeOption != null)
+        {
+            Object obj = batchSizeOption.getValueExpression().eval(context);
+            if (!(obj instanceof Integer) || (Integer) obj < 0)
+            {
+                throw new OperatorException("Batch size expression " + batchSizeOption.getValueExpression() + " should return a positive Integer. Got: " + obj);
+            }
+            temp = (int) obj;
+        }
+        return temp;
+    }
+
     private int hash(Object[] values)
     {
-        int result = 1;
+        int result = ObjectUtils.HASH_CONSTANT;
 
         int length = values.length;
         for (int i = 0; i < length; i++)
         {
             Object value = values[i];
-
-            // If value is string and is digits, use the intvalue as
-            // hash instead of string to be able to compare ints and strings
-            // on left/right side of join
-            if (value instanceof String && NumberUtils.isDigits((String) value))
-            {
-                value = Integer.parseInt((String) value);
-            }
-
-            //CSOFF
-            result = 31 * result + (value == null ? 0 : value.hashCode());
-            //CSON
+            result = result * ObjectUtils.HASH_MULTIPLIER + ObjectUtils.hash(value);
         }
         return result;
     }

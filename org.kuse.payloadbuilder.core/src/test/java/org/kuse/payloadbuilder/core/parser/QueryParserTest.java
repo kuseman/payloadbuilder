@@ -149,14 +149,14 @@ public class QueryParserTest extends AParserTest
     @Test
     public void test_subquery()
     {
-        // Only recursive asterisk's is supported atm.
-        assertQueryFail(ParseException.class, "Only a recursive asterisk select (**) is supporte for sub queries", "select * from (select 1,2 from tableA) x");
-        // No assignment selects
-        assertQueryFail(ParseException.class, "Assignment selects is not allowed in sub query context", "select * from (select @a=1 from tableA) x");
-        // No select intos
-        assertQueryFail(ParseException.class, "SELECT INTO is not allowed in sub query context", "select * from (select 1,2 into #temp from tableA) x");
+        assertQueryFail(ParseException.class, "Assignment selects are not allowed in sub query context", "select * from (select @a=1 from tableA) x");
+        assertQueryFail(ParseException.class, "SELECT INTO are not allowed in sub query context", "select * from (select 1,2 into #temp from tableA) x");
+        assertQueryFail(ParseException.class, "Only a single asterisk select (*) are supported", "select * from (select *,* from tableA) x");
+        assertQueryFail(ParseException.class, "Only non alias asterisk select (*) are supported", "select * from (select a.*, a.* from tableA a inner join tableB b on b.id = a.id) x");
+        assertQueryFail(ParseException.class, "Missing identifier for select item", "select * from (select 1,2 from tableA) x");
+        assertQueryFail(ParseException.class, "Nested selects are not allowed in sub query context", "select * from (select object(1 col) obj from tableA) x");
 
-        SelectStatement selectStm = (SelectStatement) assertQuery("select * from tableA a inner join (select ** from tableB b) x with (populate=true, batch_size=1000) on x.id = a.id").getStatements()
+        SelectStatement selectStm = (SelectStatement) assertQuery("select * from tableA a inner join (select * from tableB b) x with (populate=true, batch_size=1000) on x.id = a.id").getStatements()
                 .get(0);
 
         List<Option> joinOptions = selectStm.getSelect().getFrom().getJoins().get(0).getTableSource().getOptions();
@@ -181,12 +181,12 @@ public class QueryParserTest extends AParserTest
         assertQueryFail(ParseException.class, "Invalid table source reference 'b'", "select art_id from article a where b.art_id > 10");
         assertQueryFail(ParseException.class, "Alias is mandatory", "select * from tableA inner join tableB b on b.art_id = art_id");
         assertQueryFail(ParseException.class, "Alias is mandatory", "select * from tableA a inner join tableB on b.art_id = art_id");
-        assertQueryFail(ParseException.class, "Invalid table source reference 'q'", "select art_id from article a inner join (select ** from tableB b where id= 1 and q.id = 10) b on b.id = a.id");
+        assertQueryFail(ParseException.class, "Invalid table source reference 'q'", "select art_id from article a inner join (select * from tableB b where id= 1 and q.id = 10) b on b.id = a.id");
         // Test reference to a parent is ok
-        assertQuery("select art_id from article a inner join (select ** from tableB b where id= 1 and a.id = 10) b on b.id = a.id");
+        assertQuery("select art_id from article a inner join (select * from tableB b where id= 1 and a.id = 10) b on b.id = a.id");
         // c is not allowed since it's defined later that current context alias
         assertQueryFail(ParseException.class, "Invalid table source reference 'c'",
-                "select art_id from article a inner join (select ** from tableB b where id= 1 and c.id = 10) b on b.id = a.id inner join tableC c on c.id = b.id");
+                "select art_id from article a inner join (select * from tableB b where id= 1 and c.id = 10) b on b.id = a.id inner join tableC c on c.id = b.id");
     }
 
     @Test
@@ -210,9 +210,9 @@ public class QueryParserTest extends AParserTest
 
         // Nested
         assertQuery(
-                "select art_id from article a inner join (select ** from articleAttribute aa  inner join articlePrice ap on ap.sku_id = aa.sku_id) aa with (populate=true) on aa.art_id = a.art_id ");
+                "select art_id from article a inner join (select * from articleAttribute aa  inner join articlePrice ap on ap.sku_id = aa.sku_id) aa with (populate=true) on aa.art_id = a.art_id ");
         assertQuery(
-                "select art_id from article a inner join (select ** from articleAttribute aa  left join articlePrice ap with (populate=true) on ap.sku_id = aa.sku_id) aa with (populate=true) on aa.art_id = a.art_id ");
+                "select art_id from article a inner join (select * from articleAttribute aa  left join articlePrice ap with (populate=true) on ap.sku_id = aa.sku_id) aa with (populate=true) on aa.art_id = a.art_id ");
 
         // TODO: more parser tests, where, orderby, group by
     }

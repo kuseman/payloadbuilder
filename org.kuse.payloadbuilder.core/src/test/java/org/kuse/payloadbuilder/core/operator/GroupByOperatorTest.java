@@ -43,9 +43,9 @@ public class GroupByOperatorTest extends AOperatorTest
         {
             Tuple tuple = it.next().getTuple(0);
 
-            actual.add(IteratorUtils.toList(IteratorUtils.getIterator(tuple.getValue("col1"))));
-            actual.add(IteratorUtils.toList(IteratorUtils.getIterator(tuple.getValue("col2"))));
-            actual.add(IteratorUtils.toList(IteratorUtils.getIterator(tuple.getValue("col2"))));
+            actual.add(IteratorUtils.toList(IteratorUtils.getIterator(tuple.getValue(tuple.getColmnOrdinal("col1")))));
+            actual.add(IteratorUtils.toList(IteratorUtils.getIterator(tuple.getValue(tuple.getColmnOrdinal("col2")))));
+            actual.add(IteratorUtils.toList(IteratorUtils.getIterator(tuple.getValue(tuple.getColmnOrdinal("col2")))));
             count++;
         }
         it.close();

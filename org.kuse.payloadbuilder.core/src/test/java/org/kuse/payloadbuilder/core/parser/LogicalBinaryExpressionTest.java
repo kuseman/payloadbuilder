@@ -55,10 +55,17 @@ public class LogicalBinaryExpressionTest extends AParserTest
         assertEquals(TRUE_LITERAL, e);
 
         e = e("(a AND b AND c AND d) OR false");
-        assertEquals(e("a AND b AND c AND d"), e);
+        assertEquals(e("(a AND b AND c AND d)"), e);
 
         e = e("(a AND true) OR (b and c)");
         assertFalse(e.isConstant());
         assertEquals(e("a OR (b and c)"), e);
+
+        e = e("(pc.apply_to_articles = 1 or pc.includeSkuIds.contains(ap.sku_id)) and not pc.excludeSkuIds.contains(ap.sku_id)");
+        assertFalse(e.isConstant());
+        assertEquals(e("(pc.apply_to_articles = 1 or pc.includeSkuIds.contains(ap.sku_id)) and not pc.excludeSkuIds.contains(ap.sku_id)"), e);
+
+        e = e("((a OR ((b))))");
+        assertEquals(e("a OR b"), e);
     }
 }

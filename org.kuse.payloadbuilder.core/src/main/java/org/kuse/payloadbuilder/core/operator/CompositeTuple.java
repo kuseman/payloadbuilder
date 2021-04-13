@@ -1,8 +1,6 @@
 package org.kuse.payloadbuilder.core.operator;
 
 import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.NoSuchElementException;
 
 /** Tuple that is composed of other tuples */
 public class CompositeTuple extends ArrayList<Tuple> implements Tuple
@@ -23,6 +21,7 @@ public class CompositeTuple extends ArrayList<Tuple> implements Tuple
         {
             add(inner);
         }
+
         // A compsite's ordinal is always the outer tuples ordinal minus one
         // this to keep the hierarchy tree intact regaring a tulpes ordinal
         // should always be lower that all it's descendants
@@ -70,6 +69,12 @@ public class CompositeTuple extends ArrayList<Tuple> implements Tuple
          *   Collection (y)     or = 3
          */
 
+        // This tuple is wanted
+        if (ordinal == tupleOrdinal)
+        {
+            return this;
+        }
+
         // Start from bottom to see if we should delegate
         int size = size();
         Tuple prevTuple = null;
@@ -99,99 +104,73 @@ public class CompositeTuple extends ArrayList<Tuple> implements Tuple
     }
 
     @Override
+    public int getColumnCount()
+    {
+        int count = 0;
+        int size = size();
+        for (int i = 0; i < size; i++)
+        {
+            count += get(i).getColumnCount();
+        }
+        return count;
+    }
+
+    @Override
     public Object getValue(int ordinal)
     {
-        // Column access on a collection, delegate to first child
-        return get(0).getValue(ordinal);
-    }
-
-    @Override
-    public Object getValue(String column)
-    {
-        // Column access on a composite, delegate to first child
-        return get(0).getValue(column);
-    }
-
-    @Override
-    public Iterator<TupleColumn> getColumns(int tupleOrdinal)
-    {
-        final int size = size();
-        //CSOFF
-        return new Iterator<TupleColumn>()
-        //CSON
+        int ord = ordinal;
+        int size = size();
+        for (int i = 0; i < size; i++)
         {
-            int index;
-            Iterator<TupleColumn> current;
-            TupleColumn next;
-
-            @Override
-            public TupleColumn next()
+            Tuple tuple = get(i);
+            int tupleColumnCount = tuple.getColumnCount();
+            // Adjust ordinal to the correct tuple
+            if (ord > tupleColumnCount - 1)
             {
-                if (next == null)
-                {
-                    throw new NoSuchElementException();
-                }
-                TupleColumn result = next;
-                next = null;
-                return result;
+                ord -= tupleColumnCount;
+                continue;
             }
 
-            @Override
-            public boolean hasNext()
+            return tuple.getValue(ord);
+        }
+
+        return null;
+    }
+
+    @Override
+    public int getColmnOrdinal(String column)
+    {
+        int size = size();
+        for (int i = 0; i < size; i++)
+        {
+            int ordinal = get(i).getColmnOrdinal(column);
+            if (ordinal >= 0)
             {
-                return setNext();
+                return ordinal;
+            }
+        }
+        return -1;
+    }
+
+    @Override
+    public String getColumn(int ordinal)
+    {
+        int ord = ordinal;
+        int size = size();
+        for (int i = 0; i < size; i++)
+        {
+            Tuple tuple = get(i);
+            int tupleColumnCount = tuple.getColumnCount();
+            // Adjust ordinal to the correct tuple
+            if (ord > tupleColumnCount - 1)
+            {
+                ord -= tupleColumnCount;
+                continue;
             }
 
-            private boolean setNext()
-            {
-                while (next == null)
-                {
-                    if (current == null)
-                    {
-                        if (index >= size)
-                        {
-                            return false;
-                        }
+            return tuple.getColumn(ord);
+        }
 
-                        Tuple tuple = get(index++);
-                        // Process all tuples
-                        if (tupleOrdinal == -1
-                            ||
-                        // A specific tuple ordinal wanted
-                            (tupleOrdinal >= 0
-                                &&
-                        /* The ordinal wanted is pointing to the composite tuples ordinal
-                         * This happens for example when an asterisk select is targeted a sub query
-                         * Then we process all descendant tuples
-                         * ie
-                         * select x.*
-                         * from
-                         * (
-                         *    select
-                         *    from ....
-                         * ) x
-                         *
-                         */
-                                ((tupleOrdinal == CompositeTuple.this.tupleOrdinal
-                                    // All descendant ordinals are larger than the parents
-                                    && tupleOrdinal < tuple.getTupleOrdinal())
-                                    ||
-                        // A tuple ordinal match
-                                    tupleOrdinal == tuple.getTupleOrdinal())))
-                        {
-                            current = tuple.getColumns(tupleOrdinal);
-                        }
-                    }
-
-                    if (current == null || !current.hasNext())
-                    {
-                        current = null;
-                        continue;
-                    }
-                    next = current.next();
-                }
-                return true;
-            }
-        };
+        return null;
     }
 }

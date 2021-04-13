@@ -85,12 +85,46 @@
     {
       "name": "Inner join, asterisk select",
       "query": [
-        "select * from source s inner join article a on a.col1 = s.col1"
+        "select * ",
+        "from source s ",
+        "inner join article a ",
+        "  on a.col1 = s.col1"
       ],
       "expectedResultSets": [
         [
           [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col3", "value": "row1" }, { "key": "art_id", "value": 1 }],
           [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col3", "value": "row2" }, { "key": "art_id", "value": 2 }]
+        ]
+      ]
+    },
+    {
+      "name": "Inner join, asterisk alias select 2",
+      "query": [
+        "select a.* ",
+        "from source s ",
+        "inner join article a ",
+        "  on a.col1 = s.col1"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col3", "value": "row1" }, { "key": "art_id", "value": 1 }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col3", "value": "row2" }, { "key": "art_id", "value": 2 }]
+        ]
+      ]
+    },
+    {
+      "name": "Inner join with group by, asterisk select",
+      "query": [
+        "select * ",
+        "from source s ",
+        "inner join article a ",
+        "  on a.col1 = s.col1 ",
+        "group by s.col1, a.col2 "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": [2] }, { "key": "col1", "value": [1] }, { "key": "col2", "value": 2 }, { "key": "col3", "value": ["row1"] }, { "key": "art_id", "value": [1] }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": [4] }, { "key": "col1", "value": [3] }, { "key": "col2", "value": 4 }, { "key": "col3", "value": ["row2"] }, { "key": "art_id", "value": [2] }]
         ]
       ]
     },
@@ -116,7 +150,7 @@
         "  on s1.col1 = s.col1 ",
         "inner join ",
         "( ",
-        "  select ** ",
+        "  select * ",
         "  from source s2 ",
         "  inner join source s3 ",
         "    on s3.col1 = s2.col1 ",
@@ -163,7 +197,7 @@
         "from article a",
         "left join ",
         "( ",
-        "  select ** ",
+        "  select * ",
         "  from article_property ap ",
         "  inner join propertykey pk ",
         "    on pk.propertykey_id = ap.propertykey_id ",
@@ -194,7 +228,7 @@
         "from source s ",
         "inner join ",
         "(",
-        "  select ** ",
+        "  select * ",
         "  from table t ",
         "  left join article a ",
         "    on a.col1 = t.row_id ",
@@ -216,7 +250,7 @@
         "from source s ",
         "inner join ",
         "(",
-        "  select ** ",
+        "  select * ",
         "  from table t ",
         "  left join article a ",
         "    on a.col1 = t.row_id ",
@@ -224,7 +258,7 @@
         "  on x.col1 = s.col1 ",
         "inner join ",
         "(",
-        "  select ** ",
+        "  select * ",
         "  from table t ",
         "  left join article a ",
         "    on a.col1 = t.row_id ",
@@ -236,6 +270,41 @@
           [{ "key": "col1", "value": 1 }, { "key": "col1", "value": 1 }, { "key": "col3", "value": "row1" }, { "key": "col1", "value": 1 }, { "key": "col3", "value": "row1" }],
           [{ "key": "col1", "value": 3 }, { "key": "col1", "value": 3 }, { "key": "col3", "value": "row2" }, { "key": "col1", "value": 3 }, { "key": "col3", "value": "row2" }],
           [{ "key": "col1", "value": 5 }, { "key": "col1", "value": 5 }, { "key": "col3", "value": "row4" }, { "key": "col1", "value": 5 }, { "key": "col3", "value": "row4" }]
+        ]
+      ]
+    },
+    {
+      "name": "Inner join, with 2 sub queries, asterisk select",
+      "description": [
+      	"Join on a sub column alias even though it's not specified as a column in sub query.",
+      	"This is usually not valid in regular RDBMS but since PLB has the whole rows data, is more",
+      	"work to limit the columns than rather permit it."
+      ],
+      "query": [
+        "select * ",
+        "from source s ",
+        "inner join ",
+        "(",
+        "  select t.row_id, a.col3 ",
+        "  from table t ",
+        "  left join article a ",
+        "    on a.col1 = t.row_id ",
+        ") x with (populate=true) ",
+        "  on x.t.col1 = s.col1 ",
+        "inner join ",
+        "(",
+        "  select a.col3, t.row_id ",
+        "  from table t ",
+        "  left join article a ",
+        "    on a.col1 = t.row_id ",
+        ") x1 with (populate=true) ",
+        "  on x1.t.col1 = s.col1"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "row_id", "value": 1 }, { "key": "col3", "value": "row1" }, { "key": "col3", "value": "row1" }, { "key": "row_id", "value": 1 }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "row_id", "value": 3 }, { "key": "col3", "value": "row2" }, { "key": "col3", "value": "row2" }, { "key": "row_id", "value": 3 }],
+          [{ "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }, { "key": "row_id", "value": 6 }, { "key": "col3", "value": "row4" }, { "key": "col3", "value": "row4" }, { "key": "row_id", "value": 6 }]
         ]
       ]
     },
@@ -274,7 +343,7 @@
         "select reservation.* ",
         "from ",
         "( ",
-        "  select ** ",
+        "  select * ",
         "  from reservation rs ",
         "  cross apply open_map_collection(rs.stockhouses) sh",
         ") reservation "
@@ -292,7 +361,7 @@
         "select * ",
         "from ",
         "( ",
-        "  select ** ",
+        "  select * ",
         "  from reservation rs ",
         "  cross apply open_map_collection(rs.stockhouses) sh",
         ") reservation "
@@ -310,7 +379,7 @@
         "select reservation.index, reservation.id, reservation.sh.wareh_id ",
         "from ",
         "( ",
-        "  select ** ",
+        "  select * ",
         "  from reservation rs ",
         "  cross apply open_map_collection(rs.stockhouses) sh",
         "  group by rs.index, rs.id, sh.wareh_id ",
@@ -344,7 +413,7 @@
         "select s.id, s.index, s.sh.wareh_id, s.sh.qty ",
         "from ",
         "( ",
-        "  select **",
+        "  select *",
         "  from shopcart s ",
         "  cross apply open_map_collection(s.stockhouses) sh ",
         "  where s.id = 101 ",
@@ -363,7 +432,7 @@
         "select shopcart.s.index, shopcart.sh.sku_id, shopcart.sh.wareh_id, sum(shopcart.sh.qty) qty ",
         "from ",
         "( ",
-        "  select **",
+        "  select *",
         "  from shopcart s ",
         "  cross apply open_map_collection(s.stockhouses) sh",
         "  group by s.index, sh.sku_id, sh.wareh_id ",

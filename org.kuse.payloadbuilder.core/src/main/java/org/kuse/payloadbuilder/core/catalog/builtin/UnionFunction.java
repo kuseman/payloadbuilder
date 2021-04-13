@@ -1,12 +1,13 @@
 package org.kuse.payloadbuilder.core.catalog.builtin;
 
 import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.toSet;
 
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.commons.collections.IteratorUtils;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
@@ -30,7 +31,7 @@ class UnionFunction extends ScalarFunctionInfo
         return argumentAliases
                 .stream()
                 .flatMap(Collection::stream)
-                .collect(toSet());
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     @SuppressWarnings("unchecked")

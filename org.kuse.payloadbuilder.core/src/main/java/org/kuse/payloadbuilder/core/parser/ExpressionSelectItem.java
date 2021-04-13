@@ -4,8 +4,11 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.join;
 
+import java.util.List;
+
 import org.antlr.v4.runtime.Token;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression.ResolvePath;
 
 /** Select item that is built from an expression */
 public class ExpressionSelectItem extends SelectItem
@@ -50,6 +53,23 @@ public class ExpressionSelectItem extends SelectItem
     public Object getAssignmentValue(ExecutionContext context)
     {
         return expression.eval(context);
+    }
+
+    @SuppressWarnings("deprecation")
+    @Override
+    public List<ResolvePath> getResolvePaths()
+    {
+        if (expression instanceof QualifiedReferenceExpression)
+        {
+            return ((QualifiedReferenceExpression) expression).getResolvePaths();
+        }
+        return null;
+    }
+
+    @Override
+    public boolean isComputed()
+    {
+        return !(expression instanceof QualifiedReferenceExpression);
     }
 
     @Override

@@ -23,6 +23,7 @@ public class Join extends AJoin
         return type;
     }
 
+    @Override
     public Expression getCondition()
     {
         return condition;

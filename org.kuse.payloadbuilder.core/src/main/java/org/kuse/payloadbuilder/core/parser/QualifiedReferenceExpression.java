@@ -3,19 +3,23 @@ package org.kuse.payloadbuilder.core.parser;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.StringUtils.lowerCase;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 import org.antlr.v4.runtime.Token;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.builder.ToStringBuilder;
+import org.apache.commons.lang3.builder.ToStringStyle;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.Tuple;
-import org.kuse.payloadbuilder.core.operator.Tuple.ComputedTuple;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
 
 /**
@@ -32,7 +36,6 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
      */
     private final int lambdaId;
     private final Token token;
-    private final boolean initiallyResolved;
 
     /**
      * Mutable property. Temporary until query parser is rewritten to and a 2 pass analyze phase is done that resolves this.
@@ -44,16 +47,6 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         this.qname = requireNonNull(qname, "qname");
         this.lambdaId = lambdaId;
         this.token = token;
-        this.initiallyResolved = false;
-    }
-
-    public QualifiedReferenceExpression(QualifiedName qname, int lambdaId, List<ResolvePath> resolvePaths, Token token)
-    {
-        this.qname = requireNonNull(qname, "qname");
-        this.lambdaId = lambdaId;
-        this.token = token;
-        this.initiallyResolved = true;
-        setResolvePaths(resolvePaths);
     }
 
     public QualifiedName getQname()
@@ -71,16 +64,13 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         return token;
     }
 
-    public boolean isInitiallyResolved()
-    {
-        return initiallyResolved;
-    }
-
-    void setResolvePaths(List<ResolvePath> resolvePaths)
+    /** Set resolve path, will be removed when a 2 phase operator build is in place */
+    @Deprecated
+    public void setResolvePaths(List<ResolvePath> resolvePaths)
     {
         if (this.resolvePaths != null)
         {
-            throw new IllegalArgumentException("Resolve paths is already set");
+            return;
         }
         requireNonNull(resolvePaths, "resolvePaths");
         if (resolvePaths.isEmpty())
@@ -90,6 +80,7 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         this.resolvePaths = unmodifiableList(resolvePaths);
     }
 
+    @Deprecated
     public List<ResolvePath> getResolvePaths()
     {
         return ObjectUtils.defaultIfNull(resolvePaths, emptyList());
@@ -106,20 +97,22 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
     {
         Object value = null;
         int partIndex = 0;
-        List<String> parts;
+        String[] parts;
+        Tuple tuple = context.getTuple();
 
         // Expression mode
         if (resolvePaths == null)
         {
-            parts = qname.getParts();
+            parts = qname.getParts().toArray(ArrayUtils.EMPTY_STRING_ARRAY);
             if (lambdaId >= 0)
             {
                 value = context.getLambdaValue(lambdaId);
                 partIndex++;
             }
-            else if (context.getTuple() != null)
+            else if (tuple != null)
             {
-                value = context.getTuple().getValue(parts.get(partIndex++));
+                int ordinal = tuple.getColmnOrdinal(lowerCase(parts[partIndex++]));
+                value = tuple.getValue(ordinal);
             }
         }
         else
@@ -127,7 +120,6 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
             // TODO: sorceTupleOrdinal
             ResolvePath path = resolvePaths.get(0);
             parts = path.unresolvedPath;
-            Tuple tuple = context.getTuple();
             if (lambdaId >= 0)
             {
                 value = context.getLambdaValue(lambdaId);
@@ -145,48 +137,39 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
                     //CSOFF
                     if (tuple == null
                         //CSON
-                        || parts.size() == 0)
+                        || parts.length == 0)
                     {
                         return tuple;
                     }
 
                     // Get value for first part
-                    value = tuple.getValue(parts.get(partIndex++));
+                    int ordinal = path.columnOrdinal >= 0 ? path.columnOrdinal : tuple.getColmnOrdinal(parts[partIndex++]);
+                    value = tuple.getValue(ordinal);
                 }
             }
             else if (tuple != null)
             {
-                //CSOFF
-                if (path.computedColumnIndex >= 0)
-                {
-                    if (!(tuple instanceof Tuple.ComputedTuple))
-                    //CSON
-                    {
-                        throw new IllegalArgumentException("Expected a computed tuple but got " + tuple.getClass().getSimpleName());
-                    }
-
-                    return ((Tuple.ComputedTuple) tuple).getComputedValue(path.computedColumnIndex);
-                }
-
                 // Resolve target tuple
                 tuple = tuple.getTuple(path.targetTupleOrdinal);
 
                 // Nothing more to resolve here return tuple
                 //CSOFF
-                if (tuple == null
-                    //CSON
-                    || parts.size() == 0)
+                if (tuple == null ||
+                //CSON
+                    (path.columnOrdinal == -1
+                        && parts.length == 0))
                 {
                     return tuple;
                 }
 
                 // Resolve first part
-                value = tuple.getValue(parts.get(partIndex++));
+                int ordinal = path.columnOrdinal >= 0 ? path.columnOrdinal : tuple.getColmnOrdinal(parts[partIndex++]);
+                value = tuple.getValue(ordinal);
             }
         }
 
         if (value == null
-            || partIndex >= parts.size())
+            || partIndex >= parts.length)
         {
             return value;
         }
@@ -211,10 +194,10 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
     public boolean isCodeGenSupported()
     {
         return resolvePaths == null
-            ||
-            (resolvePaths.size() == 1
-                &&
-                resolvePaths.get(0).unresolvedPath.size() == 1);
+            || (resolvePaths.size() == 1
+                && resolvePaths.get(0).targetTupleOrdinal >= 0
+                && (resolvePaths.get(0).unresolvedPath.length == 1
+                    || resolvePaths.get(0).columnOrdinal >= 0));
     }
 
     @Override
@@ -227,18 +210,57 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         // TODO: map access etc.
 
         int targetOrdinal = -1;
-        String column = qname.toString();
+        String column = lowerCase(qname.toString());
+        int columnOrdinal = -1;
         if (!CollectionUtils.isEmpty(resolvePaths))
         {
             targetOrdinal = resolvePaths.get(0).targetTupleOrdinal;
-            column = resolvePaths.get(0).unresolvedPath.get(0);
+            columnOrdinal = resolvePaths.get(0).columnOrdinal;
+            if (columnOrdinal == -1)
+            {
+                column = resolvePaths.get(0).unresolvedPath[0];
+            }
         }
 
-        code.setCode(String.format("// %s\nObject %s = tuple%s%s;\n",
-                qname,
-                code.getResVar(),
-                targetOrdinal >= 0 ? (".getTuple(" + targetOrdinal + ")") : "",
-                ".getValue(\"" + column + "\")"));
+        StringBuilder sb = new StringBuilder();
+
+        // Expression mode then we don't have a target
+        if (targetOrdinal == -1)
+        {
+            sb.append(String.format("// %s\n"
+                + "Tuple t_%s = tuple;\n",
+                    qname,
+                    code.getResVar()));
+        }
+        else
+        {
+            /*
+             * Tuple t_v_2 =  tuple.getTuple(ordinal);
+             */
+            sb.append(String.format("// %s\n"
+                + "Tuple t_%s = tuple.getTuple(%d);\n",
+                    qname,
+                    code.getResVar(), targetOrdinal));
+        }
+
+        if (columnOrdinal >= 0)
+        {
+            /*
+             * Object v_2 = t_v_2.getValue(1);
+             */
+            sb.append(String.format("Object %s = t_%s.getValue(%d);\n",
+                    code.getResVar(), code.getResVar(), columnOrdinal));
+        }
+        else
+        {
+            /*
+             * Object v_2 = t_v_2.getValue(t_v_2.getOrdinal("col"));
+             */
+            sb.append(String.format("Object %s = t_%s.getValue(t_%s.getColmnOrdinal(\"%s\"));\n",
+                    code.getResVar(), code.getResVar(), code.getResVar(), column));
+        }
+
+        code.setCode(sb.toString());
         return code;
     }
 
@@ -301,29 +323,22 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
          *   then we have col.key.subkey left to resolve runtime from the target tuple
          * </pre>
          */
-        final List<String> unresolvedPath;
+        final String[] unresolvedPath;
 
-        /**
-         * This is a resolve path to a computed column and is pointing to the index of the computed value.
-         *
-         * <pre>
-         * Assumes that the tuple in the stream is of
-         * {@link ComputedTuple} type.
-         * </pre>
-         */
-        final int computedColumnIndex;
+        /** Pre defined column ordinal. Typically a computed expression or similar */
+        final int columnOrdinal;
 
         public ResolvePath(int sourceTupleOrdinal, int targetTupleOrdinal, List<String> unresolvedPath)
         {
             this(sourceTupleOrdinal, targetTupleOrdinal, unresolvedPath, -1);
         }
 
-        public ResolvePath(int sourceTupleOrdinal, int targetTupleOrdinal, List<String> unresolvedPath, int computedColumnIndex)
+        public ResolvePath(int sourceTupleOrdinal, int targetTupleOrdinal, List<String> unresolvedPath, int columnOrdinal)
         {
             this.sourceTupleOrinal = sourceTupleOrdinal;
             this.targetTupleOrdinal = targetTupleOrdinal;
-            this.unresolvedPath = unmodifiableList(requireNonNull(unresolvedPath, "unresolvedPath"));
-            this.computedColumnIndex = computedColumnIndex;
+            this.unresolvedPath = requireNonNull(unresolvedPath, "unresolvedPath").toArray(ArrayUtils.EMPTY_STRING_ARRAY);
+            this.columnOrdinal = columnOrdinal;
         }
 
         public int getTargetTupleOrdinal()
@@ -345,9 +360,16 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
                 ResolvePath that = (ResolvePath) obj;
                 return sourceTupleOrinal == that.sourceTupleOrinal
                     && targetTupleOrdinal == that.targetTupleOrdinal
-                    && unresolvedPath.equals(that.unresolvedPath);
+                    && columnOrdinal == that.columnOrdinal
+                    && Arrays.equals(unresolvedPath, that.unresolvedPath);
             }
             return false;
+        }
+
+        @Override
+        public String toString()
+        {
+            return ToStringBuilder.reflectionToString(this, ToStringStyle.JSON_STYLE);
         }
     }
 }

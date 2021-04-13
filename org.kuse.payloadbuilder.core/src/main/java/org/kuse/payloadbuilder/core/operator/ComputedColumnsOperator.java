@@ -4,11 +4,12 @@ import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 
-import java.util.Iterator;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
@@ -18,13 +19,15 @@ class ComputedColumnsOperator extends AOperator
 {
     private final Operator operator;
     private final List<Expression> computedExpressions;
-    private final List<String> columns;
+    private final String[] columns;
+    private final int tupleOrdinal;
 
-    ComputedColumnsOperator(int nodeId, Operator operator, List<String> columns, List<Expression> computedExpressions)
+    ComputedColumnsOperator(int nodeId, int tupleOrdinal, Operator operator, List<String> columns, List<Expression> computedExpressions)
     {
         super(nodeId);
+        this.tupleOrdinal = tupleOrdinal;
         this.operator = requireNonNull(operator, "operator");
-        this.columns = requireNonNull(columns, "columns");
+        this.columns = requireNonNull(columns, "columns").toArray(ArrayUtils.EMPTY_STRING_ARRAY);
         this.computedExpressions = requireNonNull(computedExpressions, "computedExpressions");
     }
 
@@ -43,8 +46,8 @@ class ComputedColumnsOperator extends AOperator
     @Override
     public Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
-        int size = columns.size();
-        return MapUtils.ofEntries(MapUtils.entry("Columns", IntStream.range(0, size).mapToObj(i -> String.format("%s: %s", columns.get(i), computedExpressions.get(i))).collect(joining())));
+        int size = columns.length;
+        return MapUtils.ofEntries(MapUtils.entry("Columns", IntStream.range(0, size).mapToObj(i -> String.format("%s: %s", columns[i], computedExpressions.get(i))).collect(joining())));
     }
 
     @Override
@@ -98,7 +101,7 @@ class ComputedColumnsOperator extends AOperator
             ComputedColumnsOperator that = (ComputedColumnsOperator) obj;
             return operator.equals(that.operator)
                 && computedExpressions.equals(that.computedExpressions)
-                && columns.equals(that.columns);
+                && Arrays.equals(columns, that.columns);
         }
         return false;
     }
@@ -107,13 +110,13 @@ class ComputedColumnsOperator extends AOperator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        return String.format("COMPUTED COLUMNS (ID: %d, COLUMNS: %s)", nodeId, computedExpressions) + System.lineSeparator()
+        return String.format("COMPUTED COLUMNS (ID: %d, COLUMNS: %s, EXPRESSIONS: %s)", nodeId, Arrays.toString(columns), computedExpressions) + System.lineSeparator()
             +
             indentString + operator.toString(indent + 1);
     }
 
     /** Result tuple */
-    static class ComputedTuple implements Tuple.ComputedTuple
+    class ComputedTuple implements Tuple
     {
         private final Tuple tuple;
         private final Object[] values;
@@ -127,41 +130,57 @@ class ComputedColumnsOperator extends AOperator
         @Override
         public int getTupleOrdinal()
         {
-            return tuple.getTupleOrdinal();
+            return tupleOrdinal;
         }
 
         @Override
         public Tuple getTuple(int tupleOrdinal)
         {
+            // Keep this context if we access the target computed tuple
+            // or parent.
+            if (tupleOrdinal == ComputedColumnsOperator.this.tupleOrdinal)
+            {
+                return this;
+            }
             return tuple.getTuple(tupleOrdinal);
         }
 
         @Override
-        public Object getValue(String column)
+        public int getColumnCount()
         {
-            return tuple.getValue(column);
+            return values.length + tuple.getColumnCount();
+        }
+
+        @Override
+        public int getColmnOrdinal(String column)
+        {
+            int ordinal = ArrayUtils.indexOf(columns, column);
+            if (ordinal >= 0)
+            {
+                return ordinal;
+            }
+
+            return tuple.getColmnOrdinal(column) + values.length;
+        }
+
+        @Override
+        public String getColumn(int ordinal)
+        {
+            if (ordinal < columns.length)
+            {
+                return columns[ordinal];
+            }
+            return tuple.getColumn(ordinal - columns.length);
         }
 
         @Override
         public Object getValue(int columnOrdinal)
         {
-            return tuple.getValue(columnOrdinal);
-        }
-
-        @Override
-        public Iterator<TupleColumn> getColumns(int tupleOrdinal)
-        {
-            return tuple.getColumns(tupleOrdinal);
-        }
-
-        @Override
-        public Object getComputedValue(int ordinal)
-        {
-            if (ordinal <= values.length)
+            if (columnOrdinal < columns.length)
             {
-                return values[ordinal];
+                return values[columnOrdinal];
             }
-            return null;
+            return tuple.getValue(columnOrdinal - columns.length);
         }
     }
 }

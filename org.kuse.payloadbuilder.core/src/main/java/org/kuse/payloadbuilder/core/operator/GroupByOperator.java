@@ -2,15 +2,18 @@ package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toSet;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
@@ -73,12 +76,29 @@ class GroupByOperator extends AOperator
         it.close();
 
         Iterator<List<Tuple>> iterator = table.values().iterator();
+        //CSOFF
         return new RowIterator()
+        //CSON
         {
+            Map<Integer, Set<Integer>> groupByOrdinals;
+
             @Override
             public Tuple next()
             {
-                return new GroupedRow(iterator.next(), columnReferences);
+                List<Tuple> tuples = iterator.next();
+                // Calculate ordinals from the first tuples data
+                if (groupByOrdinals == null)
+                {
+                    groupByOrdinals = new HashMap<>();
+                    Tuple firstTuple = tuples.get(0);
+                    for (Entry<Integer, Set<String>> e : columnReferences.entrySet())
+                    {
+                        // Count how many columns there are before current ordinal
+                        Tuple tuple = firstTuple.getTuple(e.getKey());
+                        groupByOrdinals.put(e.getKey(), e.getValue().stream().map(c -> tuple.getColmnOrdinal(c)).collect(toSet()));
+                    }
+                }
+                return new GroupedRow(tuples, groupByOrdinals);
             }
 
             @Override

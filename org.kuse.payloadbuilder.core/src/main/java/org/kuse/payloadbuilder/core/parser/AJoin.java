@@ -19,6 +19,11 @@ public abstract class AJoin extends ASelectNode
         return tableSource;
     }
 
+    public Expression getCondition()
+    {
+        return null;
+    }
+
     @Override
     public String toString()
     {

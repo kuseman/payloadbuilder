@@ -103,46 +103,27 @@ public class TemporaryTableScanOperator extends AOperator
         }
 
         @Override
-        public Object getValue(String column)
+        public int getColumnCount()
         {
-            return tuple.getValue(column);
+            return tuple.getColumnCount();
         }
 
         @Override
-        public Iterator<TupleColumn> getColumns(int tupleOrdinal)
+        public int getColmnOrdinal(String column)
         {
-            final Iterator<TupleColumn> it = tuple.getColumns(getActualTupleOrdinal(tupleOrdinal));
-            // Replace the downstream ordinal with the dynamic one
-            //CSOFF
-            return new Iterator<Tuple.TupleColumn>()
-            //CSON
-            {
-                @Override
-                public TupleColumn next()
-                {
-                    TupleColumn tc = it.next();
-                    return new TupleColumn()
-                    {
-                        @Override
-                        public int getTupleOrdinal()
-                        {
-                            return TemporaryTableTuple.this.tupleOrdinal;
-                        }
+            return tuple.getColmnOrdinal(column);
+        }
 
-                        @Override
-                        public String getColumn()
-                        {
-                            return tc.getColumn();
-                        }
-                    };
-                }
+        @Override
+        public String getColumn(int ordinal)
+        {
+            return tuple.getColumn(ordinal);
+        }
 
-                @Override
-                public boolean hasNext()
-                {
-                    return it.hasNext();
-                }
-            };
+        @Override
+        public Object getValue(int ordinal)
+        {
+            return tuple.getValue(ordinal);
         }
 
         private int getActualTupleOrdinal(int tupleOrdinal)

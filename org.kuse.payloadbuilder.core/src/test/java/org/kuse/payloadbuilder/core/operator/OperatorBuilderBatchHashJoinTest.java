@@ -28,7 +28,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             + "FROM source s "
             + "INNER JOIN "
             + "("
-            + "  select ** "
+            + "  select * "
             + "  from article a"
             + "  INNER JOIN articleAttribute aa with(populate=true)"
             + "    ON aa.art_id = a.art_id "
@@ -81,7 +81,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             "FROM source s " +
             "INNER JOIN " +
             "(" +
-            "  select ** " +
+            "  select * " +
             "  from article a " +
             "  INNER JOIN article_attribute aa " +
             "    ON aa.art_id = a.art_id " +
@@ -188,7 +188,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
     {
         String queryString = "SELECT a.art_id " +
             "FROM source s " +
-            "INNER JOIN (select ** from article where internet_flg = 1) a with(populate=true)" +
+            "INNER JOIN (select * from article where internet_flg = 1) a with(populate=true)" +
             "  ON a.art_id = s.art_id " +
             "  AND a.club_id = 1337 + 123 " +
             "  AND a.country_id = 0 " +
@@ -234,7 +234,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             "FROM source s " +
             "LEFT JOIN "
             + "("
-            + "  select ** "
+            + "  select * "
             + "from article "
             + "where internet_flg = 1"
             + ") a with (populate=true)" +

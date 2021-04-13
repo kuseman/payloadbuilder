@@ -109,7 +109,7 @@ topCount
 
 selectItem
  : 
- 	ASTERISK ASTERISK?
+ 	ASTERISK
  |  alias=identifier '.' ASTERISK
  |  (OBJECT | ARRAY) nestedSelectItem (AS? identifier)?
  |  (variable EQUALS)? expression 	  (AS? identifier)?
@@ -130,9 +130,9 @@ tableSourceJoined
  ;
 
 tableSource
- : tableName				identifier? tableSourceOptions?
- | functionCall				identifier? tableSourceOptions?
- | '(' selectStatement ')'	identifier? tableSourceOptions?
+ : tableName						identifier? tableSourceOptions?
+ | functionCall						identifier? tableSourceOptions?
+ | PARENO selectStatement PARENC	identifier? tableSourceOptions?
  ;
 
 tableSourceOptions
@@ -345,6 +345,8 @@ LESSTHAN			: '<';
 LESSTHANEQUAL		: '<=';
 MINUS				: '-';
 NOTEQUALS			: '!=';
+PARENO              : '(';
+PARENC              : ')';
 PERCENT				: '%';
 PLUS				: '+';
 SLASH				: '/';

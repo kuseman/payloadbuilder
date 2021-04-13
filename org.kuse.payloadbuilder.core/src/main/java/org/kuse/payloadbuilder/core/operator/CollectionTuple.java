@@ -1,7 +1,6 @@
 package org.kuse.payloadbuilder.core.operator;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -13,7 +12,7 @@ import org.apache.commons.collections.iterators.TransformIterator;
 class CollectionTuple extends ArrayList<Tuple> implements Tuple
 {
     private final int tupleOrdinal;
-    private final Set<String> singleValueColumns;
+    private final Set<Integer> singleValueOrdinals;
 
     /**
      * Target ordinal used by grouped rows. This to know which ordinal to stream values from when returning values
@@ -28,13 +27,13 @@ class CollectionTuple extends ArrayList<Tuple> implements Tuple
      * tuple in collection (they are all the same) else return an iterator of all tuples values
      * </pre>
      */
-    CollectionTuple(List<Tuple> tuples, int targetOrdinal, Set<String> singleValueColumns)
+    CollectionTuple(List<Tuple> tuples, int targetOrdinal, Set<Integer> singleValueOrdinals)
     {
         super(tuples.size());
-        this.targetOrdinal = targetOrdinal;
         addAll(tuples);
-        this.tupleOrdinal = tuples.get(0).getTupleOrdinal();
-        this.singleValueColumns = singleValueColumns;
+        this.targetOrdinal = targetOrdinal;
+        this.tupleOrdinal = targetOrdinal;
+        this.singleValueOrdinals = singleValueOrdinals;
     }
 
     /** Create a collection tuple based on another tuple */
@@ -43,7 +42,7 @@ class CollectionTuple extends ArrayList<Tuple> implements Tuple
         add(tuple);
         this.tupleOrdinal = tuple.getTupleOrdinal();
         this.targetOrdinal = -1;
-        this.singleValueColumns = null;
+        this.singleValueOrdinals = null;
     }
 
     /** Create a collection tuple based on a tuple ordinal */
@@ -51,7 +50,7 @@ class CollectionTuple extends ArrayList<Tuple> implements Tuple
     {
         this.tupleOrdinal = tupleOrdinal;
         this.targetOrdinal = -1;
-        this.singleValueColumns = null;
+        this.singleValueOrdinals = null;
     }
 
     @Override
@@ -63,18 +62,64 @@ class CollectionTuple extends ArrayList<Tuple> implements Tuple
     @Override
     public Tuple getTuple(int ordinal)
     {
-        // Populating is a collection of the same tuples
-        // if delegate to first child
-        // this is a typical accces to first row in a populated join
         return get(0).getTuple(ordinal);
+    }
+
+    @Override
+    public int getColumnCount()
+    {
+        // Use first tuple
+        Tuple tuple = get(0);
+
+        // Adapt for grouped row
+        if (targetOrdinal != -1 && tuple.getTupleOrdinal() != targetOrdinal)
+        {
+            tuple = tuple.getTuple(targetOrdinal);
+        }
+
+        return tuple.getColumnCount();
+    }
+
+    @Override
+    public String getColumn(int ordinal)
+    {
+        // Use first tuple
+        Tuple tuple = get(0);
+
+        // Adapt for grouped row
+        if (targetOrdinal != -1 && tuple.getTupleOrdinal() != targetOrdinal)
+        {
+            tuple = tuple.getTuple(targetOrdinal);
+        }
+
+        return tuple.getColumn(ordinal);
+    }
+
+    @Override
+    public int getColmnOrdinal(String column)
+    {
+        // Use first tuple
+        Tuple tuple = get(0);
+
+        // Adapt for grouped row
+        if (targetOrdinal != -1 && tuple.getTupleOrdinal() != targetOrdinal)
+        {
+            tuple = tuple.getTuple(targetOrdinal);
+        }
+
+        return tuple.getColmnOrdinal(column);
     }
 
     @Override
     public Object getValue(int ordinal)
     {
-        if (targetOrdinal >= 0)
+        if (singleValueOrdinals != null)
         {
-            // TODO: singleValueIndices
+            if (singleValueOrdinals.contains(ordinal))
+            {
+                Tuple sub = get(0).getTuple(targetOrdinal);
+                return sub != null ? sub.getValue(ordinal) : null;
+            }
             // Stream values for target ordinal
             return new TransformIterator(iterator(), tuple ->
             {
@@ -85,36 +130,5 @@ class CollectionTuple extends ArrayList<Tuple> implements Tuple
 
         // Delegate to first row
         return get(0).getValue(ordinal);
-    }
-
-    @Override
-    public Object getValue(String column)
-    {
-        if (targetOrdinal >= 0)
-        {
-            // A grouped column, return first rows value, they are all the same
-            if (singleValueColumns.contains(column))
-            {
-                Tuple sub = get(0).getTuple(targetOrdinal);
-                return sub != null ? sub.getValue(column) : null;
-            }
-
-            // Stream all values for target ordinal
-            return new TransformIterator(iterator(), tuple ->
-            {
-                Tuple sub = ((Tuple) tuple).getTuple(targetOrdinal);
-                return sub != null ? sub.getValue(column) : null;
-            });
-        }
-
-        // Delegate to first row
-        return get(0).getValue(column);
-    }
-
-    @Override
-    public Iterator<TupleColumn> getColumns(int tupleOrdinal)
-    {
-        // Delegate to first row
-        return get(0).getColumns(tupleOrdinal);
     }
 }

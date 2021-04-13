@@ -40,10 +40,10 @@ import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
  * from tableA a
  * inner join
  * (
- *   select **
+ *   select *
  *   from tableB b
  *   union all
- *   select **
+ *   select *
  *   from tableC c
  * ) x
  *   on x.id = a.id

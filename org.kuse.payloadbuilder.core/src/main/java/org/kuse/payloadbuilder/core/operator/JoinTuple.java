@@ -76,18 +76,28 @@ class JoinTuple implements Tuple
     }
 
     @Override
+    public int getColumnCount()
+    {
+        return inner.getColumnCount();
+    }
+
+    @Override
+    public int getColmnOrdinal(String column)
+    {
+        return inner.getColmnOrdinal(column);
+    }
+
+    @Override
+    public String getColumn(int ordinal)
+    {
+        return inner.getColumn(ordinal);
+    }
+
+    @Override
     public Object getValue(int ordinal)
     {
         // This is a qualifier with a single part then it can only reference
         // the inner
         return inner.getValue(ordinal);
-    }
-
-    @Override
-    public Object getValue(String column)
-    {
-        // This is a qualifier with a single part then it can only reference
-        // the inner
-        return inner.getValue(column);
     }
 }

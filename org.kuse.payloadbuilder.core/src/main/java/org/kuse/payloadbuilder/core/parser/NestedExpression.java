@@ -30,7 +30,12 @@ public class NestedExpression extends Expression
     @Override
     public Expression fold()
     {
-        return expression.fold();
+        // Only fold nested expressions to remove excessive parenthesis
+        if (expression instanceof NestedExpression)
+        {
+            return expression.fold();
+        }
+        return expression;
     }
 
     @Override
@@ -43,6 +48,12 @@ public class NestedExpression extends Expression
     public Object eval(ExecutionContext context)
     {
         return expression.eval(context);
+    }
+
+    @Override
+    public boolean isCodeGenSupported()
+    {
+        return expression.isCodeGenSupported();
     }
 
     @Override
