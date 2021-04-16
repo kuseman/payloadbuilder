@@ -9,12 +9,11 @@ import java.io.IOException;
 import java.io.Writer;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
 
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
-import org.kuse.payloadbuilder.core.operator.Tuple;
+import org.kuse.payloadbuilder.core.operator.TemporaryTable;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.VariableExpression;
 
@@ -24,8 +23,10 @@ import org.kuse.payloadbuilder.core.parser.VariableExpression;
 public class QuerySession
 {
     /* System properties */
-    /** Enable code gen for query. Will try to precompile every expression that supports code gen.
-     * NOTE! Will be default in the future and this property will be removed */
+    /**
+     * Enable code gen for query. Will try to precompile every expression that supports code gen. NOTE! Will be default in the future and this
+     * property will be removed
+     */
     public static final String CODEGEN_ENABLED = "codegen.enabled";
     /* End system properties */
 
@@ -36,7 +37,7 @@ public class QuerySession
     private Map<String, Map<String, Object>> catalogProperties;
     private Writer printWriter;
     private BooleanSupplier abortSupplier;
-    private Map<QualifiedName, List<Tuple>> temporaryTables;
+    private Map<QualifiedName, TemporaryTable> temporaryTables;
     private Map<String, Object> systemProperties;
 
     public QuerySession(CatalogRegistry catalogRegistry)
@@ -105,33 +106,37 @@ public class QuerySession
     }
 
     /** Get temporary table with provided qualifier */
-    public List<Tuple> getTemporaryTable(QualifiedName table)
+    public TemporaryTable getTemporaryTable(QualifiedName table)
     {
-        List<Tuple> rows;
+        TemporaryTable result;
         //CSOFF
         if (temporaryTables == null
-            || (rows = temporaryTables.get(table)) == null)
+            || (result = temporaryTables.get(table)) == null)
         //CSON
         {
             throw new QueryException("No temporary table found with name #" + table);
         }
 
-        return rows;
+        return result;
     }
 
-    /** Set a temporary table into context */
-    public void setTemporaryTable(QualifiedName table, List<Tuple> rows)
+    /**
+     * Set a temporary table into context
+     *
+     * @param table The temporary table
+     */
+    public void setTemporaryTable(TemporaryTable table)
     {
-        requireNonNull(rows);
+        requireNonNull(table);
         if (temporaryTables == null)
         {
             temporaryTables = new HashMap<>();
         }
-        if (temporaryTables.containsKey(table))
+        if (temporaryTables.containsKey(table.getName()))
         {
-            throw new QueryException("Temporary table #" + table + " already exists in session");
+            throw new QueryException("Temporary table #" + table.getName() + " already exists in session");
         }
-        temporaryTables.put(table, rows);
+        temporaryTables.put(table.getName(), table);
     }
 
     /** Drop temporary table */

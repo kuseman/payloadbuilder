@@ -20,9 +20,11 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorTest
             + "inner join #temp t1 "
             + "  on t1.col = s.id3 "
             + "  or active";
-        QueryResult result = getQueryResult(query);
 
         TableAlias tempAlias = TableAliasBuilder.of(1, Type.TEMPORARY_TABLE, QualifiedName.of("temp"), "t1").build();
+        session.setTemporaryTable(new TemporaryTable(QualifiedName.of("temp"), tempAlias, new String[] { "col", "active", "id2" }, emptyList()));
+
+        QueryResult result = getQueryResult(query);
 
         Operator expected = new NestedLoopJoin(
                 2,
@@ -39,7 +41,7 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorTest
 
         assertEquals(expected, result.operator);
 
-        assertEquals(new ObjectProjection(asList("id1", "id2"),
+        assertEquals(new RootProjection(asList("id1", "id2"),
                 asList(
                         new ExpressionProjection(e("s.id1")),
                         new ExpressionProjection(e("t1.id2")))),
@@ -50,9 +52,10 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorTest
     public void test_nested_loop_cache_operator_when_inner_is_filtered_temporary_table()
     {
         String query = "select s.id1, t1.id2 from source s inner join #temp t1 on (t1.col = s.id3 or active) and t1.col > 10";
-        QueryResult result = getQueryResult(query);
 
         TableAlias tempAlias = TableAliasBuilder.of(1, Type.TEMPORARY_TABLE, QualifiedName.of("temp"), "t1").build();
+        session.setTemporaryTable(new TemporaryTable(QualifiedName.of("temp"), tempAlias, new String[] { "col", "active", "id2" }, emptyList()));
+        QueryResult result = getQueryResult(query);
 
         Operator expected = new NestedLoopJoin(
                 4,
@@ -72,7 +75,7 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorTest
 
         assertEquals(expected, result.operator);
 
-        assertEquals(new ObjectProjection(asList("id1", "id2"),
+        assertEquals(new RootProjection(asList("id1", "id2"),
                 asList(
                         new ExpressionProjection(e("s.id1")),
                         new ExpressionProjection(e("t1.id2")))),
@@ -100,7 +103,7 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorTest
 
         assertEquals(expected, result.operator);
 
-        assertEquals(new ObjectProjection(asList("id1", "id2"),
+        assertEquals(new RootProjection(asList("id1", "id2"),
                 asList(
                         new ExpressionProjection(e("s.id1")),
                         new ExpressionProjection(e("a.id2")))),
@@ -129,7 +132,7 @@ public class OperatorBuilderNestedLoopJoinTest extends AOperatorTest
 
         assertEquals(expected, result.operator);
 
-        assertEquals(new ObjectProjection(asList("id1", "id2"),
+        assertEquals(new RootProjection(asList("id1", "id2"),
                 asList(
                         new ExpressionProjection(e("s.id1")),
                         new ExpressionProjection(e("a.id2")))),

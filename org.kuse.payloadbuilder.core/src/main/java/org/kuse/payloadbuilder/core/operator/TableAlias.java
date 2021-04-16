@@ -103,27 +103,6 @@ public class TableAlias
      **/
     private final int tupleOrdinal;
     private final Type type;
-
-    /**
-     * Select items for this alias
-     *
-     * <pre>
-     * ie.
-     *
-     *   select *
-     *   from
-     *   (
-     *          select col1
-     *          ,      col2
-     *          ,      col3 + col4 calc
-     *   ) x
-     *
-     *   Here we have 3 select items (col1, col2, calc)
-     *   And output columns needed from operator is (col1, col2, col3)
-     * </pre>
-     **/
-//    private List<SelectItem> selectItems;
-
     private String[] columns;
     /** Is all columns wanted for this table alias. */
     private boolean asteriskColumns;
@@ -131,6 +110,7 @@ public class TableAlias
     TableAlias(
             int tupleOrdinal,
             TableAlias parent,
+            boolean connectAsChild,
             QualifiedName table,
             String alias,
             String[] columns,
@@ -154,7 +134,10 @@ public class TableAlias
                 throw new ParseException("Alias " + alias + " already exists in scope.", token);
             }
 
-            parent.childAliases.add(this);
+            if (connectAsChild)
+            {
+                parent.childAliases.add(this);
+            }
         }
     }
 
@@ -178,12 +161,6 @@ public class TableAlias
         return parent;
     }
 
-    /** Returns true if this allias has defined columns */
-    public boolean hasDefinedColumns()
-    {
-        return type == Type.SUBQUERY;
-    }
-
     public List<TableAlias> getChildAliases()
     {
         return unmodifiableList(childAliases);
@@ -192,11 +169,6 @@ public class TableAlias
     /** Get child alias for provided alias */
     public TableAlias getChildAlias(String alias)
     {
-        if (childAliases == null)
-        {
-            return null;
-        }
-
         List<TableAlias> children = childAliases;
         // This is a sub query then first child
         // is ROOT, search in it's children
@@ -242,6 +214,79 @@ public class TableAlias
             return emptyList();
         }
         return unmodifiableList(current.childAliases);
+    }
+
+    /**
+     * Returns the highest sigling leaf ordinal.
+     *
+     * <pre>
+     * select *
+     * from tableA a                0
+     * inner join tableB b          1
+     *  on ...
+     * inner join tableC c          2
+     *  on ...
+     * inner join                   3
+     * (
+     *    select *
+     *    from tableD d             4
+     *    inner join tableE e       5
+     *      on ....
+     * ) x
+     * where ....
+     *
+     * If this is tableA we first fetch the last sibling,
+     * inner join ( ... )x, and it's a sub query to ask that alias for it's highest
+     * </pre>
+     */
+    public int getHighestSiblingLeafOrdinal()
+    {
+        // If this is a sub query
+        List<TableAlias> siblingAliases = getSiblingAliases();
+        TableAlias lastSibling = siblingAliases.get(siblingAliases.size() - 1);
+
+        if (lastSibling.type == Type.SUBQUERY)
+        {
+            List<TableAlias> children = lastSibling.getChildAliases()
+                    .get(0)
+                    .getChildAliases();
+
+            // No children => sub query with no selects
+            if (children.size() > 0)
+            {
+                // Recurse the call from the first sub query child
+                return children
+                        .get(0)
+                        .getHighestSiblingLeafOrdinal();
+            }
+        }
+
+        return lastSibling.tupleOrdinal;
+    }
+
+    /**
+     * Returns the highest possible child ordinal that this alias has. For a regular table/function etc. it's the tuple ordinal itself. A sub query is
+     * recursively called
+     */
+    public int getHighestChildOrdinal()
+    {
+        if (type == Type.SUBQUERY)
+        {
+            List<TableAlias> children = getChildAliases()
+                    .get(0)
+                    .getChildAliases();
+
+            // No children => sub query with no selects
+            if (children.size() > 0)
+            {
+                // Recurse the call from the first sub query child
+                return children
+                        .get(0)
+                        .getHighestChildOrdinal();
+            }
+        }
+
+        return tupleOrdinal;
     }
 
     /**
@@ -351,6 +396,7 @@ public class TableAlias
         private final Token token;
         private boolean asteriskColumns;
         private List<TableAliasBuilder> childAliases;
+        private boolean connectAsChild = true;
 
         TableAliasBuilder(int tupleOrdinal, Type type, QualifiedName qname, String alias, Token token)
         {
@@ -364,19 +410,20 @@ public class TableAlias
         //CSOFF
         public TableAliasBuilder parent(TableAlias parent)
         {
+            parent(parent, true);
+            return this;
+        }
+
+        public TableAliasBuilder parent(TableAlias parent, boolean connectAsChild)
+        {
             this.parent = requireNonNull(parent);
+            this.connectAsChild = connectAsChild;
             return this;
         }
 
         public TableAliasBuilder columns(String[] columns)
         {
             this.columns = requireNonNull(columns);
-            return this;
-        }
-
-        public TableAliasBuilder asteriskColumns()
-        {
-            this.asteriskColumns = true;
             return this;
         }
 
@@ -390,7 +437,7 @@ public class TableAlias
         /** Build alias */
         public TableAlias build()
         {
-            TableAlias result = new TableAlias(tupleOrdinal, parent, qname, alias, columns, asteriskColumns, type, token);
+            TableAlias result = new TableAlias(tupleOrdinal, parent, connectAsChild, qname, alias, columns, asteriskColumns, type, token);
             if (childAliases != null)
             {
                 childAliases.forEach(c ->

@@ -33,8 +33,8 @@ public class ComputedColumnsOperatorTest extends AOperatorTest
         {
             Tuple tuple = it.next();
 
-            int val = (int) tuple.getValue(tuple.getColmnOrdinal("col1"));
-            Object actual = tuple.getValue(tuple.getColmnOrdinal("newCol"));
+            int val = (int) tuple.getValue(tuple.getColumnOrdinal("col1"));
+            Object actual = tuple.getValue(tuple.getColumnOrdinal("newCol"));
             assertEquals("v-" + val, actual);
         }
         it.close();

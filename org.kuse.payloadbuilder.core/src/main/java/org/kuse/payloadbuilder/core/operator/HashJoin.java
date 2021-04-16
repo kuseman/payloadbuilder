@@ -75,7 +75,7 @@ class HashJoin extends AOperator
     }
 
     @Override
-    public List<Operator> getChildOperators()
+    public List<DescribableNode> getChildNodes()
     {
         return asList(outer, inner);
     }

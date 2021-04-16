@@ -38,7 +38,7 @@ class ListOfFunction extends ScalarFunctionInfo
         for (int i = 0; i < size; i++)
         {
             Object object = arguments.get(i).eval(context);
-            result.add(EvalUtils.unwrap(object));
+            result.add(EvalUtils.unwrap(context, object));
         }
         return result;
     }

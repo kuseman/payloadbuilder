@@ -146,6 +146,12 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
     }
 
     @Override
+    public TR visit(UnresolvedSubQueryExpression expression, TC context)
+    {
+        return null;
+    }
+
+    @Override
     public TR visit(NullPredicateExpression expression, TC context)
     {
         return visitChildren(context, expression.getExpression());

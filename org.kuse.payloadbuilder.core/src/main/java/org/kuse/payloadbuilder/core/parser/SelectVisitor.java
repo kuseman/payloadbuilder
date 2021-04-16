@@ -17,8 +17,6 @@ public interface SelectVisitor<TR, TC>
 
     TR visit(ExpressionSelectItem expressionSelectItem, TC context);
 
-    TR visit(NestedSelectItem nestedSelectItem, TC context);
-
     TR visit(AsteriskSelectItem selectItem, TC context);
 
     TR visit(Table table, TC context);
@@ -29,6 +27,6 @@ public interface SelectVisitor<TR, TC>
 
     TR visit(Apply apply, TC context);
 
-    TR visit(SubQueryTableSource populatingJoin, TC context);
+    TR visit(SubQueryTableSource subQuery, TC context);
     //CSON
 }

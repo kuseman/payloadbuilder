@@ -25,8 +25,8 @@ public abstract class ScalarFunctionInfo extends FunctionInfo
      *
      * <pre>
      * Example:
-     * <b>concat(aa, aa.ap)</b>
-     * This has source as parent alias and will resolve both arguments as resulting aliases
+     * <b>unionall(aa, aa.ap)</b>
+     * This has s (source) as parent alias and will resolve both arguments as resulting aliases
      * [aa, ap]
      *
      * Example:

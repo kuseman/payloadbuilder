@@ -17,6 +17,7 @@ public class Select extends ASelectNode
     private final Expression where;
     private final List<Expression> groupBy;
     private final List<SortItem> orderBy;
+    private final For forOutput;
 
     Select(List<SelectItem> selectItems,
             TableSourceJoined from,
@@ -24,7 +25,8 @@ public class Select extends ASelectNode
             Expression topExpression,
             Expression where,
             List<Expression> groupBy,
-            List<SortItem> orderBy)
+            List<SortItem> orderBy,
+            For forOutput)
     {
         this.selectItems = requireNonNull(selectItems, "selectItems");
         this.from = from;
@@ -33,6 +35,7 @@ public class Select extends ASelectNode
         this.where = where;
         this.groupBy = requireNonNull(groupBy, "groupBy");
         this.orderBy = requireNonNull(orderBy, "orderBy");
+        this.forOutput = forOutput;
 
         if (into != null && into.getTableAlias().getType() != Type.TEMPORARY_TABLE)
         {
@@ -75,10 +78,26 @@ public class Select extends ASelectNode
         return orderBy;
     }
 
+    public For getForOutput()
+    {
+        return forOutput;
+    }
+
     @Override
     public <TR, TC> TR accept(SelectVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
+    }
+
+    /** Type of FOR in select. Used when computing scalar values from sub queries */
+    public enum For
+    {
+        /** Object output */
+        OBJECT,
+        /** Array output */
+        ARRAY,
+        /** Object array output */
+        OBJECT_ARRAY;
     }
 
     @Override

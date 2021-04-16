@@ -1,6 +1,7 @@
 package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 
 import java.util.List;
 import java.util.Objects;
@@ -128,5 +129,26 @@ class CaseExpression extends Expression
                 && Objects.equals(elseExpression, that.elseExpression);
         }
         return false;
+    }
+
+    @Override
+    public String toString()
+    {
+        /*
+         * CASE
+         *      WHEN .....
+         *      WHEN .....
+         *      ELSE ....
+         * END
+         *
+         */
+
+        return "CASE " + System.lineSeparator()
+            + whenClauses.stream()
+                    .map(w -> "\tWHEN " + w.condition + " THEN " + w.result)
+                    .collect(joining(System.lineSeparator()))
+            + System.lineSeparator()
+            + (elseExpression != null ? ("\tELSE " + elseExpression) : "") + System.lineSeparator()
+            + "END";
     }
 }

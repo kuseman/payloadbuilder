@@ -96,7 +96,7 @@ class CollectionTuple extends ArrayList<Tuple> implements Tuple
     }
 
     @Override
-    public int getColmnOrdinal(String column)
+    public int getColumnOrdinal(String column)
     {
         // Use first tuple
         Tuple tuple = get(0);
@@ -107,7 +107,7 @@ class CollectionTuple extends ArrayList<Tuple> implements Tuple
             tuple = tuple.getTuple(targetOrdinal);
         }
 
-        return tuple.getColmnOrdinal(column);
+        return tuple.getColumnOrdinal(column);
     }
 
     @Override

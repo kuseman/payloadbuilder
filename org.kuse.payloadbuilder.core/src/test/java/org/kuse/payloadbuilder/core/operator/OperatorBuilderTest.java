@@ -15,14 +15,16 @@ import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.operator.TableAlias.Type;
-import org.kuse.payloadbuilder.core.parser.AsteriskSelectItem;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
+import org.kuse.payloadbuilder.core.parser.Select;
+import org.kuse.payloadbuilder.core.parser.Select.For;
 import org.kuse.payloadbuilder.core.parser.SortItem;
 import org.kuse.payloadbuilder.core.parser.SortItem.NullOrder;
 import org.kuse.payloadbuilder.core.parser.SortItem.Order;
+import org.kuse.payloadbuilder.core.parser.SubQueryExpression;
 import org.kuse.payloadbuilder.core.utils.CollectionUtils;
 
 /** Test of {@link OperatorBuilder} */
@@ -95,12 +97,12 @@ public class OperatorBuilderTest extends AOperatorTest
                 asList(e("col10 + col11"))),
                 queryResult.operator);
 
-        ObjectProjection expected = new ObjectProjection(
+        Projection expected = new RootProjection(
                 asList("col2", "col1", "", "col4", "calc", "col5", "col6", "col3", "col2"),
                 asList(
                         new ExpressionProjection(e("col2")),
                         new ExpressionProjection(e("col1")),
-                        new AsteriskSelectItem(null, null),
+                        new AsteriskProjection(new int[] {2}),
                         new ExpressionProjection(e("col4")),
                         new ExpressionProjection(e("calc")),
                         new ExpressionProjection(e("col5")),
@@ -183,7 +185,7 @@ public class OperatorBuilderTest extends AOperatorTest
         assertEquals(expected, queryResult.operator);
 
         // Verify that projection is changed
-        Projection expectedProjection = new ObjectProjection(asList("art_id", "newCol"), asList(
+        Projection expectedProjection = new RootProjection(asList("art_id", "newCol"), asList(
                 new ExpressionProjection(e("a.art_id")),
                 new ExpressionProjection(new QualifiedReferenceExpression(QualifiedName.of("newCol"), -1, null))));
 
@@ -370,7 +372,7 @@ public class OperatorBuilderTest extends AOperatorTest
     @Test
     public void test_table_function()
     {
-        String query = "select r.Value * r1.Value * r2.Value mul, r.Value r, r1.filter(x -> x.Value > 10).map(x -> x.Value) r1, r2.Value r2, array(Value from r1) r1A "
+        String query = "select r.Value * r1.Value * r2.Value mul, r.Value r, r1.filter(x -> x.Value > 10).map(x -> x.Value) r1, r2.Value r2, (select Value from r1 for array) r1A "
             + "from range(randomInt(100), randomInt(100) + 100) r "
             + "inner join range(randomInt(100)) r1 with (populate=true) "
             + "  on r1.Value <= r.Value "
@@ -421,13 +423,19 @@ public class OperatorBuilderTest extends AOperatorTest
 
         assertEquals(expected, queryResult.operator);
 
-        Projection expectedProjection = new ObjectProjection(asList("mul", "r", "r1", "r2", "r1A"), asList(
-                new ExpressionProjection(e("r.Value * r1.Value * r2.Value")),
-                new ExpressionProjection(e("r.Value")),
-                new ExpressionProjection(e("r1.filter(x -> x.Value > 10).map(x -> x.Value)")),
-                new ExpressionProjection(e("r2.Value")),
-                new ArrayProjection(asList(
-                        new ExpressionProjection(e("Value"))), new ExpressionOperator(6, e("r1")))));
+        Projection expectedProjection = new RootProjection(
+                asList("mul", "r", "r1", "r2", "r1A"),
+                asList(
+                        new ExpressionProjection(e("r.Value * r1.Value * r2.Value")),
+                        new ExpressionProjection(e("r.Value")),
+                        new ExpressionProjection(e("r1.filter(x -> x.Value > 10).map(x -> x.Value)")),
+                        new ExpressionProjection(e("r2.Value")),
+                        new ExpressionProjection(
+                                new SubQueryExpression(
+                                        queryResult.tableOperators.get(0),
+                                        new String[] {"Value"},
+                                        new ExpressionProjection[] {new ExpressionProjection(e("Value"))},
+                                        For.ARRAY))));
 
         //                                System.err.println(expected.toString(1));
         //                                System.out.println(queryResult.operator.toString(1));
@@ -526,7 +534,7 @@ public class OperatorBuilderTest extends AOperatorTest
 
         assertEquals(expected, queryResult.operator);
 
-        Projection expectedProjection = new ObjectProjection(asList("sku_id"),
+        Projection expectedProjection = new RootProjection(asList("sku_id"),
                 asList(new ExpressionProjection(e("aa.sku_id"))));
 
         assertEquals(expectedProjection, queryResult.projection);
@@ -538,34 +546,40 @@ public class OperatorBuilderTest extends AOperatorTest
         String query = "select r.a1.attr1_code"
             + ", art_id"
             + ", idx_id"
-            + ", object"
+            + ", "
             + "  ("
+            + "    select "
             + "    pluno, "
-            + "    object "
             + "    ("
+            + "      select "
             + "      aa.a1.rgb_code"
+            + "      for object"
             + "    ) attribute1, "
-            + "    object "
             + "    ("
+            + "      select "
             + "      aa.a1.colorGroup "
-            + "      from a1 "
+            + "      from open_rows(a1) "
             + "      where aa.a1.group_flg "
+            + "      for object"
             + "    ) attribute1Group "
-            + "    from aa "
+            + "    from open_rows(aa) "
             + "    order by aa.internet_date_start"
-            + "  ) obj "
-            + ", array"
+            + "    for object"
+            + "  ) obj, "
             + "  ("
+            + "    select"
             + "    attr2_code, "
             + "    aa.map(x -> x) "
-            + "    from aa.map(aa -> aa.a2) "
+            + "    from open_rows(aa.map(aa -> aa.a2)) "
             + "    where aa.ean13 != ''"
-            + "  ) arr "
-            + ", array"
+            + "    for array"
+            + "  ) arr, "
             + "  ("
+            + "    select"
             + "    art_id,"
             + "    note_id "
-            + "    from aa.unionall(aa.ap)"
+            + "    from open_rows(aa.unionall(aa.ap))"
+            + "    for object"
             + "  ) arr2 "
             + "from article a "
             + "inner join "
@@ -621,13 +635,13 @@ public class OperatorBuilderTest extends AOperatorTest
                                                 .children(asList(
 
                                                         TableAliasBuilder.of(2, TableAlias.Type.TABLE, of("articleAttribute"), "aa")
-                                                                .columns(new String[] {"sku_id", "attr1_id", "attr2_id", "attr3_id", "art_id", "active_flg", "internet_flg", "pluno",
-                                                                        "internet_date_start", "ean13",
+                                                                .columns(new String[] {"sku_id", "attr1_id", "attr2_id", "attr3_id", "art_id", "active_flg", "internet_flg", "internet_date_start",
+                                                                        "pluno", "ean13",
                                                                         "note_id"}),
                                                         TableAliasBuilder.of(3, TableAlias.Type.TABLE, of("articlePrice"), "ap")
                                                                 .columns(new String[] {"sku_id", "price_sales", "price_org", "art_id", "note_id"}),
                                                         TableAliasBuilder.of(4, TableAlias.Type.TABLE, of("attribute1"), "a1")
-                                                                .columns(new String[] {"attr1_id", "lang_id", "rgb_code", "colorGroup", "group_flg"}),
+                                                                .columns(new String[] {"attr1_id", "lang_id", "rgb_code", "group_flg", "colorGroup"}),
                                                         TableAliasBuilder.of(5, TableAlias.Type.TABLE, of("attribute2"), "a2").columns(new String[] {"attr2_id", "lang_id", "attr2_no", "attr2_code"}),
                                                         TableAliasBuilder.of(6, TableAlias.Type.TABLE, of("attribute3"), "a3").columns(new String[] {"attr3_id", "lang_id"}))))),
 
@@ -647,8 +661,8 @@ public class OperatorBuilderTest extends AOperatorTest
                                                         TableAliasBuilder.of(11, TableAlias.Type.TABLE, of("attribute1"), "a1").columns(new String[] {"someId", "attr1_code"})))))))
                 .build();
 
-        //                System.out.println(root.printHierarchy(1));
-        //                System.out.println(result.alias.printHierarchy(1));
+        //        System.out.println(root.printHierarchy(1));
+        //        System.out.println(result.alias.printHierarchy(1));
 
         assertTrue("Alias hierarchy should be equal", root.isEqual(result.alias));
     }
@@ -670,7 +684,7 @@ public class OperatorBuilderTest extends AOperatorTest
         assertTrue(root.isEqual(result.alias));
 
         assertEquals(result.tableOperators.get(0), result.operator);
-        assertEquals(new ObjectProjection(asList("id1", "id2"),
+        assertEquals(new RootProjection(asList("id1", "id2"),
                 asList(
                         new ExpressionProjection(e("s.id1")),
                         new ExpressionProjection(e("s.id2")))),
@@ -710,7 +724,7 @@ public class OperatorBuilderTest extends AOperatorTest
         //        System.out.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
-        assertEquals(new ObjectProjection(asList("id1", "flag1"),
+        assertEquals(new RootProjection(asList("id1", "flag1"),
                 asList(
                         new ExpressionProjection(e("s.id1")),
                         new ExpressionProjection(e("s.flag1")))),
@@ -739,7 +753,7 @@ public class OperatorBuilderTest extends AOperatorTest
         //                System.out.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
-        assertEquals(new ObjectProjection(asList("id1", "flag1"),
+        assertEquals(new RootProjection(asList("id1", "flag1"),
                 asList(
                         new ExpressionProjection(e("s.id1")),
                         new ExpressionProjection(e("s.flag1")))),
@@ -766,7 +780,7 @@ public class OperatorBuilderTest extends AOperatorTest
     @Test
     public void test_select_item_with_filter()
     {
-        String query = "select object(s.id1, a.id2 from s where s.id4 > 0) arr from source s inner join (select * from article where note_id > 0) a with(populate=true) on a.art_id = s.art_id and a.active_flg where s.id3 > 0";
+        String query = "select (select s.id1, a.id2 from s where s.id4 > 0 for array) arr from source s inner join (select * from article where note_id > 0) a with(populate=true) on a.art_id = s.art_id and a.active_flg where s.id3 > 0";
         QueryResult result = getQueryResult(query);
 
         Operator expected = new HashJoin(
@@ -787,17 +801,22 @@ public class OperatorBuilderTest extends AOperatorTest
 
         assertEquals(expected, result.operator);
 
-        assertEquals(
-                new ObjectProjection(asList("arr"),
-                        asList(new ObjectProjection(asList("id1", "id2"),
-                                asList(
-                                        new ExpressionProjection(e("s.id1")),
-                                        new ExpressionProjection(e("a.id2"))),
+        Projection pExpected = new RootProjection(
+                asList("arr"),
+                asList(new ExpressionProjection(
+                        new SubQueryExpression(
                                 new FilterOperator(
                                         6,
-                                        new ExpressionOperator(5, e("s")),
-                                        new ExpressionPredicate(e("s.id4 > 0")))))),
-                result.projection);
+                                        result.tableOperators.get(2),
+                                        new ExpressionPredicate(e("s.id4 > 0"))),
+                                new String[] {"id1", "id2"},
+                                new Projection[] {
+                                        new ExpressionProjection(e("s.id1")),
+                                        new ExpressionProjection(e("a.id2"))
+                                },
+                                Select.For.ARRAY))));
+
+        assertEquals(pExpected, result.projection);
     }
 
     @Test
@@ -845,7 +864,7 @@ public class OperatorBuilderTest extends AOperatorTest
         assertEquals(expected, result.operator);
 
         assertEquals(
-                new ObjectProjection(asList("art_id"),
+                new RootProjection(asList("art_id"),
                         asList(new ExpressionProjection(e("s.art_id")))),
                 result.projection);
     }
@@ -895,7 +914,7 @@ public class OperatorBuilderTest extends AOperatorTest
         assertEquals(expected, result.operator);
 
         assertEquals(
-                new ObjectProjection(asList("art_id"),
+                new RootProjection(asList("art_id"),
                         asList(new ExpressionProjection(e("s.art_id")))),
                 result.projection);
     }

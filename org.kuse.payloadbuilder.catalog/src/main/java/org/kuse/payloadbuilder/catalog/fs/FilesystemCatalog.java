@@ -18,8 +18,8 @@ import org.apache.commons.io.FileUtils;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
-import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.Expression;
@@ -51,12 +51,6 @@ public class FilesystemCatalog extends Catalog
         FileFunction(Catalog catalog)
         {
             super(catalog, "file");
-        }
-
-        @Override
-        public String[] getColumns()
-        {
-            return COLUMNS;
         }
 
         @SuppressWarnings("unchecked")
@@ -134,12 +128,6 @@ public class FilesystemCatalog extends Catalog
         ListFunction(Catalog catalog)
         {
             super(catalog, "list");
-        }
-
-        @Override
-        public String[] getColumns()
-        {
-            return COLUMNS;
         }
 
         @Override

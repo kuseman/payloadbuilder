@@ -139,7 +139,7 @@ public class BuiltinCatalogTest extends AParserTest
         values.put("a", asList(-1, -2, 3, null));
         values.put("b", null);
 
-        assertExpression(asList(-1, -2, 3, null), values, "a.flatMap(a -> a)");
+        assertExpression(asList(-1, -2, 3), values, "a.flatMap(a -> a)");
         assertExpression(null, values, "b.flatMap(a -> a)");
         assertExpression(asList(-1, -2, 3, null, -1, -2, 3, null, -1, -2, 3, null, -1, -2, 3, null), values, "a.flatMap(l -> a)");
         assertExpression(asList(-1, -2, 3, -1, -2, 3, -1, -2, 3, -1, -2, 3), values, "a.flatMap(l -> a).filter(a -> a IS NOT NULL)");

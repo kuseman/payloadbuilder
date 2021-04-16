@@ -59,7 +59,7 @@ public abstract class SelectItem extends ASelectNode
         return false;
     }
 
-    /** Return resolve paths for item if any.  */
+    /** Return resolve paths for item if any. */
     public List<ResolvePath> getResolvePaths()
     {
         return null;
@@ -74,6 +74,9 @@ public abstract class SelectItem extends ASelectNode
     {
         return null;
     }
+
+    /** Write this select item to output writer */
+    //    public abstract void write(OutputWriter writer, ExecutionContext context);
 
     @Override
     public String toString()

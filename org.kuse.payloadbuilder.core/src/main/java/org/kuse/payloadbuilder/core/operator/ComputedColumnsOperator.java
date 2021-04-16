@@ -14,7 +14,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
 
-/** Operator that computes columns from expressions */
+/**
+ * Operator that computes columns from expressions.
+ */
 class ComputedColumnsOperator extends AOperator
 {
     private final Operator operator;
@@ -32,7 +34,7 @@ class ComputedColumnsOperator extends AOperator
     }
 
     @Override
-    public List<Operator> getChildOperators()
+    public List<DescribableNode> getChildNodes()
     {
         return singletonList(operator);
     }
@@ -67,7 +69,7 @@ class ComputedColumnsOperator extends AOperator
                 for (int i = 0; i < size; i++)
                 {
                     context.setTuple(tuple);
-                    values[i] = computedExpressions.get(i).eval(context);
+                    values[i] = EvalUtils.unwrap(context, computedExpressions.get(i).eval(context));
                 }
 
                 return new ComputedTuple(tuple, values);
@@ -137,7 +139,6 @@ class ComputedColumnsOperator extends AOperator
         public Tuple getTuple(int tupleOrdinal)
         {
             // Keep this context if we access the target computed tuple
-            // or parent.
             if (tupleOrdinal == ComputedColumnsOperator.this.tupleOrdinal)
             {
                 return this;
@@ -148,11 +149,11 @@ class ComputedColumnsOperator extends AOperator
         @Override
         public int getColumnCount()
         {
-            return values.length + tuple.getColumnCount();
+            return tuple.getColumnCount() + values.length;
         }
 
         @Override
-        public int getColmnOrdinal(String column)
+        public int getColumnOrdinal(String column)
         {
             int ordinal = ArrayUtils.indexOf(columns, column);
             if (ordinal >= 0)
@@ -160,7 +161,7 @@ class ComputedColumnsOperator extends AOperator
                 return ordinal;
             }
 
-            return tuple.getColmnOrdinal(column) + values.length;
+            return tuple.getColumnOrdinal(column) + values.length;
         }
 
         @Override
@@ -176,6 +177,10 @@ class ComputedColumnsOperator extends AOperator
         @Override
         public Object getValue(int columnOrdinal)
         {
+            if (columnOrdinal == -1)
+            {
+                return null;
+            }
             if (columnOrdinal < columns.length)
             {
                 return values[columnOrdinal];

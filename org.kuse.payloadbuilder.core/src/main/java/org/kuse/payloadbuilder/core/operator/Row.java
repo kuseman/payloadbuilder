@@ -6,6 +6,7 @@ import java.util.Arrays;
 import java.util.Map;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /**
  * Row implementation of a {@link Tuple}. Columns and values simply
@@ -16,13 +17,15 @@ public class Row implements Tuple
     static final int POS_ORDINAL = Integer.MAX_VALUE;
 
     private final int pos;
-    private final TableAlias tableAlias;
+    private final QualifiedName table;
+    private final int tupleOrdinal;
     private final String[] columns;
     private final RowValues values;
 
     private Row(TableAlias alias, int pos, String[] columns, RowValues values)
     {
-        this.tableAlias = requireNonNull(alias, "alias");
+        this.table = requireNonNull(alias, "alias").getTable();
+        this.tupleOrdinal = alias.getTupleOrdinal();
         this.pos = pos;
         this.columns = requireNonNull(columns, "columns");
         this.values = requireNonNull(values);
@@ -31,7 +34,7 @@ public class Row implements Tuple
     @Override
     public int getTupleOrdinal()
     {
-        return tableAlias.getTupleOrdinal();
+        return tupleOrdinal;
     }
 
     @Override
@@ -52,7 +55,7 @@ public class Row implements Tuple
          * ) x
          *
          */
-        if (ordinal <= tableAlias.getTupleOrdinal())
+        if (ordinal <= tupleOrdinal)
         {
             return this;
         }
@@ -66,7 +69,7 @@ public class Row implements Tuple
     }
 
     @Override
-    public int getColmnOrdinal(String column)
+    public int getColumnOrdinal(String column)
     {
         if (POS.equalsIgnoreCase(column))
         {
@@ -106,7 +109,8 @@ public class Row implements Tuple
         {
             Row that = (Row) obj;
             return pos == that.pos
-                && tableAlias == that.tableAlias;
+                && table.equals(that.table)
+                && tupleOrdinal == that.tupleOrdinal;
         }
         return false;
     }
@@ -114,7 +118,7 @@ public class Row implements Tuple
     @Override
     public String toString()
     {
-        return tableAlias.getTable() + " row: " + pos;
+        return table + "(" + tupleOrdinal + ") pos: " + pos;
     }
 
     /** {@link Row#of(TableAlias, int, String[], RowValues)}} */
@@ -131,21 +135,21 @@ public class Row implements Tuple
 
     /**
      * Construct a row with provided alias, columns, values and position
+     *
      * <pre>
      * NOTE! Row of the same table alias type must have all their columns
      * in the same order. These are accessed by ordinal and cached for faster
      * access.
-     * 
+     *
      * However it's not a requirement that all rows has the same amount of columns
      * so the following is valid
      * Ie.
-     * 
+     *
      * Row1: col1, col2
      * Row2: col1, col2, col3
      * Row3: col1
-     * 
+     *
      * etc.
-     * 
      * </pre>
      */
     public static Row of(TableAlias alias, int pos, String[] columns, RowValues values)
@@ -155,6 +159,7 @@ public class Row implements Tuple
 
     /**
      * RowValues
+     *
      * <pre>
      * This is to delegate the value handing to operators if they can improve the performance etc.
      * Instead of sending in an Object-array

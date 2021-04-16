@@ -4,7 +4,6 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
-import static org.apache.commons.lang3.ArrayUtils.EMPTY_OBJECT_ARRAY;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.join;
@@ -14,25 +13,30 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
+import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.time.StopWatch;
 import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.FunctionInfo;
+import org.kuse.payloadbuilder.core.operator.AObjectOutputWriter;
+import org.kuse.payloadbuilder.core.operator.AObjectOutputWriter.ColumnValue;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
-import org.kuse.payloadbuilder.core.operator.ObjectProjection;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.operator.OperatorBuilder;
 import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
 import org.kuse.payloadbuilder.core.operator.Projection;
+import org.kuse.payloadbuilder.core.operator.RootProjection;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
+import org.kuse.payloadbuilder.core.operator.TemporaryTable;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.AnalyzeStatement;
 import org.kuse.payloadbuilder.core.parser.DescribeSelectStatement;
@@ -54,11 +58,10 @@ import org.kuse.payloadbuilder.core.parser.StatementVisitor;
 import org.kuse.payloadbuilder.core.parser.UseStatement;
 
 /**
- * Implementation of {@link QueryResult}. Using a visitor to traverse statements
+ * Implementation of {@link QueryResult}. Using a visitor to traverse statements and executes the query
  */
 class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
 {
-    private static final Row DUMMY_ROW = Row.of(TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("dummy"), "d").build(), 0, EMPTY_OBJECT_ARRAY);
     private static final TableAlias SHOW_VARIABLES_ALIAS = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("variables"), "v").columns(new String[] {"Name", "Value"}).build();
     private static final TableAlias SHOW_TABLES_ALIAS = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("tables"), "t").columns(new String[] {"Name"}).build();
     private static final TableAlias SHOW_FUNCTIONS_ALIAS = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("functions"), "f")
@@ -156,7 +159,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     {
         context.clear();
         Pair<Operator, Projection> pair = OperatorBuilder.create(session, statement.getSelectStatement().getSelect());
-        currentSelect = DescribeUtils.getDescribeSelect(context, pair.getKey());
+        currentSelect = DescribeUtils.getDescribeSelect(context, pair.getKey(), pair.getValue());
         return null;
     }
 
@@ -164,11 +167,23 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     public Void visit(AnalyzeStatement statement, Void ctx)
     {
         context.clear();
-        Pair<Operator, Projection> pair = OperatorBuilder.create(session, statement.getSelectStatement().getSelect(), true);
-        // Write the operator to a noop-writer to collect statistics
 
+        SelectStatement selectStatement = statement.getSelectStatement();
+        Pair<Operator, Projection> pair = OperatorBuilder.create(session, selectStatement.getSelect(), true);
+        // Write the operator to a noop-writer and collect statistics
         StopWatch sw = StopWatch.createStarted();
-        writeInternal(pair.getKey(), pair.getValue(), OutputWriterAdapter.NO_OP_WRITER);
+        if (selectStatement.isAssignmentSelect())
+        {
+            applyAssignmentSelect(selectStatement.getSelect(), pair);
+        }
+        else if (selectStatement.getSelect().getInto() != null)
+        {
+            applySelectInto(selectStatement.getSelect(), pair);
+        }
+        else
+        {
+            writeInternal(pair.getKey(), pair.getValue(), OutputWriterAdapter.NO_OP_WRITER, null);
+        }
         sw.stop();
 
         Map<Integer, ? extends NodeData> nodeData = context.getOperatorContext().getNodeData();
@@ -180,7 +195,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             data.setTotalQueryTime(totalQueryTime);
         }
 
-        currentSelect = DescribeUtils.getDescribeSelect(context, pair.getKey());
+        currentSelect = DescribeUtils.getDescribeSelect(context, pair.getKey(), pair.getValue());
         return null;
     }
 
@@ -307,17 +322,18 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     public Void visit(SelectStatement statement, Void ctx)
     {
         context.clear();
+        Pair<Operator, Projection> pair = OperatorBuilder.create(session, statement.getSelect());
         if (statement.isAssignmentSelect())
         {
-            applyAssignmentSelect(statement.getSelect());
+            applyAssignmentSelect(statement.getSelect(), pair);
         }
         else if (statement.getSelect().getInto() != null)
         {
-            applySelectInto(statement.getSelect());
+            applySelectInto(statement.getSelect(), pair);
         }
         else
         {
-            currentSelect = OperatorBuilder.create(session, statement.getSelect());
+            currentSelect = pair;
         }
         return null;
     }
@@ -334,120 +350,104 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         return null;
     }
 
-    private void applySelectInto(Select select)
+    private void applySelectInto(Select select, Pair<Operator, Projection> pair)
     {
-        Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
-        final List<Tuple> rows = new ArrayList<>();
-        final List<String> columns = new ArrayList<>();
-        final List<Object> values = new ArrayList<>();
-
-        TableAlias alias = TableAliasBuilder.of(-1, TableAlias.Type.TEMPORARY_TABLE, select.getInto().getTable(), "")
-                .build();
-
-        //CSOFF
-        OutputWriterAdapter writer = new OutputWriterAdapter()
-        //CSON
-        {
-            int pos;
-            boolean root = true;
-            String field;
-
-            @Override
-            public void writeFieldName(String name)
-            {
-                field = name;
-            };
-
-            @Override
-            public void writeValue(Object value)
-            {
-                columns.add(field);
-                values.add(value);
-            }
-
-            @Override
-            public void endRow()
-            {
-                rows.add(Row.of(alias, pos++, columns.toArray(ArrayUtils.EMPTY_STRING_ARRAY), values.toArray()));
-                columns.clear();
-                values.clear();
-                root = true;
-            }
-
-            @Override
-            public void startObject()
-            {
-                if (!root)
-                {
-                    throw new QueryException("Object values is not supported in SELECT INTO");
-                }
-                root = false;
-            }
-
-            @Override
-            public void startArray()
-            {
-                throw new QueryException("Array values is not supported in SELECT INTO");
-            }
-        };
+        // Use the select's table source if there is one else create a dummy
+        TableAlias tableAlias = select.getFrom() != null
+            ? select.getFrom().getTableSource().getTableAlias()
+            : TableAliasBuilder.of(-1, TableAlias.Type.TABLE, select.getInto().getTable(), "").build();
 
         Operator operator = pair.getKey();
         Projection projection = pair.getValue();
-        writeInternal(operator, projection, writer);
-        this.context.getSession().setTemporaryTable(select.getInto().getTable(), rows);
+
+        final List<TemporaryTable.Row> rows = new ArrayList<>();
+        final MutableObject<List<ColumnValue>> currentRow = new MutableObject<>();
+        final MutableObject<String[]> tempTableColumns = new MutableObject<>();
+
+        AObjectOutputWriter writer = new AObjectOutputWriter()
+        {
+            @Override
+            public void initResult(String[] columns)
+            {
+                tempTableColumns.setValue(columns);
+            }
+
+            @Override
+            public void consumeRow(List<ColumnValue> row)
+            {
+                currentRow.setValue(row);
+            }
+        };
+
+        writeInternal(operator, projection, writer, tuple ->
+        {
+            List<ColumnValue> row = currentRow.getValue();
+            int size = row.size();
+            Object[] values = new Object[size];
+            String[] columns = tempTableColumns.getValue();
+            boolean setColumns = false;
+
+            if (columns.length == 0)
+            {
+                columns = new String[size];
+                tempTableColumns.setValue(columns);
+                setColumns = true;
+            }
+
+            for (int i = 0; i < size; i++)
+            {
+                ColumnValue value = row.get(i);
+                values[i] = value.getValue();
+                if (setColumns)
+                {
+                    columns[i] = value.getKey();
+                }
+            }
+
+            rows.add(new TemporaryTable.Row(tuple, values));
+        });
+
+        this.context.getSession().setTemporaryTable(new TemporaryTable(
+                select.getInto().getTable(),
+                tableAlias,
+                tempTableColumns.getValue(),
+                rows));
     }
 
-    private void applyAssignmentSelect(Select select)
+    private void applyAssignmentSelect(Select select, Pair<Operator, Projection> pair)
     {
-        Pair<Operator, Projection> pair = OperatorBuilder.create(session, select);
-
         Operator operator = pair.getKey();
         int size = select.getSelectItems().size();
 
         int rowCount = 0;
-        if (operator != null)
+        RowIterator iterator = null;
+        try
         {
-            RowIterator iterator = null;
-            try
+            iterator = operator.open(context);
+            Tuple tuple = null;
+            while (iterator.hasNext())
             {
-                iterator = operator.open(context);
-                Tuple tuple = null;
-                while (iterator.hasNext())
+                if (session.abortQuery())
                 {
-                    if (session.abortQuery())
-                    {
-                        break;
-                    }
-                    tuple = iterator.next();
-                    context.setTuple(tuple);
+                    break;
+                }
+                tuple = iterator.next();
+                context.setTuple(tuple);
 
-                    for (int i = 0; i < size; i++)
-                    {
-                        SelectItem item = select.getSelectItems().get(i);
-                        Object value = item.getAssignmentValue(context);
-                        context.setVariable(item.getAssignmentName(), value);
-                    }
-                    rowCount++;
-                }
-            }
-            finally
-            {
-                if (iterator != null)
+                for (int i = 0; i < size; i++)
                 {
-                    iterator.close();
+                    SelectItem item = select.getSelectItems().get(i);
+                    Object value = item.getAssignmentValue(context);
+                    context.setVariable(item.getAssignmentName(), value);
                 }
+                rowCount++;
             }
         }
-        else
+        finally
         {
-            rowCount++;
-            context.setTuple(DUMMY_ROW);
-
-            for (int i = 0; i < size; i++)
+            if (iterator != null)
             {
-                SelectItem item = select.getSelectItems().get(i);
-                Object value = item.getAssignmentValue(context);
-                context.setVariable(item.getAssignmentName(), value);
+                iterator.close();
             }
         }
         context.setRowCount(rowCount);
@@ -491,57 +491,51 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         Operator operator = currentSelect.getKey();
         Projection projection = currentSelect.getValue();
 
-        String[] columns = null;
-        if (projection instanceof ObjectProjection)
-        {
-            columns = ((ObjectProjection) projection).getColumns();
-        }
-        writer.initResult(columns);
-        writeInternal(operator, projection, writer);
+        writeInternal(operator, projection, writer, null);
         currentSelect = null;
     }
 
-    private void writeInternal(Operator operator, Projection projection, OutputWriter writer)
+    private void writeInternal(Operator operator, Projection projection, OutputWriter writer, Consumer<Tuple> tupleConsumer)
     {
         int rowCount = 0;
         context.clear();
-        if (operator != null)
+        RowIterator iterator = null;
+        try
         {
-            RowIterator iterator = null;
-            try
+            String[] columns = ArrayUtils.EMPTY_STRING_ARRAY;
+            if (projection instanceof RootProjection)
             {
-                // Clear context before opening operator
-                context.setTuple(null);
-                iterator = operator.open(context);
-                while (iterator.hasNext())
-                {
-                    if (session.abortQuery())
-                    {
-                        break;
-                    }
-                    writer.startRow();
-                    Tuple tuple = iterator.next();
-                    context.setTuple(tuple);
-                    projection.writeValue(writer, context);
-                    writer.endRow();
-                    rowCount++;
-                }
+                columns = ((RootProjection) projection).getColumns();
             }
-            finally
+            writer.initResult(columns);
+
+            // Clear context before opening operator
+            context.setTuple(null);
+            iterator = operator.open(context);
+            while (iterator.hasNext())
             {
-                if (iterator != null)
+                if (session.abortQuery())
                 {
-                    iterator.close();
+                    break;
                 }
+                writer.startRow();
+                Tuple tuple = iterator.next();
+                context.setTuple(tuple);
+                projection.writeValue(writer, context);
+                writer.endRow();
+                if (tupleConsumer != null)
+                {
+                    tupleConsumer.accept(tuple);
+                }
+                rowCount++;
             }
         }
-        else
+        finally
         {
-            writer.startRow();
-            context.setTuple(DUMMY_ROW);
-            projection.writeValue(writer, context);
-            writer.endRow();
-            rowCount++;
+            if (iterator != null)
+            {
+                iterator.close();
+            }
         }
 
         context.setRowCount(rowCount);

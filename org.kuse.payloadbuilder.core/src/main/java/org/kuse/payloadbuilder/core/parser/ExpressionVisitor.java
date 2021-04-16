@@ -54,5 +54,8 @@ public interface ExpressionVisitor<TR, TC>
     TR visit(SubscriptExpression expression, TC context);
 
     TR visit(CaseExpression expression, TC context);
+
+    TR visit(UnresolvedSubQueryExpression expression, TC context);
     //CSOFF
+
 }

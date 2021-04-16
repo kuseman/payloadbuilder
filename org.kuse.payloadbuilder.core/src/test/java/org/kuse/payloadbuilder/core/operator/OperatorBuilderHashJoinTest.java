@@ -31,7 +31,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         assertEquals(expected, result.operator);
 
         assertEquals(
-                new ObjectProjection(asList("id1", "id2"),
+                new RootProjection(asList("id1", "id2"),
                         asList(
                                 new ExpressionProjection(e("s.id1")),
                                 new ExpressionProjection(e("a.id2")))),
@@ -62,7 +62,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         assertEquals(expected, result.operator);
 
         assertEquals(
-                new ObjectProjection(asList("id1", "id2"),
+                new RootProjection(asList("id1", "id2"),
                         asList(
                                 new ExpressionProjection(e("s.id1")),
                                 new ExpressionProjection(e("a.id2")))),
@@ -93,7 +93,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         assertEquals(expected, result.operator);
 
         assertEquals(
-                new ObjectProjection(asList("id1", "id2"),
+                new RootProjection(asList("id1", "id2"),
                         asList(
                                 new ExpressionProjection(e("s.id1")),
                                 new ExpressionProjection(e("a.id2")))),
@@ -127,7 +127,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         assertEquals(expected, result.operator);
 
         assertEquals(
-                new ObjectProjection(asList("id1", "id2"),
+                new RootProjection(asList("id1", "id2"),
                         asList(
                                 new ExpressionProjection(e("s.id1")),
                                 new ExpressionProjection(e("a.id2")))),
@@ -155,7 +155,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         assertEquals(expected, result.operator);
 
         assertEquals(
-                new ObjectProjection(asList("id1", "id2"),
+                new RootProjection(asList("id1", "id2"),
                         asList(
                                 new ExpressionProjection(e("s.id1")),
                                 new ExpressionProjection(e("a.id2")))),
@@ -186,7 +186,7 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         assertEquals(expected, result.operator);
 
         assertEquals(
-                new ObjectProjection(asList("id1", "id2"),
+                new RootProjection(asList("id1", "id2"),
                         asList(
                                 new ExpressionProjection(e("s.id1")),
                                 new ExpressionProjection(e("a.id2")))),

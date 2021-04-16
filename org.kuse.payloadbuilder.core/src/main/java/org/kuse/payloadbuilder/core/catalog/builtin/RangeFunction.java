@@ -25,12 +25,6 @@ class RangeFunction extends TableFunctionInfo
     }
 
     @Override
-    public String[] getColumns()
-    {
-        return COLUMNS;
-    }
-
-    @Override
     public RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
     {
         int from = 0;
@@ -47,6 +41,6 @@ class RangeFunction extends TableFunctionInfo
             to = ((Number) requireNonNull(arguments.get(1).eval(context), "To argument to range cannot be null.")).intValue();
         }
         final int start = from;
-        return RowIterator.wrap(IntStream.range(from, to).mapToObj(i -> (Tuple) Row.of(tableAlias, i - start, new Object[] {i})).iterator());
+        return RowIterator.wrap(IntStream.range(from, to).mapToObj(i -> (Tuple) Row.of(tableAlias, i - start, COLUMNS, new Object[] {i})).iterator());
     }
 }

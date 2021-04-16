@@ -7,17 +7,24 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.kuse.payloadbuilder.core.DescribeUtils;
+import org.kuse.payloadbuilder.core.OutputWriter;
 import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
 
-/** Analyze operator that measures things like time spent, execution count. etc. */
-class AnalyzeOperator extends AOperator
+/** Analyze projection that measures things like time spent, execution count. etc. */
+class AnalyzeProjection implements Projection
 {
-    private final Operator target;
+    private final Projection target;
+    private final int nodeId;
 
-    AnalyzeOperator(int nodeId, Operator target)
+    AnalyzeProjection(int nodeId, Projection target)
     {
-        super(nodeId);
+        this.nodeId = nodeId;
         this.target = target;
+    }
+
+    Projection getTarget()
+    {
+        return target;
     }
 
     @Override
@@ -35,18 +42,6 @@ class AnalyzeOperator extends AOperator
     }
 
     @Override
-    public int getNodeId()
-    {
-        return target.getNodeId();
-    }
-
-    @Override
-    public int getActualNodeId()
-    {
-        return nodeId;
-    }
-
-    @Override
     public Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
         Map<String, Object> properties = target.getDescribeProperties(context);
@@ -59,13 +54,11 @@ class AnalyzeOperator extends AOperator
         long total = 0;
         float percentageTime = 0;
         int executionCount = 0;
-        long rowCount = 0;
 
         NodeData data = context.getOperatorContext().getNodeData(nodeId);
         if (data != null)
         {
             executionCount = data.getExecutionCount();
-            rowCount = data.getRowCount();
             total = data.getNodeTime(TimeUnit.MILLISECONDS);
             totalAcc = total;
             // Remove the children times to get the actual time spent in this node
@@ -87,47 +80,23 @@ class AnalyzeOperator extends AOperator
         properties.put(DescribeUtils.TIME_SPENT_ACC, DurationFormatUtils.formatDurationHMS(totalAcc));
         properties.put(DescribeUtils.TIME_SPENT, timeSpent);
         properties.put(DescribeUtils.EXECUTION_COUNT, executionCount);
-        properties.put(DescribeUtils.PROCESSED_ROWS, rowCount);
 
         return properties;
     }
 
     @Override
-    public RowIterator open(ExecutionContext context)
+    public boolean isAsterisk()
+    {
+        return target.isAsterisk();
+    }
+
+    @Override
+    public void writeValue(OutputWriter writer, ExecutionContext context)
     {
         final NodeData data = context.getOperatorContext().getNodeData(nodeId, NodeData::new);
         data.increaseExecutionCount();
         data.resumeNodeTime();
-        final RowIterator it = target.open(context);
+        target.writeValue(writer, context);
         data.suspenNodeTime();
-        //CSOFF
-        return new RowIterator()
-        //CSON
-        {
-            @Override
-            public Tuple next()
-            {
-                data.increaseRowCount();
-                data.resumeNodeTime();
-                Tuple result = it.next();
-                data.suspenNodeTime();
-                return result;
-            }
-
-            @Override
-            public boolean hasNext()
-            {
-                data.resumeNodeTime();
-                boolean result = it.hasNext();
-                data.suspenNodeTime();
-                return result;
-            }
-
-            @Override
-            public void close()
-            {
-                it.close();
-            }
-        };
     }
 }

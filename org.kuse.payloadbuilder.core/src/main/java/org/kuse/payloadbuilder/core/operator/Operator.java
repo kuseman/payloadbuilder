@@ -1,64 +1,14 @@
 package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Collections.emptyIterator;
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
 
 import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 
 /** Definition of a selection operator */
-public interface Operator
+public interface Operator extends DescribableNode
 {
     /** Open iterator */
     RowIterator open(ExecutionContext context);
-
-    /** Get node id of operator */
-    int getNodeId();
-
-    /**
-     * Return the actual node id of this operator.
-     *
-     * <pre>
-     * If this operator is intercepted the {@link #getNodeId()} won't return
-     * the "real" nodeId for this operator but rather the intercepted operators node id
-     * </pre>
-     */
-    default int getActualNodeId()
-    {
-        return getNodeId();
-    }
-
-    /** Return child operators if any */
-    default List<Operator> getChildOperators()
-    {
-        return emptyList();
-    }
-
-    /** Returns name of operator when used in describe/analyze statements etc. */
-    default String getName()
-    {
-        return getClass().getSimpleName();
-    }
-
-    /**
-     * Returns a short describe string of the operator. Used in describe statement
-     */
-    default String getDescribeString()
-    {
-        return "";
-    }
-
-    /**
-     * Returns more detail properties of describe statement if {@link #getDescribeString()} is not enough.
-     *
-     * @param context Execution context
-     */
-    default Map<String, Object> getDescribeProperties(ExecutionContext context)
-    {
-        return emptyMap();
-    }
 
     /**
      * To string with indent. Used when printing operator tree

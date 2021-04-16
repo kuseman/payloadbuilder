@@ -7,18 +7,12 @@ import java.util.List;
 import java.util.Objects;
 
 import org.antlr.v4.runtime.Token;
-import org.kuse.payloadbuilder.core.OutputWriter;
-import org.kuse.payloadbuilder.core.operator.ExecutionContext;
-import org.kuse.payloadbuilder.core.operator.Projection;
-import org.kuse.payloadbuilder.core.operator.Tuple;
 
 /** Projection for wildcards. With or without alias */
-public class AsteriskSelectItem extends SelectItem implements Projection
+public class AsteriskSelectItem extends SelectItem
 {
     private final String alias;
-    /**
-     * If this select items is alias-based and is contained in a multi alias context we need to traverse values for all
-     */
+    /** Tuple ordinals that this asterisk is resolved into */
     private List<Integer> aliasTupleOrdinals;
 
     public AsteriskSelectItem(String alias, Token token)
@@ -63,38 +57,6 @@ public class AsteriskSelectItem extends SelectItem implements Projection
     public <TR, TC> TR accept(SelectVisitor<TR, TC> visitor, TC context)
     {
         return visitor.visit(this, context);
-    }
-
-    @Override
-    public void writeValue(OutputWriter writer, ExecutionContext context)
-    {
-        Tuple tuple = context.getTuple();
-
-        if (aliasTupleOrdinals == null)
-        {
-            writeTupleValues(writer, tuple);
-        }
-        else
-        {
-            for (int tupleOrdinal : aliasTupleOrdinals)
-            {
-                writeTupleValues(writer, tuple.getTuple(tupleOrdinal));
-            }
-        }
-    }
-
-    private void writeTupleValues(OutputWriter writer, Tuple tuple)
-    {
-        if (tuple == null)
-        {
-            return;
-        }
-        int count = tuple.getColumnCount();
-        for (int i = 0; i < count; i++)
-        {
-            writer.writeFieldName(tuple.getColumn(i));
-            writer.writeValue(tuple.getValue(i));
-        }
     }
 
     @Override

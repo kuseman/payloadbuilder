@@ -1,6 +1,9 @@
 package org.kuse.payloadbuilder.core.catalog;
 
+import static java.util.Collections.singleton;
+
 import java.util.List;
+import java.util.Set;
 
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
@@ -20,10 +23,29 @@ public abstract class TableFunctionInfo extends FunctionInfo
         super(catalog, name, Type.TABLE);
     }
 
-    /** Returns columns for this function or null if this function's columns is dynamic. */
-    public String[] getColumns()
+    /**
+     * Resolves resulting aliases for this function
+     *
+     * <pre>
+     *
+     * Example:
+     * Range function
+     * <b>range(1, 10)</b>
+     * Resulting alias will the table alias for the function itself
+    
+     * Example:
+     * Table valued function that opens an alias for row traversal in a sub query expression
+     * <b>open(aa)</b>
+     * Resulting alias will the argument result ie. [aa]
+     * </pre>
+     *
+     * @param alias The table alias belonging to the table function
+     * @param parentAliases Parent aliases in context to this function
+     * @param argumentAliases Resulting aliases for earch function argument
+     **/
+    public Set<TableAlias> resolveAlias(TableAlias alias, Set<TableAlias> parentAliases, List<Set<TableAlias>> argumentAliases)
     {
-        return null;
+        return singleton(alias);
     }
 
     /**

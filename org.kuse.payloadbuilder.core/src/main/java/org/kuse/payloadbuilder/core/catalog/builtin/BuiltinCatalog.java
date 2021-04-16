@@ -59,6 +59,7 @@ public class BuiltinCatalog
         // Table functions
         catalog.registerFunction(new RangeFunction(catalog));
         catalog.registerFunction(new OpenMapCollectionFunction(catalog));
+        catalog.registerFunction(new OpenRowsFunction(catalog));
 
         return catalog;
     }

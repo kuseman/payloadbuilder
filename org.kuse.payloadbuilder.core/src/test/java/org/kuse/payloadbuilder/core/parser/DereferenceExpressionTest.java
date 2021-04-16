@@ -54,7 +54,7 @@ public class DereferenceExpressionTest extends AParserTest
             }
 
             @Override
-            public int getColmnOrdinal(String column)
+            public int getColumnOrdinal(String column)
             {
                 if ("elite".equals(column))
                 {

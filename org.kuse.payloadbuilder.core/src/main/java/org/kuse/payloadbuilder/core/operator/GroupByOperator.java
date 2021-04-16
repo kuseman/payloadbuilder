@@ -1,6 +1,6 @@
 package org.kuse.payloadbuilder.core.operator;
 
-import static java.util.Arrays.asList;
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
@@ -41,9 +41,9 @@ class GroupByOperator extends AOperator
     }
 
     @Override
-    public List<Operator> getChildOperators()
+    public List<DescribableNode> getChildNodes()
     {
-        return asList(operator);
+        return singletonList(operator);
     }
 
     @Override
@@ -95,7 +95,7 @@ class GroupByOperator extends AOperator
                     {
                         // Count how many columns there are before current ordinal
                         Tuple tuple = firstTuple.getTuple(e.getKey());
-                        groupByOrdinals.put(e.getKey(), e.getValue().stream().map(c -> tuple.getColmnOrdinal(c)).collect(toSet()));
+                        groupByOrdinals.put(e.getKey(), e.getValue().stream().map(c -> tuple.getColumnOrdinal(c)).collect(toSet()));
                     }
                 }
                 return new GroupedRow(tuples, groupByOrdinals);

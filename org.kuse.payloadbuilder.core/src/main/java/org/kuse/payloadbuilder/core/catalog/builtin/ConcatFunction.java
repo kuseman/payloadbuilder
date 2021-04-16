@@ -31,7 +31,7 @@ class ConcatFunction extends ScalarFunctionInfo
             Object object = arg.eval(context);
             if (object != null)
             {
-                sb.append(EvalUtils.unwrap(object));
+                sb.append(EvalUtils.unwrap(context, object));
             }
         }
         return sb.toString();

@@ -14,25 +14,25 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.commons.collections.IteratorUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.kuse.payloadbuilder.core.OutputWriterAdapter;
 import org.kuse.payloadbuilder.core.Payloadbuilder;
 import org.kuse.payloadbuilder.core.QueryResult;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
+import org.kuse.payloadbuilder.core.operator.AObjectOutputWriter;
+import org.kuse.payloadbuilder.core.operator.AObjectOutputWriter.ColumnValue;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Tuple;
-import org.kuse.payloadbuilder.core.test.TestCase.ColumnValue;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -92,6 +92,7 @@ public class TestHarnessRunner
     @Test
     public void test()
     {
+        Assume.assumeFalse("Ignored", testCase.isIgnore());
         testInternal(false);
         testInternal(true);
     }
@@ -104,7 +105,16 @@ public class TestHarnessRunner
             registry.registerCatalog(catalog.getAlias(), new TCatalog(catalog));
         }
 
-        ResultWriter writer = new ResultWriter();
+        List<List<List<ColumnValue>>> actualResultSets = new ArrayList<>();
+        AObjectOutputWriter writer = new AObjectOutputWriter()
+        {
+            @Override
+            protected void consumeRow(List<ColumnValue> row)
+            {
+                actualResultSets.get(actualResultSets.size() - 1).add(row);
+            }
+        };
+
         QuerySession session = new QuerySession(registry);
         session.setPrintWriter(new PrintWriter(System.out));
 
@@ -115,7 +125,6 @@ public class TestHarnessRunner
 
         // Set first catalog as default
         session.getCatalogRegistry().setDefaultCatalog(harness.getCatalogs().get(0).getAlias());
-        List<List<List<ColumnValue>>> actualResultSets = new ArrayList<>();
 
         boolean fail = false;
         try
@@ -123,8 +132,8 @@ public class TestHarnessRunner
             QueryResult result = Payloadbuilder.query(session, testCase.getQuery());
             while (result.hasMoreResults())
             {
+                actualResultSets.add(new ArrayList<>());
                 result.writeResult(writer);
-                actualResultSets.add(writer.reset());
             }
 
             if (testCase.getExpectedException() != null)
@@ -238,52 +247,6 @@ public class TestHarnessRunner
         public int getNodeId()
         {
             return nodeId;
-        }
-    }
-
-    /** Harness result writer */
-    private static class ResultWriter extends OutputWriterAdapter
-    {
-        private List<List<ColumnValue>> rows = new ArrayList<>();
-
-        private List<ColumnValue> row;
-        private String column;
-
-        List<List<ColumnValue>> reset()
-        {
-            List<List<ColumnValue>> result = rows;
-            rows = new ArrayList<>();
-            return result;
-        }
-
-        @Override
-        public void startRow()
-        {
-            row = new ArrayList<>();
-        }
-
-        @Override
-        public void endRow()
-        {
-            rows.add(row);
-        }
-
-        @Override
-        public void writeFieldName(String name)
-        {
-            column = name;
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public void writeValue(Object value)
-        {
-            Object result = value;
-            if (result instanceof Iterator)
-            {
-                result = IteratorUtils.toList((Iterator<Object>) result);
-            }
-            row.add(new ColumnValue(column, result));
         }
     }
 }

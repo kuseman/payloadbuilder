@@ -4,7 +4,6 @@ import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
-import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
 import static org.apache.commons.lang3.StringUtils.upperCase;
@@ -16,7 +15,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.function.Function;
 
 import org.antlr.v4.runtime.BaseErrorListener;
@@ -44,6 +42,7 @@ import org.kuse.payloadbuilder.core.parser.Join.JoinType;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.AnalyzeStatementContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ArithmeticBinaryContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ArithmeticUnaryContext;
+import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.BracketExpressionContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.CaseExpressionContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ColumnReferenceContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ComparisonExpressionContext;
@@ -61,7 +60,6 @@ import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.LikeExpress
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.LiteralContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.LogicalBinaryContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.LogicalNotContext;
-import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.NestedExpressionContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.NullPredicateContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.PrintStatementContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.QnameContext;
@@ -91,23 +89,23 @@ public class QueryParser
     /** Parse query */
     public QueryStatement parseQuery(CatalogRegistry registry, String query)
     {
-        return getTree(registry, query, p -> p.query(), true);
+        return getTree(registry, query, p -> p.query());
     }
 
     /** Parse select */
     public Select parseSelect(CatalogRegistry registry, String query)
     {
-        return getTree(registry, query, p -> p.topSelect(), true);
+        return getTree(registry, query, p -> p.topSelect());
     }
 
     /** Parse expression */
     public Expression parseExpression(CatalogRegistry registry, String expression)
     {
-        return getTree(registry, expression, p -> p.topExpression(), false);
+        return getTree(registry, expression, p -> p.topExpression());
     }
 
     @SuppressWarnings("unchecked")
-    private <T> T getTree(CatalogRegistry registry, String body, Function<PayloadBuilderQueryParser, ParserRuleContext> function, boolean validateQualifiedReferences)
+    private <T> T getTree(CatalogRegistry registry, String body, Function<PayloadBuilderQueryParser, ParserRuleContext> function)
     {
         BaseErrorListener errorListener = new BaseErrorListener()
         {
@@ -143,7 +141,7 @@ public class QueryParser
             tree = function.apply(parser);
         }
 
-        return (T) new AstBuilder(registry, validateQualifiedReferences).visit(tree);
+        return (T) new AstBuilder(registry).visit(tree);
     }
 
     /** Builds tree */
@@ -155,13 +153,13 @@ public class QueryParser
 
         private TableAlias parentTableAlias;
         private final CatalogRegistry registry;
-        private final boolean validateQualifiedReferences;
         private int tupleOrdinal;
+        private boolean insideSelectItems;
+        private boolean isRootSelectStatement;
 
-        AstBuilder(CatalogRegistry registry, boolean validateQualifiedReferences)
+        AstBuilder(CatalogRegistry registry)
         {
             this.registry = registry;
-            this.validateQualifiedReferences = validateQualifiedReferences;
             clear(null);
         }
 
@@ -179,6 +177,8 @@ public class QueryParser
         @Override
         public Object visitStatement(StatementContext ctx)
         {
+            // Clear root flag outside of clear function because it's called from within sub query building
+            isRootSelectStatement = true;
             clear(null);
             return super.visitStatement(ctx);
         }
@@ -188,7 +188,9 @@ public class QueryParser
         {
             Expression condition = getExpression(ctx.condition);
             List<Statement> statements = ctx.stms.stms.stream().map(s -> (Statement) visit(s)).collect(toList());
-            List<Statement> elseStatements = ctx.elseStatements != null ? ctx.elseStatements.stms.stream().map(s -> (Statement) visit(s)).collect(toList()) : emptyList();
+            List<Statement> elseStatements = ctx.elseStatements != null
+                ? ctx.elseStatements.stms.stream().map(s -> (Statement) visit(s)).collect(toList())
+                : emptyList();
             return new IfStatement(condition, statements, elseStatements);
         }
 
@@ -223,11 +225,11 @@ public class QueryParser
             Expression expression = ctx.expression() != null ? getExpression(ctx.expression()) : null;
             if (expression != null && qname.getParts().size() == 1)
             {
-                throw new ParseException("Cannot assign default catalog a value", ctx.start);
+                throw new ParseException("Cannot assign value to a catalog alias", ctx.start);
             }
             else if (expression == null && qname.getParts().size() > 1)
             {
-                throw new ParseException("Must provide an assignment value to a catalog property.", ctx.start);
+                throw new ParseException("Must provide an assignment value to a catalog property", ctx.start);
             }
             return new UseStatement(qname, expression);
         }
@@ -279,25 +281,19 @@ public class QueryParser
         //CSON
         public Object visitSelectStatement(SelectStatementContext ctx)
         {
+            if (isRootSelectStatement && ctx.forClause() != null)
+            {
+                throw new ParseException("FOR clause are not allowed in top select", ctx.forClause().start);
+            }
+            isRootSelectStatement = false;
+
             TableSourceJoined from = ctx.tableSourceJoined() != null ? (TableSourceJoined) visit(ctx.tableSourceJoined()) : null;
             Expression topExpression = ctx.topCount() != null ? (Expression) visit(ctx.topCount()) : null;
             if (from == null)
             {
-                if (ctx.where != null)
-                {
-                    throw new ParseException("Cannot have a WHERE clause without a FROM.", ctx.where.start);
-                }
-                else if (!ctx.groupBy.isEmpty())
+                if (!ctx.groupBy.isEmpty())
                 {
                     throw new ParseException("Cannot have a GROUP BY clause without a FROM.", ctx.groupBy.get(0).start);
-                }
-                else if (!ctx.sortItem().isEmpty())
-                {
-                    throw new ParseException("Cannot have a ORDER BY clause without a FROM.", ctx.sortItem().get(0).start);
-                }
-                else if (topExpression != null)
-                {
-                    throw new ParseException("Cannot have a TOP clause without a FROM.", ctx.TOP().getSymbol());
                 }
             }
 
@@ -307,7 +303,10 @@ public class QueryParser
                 parentTableAlias = parentTableAlias.getChildAliases().get(0);
             }
 
+            boolean prevInsideSelectItems = insideSelectItems;
+            insideSelectItems = true;
             List<SelectItem> selectItems = ctx.selectItem().stream().map(s -> (SelectItem) visit(s)).collect(toList());
+            insideSelectItems = prevInsideSelectItems;
 
             boolean assignmentSelect = false;
             /** Verify/determine assignment select */
@@ -343,7 +342,11 @@ public class QueryParser
             Expression where = getExpression(ctx.where);
             List<Expression> groupBy = ctx.groupBy != null ? ctx.groupBy.stream().map(si -> getExpression(si)).collect(toList()) : emptyList();
             List<SortItem> orderBy = ctx.sortItem() != null ? ctx.sortItem().stream().map(si -> getSortItem(si)).collect(toList()) : emptyList();
-            Select select = new Select(selectItems, from, into, topExpression, where, groupBy, orderBy);
+            Select.For forOutput = ctx.forClause() != null
+                ? (Select.For.valueOf(upperCase(ctx.forClause().output.getText())))
+                : null;
+
+            Select select = new Select(selectItems, from, into, topExpression, where, groupBy, orderBy, forOutput);
             return new SelectStatement(select, assignmentSelect);
         }
 
@@ -378,61 +381,7 @@ public class QueryParser
                 Expression expression = getExpression(ctx.expression());
                 return new ExpressionSelectItem(expression, identifier, assignmentQname, ctx.expression().start);
             }
-            // Nested select item
-            else if (ctx.nestedSelectItem() != null)
-            {
-                NestedSelectItem.Type type = ctx.OBJECT() != null ? NestedSelectItem.Type.OBJECT : NestedSelectItem.Type.ARRAY;
-                List<SelectItem> selectItems = ctx.nestedSelectItem().selectItem().stream().map(s -> (SelectItem) visit(s)).collect(toList());
-                Expression from = getExpression(ctx.nestedSelectItem().from);
-                Expression where = getExpression(ctx.nestedSelectItem().where);
-                List<Expression> groupBy = ctx.nestedSelectItem().groupBy != null
-                    ? ctx.nestedSelectItem().groupBy
-                            .stream()
-                            .map(gb -> getExpression(gb))
-                            .collect(toList())
-                    : emptyList();
-                List<SortItem> orderBy = ctx.nestedSelectItem().orderBy != null
-                    ? ctx.nestedSelectItem().orderBy
-                            .stream()
-                            .map(si -> getSortItem(si))
-                            .collect(toList())
-                    : emptyList();
-
-                if (type == NestedSelectItem.Type.ARRAY)
-                {
-                    Optional<SelectItem> item = selectItems.stream().filter(si -> !si.isEmptyIdentifier()).findAny();
-
-                    //CSOFF
-                    if (item.isPresent())
-                    //CSON
-                    {
-                        int index = selectItems.indexOf(item.get());
-                        SelectItemContext itemCtx = ctx.nestedSelectItem().selectItem(index);
-                        throw new ParseException("Select items inside an ARRAY select cannot have aliaes. Item: " + item.get(), itemCtx.start);
-                    }
-                }
-
-                if (from == null)
-                {
-                    //CSOFF
-                    if (where != null)
-                    //CSON
-                    {
-                        throw new ParseException("Cannot have a WHERE clause without a FROM clause: " + selectItems, ctx.nestedSelectItem().where.start);
-                    }
-                    else if (!orderBy.isEmpty())
-                    {
-                        throw new ParseException("Cannot have an ORDER BY clause without a FROM clause: " + selectItems, ctx.nestedSelectItem().orderBy.get(0).start);
-                    }
-                    else if (!groupBy.isEmpty())
-                    {
-                        throw new ParseException("Cannot have an GROUP BY clause without a FROM clause: " + selectItems, ctx.nestedSelectItem().sortItem().get(0).start);
-                    }
-                }
-
-                return new NestedSelectItem(type, selectItems, from, where, identifier, groupBy, orderBy, ctx.nestedSelectItem().start);
-            }
-            // Wildcard select item
+            // Asterisk select item
             else if (ctx.ASTERISK() != null)
             {
                 String alias = null;
@@ -517,7 +466,7 @@ public class QueryParser
                     throw new ParseException("Sub query must have an alias", ctx.PARENC().getSymbol());
                 }
 
-                validateSubQuery(ctx.selectStatement());
+                validateTableSourceSubQuery(ctx.selectStatement());
 
                 /*  When visiting a sub query we want to build a new table alias hierarchy
                     Since this is a complete query.
@@ -566,8 +515,7 @@ public class QueryParser
                     .parent(getParentTableAlias())
                     .build();
 
-            String catalog = ctx.tableName().catalog != null ? ctx.tableName().catalog.getText() : null;
-            return new Table(catalog, tableAlias, options, ctx.tableName().start);
+            return new Table(tableName.getCatalogAlias(), tableAlias, options, ctx.tableName().start);
         }
 
         @Override
@@ -606,7 +554,6 @@ public class QueryParser
             QualifiedName qname = getQualifiedName(ctx.qname());
             int lambdaId = lambdaParameters.getOrDefault(qname.getFirst(), -1);
             QualifiedReferenceExpression result = new QualifiedReferenceExpression(qname, lambdaId, ctx.start);
-            validateQualifiedReference(ctx, result);
             return result;
         }
 
@@ -746,9 +693,77 @@ public class QueryParser
         }
 
         @Override
-        public Object visitNestedExpression(NestedExpressionContext ctx)
+        public Object visitBracketExpression(BracketExpressionContext ctx)
         {
-            return new NestedExpression(getExpression(ctx.expression()));
+            // Plain nested parenthesis expression
+            if (ctx.bracket_expression().expression() != null)
+            {
+                return new NestedExpression(getExpression(ctx.bracket_expression().expression()));
+            }
+
+            /*
+             * Prohibit sub query expressions every where BUT in select items
+             * will be changed when EXISTS comes into play
+             *
+             * select *
+             * from
+             * (
+             *      select col1
+             *      ,      ( select col2, col3 for object) myObj            <-- here is ok
+             *      from table
+             *      where (select col4 .....)                               <-- not ok
+             * ) x
+             *
+             */
+
+            if (!insideSelectItems)
+            {
+                throw new ParseException("Subquery expressions are only allowed in select items", ctx.bracket_expression().start);
+            }
+
+            validateSelectItemSubQuery(ctx.bracket_expression().selectStatement());
+
+            /*
+             * When building sub query expression table alias hierarchy
+             * we only bind one way, the sub query knows it's parent
+             * but the parent does not know about the sub query as child
+             *
+             * ie.
+             *
+             * select col
+             * ,      (select a.col, b.col from tableB b for object) obj
+             * from tableA a
+             * where b.col > 10     <---- this should not be possible
+             *
+             * Here we will have a table alias hierarchy like this:
+             *
+             * ROOT
+             *      tableA                  <---- Should NOT know about tableB
+             *          tableB              <---- Should know about it's parent
+             *
+             * From a sub query perspective:    we should be able to access everything, ie. traverse upwards
+             * From a table source perspective: we should not be able to access sub query expressions since these are not calculated until after
+             *                                  FROM part is complete
+             */
+            TableAlias prevParent = parentTableAlias;
+
+            TableAlias tableAlias = TableAliasBuilder
+                    .of(tupleOrdinal++, TableAlias.Type.SUBQUERY, QualifiedName.of("SubQuery"), "", ctx.bracket_expression().selectStatement().start)
+                    .parent(parentTableAlias, false)
+                    .build();
+
+            // Store previous parent table alias
+            int prevTupleOrdinal = tupleOrdinal;
+            // Start a new alias tree with subquery as parent
+            clear(tableAlias);
+            // Restore tuple ordinal counter since clear resets it
+            tupleOrdinal = prevTupleOrdinal;
+
+            SelectStatement selectStatement = (SelectStatement) visit(ctx.bracket_expression().selectStatement());
+
+            parentTableAlias = prevParent;
+
+            return new UnresolvedSubQueryExpression(selectStatement);
         }
 
         @Override
@@ -891,7 +906,32 @@ public class QueryParser
         }
 
         /**
-         * Select items of a sub query
+         * Validates a subquery when used as an expression
+         */
+        private void validateSelectItemSubQuery(SelectStatementContext ctx)
+        {
+            // Since sub query expressions are only allowed in select items, a FOR clause is then mandatory to make this a scalar
+            // expression simply
+            if (ctx.forClause() == null)
+            {
+                throw new ParseException("A FOR clause is mandatory when using a subquery expressions", ctx.start);
+            }
+            else if (ctx.into != null)
+            {
+                throw new ParseException("SELECT INTO are not allowed in sub query expressions", ctx.into.start);
+            }
+
+            for (SelectItemContext item : ctx.selectItem())
+            {
+                if (item.variable() != null)
+                {
+                    throw new ParseException("Assignment selects are not allowed in sub query expressions", item.start);
+                }
+            }
+        }
+
+        /**
+         * Validates a subquery when used as a table source
          *
          * <pre>
          * Valid select items in a sub query
@@ -899,13 +939,17 @@ public class QueryParser
          *  - No sub query select items
          * </pre>
          */
-        private void validateSubQuery(SelectStatementContext ctx)
+        private void validateTableSourceSubQuery(SelectStatementContext ctx)
         {
             if (ctx.into != null)
             {
                 throw new ParseException("SELECT INTO are not allowed in sub query context", ctx.into.start);
             }
-            
+            else if (ctx.forClause() != null)
+            {
+                throw new ParseException("FOR clause are not allowed in sub query context", ctx.forClause().start);
+            }
+
             boolean foundAsteriskSelect = false;
             for (SelectItemContext item : ctx.selectItem())
             {
@@ -919,88 +963,14 @@ public class QueryParser
                     {
                         throw new ParseException("Only non alias asterisk select (*) are supported in sub queries", item.start);
                     }
-                    
+
                     foundAsteriskSelect = true;
                 }
                 else if (item.variable() != null)
                 {
                     throw new ParseException("Assignment selects are not allowed in sub query context", item.start);
                 }
-                else if (item.OBJECT() != null || item.ARRAY() != null)
-                {
-                    throw new ParseException("Nested selects are not allowed in sub query context", item.start);
-                }
             }
-        }
-
-        /** Validate alias in QRE is pointing to an existing table alias */
-        private void validateQualifiedReference(ParserRuleContext ctx, QualifiedReferenceExpression qfe)
-        {
-            if (!validateQualifiedReferences
-                || isBlank(parentTableAlias.getAlias())
-                || qfe.getQname().getParts().size() == 1
-                || qfe.getLambdaId() >= 0)
-            {
-                return;
-            }
-
-            String aliasRef = qfe.getQname().getParts().get(0);
-
-            // Pointer to current alias
-            if (equalsIgnoreCase(aliasRef, parentTableAlias.getAlias()))
-            {
-                return;
-            }
-
-            // Pointer to child alias
-            if (parentTableAlias.getChildAlias(aliasRef) != null)
-            {
-                return;
-            }
-
-            // Sibling reference
-            if (parentTableAlias.getSiblingAlias(aliasRef) != null)
-            {
-                return;
-            }
-
-            // TODO: If join check we can traverse upwards
-            // but only check parents children with a lower index then we came from
-            /*
-             * from tableA a
-             * inner join
-             * (
-             *   select *
-             *   from tableB b
-             *   where c.id > 10            <--- Invalid reference since it's defined later that "this"
-             * ) b
-             *   on b..
-             * inner join tableC c
-             *   on c...
-             *
-             */
-
-            // Traverse parents and try to find match
-            TableAlias current = parentTableAlias.getParent();
-
-            while (current != null)
-            {
-                if (equalsIgnoreCase(aliasRef, current.getAlias()))
-                {
-                    return;
-                }
-                // This might return false positives since
-                // we might reference an invalid alias further down that we are not
-                // this is ok in a Select item expression but not in a join condition
-                else if (current.getSiblingAlias(aliasRef) != null)
-                {
-                    return;
-                }
-
-                current = current.getParent();
-            }
-
-            throw new ParseException("Invalid table source reference '" + aliasRef + "'", ctx.start);
         }
 
         private void validateFunction(FunctionInfo functionInfo, List<Expression> arguments, Token token)
@@ -1076,11 +1046,6 @@ public class QueryParser
 
         private String getIdentifierString(String string)
         {
-            if (string == null)
-            {
-                return null;
-            }
-
             String text = string;
             // Strip starting quotes
             if (text.charAt(0) == '"')
@@ -1105,10 +1070,6 @@ public class QueryParser
 
         private QualifiedName getQualifiedName(QnameContext ctx)
         {
-            if (ctx == null)
-            {
-                return null;
-            }
             List<String> parts = ctx.identifier()
                     .stream()
                     .map(i -> getIdentifierString(i.getText()))

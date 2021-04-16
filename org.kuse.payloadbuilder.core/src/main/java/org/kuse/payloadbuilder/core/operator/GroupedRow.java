@@ -50,9 +50,9 @@ class GroupedRow implements Tuple
     }
 
     @Override
-    public int getColmnOrdinal(String column)
+    public int getColumnOrdinal(String column)
     {
-        return tuples.get(0).getColmnOrdinal(column);
+        return tuples.get(0).getColumnOrdinal(column);
     }
 
     @Override
@@ -64,6 +64,6 @@ class GroupedRow implements Tuple
     @Override
     public Object getValue(int ordinal)
     {
-        return  tuples.get(0).getValue(ordinal);
+        return tuples.get(0).getValue(ordinal);
     }
 }

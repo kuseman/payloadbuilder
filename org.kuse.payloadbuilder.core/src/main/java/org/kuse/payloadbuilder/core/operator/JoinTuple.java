@@ -82,9 +82,9 @@ class JoinTuple implements Tuple
     }
 
     @Override
-    public int getColmnOrdinal(String column)
+    public int getColumnOrdinal(String column)
     {
-        return inner.getColmnOrdinal(column);
+        return inner.getColumnOrdinal(column);
     }
 
     @Override

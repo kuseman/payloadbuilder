@@ -3,8 +3,10 @@ package org.kuse.payloadbuilder.core.operator;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
+import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.unmodifiableMap;
+import static java.util.stream.Collectors.toList;
 import static org.apache.commons.collections.CollectionUtils.isEmpty;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
 import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
@@ -24,10 +26,15 @@ import java.util.Set;
 
 import org.antlr.v4.runtime.Token;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.mutable.MutableObject;
+import org.kuse.payloadbuilder.core.QuerySession;
+import org.kuse.payloadbuilder.core.catalog.FunctionInfo;
 import org.kuse.payloadbuilder.core.catalog.LambdaFunction;
 import org.kuse.payloadbuilder.core.catalog.LambdaFunction.LambdaBinding;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
+import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.TableAlias.Type;
 import org.kuse.payloadbuilder.core.parser.AExpressionVisitor;
 import org.kuse.payloadbuilder.core.parser.AJoin;
@@ -38,7 +45,6 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.ExpressionSelectItem;
 import org.kuse.payloadbuilder.core.parser.LambdaExpression;
 import org.kuse.payloadbuilder.core.parser.LiteralIntegerExpression;
-import org.kuse.payloadbuilder.core.parser.NestedSelectItem;
 import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.QualifiedFunctionCallExpression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -49,8 +55,10 @@ import org.kuse.payloadbuilder.core.parser.SelectItem;
 import org.kuse.payloadbuilder.core.parser.SortItem;
 import org.kuse.payloadbuilder.core.parser.SubQueryTableSource;
 import org.kuse.payloadbuilder.core.parser.SubscriptExpression;
+import org.kuse.payloadbuilder.core.parser.Table;
 import org.kuse.payloadbuilder.core.parser.TableFunction;
 import org.kuse.payloadbuilder.core.parser.TableSourceJoined;
+import org.kuse.payloadbuilder.core.parser.UnresolvedSubQueryExpression;
 
 import gnu.trove.set.hash.TLinkedHashSet;
 
@@ -88,6 +96,7 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
     /** Context used during visitor */
     static class Context
     {
+        QuerySession session;
         /**
          * The aliases that was the result after processing the expression.
          *
@@ -108,7 +117,7 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
          **/
         private Set<TableAlias> parentAliases = new LinkedHashSet<>();
         /** Columns by alias found */
-        private final Map<TableAlias, Set<String>> columnsByAlias = new HashMap<>();
+        private final Map<TableAlias, Set<String>> columnsByAlias = new LinkedHashMap<>();
         /** Lambda bindings. Holds which lambda id points to which alias */
         private final Map<Integer, Set<TableAlias>> lambdaAliasById = new HashMap<>();
         /** Aggregated select items by tuple ordinal */
@@ -116,7 +125,7 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
         /** Gathered/aggregated select item during visit */
         private List<SelectItem> selectItems = new ArrayList<>();
         /** Flag to know when root context */
-        private boolean isRootSelect = true;
+        private boolean rootSelect = true;
         /** Map with computed expressions by target tuple ordinal and identifier */
         private final Map<Integer, Map<SelectItem, Expression>> computedExpressionsByTupleOrdinal = new HashMap<>();
         /** Sort by identifiers that might need a computed value pushed down */
@@ -125,6 +134,16 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
         private Set<Integer> sortByOrdinals = emptySet();
         /** Current select item ordinal */
         private int selectItemOrdinal;
+
+        /**
+         * <pre>
+         * Highest ordinal that is valid to reference in current scope.
+         * This is to properly detect if a qualified reference is valid or not. For
+         * example in a join condition it's invalid to reference an alias defined later on.
+         * -1 indicates that all aliases is valid
+         * </pre>
+         */
+        private int highestValidOrdinal = -1;
 
         /** List used during test to populate resolved qualifiers */
         private List<QualifiedReferenceExpression> resolvedQualifiers;
@@ -152,16 +171,27 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
 
     /** Resolve select */
     @SuppressWarnings("deprecation")
-    public static Context resolve(Select select)
+    public static Context resolve(QuerySession session, Select select)
     {
         Context context = new Context();
+        context.session = session;
         select.accept(VISITOR, context);
         context.columnsByAlias.entrySet().forEach(e -> e.getKey().setColumns(e.getValue().toArray(EMPTY_STRING_ARRAY)));
         return context;
     }
 
-    /** Method used by test to resolve expressions */
-    public static Context resolve(Expression expression, TableAlias alias)
+    /** Resolve select. NOTE! Method used for testing only. */
+    static Context resolveForTest(QuerySession session, Select select)
+    {
+        Context context = new Context();
+        context.session = session;
+        context.resolvedQualifiers = new ArrayList<>();
+        select.accept(VISITOR, context);
+        return context;
+    }
+
+    /** Method used by test to resolve expressions. NOTE! Method used for testing only. */
+    public static Context resolveTorTest(Expression expression, TableAlias alias)
     {
         Context context = new Context();
         context.resolvedQualifiers = new ArrayList<>();
@@ -170,35 +200,35 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
         return context;
     }
 
+    //CSOFF
     @Override
+    //CSON
     public Void visit(Select select, Context context)
     {
-        Set<TableAlias> selectAliases = emptySet();
+        Set<TableAlias> selectAliases = context.parentAliases;
         TableSourceJoined tsj = select.getFrom();
         if (tsj != null)
         {
-            selectAliases = asSet(tsj.getTableSource().getTableAlias());
-
             int tupleOrdinal = tsj.getTableSource().getTableAlias().getTupleOrdinal();
             // Set select items
             context.selectItemsByTupleOrdinal.put(tupleOrdinal, select.getSelectItems());
-            context.parentAliases = selectAliases;
 
             // Dig down and resolve table source
             tsj.getTableSource().accept(this, context);
 
+            // Set the select alias property to the resulting aliases in context for the table source
+            selectAliases = context.parentAliases.isEmpty()
+                ? singleton(tsj.getTableSource().getTableAlias())
+                : context.parentAliases;
+
             for (AJoin join : tsj.getJoins())
             {
-                Set<TableAlias> joinTableAliaes = asSet(join.getTableSource().getTableAlias());
-                context.parentAliases = joinTableAliaes;
-
-                // First visit join table source
                 join.getTableSource().accept(this, context);
 
-                // Set correct context before processing condition
-                context.parentAliases = joinTableAliaes;
+                // Set highest valid ordinal for the join condition
+                // We cannot reach other than the joins table sources highest child ordinal
+                context.highestValidOrdinal = join.getTableSource().getTableAlias().getHighestChildOrdinal();
 
-                // Then resolve condition
                 Expression condition = join.getCondition();
                 if (condition != null)
                 {
@@ -209,6 +239,34 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
 
         // Set correct context before processing where/sort/group/select items
         context.parentAliases = selectAliases;
+        context.highestValidOrdinal = -1;
+
+        if (!context.parentAliases.isEmpty())
+        {
+            /*
+             * The highest ordinal we can reach in a select regarding where/orderby/etc.
+             * is the last siblings leafs ordinal
+             *
+             * select *
+             * from tableA a                0
+             * inner join tableB b          1
+             *  on ...
+             * inner join tableC c          2
+             *  on ...
+             * inner join                   3
+             * (
+             *    select *
+             *    from tableD d             4
+             *    inner join tableE e       5
+             *      on ....
+             * ) x
+             * where ....                   <--- highest allowed i 3's highest => 5
+             *
+             *
+             */
+            TableAlias alias = context.parentAliases.iterator().next();
+            context.highestValidOrdinal = alias.getHighestSiblingLeafOrdinal();
+        }
 
         if (select.getWhere() != null)
         {
@@ -232,6 +290,10 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
         int index = 1;
         for (SelectItem item : select.getSelectItems())
         {
+            // Set the select aliases before every visit
+            // in case of a sub query expression this will be changed
+            context.parentAliases = selectAliases;
+
             context.selectItemOrdinal = index++;
             item.accept(this, context);
         }
@@ -246,10 +308,21 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
     }
 
     @Override
+    public Void visit(Table table, Context context)
+    {
+        context.parentAliases = asSet(table.getTableAlias());
+        return super.visit(table, context);
+    }
+
+    @Override
     public Void visit(SubQueryTableSource tableSource, Context context)
     {
-        boolean isRootSelect = context.isRootSelect;
-        context.isRootSelect = false;
+        Set<TableAlias> parentAliases = context.parentAliases;
+        boolean isRootSelect = context.rootSelect;
+
+        context.rootSelect = false;
+        context.parentAliases = asSet(tableSource.getTableAlias());
+
         // Set select items for sub query
         context.selectItemsByTupleOrdinal.put(tableSource.getTableAlias().getTupleOrdinal(), tableSource.getSelect().getSelectItems());
         super.visit(tableSource, context);
@@ -257,14 +330,18 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
         // Overwrite the original select items with the generated ones
         context.selectItemsByTupleOrdinal.put(tableSource.getTableAlias().getTupleOrdinal(), context.selectItems);
 
-        context.isRootSelect = isRootSelect;
+        // Restore values before leaving
+        context.parentAliases = parentAliases;
+        context.rootSelect = isRootSelect;
         return null;
     }
 
     @Override
     public Void visit(TableFunction tableFunction, Context context)
     {
-        tableFunction.getArguments().forEach(a -> EXPRESSION_VISITOR.visit(a, context));
+        // Resolve the table functions argument and calculate the resulting table aliases
+        // Note the method sets parent aliases in context
+        EXPRESSION_VISITOR.resolveFunction(tableFunction.getTableAlias(), tableFunction.getFunctionInfo(), tableFunction.getToken(), tableFunction.getArguments(), context);
         return null;
     }
 
@@ -336,13 +413,12 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
         boolean sortOrdinalExists = context.sortByOrdinals.contains(context.selectItemOrdinal);
 
         if (selectItem.isComputed()
-            &&
-            (!context.isRootSelect
+            && (!context.rootSelect
                 || sortItemExists
                 || sortOrdinalExists))
         {
-            // Computed value, will push pulled up later on so replace this
-            // with a reference that points to current alias parent
+            // Computed value, will pulled up later on so replace this
+            // with a reference that points a simple reference
             /*
              * select *
              * from                             ordinal = 0
@@ -352,39 +428,41 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
              * ) x
              *
              * col1 + col2 should be replaced with a single calc item
-             * resolved to target ordinal 1 since that i where a computed operator will be placed later on
-             *
-             * select *
-             * from                             ordinal = 0
-             * (
-             *      select object(col1 from unionall(a, b)) calc
-             *      from tableA a                  ordinal = 1
-             *      inner join tableB b
-             *        on b....
-             * ) x
+             * resolved to target ordinal 1 since that is where a computed operator will be placed later on
              *
              */
 
-            for (TableAlias alias : context.parentAliases)
+            // A select with no FROM just add the expression to context as computed
+            if (context.parentAliases.isEmpty())
             {
-                // If this is not a root select then we are in a sub query
-                // and it's parent is the ROOT alias so traverse one step more to the real parent
-                int targetTupleOrdinal = alias.getTupleOrdinal();
-
-                // Store the computed select item in context
+                // Store the computed select item in context on tuple ordinal 0
                 Map<SelectItem, Expression> map = context.computedExpressionsByTupleOrdinal
-                        .computeIfAbsent(targetTupleOrdinal, k -> new LinkedHashMap<>());
-                int index = map.size();
+                        .computeIfAbsent(0, k -> new LinkedHashMap<>());
                 map.put(selectItem, selectItem.getExpression());
+            }
+            else
+            {
+                for (TableAlias alias : context.parentAliases)
+                {
+                    // If this is not a root select then we are in a sub query
+                    // and it's parent is the ROOT alias so traverse one step more to the real parent
+                    int targetTupleOrdinal = alias.getTupleOrdinal();
 
-                ResolvePath path = new ResolvePath(-1, targetTupleOrdinal, emptyList(), index);
+                    // Store the computed select item in context
+                    Map<SelectItem, Expression> map = context.computedExpressionsByTupleOrdinal
+                            .computeIfAbsent(targetTupleOrdinal, k -> new LinkedHashMap<>());
+                    int index = map.size();
+                    map.put(selectItem, selectItem.getExpression());
 
-                QualifiedReferenceExpression qre = new QualifiedReferenceExpression(QualifiedName.of(selectItem.getIdentifier()), -1, selectItem.getToken());
-                qre.setResolvePaths(asList(path));
+                    ResolvePath path = new ResolvePath(-1, targetTupleOrdinal, emptyList(), index);
 
-                context.selectItems.add(new ExpressionSelectItem(qre, selectItem.getIdentifier(), null, selectItem.getToken()));
-                // Should only be one parent alias here so drop out
-                break;
+                    QualifiedReferenceExpression qre = new QualifiedReferenceExpression(QualifiedName.of(selectItem.getIdentifier()), -1, selectItem.getToken());
+                    qre.setResolvePaths(asList(path));
+
+                    context.selectItems.add(new ExpressionSelectItem(qre, selectItem.getIdentifier(), null, selectItem.getToken()));
+                    // Should only be one parent alias here so drop out
+                    break;
+                }
             }
         }
         else
@@ -394,45 +472,13 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
         return null;
     }
 
-    @Override
-    public Void visit(NestedSelectItem nestedSelectItem, Context context)
-    {
-        Expression from = nestedSelectItem.getFrom();
-        if (from != null)
-        {
-            context.parentAliases = EXPRESSION_VISITOR.visit(from, context);
-        }
-
-        List<SelectItem> prevItems = context.selectItems;
-        context.selectItems = new ArrayList<>();
-
-        for (SelectItem s : nestedSelectItem.getSelectItems())
-        {
-            s.accept(this, context);
-        }
-
-        context.selectItems = prevItems;
-
-        if (nestedSelectItem.getWhere() != null)
-        {
-            EXPRESSION_VISITOR.visit(nestedSelectItem.getWhere(), context);
-        }
-
-        if (!nestedSelectItem.getGroupBy().isEmpty())
-        {
-            nestedSelectItem.getGroupBy().forEach(gb -> EXPRESSION_VISITOR.visit(gb, context));
-        }
-
-        if (!nestedSelectItem.getOrderBy().isEmpty())
-        {
-            nestedSelectItem.getOrderBy().forEach(si -> EXPRESSION_VISITOR.visit(si.getExpression(), context));
-        }
-        context.selectItems.add(nestedSelectItem);
-        return null;
-    }
-
     /**
-     * Visits order by items. Collects potential order by items that might be present in an expression select item as column or ordinal
+     * Visits order by items
+     *
+     * <pre>
+     * Collects potential order by items that might be present in an
+     * expression select item as column or ordinal
+     * </pre>
      */
     private void proccessOrderBy(Context context, Select select)
     {
@@ -507,10 +553,9 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
             }
 
             Set<TableAlias> tableAliases = context.parentAliases;
-            if (!expression.getResolvePaths().isEmpty())
+            if (tableAliases.isEmpty())
             {
-                // Already resolved
-                return tableAliases;
+                throw new ParseException("Unkown reference " + expression, expression.getToken());
             }
 
             QualifiedName qname = expression.getQname();
@@ -558,15 +603,17 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
             for (TableAlias alias : tableAliases)
             {
                 List<String> tempParts = new ArrayList<>(parts);
-                TableAlias pathAlias = getFromQualifiedName(alias, tempParts);
+                TableAlias pathAlias = getFromQualifiedName(context, alias, tempParts, expression.getToken(), true);
 
                 int sourceTupleOrdinal = needSourceTupleOrdinal ? alias.getTupleOrdinal() : -1;
-                int targetTupleOrdinal = pathAlias.getTupleOrdinal();
+                // If we landed on the same alias after traversing then we don't need a target, the target
+                // will be the context tuple.
+                int targetTupleOrdinal = alias != pathAlias ? pathAlias.getTupleOrdinal() : -1;
 
                 // Multi alias context but we never changed target then we can remove the previous path
                 // since they are the same
                 // this happens if we are traversing upwards and access a common tuple ordinal
-                if (targetTupleOrdinal == prevTargetOrdinal)
+                if (sourceTupleOrdinal >= 0 && targetTupleOrdinal != -1 && targetTupleOrdinal == prevTargetOrdinal)
                 {
                     sourceTupleOrdinal = -1;
                     resolvePaths.remove(resolvePaths.size() - 1);
@@ -586,35 +633,111 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
 
                 String column = tempParts.get(0);
 
-                boolean done = false;
-                while (pathAlias.getType() == Type.SUBQUERY)
+                MutableObject<TableAlias> pathAliasHolder = new MutableObject<>(pathAlias);
+                if (processPathAlias(context, targetTupleOrdinal, column, tempParts, pathAliasHolder, resolvePaths, expression.getToken()))
+                {
+                    continue;
+                }
+                pathAlias = pathAliasHolder.getValue();
+                resolvePaths.add(new ResolvePath(sourceTupleOrdinal, pathAlias.getTupleOrdinal(), tempParts));
+
+                // Append column to pathAlias
+                // No need to add to temp table alias
+                if (pathAlias.getType() != TableAlias.Type.TEMPORARY_TABLE)
+                {
+                    Set<String> columns = context.columnsByAlias.computeIfAbsent(pathAlias, key -> new TLinkedHashSet<>());
+                    columns.add(column);
+                }
+            }
+
+            expression.setResolvePaths(resolvePaths);
+            return output;
+        }
+
+        /**
+         * Processes provided path alias.
+         *
+         * <pre>
+         * If the alias is a sub query we resolve into the sub queries select items to see if there is a match
+         * and if so copy it's resolve path.
+         * ie.
+         *
+         * select id                <--- this get the same resolve path ...
+         * ,      x.map.key         <--- this will get the same path as a.map below BUT with an extra un-resolved path (key)
+         * from
+         * (
+         *    select a.id           <--- as this
+         *    ,      a.map
+         *    from table a
+         * ) x
+         *
+         * If the alias is a temp table, the temp tables alias hierarchy is traverse and we will get a multi target resolve path.
+         * ie.
+         *
+         * select *
+         * into #temp
+         * from tableA a            ordinal = 0
+         * inner join tableB b      ordinal = 1
+         *   on b.col = a.col
+         *
+         * select t.b.col4          <-- this one will get a multi target => 0 (for this selects target) and then 1
+         *                              for the temp tables table alias target above
+         * from #temp               ordinal = 0
+         * </pre>
+         */
+        private boolean processPathAlias(
+                Context context,
+                int targetTupleOrdinal,
+                String column,
+                List<String> tempParts,
+                MutableObject<TableAlias> pathAliasHolder,
+                List<ResolvePath> resolvePaths,
+                Token token)
+        {
+            // If we are resolving into a temp table, this is the ordinal in the original select hierarchy
+            boolean tempTablePath = false;
+            // If we are resolving into a temp-table path, this list will contain the end path
+            List<Integer> subTuplePath = new ArrayList<>();
+            int columnIndex = -1;
+
+            TableAlias pathAlias = pathAliasHolder.getValue();
+            while (true)
+            {
+                if (pathAlias.getType() == TableAlias.Type.SUBQUERY)
                 {
                     if (context.selectItemsByTupleOrdinal.containsKey(pathAlias.getTupleOrdinal()))
                     {
                         // Resolved path is a sub query then verify that column exists as a defined item
                         SelectItem item = getSelectItem(context, pathAlias, column);
+                        //CSOFF
                         if (item == null)
+                        //CSON
                         {
-                            throw new ParseException("No column defined with name " + column + " for alias " + pathAlias.getAlias(), expression.getToken());
+                            throw new ParseException("No column defined with name " + column + " for alias " + pathAlias.getAlias(), token);
                         }
 
                         List<ResolvePath> itemResolvePaths = item.getResolvePaths();
+                        //CSOFF
                         if (!CollectionUtils.isEmpty(itemResolvePaths))
+                        //CSON
                         {
-                            // Matching column in sub query then copy it's resolve path
-                            resolvePaths.addAll(itemResolvePaths);
-                            done = true;
-                            break;
-                        }
-                        else if (item.isComputed())
-                        {
-                            // Computed item then targetOrdinal is the sub query itself
-                            // There will be a ComputedValues operator at this ordinal in the plan
-                            // that will be calculated
-
-                            resolvePaths.add(new ResolvePath(sourceTupleOrdinal, targetTupleOrdinal, tempParts));
-                            done = true;
-                            break;
+                            resolvePaths.addAll(
+                                    itemResolvePaths
+                                            .stream()
+                                            .map(r ->
+                                            {
+                                                //CSOFF
+                                                if (r.getUnresolvedPath().length < tempParts.size())
+                                                //CSON
+                                                {
+                                                    // We have more unresolved parts the the target resolve path
+                                                    // alter the resolve path
+                                                    return new ResolvePath(r.getSourceTupleOrdinal(), r.getTargetTupleOrdinal(), tempParts);
+                                                }
+                                                return r;
+                                            })
+                                            .collect(toList()));
+                            return true;
                         }
                     }
 
@@ -636,25 +759,125 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
                             .getChildAliases()
                             .get(0);                // First child
                 }
-
-                if (done)
+                // Temp table, resolve column ordinal or traverse into the temp table alias
+                else if (pathAlias.getType() == TableAlias.Type.TEMPORARY_TABLE)
                 {
-                    continue;
+                    tempTablePath = true;
+                    TemporaryTable table = context.session.getTemporaryTable(pathAlias.getTable());
+                    int size = tempParts.size();
+                    int highestValidOrdinal = context.highestValidOrdinal;
+                    context.highestValidOrdinal = -1;
+                    // Traverse the temp table
+                    TableAlias alias = getFromQualifiedName(context, table.getTableAlias(), tempParts, token, false);
+                    context.highestValidOrdinal = highestValidOrdinal;
+
+                    if (tempParts.size() == 0)
+                    {
+                        subTuplePath.add(alias.getTupleOrdinal());
+                        break;
+                    }
+                    else if (tempParts.size() == 1)
+                    {
+                        //CSOFF
+                        // We are on the same alias before traversal with a size one part => can only be a column
+                        if (alias == table.getTableAlias() && size == 1)
+                        //CSON
+                        {
+                            columnIndex = ArrayUtils.indexOf(table.getColumns(), tempParts.get(0));
+                            //CSOFF
+                            if (columnIndex == -1)
+                            //CSON
+                            {
+                                throw new ParseException("Unkown column '" + tempParts.get(0) + "' in temporary table #" + table.getName(), token);
+                            }
+                            tempParts.clear();
+                            break;
+                        }
+                        else if (alias.getType() != Type.TEMPORARY_TABLE)
+                        {
+                            subTuplePath.add(alias.getTupleOrdinal());
+                            break;
+                        }
+                    }
+
+                    if (alias != table.getTableAlias())
+                    {
+                        subTuplePath.add(alias.getTupleOrdinal());
+                    }
+                    pathAlias = alias;
                 }
-
-                resolvePaths.add(new ResolvePath(sourceTupleOrdinal, pathAlias.getTupleOrdinal(), tempParts));
-
-                // Append column to pathAlias
-                Set<String> columns = context.columnsByAlias.computeIfAbsent(pathAlias, key -> new TLinkedHashSet<>());
-                columns.add(column);
+                else
+                {
+                    break;
+                }
             }
 
-            expression.setResolvePaths(resolvePaths);
-            return output;
+            // Temp table hit, add resolve path and return true since we're done
+            // resolving
+            if (tempTablePath)
+            {
+                resolvePaths.add(new ResolvePath(
+                        -1,
+                        targetTupleOrdinal,
+                        tempParts,
+                        columnIndex,
+                        subTuplePath.stream().mapToInt(x -> x).toArray()));
+                return true;
+            }
+
+            pathAliasHolder.setValue(pathAlias);
+            return false;
         }
 
         @Override
         public Set<TableAlias> visit(QualifiedFunctionCallExpression expression, Context context)
+        {
+            return resolveFunction(null, expression.getFunctionInfo(), expression.getToken(), expression.getArguments(), context);
+        }
+
+        @Override
+        public Set<TableAlias> visit(UnresolvedSubQueryExpression expression, Context context)
+        {
+            Set<TableAlias> tableAliases = context.parentAliases;
+            Select select = expression.getSelectStatement().getSelect();
+
+            List<SelectItem> selectItems = context.selectItems;
+
+            // Skip all select item in sub query expression
+            // these should not count as accessible select item from outside
+            // the whole expression is a scalar value
+            context.selectItems = new ArrayList<>();
+            select.accept(VISITOR, context);
+
+            context.selectItems = selectItems;
+
+            return tableAliases;
+        }
+
+        private SelectItem getSelectItem(Context context, TableAlias alias, String column)
+        {
+            List<SelectItem> selectItems = context.selectItemsByTupleOrdinal.getOrDefault(alias.getTupleOrdinal(), emptyList());
+            for (SelectItem item : selectItems)
+            {
+                if (item.isAsterisk()
+                    ||
+                    (!isBlank(item.getIdentifier()) && equalsIgnoreCase(column, item.getIdentifier())))
+                {
+                    return item;
+                }
+            }
+            return null;
+        }
+
+        /**
+         * Visit function info and resolve arguments Takes special care with lambda functions and binds their identifiers etc.
+         *
+         * @param alias Table alias for the function. Only applicable when FunctionInfo is a {@link TableFunctionInfo}
+         * @param functionInfo The function to resolve
+         * @param token Token of the parent node (QualifiedFunctionCall or TableFunction)
+         * @param arguments Arguments for the function
+         */
+        private Set<TableAlias> resolveFunction(TableAlias alias, FunctionInfo functionInfo, Token token, List<Expression> arguments, Context context)
         {
             /*
              *  Lambda function
@@ -687,23 +910,21 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
              *
              */
 
-            ScalarFunctionInfo functionInfo = expression.getFunctionInfo();
-
             // Store parent aliases before resolving this function call
             Set<TableAlias> parentAliases = context.parentAliases;
-            List<Expression> arguments = new ArrayList<>(expression.getArguments());
+            List<Expression> newArgs = new ArrayList<>(arguments);
             // Fill resulting aliases per argument list with
             List<Set<TableAlias>> argumentAliases = new ArrayList<>(Collections.nCopies(arguments.size(), null));
             if (functionInfo instanceof LambdaFunction)
             {
-                bindLambdaArguments(context, expression.getToken(), arguments, argumentAliases, functionInfo);
+                bindLambdaArguments(context, newArgs, argumentAliases, functionInfo);
             }
 
             // Visit non visited arguments
-            int size = arguments.size();
+            int size = newArgs.size();
             for (int i = 0; i < size; i++)
             {
-                Expression arg = arguments.get(i);
+                Expression arg = newArgs.get(i);
                 if (arg == null)
                 {
                     // Lambda argument already processed
@@ -715,7 +936,17 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
             }
 
             // Resolve alias from function
-            Set<TableAlias> result = functionInfo.resolveAlias(parentAliases, argumentAliases);
+            Set<TableAlias> result;
+
+            if (functionInfo instanceof ScalarFunctionInfo)
+            {
+                result = ((ScalarFunctionInfo) functionInfo).resolveAlias(parentAliases, argumentAliases);
+            }
+            else
+            {
+                result = ((TableFunctionInfo) functionInfo).resolveAlias(alias, parentAliases, argumentAliases);
+            }
+
             if (isEmpty(result))
             {
                 result = parentAliases;
@@ -723,21 +954,6 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
 
             context.parentAliases = result;
             return result;
-        }
-
-        private SelectItem getSelectItem(Context context, TableAlias alias, String column)
-        {
-            List<SelectItem> selectItems = context.selectItemsByTupleOrdinal.getOrDefault(alias.getTupleOrdinal(), emptyList());
-            for (SelectItem item : selectItems)
-            {
-                if (item.isAsterisk()
-                    ||
-                    (!isBlank(item.getIdentifier()) && equalsIgnoreCase(column, item.getIdentifier())))
-                {
-                    return item;
-                }
-            }
-            return null;
         }
 
         /**
@@ -753,10 +969,9 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
          */
         private void bindLambdaArguments(
                 Context context,
-                Token token,
                 List<Expression> arguments,
                 List<Set<TableAlias>> argumentAliases,
-                ScalarFunctionInfo functionInfo)
+                FunctionInfo functionInfo)
         {
             List<LambdaBinding> lambdaBindings = ((LambdaFunction) functionInfo).getLambdaBindings();
             for (LambdaBinding binding : lambdaBindings)
@@ -774,11 +989,6 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
                     continue;
                 }
 
-                if (!(lambdaExpression instanceof LambdaExpression))
-                {
-                    throw new ParseException("Expected a lambda expression at argument index: " + binding.getLambdaArg(), token);
-                }
-
                 LambdaExpression le = (LambdaExpression) lambdaExpression;
 
                 for (int id : le.getLambdaIds())
@@ -791,11 +1001,11 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
         /**
          * Find relative alias to provided according to parts. Note! Removes found parts from list
          **/
-        private TableAlias getFromQualifiedName(TableAlias parent, List<String> parts)
+        private TableAlias getFromQualifiedName(Context context, TableAlias parent, List<String> parts, Token token, boolean throwInvalidTableSource)
         {
             TableAlias result = parent;
             TableAlias current = parent;
-
+            int initSize = parts.size();
             while (current != null && parts.size() > 0)
             {
                 String part = parts.get(0);
@@ -809,7 +1019,6 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
                 }
 
                 // 2. Child alias
-                // TODO: not valid in join-predicates
                 TableAlias alias = current.getChildAlias(part);
                 if (alias == null)
                 {
@@ -826,6 +1035,17 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
 
                 // 4. Parent alias match upwards
                 current = current.getParent();
+            }
+
+            if (context.highestValidOrdinal != -1
+                && result.getTupleOrdinal() > context.highestValidOrdinal)
+            {
+                throw new ParseException("Invalid table source reference '" + result.getAlias() + "'", token);
+            }
+            // We have a multi part identifier that did got any alias match
+            if (throwInvalidTableSource && initSize == parts.size() && initSize > 1)
+            {
+                throw new ParseException("Invalid table source reference '" + parts.get(0) + "'", token);
             }
 
             return result;

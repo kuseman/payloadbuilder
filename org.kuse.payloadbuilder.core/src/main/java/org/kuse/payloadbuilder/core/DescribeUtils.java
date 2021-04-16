@@ -1,6 +1,7 @@
 package org.kuse.payloadbuilder.core;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
 
@@ -13,10 +14,11 @@ import java.util.stream.IntStream;
 import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.tuple.Pair;
+import org.kuse.payloadbuilder.core.operator.DescribableNode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
-import org.kuse.payloadbuilder.core.operator.ObjectProjection;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.Projection;
+import org.kuse.payloadbuilder.core.operator.RootProjection;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
@@ -63,16 +65,19 @@ public class DescribeUtils
     }
 
     /** Build describe select from provided select */
-    static Pair<Operator, Projection> getDescribeSelect(ExecutionContext context, Operator operator)
+    static Pair<Operator, Projection> getDescribeSelect(ExecutionContext context, Operator operator, Projection projection)
     {
-        final List<DescribeOperatorRow> describeRows = new ArrayList<>();
-        collectOperatorDescribeRows(context, describeRows, operator, 0, "", false);
+        final List<DescribableRow> describeRows = new ArrayList<>();
+        describeRows.add(new DescribableRow(-1, "Selection", emptyMap()));
+        collectDescribableRows(context, describeRows, operator, 0, "", false);
+        describeRows.add(new DescribableRow(-1, "Projection", emptyMap()));
+        collectDescribableRows(context, describeRows, projection, 0, "", false);
 
         List<String> describeColumns = new ArrayList<>();
         Map<String, MutableInt> countByColumn = new HashMap<>();
 
         // Count properties columns
-        for (DescribeOperatorRow row : describeRows)
+        for (DescribableRow row : describeRows)
         {
             for (String col : row.properties.keySet())
             {
@@ -102,10 +107,13 @@ public class DescribeUtils
         List<Tuple> rows = new ArrayList<>(describeRows.size());
         int pos = 0;
         int size = describeColumns.size();
-        for (DescribeOperatorRow dRow : describeRows)
+        for (DescribableRow dRow : describeRows)
         {
             Object[] values = new Object[size];
-            values[0] = dRow.nodeId;
+            if (dRow.nodeId >= 0)
+            {
+                values[0] = dRow.nodeId;
+            }
             values[1] = dRow.name;
 
             for (int i = 2; i < size; i++)
@@ -137,7 +145,7 @@ public class DescribeUtils
     /** Get an object projection over column array */
     static Projection getIndexProjection(List<String> columns)
     {
-        return new ObjectProjection(
+        return new RootProjection(
                 columns,
                 IntStream.range(0, columns.size()).mapToObj(index -> (Projection) (writer, ctx) ->
                 {
@@ -146,31 +154,31 @@ public class DescribeUtils
                 }).collect(toList()));
     }
 
-    private static void collectOperatorDescribeRows(
+    private static void collectDescribableRows(
             ExecutionContext context,
-            List<DescribeOperatorRow> rows,
-            Operator parent,
+            List<DescribableRow> rows,
+            DescribableNode parent,
             int pos,
             String indent,
             boolean last)
     {
-        rows.add(new DescribeOperatorRow(parent.getNodeId(), indent + "+- " + parent.getName(), parent.getDescribeProperties(context)));
+        rows.add(new DescribableRow(parent.getNodeId(), indent + "+- " + parent.getName(), parent.getDescribeProperties(context)));
         String nextIndent = indent + (last ? "   " : "|  ");
-        for (int i = 0; i < parent.getChildOperators().size(); i++)
+        for (int i = 0; i < parent.getChildNodes().size(); i++)
         {
-            Operator child = parent.getChildOperators().get(i);
-            collectOperatorDescribeRows(context, rows, child, pos + 1, nextIndent, i == parent.getChildOperators().size() - 1);
+            DescribableNode child = parent.getChildNodes().get(i);
+            collectDescribableRows(context, rows, child, pos + 1, nextIndent, i == parent.getChildNodes().size() - 1);
         }
     }
 
     /** Describe row */
-    private static class DescribeOperatorRow
+    private static class DescribableRow
     {
         final int nodeId;
         final String name;
         final Map<String, Object> properties;
 
-        DescribeOperatorRow(int nodeId, String name, Map<String, Object> properties)
+        DescribableRow(int nodeId, String name, Map<String, Object> properties)
         {
             this.nodeId = nodeId;
             this.name = name;

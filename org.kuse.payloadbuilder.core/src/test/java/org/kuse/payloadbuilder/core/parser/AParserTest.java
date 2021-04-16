@@ -105,7 +105,7 @@ public abstract class AParserTest extends Assert
     {
         Expression e = e(expression);
         // Resolve expression with provided alias
-        SelectResolver.resolve(e, alias);
+        SelectResolver.resolveTorTest(e, alias);
         return e;
     }
 
@@ -148,7 +148,7 @@ public abstract class AParserTest extends Assert
                     }
 
                     @Override
-                    public int getColmnOrdinal(String column)
+                    public int getColumnOrdinal(String column)
                     {
                         return ArrayUtils.indexOf(columns, column);
                     }
@@ -238,7 +238,7 @@ public abstract class AParserTest extends Assert
                     }
 
                     @Override
-                    public int getColmnOrdinal(String column)
+                    public int getColumnOrdinal(String column)
                     {
                         return ArrayUtils.indexOf(columns, column);
                     }
@@ -273,7 +273,7 @@ public abstract class AParserTest extends Assert
                 });
             }
 
-            Object actual = EvalUtils.unwrap(expr.eval(context));
+            Object actual = EvalUtils.unwrap(context, expr.eval(context));
             if (predicate)
             {
                 assertEquals("Eval: " + expression, expected, actual == null ? false : actual);

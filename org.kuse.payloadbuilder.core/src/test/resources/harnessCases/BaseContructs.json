@@ -418,6 +418,43 @@
       ],
       "expectedException": "org.kuse.payloadbuilder.core.parser.ParseException",
       "expectedMessageContains": "No column defined with name col for alias x"
+    },
+    {
+      "name": "Selects without table source",
+      "query": [
+      	"select 1",
+        "select 2 where false",
+        "select 3 order by 1",
+        "select top 10 4"
+      ],
+      "expectedResultSets": [
+      	[
+      	  [{"key":"","value": 1}]
+      	],
+      	[
+      	],
+      	[
+      	  [{"key":"","value": 3}]
+      	],
+      	[
+      	  [{"key":"","value": 4}]
+      	]
+      ]
+    },
+    {
+      "name": "Selects with for output",
+      "query": [
+      	"select (select 1 col1, 2 col2 for object), ",
+      	"       (select 1, 2 for array), ",
+     	"       (select 1 col1, 2 col2 for object_array), ",
+     	"       (select (select 1, 2 for array), (select 3, 4 for array) for array),",
+     	"       (select (select 1, 2 for array) ar1, (select 3, 4 for array) ar2 for object)"
+      ],
+      "expectedResultSets": [
+      	[
+      	  [{"key":"","value": {"col1": 1, "col2": 2}},{"key":"","value": [1,2]},{"key":"","value": [{"col1": 1, "col2": 2}]},{"key":"","value": [[1,2],[3,4]]},{"key":"","value": {"ar1":[1,2],"ar2":[3,4]}}]
+      	]
+      ]
     }
   ]
 }

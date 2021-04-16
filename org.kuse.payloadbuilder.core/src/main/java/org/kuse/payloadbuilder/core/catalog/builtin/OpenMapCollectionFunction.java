@@ -1,5 +1,6 @@
 package org.kuse.payloadbuilder.core.catalog.builtin;
 
+import static java.util.Collections.singletonList;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
 
 import java.util.Iterator;
@@ -14,6 +15,7 @@ import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
+import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.utils.CollectionUtils;
 
@@ -57,6 +59,12 @@ class OpenMapCollectionFunction extends TableFunctionInfo
     }
 
     @Override
+    public List<Class<? extends Expression>> getInputTypes()
+    {
+        return singletonList(Expression.class);
+    }
+
+    @Override
     public RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
     {
         final Object value = arguments.get(0).eval(context);
@@ -68,7 +76,7 @@ class OpenMapCollectionFunction extends TableFunctionInfo
             private Set<String> addedColumns;
             private String[] columns = tableAlias.isAsteriskColumns() ? null : tableAlias.getColumns();
             private int pos;
-            private Row next;
+            private Tuple next;
 
             @Override
             public boolean hasNext()
@@ -77,9 +85,9 @@ class OpenMapCollectionFunction extends TableFunctionInfo
             }
 
             @Override
-            public Row next()
+            public Tuple next()
             {
-                Row r = next;
+                Tuple r = next;
                 next = null;
                 return r;
             }
@@ -93,8 +101,10 @@ class OpenMapCollectionFunction extends TableFunctionInfo
                         return false;
                     }
 
+                    Object value = it.next();
+
                     @SuppressWarnings("unchecked")
-                    Map<String, Object> item = (Map<String, Object>) it.next();
+                    Map<String, Object> item = (Map<String, Object>) value;
 
                     if (item == null)
                     {

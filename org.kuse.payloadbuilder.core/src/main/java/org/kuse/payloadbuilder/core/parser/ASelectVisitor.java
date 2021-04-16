@@ -61,22 +61,6 @@ public abstract class ASelectVisitor<TR, TC> implements SelectVisitor<TR, TC>
     }
 
     @Override
-    public TR visit(NestedSelectItem nestedSelectItem, TC context)
-    {
-        if (nestedSelectItem.getFrom() != null)
-        {
-            visit(nestedSelectItem.getFrom(), context);
-        }
-        nestedSelectItem.getSelectItems().forEach(s -> s.accept(this, context));
-        if (nestedSelectItem.getWhere() != null)
-        {
-            visit(nestedSelectItem.getWhere(), context);
-        }
-        nestedSelectItem.getOrderBy().forEach(si -> si.accept(this, context));
-        return null;
-    }
-
-    @Override
     public TR visit(Table table, TC context)
     {
         return null;

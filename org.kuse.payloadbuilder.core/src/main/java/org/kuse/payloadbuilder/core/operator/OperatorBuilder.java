@@ -4,7 +4,6 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.collections.CollectionUtils.containsAny;
-import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
 import static org.kuse.payloadbuilder.core.operator.OperatorBuilderUtils.createGroupBy;
@@ -21,6 +20,8 @@ import java.util.Set;
 import java.util.function.Predicate;
 
 import org.antlr.v4.runtime.Token;
+import org.apache.commons.collections.IteratorUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -45,8 +46,6 @@ import org.kuse.payloadbuilder.core.parser.ExpressionSelectItem;
 import org.kuse.payloadbuilder.core.parser.Join;
 import org.kuse.payloadbuilder.core.parser.Join.JoinType;
 import org.kuse.payloadbuilder.core.parser.LiteralIntegerExpression;
-import org.kuse.payloadbuilder.core.parser.NestedSelectItem;
-import org.kuse.payloadbuilder.core.parser.NestedSelectItem.Type;
 import org.kuse.payloadbuilder.core.parser.Option;
 import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -56,11 +55,13 @@ import org.kuse.payloadbuilder.core.parser.Select;
 import org.kuse.payloadbuilder.core.parser.SelectItem;
 import org.kuse.payloadbuilder.core.parser.SelectStatement;
 import org.kuse.payloadbuilder.core.parser.SortItem;
+import org.kuse.payloadbuilder.core.parser.SubQueryExpression;
 import org.kuse.payloadbuilder.core.parser.SubQueryTableSource;
 import org.kuse.payloadbuilder.core.parser.Table;
 import org.kuse.payloadbuilder.core.parser.TableFunction;
 import org.kuse.payloadbuilder.core.parser.TableSource;
 import org.kuse.payloadbuilder.core.parser.TableSourceJoined;
+import org.kuse.payloadbuilder.core.parser.UnresolvedSubQueryExpression;
 
 /**
  * Builder that constructs a {@link Operator} and {@link Projection} for a {@link SelectStatement}
@@ -90,7 +91,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         private Map<Integer, Map<SelectItem, Expression>> computedExpressionsByTupleOrdinal;
         /** Resulting operator */
         private Operator operatorResult;
-        /** Resulting projection */
+        /** Resulting select items */
         private Projection projectionResult;
         /** Index if any that should be picked up when creating table operator */
         private Index index;
@@ -103,7 +104,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
          */
         private boolean analyze;
         /** Flag to mark if the visitor is inside a root select or below */
-        private final boolean isRootSelect = true;
+        private boolean rootSelect = true;
+
         /** Acquire next unique node id */
         private int acquireNodeId()
         {
@@ -165,7 +167,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         context.session = session;
 
         // Start with resolving the select
-        org.kuse.payloadbuilder.core.operator.SelectResolver.Context resolveContext = SelectResolver.resolve(select);
+        org.kuse.payloadbuilder.core.operator.SelectResolver.Context resolveContext = SelectResolver.resolve(session, select);
 
         context.selectItemsByTupleOrdinal = resolveContext.getSelectItems();
         context.computedExpressionsByTupleOrdinal = resolveContext.getComputedExpressions();
@@ -234,6 +236,12 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 }
             }
         }
+        else
+        {
+            // Set a no op operator if we don't have any table source
+            // to avoid NPE's etc.
+            context.setOperator(getEmptyTableSourceOperator(context));
+        }
 
         if (batchLimitOption != null)
         {
@@ -249,6 +257,9 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         // Always use select items from context cause these ones are aggregated in case of sub queries etc.
         List<SelectItem> selectItems = tableAlias != null ? context.selectItemsByTupleOrdinal.get(tableAlias.getTupleOrdinal()) : select.getSelectItems();
+
+        // Resolve sub query expressions
+        processSubQueryExpressions(context, tableAlias, selectItems);
         sortItems = pullUpComputedColumns(context, tableAlias, selectItems, sortItems);
 
         if (where != null)
@@ -276,7 +287,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             context.setOperator(new TopOperator(context.acquireNodeId(), context.getOperator(), select.getTopExpression()));
         }
 
-        if (context.isRootSelect)
+        if (context.rootSelect)
         {
             List<String> projectionAliases = new ArrayList<>();
             List<Projection> projections = new ArrayList<>();
@@ -285,70 +296,109 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
             selectItems.forEach(s ->
             {
-                projectionAliases.add(defaultIfBlank(s.getIdentifier(), ""));
+                projectionAliases.add(s.getIdentifier());
                 projections.add(createProjection(context, s));
             });
 
-            context.projectionResult = new ObjectProjection(projectionAliases, projections);
+            context.projectionResult = new RootProjection(projectionAliases, projections);
+            if (context.analyze)
+            {
+                context.projectionResult = new AnalyzeProjection(context.acquireNodeId(), context.projectionResult);
+            }
         }
         return null;
     }
 
+    /**
+     * Processes sub query expressions and resolves those by building an operator and projection
+     */
+    private void processSubQueryExpressions(Context context, TableAlias tableAlias, List<SelectItem> selectItems)
+    {
+        Operator operatorResult = context.operatorResult;
+        boolean isRootSelect = context.rootSelect;
+
+        // Process select items
+        int size = selectItems.size();
+        for (int i = 0; i < size; i++)
+        {
+            SelectItem item = selectItems.get(i);
+            if (item instanceof ExpressionSelectItem
+                && ((ExpressionSelectItem) item).getExpression() instanceof UnresolvedSubQueryExpression)
+            {
+                UnresolvedSubQueryExpression subQueryExpression = (UnresolvedSubQueryExpression) ((ExpressionSelectItem) item).getExpression();
+                SubQueryExpression resolvedExpression = resolveSubQueryExpression(context, subQueryExpression);
+                selectItems.set(i, new ExpressionSelectItem(
+                        resolvedExpression,
+                        item.getIdentifier(),
+                        null,
+                        item.getToken()));
+            }
+        }
+
+        // Process computed sub query expressions
+        if (tableAlias != null)
+        {
+            Map<SelectItem, Expression> map = context.computedExpressionsByTupleOrdinal.getOrDefault(tableAlias.getTupleOrdinal(), emptyMap());
+            for (Entry<SelectItem, Expression> e : map.entrySet())
+            {
+                if (e.getValue() instanceof UnresolvedSubQueryExpression)
+                {
+                    e.setValue(resolveSubQueryExpression(context, (UnresolvedSubQueryExpression) e.getValue()));
+                }
+            }
+        }
+
+        context.rootSelect = isRootSelect;
+        context.operatorResult = operatorResult;
+    }
+
+    private SubQueryExpression resolveSubQueryExpression(Context context, UnresolvedSubQueryExpression expression)
+    {
+        // We need a clean operator for each sub query expression
+        context.operatorResult = null;
+        context.rootSelect = true;
+
+        Select select = expression.getSelectStatement().getSelect();
+
+        // Visit
+        select.accept(this, context);
+
+        // Unwrap analyze node if any
+        if (context.projectionResult instanceof AnalyzeProjection)
+        {
+            context.projectionResult = ((AnalyzeProjection) context.projectionResult).getTarget();
+        }
+
+        RootProjection rootProjection = (RootProjection) context.projectionResult;
+        return new SubQueryExpression(context.operatorResult, rootProjection.getColumns(), rootProjection.getProjections(), select.getForOutput());
+    }
+
     private Projection createProjection(Context context, SelectItem item)
     {
+        Projection result = null;
         if (item instanceof ExpressionSelectItem)
         {
-            return new ExpressionProjection(((ExpressionSelectItem) item).getExpression());
+            result = new ExpressionProjection(((ExpressionSelectItem) item).getExpression());
         }
         else if (item instanceof AsteriskSelectItem)
         {
-            return (AsteriskSelectItem) item;
+            result = new AsteriskProjection(
+                    ArrayUtils.toPrimitive(
+                            ((AsteriskSelectItem) item).getAliasTupleOrdinals()
+                                    .toArray(ArrayUtils.EMPTY_INTEGER_OBJECT_ARRAY)));
         }
-        else if (item instanceof NestedSelectItem)
+
+        if (result == null)
         {
-            NestedSelectItem nestedSelectItem = (NestedSelectItem) item;
-            Operator fromOperator = null;
-            Expression from = nestedSelectItem.getFrom();
-
-            if (from != null)
-            {
-                fromOperator = new ExpressionOperator(context.acquireNodeId(), from);
-            }
-            if (nestedSelectItem.getWhere() != null)
-            {
-                fromOperator = new FilterOperator(context.acquireNodeId(), fromOperator, new ExpressionPredicate(nestedSelectItem.getWhere()));
-            }
-
-            if (!nestedSelectItem.getGroupBy().isEmpty())
-            {
-                fromOperator = createGroupBy(context.acquireNodeId(), nestedSelectItem.getGroupBy(), fromOperator);
-            }
-
-            if (!nestedSelectItem.getOrderBy().isEmpty())
-            {
-                fromOperator = new OrderByOperator(context.acquireNodeId(), fromOperator, new ExpressionTupleComparator(nestedSelectItem.getOrderBy()));
-            }
-
-            List<String> projectionAliases = new ArrayList<>();
-            List<Projection> projections = new ArrayList<>();
-
-            for (SelectItem s : nestedSelectItem.getSelectItems())
-            {
-                projectionAliases.add(s.getIdentifier());
-                projections.add(createProjection(context, s));
-            }
-
-            if (nestedSelectItem.getType() == Type.ARRAY)
-            {
-                return new ArrayProjection(projections, fromOperator);
-            }
-            else
-            {
-                return new ObjectProjection(projectionAliases, projections, fromOperator);
-            }
+            throw new IllegalArgumentException("Unknown select item type: " + item.getClass());
         }
 
-        throw new RuntimeException("Implment");
+        if (context.analyze)
+        {
+            return new AnalyzeProjection(context.acquireNodeId(), result);
+        }
+
+        return result;
     }
 
     @Override
@@ -533,7 +583,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             return sortItems;
         }
 
-        Map<SelectItem, Expression> computedExpressionByColumn = context.computedExpressionsByTupleOrdinal.getOrDefault(tableAlias.getTupleOrdinal(), emptyMap());
+        int tupleOrdinal = tableAlias.getTupleOrdinal();
+        Map<SelectItem, Expression> computedExpressionByColumn = context.computedExpressionsByTupleOrdinal.getOrDefault(tupleOrdinal, emptyMap());
 
         // No computed value and no sort items to process, drop out
         if (computedExpressionByColumn.isEmpty() && sortItems.isEmpty())
@@ -607,7 +658,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         if (computedExpressions.size() > 0)
         {
-            context.setOperator(new ComputedColumnsOperator(context.acquireNodeId(), tableAlias.getTupleOrdinal(), context.getOperator(), columns, computedExpressions));
+            context.setOperator(new ComputedColumnsOperator(context.acquireNodeId(), tupleOrdinal, context.getOperator(), columns, computedExpressions));
         }
 
         return sortItems;
@@ -1064,6 +1115,75 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             Pair<List<AnalyzePair>, AnalyzeResult> pair = result.extractPushdownPairs(alias);
             pushDownPairs = pair.getKey();
             condition = pair.getValue();
+        }
+    }
+
+    /** Create a dummy operator for selects without a FROM clause */
+    private Operator getEmptyTableSourceOperator(Context context)
+    {
+        return new NoOpOperator(context.acquireNodeId());
+    }
+
+    /** No op operator used for selects with no table source */
+    private static class NoOpOperator extends AOperator
+    {
+        private NoOpOperator(int nodeId)
+        {
+            super(nodeId);
+        }
+
+        @Override
+        public String getName()
+        {
+            return "Empty operator";
+        }
+
+        @Override
+        public RowIterator open(ExecutionContext context)
+        {
+            return RowIterator.wrap(IteratorUtils.singletonIterator(NoOpTuple.NO_OP));
+        }
+    }
+
+    /** No op tuple used for selects with no table source */
+    private static class NoOpTuple implements Tuple
+    {
+        private static final Tuple NO_OP = new NoOpTuple();
+
+        @Override
+        public int getTupleOrdinal()
+        {
+            return -1;
+        }
+
+        @Override
+        public Tuple getTuple(int tupleOrdinal)
+        {
+            return null;
+        }
+
+        @Override
+        public int getColumnCount()
+        {
+            return 0;
+        }
+
+        @Override
+        public int getColumnOrdinal(String column)
+        {
+            return -1;
+        }
+
+        @Override
+        public String getColumn(int ordinal)
+        {
+            return null;
+        }
+
+        @Override
+        public Object getValue(int ordinal)
+        {
+            return null;
         }
     }
 

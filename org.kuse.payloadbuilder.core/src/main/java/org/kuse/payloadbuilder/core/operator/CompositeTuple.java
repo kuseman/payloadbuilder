@@ -106,71 +106,24 @@ public class CompositeTuple extends ArrayList<Tuple> implements Tuple
     @Override
     public int getColumnCount()
     {
-        int count = 0;
-        int size = size();
-        for (int i = 0; i < size; i++)
-        {
-            count += get(i).getColumnCount();
-        }
-        return count;
+        return get(0).getColumnCount();
     }
 
     @Override
     public Object getValue(int ordinal)
     {
-        int ord = ordinal;
-        int size = size();
-        for (int i = 0; i < size; i++)
-        {
-            Tuple tuple = get(i);
-            int tupleColumnCount = tuple.getColumnCount();
-            // Adjust ordinal to the correct tuple
-            if (ord > tupleColumnCount - 1)
-            {
-                ord -= tupleColumnCount;
-                continue;
-            }
-
-            return tuple.getValue(ord);
-        }
-
-        return null;
+        return get(0).getValue(ordinal);
     }
 
     @Override
-    public int getColmnOrdinal(String column)
+    public int getColumnOrdinal(String column)
     {
-        int size = size();
-        for (int i = 0; i < size; i++)
-        {
-            int ordinal = get(i).getColmnOrdinal(column);
-            if (ordinal >= 0)
-            {
-                return ordinal;
-            }
-        }
-        return -1;
+        return get(0).getColumnOrdinal(column);
     }
 
     @Override
     public String getColumn(int ordinal)
     {
-        int ord = ordinal;
-        int size = size();
-        for (int i = 0; i < size; i++)
-        {
-            Tuple tuple = get(i);
-            int tupleColumnCount = tuple.getColumnCount();
-            // Adjust ordinal to the correct tuple
-            if (ord > tupleColumnCount - 1)
-            {
-                ord -= tupleColumnCount;
-                continue;
-            }
-
-            return tuple.getColumn(ord);
-        }
-
-        return null;
+        return get(0).getColumn(ordinal);
     }
 }

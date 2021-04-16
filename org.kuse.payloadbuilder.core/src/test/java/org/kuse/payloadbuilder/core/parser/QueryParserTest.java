@@ -20,11 +20,24 @@ public class QueryParserTest extends AParserTest
     }
 
     @Test
-    public void test_selectItems_failures()
+    public void test_misc()
     {
-        assertQueryFail(ParseException.class, "Select items inside an ARRAY", "select array(10 col1, 20 col2 from s) col from source s");
-        assertQueryFail(ParseException.class, "Cannot have a WHERE clause without a FROM clause", "select object(s.id where false) from source s");
-        assertQueryFail(ParseException.class, "Cannot have an ORDER BY clause without a FROM clause", "select object(s.id order by 1) from source s");
+        assertQuery("show tables");
+        assertQuery("show functions");
+        assertQuery("use cat");
+        assertQuery("use cat.prop = 10");
+        assertQueryFail(ParseException.class, "Cannot assign value to a catalog alias", "use cat = 10");
+        assertQueryFail(ParseException.class, "Must provide an assignment value to a catalog property", "use cat.prop");
+
+        assertQuery("if true then print 'hello' end if");
+        assertQuery("if true then print 'hello' else print 'world' end if");
+
+        assertQuery("drop table table");
+        assertQuery("drop table cat#table");
+        assertQuery("drop table if exists table");
+
+        assertQuery("select top 10 1");
+        assertQuery("select top (@a) 1");
     }
 
     @Test
@@ -35,24 +48,47 @@ public class QueryParserTest extends AParserTest
         assertQueryFail(ParseException.class, "Cannot combine variable assignment items with data retrieval items", "select @var = a.col, a.col2 from table a");
 
         assertQueryFail(ParseException.class, "Cannot assign to system variables", "select @@rowcount = 1");
+
+        // Test assign a sub query
+        assertQuery("select @var = (select 'value' key1, 1234 key2 for object)");
+        assertQuery("select @var = (select Value from range(1,100) for array)");
+    }
+
+    @Test
+    public void test_subquery_expression()
+    {
+        assertQueryFail(ParseException.class, "Subquery expressions are only allowed in select items", "select * from table where (select col1 > 10)");
+        assertQueryFail(ParseException.class, "A FOR clause is mandatory when using a subquery expressions", "select (select 1 col, 2 col)");
+        assertQueryFail(ParseException.class, "SELECT INTO are not allowed in sub query expressions", "select (select 1 col, 2 col into #temp for object)");
+        assertQueryFail(ParseException.class, "Assignment selects are not allowed in sub query expressions", "select (select @var = 1, 2 col for object)");
+
+        assertQueryFail(ParseException.class, "All select items in OBJECT output must have identifiers", "select (select 1, 2 col for object)");
+        assertQueryFail(ParseException.class, "All select items in ARRAY output must have empty identifiers", "select (select 1, 2 col for array)");
+
+        assertQuery("select (select 1, 2 for array)");
+
+        assertQuery(""
+            + "select col, x.col2.key "
+            + "from "
+            + "( "
+            + "  select 'value' col, "
+            + "        (select 123 key for object) col2"
+            + ") x");
     }
 
     @Test
     public void test_selectItems()
     {
         assertQuery("select 'str' myObj from articleName an where an.lang_id = 1 order by an.id asc nulls last, an.id2 desc nulls first, an.id3, an.id4 desc, an.id4 nulls last");
-
         assertQuery("select an.art_id, an.a_flg = an.b_flg as \"boolean column\" from articleName an");
         assertQuery("select an.art_id \"my shiny field\", an.art_id \"my \"\"new id\", an.sku_id as \"my new ' id again\" from articleName an");
-        assertQuery("select an.art_id, object(an.lang_id, an.id, an.id2 < 0.1 TEST, 'str' \"MY STRING\" from an.brand where brand_id > 0 ) myObj from articleName an");
-        assertQuery("select array(array(object(1 col), 'str', null from a), 1.1, a.field from a) arr from article a");
-
-        assertQuery("select array(array(object(1 col), 'str', null from a), 1.1, a.field from a) arr from article a where a.id is not null");
     }
 
     @Test
     public void test_describe()
     {
+        assertQuery("describe table");
+        assertQuery("describe cat#table");
         assertQuery("describe select * from table");
         assertQuery("analyze select * from table");
     }
@@ -60,6 +96,9 @@ public class QueryParserTest extends AParserTest
     @Test
     public void test_functions()
     {
+        // Test trigger of wrong parameter types for function
+        assertQueryFail(ParseException.class, "Function map expects LambdaExpression as parameter at index 1 but got LiteralIntegerExpression", "select map(1, 2)");
+
         assertExpression("isnull(null, 1+1.1)");
         assertExpression("coalesce(null, 1+1.1)");
 
@@ -154,7 +193,8 @@ public class QueryParserTest extends AParserTest
         assertQueryFail(ParseException.class, "Only a single asterisk select (*) are supported", "select * from (select *,* from tableA) x");
         assertQueryFail(ParseException.class, "Only non alias asterisk select (*) are supported", "select * from (select a.*, a.* from tableA a inner join tableB b on b.id = a.id) x");
         assertQueryFail(ParseException.class, "Missing identifier for select item", "select * from (select 1,2 from tableA) x");
-        assertQueryFail(ParseException.class, "Nested selects are not allowed in sub query context", "select * from (select object(1 col) obj from tableA) x");
+        assertQueryFail(ParseException.class, "FOR clause are not allowed in sub query context", "select * from (select 1 col1 ,2 col2 from tableA for object) x");
+        assertQueryFail(ParseException.class, "Sub query must have an alias", "select * from (select 1 col1 ,2 col2 from tableA for object)");
 
         SelectStatement selectStm = (SelectStatement) assertQuery("select * from tableA a inner join (select * from tableB b) x with (populate=true, batch_size=1000) on x.id = a.id").getStatements()
                 .get(0);
@@ -171,22 +211,6 @@ public class QueryParserTest extends AParserTest
     {
         assertQuery("if true then print 'hello' else print 'world' end if");
         assertQuery("print hash(a,b); print hash(10, null); print hash(123, 12.10);");
-    }
-
-    @Test
-    public void test_alias_policy()
-    {
-        assertQuery("select art_id from article");
-        assertQuery("select art_id from article where a.id = 10");
-        assertQueryFail(ParseException.class, "Invalid table source reference 'b'", "select art_id from article a where b.art_id > 10");
-        assertQueryFail(ParseException.class, "Alias is mandatory", "select * from tableA inner join tableB b on b.art_id = art_id");
-        assertQueryFail(ParseException.class, "Alias is mandatory", "select * from tableA a inner join tableB on b.art_id = art_id");
-        assertQueryFail(ParseException.class, "Invalid table source reference 'q'", "select art_id from article a inner join (select * from tableB b where id= 1 and q.id = 10) b on b.id = a.id");
-        // Test reference to a parent is ok
-        assertQuery("select art_id from article a inner join (select * from tableB b where id= 1 and a.id = 10) b on b.id = a.id");
-        // c is not allowed since it's defined later that current context alias
-        assertQueryFail(ParseException.class, "Invalid table source reference 'c'",
-                "select art_id from article a inner join (select * from tableB b where id= 1 and c.id = 10) b on b.id = a.id inner join tableC c on c.id = b.id");
     }
 
     @Test
@@ -218,6 +242,23 @@ public class QueryParserTest extends AParserTest
     }
 
     @Test
+    public void test_select()
+    {
+        // Selects without table source
+        assertQuery("select 1");
+        assertQuery("select 1 where false");
+        assertQuery("select 1 order by 1");
+        assertQuery("select top 10 1");
+
+        assertQuery("select ( select 'value' key for object) select ( select 'value2' key for object)");
+
+        assertQueryFail(ParseException.class, "Cannot have a GROUP BY clause without a FROM", "select 1 group by 1");
+        assertQueryFail(ParseException.class, "FOR clause are not allowed in top select", "select 1 for array");
+
+        assertQueryFail(ParseException.class, "Expected a TABLE function for concat", "select 1 from concat(10)");
+    }
+
+    @Test
     public void test_ands()
     {
         assertExpression("a and (b or c)");
@@ -237,6 +278,8 @@ public class QueryParserTest extends AParserTest
     public void test_expressions()
     {
         assertExpression("1");
+        assertExpression("+1");
+        assertExpression("-1");
         assertExpression("1+1");
         assertExpression("1-1");
         assertExpression("1/1");
@@ -253,6 +296,15 @@ public class QueryParserTest extends AParserTest
         assertExpression("not a != 1");
         assertExpression("not a in (1,1,true,2,3.,3,null,false)");
         assertExpression("@value > 10 AND @value_two < 20");
+        assertExpression("a IN (1,2,3)");
+        assertExpression("a NOT IN (1,2,3)");
+        assertExpression("@a");
+        assertExpression("@@rowcount");
+
+        assertExpressionFail(ParseException.class, "Expected a SCALAR function for open_rows", "open_rows(10)");
+        assertExpressionFail(ParseException.class, "Expected a SCALAR function for open_rows", "'string'.open_rows()");
+
+        assertExpressionFail(ParseException.class, "No function found named: nonono in catalog: BuiltIn", "nonono()");
     }
 
     @Test

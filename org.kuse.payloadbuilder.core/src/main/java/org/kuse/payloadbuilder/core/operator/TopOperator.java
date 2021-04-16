@@ -35,7 +35,7 @@ class TopOperator extends AOperator
     }
 
     @Override
-    public List<Operator> getChildOperators()
+    public List<DescribableNode> getChildNodes()
     {
         return singletonList(target);
     }

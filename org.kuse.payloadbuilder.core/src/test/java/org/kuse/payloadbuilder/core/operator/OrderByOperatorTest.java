@@ -34,7 +34,7 @@ public class OrderByOperatorTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            int val = (int) tuple.getTuple(0).getValue(tuple.getTuple(0).getColmnOrdinal("col1"));
+            int val = (int) tuple.getTuple(0).getValue(tuple.getTuple(0).getColumnOrdinal("col1"));
             if (prev != -1)
             {
                 assertTrue(prev <= val);

@@ -60,8 +60,8 @@ public class HashJoinTest extends AOperatorTest
         {
             Tuple tuple = it.next();
 
-            assertEquals(tableAPos[count], tuple.getTuple(0).getValue(tuple.getTuple(0).getColmnOrdinal("col1")));
-            assertEquals(tableBPos[count], tuple.getTuple(1).getValue(tuple.getTuple(1).getColmnOrdinal("Value")));
+            assertEquals(tableAPos[count], tuple.getTuple(0).getValue(tuple.getTuple(0).getColumnOrdinal("col1")));
+            assertEquals(tableBPos[count], tuple.getTuple(1).getValue(tuple.getTuple(1).getColumnOrdinal("Value")));
             count++;
         }
         it.close();

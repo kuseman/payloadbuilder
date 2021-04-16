@@ -165,15 +165,16 @@
 		"into #temp1 ",
 		"from range(1,3) ",
 		"",
-		"select * from #temp t ",
+		"select * ",
+		"from #temp t ",
 		"inner join #temp1 t1 ",
 		"  on t1.Value = t.Value ",
 		"order by t1.newCol_temp_1 desc"      
 	  ],
       "expectedResultSets": [
         [
-          [{ "key": "Value", "value": 2 }, { "key": "newCol_temp", "value": 3 },{ "key": "Value", "value": 2 }, { "key": "newCol_temp_1", "value": 4 } ],
-          [{ "key": "Value", "value": 1 }, { "key": "newCol_temp", "value": 2 },{ "key": "Value", "value": 1 }, { "key": "newCol_temp_1", "value": 3 } ]
+          [{ "key": "Value", "value": 2 },{ "key": "newCol_temp", "value": 3 },{ "key": "Value", "value": 2 },{ "key": "newCol_temp_1", "value": 4 }],
+          [{ "key": "Value", "value": 1 },{ "key": "newCol_temp", "value": 2 },{ "key": "Value", "value": 1 },{ "key": "newCol_temp_1", "value": 3 }]
         ]
       ]
     },
@@ -193,6 +194,50 @@
           [{ "key": "id", "value": 3 }, { "key": "row_id", "value": 3 }, { "key": "data", "value": "3_3" }, { "key": "col", "value": 6 } ]
         ]
       ]
+    },
+    {
+      "name": "Traverse into temp table hierarchy",
+      "query": [
+        "select d.row_id * s.col2 calc ",
+        "into #temp ",
+        "from source s ",
+        "inner join data d ",
+        "  on d.id = s.col1 ",
+        " ",
+        "select calc, t.s.col1, t.d.data ",
+        "from #temp t "
+	  ],
+	  "expectedResultSets": [
+        [
+          [{ "key": "calc", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "data", "value": "1_1" }],
+          [{ "key": "calc", "value": 4 }, { "key": "col1", "value": 1 }, { "key": "data", "value": "1_2" }],
+          [{ "key": "calc", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "data", "value": "3_1" }],
+          [{ "key": "calc", "value": 8 }, { "key": "col1", "value": 3 }, { "key": "data", "value": "3_2" }],
+          [{ "key": "calc", "value": 12 }, { "key": "col1", "value": 3 }, { "key": "data", "value": "3_3" }]
+        ]
+	  ]    
+    },
+    {
+      "name": "Complex value in temp table",
+      "query": [
+        "select (select d.row_id * s.col2 calc for object) obj ",
+        "into #temp ",
+        "from source s ",
+        "inner join data d ",
+        "  on d.id = s.col1 ",
+        " ",
+        "select obj, t.obj.calc, t.s.col1, t.d.data ",
+        "from #temp t "
+	  ],
+	  "expectedResultSets": [
+        [
+          [{ "key": "obj", "value": {"calc": 2 } }, { "key": "calc", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "data", "value": "1_1" }],
+          [{ "key": "obj", "value": {"calc": 4 } }, { "key": "calc", "value": 4 }, { "key": "col1", "value": 1 }, { "key": "data", "value": "1_2" }],
+          [{ "key": "obj", "value": {"calc": 4 } }, { "key": "calc", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "data", "value": "3_1" }],
+          [{ "key": "obj", "value": {"calc": 8 } }, { "key": "calc", "value": 8 }, { "key": "col1", "value": 3 }, { "key": "data", "value": "3_2" }],
+          [{ "key": "obj", "value": {"calc": 12 } },{ "key": "calc", "value": 12 }, { "key": "col1", "value": 3 }, { "key": "data", "value": "3_3" }]
+        ]
+	  ]    
     }
   ]
 }

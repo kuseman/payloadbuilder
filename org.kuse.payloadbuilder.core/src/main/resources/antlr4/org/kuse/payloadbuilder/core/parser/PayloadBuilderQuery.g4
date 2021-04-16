@@ -96,6 +96,11 @@ selectStatement
    (WHERE where=expression)?
    (GROUPBY groupBy+=expression (',' groupBy+=expression)*)?
    (ORDERBY sortItem (',' sortItem)*)?
+   (forClause)?
+ ;
+
+forClause
+ : FOR output=(OBJECT | ARRAY | OBJECT_ARRAY)
  ;
 
 dropTableStatement
@@ -109,20 +114,8 @@ topCount
 
 selectItem
  : 
- 	ASTERISK
- |  alias=identifier '.' ASTERISK
- |  (OBJECT | ARRAY) nestedSelectItem (AS? identifier)?
- |  (variable EQUALS)? expression 	  (AS? identifier)?
- ;
- 
-nestedSelectItem
- : '('
-   selectItem (',' selectItem)*
-   (FROM from=expression)?
-   (WHERE where=expression)?
-   (GROUPBY groupBy+=expression (',' groupBy+=expression)*)?
-   (ORDERBY orderBy+=sortItem (',' orderBy+=sortItem)*)?
-   ')'
+ 	(alias=identifier '.')? ASTERISK
+ |  (variable EQUALS)? expression (AS? identifier)?
  ;
  
 tableSourceJoined
@@ -205,8 +198,13 @@ primary
  | '(' identifier (',' identifier)+ ')' '->' expression  	#lambdaExpression
  | value=primary '[' subscript=expression ']'    			#subscript
  | variable													#variableExpression
- | '(' expression ')' 										#nestedExpression
+ | bracket_expression 										#bracketExpression
  | CASE when+ (ELSE elseExpr=expression)? END               #caseExpression
+ ;
+
+bracket_expression
+ : '(' expression ')'
+ | '(' selectStatement ')'
  ;
 
 when
@@ -273,7 +271,7 @@ booleanLiteral
  ;
  
 nonReserved
- : FROM | FIRST | TABLE | TABLES | LIKE
+ : FROM | FIRST | TABLE | TABLES | LIKE | OBJECT | ARRAY | OBJECT_ARRAY | FOR
  ;
  
 // Tokens
@@ -295,6 +293,7 @@ ESCAPE		 : E S C A P E;
 EXISTS       : E X I S T S;
 FALSE	     : F A L S E;
 FIRST	     : F I R S T;
+FOR          : F O R;
 FROM	     : F R O M;
 FUNCTIONS	 : F U N C T I O N S;
 GROUPBY      : G R O U P ' ' B Y;
@@ -313,6 +312,7 @@ NOT		     : N O T;
 NULL	     : N U L L;
 NULLS	     : N U L L S;
 OBJECT	     : O B J E C T;
+OBJECT_ARRAY : O B J E C T '_' A R R A Y;
 ON		     : O N;
 OR		     : O R;
 ORDERBY	     : O R D E R ' ' B Y;

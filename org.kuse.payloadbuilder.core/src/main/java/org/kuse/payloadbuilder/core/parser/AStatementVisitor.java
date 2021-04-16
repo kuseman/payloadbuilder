@@ -148,23 +148,6 @@ public class AStatementVisitor<TR, TC> implements StatementVisitor<TR, TC>, Sele
     }
 
     @Override
-    public TR visit(NestedSelectItem nestedSelectItem, TC context)
-    {
-        nestedSelectItem.getSelectItems().forEach(s -> s.accept(this, context));
-        if (nestedSelectItem.getFrom() != null)
-        {
-            visitExpression(context, nestedSelectItem.getFrom());
-        }
-        if (nestedSelectItem.getWhere() != null)
-        {
-            visitExpression(context, nestedSelectItem.getWhere());
-        }
-        nestedSelectItem.getGroupBy().forEach(g -> visitExpression(context, g));
-        nestedSelectItem.getOrderBy().forEach(o -> o.accept(this, context));
-        return null;
-    }
-
-    @Override
     public TR visit(AsteriskSelectItem selectItem, TC context)
     {
         return null;

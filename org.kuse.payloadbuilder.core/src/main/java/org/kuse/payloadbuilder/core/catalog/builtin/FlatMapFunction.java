@@ -1,6 +1,7 @@
 package org.kuse.payloadbuilder.core.catalog.builtin;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyIterator;
 import static java.util.Collections.singletonList;
 
 import java.util.Iterator;
@@ -78,6 +79,10 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
                         {
                             context.setLambdaValue(lambdaId, input);
                             Object value = le.getExpression().eval(context);
+                            if (value == null)
+                            {
+                                return emptyIterator();
+                            }
                             it = CollectionUtils.getIterator(value);
                             Object result = it;
                             if (!it.hasNext())

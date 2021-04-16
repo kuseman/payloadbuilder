@@ -62,8 +62,8 @@ public class OperatorContext
         private long rowCount;
         /**
          * <pre>
-         *  
-          * Time that is set on all nodes after query is run to be 
+         *
+          * Time that is set on all nodes after query is run to be
           *  able to calculate a percentage when {@link Operator#getDescribeProperties} is called
          * </pre>
          */

@@ -1,6 +1,6 @@
 package org.kuse.payloadbuilder.core.operator;
 
-import static java.util.Arrays.asList;
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
@@ -27,9 +27,9 @@ class BatchRepeatOperator extends AOperator
     }
 
     @Override
-    public List<Operator> getChildOperators()
+    public List<DescribableNode> getChildNodes()
     {
-        return asList(operator);
+        return singletonList(operator);
     }
 
     @Override
