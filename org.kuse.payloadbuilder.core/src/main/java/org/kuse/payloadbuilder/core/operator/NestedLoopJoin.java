@@ -14,7 +14,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.lang3.time.StopWatch;
 import org.kuse.payloadbuilder.core.DescribeUtils;
-import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
+import org.kuse.payloadbuilder.core.operator.StatementContext.NodeData;
 
 /** Operator the join two other operators using nested loop */
 class NestedLoopJoin extends AOperator
@@ -67,7 +67,7 @@ class NestedLoopJoin extends AOperator
     @Override
     public Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
-        Data data = context.getOperatorContext().getNodeData(nodeId);
+        Data data = context.getStatementContext().getNodeData(nodeId);
         Map<String, Object> result = ofEntries(
                 entry(DescribeUtils.PREDICATE, predicate == null ? "" : predicate.toString()),
                 entry(DescribeUtils.POPULATING, populating));
@@ -82,8 +82,8 @@ class NestedLoopJoin extends AOperator
     @Override
     public RowIterator open(ExecutionContext context)
     {
-        final Data data = context.getOperatorContext().getNodeData(nodeId, Data::new);
-        final Tuple contextParent = context.getTuple();
+        final Data data = context.getStatementContext().getOrCreateNodeData(nodeId, Data::new);
+        final Tuple contextParent = context.getStatementContext().getTuple();
         final JoinTuple joinTuple = new JoinTuple(contextParent);
         final RowIterator it = outer.open(context);
         //CSOFF
@@ -136,7 +136,7 @@ class NestedLoopJoin extends AOperator
 
                     if (ii == null)
                     {
-                        context.setTuple(currentOuter);
+                        context.getStatementContext().setTuple(currentOuter);
                         ii = inner.open(context);
                     }
 
@@ -160,9 +160,9 @@ class NestedLoopJoin extends AOperator
                     joinTuple.setInner(currentInner);
 
                     data.predicateTime.resume();
-                    context.setTuple(joinTuple);
+                    context.getStatementContext().setTuple(joinTuple);
                     boolean result = predicate == null || predicate.test(context);
-                    context.setTuple(null);
+                    context.getStatementContext().setTuple(null);
                     data.predicateTime.suspend();
 
                     if (result)

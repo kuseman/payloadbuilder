@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.junit.Test;
+import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.parser.AParserTest;
 
 /** Tests functions etc. in built in catalog */
@@ -100,6 +101,12 @@ public class BuiltinCatalogTest extends AParserTest
         values.put("c", asList(-1, -2, -3, 0, 1, 2, 3).iterator());
 
         assertExpression(true, values, "contains(c, -2)");
+    }
+
+    @Test
+    public void test_isCodegenSupported()
+    {
+        assertTrue(((ScalarFunctionInfo) session.getCatalogRegistry().getBuiltin().getFunction("contains")).isCodeGenSupported(asList(e("10"), e("20"))));
     }
 
     @Test

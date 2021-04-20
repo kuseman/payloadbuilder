@@ -1,48 +1,47 @@
 package org.kuse.payloadbuilder.core;
 
-import static java.util.Arrays.asList;
-import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
-import static java.util.stream.Collectors.toList;
-import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
-import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.join;
+import static org.apache.commons.lang3.StringUtils.lowerCase;
 
+import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.stream.Stream;
 
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.mutable.MutableObject;
+import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.lang3.time.StopWatch;
 import org.apache.commons.lang3.tuple.Pair;
-import org.kuse.payloadbuilder.core.catalog.Catalog;
+import org.kuse.payloadbuilder.core.cache.CacheProvider;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
-import org.kuse.payloadbuilder.core.catalog.FunctionInfo;
+import org.kuse.payloadbuilder.core.codegen.BaseProjection;
 import org.kuse.payloadbuilder.core.operator.AObjectOutputWriter;
 import org.kuse.payloadbuilder.core.operator.AObjectOutputWriter.ColumnValue;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.RowList;
 import org.kuse.payloadbuilder.core.operator.OperatorBuilder;
-import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
+import org.kuse.payloadbuilder.core.operator.OperatorBuilder.BuildResult;
 import org.kuse.payloadbuilder.core.operator.Projection;
 import org.kuse.payloadbuilder.core.operator.RootProjection;
-import org.kuse.payloadbuilder.core.operator.Row;
+import org.kuse.payloadbuilder.core.operator.StatementContext;
+import org.kuse.payloadbuilder.core.operator.StatementContext.NodeData;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.operator.TemporaryTable;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.AnalyzeStatement;
+import org.kuse.payloadbuilder.core.parser.CacheFlushRemoveStatement;
 import org.kuse.payloadbuilder.core.parser.DescribeSelectStatement;
 import org.kuse.payloadbuilder.core.parser.DescribeTableStatement;
 import org.kuse.payloadbuilder.core.parser.DropTableStatement;
 import org.kuse.payloadbuilder.core.parser.IfStatement;
+import org.kuse.payloadbuilder.core.parser.Option;
 import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.PrintStatement;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -52,7 +51,6 @@ import org.kuse.payloadbuilder.core.parser.SelectItem;
 import org.kuse.payloadbuilder.core.parser.SelectStatement;
 import org.kuse.payloadbuilder.core.parser.SetStatement;
 import org.kuse.payloadbuilder.core.parser.ShowStatement;
-import org.kuse.payloadbuilder.core.parser.ShowStatement.Type;
 import org.kuse.payloadbuilder.core.parser.Statement;
 import org.kuse.payloadbuilder.core.parser.StatementVisitor;
 import org.kuse.payloadbuilder.core.parser.UseStatement;
@@ -62,36 +60,20 @@ import org.kuse.payloadbuilder.core.parser.UseStatement;
  */
 class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
 {
-    private static final TableAlias SHOW_VARIABLES_ALIAS = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("variables"), "v").columns(new String[] {"Name", "Value"}).build();
-    private static final TableAlias SHOW_TABLES_ALIAS = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("tables"), "t").columns(new String[] {"Name"}).build();
-    private static final TableAlias SHOW_FUNCTIONS_ALIAS = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("functions"), "f")
-            .columns(new String[] {"Name", "Type", "Description"})
-            .build();
-
+    private Pair<Operator, Projection> currentSelect;
     private final QuerySession session;
     private final CatalogRegistry registry;
-    private ExecutionContext context;
-    private final QueryStatement query;
-    private Pair<Operator, Projection> currentSelect;
-
+    private final ExecutionContext context;
     /** Queue of statement to process */
     private final List<Statement> queue = new ArrayList<>();
+    private long analyzeQueryTime = -1;
 
     QueryResultImpl(QuerySession session, QueryStatement query)
     {
         this.session = requireNonNull(session);
         this.registry = session.getCatalogRegistry();
-        this.query = query;
         this.context = new ExecutionContext(session);
         queue.addAll(query.getStatements());
-    }
-
-    @Override
-    public void reset()
-    {
-        queue.clear();
-        queue.addAll(query.getStatements());
-        context = new ExecutionContext(session);
     }
 
     @Override
@@ -99,6 +81,13 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     {
         Object value = statement.getExpression().eval(context);
         session.printLine(value);
+        return null;
+    }
+
+    protected Void visit(Statement statement, Void ctx)
+    {
+        context.getStatementContext().clear();
+        statement.accept(this, ctx);
         return null;
     }
 
@@ -157,36 +146,34 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     @Override
     public Void visit(DescribeSelectStatement statement, Void ctx)
     {
-        context.clear();
-        Pair<Operator, Projection> pair = OperatorBuilder.create(session, statement.getSelectStatement().getSelect());
-        currentSelect = DescribeUtils.getDescribeSelect(context, pair.getKey(), pair.getValue());
+        BuildResult buildResult = OperatorBuilder.create(session, statement.getSelectStatement().getSelect());
+        currentSelect = DescribeUtils.getDescribeSelect(context, buildResult.getOperator(), buildResult.getProjection());
         return null;
     }
 
     @Override
     public Void visit(AnalyzeStatement statement, Void ctx)
     {
-        context.clear();
-
         SelectStatement selectStatement = statement.getSelectStatement();
-        Pair<Operator, Projection> pair = OperatorBuilder.create(session, selectStatement.getSelect(), true);
+
+        BuildResult buildResult = OperatorBuilder.create(session, selectStatement.getSelect(), true);
         // Write the operator to a noop-writer and collect statistics
         StopWatch sw = StopWatch.createStarted();
         if (selectStatement.isAssignmentSelect())
         {
-            applyAssignmentSelect(selectStatement.getSelect(), pair);
+            applyAssignmentSelect(selectStatement.getSelect(), buildResult);
         }
         else if (selectStatement.getSelect().getInto() != null)
         {
-            applySelectInto(selectStatement.getSelect(), pair);
+            applySelectInto(selectStatement.getSelect(), buildResult);
         }
         else
         {
-            writeInternal(pair.getKey(), pair.getValue(), OutputWriterAdapter.NO_OP_WRITER, null);
+            writeInternal(buildResult.getOperator(), buildResult.getProjection(), OutputWriterAdapter.NO_OP_WRITER, null);
         }
         sw.stop();
 
-        Map<Integer, ? extends NodeData> nodeData = context.getOperatorContext().getNodeData();
+        Map<Integer, ? extends NodeData> nodeData = context.getStatementContext().getNodeData();
 
         // Extract the root nodes total time which is the total query time
         long totalQueryTime = sw.getTime(TimeUnit.MILLISECONDS);
@@ -195,119 +182,52 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             data.setTotalQueryTime(totalQueryTime);
         }
 
-        currentSelect = DescribeUtils.getDescribeSelect(context, pair.getKey(), pair.getValue());
+        analyzeQueryTime = sw.getTime();
+
+        currentSelect = DescribeUtils.getDescribeSelect(context, buildResult.getOperator(), buildResult.getProjection());
         return null;
     }
 
     @Override
     public Void visit(ShowStatement statement, Void ctx)
     {
-        context.clear();
-        Operator operator = null;
-        MutableInt pos = new MutableInt();
-        String[] columns = null;
-        if (statement.getType() == Type.VARIABLES)
-        {
-            Map<String, Object> variables = context.getVariables();
-            columns = SHOW_VARIABLES_ALIAS.getColumns();
-            operator = new Operator()
-            {
-                @Override
-                public RowIterator open(ExecutionContext context)
-                {
-                    return RowIterator.wrap(variables
-                            .entrySet()
-                            .stream()
-                            .map(e -> (Tuple) Row.of(SHOW_VARIABLES_ALIAS, pos.incrementAndGet(), new Object[] {e.getKey(), e.getValue()}))
-                            .iterator());
-                }
+        currentSelect = ShowUtils.getShowSelect(context, statement);
+        return null;
+    }
 
-                @Override
-                public int getNodeId()
-                {
-                    return 0;
-                }
-            };
+    @Override
+    public Void visit(CacheFlushRemoveStatement statement, Void ctx)
+    {
+        CacheProvider provider = context.getSession().getCacheProvider(statement.getType());
+        if (statement.isFlush())
+        {
+            if (statement.isAll())
+            {
+                provider.flushAll();
+            }
+            else if (statement.getKey() != null)
+            {
+                Object key = statement.getKey().eval(context);
+                provider.flush(statement.getName(), key);
+            }
+            else
+            {
+                provider.flush(statement.getName());
+            }
         }
-        else if (statement.getType() == Type.TABLES)
+        // Remove
+        else
         {
-            String alias = defaultIfBlank(statement.getCatalog(), registry.getDefaultCatalogAlias());
-            if (isBlank(alias))
+            if (statement.isAll())
             {
-                throw new ParseException("No catalog alias provided.", statement.getToken());
+                provider.removeAll();
             }
-            Catalog catalog = session.getCatalogRegistry().getCatalog(alias);
-            if (catalog == null)
+            else
             {
-                throw new ParseException("No catalog found with alias: " + alias, statement.getToken());
+                provider.remove(statement.getName());
             }
-
-            List<String> tables = new ArrayList<>();
-            tables.addAll(session.getTemporaryTableNames().stream().map(t -> "#" + t.toString()).collect(toList()));
-            tables.addAll(catalog.getTables(session, alias));
-            columns = SHOW_TABLES_ALIAS.getColumns();
-            operator = new Operator()
-            {
-                @Override
-                public RowIterator open(ExecutionContext context)
-                {
-                    return RowIterator.wrap(tables
-                            .stream()
-                            .map(table -> (Tuple) Row.of(SHOW_TABLES_ALIAS, pos.incrementAndGet(), new Object[] {table}))
-                            .iterator());
-                }
-
-                @Override
-                public int getNodeId()
-                {
-                    return 0;
-                }
-            };
-        }
-        else if (statement.getType() == Type.FUNCTIONS)
-        {
-            String alias = defaultIfBlank(statement.getCatalog(), registry.getDefaultCatalogAlias());
-            Catalog catalog = session.getCatalogRegistry().getCatalog(alias);
-            if (!isBlank(statement.getCatalog()) && catalog == null)
-            {
-                throw new ParseException("No catalog found with alias: " + statement.getCatalog(), statement.getToken());
-            }
-
-            Catalog builtIn = session.getCatalogRegistry().getBuiltin();
-            Collection<FunctionInfo> functions = catalog != null ? catalog.getFunctions() : emptyList();
-            columns = SHOW_FUNCTIONS_ALIAS.getColumns();
-            //CSOFF
-            operator = new Operator()
-            //CSON
-            {
-                @Override
-                public RowIterator open(ExecutionContext context)
-                {
-                    return RowIterator.wrap(Stream.concat(
-                            functions
-                                    .stream()
-                                    .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName()))
-                                    .map(function -> (Tuple) Row.of(SHOW_FUNCTIONS_ALIAS, pos.incrementAndGet(), new Object[] {function.getName(), function.getType(), function.getDescription()})),
-                            Stream.concat(
-                                    functions.size() > 0
-                                        ? Stream.of(Row.of(SHOW_FUNCTIONS_ALIAS, pos.incrementAndGet(), new Object[] {"-- Built in --", "", ""}))
-                                        : Stream.empty(),
-                                    builtIn.getFunctions()
-                                            .stream()
-                                            .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName()))
-                                            .map(function -> Row.of(SHOW_FUNCTIONS_ALIAS, pos.incrementAndGet(), new Object[] {function.getName(), function.getType(), function.getDescription()}))))
-                            .iterator());
-                }
-
-                @Override
-                public int getNodeId()
-                {
-                    return 0;
-                }
-            };
         }
 
-        currentSelect = Pair.of(operator, DescribeUtils.getIndexProjection(asList(columns)));
         return null;
     }
 
@@ -321,19 +241,18 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     @Override
     public Void visit(SelectStatement statement, Void ctx)
     {
-        context.clear();
-        Pair<Operator, Projection> pair = OperatorBuilder.create(session, statement.getSelect());
+        BuildResult buildResult = OperatorBuilder.create(session, statement.getSelect());
         if (statement.isAssignmentSelect())
         {
-            applyAssignmentSelect(statement.getSelect(), pair);
+            applyAssignmentSelect(statement.getSelect(), buildResult);
         }
         else if (statement.getSelect().getInto() != null)
         {
-            applySelectInto(statement.getSelect(), pair);
+            applySelectInto(statement.getSelect(), buildResult);
         }
         else
         {
-            currentSelect = pair;
+            currentSelect = Pair.of(buildResult.getOperator(), buildResult.getProjection());
         }
         return null;
     }
@@ -350,15 +269,63 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         return null;
     }
 
-    private void applySelectInto(Select select, Pair<Operator, Projection> pair)
+    private void applySelectInto(Select select, BuildResult buildResult)
+    {
+        List<Option> options = select.getInto().getOptions();
+        QualifiedName cacheName = null;
+        Object cacheKey = null;
+        Duration ttl = null;
+
+        if (options != null)
+        {
+            int size = options.size();
+            for (int i = 0; i < size; i++)
+            {
+                Option option = options.get(i);
+                String lowerName = lowerCase(option.getOption().toString());
+                if (lowerName.equals("cachename"))
+                {
+                    cacheName = QualifiedName.of(option.getValueExpression().eval(context));
+                }
+                else if (lowerName.equals("cachekey"))
+                {
+                    cacheKey = option.getValueExpression().eval(context);
+                }
+                else if (lowerName.equals("cachettl"))
+                {
+                    ttl = Duration.parse((String) option.getValueExpression().eval(context));
+                }
+            }
+        }
+
+        TemporaryTable table;
+        if (cacheName != null)
+        {
+            table = context.getSession()
+                    .getTempTableCacheProvider()
+                    .computIfAbsent(
+                            cacheName,
+                            cacheKey,
+                            ttl,
+                            () -> createTempTable(select, buildResult, true));
+        }
+        else
+        {
+            table = createTempTable(select, buildResult, false);
+        }
+
+        this.context.getSession().setTemporaryTable(table);
+    }
+
+    private TemporaryTable createTempTable(Select select, BuildResult buildResult, final boolean cache)
     {
         // Use the select's table source if there is one else create a dummy
         TableAlias tableAlias = select.getFrom() != null
             ? select.getFrom().getTableSource().getTableAlias()
             : TableAliasBuilder.of(-1, TableAlias.Type.TABLE, select.getInto().getTable(), "").build();
 
-        Operator operator = pair.getKey();
-        Projection projection = pair.getValue();
+        Operator operator = buildResult.getOperator();
+        Projection projection = buildResult.getProjection();
 
         final List<TemporaryTable.Row> rows = new ArrayList<>();
         final MutableObject<List<ColumnValue>> currentRow = new MutableObject<>();
@@ -404,36 +371,48 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                 }
             }
 
+            if (cache)
+            {
+                /* Optimize tuple before storing to table */
+                context.intern(values);
+                tuple = tuple.optimize(context);
+            }
             rows.add(new TemporaryTable.Row(tuple, values));
         });
 
-        this.context.getSession().setTemporaryTable(new TemporaryTable(
+        return new TemporaryTable(
                 select.getInto().getTable(),
                 tableAlias,
                 tempTableColumns.getValue(),
-                rows));
+                rows);
     }
 
-    private void applyAssignmentSelect(Select select, Pair<Operator, Projection> pair)
+    private void applyAssignmentSelect(Select select, BuildResult buildResult)
     {
-        Operator operator = pair.getKey();
+        Operator operator = buildResult.getOperator();
         int size = select.getSelectItems().size();
 
         int rowCount = 0;
+        StatementContext statementContext = context.getStatementContext();
+
         RowIterator iterator = null;
         try
         {
             iterator = operator.open(context);
-            Tuple tuple = null;
-            while (iterator.hasNext())
+            RowList list = iterator instanceof RowList ? (RowList) iterator : null;
+            int index = 0;
+            boolean complete = list == null
+                ? !iterator.hasNext()
+                : index >= list.size();
+
+            while (!complete)
             {
                 if (session.abortQuery())
                 {
                     break;
                 }
-                tuple = iterator.next();
-                context.setTuple(tuple);
-
+                Tuple tuple = list == null ? iterator.next() : list.get(index++);
+                statementContext.setTuple(tuple);
                 for (int i = 0; i < size; i++)
                 {
                     SelectItem item = select.getSelectItems().get(i);
@@ -441,6 +420,10 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                     context.setVariable(item.getAssignmentName(), value);
                 }
                 rowCount++;
+
+                complete = list == null
+                    ? !iterator.hasNext()
+                    : index >= list.size();
             }
         }
         finally
@@ -450,7 +433,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                 iterator.close();
             }
         }
-        context.setRowCount(rowCount);
+        statementContext.setRowCount(rowCount);
     }
 
     private boolean setNext()
@@ -468,7 +451,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                 System.err.println();
             }
             // context.clearStatementCache();
-            stm.accept(this, null);
+            visit(stm, null);
         }
 
         return true;
@@ -495,11 +478,13 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         currentSelect = null;
     }
 
+    //CSOFF
     private void writeInternal(Operator operator, Projection projection, OutputWriter writer, Consumer<Tuple> tupleConsumer)
+    //CSON
     {
         int rowCount = 0;
-        context.clear();
         RowIterator iterator = null;
+        StatementContext statementContext = context.getStatementContext();
         try
         {
             String[] columns = ArrayUtils.EMPTY_STRING_ARRAY;
@@ -507,20 +492,30 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             {
                 columns = ((RootProjection) projection).getColumns();
             }
+            else if (projection instanceof BaseProjection)
+            {
+                columns = ((BaseProjection) projection).getProjection().getColumns();
+            }
             writer.initResult(columns);
 
             // Clear context before opening operator
-            context.setTuple(null);
+            statementContext.setTuple(null);
             iterator = operator.open(context);
-            while (iterator.hasNext())
+            RowList list = iterator instanceof RowList ? (RowList) iterator : null;
+            int index = 0;
+            boolean complete = list == null
+                ? !iterator.hasNext()
+                : index >= list.size();
+
+            while (!complete)
             {
                 if (session.abortQuery())
                 {
                     break;
                 }
                 writer.startRow();
-                Tuple tuple = iterator.next();
-                context.setTuple(tuple);
+                Tuple tuple = list == null ? iterator.next() : list.get(index++);
+                statementContext.setTuple(tuple);
                 projection.writeValue(writer, context);
                 writer.endRow();
                 if (tupleConsumer != null)
@@ -528,6 +523,10 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                     tupleConsumer.accept(tuple);
                 }
                 rowCount++;
+
+                complete = list == null
+                    ? !iterator.hasNext()
+                    : index >= list.size();
             }
         }
         finally
@@ -538,6 +537,12 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             }
         }
 
-        context.setRowCount(rowCount);
+        statementContext.setRowCount(rowCount);
+
+        if (analyzeQueryTime != -1)
+        {
+            context.getSession().printLine("Query time: " + DurationFormatUtils.formatDurationHMS(analyzeQueryTime));
+            analyzeQueryTime = -1;
+        }
     }
 }

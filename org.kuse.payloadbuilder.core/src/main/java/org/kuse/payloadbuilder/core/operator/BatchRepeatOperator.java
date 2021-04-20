@@ -91,7 +91,7 @@ class BatchRepeatOperator extends AOperator
                     }
                     else if (!it.hasNext())
                     {
-                        BatchLimitData batchLimitData = context.getOperatorContext().getNodeData(targetNodeId);
+                        BatchLimitData batchLimitData = context.getStatementContext().getNodeData(targetNodeId);
                         if (batchLimitData == null)
                         {
                             throw new OperatorException("Missing node data for target node id: " + targetNodeId);

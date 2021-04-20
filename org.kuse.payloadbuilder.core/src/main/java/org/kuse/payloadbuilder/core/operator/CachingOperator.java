@@ -7,7 +7,7 @@ import static org.apache.commons.lang3.StringUtils.repeat;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
+import org.kuse.payloadbuilder.core.operator.StatementContext.NodeData;
 
 /** Caches provided operator to allow rewinds (Used in inner operator for nested loop) */
 class CachingOperator extends AOperator
@@ -40,7 +40,7 @@ class CachingOperator extends AOperator
     {
         executionCount++;
 
-        Data data = context.getOperatorContext().getNodeData(nodeId, Data::new);
+        Data data = context.getStatementContext().getOrCreateNodeData(nodeId, Data::new);
 
         if (data.cache == null)
         {

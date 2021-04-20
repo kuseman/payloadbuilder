@@ -7,6 +7,8 @@ import java.util.stream.IntStream;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.junit.Test;
+import org.kuse.payloadbuilder.core.catalog.TableMeta;
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -21,7 +23,9 @@ public class OrderByOperatorTest extends AOperatorTest
     public void test()
     {
         Random rnd = new Random();
-        TableAlias alias = TableAliasBuilder.of(0, TableAlias.Type.TABLE, QualifiedName.of("table"), "a").columns(new String[] {"col1"}).build();
+        TableAlias alias = TableAliasBuilder.of(0, TableAlias.Type.TABLE, QualifiedName.of("table"), "a")
+                .tableMeta(new TableMeta(asList(new TableMeta.Column("col1", DataType.ANY))))
+                .build();
         MutableBoolean close = new MutableBoolean();
         Operator target = op(ctx -> IntStream.range(0, 100).mapToObj(i -> (Tuple) Row.of(alias, i, new Object[] {rnd.nextInt(100)})).iterator(), () -> close.setTrue());
         OrderByOperator operator = new OrderByOperator(
@@ -34,7 +38,7 @@ public class OrderByOperatorTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            int val = (int) tuple.getTuple(0).getValue(tuple.getTuple(0).getColumnOrdinal("col1"));
+            int val = (int) getValue(tuple, 0, "col1");
             if (prev != -1)
             {
                 assertTrue(prev <= val);

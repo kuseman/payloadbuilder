@@ -7,6 +7,8 @@ import java.util.stream.IntStream;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.junit.Test;
+import org.kuse.payloadbuilder.core.catalog.TableMeta;
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -18,7 +20,9 @@ public class ComputedColumnsOperatorTest extends AOperatorTest
     public void test()
     {
         Random rnd = new Random();
-        TableAlias alias = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("table"), "a").columns(new String[] {"col1"}).build();
+        TableAlias alias = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("table"), "a")
+                .tableMeta(new TableMeta(asList(new TableMeta.Column("col1", DataType.ANY))))
+                .build();
         MutableBoolean close = new MutableBoolean();
         Operator target = op(ctx -> IntStream.range(0, 100).mapToObj(i -> (Tuple) Row.of(alias, i, new Object[] {rnd.nextInt(100)})).iterator(), () -> close.setTrue());
         ComputedColumnsOperator operator = new ComputedColumnsOperator(
@@ -33,8 +37,8 @@ public class ComputedColumnsOperatorTest extends AOperatorTest
         {
             Tuple tuple = it.next();
 
-            int val = (int) tuple.getValue(tuple.getColumnOrdinal("col1"));
-            Object actual = tuple.getValue(tuple.getColumnOrdinal("newCol"));
+            int val = (int) getValue(tuple, -1, "col1");
+            Object actual = getValue(tuple, -1, "newCol");
             assertEquals("v-" + val, actual);
         }
         it.close();

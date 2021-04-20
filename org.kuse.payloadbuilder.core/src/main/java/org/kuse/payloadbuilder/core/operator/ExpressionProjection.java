@@ -8,15 +8,17 @@ import java.util.List;
 import java.util.Map;
 
 import org.kuse.payloadbuilder.core.OutputWriter;
+import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
+import org.kuse.payloadbuilder.core.codegen.ProjectionCode;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 
 /** Projection that operates over an {@link Expression} */
-class ExpressionProjection extends AProjection
+public class ExpressionProjection extends AProjection
 {
     private final Expression expression;
 
-    ExpressionProjection(Expression expression)
+    public ExpressionProjection(Expression expression)
     {
         this.expression = requireNonNull(expression, "expression");
     }
@@ -53,6 +55,12 @@ class ExpressionProjection extends AProjection
             return ((DescribableNode) expression).getDescribeProperties(context);
         }
         return emptyMap();
+    }
+
+    @Override
+    public ProjectionCode generateCode(CodeGeneratorContext context)
+    {
+        return expression.generateProjectionCode(context);
     }
 
     @Override

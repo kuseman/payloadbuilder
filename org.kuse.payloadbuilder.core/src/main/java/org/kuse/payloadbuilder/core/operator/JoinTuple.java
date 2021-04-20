@@ -13,24 +13,9 @@ class JoinTuple implements Tuple
         this.contextOuter = contextOuter;
     }
 
-    public Tuple getContextOuter()
-    {
-        return contextOuter;
-    }
-
-    public Tuple getOuter()
-    {
-        return outer;
-    }
-
     public void setOuter(Tuple outer)
     {
         this.outer = outer;
-    }
-
-    public Tuple getInner()
-    {
-        return inner;
     }
 
     public void setInner(Tuple inner)
@@ -43,61 +28,65 @@ class JoinTuple implements Tuple
     {
         // This is a root tuple that should never be compared to a tuple ordinal
         // it's only used during a join process
-        throw new RuntimeException("Join tuple does not have a tuple orinal");
-    }
-
-    @Override
-    public Tuple getTuple(int ordinal)
-    {
-        /*
-         * tableA                   (to = 0, contextOuter)
-         *   tableB                 (to = 1)
-         *   tableC                 (to = 2, outer)
-         *     tabbleD              (to = 3)
-         *   tableE                 (to = 4, inner)
-         */
-
-        int innerTupleOrdinal = inner.getTupleOrdinal();
-
-        // A tuple higher up in hierarchy is wanted
-        if (contextOuter != null && ordinal <= contextOuter.getTupleOrdinal())
-        {
-            return contextOuter.getTuple(ordinal);
-        }
-        else if (outer != null)
-        {
-            if (ordinal <= outer.getTupleOrdinal() || ordinal < innerTupleOrdinal)
-            {
-                return outer.getTuple(ordinal);
-            }
-        }
-
-        return inner.getTuple(ordinal);
-    }
-
-    @Override
-    public int getColumnCount()
-    {
-        return inner.getColumnCount();
+        throw new IllegalArgumentException("Not implemented");
     }
 
     @Override
     public int getColumnOrdinal(String column)
     {
+        if (inner == null)
+        {
+            return -1;
+        }
         return inner.getColumnOrdinal(column);
     }
 
     @Override
-    public String getColumn(int ordinal)
+    public Object getValue(int columnOrdinal)
     {
-        return inner.getColumn(ordinal);
+        if (inner == null)
+        {
+            return null;
+        }
+        return inner.getValue(columnOrdinal);
     }
 
     @Override
-    public Object getValue(int ordinal)
+    public boolean isNull(int columnOrdinal)
     {
-        // This is a qualifier with a single part then it can only reference
-        // the inner
-        return inner.getValue(ordinal);
+        throw new RuntimeException("Implement");
+    }
+
+    @Override
+    public Tuple getTuple(int tupleOrdinal)
+    {
+        /*
+        * tableA                   (to = 0, contextOuter)
+        *   tableB                 (to = 1)
+        *   tableC                 (to = 2, outer)
+        *     tabbleD              (to = 3)
+        *   tableE                 (to = 4, inner)
+        */
+
+        // Closest tuple is the inner
+        if (tupleOrdinal == -1)
+        {
+            return inner != null ? inner.getTuple(tupleOrdinal) : null;
+        }
+
+        // A tuple higher up in hierarchy is wanted
+        if (contextOuter != null
+            && tupleOrdinal <= contextOuter.getTupleOrdinal())
+        {
+            return contextOuter.getTuple(tupleOrdinal);
+        }
+        else if (outer != null
+            && (tupleOrdinal <= outer.getTupleOrdinal()
+                || tupleOrdinal < inner.getTupleOrdinal()))
+        {
+            return outer.getTuple(tupleOrdinal);
+        }
+
+        return inner.getTuple(tupleOrdinal);
     }
 }

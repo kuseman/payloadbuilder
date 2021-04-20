@@ -44,6 +44,11 @@ public final class CollectionUtils
             }
             return ((Collection) obj).iterator();
         }
+        else if (obj instanceof Iterable)
+        {
+            Iterable<T> it = (Iterable<T>) obj;
+            return it.iterator();
+        }
         else if (obj instanceof Object[])
         {
             return new ObjectArrayIterator((Object[]) obj);

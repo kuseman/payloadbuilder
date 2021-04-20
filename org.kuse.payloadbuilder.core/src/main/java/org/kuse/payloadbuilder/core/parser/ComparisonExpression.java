@@ -7,9 +7,11 @@ import static org.kuse.payloadbuilder.core.utils.ExpressionMath.gte;
 import static org.kuse.payloadbuilder.core.utils.ExpressionMath.lt;
 import static org.kuse.payloadbuilder.core.utils.ExpressionMath.lte;
 
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+import org.kuse.payloadbuilder.core.utils.TypeUtils;
 
 /** Comparison expression */
 public class ComparisonExpression extends Expression
@@ -79,65 +81,130 @@ public class ComparisonExpression extends Expression
     @Override
     public ExpressionCode generateCode(CodeGeneratorContext context)
     {
-        ExpressionCode code = context.getCode();
-
+        ExpressionCode code = context.getExpressionCode();
         ExpressionCode leftCode = left.generateCode(context);
         ExpressionCode rightCode = right.generateCode(context);
 
-        String cmpOp = null;
-        //CSOFF
-        switch (type)
-        //CSON
+        DataType leftType = left.getDataType();
+        DataType rightType = right.getDataType();
+
+        if (TypeUtils.isNativeComparable(leftType, rightType))
         {
-            case EQUAL:
-                cmpOp = "ExpressionMath.eq";
-                break;
-            case NOT_EQUAL:
-                cmpOp = "!ExpressionMath.eq";
-                break;
-            case GREATER_THAN:
-                cmpOp = "ExpressionMath.gt";
-                break;
-            case GREATER_THAN_EQUAL:
-                cmpOp = "ExpressionMath.gte";
-                break;
-            case LESS_THAN:
-                cmpOp = "ExpressionMath.lt";
-                break;
-            case LESS_THAN_EQUAL:
-                cmpOp = "ExpressionMath.lte";
-                break;
+            code.setCode(String.format(
+                    "%s"                                      // leftCode
+                        + "boolean %s = false;\n"                 // resVar
+                        + "boolean %s = %s;\n"                    // nullVar, leftCode nullvar
+                        + "if (!%s)\n"                            // left nullVar
+                        + "{\n"
+                        + "  %s"                                  // rightCode
+                        + "  if (!%s) %s = %s %s %s;\n"           // rightCode nullVar, resVar, leftCode resVar, cmpOp, rightCode resVar
+                        + "  %s = %s;\n"                          // nullVar, right nullVar
+                        + "}\n",
+                    leftCode.getCode(),
+                    code.getResVar(),
+                    code.getNullVar(), leftCode.getNullVar(),
+                    leftCode.getNullVar(),
+                    rightCode.getCode(),
+                    rightCode.getNullVar(), code.getResVar(), leftCode.getResVar(), type.value, rightCode.getResVar(),
+                    code.getNullVar(), rightCode.getNullVar()));
         }
+        else if (leftType == DataType.BOOLEAN && rightType == DataType.BOOLEAN)
+        {
+            String compareString = null;
+            if (type == Type.EQUAL || type == Type.NOT_EQUAL)
+            {
+                compareString = String.format("%s %s %s", leftCode.getResVar(), type.value, rightCode.getResVar());
+            }
+            else if (type == Type.GREATER_THAN)
+            {
+                compareString = String.format("Boolean.compare(%s, %s) > 0", leftCode.getResVar(), rightCode.getResVar());
+            }
+            else if (type == Type.GREATER_THAN_EQUAL)
+            {
+                compareString = String.format("Boolean.compare(%s, %s) >= 0", leftCode.getResVar(), rightCode.getResVar());
+            }
+            else if (type == Type.LESS_THAN)
+            {
+                compareString = String.format("Boolean.compare(%s, %s) < 0", leftCode.getResVar(), rightCode.getResVar());
+            }
+            else if (type == Type.LESS_THAN_EQUAL)
+            {
+                compareString = String.format("Boolean.compare(%s, %s) <= 0", leftCode.getResVar(), rightCode.getResVar());
+            }
 
-        //        * Object v1 = tuple.getTuple(1).getValue("country_id");
-        //        * Boolean v3 = false;
-        //        * if (v1 != null)
-        //        * {
-        //        *   Object v2 = tuple.getTuple(0).getValue("country_id");
-        //        *   v3 = v2 != null && ExpressionMath.eq(v1, v2);
-        //        * }
+            // Special handing of booleans
+            code.setCode(String.format(
+                    "%s"                                          // leftCode
+                        + "boolean %s = false;\n"                 // resVar
+                        + "boolean %s = %s;\n"                    // nullVar, leftCode nullvar
+                        + "if (!%s)\n"                            // left nullVar
+                        + "{\n"
+                        + "  %s"                                  // rightCode
+                        + "  if (!%s) %s = %s;\n"                 // rightCode nullVar, resVar,  compare string
+                        + "  %s = %s;\n"                          // nullVar, right nullVar
+                        + "}\n",
+                    leftCode.getCode(),
+                    code.getResVar(),
+                    code.getNullVar(), leftCode.getNullVar(),
+                    leftCode.getNullVar(),
+                    rightCode.getCode(),
+                    rightCode.getNullVar(), code.getResVar(), compareString,
+                    code.getNullVar(), rightCode.getNullVar()));
+        }
+        else
+        {
+            context.addImport("org.kuse.payloadbuilder.core.utils.ExpressionMath");
+            String cmpOp = null;
+            //CSOFF
+            switch (type)
+            //CSON
+            {
+                case EQUAL:
+                    cmpOp = "ExpressionMath.eq";
+                    break;
+                case NOT_EQUAL:
+                    cmpOp = "!ExpressionMath.eq";
+                    break;
+                case GREATER_THAN:
+                    cmpOp = "ExpressionMath.gt";
+                    break;
+                case GREATER_THAN_EQUAL:
+                    cmpOp = "ExpressionMath.gte";
+                    break;
+                case LESS_THAN:
+                    cmpOp = "ExpressionMath.lt";
+                    break;
+                case LESS_THAN_EQUAL:
+                    cmpOp = "ExpressionMath.lte";
+                    break;
+            }
 
-        code.setCode(String.format(
-                "%s"                                      // Leftcode
-                    + "Boolean %s = false;\n"                 // This result var
-                    + "if (%s != null)\n"                     // Left res var
-                    + "{\n"
-                    + "  %s"                                  // Right code
-                    + "  %s = %s != null && %s(%s, %s);\n"    // ExpressionMath-function
-                    + "}\n",
-                leftCode.getCode(),
-                code.getResVar(),
-                leftCode.getResVar(),
-                rightCode.getCode(),
-                code.getResVar(), rightCode.getResVar(), cmpOp, leftCode.getResVar(), rightCode.getResVar()));
+            code.setCode(String.format(
+                    "%s"                                      // leftCode
+                        + "boolean %s = false;\n"                 // resVar
+                        + "boolean %s = true;\n"                  // nullVar
+                        + "if (!%s)\n"                            // left nullVar
+                        + "{\n"
+                        + "  %s"                                  // rightCode
+                        + "  %s = !%s && %s(%s, %s);\n"           // resVar, right nullVar, cmpFunc, leftCode resVar, rightCode resVar
+                        + "  %s = %s;\n"                          // nullVar, right nullVar
+                        + "}\n",
+                    leftCode.getCode(),
+                    code.getResVar(),
+                    code.getNullVar(),
+                    leftCode.getNullVar(),
+                    rightCode.getCode(),
+                    code.getResVar(), rightCode.getNullVar(), cmpOp, leftCode.getResVar(), rightCode.getResVar(),
+                    code.getNullVar(), rightCode.getNullVar()));
+        }
 
         return code;
     }
 
     @Override
-    public Class<?> getDataType()
+    public DataType getDataType()
     {
-        return Boolean.class;
+        return DataType.BOOLEAN;
     }
 
     private Object evalInternal(Object leftResult, Object rightResult)
@@ -207,7 +274,7 @@ public class ComparisonExpression extends Expression
     /** Type */
     public enum Type
     {
-        EQUAL("="),
+        EQUAL("=="),
         NOT_EQUAL("!="),
         LESS_THAN("<"),
         LESS_THAN_EQUAL("<="),

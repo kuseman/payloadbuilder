@@ -2,8 +2,6 @@ package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.List;
-
 import org.antlr.v4.runtime.Token;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression.ResolvePath;
@@ -60,7 +58,7 @@ public abstract class SelectItem extends ASelectNode
     }
 
     /** Return resolve paths for item if any. */
-    public List<ResolvePath> getResolvePaths()
+    public ResolvePath[] getResolvePaths()
     {
         return null;
     }

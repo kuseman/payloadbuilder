@@ -1,9 +1,11 @@
 package org.kuse.payloadbuilder.core.parser;
 
+import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
+import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
 import java.util.Iterator;
@@ -16,11 +18,13 @@ import java.util.function.Predicate;
 import org.apache.commons.collections.IteratorUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
+import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Assert;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.Index;
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGenerator;
 import org.kuse.payloadbuilder.core.operator.EvalUtils;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
@@ -29,11 +33,12 @@ import org.kuse.payloadbuilder.core.operator.OperatorBuilder;
 import org.kuse.payloadbuilder.core.operator.SelectResolver;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Tuple;
+import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression.ResolvePath;
 
 /** Base class for parser tests */
 public abstract class AParserTest extends Assert
 {
-    private static final CodeGenerator CODE_GENERATOR = new CodeGenerator();
+    protected static final CodeGenerator CODE_GENERATOR = new CodeGenerator();
     private final QueryParser p = new QueryParser();
     protected final QuerySession session = new QuerySession(new CatalogRegistry());
     protected final ExecutionContext context = new ExecutionContext(session);
@@ -88,7 +93,7 @@ public abstract class AParserTest extends Assert
 
         session.getCatalogRegistry().setDefaultCatalog("test");
 
-        return OperatorBuilder.create(session, select).getKey();
+        return OperatorBuilder.create(session, select).getOperator();
     }
 
     protected Select s(String query)
@@ -127,7 +132,7 @@ public abstract class AParserTest extends Assert
                     values[index.getAndIncrement()] = en.getValue();
                 });
 
-                context.setTuple(new Tuple()
+                context.getStatementContext().setTuple(new Tuple()
                 {
                     @Override
                     public int getTupleOrdinal()
@@ -142,9 +147,9 @@ public abstract class AParserTest extends Assert
                     }
 
                     @Override
-                    public String getColumn(int ordinal)
+                    public String getColumn(int columnOrdinal)
                     {
-                        return columns[ordinal];
+                        return columns[columnOrdinal];
                     }
 
                     @Override
@@ -154,13 +159,13 @@ public abstract class AParserTest extends Assert
                     }
 
                     @Override
-                    public Object getValue(int ordinal)
+                    public Object getValue(int columnOrdinal)
                     {
-                        return values[ordinal];
+                        return values[columnOrdinal];
                     }
 
                     @Override
-                    public Tuple getTuple(int ordinal)
+                    public Tuple getTuple(int tupleOrdinal)
                     {
                         return null;
                     }
@@ -215,7 +220,7 @@ public abstract class AParserTest extends Assert
                     values[index.getAndIncrement()] = en.getValue();
                 });
 
-                context.setTuple(new Tuple()
+                context.getStatementContext().setTuple(new Tuple()
                 {
                     Map<Integer, Object> iteratorCache = new HashMap<>();
 
@@ -232,9 +237,9 @@ public abstract class AParserTest extends Assert
                     }
 
                     @Override
-                    public String getColumn(int ordinal)
+                    public String getColumn(int columnOrdinal)
                     {
-                        return columns[ordinal];
+                        return columns[columnOrdinal];
                     }
 
                     @Override
@@ -244,12 +249,12 @@ public abstract class AParserTest extends Assert
                     }
 
                     @Override
-                    public Object getValue(int ordinal)
+                    public Object getValue(int columnOrdinal)
                     {
-                        Object v = iteratorCache.get(ordinal);
+                        Object v = iteratorCache.get(columnOrdinal);
                         if (v == null)
                         {
-                            v = values[ordinal];
+                            v = values[columnOrdinal];
                         }
 
                         // To be able to test an iterator multiple times, store the
@@ -258,7 +263,7 @@ public abstract class AParserTest extends Assert
                         {
                             @SuppressWarnings("unchecked")
                             List<Object> l = IteratorUtils.toList((Iterator<Object>) v);
-                            iteratorCache.put(ordinal, l.iterator());
+                            iteratorCache.put(columnOrdinal, l.iterator());
                             v = l.iterator();
                         }
 
@@ -291,7 +296,7 @@ public abstract class AParserTest extends Assert
             else if (function)
             {
                 Function<ExecutionContext, Object> f = CODE_GENERATOR.generateFunction(expr);
-                assertEquals("Code gen: " + expression, expected, f.apply(context));
+                assertEquals("Code gen: " + expression, expected, EvalUtils.unwrap(context, f.apply(context)));
             }
         }
         catch (Exception e)
@@ -299,5 +304,50 @@ public abstract class AParserTest extends Assert
             e.printStackTrace();
             fail(expression + " " + e.getMessage());
         }
+    }
+
+    /** Set up qualified expressions and tuple with values and types */
+    protected void setup(Tuple tuple, Expression e, Map<String, Pair<Object, DataType>> types)
+    {
+        e.accept(new AExpressionVisitor<Void, Void>()
+        {
+            int col;
+
+            @SuppressWarnings("deprecation")
+            @Override
+            public Void visit(QualifiedReferenceExpression e, Void context)
+            {
+                String colName = e.getQname().toString();
+                Pair<Object, DataType> pair = types.get(colName);
+                e.setResolvePaths(asList(new ResolvePath(-1, -1, asList(colName), -1,new int[0], pair.getValue())));
+                when(tuple.getColumnOrdinal(colName)).thenReturn(col);
+
+                boolean isNull = pair.getKey() == null;
+                when(tuple.isNull(col)).thenReturn(isNull);
+                if (!isNull && pair.getValue() == DataType.INT)
+                {
+                    when(tuple.getInt(col)).thenReturn((Integer) pair.getKey());
+                }
+                else if (!isNull && pair.getValue() == DataType.LONG)
+                {
+                    when(tuple.getLong(col)).thenReturn((Long) pair.getKey());
+                }
+                else if (!isNull && pair.getValue() == DataType.FLOAT)
+                {
+                    when(tuple.getFloat(col)).thenReturn((Float) pair.getKey());
+                }
+                else if (!isNull && pair.getValue() == DataType.DOUBLE)
+                {
+                    when(tuple.getDouble(col)).thenReturn((Double) pair.getKey());
+                }
+                else if (!isNull && pair.getValue() == DataType.BOOLEAN)
+                {
+                    when(tuple.getBool(col)).thenReturn((Boolean) pair.getKey());
+                }
+                when(tuple.getValue(col)).thenReturn(pair.getKey());
+                col++;
+                return null;
+            }
+        }, null);
     }
 }

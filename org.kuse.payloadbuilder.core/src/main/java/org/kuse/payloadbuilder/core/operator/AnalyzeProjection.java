@@ -1,5 +1,7 @@
 package org.kuse.payloadbuilder.core.operator;
 
+import static java.util.Objects.requireNonNull;
+
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -8,17 +10,19 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.kuse.payloadbuilder.core.DescribeUtils;
 import org.kuse.payloadbuilder.core.OutputWriter;
-import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
+import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
+import org.kuse.payloadbuilder.core.codegen.ProjectionCode;
+import org.kuse.payloadbuilder.core.operator.StatementContext.NodeData;
 
 /** Analyze projection that measures things like time spent, execution count. etc. */
 class AnalyzeProjection implements Projection
 {
     private final Projection target;
-    private final int nodeId;
+    private final Integer nodeId;
 
-    AnalyzeProjection(int nodeId, Projection target)
+    AnalyzeProjection(Integer nodeId, Projection target)
     {
-        this.nodeId = nodeId;
+        this.nodeId = requireNonNull(nodeId);
         this.target = target;
     }
 
@@ -55,7 +59,7 @@ class AnalyzeProjection implements Projection
         float percentageTime = 0;
         int executionCount = 0;
 
-        NodeData data = context.getOperatorContext().getNodeData(nodeId);
+        NodeData data = context.getStatementContext().getNodeData(nodeId);
         if (data != null)
         {
             executionCount = data.getExecutionCount();
@@ -65,7 +69,7 @@ class AnalyzeProjection implements Projection
             List<DescribableNode> children = getChildNodes();
             for (DescribableNode child : children)
             {
-                NodeData childData = context.getOperatorContext().getNodeData(child.getActualNodeId());
+                NodeData childData = context.getStatementContext().getNodeData(child.getActualNodeId());
                 if (childData != null)
                 {
                     total -= childData.getNodeTime(TimeUnit.MILLISECONDS);
@@ -91,9 +95,15 @@ class AnalyzeProjection implements Projection
     }
 
     @Override
+    public ProjectionCode generateCode(CodeGeneratorContext context)
+    {
+        return target.generateCode(context);
+    }
+
+    @Override
     public void writeValue(OutputWriter writer, ExecutionContext context)
     {
-        final NodeData data = context.getOperatorContext().getNodeData(nodeId, NodeData::new);
+        NodeData data = context.getStatementContext().getOrCreateNodeData(nodeId);
         data.increaseExecutionCount();
         data.resumeNodeTime();
         target.writeValue(writer, context);

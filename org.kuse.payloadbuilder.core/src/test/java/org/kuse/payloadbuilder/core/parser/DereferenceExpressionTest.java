@@ -48,7 +48,7 @@ public class DereferenceExpressionTest extends AParserTest
             }
 
             @Override
-            public String getColumn(int ordinal)
+            public String getColumn(int columnOrdinal)
             {
                 return "elite";
             }
@@ -64,11 +64,11 @@ public class DereferenceExpressionTest extends AParserTest
             }
 
             @Override
-            public Object getValue(int ordinal)
+            public Object getValue(int columnOrdinal)
             {
-                if (ordinal == 1337)
+                if (columnOrdinal == 1337)
                 {
-                    return ordinal;
+                    return columnOrdinal;
                 }
                 return null;
             }

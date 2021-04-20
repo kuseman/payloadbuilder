@@ -10,7 +10,7 @@ import java.util.Map;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 
 /** Subscript. index acces etc. ie "array[0]" */
-public class SubscriptExpression extends Expression
+public class SubscriptExpression extends Expression implements HasIdentifier
 {
     private final Expression value;
     private final Expression subscript;
@@ -29,6 +29,16 @@ public class SubscriptExpression extends Expression
     public Expression getSubscript()
     {
         return subscript;
+    }
+
+    @Override
+    public String identifier()
+    {
+        if (value instanceof QualifiedReferenceExpression)
+        {
+            return ((QualifiedReferenceExpression) value).identifier();
+        }
+        return null;
     }
 
     @Override
@@ -54,15 +64,17 @@ public class SubscriptExpression extends Expression
             return null;
         }
 
-        if (value instanceof Iterator)
-        {
-            return getFromIterator((Iterator<Object>) value, subscript);
-        }
-        else if (value instanceof List)
+        // Check list before iterator since there are classes implementing both
+        // like CollectionTuple and we want to favor list before iterator
+        if (value instanceof List)
         {
             int index = getInt(subscript);
             List<Object> list = (List<Object>) value;
             return index >= 0 && index < list.size() ? list.get(index) : null;
+        }
+        else if (value instanceof Iterator)
+        {
+            return getFromIterator((Iterator<Object>) value, subscript);
         }
         else if (value instanceof Iterable)
         {

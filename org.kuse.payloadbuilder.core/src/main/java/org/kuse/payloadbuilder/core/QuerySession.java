@@ -12,13 +12,26 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BooleanSupplier;
 
+import org.kuse.payloadbuilder.core.cache.BatchCacheProvider;
+import org.kuse.payloadbuilder.core.cache.CacheProvider;
+import org.kuse.payloadbuilder.core.cache.CacheProvider.Type;
+import org.kuse.payloadbuilder.core.cache.CustomCacheProvider;
+import org.kuse.payloadbuilder.core.cache.SessionBatchCacheProvider;
+import org.kuse.payloadbuilder.core.cache.SessionCustomCacheProvider;
+import org.kuse.payloadbuilder.core.cache.SessionTempTableCacheProvider;
+import org.kuse.payloadbuilder.core.cache.TempTableCacheProvider;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.operator.TemporaryTable;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.VariableExpression;
 
 /**
- * A query session. Holds properties for catalog implementations etc. Can live through multiple query executions
+ * A query session. Holds properties for catalog implementations etc.
+ *
+ * <pre>
+ * Life cycle for a session is pretty much infinite, the same session
+ * can be used for multiple executions.
+ * </pre>
  **/
 public class QuerySession
 {
@@ -28,17 +41,28 @@ public class QuerySession
      * property will be removed
      */
     public static final String CODEGEN_ENABLED = "codegen.enabled";
+    /** Disable batch cache */
+    public static final String BATCH_CACHE_DISABLED = "batch_cache.disbled";
+    /** Only perform reads when using batch cache */
+    public static final String BATCH_CACHE_READ_ONLY = "batch_cache.read_only";
     /* End system properties */
 
     private final CatalogRegistry catalogRegistry;
+
     /** Variable values for {@link VariableExpression}'s */
     private final Map<String, Object> variables;
     /** Catalog properties by catalog alias */
     private Map<String, Map<String, Object>> catalogProperties;
+    /** System properties */
+    private Map<String, Object> systemProperties;
+
     private Writer printWriter;
     private BooleanSupplier abortSupplier;
     private Map<QualifiedName, TemporaryTable> temporaryTables;
-    private Map<String, Object> systemProperties;
+
+    private BatchCacheProvider batchCacheProvider = new SessionBatchCacheProvider();
+    private TempTableCacheProvider tempTableCacheProvider = new SessionTempTableCacheProvider();
+    private CustomCacheProvider customCacheProvider = new SessionCustomCacheProvider();
 
     public QuerySession(CatalogRegistry catalogRegistry)
     {
@@ -178,14 +202,15 @@ public class QuerySession
     }
 
     /** Get catalog property */
-    public Object getCatalogProperty(String alias, String key)
+    @SuppressWarnings("unchecked")
+    public <T> T getCatalogProperty(String alias, String key)
     {
         if (catalogProperties == null)
         {
             return null;
         }
 
-        return catalogProperties.getOrDefault(alias, emptyMap()).get(key);
+        return (T) catalogProperties.getOrDefault(alias, emptyMap()).get(key);
     }
 
     /** Set system property */
@@ -202,5 +227,69 @@ public class QuerySession
     public Object getSystemProperty(String name)
     {
         return systemProperties != null ? systemProperties.get(lowerCase(name)) : null;
+    }
+
+    /** Return batch cache provider */
+    public BatchCacheProvider getBatchCacheProvider()
+    {
+        return batchCacheProvider;
+    }
+
+    /** Set batch cache provider */
+    public void setBatchCacheProvider(BatchCacheProvider batchCacheProvider)
+    {
+        this.batchCacheProvider = requireNonNull(batchCacheProvider, "Cache provider cannot be null");
+        if (batchCacheProvider.getType() != Type.BATCH)
+        {
+            throw new IllegalArgumentException("Wrong type of cache provider");
+        }
+    }
+
+    /** Return temp table cache provider */
+    public TempTableCacheProvider getTempTableCacheProvider()
+    {
+        return tempTableCacheProvider;
+    }
+
+    /** Set temp table cache provider */
+    public void setTempTableCacheProvider(TempTableCacheProvider tempTableCacheProvider)
+    {
+        this.tempTableCacheProvider = requireNonNull(tempTableCacheProvider, "Cache provider cannot be null");
+        if (tempTableCacheProvider.getType() != Type.TEMPTABLE)
+        {
+            throw new IllegalArgumentException("Wrong type of cache provider");
+        }
+    }
+
+    /** Return custom cache provider */
+    public CustomCacheProvider getCustomCacheProvider()
+    {
+        return customCacheProvider;
+    }
+
+    /** Set custom cache provider */
+    public void setCustomCacheProvider(CustomCacheProvider customCacheProvider)
+    {
+        this.customCacheProvider = requireNonNull(customCacheProvider, "Cache provider cannot be null");
+        if (customCacheProvider.getType() != Type.CUSTOM)
+        {
+            throw new IllegalArgumentException("Wrong type of cache provider");
+        }
+    }
+
+    /** Return cache provider with provided type */
+    public CacheProvider getCacheProvider(CacheProvider.Type type)
+    {
+        switch (type)
+        {
+            case BATCH:
+                return batchCacheProvider;
+            case CUSTOM:
+                return customCacheProvider;
+            case TEMPTABLE:
+                return tempTableCacheProvider;
+            default:
+                throw new IllegalArgumentException("Unknown cache type " + type);
+        }
     }
 }

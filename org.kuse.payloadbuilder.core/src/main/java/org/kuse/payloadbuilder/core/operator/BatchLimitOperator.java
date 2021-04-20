@@ -12,7 +12,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.kuse.payloadbuilder.core.DescribeUtils;
 import org.kuse.payloadbuilder.core.operator.BatchRepeatOperator.BatchLimitData;
-import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
+import org.kuse.payloadbuilder.core.operator.StatementContext.NodeData;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /**
@@ -52,7 +52,7 @@ class BatchLimitOperator extends AOperator
     @Override
     public RowIterator open(ExecutionContext context)
     {
-        Data data = context.getOperatorContext().getNodeData(nodeId, Data::new);
+        Data data = context.getStatementContext().getOrCreateNodeData(nodeId, Data::new);
         if (data.iterator == null)
         {
             Object obj = batchLimitExpression.eval(context);

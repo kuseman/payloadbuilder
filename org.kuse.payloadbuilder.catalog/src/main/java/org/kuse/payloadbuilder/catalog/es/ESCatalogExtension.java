@@ -114,8 +114,8 @@ class ESCatalogExtension implements ICatalogExtension
     @Override
     public void update(String catalogAlias, QuerySession querySession)
     {
-        String endpoint = (String) querySession.getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY);
-        String index = (String) querySession.getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY);
+        String endpoint = querySession.getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY);
+        String index = querySession.getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY);
         String endointToSet = null;
         String indexToSet = null;
         for (Entry<String, List<String>> e : indicesByEndpoint.entrySet())

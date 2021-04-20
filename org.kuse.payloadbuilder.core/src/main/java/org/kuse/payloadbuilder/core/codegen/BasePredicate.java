@@ -7,7 +7,7 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Base class for predicates */
 //CSOFF
-public abstract class BasePredicate implements Predicate<ExecutionContext>
+public abstract class BasePredicate extends BaseGeneratedClass implements Predicate<ExecutionContext>
 //CSON
 {
     private Expression expression;
@@ -17,7 +17,7 @@ public abstract class BasePredicate implements Predicate<ExecutionContext>
         this.expression = expression;
     }
 
-    public Object getExpression()
+    public Expression getExpression()
     {
         return expression;
     }

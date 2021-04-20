@@ -10,6 +10,7 @@ import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.RowList;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.Expression;
@@ -74,7 +75,16 @@ class OpenRowsFunction extends TableFunctionInfo
     @Override
     public RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
     {
-        final Object value = arguments.get(0).eval(context);
+        Object value = arguments.get(0).eval(context);
+        if (value == null)
+        {
+            return RowIterator.EMPTY;
+        }
+        else if (value instanceof RowList)
+        {
+            return (RowList) value;
+        }
+
         final Iterator<Object> it = CollectionUtils.getIterator(value);
         //CSOFF
         return new RowIterator()
@@ -85,7 +95,12 @@ class OpenRowsFunction extends TableFunctionInfo
             @Override
             public boolean hasNext()
             {
-                return setNext();
+                if (!it.hasNext())
+                {
+                    return false;
+                }
+                next = (Tuple) it.next();
+                return true;
             }
 
             @Override
@@ -94,22 +109,6 @@ class OpenRowsFunction extends TableFunctionInfo
                 Tuple r = next;
                 next = null;
                 return r;
-            }
-
-            private boolean setNext()
-            {
-                while (next == null)
-                {
-                    if (!it.hasNext())
-                    {
-                        return false;
-                    }
-
-                    Object value = it.next();
-                    next = (Tuple) value;
-                }
-
-                return next != null;
             }
         };
     }

@@ -32,9 +32,9 @@ class ExpressionTupleComparator implements TupleComparator
             Order order = item.getOrder();
             Expression e = item.getExpression();
 
-            context.setTuple(a);
+            context.getStatementContext().setTuple(a);
             Object aValue = e.eval(context);
-            context.setTuple(b);
+            context.getStatementContext().setTuple(b);
             Object bValue = e.eval(context);
 
             if (aValue == null && bValue == null)

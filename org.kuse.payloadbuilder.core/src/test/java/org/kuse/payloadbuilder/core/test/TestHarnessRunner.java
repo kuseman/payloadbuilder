@@ -1,6 +1,7 @@
 package org.kuse.payloadbuilder.core.test;
 
 import static java.util.Arrays.asList;
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.containsIgnoreCase;
 import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
@@ -10,9 +11,11 @@ import static org.junit.Assert.fail;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -21,6 +24,7 @@ import org.junit.Assume;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.kuse.payloadbuilder.core.CompiledQuery;
 import org.kuse.payloadbuilder.core.Payloadbuilder;
 import org.kuse.payloadbuilder.core.QueryResult;
 import org.kuse.payloadbuilder.core.QuerySession;
@@ -33,6 +37,7 @@ import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Tuple;
+import org.kuse.payloadbuilder.core.utils.ExpressionMath;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -97,7 +102,9 @@ public class TestHarnessRunner
         testInternal(true);
     }
 
+    //CSOFF
     private void testInternal(boolean codeGen)
+    //CSON
     {
         CatalogRegistry registry = new CatalogRegistry();
         for (TestCatalog catalog : harness.getCatalogs())
@@ -115,8 +122,18 @@ public class TestHarnessRunner
             }
         };
 
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw)
+        {
+            @Override
+            public void flush()
+            {
+                throw new RuntimeException("Error:" + sw.toString());
+            }
+        };
+
         QuerySession session = new QuerySession(registry);
-        session.setPrintWriter(new PrintWriter(System.out));
+        session.setPrintWriter(pw);
 
         if (codeGen)
         {
@@ -129,7 +146,8 @@ public class TestHarnessRunner
         boolean fail = false;
         try
         {
-            QueryResult result = Payloadbuilder.query(session, testCase.getQuery());
+            CompiledQuery query = Payloadbuilder.compile(testCase.getQuery(), session.getCatalogRegistry());
+            QueryResult result = query.execute(session);
             while (result.hasMoreResults())
             {
                 actualResultSets.add(new ArrayList<>());
@@ -172,12 +190,69 @@ public class TestHarnessRunner
 
         int size = testCase.getExpectedResultSets().size();
 
-        Assert.assertEquals("Expected number of result sets to be equal", size, actualResultSets.size());
+        Assert.assertEquals((codeGen ? "CodeGen: " : "") + "Expected number of result sets to be equal", size, actualResultSets.size());
 
         for (int i = 0; i < size; i++)
         {
-            Assert.assertEquals("Expected rows in result set: " + (i + 1) + " to be equal", testCase.getExpectedResultSets().get(i), actualResultSets.get(i));
+            assertResultSetEqual(codeGen, i, testCase.getExpectedResultSets().get(i), actualResultSets.get(i));
         }
+    }
+
+    private void assertResultSetEqual(boolean codeGen, int number, List<List<ColumnValue>> expected, List<List<ColumnValue>> actual)
+    {
+        int size = expected.size();
+        if (size != actual.size())
+        {
+            fail((codeGen ? "CodeGen: " : "") + "Result set number: " + (number + 1) + ", expected size " + size + " but was " + actual.size());
+        }
+
+        for (int i = 0; i < size; i++)
+        {
+            List<ColumnValue> expectedRow = expected.get(i);
+            List<ColumnValue> actualRow = actual.get(i);
+
+            int rowSize = expectedRow.size();
+            if (rowSize != actualRow.size())
+            {
+                fail((codeGen ? "CodeGen: " : "") + "Result set number: " + (number + 1) + ", row number: " + i + ", expected size " + rowSize + " but was " + actualRow.size());
+            }
+
+            for (int j = 0; j < rowSize; j++)
+            {
+                ColumnValue expectedColumn = expectedRow.get(j);
+                ColumnValue actualColumn = actualRow.get(j);
+
+                if (!equals(expectedColumn, actualColumn))
+                {
+                    fail((codeGen ? "CodeGen: " : "") + "Result set number: " + (number + 1) + ", row: " + i + ", col: " + j + ", expected " + expectedColumn + " but was " + actualColumn + System.lineSeparator() + "Expected: " + System.lineSeparator() + expected.stream().map(Object::toString).collect(joining(System.lineSeparator())) + System.lineSeparator() + ", but was:" + System.lineSeparator() + actual.stream().map(Object::toString).collect(joining(System.lineSeparator())));
+                }
+            }
+        }
+    }
+
+    private boolean equals(ColumnValue expected, ColumnValue actual)
+    {
+        if (!Objects.equals(expected.getKey(), actual.getKey()))
+        {
+            return false;
+        }
+
+        if (expected.getValue() == null)
+        {
+            return actual.getValue() == null;
+        }
+        else if (actual.getValue() == null)
+        {
+            return false;
+        }
+
+        // Use expression math to handle float = double etc.
+        if (ExpressionMath.eq(expected.getValue(), actual.getValue(), false))
+        {
+            return true;
+        }
+
+        return Objects.equals(expected.getValue(), actual.getValue());
     }
 
     /** Harness catalog */

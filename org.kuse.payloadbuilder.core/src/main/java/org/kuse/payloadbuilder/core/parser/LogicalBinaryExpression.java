@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 import static org.kuse.payloadbuilder.core.parser.LiteralBooleanExpression.FALSE_LITERAL;
 import static org.kuse.payloadbuilder.core.parser.LiteralBooleanExpression.TRUE_LITERAL;
 
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
@@ -38,9 +39,9 @@ public class LogicalBinaryExpression extends Expression
     }
 
     @Override
-    public Class<?> getDataType()
+    public DataType getDataType()
     {
-        return Boolean.class;
+        return DataType.BOOLEAN;
     }
 
     @Override
@@ -146,7 +147,7 @@ public class LogicalBinaryExpression extends Expression
     @Override
     public ExpressionCode generateCode(CodeGeneratorContext context)
     {
-        ExpressionCode code = context.getCode();
+        ExpressionCode code = context.getExpressionCode();
 
         ExpressionCode leftCode = left.generateCode(context);
         ExpressionCode rightCode = right.generateCode(context);
@@ -154,38 +155,46 @@ public class LogicalBinaryExpression extends Expression
         if (type == LogicalBinaryExpression.Type.AND)
         {
             /* False if either side is false or null */
-            String template = "%s"
-                + "Boolean %s = false;\n"
-                + "if (%s != null && (Boolean) %s)\n"
+            String template = "%s"                              // leftCode
+                + "boolean %s = false;\n"                       // resVar
+                + "boolean %s = true;\n"                        // nullVar
+                + "if (!%s && %s %s)\n"                         // left nullVar, cast left, left resVar
                 + "{\n"
-                + "  %s"
-                + "  %s = %s != null && (Boolean) %s;\n"
+                + "  %s"                                        // right code
+                + "  %s = !%s && %s %s;\n"                      // resVar, right nullVar, cast right, right resVar
+                + "  %s = %s;\n"                                // nullVar, right nullVar
                 + "}\n";
 
             code.setCode(String.format(template,
                     leftCode.getCode(),
                     code.getResVar(),
-                    leftCode.getResVar(), leftCode.getResVar(),
+                    code.getNullVar(),
+                    leftCode.getNullVar(), left.getDataType() != DataType.BOOLEAN ? "(Boolean)" : "", leftCode.getResVar(),
                     rightCode.getCode(),
-                    code.getResVar(), rightCode.getResVar(), rightCode.getResVar()));
+                    code.getResVar(), rightCode.getNullVar(), right.getDataType() != DataType.BOOLEAN ? "(Boolean)" : "", rightCode.getResVar(),
+                    code.getNullVar(), rightCode.getNullVar()));
         }
         else    // OR
         {
             // true if left or right is true no matter of null
-            String template = "%s"
-                + "Boolean %s = true;\n"
-                + "if (%s == null || !(Boolean) %s)\n"
+            String template = "%s"                              // leftCode
+                + "boolean %s = true;\n"                        // resVar
+                + "boolean %s = %s;\n"                          // nullVar, left nullVar
+                + "if (%s || !%s %s)\n"                         // left nullVar, cast left, left resVar
                 + "{\n"
-                + "  %s"
-                + "  %s = %s != null && (Boolean) %s;\n"
+                + "  %s"                                        // rightCode
+                + "  %s = !%s && %s %s;\n"                      // resVar, right nullVar, cast right, right resVar
+                + "  %s = %s && %s;\n"                          // nullVar, left nullVar, right nullVar
                 + "}\n";
 
             code.setCode(String.format(template,
                     leftCode.getCode(),
                     code.getResVar(),
-                    leftCode.getResVar(), leftCode.getResVar(),
+                    code.getNullVar(), leftCode.getNullVar(),
+                    leftCode.getNullVar(), left.getDataType() != DataType.BOOLEAN ? "(Boolean)" : "", leftCode.getResVar(),
                     rightCode.getCode(),
-                    code.getResVar(), rightCode.getResVar(), rightCode.getResVar()));
+                    code.getResVar(), rightCode.getNullVar(), right.getDataType() != DataType.BOOLEAN ? "(Boolean)" : "", rightCode.getResVar(),
+                    code.getNullVar(), leftCode.getNullVar(), rightCode.getNullVar()));
         }
 
         return code;

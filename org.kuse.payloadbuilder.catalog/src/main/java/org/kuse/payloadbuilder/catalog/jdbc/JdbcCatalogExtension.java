@@ -119,8 +119,8 @@ class JdbcCatalogExtension implements ICatalogExtension
     @Override
     public void update(String catalogAlias, QuerySession querySession)
     {
-        String url = (String) querySession.getCatalogProperty(catalogAlias, JdbcCatalog.URL);
-        String database = (String) querySession.getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE);
+        String url = querySession.getCatalogProperty(catalogAlias, JdbcCatalog.URL);
+        String database = querySession.getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE);
 
         MutableObject<ServerConnection> connectionToSelect = new MutableObject<>();
         MutableObject<String> databaseToSelect = new MutableObject<>();
@@ -170,12 +170,12 @@ class JdbcCatalogExtension implements ICatalogExtension
         if (askForCredentials)
         {
             ServerConnection connection = (ServerConnection) propertiesComponent.connections.getSelectedItem();
-            String url = (String) querySession.getCatalogProperty(catalogAlias, JdbcCatalog.URL);
+            String url = querySession.getCatalogProperty(catalogAlias, JdbcCatalog.URL);
 
             boolean isSelectedConnection = equalsIgnoreCase(url, connection.getURL());
 
             String connectionDescription = isSelectedConnection ? connection.toString() : url;
-            String prefilledUsername = isSelectedConnection ? connection.username : (String) querySession.getCatalogProperty(catalogAlias, JdbcCatalog.USERNAME);
+            String prefilledUsername = isSelectedConnection ? connection.username : querySession.getCatalogProperty(catalogAlias, JdbcCatalog.USERNAME);
 
             Pair<String, char[]> credentials = getCredentials(connectionDescription, prefilledUsername);
             if (credentials != null)

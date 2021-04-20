@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
@@ -46,6 +47,18 @@ class IsNullFunction extends ScalarFunctionInfo
     }
 
     @Override
+    public DataType getDataType(List<Expression> arguments)
+    {
+        DataType aType = arguments.get(0).getDataType();
+        DataType bType = arguments.get(1).getDataType();
+        if (aType == bType)
+        {
+            return aType;
+        }
+        return DataType.ANY;
+    }
+
+    @Override
     public boolean isCodeGenSupported(List<Expression> arguments)
     {
         return arguments.get(0).isCodeGenSupported() && arguments.get(1).isCodeGenSupported();
@@ -54,24 +67,44 @@ class IsNullFunction extends ScalarFunctionInfo
     @Override
     public ExpressionCode generateCode(CodeGeneratorContext context, List<Expression> arguments)
     {
-        ExpressionCode code = context.getCode();
+        ExpressionCode code = context.getExpressionCode();
 
         ExpressionCode arg0Code = arguments.get(0).generateCode(context);
         ExpressionCode arg1Code = arguments.get(1).generateCode(context);
 
-        String template = "// ISNULL\n"
-            + "%s"
-            + "Object %s = %s;\n"
-            + "if (%s == null)\n"
+        /*
+         * Object v_0 = ...
+         * boolean n_0 = ....
+         *
+         * Object v_2 = v_0;
+         * boolean n_2 = n_0;
+         * if (n_0)
+         * {
+         *   Object v_1 = ...
+         *   boolean n_1 = ....
+         *
+         *   v_2 = v_1;
+         *   n_0 = n_1;
+         * }
+         */
+
+        String template = "// isnull \n"
+            + "%s"                              // arg0 code
+            + "boolean %s = %s;\n"              // nullVar, arg0 nullVar
+            + "%s %s = %s;\n"                   // datatype, resVar, arg0 resVar
+            + "if (%s)\n"                       // arg0 nullVar
             + "{\n"
-            + "  %s"
-            + "  %s = %s;\n"
+            + "  %s"                            // arg1 code
+            + "  %s = %s;\n"                    // nullVar, arg1 nullVar
+            + "  %s = %s;\n"                    // resVar, arg1 resVar
             + "}\n";
         code.setCode(String.format(template,
                 arg0Code.getCode(),
-                code.getResVar(), arg0Code.getResVar(),
-                code.getResVar(),
+                code.getNullVar(), arg0Code.getNullVar(),
+                getDataType(arguments).getJavaTypeString(), code.getResVar(), arg0Code.getResVar(),
+                arg0Code.getNullVar(),
                 arg1Code.getCode(),
+                code.getNullVar(), arg1Code.getNullVar(),
                 code.getResVar(), arg1Code.getResVar()));
         return code;
     }

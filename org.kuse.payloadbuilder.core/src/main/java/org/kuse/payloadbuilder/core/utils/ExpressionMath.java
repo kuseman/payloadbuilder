@@ -1,9 +1,12 @@
 package org.kuse.payloadbuilder.core.utils;
 
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.Iterator;
 
-/** Math methods used when evaluating expressions */
+/**
+ * Math methods used when evaluating expressions TODO: Overflows aren't taken care of in arithmetic operations
+ */
 public final class ExpressionMath
 {
     private ExpressionMath()
@@ -13,100 +16,54 @@ public final class ExpressionMath
     private static final byte ONE = 1;
     private static final byte ZERO = 1;
 
-    /** Equals */
-    public static boolean eq(Number left, Number right)
+    /** Double op */
+    private interface DoubleOp
     {
-        if (left instanceof Double || right instanceof Double)
-        {
-            return Double.compare(left.doubleValue(), right.doubleValue()) == 0;
-        }
-        else if (left instanceof Float || right instanceof Float)
-        {
-            return Float.compare(left.floatValue(), right.floatValue()) == 0;
-        }
-        else if (left instanceof Long || right instanceof Long)
-        {
-            return left.longValue() == right.longValue();
-        }
-
-        return left.intValue() == right.intValue();
+        double apply(double left, double right);
     }
 
-    /** Greater than */
-    public static boolean gt(Number left, Number right)
+    /** Float op */
+    private interface FloatOp
     {
-        if (left instanceof Double || right instanceof Double)
-        {
-            return left.doubleValue() > right.doubleValue();
-        }
-        else if (left instanceof Float || right instanceof Float)
-        {
-            return left.floatValue() > right.floatValue();
-        }
-        else if (left instanceof Long || right instanceof Long)
-        {
-            return left.longValue() > right.longValue();
-        }
-
-        return left.intValue() > right.intValue();
+        float apply(float left, float right);
     }
 
-    /** Greater than equal */
-    public static boolean gte(Number left, Number right)
+    /** Long op */
+    private interface LongOp
     {
-        if (left instanceof Double || right instanceof Double)
-        {
-            return left.doubleValue() >= right.doubleValue();
-        }
-        else if (left instanceof Float || right instanceof Float)
-        {
-            return left.floatValue() >= right.floatValue();
-        }
-        else if (left instanceof Long || right instanceof Long)
-        {
-            return left.longValue() >= right.longValue();
-        }
-
-        return left.intValue() >= right.intValue();
+        long apply(long left, long right);
     }
 
-    /** Less than */
-    public static boolean lt(Number left, Number right)
+    /** Int op */
+    private interface IntOp
     {
-        if (left instanceof Double || right instanceof Double)
-        {
-            return left.doubleValue() < right.doubleValue();
-        }
-        else if (left instanceof Float || right instanceof Float)
-        {
-            return left.floatValue() < right.floatValue();
-        }
-        else if (left instanceof Long || right instanceof Long)
-        {
-            return left.longValue() < right.longValue();
-        }
-
-        return left.intValue() < right.intValue();
+        int apply(int left, int right);
     }
 
-    /** Less than equal */
-    public static boolean lte(Number left, Number right)
-    {
-        if (left instanceof Double || right instanceof Double)
-        {
-            return left.doubleValue() <= right.doubleValue();
-        }
-        else if (left instanceof Float || right instanceof Float)
-        {
-            return left.floatValue() <= right.floatValue();
-        }
-        else if (left instanceof Long || right instanceof Long)
-        {
-            return left.longValue() <= right.longValue();
-        }
+    private static final DoubleOp ADD_DOUBLE = (left, right) -> left + right;
+    private static final FloatOp ADD_FLOAT = (left, right) -> left + right;
+    private static final LongOp ADD_LONG = (left, right) -> left + right;
+    private static final IntOp ADD_INT = (left, right) -> left + right;
 
-        return left.intValue() <= right.intValue();
-    }
+    private static final DoubleOp SUB_DOUBLE = (left, right) -> left - right;
+    private static final FloatOp SUB_FLOAT = (left, right) -> left - right;
+    private static final LongOp SUB_LONG = (left, right) -> left - right;
+    private static final IntOp SUB_INT = (left, right) -> left - right;
+
+    private static final DoubleOp MUL_DOUBLE = (left, right) -> left * right;
+    private static final FloatOp MUL_FLOAT = (left, right) -> left * right;
+    private static final LongOp MUL_LONG = (left, right) -> left * right;
+    private static final IntOp MUL_INT = (left, right) -> left * right;
+
+    private static final DoubleOp DIV_DOUBLE = (left, right) -> left / right;
+    private static final FloatOp DIV_FLOAT = (left, right) -> left / right;
+    private static final LongOp DIV_LONG = (left, right) -> left / right;
+    private static final IntOp DIV_INT = (left, right) -> left / right;
+
+    private static final DoubleOp MOD_DOUBLE = (left, right) -> left % right;
+    private static final FloatOp MOD_FLOAT = (left, right) -> left % right;
+    private static final LongOp MOD_LONG = (left, right) -> left % right;
+    private static final IntOp MOD_INT = (left, right) -> left % right;
 
     /** Greater than */
     @SuppressWarnings("unchecked")
@@ -118,7 +75,7 @@ public final class ExpressionMath
             Number r = convertToNumber(l, right, true);
             if (r != null)
             {
-                return gt(l, r);
+                return cmp(l, r) > 0;
             }
         }
         else if (right instanceof Number)
@@ -127,7 +84,7 @@ public final class ExpressionMath
             Number l = convertToNumber(r, left, true);
             if (l != null)
             {
-                return gt(l, r);
+                return cmp(l, r) > 0;
             }
         }
         else if (left instanceof Boolean && right instanceof Boolean)
@@ -155,7 +112,7 @@ public final class ExpressionMath
             Number r = convertToNumber(l, right, true);
             if (r != null)
             {
-                return gte(l, r);
+                return cmp(l, r) >= 0;
             }
         }
         else if (right instanceof Number)
@@ -164,7 +121,7 @@ public final class ExpressionMath
             Number l = convertToNumber(r, left, true);
             if (l != null)
             {
-                return gte(l, r);
+                return cmp(l, r) >= 0;
             }
         }
         else if (left instanceof Boolean && right instanceof Boolean)
@@ -192,7 +149,7 @@ public final class ExpressionMath
             Number r = convertToNumber(l, right, true);
             if (r != null)
             {
-                return lt(l, r);
+                return cmp(l, r) < 0;
             }
         }
         else if (right instanceof Number)
@@ -201,7 +158,7 @@ public final class ExpressionMath
             Number l = convertToNumber(r, left, true);
             if (l != null)
             {
-                return lt(l, r);
+                return cmp(l, r) < 0;
             }
         }
         else if (left instanceof Boolean && right instanceof Boolean)
@@ -229,7 +186,7 @@ public final class ExpressionMath
             Number r = convertToNumber(l, right, true);
             if (r != null)
             {
-                return lte(l, r);
+                return cmp(l, r) <= 0;
             }
         }
         else if (right instanceof Number)
@@ -238,7 +195,7 @@ public final class ExpressionMath
             Number l = convertToNumber(r, left, true);
             if (l != null)
             {
-                return lte(l, r);
+                return cmp(l, r) <= 0;
             }
         }
         else if (left instanceof Boolean && right instanceof Boolean)
@@ -256,31 +213,46 @@ public final class ExpressionMath
         return ((Comparable<Object>) left).compareTo(right) <= 0;
     }
 
-    /** Equal */
-    public static boolean eq(Object left, Object right)
-    {
-        return eq(left, right, true);
-    }
-
     /** Compare */
     @SuppressWarnings("unchecked")
     public static int cmp(Object left, Object right)
     {
-        if (left instanceof Double && right instanceof Number)
+        if ((left instanceof Double
+            || left instanceof BigDecimal)
+            && right instanceof Number)
         {
-            return Double.compare(((Double) left).doubleValue(), ((Number) right).doubleValue());
+            return Double.compare(((Number) left).doubleValue(), ((Number) right).doubleValue());
         }
-        else if (left instanceof Float && right instanceof Number)
+        else if ((right instanceof Double
+            || right instanceof BigDecimal)
+            && left instanceof Number)
         {
-            return Float.compare(((Float) left).floatValue(), ((Number) right).floatValue());
+            return Double.compare(((Number) left).doubleValue(), ((Number) right).doubleValue());
         }
-        else if (left instanceof Long && right instanceof Number)
+        else if (left instanceof Float
+            && right instanceof Number)
         {
-            return Long.compare(((Long) left).longValue(), ((Number) right).longValue());
+            return Float.compare(((Number) left).floatValue(), ((Number) right).floatValue());
         }
-        else if (left instanceof Integer && right instanceof Number)
+        else if (right instanceof Float
+            && left instanceof Number)
         {
-            return Integer.compare(((Integer) left).intValue(), ((Number) right).intValue());
+            return Float.compare(((Number) left).floatValue(), ((Number) right).floatValue());
+        }
+        else if (left instanceof Long
+            && right instanceof Number)
+        {
+            return Long.compare(((Number) left).longValue(), ((Number) right).longValue());
+        }
+        else if (right instanceof Long
+            && left instanceof Number)
+        {
+            return Long.compare(((Number) left).longValue(), ((Number) right).longValue());
+        }
+        else if (left instanceof Integer
+            && right instanceof Number)
+        {
+            return Integer.compare(((Number) left).intValue(), ((Number) right).intValue());
         }
         else if (left.getClass() != right.getClass() || !(left instanceof Comparable))
         {
@@ -288,6 +260,16 @@ public final class ExpressionMath
         }
 
         return ((Comparable<Object>) left).compareTo(right);
+    }
+
+    /** Equal */
+    public static boolean eq(Object left, Object right)
+    {
+        if (left == null || right == null)
+        {
+            return left == right;
+        }
+        return eq(left, right, true);
     }
 
     /** Equal */
@@ -300,7 +282,7 @@ public final class ExpressionMath
             Number r = convertToNumber(l, right, throwIfNotComparable);
             if (r != null)
             {
-                return eq(l, r);
+                return cmp(l, r) == 0;
             }
         }
         else if (right instanceof Number)
@@ -309,7 +291,7 @@ public final class ExpressionMath
             Number l = convertToNumber(r, left, throwIfNotComparable);
             if (l != null)
             {
-                return eq(l, r);
+                return cmp(l, r) == 0;
             }
         }
         else if (left instanceof Boolean && right instanceof Boolean)
@@ -330,525 +312,34 @@ public final class ExpressionMath
         return ((Comparable<Object>) left).compareTo(right) == 0;
     }
 
-    /* ARITHMETIC METHODS  */
-    /** Add */
-    public static long add(long left, long right)
+    /** Arithmetic operation */
+    private static Number arithmetic(
+            Number left,
+            Number right,
+            DoubleOp doubleOp,
+            FloatOp floatOp,
+            LongOp longOp,
+            IntOp intOp)
     {
-        return left + right;
-    };
-
-    /** Add */
-    public static double add(long left, double right)
-    {
-        return left + right;
-    };
-
-    /** Add */
-    public static double add(double left, long right)
-    {
-        return left + right;
-    };
-
-    /** Add */
-    public static double add(double left, double right)
-    {
-        return left + right;
-    };
-
-    /** Add */
-    public static Number add(double left, Number right)
-    {
-        return right != null ? left + right.doubleValue() : null;
-    }
-
-    /** Add */
-    public static Number add(Number left, double right)
-    {
-        return left != null ? left.doubleValue() + right : null;
-    }
-
-    /** Add */
-    public static Number add(Number left, long right)
-    {
-        if (left == null)
+        if (left instanceof BigDecimal
+            || right instanceof BigDecimal
+            || left instanceof Double
+            || right instanceof Double)
         {
-            return left;
+            return doubleOp.apply(left.doubleValue(), right.doubleValue());
         }
-        else if (left instanceof Double)
+        else if (left instanceof Float
+            || right instanceof Float)
         {
-            return left.doubleValue() + right;
+            return floatOp.apply(left.floatValue(), right.floatValue());
         }
-        else if (left instanceof Float)
+        else if (left instanceof Long
+            || right instanceof Long)
         {
-            return left.floatValue() + right;
-        }
-        else if (left instanceof Long)
-        {
-            return left.longValue() + right;
-        }
-        return left.intValue() + right;
-    }
-
-    /** Add */
-    public static Number add(long left, Number right)
-    {
-        if (right == null)
-        {
-            return right;
-        }
-        else if (right instanceof Double)
-        {
-            return left + right.doubleValue();
-        }
-        else if (right instanceof Float)
-        {
-            return left + right.floatValue();
-        }
-        else if (right instanceof Long)
-        {
-            return left + right.longValue();
-        }
-        return left + right.intValue();
-    }
-
-    /** Add */
-    public static Number add(Number left, Number right)
-    {
-        if (left == null || right == null)
-        {
-            return null;
+            return longOp.apply(left.longValue(), right.longValue());
         }
 
-        if (left instanceof Double || right instanceof Double)
-        {
-            return left.doubleValue() + right.doubleValue();
-        }
-        else if (left instanceof Float || right instanceof Float)
-        {
-            return left.floatValue() + right.floatValue();
-        }
-        else if (left instanceof Long || right instanceof Long)
-        {
-            return left.longValue() + right.longValue();
-        }
-
-        return left.intValue() + right.intValue();
-    }
-
-    /** Subtract */
-    public static long subtract(long left, long right)
-    {
-        return left - right;
-    };
-
-    /** Subtract */
-    public static double subtract(long left, double right)
-    {
-        return left - right;
-    };
-
-    /** Subtract */
-    public static double subtract(double left, long right)
-    {
-        return left - right;
-    };
-
-    /** Subtract */
-    public static double subtract(double left, double right)
-    {
-        return left - right;
-    };
-
-    /** Subtract */
-    public static Number subtract(double left, Number right)
-    {
-        return right != null ? left - right.longValue() : null;
-    }
-
-    /** Subtract */
-    public static Number subtract(Number left, double right)
-    {
-        return left != null ? left.longValue() - right : null;
-    }
-
-    /** Subtract */
-    public static Number subtract(Number left, long right)
-    {
-        if (left == null)
-        {
-            return left;
-        }
-        else if (left instanceof Double)
-        {
-            return left.doubleValue() - right;
-        }
-        else if (left instanceof Float)
-        {
-            return left.floatValue() - right;
-        }
-        else if (left instanceof Long)
-        {
-            return left.longValue() - right;
-        }
-        return left.intValue() - right;
-    }
-
-    /** Subtract */
-    public static Number subtract(long left, Number right)
-    {
-        if (right == null)
-        {
-            return right;
-        }
-        else if (right instanceof Double)
-        {
-            return left - right.doubleValue();
-        }
-        else if (right instanceof Float)
-        {
-            return left - right.floatValue();
-        }
-        else if (right instanceof Long)
-        {
-            return left - right.longValue();
-        }
-        return left - right.intValue();
-    }
-
-    /** Subtract */
-    public static Number subtract(Number left, Number right)
-    {
-        if (left == null || right == null)
-        {
-            return null;
-        }
-
-        if (left instanceof Double || right instanceof Double)
-        {
-            return left.doubleValue() - right.doubleValue();
-        }
-        else if (left instanceof Float || right instanceof Float)
-        {
-            return left.floatValue() - right.floatValue();
-        }
-        else if (left instanceof Long || right instanceof Long)
-        {
-            return left.longValue() - right.longValue();
-        }
-
-        return left.intValue() - right.intValue();
-    }
-
-    /** Multiply */
-    public static long multiply(long left, long right)
-    {
-        return left * right;
-    };
-
-    /** Multiply */
-    public static double multiply(long left, double right)
-    {
-        return left * right;
-    };
-
-    /** Multiply */
-    public static double multiply(double left, long right)
-    {
-        return left * right;
-    };
-
-    /** Multiply */
-    public static double multiply(double left, double right)
-    {
-        return left * right;
-    };
-
-    /** Multiply */
-    public static Number multiply(double left, Number right)
-    {
-        return right != null ? left * right.doubleValue() : null;
-    }
-
-    /** Multiply */
-    public static Number multiply(Number left, double right)
-    {
-        return left != null ? left.doubleValue() * right : null;
-    }
-
-    /** Multiply */
-    public static Number multiply(Number left, long right)
-    {
-        if (left == null)
-        {
-            return left;
-        }
-        else if (left instanceof Double)
-        {
-            return left.doubleValue() * right;
-        }
-        else if (left instanceof Float)
-        {
-            return left.floatValue() * right;
-        }
-        else if (left instanceof Long)
-        {
-            return left.longValue() * right;
-        }
-        return left.intValue() * right;
-    }
-
-    /** Multiply */
-    public static Number multiply(long left, Number right)
-    {
-        if (right == null)
-        {
-            return right;
-        }
-        else if (right instanceof Double)
-        {
-            return left * right.doubleValue();
-        }
-        else if (right instanceof Float)
-        {
-            return left * right.floatValue();
-        }
-        else if (right instanceof Long)
-        {
-            return left * right.longValue();
-        }
-        return left * right.intValue();
-    }
-
-    /** Multiply */
-    public static Number multiply(Number left, Number right)
-    {
-        if (left == null || right == null)
-        {
-            return null;
-        }
-
-        if (left instanceof Double || right instanceof Double)
-        {
-            return left.doubleValue() * right.doubleValue();
-        }
-        else if (left instanceof Float || right instanceof Float)
-        {
-            return left.floatValue() * right.floatValue();
-        }
-        else if (left instanceof Long || right instanceof Long)
-        {
-            return left.longValue() * right.longValue();
-        }
-
-        return left.intValue() * right.intValue();
-    }
-
-    /** Divide */
-    public static long divide(long left, long right)
-    {
-        return left / right;
-    };
-
-    /** Divide */
-    public static double divide(long left, double right)
-    {
-        return left / right;
-    };
-
-    /** Divide */
-    public static double divide(double left, long right)
-    {
-        return left / right;
-    };
-
-    /** Divide */
-    public static double divide(double left, double right)
-    {
-        return left / right;
-    };
-
-    /** Divide */
-    public static Number divide(double left, Number right)
-    {
-        return right != null ? left / right.doubleValue() : null;
-    }
-
-    /** Divide */
-    public static Number divide(Number left, double right)
-    {
-        return left != null ? left.doubleValue() / right : null;
-    }
-
-    /** Divide */
-    public static Number divide(Number left, long right)
-    {
-        if (left == null)
-        {
-            return left;
-        }
-        else if (left instanceof Double)
-        {
-            return left.doubleValue() / right;
-        }
-        else if (left instanceof Float)
-        {
-            return left.floatValue() / right;
-        }
-        else if (left instanceof Long)
-        {
-            return left.longValue() / right;
-        }
-        return left.intValue() / right;
-    }
-
-    /** Divide */
-    public static Number divide(long left, Number right)
-    {
-        if (right == null)
-        {
-            return right;
-        }
-        else if (right instanceof Double)
-        {
-            return left / right.doubleValue();
-        }
-        else if (right instanceof Float)
-        {
-            return left / right.floatValue();
-        }
-        else if (right instanceof Long)
-        {
-            return left / right.longValue();
-        }
-        return left / right.intValue();
-    }
-
-    /** Divide */
-    public static Number divide(Number left, Number right)
-    {
-        if (left == null || right == null)
-        {
-            return null;
-        }
-
-        if (left instanceof Double || right instanceof Double)
-        {
-            return left.doubleValue() / right.doubleValue();
-        }
-        else if (left instanceof Float || right instanceof Float)
-        {
-            return left.floatValue() / right.floatValue();
-        }
-        else if (left instanceof Long || right instanceof Long)
-        {
-            return left.longValue() / right.longValue();
-        }
-
-        return left.intValue() / right.intValue();
-    }
-
-    /** Modulo */
-    public static long modulo(long left, long right)
-    {
-        return left % right;
-    };
-
-    /** Modulo */
-    public static double modulo(long left, double right)
-    {
-        return left % right;
-    };
-
-    /** Modulo */
-    public static double modulo(double left, long right)
-    {
-        return left % right;
-    };
-
-    /** Modulo */
-    public static double modulo(double left, double right)
-    {
-        return left % right;
-    };
-
-    /** Modulo */
-    public static Number modulo(double left, Number right)
-    {
-        return right != null ? left % right.doubleValue() : null;
-    }
-
-    /** Modulo */
-    public static Number modulo(Number left, double right)
-    {
-        return left != null ? left.doubleValue() % right : null;
-    }
-
-    /** Modulo */
-    public static Number modulo(Number left, long right)
-    {
-        if (left == null)
-        {
-            return left;
-        }
-        else if (left instanceof Double)
-        {
-            return left.doubleValue() % right;
-        }
-        else if (left instanceof Float)
-        {
-            return left.floatValue() % right;
-        }
-        else if (left instanceof Long)
-        {
-            return left.longValue() % right;
-        }
-        return left.intValue() % right;
-    }
-
-    /** Modulo */
-    public static Number modulo(long left, Number right)
-    {
-        if (right == null)
-        {
-            return right;
-        }
-        else if (right instanceof Double)
-        {
-            return left % right.doubleValue();
-        }
-        else if (right instanceof Float)
-        {
-            return left % right.floatValue();
-        }
-        else if (right instanceof Long)
-        {
-            return left % right.longValue();
-        }
-        return left % right.intValue();
-    }
-
-    /** Modulo */
-    public static Number modulo(Number left, Number right)
-    {
-        if (left == null || right == null)
-        {
-            return null;
-        }
-
-        if (left instanceof Double || right instanceof Double)
-        {
-            return left.doubleValue() % right.doubleValue();
-        }
-        else if (left instanceof Float || right instanceof Float)
-        {
-            return left.floatValue() % right.floatValue();
-        }
-        else if (left instanceof Long || right instanceof Long)
-        {
-            return left.longValue() % right.longValue();
-        }
-
-        return left.intValue() % right.intValue();
+        return intOp.apply(left.intValue(), right.intValue());
     }
 
     /** Add */
@@ -858,13 +349,15 @@ public final class ExpressionMath
         {
             return null;
         }
-        else if (left instanceof CharSequence || right instanceof CharSequence)
+        else if (left instanceof CharSequence
+            || right instanceof CharSequence)
         {
             return String.valueOf(left) + String.valueOf(right);
         }
-        else if (left instanceof Number && right instanceof Number)
+        else if (left instanceof Number
+            && right instanceof Number)
         {
-            return add((Number) left, (Number) right);
+            return arithmetic((Number) left, (Number) right, ADD_DOUBLE, ADD_FLOAT, ADD_LONG, ADD_INT);
         }
 
         throw new ArithmeticException("Cannot add " + left + " and " + right);
@@ -877,9 +370,10 @@ public final class ExpressionMath
         {
             return null;
         }
-        else if (left instanceof Number && right instanceof Number)
+        else if (left instanceof Number
+            && right instanceof Number)
         {
-            return subtract((Number) left, (Number) right);
+            return arithmetic((Number) left, (Number) right, SUB_DOUBLE, SUB_FLOAT, SUB_LONG, SUB_INT);
         }
 
         throw new ArithmeticException("Cannot subtract " + left + " and " + right);
@@ -892,9 +386,10 @@ public final class ExpressionMath
         {
             return null;
         }
-        else if (left instanceof Number && right instanceof Number)
+        else if (left instanceof Number
+            && right instanceof Number)
         {
-            return multiply((Number) left, (Number) right);
+            return arithmetic((Number) left, (Number) right, MUL_DOUBLE, MUL_FLOAT, MUL_LONG, MUL_INT);
         }
 
         throw new ArithmeticException("Cannot multiply " + left + " and " + right);
@@ -907,9 +402,10 @@ public final class ExpressionMath
         {
             return null;
         }
-        else if (left instanceof Number && right instanceof Number)
+        else if (left instanceof Number
+            && right instanceof Number)
         {
-            return divide((Number) left, (Number) right);
+            return arithmetic((Number) left, (Number) right, DIV_DOUBLE, DIV_FLOAT, DIV_LONG, DIV_INT);
         }
 
         throw new ArithmeticException("Cannot divide " + left + " and " + right);
@@ -922,9 +418,10 @@ public final class ExpressionMath
         {
             return null;
         }
-        else if (left instanceof Number && right instanceof Number)
+        else if (left instanceof Number
+            && right instanceof Number)
         {
-            return modulo((Number) left, (Number) right);
+            return arithmetic((Number) left, (Number) right, MOD_DOUBLE, MOD_FLOAT, MOD_LONG, MOD_INT);
         }
 
         throw new ArithmeticException("Cannot modulo " + left + " and " + right);
@@ -935,19 +432,19 @@ public final class ExpressionMath
     {
         if (value instanceof Double)
         {
-            return -(Double) value;
+            return -((Double) value).doubleValue();
         }
         else if (value instanceof Float)
         {
-            return -(Float) value;
+            return -((Float) value).floatValue();
         }
         else if (value instanceof Long)
         {
-            return -(Long) value;
+            return -((Long) value).longValue();
         }
         else if (value instanceof Integer)
         {
-            return -(Integer) value;
+            return -((Integer) value).intValue();
         }
 
         throw new IllegalArgumentException("Cannot negate " + value);

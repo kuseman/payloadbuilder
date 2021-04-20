@@ -57,7 +57,7 @@ class OuterValuesOperator extends AOperator
             outerValues[i] = valueExpressions.get(i).eval(context);
         }
 
-        context.getOperatorContext().setOuterIndexValues(new SingletonIterator(outerValues));
+        context.getStatementContext().setOuterIndexValues(new SingletonIterator(outerValues));
         return operator.open(context);
     }
 

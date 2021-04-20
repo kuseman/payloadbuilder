@@ -3,7 +3,8 @@ package org.kuse.payloadbuilder.core;
 /** Definition of a query result */
 public interface QueryResult
 {
-    /** Returns true if there are more result sets */
+    /** Returns true if there are more result sets.
+     * If true then {@link #writeResult(OutputWriter)} is supposed to be called to write current result */
     boolean hasMoreResults();
 
     /**
@@ -12,7 +13,4 @@ public interface QueryResult
      * @throws IllegalArgumentException if there are no more results
      */
     void writeResult(OutputWriter writer);
-
-    /** Resets the query result to initial state */
-    void reset();
 }

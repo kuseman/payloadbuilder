@@ -7,6 +7,9 @@ import java.util.Iterator;
 /** Definition of a selection operator */
 public interface Operator extends DescribableNode
 {
+    /** Empty operator */
+    Operator EMPTY_OPERATOR = context -> RowIterator.EMPTY;
+
     /** Open iterator */
     RowIterator open(ExecutionContext context);
 
@@ -21,7 +24,7 @@ public interface Operator extends DescribableNode
     }
 
     /** Definition of a iterator that stream {@link Tuple}'s */
-    public interface RowIterator extends Iterator<Tuple>
+    public interface RowIterator
     {
         RowIterator EMPTY = wrap(emptyIterator());
 
@@ -61,9 +64,38 @@ public interface Operator extends DescribableNode
             };
         }
 
+        /** Returns true if this iterator has more elements else false */
+        boolean hasNext();
+
+        /** Returns next tuple */
+        Tuple next();
+
         /** Close iterator */
         default void close()
         {
         }
+    }
+
+    /** Extension of {@link RowIterator} that operates over in memory structures */
+    public interface RowList extends RowIterator
+    {
+        /** These methods should not be implemented */
+        @Override
+        default boolean hasNext()
+        {
+            throw new IllegalAccessError("Not implemented");
+        }
+
+        @Override
+        default Tuple next()
+        {
+            throw new IllegalAccessError("Not implemented");
+        }
+
+        /** Return size of list */
+        int size();
+
+        /** Return tuple at provided index */
+        Tuple get(int index);
     }
 }

@@ -7,7 +7,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.kuse.payloadbuilder.core.DescribeUtils;
-import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
+import org.kuse.payloadbuilder.core.operator.StatementContext.NodeData;
 
 /** Analyze operator that measures things like time spent, execution count. etc. */
 class AnalyzeOperator extends AOperator
@@ -61,7 +61,7 @@ class AnalyzeOperator extends AOperator
         int executionCount = 0;
         long rowCount = 0;
 
-        NodeData data = context.getOperatorContext().getNodeData(nodeId);
+        NodeData data = context.getStatementContext().getNodeData(nodeId);
         if (data != null)
         {
             executionCount = data.getExecutionCount();
@@ -72,7 +72,7 @@ class AnalyzeOperator extends AOperator
             List<DescribableNode> children = getChildNodes();
             for (DescribableNode child : children)
             {
-                NodeData childData = context.getOperatorContext().getNodeData(child.getActualNodeId());
+                NodeData childData = context.getStatementContext().getNodeData(child.getActualNodeId());
                 if (childData != null)
                 {
                     total -= childData.getNodeTime(TimeUnit.MILLISECONDS);
@@ -95,39 +95,67 @@ class AnalyzeOperator extends AOperator
     @Override
     public RowIterator open(ExecutionContext context)
     {
-        final NodeData data = context.getOperatorContext().getNodeData(nodeId, NodeData::new);
+        final AnalyzeData data = context.getStatementContext().getOrCreateNodeData(nodeId, AnalyzeData::new);
         data.increaseExecutionCount();
+
+        if (data.iterator == null)
+        {
+            data.iterator = new AnalyzeIterator(data);
+        }
+
         data.resumeNodeTime();
         final RowIterator it = target.open(context);
         data.suspenNodeTime();
-        //CSOFF
-        return new RowIterator()
-        //CSON
+
+        data.iterator.it = it;
+        data.iterator.index = 0;
+
+        return data.iterator;
+    }
+
+    /** Analyze iterator */
+    private static class AnalyzeIterator implements RowIterator
+    {
+        private final NodeData data;
+        private RowIterator it;
+        private int index;
+
+        AnalyzeIterator(NodeData data)
         {
-            @Override
-            public Tuple next()
-            {
-                data.increaseRowCount();
-                data.resumeNodeTime();
-                Tuple result = it.next();
-                data.suspenNodeTime();
-                return result;
-            }
+            this.data = data;
+        }
 
-            @Override
-            public boolean hasNext()
-            {
-                data.resumeNodeTime();
-                boolean result = it.hasNext();
-                data.suspenNodeTime();
-                return result;
-            }
+        @Override
+        public Tuple next()
+        {
+            RowList list = it instanceof RowList ? (RowList) it : null;
+            data.increaseRowCount();
+            data.resumeNodeTime();
+            Tuple result = list == null ? it.next() : list.get(index++);
+            data.suspenNodeTime();
+            return result;
+        }
 
-            @Override
-            public void close()
-            {
-                it.close();
-            }
-        };
+        @Override
+        public boolean hasNext()
+        {
+            RowList list = it instanceof RowList ? (RowList) it : null;
+            data.resumeNodeTime();
+            boolean result = list == null ? it.hasNext() : index < list.size();
+            data.suspenNodeTime();
+            return result;
+        }
+
+        @Override
+        public void close()
+        {
+            it.close();
+        }
+    }
+
+    /** Analyze data */
+    private static class AnalyzeData extends NodeData
+    {
+        AnalyzeIterator iterator;
     }
 }

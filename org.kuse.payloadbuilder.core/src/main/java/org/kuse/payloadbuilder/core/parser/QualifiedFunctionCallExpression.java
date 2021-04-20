@@ -7,6 +7,7 @@ import java.util.List;
 
 import org.antlr.v4.runtime.Token;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
@@ -44,6 +45,12 @@ public class QualifiedFunctionCallExpression extends Expression
     }
 
     @Override
+    public boolean isConstant()
+    {
+        return functionInfo.isConstant(arguments);
+    }
+
+    @Override
     public Object eval(ExecutionContext context)
     {
         return functionInfo.eval(context, arguments);
@@ -68,9 +75,9 @@ public class QualifiedFunctionCallExpression extends Expression
     }
 
     @Override
-    public Class<?> getDataType()
+    public DataType getDataType()
     {
-        return functionInfo.getDataType();
+        return functionInfo.getDataType(arguments);
     }
 
     @Override

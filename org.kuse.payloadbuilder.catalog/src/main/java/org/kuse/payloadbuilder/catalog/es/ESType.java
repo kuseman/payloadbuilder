@@ -24,7 +24,7 @@ class ESType
 
     static String getEndpoint(QuerySession session, String catalogAlias)
     {
-        String endpoint = (String) session.getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY);
+        String endpoint = session.getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY);
         if (isBlank(endpoint))
         {
             throw new IllegalArgumentException("Missing endpoint key in catalog properties for: " + catalogAlias);
@@ -34,7 +34,7 @@ class ESType
 
     static String getIndex(QuerySession session, String catalogAlias)
     {
-        String index = (String) session.getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY);
+        String index = session.getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY);
         if (isBlank(index))
         {
             throw new IllegalArgumentException("Missing index key in catalog properties for: " + catalogAlias);

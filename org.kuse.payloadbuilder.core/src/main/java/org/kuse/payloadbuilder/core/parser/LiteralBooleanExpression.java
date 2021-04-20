@@ -1,5 +1,6 @@
 package org.kuse.payloadbuilder.core.parser;
 
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 
@@ -17,17 +18,24 @@ public class LiteralBooleanExpression extends LiteralExpression
         this.value = value;
     }
 
-    public boolean getValue()
+    boolean getValue()
     {
         return value;
     }
 
     @Override
+    public DataType getDataType()
+    {
+        return DataType.BOOLEAN;
+    }
+
+    @Override
     public ExpressionCode generateCode(CodeGeneratorContext context)
     {
-        ExpressionCode code = context.getCode();
-        String template = "Boolean %s = %s;\n";
-        code.setCode(String.format(template, code.getResVar(), value));
+        ExpressionCode code = context.getExpressionCode();
+        String template = "boolean %s = %s;\n"
+            + "boolean %s = false;\n";
+        code.setCode(String.format(template, code.getResVar(), value, code.getNullVar()));
         return code;
     }
 

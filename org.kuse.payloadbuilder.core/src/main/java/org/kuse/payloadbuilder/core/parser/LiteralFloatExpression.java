@@ -1,5 +1,6 @@
 package org.kuse.payloadbuilder.core.parser;
 
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 
@@ -19,17 +20,19 @@ public class LiteralFloatExpression extends LiteralExpression
         this.value = value;
     }
 
-    public float getValue()
+    @Override
+    public DataType getDataType()
     {
-        return value;
+        return DataType.FLOAT;
     }
 
     @Override
     public ExpressionCode generateCode(CodeGeneratorContext context)
     {
-        ExpressionCode code = context.getCode();
-        String template = "Float %s = %sf;\n";
-        code.setCode(String.format(template, code.getResVar(), value));
+        ExpressionCode code = context.getExpressionCode();
+        String template = "float %s = %sf;\n"
+            + "boolean %s = false;\n";
+        code.setCode(String.format(template, code.getResVar(), value, code.getNullVar()));
         return code;
     }
 

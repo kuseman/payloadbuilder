@@ -1,5 +1,6 @@
 package org.kuse.payloadbuilder.core.parser;
 
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 
@@ -25,11 +26,18 @@ public class LiteralIntegerExpression extends LiteralExpression
     }
 
     @Override
+    public DataType getDataType()
+    {
+        return DataType.INT;
+    }
+
+    @Override
     public ExpressionCode generateCode(CodeGeneratorContext context)
     {
-        ExpressionCode code = context.getCode();
-        String template = "Integer %s = %s;\n";
-        code.setCode(String.format(template, code.getResVar(), value));
+        ExpressionCode code = context.getExpressionCode();
+        String template = "int %s = %s;\n"
+            + "boolean %s = false;\n";
+        code.setCode(String.format(template, code.getResVar(), value, code.getNullVar()));
         return code;
     }
 

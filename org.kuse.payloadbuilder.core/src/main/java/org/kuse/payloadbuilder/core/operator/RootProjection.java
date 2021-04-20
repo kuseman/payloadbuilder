@@ -11,6 +11,8 @@ import java.util.Map;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.kuse.payloadbuilder.core.OutputWriter;
+import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
+import org.kuse.payloadbuilder.core.codegen.ProjectionCode;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
 
 /** Projection used for the root select */
@@ -62,12 +64,46 @@ public class RootProjection implements Projection
     }
 
     @Override
+    public ProjectionCode generateCode(CodeGeneratorContext context)
+    {
+        ProjectionCode code = context.getProjectionCode();
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("writer.startObject();\n");
+        sb.append("Tuple rootTuple = context.getStatementContext().getTuple();\n");
+
+        int size = projections.length;
+        for (int i = 0; i < size; i++)
+        {
+            Projection projection = projections[i];
+
+            if (!(projection.isAsterisk()))
+            {
+                sb.append("writer.writeFieldName(\"").append(columns[i]).append("\");\n");
+            }
+
+            if (i > 0)
+            {
+                // Re-set context tuple on each iterator since it can change with nested projections
+                sb.append("context.getStatementContext().setTuple(rootTuple);\n");
+            }
+            context.setTupleFieldName("rootTuple");
+            sb.append(projection.generateCode(context).getCode());
+            sb.append(System.lineSeparator());
+        }
+
+        sb.append("writer.endObject();\n");
+        code.setCode(sb.toString());
+        return code;
+    }
+
+    @Override
     public void writeValue(OutputWriter writer, ExecutionContext context)
     {
         // The root projection is always an object
         writer.startObject();
 
-        Tuple tuple = context.getTuple();
+        Tuple tuple = context.getStatementContext().getTuple();
         int size = projections.length;
         for (int i = 0; i < size; i++)
         {
@@ -79,8 +115,11 @@ public class RootProjection implements Projection
                 writer.writeFieldName(columns[i]);
             }
 
-            // Re-set context tuple on each iterator since it can change with nested projections
-            context.setTuple(tuple);
+            if (i > 0)
+            {
+                // Re-set context tuple on each iterator since it can change with nested projections
+                context.getStatementContext().setTuple(tuple);
+            }
             projection.writeValue(writer, context);
         }
 

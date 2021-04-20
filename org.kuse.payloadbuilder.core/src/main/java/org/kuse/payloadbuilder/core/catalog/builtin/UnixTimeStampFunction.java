@@ -10,6 +10,7 @@ import java.util.List;
 
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
@@ -22,9 +23,9 @@ class UnixTimeStampFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public Class<?> getDataType()
+    public DataType getDataType(List<Expression> arguments)
     {
-        return Long.class;
+        return DataType.LONG;
     }
 
     @Override

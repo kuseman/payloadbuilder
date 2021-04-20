@@ -1,5 +1,6 @@
 package org.kuse.payloadbuilder.core.parser;
 
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 
@@ -19,17 +20,19 @@ public class LiteralLongExpression extends LiteralExpression
         this.value = value;
     }
 
-    public long getValue()
+    @Override
+    public DataType getDataType()
     {
-        return value;
+        return DataType.LONG;
     }
 
     @Override
     public ExpressionCode generateCode(CodeGeneratorContext context)
     {
-        ExpressionCode code = context.getCode();
-        String template = "Long %s = %sl;\n";
-        code.setCode(String.format(template, code.getResVar(), value));
+        ExpressionCode code = context.getExpressionCode();
+        String template = "long %s = %sl;\n"
+            + "boolean %s = false;\n";
+        code.setCode(String.format(template, code.getResVar(), value, code.getNullVar()));
         return code;
     }
 

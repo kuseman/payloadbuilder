@@ -1,14 +1,15 @@
 package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
-import java.util.Collection;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
@@ -16,8 +17,11 @@ import java.util.stream.StreamSupport;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.Index;
+import org.kuse.payloadbuilder.core.operator.BatchCacheOperatorTest.TestCacheProvider;
+import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory.IIndexValues;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
+import org.kuse.payloadbuilder.core.utils.MapUtils;
 
 /** Test {@link BatchHashJoin} */
 public class BatchHashJoinTest extends AOperatorTest
@@ -26,16 +30,16 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_inner_join_empty_outer()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 1);
-        Operator left = op(ctx -> RowIterator.EMPTY);
-        Operator right = op(ctx -> RowIterator.EMPTY);
+        Operator left = op1(ctx -> RowIterator.EMPTY);
+        Operator right = op1(ctx -> RowIterator.EMPTY);
 
         BatchHashJoin op = new BatchHashJoin(
                 0,
                 "",
                 left,
                 right,
-                new ExpressionValuesExtractor(asList(e("a.col1"))),
-                new ExpressionValuesExtractor(asList(e("b.col1"))),
+                new ExpressionIndexValuesFactory(asList(e("a.col1"))),
+                new ExpressionHashFunction(asList(e("b.col1"))),
                 new ExpressionPredicate(e("b.col1 = a.col1")),
                 new DefaultTupleMerger(-1, 0, 2),
                 false,
@@ -60,15 +64,15 @@ public class BatchHashJoinTest extends AOperatorTest
         Index index = new Index(QualifiedName.of("table"), asList("col1"), 1);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
-                ofEntries(entry("tableB", a -> op(ctx ->
+                ofEntries(entry("tableB", a -> op1(ctx ->
                 {
-                    while (ctx.getOperatorContext().getOuterIndexValues().hasNext())
+                    while (ctx.getStatementContext().getOuterIndexValues().hasNext())
                     {
-                        ctx.getOperatorContext().getOuterIndexValues().next();
+                        ctx.getStatementContext().getOuterIndexValues().next();
                     }
                     return RowIterator.EMPTY;
                 }, () -> bClose.increment()))),
-                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator(), () -> aClose.increment()))));
+                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new String[] {"col1"}, new Object[] {i})).iterator(), () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
@@ -94,8 +98,8 @@ public class BatchHashJoinTest extends AOperatorTest
         Index index = new Index(QualifiedName.of("table"), asList("col1"), 1);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
-                ofEntries(entry("tableB", a -> op(ctx -> RowIterator.EMPTY, () -> bClose.increment()))),
-                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator(), () -> aClose.increment()))));
+                ofEntries(entry("tableB", a -> op1(ctx -> RowIterator.EMPTY, () -> bClose.increment()))),
+                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new String[] {"col1"}, new Object[] {i})).iterator(), () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
@@ -126,11 +130,11 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(ctx ->
                 {
-                    ctx.getOperatorContext().getOuterIndexValues().hasNext();
-                    Object[] ar = ctx.getOperatorContext().getOuterIndexValues().next();
-                    return asList((Tuple) Row.of(a, 0, ar)).iterator();
+                    ctx.getStatementContext().getOuterIndexValues().hasNext();
+                    IIndexValues ar = ctx.getStatementContext().getOuterIndexValues().next();
+                    return asList((Tuple) Row.of(a, 0, new String[] {"col1"}, new Object[] {ar.getValue(0)})).iterator();
                 }, () -> bClose.increment()))),
-                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator(), () -> aClose.increment()))));
+                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new String[] {"col1"}, new Object[] {i})).iterator(), () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
@@ -159,16 +163,16 @@ public class BatchHashJoinTest extends AOperatorTest
         Index index = new Index(QualifiedName.of("table"), asList("col1"), 2);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
-                ofEntries(entry("tableB", a -> op(ctx ->
+                ofEntries(entry("tableB", a -> op1(ctx ->
                 {
-                    while (ctx.getOperatorContext().getOuterIndexValues().hasNext())
+                    while (ctx.getStatementContext().getOuterIndexValues().hasNext())
                     {
-                        ctx.getOperatorContext().getOuterIndexValues().next();
+                        ctx.getStatementContext().getOuterIndexValues().next();
                     }
-                    ctx.getOperatorContext().getOuterIndexValues().next();
+                    ctx.getStatementContext().getOuterIndexValues().next();
                     return RowIterator.EMPTY;
                 }, () -> bClose.increment()))),
-                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator(), () -> aClose.increment()))));
+                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new String[] {"col1"}, new Object[] {i})).iterator(), () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
@@ -222,9 +226,9 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableC", index)),
                 ofEntries(entry("tableC", a -> op(ctx ->
                 {
-                    Iterable<Object[]> it = () -> ctx.getOperatorContext().getOuterIndexValues();
+                    Iterable<IIndexValues> it = () -> ctx.getStatementContext().getOuterIndexValues();
                     List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                            .map(ar -> (Integer) ar[0])
+                            .map(ar -> (Integer) ar.getValue(0))
                             .map(val -> (Tuple) Row.of(a, posC.getAndIncrement(), new String[] {"col1", "col2"}, new Object[] {val, "val" + val}))
                             .collect(toList());
 
@@ -251,9 +255,9 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(tableAPos[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
-            assertEquals(tableBPos[count], tuple.getTuple(2).getValue(Row.POS_ORDINAL));
-            assertEquals(tableCPos[count], tuple.getTuple(3).getValue(Row.POS_ORDINAL));
+            assertEquals(tableAPos[count], getValue(tuple, -1, Row.POS_ORDINAL));
+            assertEquals(tableBPos[count], getValue(tuple, 2, Row.POS_ORDINAL));
+            assertEquals(tableCPos[count], getValue(tuple, 3, Row.POS_ORDINAL));
             count++;
         }
         it.close();
@@ -284,19 +288,19 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
                     List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                            .map(ar -> (Integer) ar[0])
+                            .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
                             .distinct()
-                            .map(val -> Row.of(a, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
+                            .map(val -> Row.of(a, posRight.getAndIncrement(), new String[] {"col1"}, new Object[] {val, "Val" + val}))
                             .collect(toList());
 
                     return inner.iterator();
                 }, () -> bClose.increment()))),
                 ofEntries(entry("tableA", a -> op(ctx -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
                         .stream()
-                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i}))
                         .iterator(), () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
@@ -319,14 +323,128 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], getValue(tuple, -1, Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], getValue(tuple, 1, Row.POS_ORDINAL));
             count++;
         }
         it.close();
 
         assertEquals(5, count);
         assertEquals(1, aClose.intValue());
+        assertEquals(5, bClose.intValue());
+    }
+
+    @Test
+    public void test_inner_join_one_to_one_with_cache()
+    {
+        String query = "select * "
+            + "from tableA a "
+            + "inner join tableB b with (cacheName = 'tableB', cacheKey = @param, cacheTTL = 'PT10m') "
+            + "  on b.col1 = a.col1";
+
+        MutableInt aClose = new MutableInt();
+        MutableInt bClose = new MutableInt();
+        MutableInt posLeft = new MutableInt();
+        MutableInt posRight = new MutableInt();
+
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Operator op = operator(query,
+                ofEntries(entry("tableB", index)),
+                ofEntries(entry("tableB", a -> op(context ->
+                {
+                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
+                    List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
+                            .map(ar -> (Integer) ar.getValue(0))
+                            .filter(val -> val >= 5 && val <= 9)
+                            .distinct()
+                            .map(val -> Row.of(a, posRight.getAndIncrement(), new String[] {"col1"}, new Object[] {val, "Val" + val}))
+                            .collect(toList());
+
+                    return inner.iterator();
+                }, () -> bClose.increment()))),
+                ofEntries(entry("tableA", a -> op(ctx -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+                        .stream()
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i}))
+                        .iterator(), () -> aClose.increment()))));
+
+        assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
+        assertTrue("Inner operator should be of BatchCache type", ((BatchHashJoin) op).getInner() instanceof BatchCacheOperator);
+
+        TestCacheProvider cacheProvider = new BatchCacheOperatorTest.TestCacheProvider();
+        session.setBatchCacheProvider(cacheProvider);
+        ExecutionContext context = new ExecutionContext(session);
+        context.setVariable("param", 1337);
+
+        int[] expectedOuterPositions = new int[] {
+                7,          // Batch 1
+                8, 9, 10,   // Batch 2
+                11          // Batch 3
+        };
+
+        int[] expectedInnerPositions = new int[] {
+                0,          // Batch 1
+                1, 2, 3,    // Batch 2
+                4           // Batch 3
+        };
+
+        List<Tuple> innerTuples = new ArrayList<>();
+
+        int count = 0;
+        RowIterator it = op.open(context);
+        while (it.hasNext())
+        {
+            Tuple tuple = it.next();
+            assertEquals(expectedOuterPositions[count], getValue(tuple, -1, Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], getValue(tuple, 1, Row.POS_ORDINAL));
+            innerTuples.add(tuple.getTuple(1));
+            count++;
+        }
+        it.close();
+
+        assertEquals(5, count);
+        assertEquals(1, aClose.intValue());
+        assertEquals(5, bClose.intValue());
+
+        Map<Object, List<Tuple>> cache = cacheProvider.cache.get("test_tableB");
+        // 14 outer values should be cached
+        assertEquals(14, cache.size());
+
+        Map<Object, List<Tuple>> expectedCache = MapUtils.ofEntries(
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {-2})), emptyList()),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {-1})), emptyList()),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {0})), emptyList()),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {1})), emptyList()),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {2})), emptyList()),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {3})), emptyList()),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {4})), emptyList()),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {5})), asList(innerTuples.get(0))),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {6})), asList(innerTuples.get(1))),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {7})), asList(innerTuples.get(2))),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {8})), asList(innerTuples.get(3))),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {9})), asList(innerTuples.get(4))),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {10})), emptyList()),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {11})), emptyList()));
+        assertEquals(expectedCache, cache);
+
+        // Open once more and verify that inner operator wasn't opened at all
+        posLeft.setValue(0);
+        posRight.setValue(0);
+        count = 0;
+        it = op.open(context);
+        while (it.hasNext())
+        {
+            Tuple tuple = it.next();
+            assertEquals(expectedOuterPositions[count], getValue(tuple, -1, Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], getValue(tuple, 1, Row.POS_ORDINAL));
+            innerTuples.add(tuple.getTuple(1));
+            count++;
+        }
+        it.close();
+
+        assertEquals(5, count);
+        // Outer operator was opened one more time
+        assertEquals(2, aClose.intValue());
+        // ... but inner should still have 5
         assertEquals(5, bClose.intValue());
     }
 
@@ -348,19 +466,19 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
                     List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                            .map(ar -> (Integer) ar[0])
+                            .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
                             .distinct()
-                            .map(val -> Row.of(a, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
+                            .map(val -> Row.of(a, posRight.getAndIncrement(), new String[] {"col1"}, new Object[] {val, "Val" + val}))
                             .collect(toList());
 
                     return inner.iterator();
                 }, () -> bClose.increment()))),
                 ofEntries(entry("tableA", a -> op(ctx -> asList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
                         .stream()
-                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i}))
                         .iterator(), () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
@@ -385,9 +503,9 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals("Count: " + count, expectedOuterPositions[count], getValue(tuple, -1, Row.POS_ORDINAL));
 
-            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue(Row.POS_ORDINAL)).orElse(null);
+            Integer val = (Integer) getValue(tuple, 1, Row.POS_ORDINAL);
             assertEquals(expectedInnerPositions[count], val);
             count++;
         }
@@ -415,16 +533,16 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
                     return StreamSupport.stream(it.spliterator(), false)
-                            .map(ar -> (Integer) ar[0])
+                            .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
                             .distinct()
                             .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}, new Object[] {-666, 3}).stream())
-                            .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), ar))
+                            .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), new String[] {"col1"}, ar))
                             .iterator();
                 }, () -> bClose.increment()))),
-                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator(), () -> aClose.increment()))));
+                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i})).iterator(), () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
@@ -448,8 +566,8 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], getValue(tuple, -1, Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], getValue(tuple, 1, Row.POS_ORDINAL));
             count++;
         }
         it.close();
@@ -477,16 +595,16 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
                     return StreamSupport.stream(it.spliterator(), false)
-                            .map(ar -> (Integer) ar[0])
+                            .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
                             .distinct()
                             .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
-                            .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), ar))
+                            .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), new String[] {"col1"}, ar))
                             .iterator();
                 }, () -> bClose.increment()))),
-                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator(), () -> aClose.increment()))));
+                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i})).iterator(), () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
@@ -512,9 +630,9 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], getValue(tuple, -1, Row.POS_ORDINAL));
 
-            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue(Row.POS_ORDINAL)).orElse(null);
+            Integer val = (Integer) getValue(tuple, 1, Row.POS_ORDINAL);
             assertEquals(expectedInnerPositions[count], val);
             count++;
         }
@@ -543,19 +661,19 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
                     List<Tuple> rows = StreamSupport.stream(it.spliterator(), false)
-                            .map(ar -> (Integer) ar[0])
+                            .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
                             .distinct()
-                            .map(val -> (Tuple) Row.of(a, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
+                            .map(val -> (Tuple) Row.of(a, posRight.getAndIncrement(), new String[] {"col1"}, new Object[] {val, "Val" + val}))
                             .collect(toList());
 
                     return rows.iterator();
                 }, () -> bClose.increment()))),
                 ofEntries(entry("tableA", a -> op(ctx -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
                         .stream()
-                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i}))
                         .iterator(), () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
@@ -578,8 +696,8 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], getValue(tuple, -1, Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], getValue(tuple, 1, Row.POS_ORDINAL));
             count++;
         }
         it.close();
@@ -607,19 +725,19 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
                     List<Tuple> rows = StreamSupport.stream(it.spliterator(), false)
-                            .map(ar -> (Integer) ar[0])
+                            .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
                             .distinct()
-                            .map(val -> (Tuple) Row.of(a, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
+                            .map(val -> (Tuple) Row.of(a, posRight.getAndIncrement(), new String[] {"col1"}, new Object[] {val, "Val" + val}))
                             .collect(toList());
 
                     return rows.iterator();
                 }, () -> bClose.increment()))),
                 ofEntries(entry("tableA", a -> op(ctx -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
                         .stream()
-                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i}))
                         .iterator(), () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
@@ -652,9 +770,9 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals("Count: " + count, expectedOuterPositions[count], getValue(tuple, -1, Row.POS_ORDINAL));
 
-            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue(Row.POS_ORDINAL)).orElse(null);
+            Integer val = (Integer) getValue(tuple, 1, Row.POS_ORDINAL);
             assertEquals(expectedInnerPositions[count], val);
             count++;
         }
@@ -662,7 +780,7 @@ public class BatchHashJoinTest extends AOperatorTest
 
         assertEquals(24, count);
         assertEquals(1, aClose.intValue());
-        assertEquals(8, bClose.intValue());
+        assertEquals(7, bClose.intValue());
     }
 
     @Test
@@ -684,20 +802,20 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", a -> op(context ->
                 {
                     // Create 2 rows for each input row
-                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
                     List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                            .map(ar -> (Integer) ar[0])
+                            .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
                             .distinct()
                             .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
-                            .map(ar -> Row.of(a, posRight.getAndIncrement(), ar))
+                            .map(ar -> Row.of(a, posRight.getAndIncrement(), new String[] {"col1"}, ar))
                             .collect(toList());
 
                     return inner.iterator();
                 }, () -> bClose.increment()))),
                 ofEntries(entry("tableA", a -> op(ctx -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
                         .stream()
-                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i}))
                         .iterator(), () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
@@ -722,15 +840,15 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], getValue(tuple, -1, Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], getValue(tuple, 1, Row.POS_ORDINAL));
             count++;
         }
         it.close();
 
         assertEquals(20, count);
         assertEquals(1, aClose.intValue());
-        assertEquals(8, bClose.intValue());
+        assertEquals(7, bClose.intValue());
     }
 
     @Test
@@ -753,9 +871,9 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", a -> op(context ->
                 {
                     // Create 3 rows for each input row
-                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
                     List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                            .map(ar -> (Integer) ar[0])
+                            .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
                             .distinct()
                             .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}, new Object[] {val, 3}).stream())
@@ -766,7 +884,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 }, () -> bClose.increment()))),
                 ofEntries(entry("tableA", a -> op(ctx -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
                         .stream()
-                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i}))
                         .iterator(), () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
@@ -798,9 +916,9 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals("Count :" + count, expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals("Count :" + count, expectedOuterPositions[count], getValue(tuple, -1, Row.POS_ORDINAL));
 
-            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue(Row.POS_ORDINAL)).orElse(null);
+            Integer val = (Integer) getValue(tuple, 1, Row.POS_ORDINAL);
             assertEquals("Count: " + count, expectedInnerPositions[count], val);
             count++;
         }
@@ -808,7 +926,7 @@ public class BatchHashJoinTest extends AOperatorTest
 
         assertEquals(34, count);
         assertEquals(1, aClose.intValue());
-        assertEquals(8, bClose.intValue());
+        assertEquals(7, bClose.intValue());
     }
 
     @Test
@@ -829,19 +947,19 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
                     List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                            .map(ar -> (Integer) ar[0])
+                            .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
                             .distinct()
-                            .map(val -> Row.of(a, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
+                            .map(val -> Row.of(a, posRight.getAndIncrement(), new String[] {"col1"}, new Object[] {val, "Val" + val}))
                             .collect(toList());
 
                     return inner.iterator();
                 }, () -> bClose.increment()))),
                 ofEntries(entry("tableA", a -> op(ctx -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
                         .stream()
-                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i}))
                         .iterator(), () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
@@ -862,11 +980,11 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals("Count: " + count, expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals("Count: " + count, expectedOuterPositions[count], getValue(tuple, -1, Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
-            Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
-            assertArrayEquals("Count: " + count, new int[] {expectedInnerPositions[count]}, col.stream().mapToInt(t -> (int) t.getValue(Row.POS_ORDINAL)).toArray());
+            Iterable<Tuple> col = (Iterable<Tuple>) tuple.getTuple(1);
+            assertArrayEquals("Count: " + count, new int[] {expectedInnerPositions[count]}, stream(col).mapToInt(t -> (int) t.getValue(Row.POS_ORDINAL)).toArray());
             count++;
         }
         it.close();
@@ -894,19 +1012,19 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
                     List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
-                            .map(ar -> (Integer) ar[0])
+                            .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
                             .distinct()
-                            .map(val -> Row.of(a, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
+                            .map(val -> Row.of(a, posRight.getAndIncrement(), new String[] {"col1"}, new Object[] {val, "Val" + val}))
                             .collect(toList());
 
                     return inner.iterator();
                 }, () -> bClose.increment()))),
                 ofEntries(entry("tableA", a -> op(ctx -> asList(-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
                         .stream()
-                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i}))
                         .iterator(), () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
@@ -932,12 +1050,12 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals("Count: " + count, expectedOuterPositions[count], getValue(tuple, -1, Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
-            Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
+            Iterable<Tuple> col = (Iterable<Tuple>) tuple.getTuple(1);
 
-            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue(Row.POS_ORDINAL)).collect(toList()) : null);
+            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? stream(col).map(t -> (int) t.getValue(Row.POS_ORDINAL)).collect(toList()) : null);
             count++;
         }
         it.close();
@@ -965,16 +1083,16 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
                     return StreamSupport.stream(it.spliterator(), false)
-                            .map(ar -> (Integer) ar[0])
+                            .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
                             .distinct()
                             .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
-                            .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), ar))
+                            .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), new String[] {"col1"}, ar))
                             .iterator();
                 }, () -> bClose.increment()))),
-                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator(), () -> aClose.increment()))));
+                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i})).iterator(), () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
@@ -998,12 +1116,12 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], getValue(tuple, -1, Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
-            Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
+            Iterable<Tuple> col = (Iterable<Tuple>) tuple.getTuple(1);
 
-            assertArrayEquals("" + count, expectedInnerPositions[count], col.stream().mapToInt(t -> (int) t.getValue(Row.POS_ORDINAL)).toArray());
+            assertArrayEquals("" + count, expectedInnerPositions[count], stream(col).mapToInt(t -> (int) t.getValue(Row.POS_ORDINAL)).toArray());
             count++;
         }
         it.close();
@@ -1031,16 +1149,16 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
                     return StreamSupport.stream(it.spliterator(), false)
-                            .map(ar -> (Integer) ar[0])
+                            .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
                             .distinct()
                             .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
-                            .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), ar))
+                            .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), new String[] {"col1"}, ar))
                             .iterator();
                 }, () -> bClose.increment()))),
-                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator(), () -> aClose.increment()))));
+                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i})).iterator(), () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
@@ -1074,12 +1192,12 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], getValue(tuple, -1, Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
-            Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
+            Iterable<Tuple> col = (Iterable<Tuple>) tuple.getTuple(1);
 
-            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue(Row.POS_ORDINAL)).collect(toList()) : null);
+            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? stream(col).map(t -> (int) t.getValue(Row.POS_ORDINAL)).collect(toList()) : null);
             count++;
         }
         it.close();
@@ -1109,18 +1227,18 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", a -> op(context ->
                 {
                     // Create 2 rows for each input row
-                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
                     return StreamSupport.stream(it.spliterator(), false)
-                            .map(ar -> (Integer) ar[0])
+                            .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
                             .distinct()
                             .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
-                            .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), ar))
+                            .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), new String[] {"col1"}, ar))
                             .iterator();
                 }, () -> bClose.increment()))),
                 ofEntries(entry("tableA", a -> op(ctx -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
                         .stream()
-                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i}))
                         .iterator(), () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
@@ -1145,19 +1263,19 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals("Count: " + count, expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals("Count: " + count, expectedOuterPositions[count], getValue(tuple, -1, Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
-            Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
+            Iterable<Tuple> col = (Iterable<Tuple>) tuple.getTuple(1);
 
-            assertArrayEquals("Count: " + count, expectedInnerPositions[count], col.stream().mapToInt(t -> (int) t.getValue(Row.POS_ORDINAL)).toArray());
+            assertArrayEquals("Count: " + count, expectedInnerPositions[count], stream(col).mapToInt(t -> (int) t.getValue(Row.POS_ORDINAL)).toArray());
             count++;
         }
         it.close();
 
         assertEquals(10, count);
         assertEquals(1, aClose.intValue());
-        assertEquals(8, bClose.intValue());
+        assertEquals(7, bClose.intValue());
     }
 
     @Test
@@ -1180,18 +1298,18 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", a -> op(context ->
                 {
                     // Create 2 rows for each input row
-                    Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
                     return StreamSupport.stream(it.spliterator(), false)
-                            .map(ar -> (Integer) ar[0])
+                            .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
                             .distinct()
                             .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
-                            .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), ar))
+                            .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), new String[] {"col1"}, ar))
                             .iterator();
                 }, () -> bClose.increment()))),
                 ofEntries(entry("tableA", a -> op(ctx -> asList(-2, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 11)
                         .stream()
-                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i}))
+                        .map(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i}))
                         .iterator(), () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
@@ -1223,19 +1341,19 @@ public class BatchHashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], getValue(tuple, -1, Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
-            Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
+            Iterable<Tuple> col = (Iterable<Tuple>) tuple.getTuple(1);
 
-            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? col.stream().map(t -> (int) t.getValue(Row.POS_ORDINAL)).collect(toList()) : null);
+            assertEquals("" + count, expectedInnerPositions.get(count), col != null ? stream(col).map(t -> (int) t.getValue(Row.POS_ORDINAL)).collect(toList()) : null);
             count++;
         }
         it.close();
 
         assertEquals(24, count);
         assertEquals(1, aClose.intValue());
-        assertEquals(8, bClose.intValue());
+        assertEquals(7, bClose.intValue());
     }
 
     //        @Ignore
@@ -1269,7 +1387,7 @@ public class BatchHashJoinTest extends AOperatorTest
     //                MapUtils.ofEntries(
     //                        MapUtils.entry("tableB", a -> op(context ->
     //                        {
-    //                            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+    //                            Iterable<Object[]> it = () -> context.getStatementContext().getOuterIndexValues();
     //                            return StreamSupport.stream(it.spliterator(), false)
     //                                    .map(ar -> (Integer) ar[0])
     //                                    .flatMap(val -> asList(
@@ -1282,7 +1400,7 @@ public class BatchHashJoinTest extends AOperatorTest
     //                        })),
     //                        MapUtils.entry("tableC", a -> op(context ->
     //                        {
-    //                            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+    //                            Iterable<Object[]> it = () -> context.getStatementContext().getOuterIndexValues();
     //                            return StreamSupport.stream(it.spliterator(), false)
     //                                    .map(ar -> (Integer) ar[0])
     //                                    .flatMap(val -> asList(

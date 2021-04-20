@@ -47,11 +47,14 @@ class FilterOperator extends AOperator
     @Override
     public RowIterator open(ExecutionContext context)
     {
-        RowIterator iterator = operator.open(context);
+        final RowIterator iterator = operator.open(context);
+        final RowList list = iterator instanceof RowList ? (RowList) iterator : null;
         //CSOFF
         return new RowIterator()
         //CSON
         {
+            /** Index used when iterator is a {@link RowList} */
+            private int index;
             private Tuple next;
 
             @Override
@@ -78,18 +81,22 @@ class FilterOperator extends AOperator
             {
                 while (next == null)
                 {
-                    if (!iterator.hasNext())
+                    if (list == null && !iterator.hasNext())
+                    {
+                        return false;
+                    }
+                    else if (list != null && index >= list.size())
                     {
                         return false;
                     }
 
-                    Tuple tuple = iterator.next();
-                    context.setTuple(tuple);
+                    Tuple tuple = list == null ? iterator.next() : list.get(index++);
+                    context.getStatementContext().setTuple(tuple);
                     if (predicate.test(context))
                     {
                         next = tuple;
                     }
-                    context.setTuple(null);
+                    context.getStatementContext().setTuple(null);
                 }
                 return true;
             }

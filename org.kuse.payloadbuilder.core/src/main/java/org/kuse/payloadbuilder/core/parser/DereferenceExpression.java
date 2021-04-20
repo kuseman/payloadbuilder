@@ -47,7 +47,7 @@ public class DereferenceExpression extends Expression implements HasIdentifier
 
         if (leftResult instanceof Tuple)
         {
-            context.setTuple((Tuple) leftResult);
+            context.getStatementContext().setTuple((Tuple) leftResult);
             return right.eval(context);
         }
         else if (leftResult instanceof Map)

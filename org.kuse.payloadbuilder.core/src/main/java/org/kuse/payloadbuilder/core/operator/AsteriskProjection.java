@@ -6,6 +6,8 @@ import java.util.Arrays;
 import java.util.Map;
 
 import org.kuse.payloadbuilder.core.OutputWriter;
+import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
+import org.kuse.payloadbuilder.core.codegen.ProjectionCode;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
 
 /** Projection for asterisk selects */
@@ -37,9 +39,18 @@ class AsteriskProjection extends AProjection
     }
 
     @Override
+    public ProjectionCode generateCode(CodeGeneratorContext context)
+    {
+        int index = context.addReference(this);
+        ProjectionCode code = context.getProjectionCode();
+        code.setCode("((Projection) references[" + index + "]).writeValue(writer, context);\n");
+        return code;
+    }
+
+    @Override
     public void writeValue(OutputWriter writer, ExecutionContext context)
     {
-        Tuple tuple = context.getTuple();
+        Tuple tuple = context.getStatementContext().getTuple();
 
         int length = tupleOrdinals.length;
         if (length == 0)
@@ -50,7 +61,8 @@ class AsteriskProjection extends AProjection
         {
             for (int i = 0; i < length; i++)
             {
-                writeTupleValues(writer, context, tuple.getTuple(tupleOrdinals[i]));
+                int tupleOrdinal = tupleOrdinals[i];
+                writeTupleValues(writer, context, tuple.getTuple(tupleOrdinal));
             }
         }
     }

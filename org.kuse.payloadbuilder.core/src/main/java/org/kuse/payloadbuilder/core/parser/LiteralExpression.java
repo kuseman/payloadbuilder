@@ -2,6 +2,10 @@ package org.kuse.payloadbuilder.core.parser;
 
 import java.util.Objects;
 
+import org.apache.commons.lang3.mutable.MutableDouble;
+import org.apache.commons.lang3.mutable.MutableFloat;
+import org.apache.commons.lang3.mutable.MutableInt;
+import org.apache.commons.lang3.mutable.MutableLong;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 
 /** Base literal expression */
@@ -40,12 +44,6 @@ public abstract class LiteralExpression extends Expression
     }
 
     @Override
-    public Class<?> getDataType()
-    {
-        return objectValue != null ? objectValue.getClass() : super.getDataType();
-    }
-
-    @Override
     public int hashCode()
     {
         //CSOFF
@@ -78,19 +76,19 @@ public abstract class LiteralExpression extends Expression
         {
             return (Boolean) value ? LiteralBooleanExpression.TRUE_LITERAL : LiteralBooleanExpression.FALSE_LITERAL;
         }
-        else if (value instanceof Double)
+        else if (value instanceof Double || value instanceof MutableDouble)
         {
             return new LiteralDoubleExpression(((Number) value).doubleValue());
         }
-        else if (value instanceof Float)
+        else if (value instanceof Float || value instanceof MutableFloat)
         {
             return new LiteralFloatExpression(((Number) value).floatValue());
         }
-        else if (value instanceof Long)
+        else if (value instanceof Long || value instanceof MutableLong)
         {
             return new LiteralLongExpression(((Number) value).longValue());
         }
-        else if (value instanceof Integer)
+        else if (value instanceof Integer || value instanceof MutableInt)
         {
             return new LiteralIntegerExpression(((Number) value).intValue());
         }

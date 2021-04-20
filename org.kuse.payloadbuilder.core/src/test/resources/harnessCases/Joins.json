@@ -147,13 +147,93 @@
     {
       "name": "Self join 3, asterisk select",
       "query": [
-        "select * from source s inner join source s1 on s1.col1 = s.col1 inner join source s2 on s2.col1 = s1.col1"
+        "select * ",
+        "from source s ",
+        "inner join source s1 ",
+        "  on s1.col1 = s.col1 ",
+        "inner join source s2 ",
+        "  on s2.col1 = s1.col1"
       ],
       "expectedResultSets": [
         [
           [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }],
           [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }],
           [{ "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }, { "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }, { "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }]
+        ]
+      ]
+    },
+    {
+      "name": "join 3 tables without populate multiple rows",
+     "description": [
+		"Here we are creating multiple tuples and need to make sure that CompositeTuples properly handles this and copies it self"
+      ],
+      "query": [
+        "select * ",
+        "from source s ",
+        "inner join article a ",
+        "  on a.col1 = s.col1 ",
+        "inner join table t ",
+        "  on t.col1 = a.col1"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col3", "value": "row1" }, { "key": "art_id", "value": 1 }, { "key": "col1", "value": 1 }, { "key": "row_id", "value": 1 }],
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col3", "value": "row1" }, { "key": "art_id", "value": 1 }, { "key": "col1", "value": 1 }, { "key": "row_id", "value": 2 }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col3", "value": "row2" }, { "key": "art_id", "value": 2 }, { "key": "col1", "value": 3 }, { "key": "row_id", "value": 3 }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col3", "value": "row2" }, { "key": "art_id", "value": 2 }, { "key": "col1", "value": 3 }, { "key": "row_id", "value": 4 }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col3", "value": "row2" }, { "key": "art_id", "value": 2 }, { "key": "col1", "value": 3 }, { "key": "row_id", "value": 5 }]
+        ]
+      ]
+    },
+    {
+      "name": "Join sub queries multiple rows",
+      "description": [
+		"Here we are creating multiple tuples and need to make sure that CompositeTuples properly handles this and copies it self"
+      ],
+      "query": [
+        "select * ",
+        "from source s ",
+        "inner join article a ",
+        "  on a.col1 = s.col1 ",
+        "inner join ",
+        "( ",
+        "  select * ",
+        "  from source s2 ",
+        "  inner join table t ",
+        "    on t.col1 = s2.col1 ",
+        ") s4 ",
+        "  on s4.col1 = s.col1"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col3", "value": "row1" }, { "key": "art_id", "value": 1 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "row_id", "value": 1 }],
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col3", "value": "row1" }, { "key": "art_id", "value": 1 }, { "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "row_id", "value": 2 }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col3", "value": "row2" }, { "key": "art_id", "value": 2 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "row_id", "value": 3 }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col3", "value": "row2" }, { "key": "art_id", "value": 2 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "row_id", "value": 4 }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col3", "value": "row2" }, { "key": "art_id", "value": 2 }, { "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "row_id", "value": 5 }]
+        ]
+      ]
+    },
+    {
+      "name": "Join with single sub query and populate",
+      "description": [
+		"Make sure CompositeTuple handles to find mering tuple when having a single sub query where ordinals to match "
+      ],
+      "query": [
+        "select t.map(x -> x.row_id) ids, s.col1 ",
+        "from source s ",
+        "inner join ",
+        "( ",
+        "  select * ",
+        "  from table t ",
+        ") t with (populate = true) ",
+        "  on t.col1 = s.col1"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "ids", "value": [1, 2] }   , { "key": "col1", "value": 1 }],
+          [{ "key": "ids", "value": [3, 4, 5] }, { "key": "col1", "value": 3 }],
+          [{ "key": "ids", "value": [6] }      , { "key": "col1", "value": 5 }]
         ]
       ]
     },
@@ -209,7 +289,8 @@
     {
       "name": "Left join with grouped by sub query",
       "query": [
-        "select a.art_id, ap.map(x -> listOf(x.pk.name[0], x.pv.map(y -> y.value))) properties",
+        "select a.art_id, ap.map(x -> listOf(x.pk[0].name, x.pv.map(y -> y.value))) properties ",
+        "",
         "from article a",
         "left join ",
         "( ",
@@ -327,7 +408,10 @@
     {
       "name": "Left join, asterisk select",
       "query": [
-        "select * from source s left join article a on a.col1 = s.col1"
+        "select * ",
+        "from source s ",
+        "left join article a ",
+        "  on a.col1 = s.col1"
       ],
       "expectedResultSets": [
         [

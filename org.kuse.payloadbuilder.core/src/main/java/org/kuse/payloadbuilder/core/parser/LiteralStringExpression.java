@@ -19,9 +19,10 @@ public class LiteralStringExpression extends LiteralExpression
     @Override
     public ExpressionCode generateCode(CodeGeneratorContext context)
     {
-        ExpressionCode code = context.getCode();
-        String template = "String %s = \"%s\";\n";
-        code.setCode(String.format(template, code.getResVar(), value));
+        ExpressionCode code = context.getExpressionCode();
+        String template = "String %s = \"%s\";\n"
+            + "boolean %s = false;\n";
+        code.setCode(String.format(template, code.getResVar(), value, code.getNullVar()));
         return code;
     }
 

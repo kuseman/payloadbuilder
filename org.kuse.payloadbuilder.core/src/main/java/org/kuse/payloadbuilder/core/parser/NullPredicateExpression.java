@@ -2,6 +2,7 @@ package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Objects.requireNonNull;
 
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
@@ -69,22 +70,28 @@ public class NullPredicateExpression extends Expression
     @Override
     public ExpressionCode generateCode(CodeGeneratorContext context)
     {
-        ExpressionCode code = context.getCode();
+        ExpressionCode code = context.getExpressionCode();
         ExpressionCode childCode = expression.generateCode(context);
 
         /*
-        * Boolean res0 = false;
-        * Object res1 = res0 == null / res0 != null
+        * Object v_0 = ....
+        * boolean n_0 = ....
+        *
+        * boolean n_1 = false;
+        * boolean v_1 = (!)n_0;
         *
         */
 
-        String template = "//%s\n%s"
-            + "Boolean %s = %s %s= null;\n";
+        String template = "// %s\n"
+            + "%s"                                  // child code
+            + "boolean %s = false;\n"               // nullVar
+            + "boolean %s = %s%s;\n";               // resVar, not, child nullVar
 
         code.setCode(String.format(template,
                 toString(),
                 childCode.getCode(),
-                code.getResVar(), childCode.getResVar(), not ? "!" : "="));
+                code.getNullVar(),
+                code.getResVar(), not ? "!" : "", childCode.getNullVar()));
 
         return code;
     }
@@ -96,9 +103,9 @@ public class NullPredicateExpression extends Expression
     }
 
     @Override
-    public Class<?> getDataType()
+    public DataType getDataType()
     {
-        return boolean.class;
+        return DataType.BOOLEAN;
     }
 
     @Override

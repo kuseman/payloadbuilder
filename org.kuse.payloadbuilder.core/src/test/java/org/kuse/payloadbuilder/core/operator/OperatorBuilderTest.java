@@ -222,7 +222,7 @@ public class OperatorBuilderTest extends AOperatorTest
                 1,
                 queryResult.tableOperators.get(0),
                 ofEntries(entry(0, CollectionUtils.asSet("art_id"))),
-                new ExpressionValuesExtractor(asList(e("a.art_id"))),
+                new ExpressionIndexValuesFactory(asList(e("a.art_id"))),
                 1);
 
         //                System.out.println(queryResult.operator.toString(1));
@@ -268,7 +268,7 @@ public class OperatorBuilderTest extends AOperatorTest
                         new ExpressionHashFunction(asList(e("s.art_id"))),
                         new ExpressionHashFunction(asList(e("a.art_id"))),
                         new ExpressionPredicate(e("a.art_id = s.art_id")),
-                        new DefaultTupleMerger(-1, 1, 2),
+                        new DefaultTupleMerger(-1, 1, 3),
                         true,
                         false),
                 new ExpressionPredicate(e("a.ab.active_flg = true")));
@@ -384,9 +384,12 @@ public class OperatorBuilderTest extends AOperatorTest
 
         TableAlias root = TableAliasBuilder.of(-1, Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
                 .children(asList(
-                        TableAliasBuilder.of(0, Type.FUNCTION, QualifiedName.of("range"), "r").columns(new String[] {"Value"}),
-                        TableAliasBuilder.of(1, Type.FUNCTION, QualifiedName.of("range"), "r1").columns(new String[] {"Value"}),
-                        TableAliasBuilder.of(2, Type.FUNCTION, QualifiedName.of("range"), "r2").columns(new String[] {"Value"})))
+                        TableAliasBuilder.of(0, Type.FUNCTION, QualifiedName.of("range"), "r")
+                                .tableMeta(range.getTableMeta()),
+                        TableAliasBuilder.of(1, Type.FUNCTION, QualifiedName.of("range"), "r1")
+                                .tableMeta(range.getTableMeta()),
+                        TableAliasBuilder.of(2, Type.FUNCTION, QualifiedName.of("range"), "r2")
+                                .tableMeta(range.getTableMeta())))
                 .build();
 
         TableAlias r = root.getChildAliases().get(0);
@@ -469,15 +472,15 @@ public class OperatorBuilderTest extends AOperatorTest
 
         TableAlias root = TableAliasBuilder.of(-1, Type.ROOT, of("ROOT"), "ROOT")
                 .children(asList(
-                        TableAliasBuilder.of(0, Type.TABLE, of("source"), "s").columns(new String[] {"art_id"}),
-                        TableAliasBuilder.of(1, Type.TABLE, of("article"), "a").columns(new String[] {"art_id"}),
+                        TableAliasBuilder.of(0, Type.TABLE, of("source"), "s"),
+                        TableAliasBuilder.of(1, Type.TABLE, of("article"), "a"),
                         TableAliasBuilder.of(2, Type.SUBQUERY, of("SubQuery"), "aa")
                                 .children(asList(
                                         TableAliasBuilder.of(-1, Type.ROOT, of("ROOT"), "ROOT")
                                                 .children(asList(
-                                                        TableAliasBuilder.of(3, Type.TABLE, of("articleAttribute"), "aa").columns(new String[] {"sku_id", "attr1_id", "active_flg", "art_id"}),
-                                                        TableAliasBuilder.of(4, Type.TABLE, of("articlePrice"), "ap").columns(new String[] {"sku_id", "price_sales"}),
-                                                        TableAliasBuilder.of(5, Type.TABLE, of("attribute1"), "a1").columns(new String[] {"attr1_id"})))))))
+                                                        TableAliasBuilder.of(3, Type.TABLE, of("articleAttribute"), "aa"),
+                                                        TableAliasBuilder.of(4, Type.TABLE, of("articlePrice"), "ap"),
+                                                        TableAliasBuilder.of(5, Type.TABLE, of("attribute1"), "a1")))))))
                 .build();
 
         TableAlias source = root.getChildAliases().get(0);
@@ -498,7 +501,7 @@ public class OperatorBuilderTest extends AOperatorTest
                         new ExpressionHashFunction(asList(e("s.art_id"))),
                         new ExpressionHashFunction(asList(e("a.art_id"))),
                         new ExpressionPredicate(e("a.art_id = s.art_id")),
-                        new DefaultTupleMerger(-1, 1, 3),
+                        new DefaultTupleMerger(-1, 1, 5),
                         true,
                         false),
                 new HashJoin(
@@ -525,7 +528,7 @@ public class OperatorBuilderTest extends AOperatorTest
                 new ExpressionHashFunction(asList(e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("aa.art_id"))),
                 new ExpressionPredicate(e("aa.art_id = s.art_id")),
-                new DefaultTupleMerger(-1, 2, 3),
+                new DefaultTupleMerger(-1, 2, 5),
                 true,
                 false);
 
@@ -624,45 +627,41 @@ public class OperatorBuilderTest extends AOperatorTest
 
         QueryResult result = getQueryResult(query);
 
+        TableFunctionInfo rangeFunction = (TableFunctionInfo) session.getCatalogRegistry().getBuiltin().getFunction("range");
+
         TableAlias root = TableAliasBuilder
                 .of(-1, TableAlias.Type.ROOT, QualifiedName.of("ROOT"), "ROOT")
                 .children(asList(
-                        TableAliasBuilder.of(0, TableAlias.Type.TABLE, of("article"), "a").columns(new String[] {"art_id", "add_on_flg", "articleType", "note_id", "stamp_dat_cr", "idx_id"}),
+                        TableAliasBuilder.of(0, TableAlias.Type.TABLE, of("article"), "a"),
                         TableAliasBuilder.of(1, TableAlias.Type.SUBQUERY, of("SubQuery"), "aa")
                                 .children(asList(
                                         TableAliasBuilder
                                                 .of(-1, TableAlias.Type.ROOT, QualifiedName.of("ROOT"), "ROOT")
                                                 .children(asList(
-
-                                                        TableAliasBuilder.of(2, TableAlias.Type.TABLE, of("articleAttribute"), "aa")
-                                                                .columns(new String[] {"sku_id", "attr1_id", "attr2_id", "attr3_id", "art_id", "active_flg", "internet_flg", "internet_date_start",
-                                                                        "pluno", "ean13",
-                                                                        "note_id"}),
-                                                        TableAliasBuilder.of(3, TableAlias.Type.TABLE, of("articlePrice"), "ap")
-                                                                .columns(new String[] {"sku_id", "price_sales", "price_org", "art_id", "note_id"}),
-                                                        TableAliasBuilder.of(4, TableAlias.Type.TABLE, of("attribute1"), "a1")
-                                                                .columns(new String[] {"attr1_id", "lang_id", "rgb_code", "group_flg", "colorGroup"}),
-                                                        TableAliasBuilder.of(5, TableAlias.Type.TABLE, of("attribute2"), "a2").columns(new String[] {"attr2_id", "lang_id", "attr2_no", "attr2_code"}),
-                                                        TableAliasBuilder.of(6, TableAlias.Type.TABLE, of("attribute3"), "a3").columns(new String[] {"attr3_id", "lang_id"}))))),
+                                                        TableAliasBuilder.of(2, TableAlias.Type.TABLE, of("articleAttribute"), "aa"),
+                                                        TableAliasBuilder.of(3, TableAlias.Type.TABLE, of("articlePrice"), "ap"),
+                                                        TableAliasBuilder.of(4, TableAlias.Type.TABLE, of("attribute1"), "a1"),
+                                                        TableAliasBuilder.of(5, TableAlias.Type.TABLE, of("attribute2"), "a2"),
+                                                        TableAliasBuilder.of(6, TableAlias.Type.TABLE, of("attribute3"), "a3"))))),
 
                         TableAliasBuilder.of(7, TableAlias.Type.SUBQUERY, of("SubQuery"), "ap")
                                 .children(asList(
                                         TableAliasBuilder
                                                 .of(-1, TableAlias.Type.ROOT, QualifiedName.of("ROOT"), "ROOT")
                                                 .children(asList(
-                                                        TableAliasBuilder.of(8, TableAlias.Type.TABLE, of("articleProperty"), "").columns(new String[] {"propertykey_id", "art_id"}))))),
+                                                        TableAliasBuilder.of(8, TableAlias.Type.TABLE, of("articleProperty"), ""))))),
                         TableAliasBuilder.of(9, TableAlias.Type.SUBQUERY, of("SubQuery"), "r")
                                 .children(asList(
                                         TableAliasBuilder
                                                 .of(-1, TableAlias.Type.ROOT, QualifiedName.of("ROOT"), "ROOT")
                                                 .children(asList(
                                                         TableAliasBuilder.of(10, TableAlias.Type.FUNCTION, of("range"), "r")
-                                                                .columns(new String[] {"Value"}),
-                                                        TableAliasBuilder.of(11, TableAlias.Type.TABLE, of("attribute1"), "a1").columns(new String[] {"someId", "attr1_code"})))))))
+                                                                .tableMeta(rangeFunction.getTableMeta()),
+                                                        TableAliasBuilder.of(11, TableAlias.Type.TABLE, of("attribute1"), "a1")))))))
                 .build();
 
-        //        System.out.println(root.printHierarchy(1));
-        //        System.out.println(result.alias.printHierarchy(1));
+        //                System.out.println(root.printHierarchy(1));
+        //                System.out.println(result.alias.printHierarchy(1));
 
         assertTrue("Alias hierarchy should be equal", root.isEqual(result.alias));
     }
@@ -675,7 +674,7 @@ public class OperatorBuilderTest extends AOperatorTest
 
         TableAlias root = TableAliasBuilder.of(-1, Type.ROOT, QualifiedName.of("ROOT"), "ROOT")
                 .children(asList(
-                        TableAliasBuilder.of(0, TableAlias.Type.TABLE, QualifiedName.of("source"), "s").columns(new String[] {"id1", "id2"})))
+                        TableAliasBuilder.of(0, TableAlias.Type.TABLE, QualifiedName.of("source"), "s")))
                 .build();
 
         //                System.out.println(root.printHierarchy(1));
@@ -854,7 +853,7 @@ public class OperatorBuilderTest extends AOperatorTest
                                 true,
                                 false),
                         new ExpressionPredicate(e("a.art_id = s.art_id")),
-                        new DefaultTupleMerger(-1, 1, 2),
+                        new DefaultTupleMerger(-1, 1, 3),
                         true,
                         false);
 
@@ -904,7 +903,7 @@ public class OperatorBuilderTest extends AOperatorTest
                                 true,
                                 false),
                         new ExpressionPredicate(e("a.art_id = s.art_id")),
-                        new DefaultTupleMerger(-1, 1, 2),
+                        new DefaultTupleMerger(-1, 1, 3),
                         true,
                         false);
 

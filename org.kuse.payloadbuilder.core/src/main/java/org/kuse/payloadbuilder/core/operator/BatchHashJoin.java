@@ -2,8 +2,8 @@ package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
-import static org.apache.commons.lang3.ArrayUtils.contains;
 import static org.kuse.payloadbuilder.core.DescribeUtils.BATCH_SIZE;
 import static org.kuse.payloadbuilder.core.DescribeUtils.INDEX;
 import static org.kuse.payloadbuilder.core.DescribeUtils.INNER_HASH_TIME;
@@ -18,24 +18,24 @@ import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
+import java.util.function.ToIntBiFunction;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.lang3.time.StopWatch;
 import org.kuse.payloadbuilder.core.catalog.Index;
-import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
+import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory.IIndexValues;
+import org.kuse.payloadbuilder.core.operator.StatementContext.NodeData;
 import org.kuse.payloadbuilder.core.parser.Option;
-import org.kuse.payloadbuilder.core.utils.ObjectUtils;
 
-import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 
 /**
@@ -55,17 +55,17 @@ import gnu.trove.map.hash.TIntObjectHashMap;
  **/
 class BatchHashJoin extends AOperator
 {
+    private static final int DEFAULT_INNER_CAPACITY = 10;
     private final String logicalOperator;
     private final Operator outer;
     private final Operator inner;
-    private final ValuesExtractor outerValuesExtractor;
-    private final ValuesExtractor innerValuesExtractor;
+    private final IIndexValuesFactory outerValuesFactory;
+    private final ToIntBiFunction<ExecutionContext, Tuple> innerHashFunction;
     private final Predicate<ExecutionContext> predicate;
     private final TupleMerger rowMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
     private final Index innerIndex;
-    private final int valuesSize;
     private final Option batchSizeOption;
 
     //CSOFF
@@ -75,8 +75,8 @@ class BatchHashJoin extends AOperator
             String logicalOperator,
             Operator outer,
             Operator inner,
-            ValuesExtractor outerValuesExtractor,
-            ValuesExtractor innerValuesExtractor,
+            IIndexValuesFactory outerValuesFactory,
+            ToIntBiFunction<ExecutionContext, Tuple> innerHashFunction,
             Predicate<ExecutionContext> predicate,
             TupleMerger rowMerger,
             boolean populating,
@@ -88,15 +88,19 @@ class BatchHashJoin extends AOperator
         this.logicalOperator = requireNonNull(logicalOperator, "logicalOperator");
         this.outer = requireNonNull(outer, "outer");
         this.inner = requireNonNull(inner, "inner");
-        this.outerValuesExtractor = requireNonNull(outerValuesExtractor, "outerValuesExtractor");
-        this.innerValuesExtractor = requireNonNull(innerValuesExtractor, "innerValuesExtractor");
+        this.outerValuesFactory = requireNonNull(outerValuesFactory, "outerValuesExtractor");
+        this.innerHashFunction = requireNonNull(innerHashFunction, "innerHashFunction");
         this.predicate = requireNonNull(predicate, "predicate");
         this.rowMerger = requireNonNull(rowMerger, "rowMerger");
         this.populating = populating;
         this.emitEmptyOuterRows = emitEmptyOuterRows;
         this.innerIndex = requireNonNull(innerIndex, "innerIndex");
-        this.valuesSize = outerValuesExtractor.size();
         this.batchSizeOption = batchSizeOption;
+    }
+
+    Operator getInner()
+    {
+        return inner;
     }
 
     @Override
@@ -114,15 +118,15 @@ class BatchHashJoin extends AOperator
     @Override
     public Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
-        Data data = context.getOperatorContext().getNodeData(nodeId);
+        Data data = context.getStatementContext().getNodeData(nodeId);
         Map<String, Object> result = ofEntries(true,
                 entry(LOGICAL_OPERATOR, logicalOperator),
                 entry(POPULATING, populating),
                 entry(BATCH_SIZE, batchSizeOption != null ? batchSizeOption.getValueExpression().toString() : innerIndex.getBatchSize()),
                 entry(PREDICATE, predicate),
                 entry(INDEX, innerIndex),
-                entry(OUTER_VALUES, outerValuesExtractor),
-                entry(INNER_VALUES, innerValuesExtractor));
+                entry(OUTER_VALUES, outerValuesFactory),
+                entry(INNER_VALUES, innerHashFunction));
 
         if (data != null)
         {
@@ -139,8 +143,8 @@ class BatchHashJoin extends AOperator
     //CSON
     public RowIterator open(ExecutionContext context)
     {
-        final JoinTuple joinTuple = new JoinTuple(context.getTuple());
-        final Data data = context.getOperatorContext().getNodeData(nodeId, Data::new);
+        final JoinTuple joinTuple = new JoinTuple(context.getStatementContext().getTuple());
+        final Data data = context.getStatementContext().getOrCreateNodeData(nodeId, Data::new);
         final RowIterator outerIt = outer.open(context);
         final int batchSize = getBatchSize(context);
         //CSOFF
@@ -154,15 +158,16 @@ class BatchHashJoin extends AOperator
             private int innerRowIndex;
 
             /** Reference to outer values iterator to verify that implementations of Operator fully uses the index if specified */
-            private Iterator<Object[]> outerValuesIterator;
+            private Iterator<IIndexValues> outerValuesIterator;
 
             /** Table use for hashed inner values */
-            private final TIntObjectMap<TableValue> table = new TIntObjectHashMap<>((int) (batchSize * 1.5));
+            private final TIntObjectHashMap<List<Tuple>> table = new TIntObjectHashMap<>(batchSize);
+
+            private final Set<IIndexValues> addedValues = new HashSet<>(batchSize);
 
             private Tuple next;
             private TupleHolder outerTuple;
-
-            private final Object[] keyValues = new Object[valuesSize];
+            private TupleHolder prevOuterTuple;
 
             /** Flag used when having populating join or, left join */
             private boolean emitOuterRows;
@@ -207,7 +212,8 @@ class BatchHashJoin extends AOperator
                             return false;
                         }
 
-                        hashInnerBatch();
+                        // No inner rows was fetched
+                        fetchInnerBatch();
 
                         // Start probing
                         continue;
@@ -234,15 +240,8 @@ class BatchHashJoin extends AOperator
                         }
 
                         outerTuple = outerTuples.get(outerTupleIndex);
-                        TableValue tableValue = table.get(outerTuple.hash);
-                        if (tableValue == null)
-                        {
-                            outerTupleIndex++;
-                            continue;
-                        }
-
-                        innerTuples = tableValue.getRows();
-                        if (innerTuples.isEmpty())
+                        innerTuples = table.get(outerTuple.hash);
+                        if (innerTuples == null)
                         {
                             //CSOFF
                             if (!populating && emitEmptyOuterRows)
@@ -269,9 +268,9 @@ class BatchHashJoin extends AOperator
                     joinTuple.setInner(innerRow);
 
                     data.predicateTime.resume();
-                    context.setTuple(joinTuple);
+                    context.getStatementContext().setTuple(joinTuple);
                     boolean result = predicate.test(context);
-                    context.setTuple(null);
+                    context.getStatementContext().setTuple(null);
                     data.predicateTime.suspend();
 
                     if (result)
@@ -295,54 +294,134 @@ class BatchHashJoin extends AOperator
                 // Stop early to avoid allocation of lists
                 if (!outerIt.hasNext())
                 {
-                    outerTuples = emptyList();
+                    // Pick prev tuple if any
+                    outerTuples = prevOuterTuple != null ? singletonList(prevOuterTuple) : emptyList();
+                    prevOuterTuple = null;
                     return;
                 }
 
+                joinTuple.setOuter(null);
                 int count = 0;
                 int size = batchSize > 0 ? batchSize : 100;
-                outerTuples = new ArrayList<>(size);
+                outerTuples = new ArrayList<>(size + (prevOuterTuple != null ? 1 : 0));
+
+                // Adapt for eventual prev tuple
+                if (prevOuterTuple != null)
+                {
+                    outerTuples.add(prevOuterTuple);
+                    prevOuterTuple = null;
+                    count = 1;
+                }
+
+                // Flag to indicate if the batch is complete
+                // then we keep fetching outer tuples until the values
+                // changes, this to avoid calling down stream operator
+                // multiple times with the same values
+                /*
+                 * ie.
+                 *
+                 * outer value
+                 * 1
+                 * 1             Batch 1
+                 * 2
+                 * --------
+                 * 2
+                 * 3             Batch 2
+                 * 3
+                 *
+                 *
+                 * Here we should fetch batches like this:
+                 *
+                 * 1
+                 * 1
+                 * 2             Batch 1
+                 * 2
+                 * --------
+                 * 3             Batch 2
+                 * 3
+                 *
+                 *
+                 *
+                 */
+                boolean batchComplete = false;
+
                 while (outerIt.hasNext())
                 {
                     Tuple tuple = outerIt.next();
-                    outerTuples.add(new TupleHolder(tuple));
-                    count++;
-                    if (batchSize > 0 && count >= batchSize)
+
+                    joinTuple.setInner(tuple);
+                    IIndexValues outerValues = outerValuesFactory.create(context, joinTuple);
+                    int hash = outerValues.hashCode();
+
+                    TupleHolder holder = new TupleHolder(tuple, hash);
+                    batchComplete = count >= size;
+
+                    // If current tuple yielded unique values
+                    // use it when opening the down stream operator
+                    if (addedValues.add(outerValues))
                     {
-                        break;
+                        holder.outerValues = outerValues;
+                        // First unique values after the batch was complete, drop out
+                        // and use current tuple in the next batch.
+                        // This to avoid fetching the same inner tuples multiple times
+                        if (batchComplete)
+                        {
+                            prevOuterTuple = holder;
+                            break;
+                        }
                     }
+
+                    outerTuples.add(holder);
+                    count++;
                 }
             }
 
-            private void hashInnerBatch()
+            private boolean fetchInnerBatch()
             {
-                outerValuesIterator = outerValuesIterator(context);
+                outerValuesIterator = outerTuples
+                        .stream()
+                        .filter(o -> o.outerValues != null)
+                        .map(o -> o.outerValues)
+                        .iterator();
+
                 if (!outerValuesIterator.hasNext())
                 {
-                    return;
+                    return false;
                 }
 
-                context.getOperatorContext().setOuterIndexValues(outerValuesIterator);
+                context.getStatementContext().setOuterIndexValues(outerValuesIterator);
                 RowIterator it = inner.open(context);
 
                 joinTuple.setOuter(null);
+                boolean tuplesFetched = false;
 
                 // Hash batch
                 while (it.hasNext())
                 {
+                    tuplesFetched = true;
                     Tuple tuple = it.next();
                     joinTuple.setInner(tuple);
                     data.innerHashTime.resume();
                     try
                     {
-                        int hash = populateKeyValues(innerValuesExtractor, context, joinTuple);
-                        TableValue tableValue = table.get(hash);
-                        if (tableValue == null)
+                        int hash = innerHashFunction.applyAsInt(context, joinTuple);
+                        List<Tuple> list = table.get(hash);
+                        if (list == null)
                         {
-                            // No outer row exists for this inner rows hash, no need to add it
+                            // Start with singleton list
+                            list = singletonList(tuple);
+                            table.put(hash, list);
                             continue;
                         }
-                        tableValue.addRow(tuple);
+                        else if (list.size() == 1)
+                        {
+                            // Switch to array list
+                            List<Tuple> newList = new ArrayList<>(DEFAULT_INNER_CAPACITY);
+                            newList.add(list.get(0));
+                            list = newList;
+                            table.put(hash, list);
+                        }
+                        list.add(tuple);
                     }
                     finally
                     {
@@ -352,7 +431,8 @@ class BatchHashJoin extends AOperator
                 it.close();
 
                 verifyOuterValuesIterator();
-                context.getOperatorContext().setOuterIndexValues(null);
+                context.getStatementContext().setOuterIndexValues(null);
+                return tuplesFetched;
             }
 
             private void emitOuterRows()
@@ -388,91 +468,6 @@ class BatchHashJoin extends AOperator
                 outerTupleIndex = 0;
                 emitOuterRows = false;
             }
-
-            private int populateKeyValues(
-                    ValuesExtractor valueExtractor,
-                    ExecutionContext context,
-                    Tuple tuple)
-            {
-                valueExtractor.extract(context, tuple, keyValues);
-                return hash(keyValues);
-            }
-
-            private Iterator<Object[]> outerValuesIterator(ExecutionContext context)
-            {
-                //CSOFF
-                return new Iterator<Object[]>()
-                //CSON
-                {
-                    private int outerRowsIndex;
-                    private Object[] nextArray;
-
-                    @Override
-                    public boolean hasNext()
-                    {
-                        return setNext();
-                    }
-
-                    @Override
-                    public Object[] next()
-                    {
-                        if (nextArray == null)
-                        {
-                            throw new NoSuchElementException();
-                        }
-
-                        Object[] result = nextArray;
-                        nextArray = null;
-                        return result;
-                    }
-
-                    private boolean setNext()
-                    {
-                        while (nextArray == null)
-                        {
-                            if (outerRowsIndex >= outerTuples.size())
-                            {
-                                return false;
-                            }
-
-                            data.outerHashTime.resume();
-                            TupleHolder holder = outerTuples.get(outerRowsIndex++);
-                            joinTuple.setOuter(null);
-                            joinTuple.setInner(holder.tuple);
-                            try
-                            {
-                                int hash = populateKeyValues(outerValuesExtractor, context, joinTuple);
-                                // Cannot be null values in keys
-                                if (contains(keyValues, null))
-                                {
-                                    continue;
-                                }
-                                holder.hash = hash;
-                                TableValue tableValue = table.get(holder.hash);
-                                if (tableValue == null)
-                                {
-                                    tableValue = new TableValue();
-                                    table.put(holder.hash, tableValue);
-                                }
-
-                                if (!tableValue.addInnterValues(keyValues))
-                                {
-                                    // Value already present, no need to push values to downstream
-                                    continue;
-                                }
-                            }
-                            finally
-                            {
-                                data.outerHashTime.suspend();
-                            }
-
-                            nextArray = keyValues;
-                        }
-
-                        return true;
-                    }
-                };
-            }
         };
     }
 
@@ -489,19 +484,6 @@ class BatchHashJoin extends AOperator
             temp = (int) obj;
         }
         return temp;
-    }
-
-    private int hash(Object[] values)
-    {
-        int result = ObjectUtils.HASH_CONSTANT;
-
-        int length = values.length;
-        for (int i = 0; i < length; i++)
-        {
-            Object value = values[i];
-            result = result * ObjectUtils.HASH_MULTIPLIER + ObjectUtils.hash(value);
-        }
-        return result;
     }
 
     @Override
@@ -525,8 +507,8 @@ class BatchHashJoin extends AOperator
                 && logicalOperator.equals(that.logicalOperator)
                 && outer.equals(that.outer)
                 && inner.equals(that.inner)
-                && outerValuesExtractor.equals(that.outerValuesExtractor)
-                && innerValuesExtractor.equals(that.innerValuesExtractor)
+                && outerValuesFactory.equals(that.outerValuesFactory)
+                && innerHashFunction.equals(that.innerHashFunction)
                 && predicate.equals(that.predicate)
                 && rowMerger.equals(that.rowMerger)
                 && populating == that.populating
@@ -549,8 +531,8 @@ class BatchHashJoin extends AOperator
                 emitEmptyOuterRows,
                 batchSizeOption != null ? batchSizeOption.getValueExpression().toString() : innerIndex.getBatchSize(),
                 innerIndex,
-                outerValuesExtractor,
-                innerValuesExtractor,
+                outerValuesFactory,
+                innerHashFunction,
                 predicate);
         return description + System.lineSeparator()
             + indentString + outer.toString(indent + 1) + System.lineSeparator()
@@ -577,72 +559,22 @@ class BatchHashJoin extends AOperator
         }
     }
 
-    /** Tuple holder */
+    /** Holder for a tuple with properties needed to perform operator logic */
     private static class TupleHolder
     {
+        // Non cache key data
         private Tuple tuple;
-        private int hash;
+        private final int hash;
+
+        /** Flag to indicate that this holder should be pushed to downstream operator to be used as index value foundation */
+        private IIndexValues outerValues;
+        /** Flag to indicate if this tuple got a match or not. Used in populating and left joins */
         private boolean match;
 
-        TupleHolder(Tuple tuple)
+        TupleHolder(Tuple tuple, int hash)
         {
             this.tuple = tuple;
-        }
-    }
-
-    /** Value used in table */
-    private static class TableValue
-    {
-        private List<Tuple> tuples;
-        private List<Object[]> values;
-
-        /** Check if provided key exists in values */
-        private boolean contains(Object[] keyValues)
-        {
-            int size = values.size();
-            for (int i = 0; i < size; i++)
-            {
-                if (Arrays.equals(values.get(i), keyValues))
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        public void addRow(Tuple tuple)
-        {
-            if (tuples == null)
-            {
-                tuples = new ArrayList<>();
-            }
-
-            tuples.add(tuple);
-        }
-
-        public List<Tuple> getRows()
-        {
-            return tuples != null ? tuples : emptyList();
-        }
-
-        /**
-         * Add inner values array
-         *
-         * @return True if array was added
-         */
-        boolean addInnterValues(Object[] keyValues)
-        {
-            if (values == null)
-            {
-                values = new ArrayList<>();
-            }
-            else if (contains(keyValues))
-            {
-                return false;
-            }
-
-            values.add(Arrays.copyOf(keyValues, keyValues.length));
-            return true;
+            this.hash = hash;
         }
     }
 }

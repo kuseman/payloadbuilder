@@ -68,7 +68,7 @@ class ComputedColumnsOperator extends AOperator
                 Object[] values = new Object[size];
                 for (int i = 0; i < size; i++)
                 {
-                    context.setTuple(tuple);
+                    context.getStatementContext().setTuple(tuple);
                     values[i] = EvalUtils.unwrap(context, computedExpressions.get(i).eval(context));
                 }
 
@@ -136,17 +136,6 @@ class ComputedColumnsOperator extends AOperator
         }
 
         @Override
-        public Tuple getTuple(int tupleOrdinal)
-        {
-            // Keep this context if we access the target computed tuple
-            if (tupleOrdinal == ComputedColumnsOperator.this.tupleOrdinal)
-            {
-                return this;
-            }
-            return tuple.getTuple(tupleOrdinal);
-        }
-
-        @Override
         public int getColumnCount()
         {
             return tuple.getColumnCount() + values.length;
@@ -175,6 +164,17 @@ class ComputedColumnsOperator extends AOperator
         }
 
         @Override
+        public Tuple getTuple(int tupleOrdinal)
+        {
+            // Keep this context if we access the target computed tuple
+            if (tupleOrdinal == ComputedColumnsOperator.this.tupleOrdinal)
+            {
+                return this;
+            }
+            return tuple.getTuple(tupleOrdinal);
+        }
+
+        @Override
         public Object getValue(int columnOrdinal)
         {
             if (columnOrdinal == -1)
@@ -186,6 +186,13 @@ class ComputedColumnsOperator extends AOperator
                 return values[columnOrdinal];
             }
             return tuple.getValue(columnOrdinal - columns.length);
+        }
+
+        @Override
+        public Tuple optimize(ExecutionContext context)
+        {
+            context.intern(values);
+            return new ComputedTuple(tuple.optimize(context), values);
         }
     }
 }

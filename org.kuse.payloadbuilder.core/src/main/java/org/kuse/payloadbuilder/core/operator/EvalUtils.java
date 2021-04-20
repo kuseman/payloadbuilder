@@ -13,6 +13,10 @@ import java.util.Stack;
 
 import org.apache.commons.collections.IteratorUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.mutable.MutableDouble;
+import org.apache.commons.lang3.mutable.MutableFloat;
+import org.apache.commons.lang3.mutable.MutableInt;
+import org.apache.commons.lang3.mutable.MutableLong;
 import org.kuse.payloadbuilder.core.OutputWriter;
 
 /** Utils for evaluation of expressions */
@@ -31,6 +35,7 @@ public final class EvalUtils
      * These are:
      *   - Iterator (make a list of it)
      *   - Reader (Read to string)
+     *   - Mutable numbers
      * </pre>
      */
     @SuppressWarnings("unchecked")
@@ -76,6 +81,23 @@ public final class EvalUtils
             ComplexValueWriter writer = new ComplexValueWriter(context);
             value.write(writer, context);
             return writer.getValue();
+        }
+        // Unwrap mutables
+        else if (object instanceof MutableDouble)
+        {
+            return ((MutableDouble) object).doubleValue();
+        }
+        else if (object instanceof MutableFloat)
+        {
+            return ((MutableFloat) object).floatValue();
+        }
+        else if (object instanceof MutableLong)
+        {
+            return ((MutableLong) object).longValue();
+        }
+        else if (object instanceof MutableInt)
+        {
+            return ((MutableInt) object).intValue();
         }
 
         return object;

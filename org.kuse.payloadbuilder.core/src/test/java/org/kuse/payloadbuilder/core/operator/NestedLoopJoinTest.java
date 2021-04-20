@@ -2,10 +2,8 @@ package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Collections.emptyList;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.IntStream;
 
@@ -77,9 +75,9 @@ public class NestedLoopJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(tableAPos[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
-            assertEquals(tableBPos[count], tuple.getTuple(2).getValue(Row.POS_ORDINAL));
-            assertEquals(tableCPos[count], tuple.getTuple(3).getValue(Row.POS_ORDINAL));
+            assertEquals(tableAPos[count], getValue(tuple, 0, Row.POS_ORDINAL));
+            assertEquals(tableBPos[count], getValue(tuple, 2, Row.POS_ORDINAL));
+            assertEquals(tableCPos[count], getValue(tuple, 3, Row.POS_ORDINAL));
             count++;
         }
         it.close();
@@ -103,8 +101,8 @@ public class NestedLoopJoinTest extends AOperatorTest
             + "cross apply tableB b";
 
         Map<String, Function<TableAlias, Operator>> opByTable = MapUtils.ofEntries(
-                MapUtils.entry("tableA", a -> op(context -> IntStream.range(1, 5).mapToObj(i -> (Tuple) Row.of(a, i - 1, new Object[] {i})).iterator(), () -> leftClose.increment())),
-                MapUtils.entry("tableB", a -> op(ctx -> new TableFunctionOperator(0, "", a, new Range(2), emptyList()).open(ctx), () -> rightClose.increment())));
+                MapUtils.entry("tableA", a -> op(context -> IntStream.range(1, 5).mapToObj(i -> (Tuple) Row.of(a, i - 1, new String[] { "col" }, new Object[] {i})).iterator(), () -> leftClose.increment())),
+                MapUtils.entry("tableB", a -> op1(ctx -> new TableFunctionOperator(0, "", a, new Range(2), emptyList()).open(ctx), () -> rightClose.increment())));
 
         Operator op = operator(query, opByTable);
 
@@ -119,8 +117,8 @@ public class NestedLoopJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(tableAPos[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
-            assertEquals(tableBPos[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
+            assertEquals(tableAPos[count], getValue(tuple, -1, Row.POS_ORDINAL));
+            assertEquals(tableBPos[count], getValue(tuple, 1, Row.POS_ORDINAL));
             count++;
         }
         it.close();
@@ -141,8 +139,8 @@ public class NestedLoopJoinTest extends AOperatorTest
             + "cross apply tableB b with (populate=true)";
 
         Map<String, Function<TableAlias, Operator>> opByTable = MapUtils.ofEntries(
-                MapUtils.entry("tableA", a -> op(context -> IntStream.range(1, 5).mapToObj(i -> (Tuple) Row.of(a, i - 1, new Object[] {i})).iterator(), () -> leftClose.increment())),
-                MapUtils.entry("tableB", a -> op(ctx -> new TableFunctionOperator(0, "", a, new Range(2), emptyList()).open(ctx), () -> rightClose.increment())));
+                MapUtils.entry("tableA", a -> op(context -> IntStream.range(1, 5).mapToObj(i -> (Tuple) Row.of(a, i - 1, new String[] { "col" }, new Object[] {i})).iterator(), () -> leftClose.increment())),
+                MapUtils.entry("tableB", a -> op1(ctx -> new TableFunctionOperator(0, "", a, new Range(2), emptyList()).open(ctx), () -> rightClose.increment())));
 
         Operator op = operator(query, opByTable);
 
@@ -154,10 +152,10 @@ public class NestedLoopJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(count, tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(count, tuple.getValue(Row.POS_ORDINAL));
             @SuppressWarnings("unchecked")
-            Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
-            assertArrayEquals(new int[] {0, 1}, col.stream().mapToInt(t -> (int) t.getValue(Row.POS_ORDINAL)).toArray());
+            Iterable<Tuple> col = (Iterable<Tuple>) tuple.getTuple(1);
+            assertArrayEquals(new int[] {0, 1}, stream(col).mapToInt(t -> (int) t.getValue(Row.POS_ORDINAL)).toArray());
             count++;
         }
         it.close();
@@ -178,8 +176,8 @@ public class NestedLoopJoinTest extends AOperatorTest
             + "outer apply tableB b ";
 
         Map<String, Function<TableAlias, Operator>> opByTable = MapUtils.ofEntries(
-                MapUtils.entry("tableA", a -> op(context -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i - 1, new Object[] {i})).iterator(), () -> leftClose.increment())),
-                MapUtils.entry("tableB", a -> op(ctx -> new TableFunctionOperator(0, "", a, new Range(0), emptyList()).open(ctx), () -> rightClose.increment())));
+                MapUtils.entry("tableA", a -> op(context -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i - 1, new String[] { "col" }, new Object[] {i})).iterator(), () -> leftClose.increment())),
+                MapUtils.entry("tableB", a -> op1(ctx -> new TableFunctionOperator(0, "", a, new Range(0), emptyList()).open(ctx), () -> rightClose.increment())));
 
         Operator op = operator(query, opByTable);
 
@@ -191,7 +189,7 @@ public class NestedLoopJoinTest extends AOperatorTest
         {
             Tuple tuple = it.next();
 
-            assertEquals(count, tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(count, tuple.getValue(Row.POS_ORDINAL));
             // Outer apply, no b rows should be present
             assertNull(tuple.getTuple(1));
             count++;
@@ -215,8 +213,8 @@ public class NestedLoopJoinTest extends AOperatorTest
             + "  on a.__pos % 2 = 0 ";
 
         Map<String, Function<TableAlias, Operator>> opByTable = MapUtils.ofEntries(
-                MapUtils.entry("tableA", a -> op(context -> IntStream.range(1, 5).mapToObj(i -> (Tuple) Row.of(a, i - 1, new Object[] {i})).iterator(), () -> leftClose.increment())),
-                MapUtils.entry("tableB", a -> op(ctx -> new TableFunctionOperator(0, "", a, new Range(2), emptyList()).open(ctx), () -> rightClose.increment())));
+                MapUtils.entry("tableA", a -> op(context -> IntStream.range(1, 5).mapToObj(i -> (Tuple) Row.of(a, i - 1, new String[] { "col" }, new Object[] {i})).iterator(), () -> leftClose.increment())),
+                MapUtils.entry("tableB", a -> op1(ctx -> new TableFunctionOperator(0, "", a, new Range(2), emptyList()).open(ctx), () -> rightClose.increment())));
 
         Operator op = operator(query, opByTable);
 
@@ -231,9 +229,9 @@ public class NestedLoopJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(tableAPos[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(tableAPos[count], tuple.getValue(Row.POS_ORDINAL));
 
-            Integer val = Optional.ofNullable(tuple.getTuple(1)).map(t -> (Integer) t.getValue(Row.POS_ORDINAL)).orElse(null);
+            Integer val = (Integer) getValue(tuple, 1, Row.POS_ORDINAL);
             assertEquals("Count: " + count, tableBPos[count], val);
             count++;
         }
@@ -258,8 +256,8 @@ public class NestedLoopJoinTest extends AOperatorTest
             + "  on a.__pos % 2 = 0 ";
 
         Map<String, Function<TableAlias, Operator>> opByTable = MapUtils.ofEntries(
-                MapUtils.entry("tableA", a -> op(context -> IntStream.range(1, 5).mapToObj(i -> (Tuple) Row.of(a, i - 1, new Object[] {i})).iterator(), () -> leftClose.increment())),
-                MapUtils.entry("tableB", a -> op(ctx -> new TableFunctionOperator(0, "", a, new Range(2), emptyList()).open(ctx), () -> rightClose.increment())));
+                MapUtils.entry("tableA", a -> op(context -> IntStream.range(1, 5).mapToObj(i -> (Tuple) Row.of(a, i - 1, new String[] { "col" }, new Object[] {i})).iterator(), () -> leftClose.increment())),
+                MapUtils.entry("tableB", a -> op1(ctx -> new TableFunctionOperator(0, "", a, new Range(2), emptyList()).open(ctx), () -> rightClose.increment())));
 
         Operator op = operator(query, opByTable);
 
@@ -270,13 +268,13 @@ public class NestedLoopJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            int pos = (int) tuple.getTuple(0).getValue(Row.POS_ORDINAL);
+            int pos = (int) tuple.getValue(Row.POS_ORDINAL);
             assertEquals(count, pos);
             @SuppressWarnings("unchecked")
-            Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
+            Iterable<Tuple> col = (Iterable<Tuple>) tuple.getTuple(1);
             if (pos % 2 == 0)
             {
-                assertArrayEquals(new int[] {0, 1}, col.stream().mapToInt(t -> (int) t.getValue(Row.POS_ORDINAL)).toArray());
+                assertArrayEquals(new int[] {0, 1}, stream(col).mapToInt(t -> (int) t.getValue(Row.POS_ORDINAL)).toArray());
             }
             else
             {
@@ -305,15 +303,10 @@ public class NestedLoopJoinTest extends AOperatorTest
             this.to = to;
         }
 
-        @SuppressWarnings("deprecation")
         @Override
         public RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
         {
-            if (tableAlias.getColumns() == null)
-            {
-                tableAlias.setColumns(new String[] {"Value"});
-            }
-            return RowIterator.wrap(IntStream.range(0, to).mapToObj(i -> (Tuple) Row.of(tableAlias, i, new Object[] {i + 1})).iterator());
+            return RowIterator.wrap(IntStream.range(0, to).mapToObj(i -> (Tuple) Row.of(tableAlias, i, new String[] { "Value" }, new Object[] {i + 1})).iterator());
         }
     }
 }

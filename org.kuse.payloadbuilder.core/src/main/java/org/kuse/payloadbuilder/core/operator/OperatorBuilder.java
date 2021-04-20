@@ -18,9 +18,9 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.function.ToIntBiFunction;
 
 import org.antlr.v4.runtime.Token;
-import org.apache.commons.collections.IteratorUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.ObjectUtils;
@@ -105,6 +105,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         private boolean analyze;
         /** Flag to mark if the visitor is inside a root select or below */
         private boolean rootSelect = true;
+        /** Flag to indicate if we should generate code for root projection */
+        private boolean codeGenerateRootProjection = true;
 
         /** Acquire next unique node id */
         private int acquireNodeId()
@@ -154,13 +156,13 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     }
 
     /** Create operator */
-    public static Pair<Operator, Projection> create(QuerySession session, Select select)
+    public static BuildResult create(QuerySession session, Select select)
     {
         return create(session, select, false);
     }
 
     /** Create operator */
-    public static Pair<Operator, Projection> create(QuerySession session, Select select, boolean analyze)
+    public static BuildResult create(QuerySession session, Select select, boolean analyze)
     {
         Context context = new Context();
         context.analyze = analyze;
@@ -174,7 +176,37 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         context.registry = session.getCatalogRegistry();
         select.accept(VISITOR, context);
 
-        return Pair.of(context.getOperator(), context.projectionResult);
+        return new BuildResult(context.getOperator(), context.projectionResult, resolveContext.getColumnOrdinalSlotCount());
+    }
+
+    /** Result of operator building */
+    public static class BuildResult
+    {
+        private final Operator operator;
+        private final Projection projection;
+        private final int columnOrdinalSlotCount;
+
+        BuildResult(Operator operator, Projection projection, int columnOrdinalSlotCount)
+        {
+            this.operator = operator;
+            this.projection = projection;
+            this.columnOrdinalSlotCount = columnOrdinalSlotCount;
+        }
+
+        public Operator getOperator()
+        {
+            return operator;
+        }
+
+        public Projection getProjection()
+        {
+            return projection;
+        }
+
+        public int getColumnOrdinalSlotCount()
+        {
+            return columnOrdinalSlotCount;
+        }
     }
 
     @Override
@@ -269,7 +301,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         if (!select.getGroupBy().isEmpty())
         {
-            context.setOperator(createGroupBy(context.acquireNodeId(), select.getGroupBy(), context.getOperator()));
+            context.setOperator(createGroupBy(context.acquireNodeId(), select.getGroupBy(), createIndexVauesFactory(context.session, select.getGroupBy()), context.getOperator()));
         }
 
         if (batchLimitOption != null)
@@ -300,7 +332,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 projections.add(createProjection(context, s));
             });
 
-            context.projectionResult = new RootProjection(projectionAliases, projections);
+            context.projectionResult = createRootProjection(context, new RootProjection(projectionAliases, projections));
             if (context.analyze)
             {
                 context.projectionResult = new AnalyzeProjection(context.acquireNodeId(), context.projectionResult);
@@ -357,18 +389,21 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         // We need a clean operator for each sub query expression
         context.operatorResult = null;
         context.rootSelect = true;
+        boolean prevCodeGenerateRootProjection = context.codeGenerateRootProjection;
+        context.codeGenerateRootProjection = false;
 
         Select select = expression.getSelectStatement().getSelect();
 
         // Visit
         select.accept(this, context);
 
+        context.codeGenerateRootProjection = prevCodeGenerateRootProjection;
+
         // Unwrap analyze node if any
         if (context.projectionResult instanceof AnalyzeProjection)
         {
             context.projectionResult = ((AnalyzeProjection) context.projectionResult).getTarget();
         }
-
         RootProjection rootProjection = (RootProjection) context.projectionResult;
         return new SubQueryExpression(context.operatorResult, rootProjection.getColumns(), rootProjection.getProjections(), select.getForOutput());
     }
@@ -490,6 +525,16 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     {
         TableFunctionInfo functionInfo = tableFunction.getFunctionInfo();
         context.setOperator(new TableFunctionOperator(context.acquireNodeId(), tableFunction.getCatalogAlias(), tableFunction.getTableAlias(), functionInfo, tableFunction.getArguments()));
+        return null;
+    }
+
+    @Override
+    public Void visit(SubQueryTableSource tableSource, Context context)
+    {
+        boolean prevCodeGenerateRootProjection = context.codeGenerateRootProjection;
+        context.codeGenerateRootProjection = false;
+        super.visit(tableSource, context);
+        context.codeGenerateRootProjection = prevCodeGenerateRootProjection;
         return null;
     }
 
@@ -716,7 +761,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         String catalogAlias = innerTableSource.getCatalogAlias();
         QualifiedName table = innerTableSource.getTable();
         List<Index> indices = emptyList();
-        int compositeTupleCountOnLevel = innerTableSource.getTableAlias().getParent().getChildAliases().size();
+        int compositeTupleCountOnLevel = innerTableSource.getTableAlias().getTupleCountCountOnLevel();
 
         // Sub query, use the inner table sources table and catalog when resolving indices
         if (innerTableSource instanceof SubQueryTableSource)
@@ -810,10 +855,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                     logicalOperator,
                     outer,
                     inner,
-                    // Collect outer hash expressions
-                    new ExpressionHashFunction(foundation.outerValueExpressions),
-                    // Collect inner hash expression
-                    new ExpressionHashFunction(foundation.innerValueExpressions),
+                    createHashFunction(context.session, foundation.outerValueExpressions),
+                    createHashFunction(context.session, foundation.innerValueExpressions),
                     predicate,
                     new DefaultTupleMerger(-1, innerTableSource.getTableAlias().getTupleOrdinal(), compositeTupleCountOnLevel),
                     populating,
@@ -821,38 +864,116 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         }
 
         context.index = index;
+
+        Option cacheName = getOption(innerTableSource, "cachename");
+        Option cacheKey = getOption(innerTableSource, "cachekey");
+        Option cachettl = getOption(innerTableSource, "cachettl");
+        Option parallelism = getOption(innerTableSource, "parallelism");
+
+        //        Option cachefilter = getOption(innerTableSource, "cachefilter");
+        //          TODO: not cacheFilter then extract predicates before visiting inner table source
+
         innerTableSource.accept(this, context);
         if (context.index != null)
         {
             throw new RuntimeException("Index " + index + " should have been consumed by " + innerTableSource.getTable());
         }
+
         Operator inner = wrapWithPushDown(context, context.getOperator(), innerTableSource.getTableAlias());
 
         constantalizeValueExtractors(foundation.outerValueExpressions, foundation.innerValueExpressions);
-        ExpressionValuesExtractor outerValuesExtractor = new ExpressionValuesExtractor(foundation.outerValueExpressions);
-        ExpressionValuesExtractor innerValuesExtractor = new ExpressionValuesExtractor(foundation.innerValueExpressions);
+        IIndexValuesFactory outerIndexValuesFactory = createIndexVauesFactory(context.session, foundation.outerValueExpressions);
+        ToIntBiFunction<ExecutionContext, Tuple> innerHashFunction = createHashFunction(context.session, foundation.innerValueExpressions);
+
+        if (cacheName != null && !batchCacheDisabled(context.session))
+        {
+            IIndexValuesFactory innerIndexValuesFactory = createIndexVauesFactory(context.session, foundation.innerValueExpressions);
+            // When caching we need to have asterisk columns else is will be strange to select different columns
+            // then the original query
+            BatchCacheOperator.CacheSettings settings = new BatchCacheOperator.CacheSettings(
+                    new ExpressionFunction(cacheName.getValueExpression()),
+                    cacheKey != null ? new ExpressionFunction(cacheKey.getValueExpression()) : null,
+                    cachettl != null ? new ExpressionFunction(cachettl.getValueExpression()) : null);
+
+            inner = context.wrap(new BatchCacheOperator(
+                    context.acquireNodeId(),
+                    inner,
+                    innerIndexValuesFactory,
+                    settings));
+        }
 
         // Get batch size option for provided table source (if any) Used to override default {@link Index#getBatchSize()} for a table
         Option batchSizeOption = getOption(innerTableSource, BATCH_SIZE);
 
-        return new BatchHashJoin(
-                context.acquireNodeId(),
-                logicalOperator,
-                outer,
-                inner,
-                outerValuesExtractor,
-                innerValuesExtractor,
-                predicate != null ? predicate : ctx -> true,
-                new DefaultTupleMerger(-1, innerTableSource.getTableAlias().getTupleOrdinal(), compositeTupleCountOnLevel),
-                populating,
-                emitEmptyOuterRows,
-                index,
-                batchSizeOption);
+        int batchParallelismOuterNodeId;
+        if (parallelism != null)
+        {
+            batchParallelismOuterNodeId = context.acquireNodeId();
+            Operator outerOp = context.wrap(new BatchParallelismOperator.BatchhParallelismOuterOperator(batchParallelismOuterNodeId));
+            return new BatchParallelismOperator(
+                    context.acquireNodeId(),
+                    outer,
+                    context.wrap(new BatchHashJoin(
+                            context.acquireNodeId(),
+                            logicalOperator,
+                            outerOp,
+                            inner,
+                            outerIndexValuesFactory,
+                            innerHashFunction,
+                            predicate != null ? predicate : ctx -> true,
+                            new DefaultTupleMerger(-1, innerTableSource.getTableAlias().getTupleOrdinal(), compositeTupleCountOnLevel),
+                            populating,
+                            emitEmptyOuterRows,
+                            index,
+                            batchSizeOption)),
+                    batchParallelismOuterNodeId,
+                    index.getBatchSize());
+        }
+        else
+        {
+            return new BatchHashJoin(
+                    context.acquireNodeId(),
+                    logicalOperator,
+                    outer,
+                    inner,
+                    outerIndexValuesFactory,
+                    innerHashFunction,
+                    predicate != null ? predicate : ctx -> true,
+                    new DefaultTupleMerger(-1, innerTableSource.getTableAlias().getTupleOrdinal(), compositeTupleCountOnLevel),
+                    populating,
+                    emitEmptyOuterRows,
+                    index,
+                    batchSizeOption);
+        }
     }
 
     private boolean forceHashJoin(QuerySession session)
     {
         return BooleanUtils.isTrue((Boolean) session.getSystemProperty("force.hash_join"));
+    }
+
+    private boolean batchCacheDisabled(QuerySession session)
+    {
+        return BooleanUtils.isTrue((Boolean) session.getSystemProperty(QuerySession.BATCH_CACHE_DISABLED));
+    }
+
+    private Projection createRootProjection(Context context, RootProjection projection)
+    {
+        if (context.codeGenerateRootProjection && BooleanUtils.isTrue((Boolean) context.session.getSystemProperty(QuerySession.CODEGEN_ENABLED)))
+        {
+            try
+            {
+                return CODE_GENERATOR.generateProjection(projection);
+            }
+            catch (Exception e)
+            {
+                String message = e.getMessage();
+                e.printStackTrace(new PrintWriter(context.session.getPrintWriter()));
+                context.session.printLine("Could not generate code for projection '" + projection + "' Fallback to evaluating. " + message);
+            }
+        }
+
+        return projection;
     }
 
     private Predicate<ExecutionContext> createPredicate(QuerySession session, Expression predicate)
@@ -872,11 +993,49 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             {
                 String message = e.getMessage();
                 e.printStackTrace(new PrintWriter(session.getPrintWriter()));
-                session.printLine("Could not generate code for predicate for '" + predicate + "' Fallback to evaluating. " + message);
+                session.printLine("Could not generate code for predicate: '" + predicate + "' Fallback to evaluating. " + message);
             }
         }
 
         return new ExpressionPredicate(predicate);
+    }
+
+    private IIndexValuesFactory createIndexVauesFactory(QuerySession session, List<Expression> expressions)
+    {
+        if (BooleanUtils.isTrue((Boolean) session.getSystemProperty(QuerySession.CODEGEN_ENABLED)) && expressions.stream().allMatch(Expression::isCodeGenSupported))
+        {
+            try
+            {
+                return CODE_GENERATOR.generateIndexValuesFactory(expressions);
+            }
+            catch (Exception e)
+            {
+                String message = e.getMessage();
+                e.printStackTrace(new PrintWriter(session.getPrintWriter()));
+                session.printLine("Could not generate code for hash function: '" + expressions + "' Fallback to evaluating. " + message);
+            }
+        }
+
+        return new ExpressionIndexValuesFactory(expressions);
+    }
+
+    private ToIntBiFunction<ExecutionContext, Tuple> createHashFunction(QuerySession session, List<Expression> expressions)
+    {
+        if (BooleanUtils.isTrue((Boolean) session.getSystemProperty(QuerySession.CODEGEN_ENABLED)) && expressions.stream().allMatch(Expression::isCodeGenSupported))
+        {
+            try
+            {
+                return CODE_GENERATOR.generateHashFunction(expressions);
+            }
+            catch (Exception e)
+            {
+                String message = e.getMessage();
+                e.printStackTrace(new PrintWriter(session.getPrintWriter()));
+                session.printLine("Could not generate code for hash function: '" + expressions + "' Fallback to evaluating. " + message);
+            }
+        }
+
+        return new ExpressionHashFunction(expressions);
     }
 
     /** Fetch index from provided equi pairs and indices list */
@@ -1124,9 +1283,12 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         return new NoOpOperator(context.acquireNodeId());
     }
 
-    /** No op operator used for selects with no table source */
+    /**
+     * No op operator used for selects with no table source It returns ONE dummy NoOp tuple
+     */
     private static class NoOpOperator extends AOperator
     {
+        private static final NoOpRowList ROW_LIST = new NoOpRowList();
         private NoOpOperator(int nodeId)
         {
             super(nodeId);
@@ -1141,49 +1303,27 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         @Override
         public RowIterator open(ExecutionContext context)
         {
-            return RowIterator.wrap(IteratorUtils.singletonIterator(NoOpTuple.NO_OP));
-        }
-    }
-
-    /** No op tuple used for selects with no table source */
-    private static class NoOpTuple implements Tuple
-    {
-        private static final Tuple NO_OP = new NoOpTuple();
-
-        @Override
-        public int getTupleOrdinal()
-        {
-            return -1;
+            return ROW_LIST;
         }
 
-        @Override
-        public Tuple getTuple(int tupleOrdinal)
+        /** No op iterator */
+        private static class NoOpRowList implements RowList
         {
-            return null;
-        }
+            @Override
+            public int size()
+            {
+                return 1;
+            }
 
-        @Override
-        public int getColumnCount()
-        {
-            return 0;
-        }
-
-        @Override
-        public int getColumnOrdinal(String column)
-        {
-            return -1;
-        }
-
-        @Override
-        public String getColumn(int ordinal)
-        {
-            return null;
-        }
-
-        @Override
-        public Object getValue(int ordinal)
-        {
-            return null;
+            @Override
+            public Tuple get(int index)
+            {
+                if (index == 0)
+                {
+                    return NoOpTuple.NO_OP;
+                }
+                throw new IndexOutOfBoundsException("" + index);
+            }
         }
     }
 

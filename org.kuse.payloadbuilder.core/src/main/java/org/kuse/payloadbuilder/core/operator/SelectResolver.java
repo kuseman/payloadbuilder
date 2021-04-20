@@ -6,15 +6,16 @@ import static java.util.Collections.emptySet;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.unmodifiableMap;
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.collections.CollectionUtils.isEmpty;
-import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
 import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
 import static org.kuse.payloadbuilder.core.utils.CollectionUtils.asSet;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -25,7 +26,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.antlr.v4.runtime.Token;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.mutable.MutableObject;
@@ -35,6 +35,9 @@ import org.kuse.payloadbuilder.core.catalog.LambdaFunction;
 import org.kuse.payloadbuilder.core.catalog.LambdaFunction.LambdaBinding;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
+import org.kuse.payloadbuilder.core.catalog.TableMeta;
+import org.kuse.payloadbuilder.core.catalog.TableMeta.Column;
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.TableAlias.Type;
 import org.kuse.payloadbuilder.core.parser.AExpressionVisitor;
 import org.kuse.payloadbuilder.core.parser.AJoin;
@@ -59,8 +62,6 @@ import org.kuse.payloadbuilder.core.parser.Table;
 import org.kuse.payloadbuilder.core.parser.TableFunction;
 import org.kuse.payloadbuilder.core.parser.TableSourceJoined;
 import org.kuse.payloadbuilder.core.parser.UnresolvedSubQueryExpression;
-
-import gnu.trove.set.hash.TLinkedHashSet;
 
 /**
  * Resolver for a select. - Resolves all expression references to their correct target ordinals. - Aggregates select items. Ie a asterisk parent will
@@ -116,8 +117,6 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
          * </pre>
          **/
         private Set<TableAlias> parentAliases = new LinkedHashSet<>();
-        /** Columns by alias found */
-        private final Map<TableAlias, Set<String>> columnsByAlias = new LinkedHashMap<>();
         /** Lambda bindings. Holds which lambda id points to which alias */
         private final Map<Integer, Set<TableAlias>> lambdaAliasById = new HashMap<>();
         /** Aggregated select items by tuple ordinal */
@@ -134,6 +133,8 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
         private Set<Integer> sortByOrdinals = emptySet();
         /** Current select item ordinal */
         private int selectItemOrdinal;
+        /** Column ordinal slot counter */
+        private int columnOrdinalSlot;
 
         /**
          * <pre>
@@ -158,11 +159,13 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
             return unmodifiableMap(selectItemsByTupleOrdinal);
         }
 
-        Map<TableAlias, Set<String>> getColumnsByAlias()
+        /** Return count of column ordinal slots for this select */
+        int getColumnOrdinalSlotCount()
         {
-            return unmodifiableMap(columnsByAlias);
+            return columnOrdinalSlot;
         }
 
+        /** Return resolved qualifiers. NOTE! Used for tests only */
         public List<QualifiedReferenceExpression> getResolvedQualifiers()
         {
             return resolvedQualifiers;
@@ -170,13 +173,11 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
     }
 
     /** Resolve select */
-    @SuppressWarnings("deprecation")
     public static Context resolve(QuerySession session, Select select)
     {
         Context context = new Context();
         context.session = session;
         select.accept(VISITOR, context);
-        context.columnsByAlias.entrySet().forEach(e -> e.getKey().setColumns(e.getValue().toArray(EMPTY_STRING_ARRAY)));
         return context;
     }
 
@@ -373,7 +374,6 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
                 }
                 else
                 {
-                    siblingAlias.setAsteriskColumns();
                     tupleOrdinals.add(siblingAlias.getTupleOrdinal());
                     if (add)
                     {
@@ -574,7 +574,7 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
                 // at runtime
                 if (tableAliases == null)
                 {
-                    expression.setResolvePaths(singletonList(new ResolvePath(-1, -1, parts)));
+                    expression.setResolvePaths(singletonList(new ResolvePath(-1, -1, parts, -1)));
                     return null;
                 }
 
@@ -583,7 +583,7 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
                 {
                     // This is a lambda access ie. we have an identity lambda of form 'x -> x'
                     // Runtime this means simply return the value we encounter in the lambda
-                    expression.setResolvePaths(singletonList(new ResolvePath(-1, -1, emptyList())));
+                    expression.setResolvePaths(singletonList(new ResolvePath(-1, -1, emptyList(), -1)));
                     return tableAliases;
                 }
             }
@@ -626,7 +626,7 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
                  */
                 if (tempParts.isEmpty())
                 {
-                    resolvePaths.add(new ResolvePath(sourceTupleOrdinal, targetTupleOrdinal, tempParts));
+                    resolvePaths.add(new ResolvePath(sourceTupleOrdinal, targetTupleOrdinal, tempParts, -1));
                     output.add(pathAlias);
                     continue;
                 }
@@ -639,15 +639,38 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
                     continue;
                 }
                 pathAlias = pathAliasHolder.getValue();
-                resolvePaths.add(new ResolvePath(sourceTupleOrdinal, pathAlias.getTupleOrdinal(), tempParts));
 
-                // Append column to pathAlias
-                // No need to add to temp table alias
+                int columnOrdinal = -1;
+                DataType dataType = DataType.ANY;
                 if (pathAlias.getType() != TableAlias.Type.TEMPORARY_TABLE)
                 {
-                    Set<String> columns = context.columnsByAlias.computeIfAbsent(pathAlias, key -> new TLinkedHashSet<>());
-                    columns.add(column);
+                    if (pathAlias.getTableMeta() != null)
+                    {
+                        TableMeta.Column tableColumn = pathAlias.getTableMeta().getColumn(column);
+                        //CSOFF
+                        if (tableColumn != null)
+                        //CSON
+                        {
+                            dataType = tableColumn.getType();
+                            columnOrdinal = tableColumn.getOrdinal();
+                            // Strip the first unresolved part from path
+                            tempParts = tempParts.subList(1, tempParts.size());
+                        }
+                        else
+                        {
+                            throw new ParseException(
+                                    "Unknown column: '"
+                                        + column
+                                        + "' in table source: '"
+                                        + pathAlias.getTable() + " " + pathAlias.getAlias()
+                                        + "', expected one of: ["
+                                        + pathAlias.getTableMeta().getColumns().stream().map(Column::getName).collect(joining(", "))
+                                        + "]",
+                                    expression.getToken());
+                        }
+                    }
                 }
+                resolvePaths.add(new ResolvePath(sourceTupleOrdinal, pathAlias.getTupleOrdinal(), tempParts, columnOrdinal, dataType));
             }
 
             expression.setResolvePaths(resolvePaths);
@@ -716,14 +739,13 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
                             throw new ParseException("No column defined with name " + column + " for alias " + pathAlias.getAlias(), token);
                         }
 
-                        List<ResolvePath> itemResolvePaths = item.getResolvePaths();
+                        ResolvePath[] itemResolvePaths = item.getResolvePaths();
                         //CSOFF
-                        if (!CollectionUtils.isEmpty(itemResolvePaths))
+                        if (!ArrayUtils.isEmpty(itemResolvePaths))
                         //CSON
                         {
                             resolvePaths.addAll(
-                                    itemResolvePaths
-                                            .stream()
+                                    Arrays.stream(itemResolvePaths)
                                             .map(r ->
                                             {
                                                 //CSOFF
@@ -732,7 +754,7 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
                                                 {
                                                     // We have more unresolved parts the the target resolve path
                                                     // alter the resolve path
-                                                    return new ResolvePath(r.getSourceTupleOrdinal(), r.getTargetTupleOrdinal(), tempParts);
+                                                    return new ResolvePath(r, tempParts);
                                                 }
                                                 return r;
                                             })
@@ -1042,8 +1064,11 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
             {
                 throw new ParseException("Invalid table source reference '" + result.getAlias() + "'", token);
             }
-            // We have a multi part identifier that did got any alias match
-            if (throwInvalidTableSource && initSize == parts.size() && initSize > 1)
+            // We have a multi part identifier that did got any alias match => throw
+            if (throwInvalidTableSource
+                && !isBlank(result.getAlias())
+                && initSize == parts.size()
+                && initSize > 1)
             {
                 throw new ParseException("Invalid table source reference '" + parts.get(0) + "'", token);
             }

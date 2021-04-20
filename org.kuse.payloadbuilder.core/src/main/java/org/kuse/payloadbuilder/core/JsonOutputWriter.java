@@ -54,7 +54,7 @@ public class JsonOutputWriter implements OutputWriter
         }
         catch (IOException e)
         {
-            throw new RuntimeException("Error closing CSV stream", e);
+            throw new RuntimeException("Error closing JSON stream", e);
         }
     }
 
@@ -148,6 +148,71 @@ public class JsonOutputWriter implements OutputWriter
             {
                 generator.writeString(String.valueOf(value));
             }
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Error writing JSON value", e);
+        }
+    }
+
+    @Override
+    public void writeBool(boolean value)
+    {
+        try
+        {
+            generator.writeBoolean(value);
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Error writing JSON value", e);
+        }
+    }
+
+    @Override
+    public void writeInt(int value)
+    {
+        try
+        {
+            generator.writeNumber(value);
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Error writing JSON value", e);
+        }
+    }
+
+    @Override
+    public void writeLong(long value)
+    {
+        try
+        {
+            generator.writeNumber(value);
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Error writing JSON value", e);
+        }
+    }
+
+    @Override
+    public void writeFloat(float value)
+    {
+        try
+        {
+            generator.writeNumber(value);
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Error writing JSON value", e);
+        }
+    }
+
+    @Override
+    public void writeDouble(double value)
+    {
+        try
+        {
+            generator.writeNumber(value);
         }
         catch (IOException e)
         {

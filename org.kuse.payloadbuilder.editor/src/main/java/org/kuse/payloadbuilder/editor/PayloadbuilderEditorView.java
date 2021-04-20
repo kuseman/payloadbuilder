@@ -13,6 +13,8 @@ import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
@@ -139,7 +141,18 @@ class PayloadbuilderEditorView extends JFrame
         labelMemory = new JLabel("", SwingConstants.CENTER);
         labelMemory.setPreferredSize(new Dimension(100, 20));
         labelMemory.setBorder(new EtchedBorder(EtchedBorder.LOWERED));
-        labelMemory.setToolTipText("Memory");
+        labelMemory.setToolTipText("Memory (Total / Used)");
+        labelMemory.addMouseListener(new MouseAdapter()
+        {
+            @Override
+            public void mouseClicked(MouseEvent e)
+            {
+                if (e.getClickCount() == 2)
+                {
+                    System.gc();
+                }
+            }
+        });
 
         labelCaret = new JLabel("", SwingConstants.CENTER);
         labelCaret.setBorder(new EtchedBorder(EtchedBorder.LOWERED));

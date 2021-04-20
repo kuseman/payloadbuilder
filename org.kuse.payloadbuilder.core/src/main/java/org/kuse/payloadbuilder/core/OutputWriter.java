@@ -38,6 +38,36 @@ public interface OutputWriter
     /** Write value */
     void writeValue(Object value);
 
+    /** Write int value */
+    default void writeInt(int value)
+    {
+        writeValue(value);
+    }
+
+    /** Write long value */
+    default void writeLong(long value)
+    {
+        writeValue(value);
+    }
+
+    /** Write float value */
+    default void writeFloat(float value)
+    {
+        writeValue(value);
+    }
+
+    /** Write double value */
+    default void writeDouble(double value)
+    {
+        writeValue(value);
+    }
+
+    /** Write boolean value */
+    default void writeBool(boolean value)
+    {
+        writeValue(value);
+    }
+
     /** Start object */
     void startObject();
 

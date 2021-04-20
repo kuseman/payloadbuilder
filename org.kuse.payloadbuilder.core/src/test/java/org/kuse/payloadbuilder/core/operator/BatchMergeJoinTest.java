@@ -1,7 +1,6 @@
 package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Arrays.asList;
-import static java.util.Collections.emptyIterator;
 import static java.util.stream.Collectors.toList;
 
 import java.util.Collection;
@@ -14,6 +13,7 @@ import org.apache.commons.lang3.mutable.MutableInt;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.Index;
+import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory.IIndexValues;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -24,18 +24,16 @@ public class BatchMergeJoinTest extends AOperatorTest
 {
     private final Index index = new Index(QualifiedName.of("table"), asList("col"), 10);
     private final TableAlias a = TableAliasBuilder.of(0, TableAlias.Type.TABLE, QualifiedName.of("table"), "a")
-            .columns(new String[] {"col1", "col2"})
             .children(asList(
-                    TableAliasBuilder.of(1, TableAlias.Type.TABLE, QualifiedName.of("tableB"), "b")
-                            .columns(new String[] {"col1", "col2"})))
+                    TableAliasBuilder.of(1, TableAlias.Type.TABLE, QualifiedName.of("tableB"), "b")))
             .build();
     private final TableAlias b = a.getChildAliases().get(0);
 
     @Test
     public void test_inner_join_empty_outer()
     {
-        Operator left = op(context -> emptyIterator());
-        Operator right = op(context -> emptyIterator());
+        Operator left = op1(context -> RowIterator.EMPTY);
+        Operator right = op1(context -> RowIterator.EMPTY);
 
         BatchMergeJoin op = new BatchMergeJoin(
                 0, "",
@@ -57,13 +55,13 @@ public class BatchMergeJoinTest extends AOperatorTest
     public void test_inner_join_empty_inner()
     {
         Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator());
-        Operator right = op(context ->
+        Operator right = op1(context ->
         {
-            while (context.getOperatorContext().getOuterIndexValues().hasNext())
+            while (context.getStatementContext().getOuterIndexValues().hasNext())
             {
-                context.getOperatorContext().getOuterIndexValues().next();
+                context.getStatementContext().getOuterIndexValues().next();
             }
-            return emptyIterator();
+            return RowIterator.EMPTY;
         });
 
         BatchMergeJoin op = new BatchMergeJoin(
@@ -86,7 +84,7 @@ public class BatchMergeJoinTest extends AOperatorTest
     public void test_bad_implementation_of_inner_operator()
     {
         Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator());
-        Operator right = op(context -> emptyIterator());
+        Operator right = op1(context -> RowIterator.EMPTY);
 
         BatchMergeJoin op = new BatchMergeJoin(
                 0, "",
@@ -108,14 +106,14 @@ public class BatchMergeJoinTest extends AOperatorTest
     public void test_bad_implementation_of_inner_operator_3()
     {
         Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator());
-        Operator right = op(context ->
+        Operator right = op1(context ->
         {
-            while (context.getOperatorContext().getOuterIndexValues().hasNext())
+            while (context.getStatementContext().getOuterIndexValues().hasNext())
             {
-                context.getOperatorContext().getOuterIndexValues().next();
+                context.getStatementContext().getOuterIndexValues().next();
             }
-            context.getOperatorContext().getOuterIndexValues().next();
-            return emptyIterator();
+            context.getStatementContext().getOuterIndexValues().next();
+            return RowIterator.EMPTY;
         });
 
         BatchMergeJoin op = new BatchMergeJoin(
@@ -145,9 +143,9 @@ public class BatchMergeJoinTest extends AOperatorTest
                 .iterator());
         Operator right = op(context ->
         {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValue(0))
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .map(val -> (Tuple) Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
@@ -185,8 +183,8 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], tuple.getValue(Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], tuple.getValue(Row.POS_ORDINAL));
             count++;
         }
 
@@ -204,9 +202,9 @@ public class BatchMergeJoinTest extends AOperatorTest
                 .iterator());
         Operator right = op(context ->
         {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValue(0))
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .map(val -> (Tuple) Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
@@ -246,8 +244,8 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], tuple.getValue(Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], tuple.getValue(Row.POS_ORDINAL));
             count++;
         }
 
@@ -262,9 +260,9 @@ public class BatchMergeJoinTest extends AOperatorTest
         Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
         Operator right = op(context ->
         {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValue(0))
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
@@ -303,8 +301,8 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], tuple.getValue(Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], tuple.getValue(Row.POS_ORDINAL));
             count++;
         }
 
@@ -319,9 +317,9 @@ public class BatchMergeJoinTest extends AOperatorTest
         Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
         Operator right = op(context ->
         {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValue(0))
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
@@ -364,8 +362,8 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], tuple.getValue(Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], tuple.getValue(Row.POS_ORDINAL));
             count++;
         }
 
@@ -386,9 +384,9 @@ public class BatchMergeJoinTest extends AOperatorTest
         Operator right = op(context ->
         {
             batchCount.increment();
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValue(0))
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .map(val -> (Tuple) Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
@@ -424,8 +422,8 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], tuple.getValue(Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], tuple.getValue(Row.POS_ORDINAL));
             count++;
         }
 
@@ -447,9 +445,9 @@ public class BatchMergeJoinTest extends AOperatorTest
         Operator right = op(context ->
         {
             batchCount.increment();
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValue(0))
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .map(val -> (Tuple) Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
@@ -493,8 +491,8 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], tuple.getValue(Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], tuple.getValue(Row.POS_ORDINAL));
             count++;
         }
 
@@ -517,9 +515,9 @@ public class BatchMergeJoinTest extends AOperatorTest
         {
             batchCount.increment();
             // Create 2 rows for each input row
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValue(0))
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
@@ -560,8 +558,8 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], tuple.getValue(Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], tuple.getValue(Row.POS_ORDINAL));
             count++;
         }
 
@@ -584,9 +582,9 @@ public class BatchMergeJoinTest extends AOperatorTest
         {
             batchCount.increment();
             // Create 2 rows for each input row
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValue(0))
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}, new Object[] {val, 3}).stream())
@@ -630,8 +628,8 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
-            assertEquals(expectedInnerPositions[count], tuple.getTuple(1).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], tuple.getValue(Row.POS_ORDINAL));
+            assertEquals(expectedInnerPositions[count], tuple.getValue(Row.POS_ORDINAL));
             count++;
         }
 
@@ -650,9 +648,9 @@ public class BatchMergeJoinTest extends AOperatorTest
                 .iterator());
         Operator right = op(context ->
         {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValue(0))
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .map(val -> (Tuple) Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
@@ -688,7 +686,7 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], tuple.getValue(Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
@@ -711,9 +709,9 @@ public class BatchMergeJoinTest extends AOperatorTest
                 .iterator());
         Operator right = op(context ->
         {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValue(0))
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .map(val -> (Tuple) Row.of(b, posRight.getAndIncrement(), new Object[] {val, "Val" + val}))
@@ -754,7 +752,7 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], tuple.getValue(Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
@@ -774,9 +772,9 @@ public class BatchMergeJoinTest extends AOperatorTest
         Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
         Operator right = op(context ->
         {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValue(0))
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
@@ -815,7 +813,7 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], tuple.getValue(Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
@@ -835,9 +833,9 @@ public class BatchMergeJoinTest extends AOperatorTest
         Operator left = op(context -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new Object[] {i})).iterator());
         Operator right = op(context ->
         {
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValue(0))
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
@@ -883,7 +881,7 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], tuple.getValue(Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
@@ -909,9 +907,9 @@ public class BatchMergeJoinTest extends AOperatorTest
         {
             batchCount.increment();
             // Create 2 rows for each input row
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValue(0))
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
@@ -949,7 +947,7 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], tuple.getValue(Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
@@ -975,9 +973,9 @@ public class BatchMergeJoinTest extends AOperatorTest
         {
             batchCount.increment();
             // Create 2 rows for each input row
-            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+            Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
             return StreamSupport.stream(it.spliterator(), false)
-                    .map(ar -> (Integer) ar[0])
+                    .map(ar -> (Integer) ar.getValue(0))
                     .filter(val -> val >= 5 && val <= 9)
                     .distinct()
                     .flatMap(val -> asList(new Object[] {val, 1}, new Object[] {val, 2}).stream())
@@ -1025,7 +1023,7 @@ public class BatchMergeJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedOuterPositions[count], tuple.getTuple(0).getValue(Row.POS_ORDINAL));
+            assertEquals(expectedOuterPositions[count], tuple.getValue(Row.POS_ORDINAL));
 
             @SuppressWarnings("unchecked")
             Collection<Tuple> col = (Collection<Tuple>) tuple.getTuple(1);
@@ -1052,9 +1050,9 @@ public class BatchMergeJoinTest extends AOperatorTest
     //        Operator tableA = op(context -> IntStream.range(1, 400000).mapToObj(i -> Row.of(a, i, new Object[] {i, rnd.nextBoolean()})).iterator());
     //        Operator tableB = op(context ->
     //        {
-    //            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+    //            Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
     //            return StreamSupport.stream(it.spliterator(), false)
-    //                    .map(ar -> (Integer) ar[0])
+    //                    .map(ar -> (Integer) ar.getValue(0))
     //                    .flatMap(val -> asList(
     //                            new Object[] {val, 1, rnd.nextBoolean()},
     //                            new Object[] {val, 2, rnd.nextBoolean()},
@@ -1065,10 +1063,10 @@ public class BatchMergeJoinTest extends AOperatorTest
     //        });
     //        Operator tableC = op(context ->
     //        {
-    //            Iterable<Object[]> it = () -> context.getOperatorContext().getOuterIndexValues();
+    //            Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
     //
     //            return StreamSupport.stream(it.spliterator(), false)
-    //                    .map(ar -> (Integer) ar[0])
+    //                    .map(ar -> (Integer) ar.getValue(0))
     //                    .flatMap(val -> asList(
     //                            new Object[] {val, 1, "Val" + val},
     //                            new Object[] {val, 4, rnd.nextBoolean()}).stream())

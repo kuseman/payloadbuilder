@@ -13,6 +13,7 @@ import org.apache.commons.collections.iterators.ObjectGraphIterator;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.LambdaFunction;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.Expression;
@@ -44,9 +45,9 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
     }
 
     @Override
-    public Class<?> getDataType()
+    public DataType getDataType(List<Expression> arguments)
     {
-        return Iterator.class;
+        return DataType.ANY;
     }
 
     @Override
@@ -77,7 +78,7 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
                     {
                         if (it == null)
                         {
-                            context.setLambdaValue(lambdaId, input);
+                            context.getStatementContext().setLambdaValue(lambdaId, input);
                             Object value = le.getExpression().eval(context);
                             if (value == null)
                             {

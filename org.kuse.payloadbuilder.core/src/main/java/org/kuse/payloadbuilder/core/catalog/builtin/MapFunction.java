@@ -3,7 +3,6 @@ package org.kuse.payloadbuilder.core.catalog.builtin;
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
 
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -11,6 +10,8 @@ import org.apache.commons.collections.iterators.TransformIterator;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.LambdaFunction;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
+import org.kuse.payloadbuilder.core.operator.EvalUtils;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.Expression;
@@ -42,9 +43,9 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
     }
 
     @Override
-    public Class<?> getDataType()
+    public DataType getDataType(List<Expression> arguments)
     {
-        return Iterator.class;
+        return DataType.ANY;
     }
 
     @Override
@@ -65,8 +66,8 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
         int lambdaId = le.getLambdaIds()[0];
         return new TransformIterator(CollectionUtils.getIterator(argResult), input ->
         {
-            context.setLambdaValue(lambdaId, input);
-            return le.getExpression().eval(context);
+            context.getStatementContext().setLambdaValue(lambdaId, input);
+            return EvalUtils.unwrap(context, le.getExpression().eval(context));
         });
     }
 

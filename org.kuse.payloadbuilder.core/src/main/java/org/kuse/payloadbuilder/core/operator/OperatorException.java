@@ -7,4 +7,9 @@ public class OperatorException extends RuntimeException
     {
         super(message);
     }
+
+    public OperatorException(String message, Exception e)
+    {
+        super(message, e);
+    }
 }

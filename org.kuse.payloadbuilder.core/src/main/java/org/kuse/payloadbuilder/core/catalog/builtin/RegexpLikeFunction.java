@@ -5,6 +5,7 @@ import java.util.regex.Pattern;
 
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
@@ -17,9 +18,9 @@ class RegexpLikeFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public Class<?> getDataType()
+    public DataType getDataType(List<Expression> arguments)
     {
-        return Boolean.class;
+        return DataType.BOOLEAN;
     }
 
     @Override

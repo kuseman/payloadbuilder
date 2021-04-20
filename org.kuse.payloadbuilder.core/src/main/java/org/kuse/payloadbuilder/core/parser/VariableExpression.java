@@ -46,7 +46,7 @@ public class VariableExpression extends Expression implements HasIdentifier
         {
             if ("rowcount".equals(name))
             {
-                return context.getRowCount();
+                return context.getStatementContext().getRowCount();
             }
             else if ("version".equals(name))
             {

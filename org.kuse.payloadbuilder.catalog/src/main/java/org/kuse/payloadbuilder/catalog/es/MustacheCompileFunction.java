@@ -9,6 +9,7 @@ import java.util.Map;
 
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
@@ -35,9 +36,9 @@ class MustacheCompileFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public Class<?> getDataType()
+    public DataType getDataType(List<Expression> arguments)
     {
-        return String.class;
+        return DataType.ANY;
     }
 
     @Override

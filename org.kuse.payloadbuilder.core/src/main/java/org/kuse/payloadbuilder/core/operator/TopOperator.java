@@ -50,6 +50,7 @@ class TopOperator extends AOperator
         }
         final int top = ((Integer) obj).intValue();
         final RowIterator it = target.open(context);
+        final RowList list = it instanceof RowList ? (RowList) it : null;
         //CSOFF
         return new RowIterator()
         //CSON
@@ -59,14 +60,20 @@ class TopOperator extends AOperator
             @Override
             public Tuple next()
             {
+                Tuple result = list == null ? it.next() : list.get(count);
                 count++;
-                return it.next();
+                return result;
             }
 
             @Override
             public boolean hasNext()
             {
-                return count < top && it.hasNext();
+                if (list == null)
+                {
+                    return count < top && it.hasNext();
+                }
+
+                return count < top && count < list.size();
             }
 
             @Override

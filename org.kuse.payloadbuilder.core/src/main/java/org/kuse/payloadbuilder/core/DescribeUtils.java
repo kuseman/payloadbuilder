@@ -100,9 +100,9 @@ public class DescribeUtils
         describeColumns.addAll(0, asList("Node id", "Name"));
         TableAlias alias = TableAliasBuilder
                 .of(-1, TableAlias.Type.TABLE, QualifiedName.of("describe"), "d")
-                .columns(describeColumns.toArray(EMPTY_STRING_ARRAY))
                 .build();
 
+        String[] columns = describeColumns.toArray(EMPTY_STRING_ARRAY);
         // Result set rows
         List<Tuple> rows = new ArrayList<>(describeRows.size());
         int pos = 0;
@@ -121,7 +121,7 @@ public class DescribeUtils
                 values[i] = dRow.properties.get(describeColumns.get(i));
             }
 
-            rows.add(Row.of(alias, pos++, values));
+            rows.add(Row.of(alias, pos++, columns, values));
         }
 
         Operator describeOperator = new Operator()
@@ -149,7 +149,7 @@ public class DescribeUtils
                 columns,
                 IntStream.range(0, columns.size()).mapToObj(index -> (Projection) (writer, ctx) ->
                 {
-                    Tuple tuple = ctx.getTuple();
+                    Tuple tuple = ctx.getStatementContext().getTuple();
                     writer.writeValue(tuple.getValue(index));
                 }).collect(toList()));
     }

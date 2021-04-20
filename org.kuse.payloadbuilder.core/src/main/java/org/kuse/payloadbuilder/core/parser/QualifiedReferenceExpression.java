@@ -1,7 +1,5 @@
 package org.kuse.payloadbuilder.core.parser;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
 
@@ -11,11 +9,11 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.antlr.v4.runtime.Token;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
@@ -27,6 +25,15 @@ import org.kuse.payloadbuilder.core.utils.MapUtils;
  **/
 public class QualifiedReferenceExpression extends Expression implements HasIdentifier
 {
+    private static final Map<DataType, String> TUPLE_ACCESSOR_METHOD = MapUtils.ofEntries(
+            MapUtils.entry(DataType.INT, "getInt"),
+            MapUtils.entry(DataType.LONG, "getLong"),
+            MapUtils.entry(DataType.FLOAT, "getFloat"),
+            MapUtils.entry(DataType.DOUBLE, "getDouble"),
+            MapUtils.entry(DataType.BOOLEAN, "getBool"));
+
+    private static final ResolvePath[] EMPTY = new ResolvePath[0];
+
     private final QualifiedName qname;
     /**
      * <pre>
@@ -40,7 +47,7 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
     /**
      * Mutable property. Temporary until query parser is rewritten to and a 2 pass analyze phase is done that resolves this.
      */
-    private List<ResolvePath> resolvePaths;
+    private ResolvePath[] resolvePaths;
 
     public QualifiedReferenceExpression(QualifiedName qname, int lambdaId, Token token)
     {
@@ -77,13 +84,13 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         {
             throw new IllegalArgumentException("Empty resolve path");
         }
-        this.resolvePaths = unmodifiableList(resolvePaths);
+        this.resolvePaths = resolvePaths.toArray(EMPTY);
     }
 
     @Deprecated
-    public List<ResolvePath> getResolvePaths()
+    public ResolvePath[] getResolvePaths()
     {
-        return ObjectUtils.defaultIfNull(resolvePaths, emptyList());
+        return ObjectUtils.defaultIfNull(resolvePaths, EMPTY);
     }
 
     @Override
@@ -93,12 +100,37 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
     }
 
     @Override
+    public DataType getDataType()
+    {
+        if (resolvePaths == null)
+        {
+            return DataType.ANY;
+        }
+
+        int size = resolvePaths.length;
+        DataType prev = null;
+        for (int i = 0; i < size; i++)
+        {
+            if (prev == null)
+            {
+                prev = resolvePaths[i].columnType;
+            }
+            else if (prev != resolvePaths[i].columnType)
+            {
+                return DataType.ANY;
+            }
+        }
+
+        return prev;
+    }
+
+    @Override
     public Object eval(ExecutionContext context)
     {
         Object value = null;
         int partIndex = 0;
         String[] parts = ArrayUtils.EMPTY_STRING_ARRAY;
-        Tuple tuple = context.getTuple();
+        Tuple tuple = context.getStatementContext().getTuple();
 
         // Expression mode / test mode
         // We have no resolve path, simply use the full qualified name as column
@@ -107,7 +139,7 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
             parts = qname.getParts().toArray(ArrayUtils.EMPTY_STRING_ARRAY);
             if (lambdaId >= 0)
             {
-                value = context.getLambdaValue(lambdaId);
+                value = context.getStatementContext().getLambdaValue(lambdaId);
                 partIndex++;
             }
             else if (tuple != null)
@@ -120,7 +152,7 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         {
             if (lambdaId >= 0)
             {
-                value = context.getLambdaValue(lambdaId);
+                value = context.getStatementContext().getLambdaValue(lambdaId);
 
                 // If the lambda value was a Tuple, set tuple field
                 // else null it to not resolve further down
@@ -137,12 +169,17 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
             }
 
             // TODO: sorceTupleOrdinal
-            ResolvePath path = resolvePaths.get(0);
+            ResolvePath path = resolvePaths[0];
             parts = path.unresolvedPath;
             if (tuple != null)
             {
-                tuple = resolve(tuple, path);
-                value = resolveValue(tuple, path, partIndex);
+                value = resolve(tuple, path);
+                //CSOFF
+                if (value instanceof Tuple)
+                //CSON
+                {
+                    value = resolveValue((Tuple) value, path, partIndex);
+                }
                 partIndex++;
             }
         }
@@ -174,11 +211,13 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
     {
         if (resolvePaths == null
             || lambdaId >= 0
-            || resolvePaths.size() != 1
-            || resolvePaths.get(0).subTupleOrdinals.length != 0
-            // Multi part path ie map access etc. not supported yet
-            || (resolvePaths.get(0).unresolvedPath.length != 1
-                && resolvePaths.get(0).columnOrdinal == -1))
+            || resolvePaths.length != 1
+            || resolvePaths[0].subTupleOrdinals.length != 0
+            // Multi part path ie. map access etc. not supported yet
+            || resolvePaths[0].unresolvedPath.length > 1
+            // Tuple access not supported yet
+            || (resolvePaths[0].unresolvedPath.length == 0
+                && resolvePaths[0].columnOrdinal == -1))
         {
             return false;
         }
@@ -186,10 +225,12 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         return true;
     }
 
+    //CSOFF
     @Override
+    //CSON
     public ExpressionCode generateCode(CodeGeneratorContext context)
     {
-        ExpressionCode code = context.getCode();
+        ExpressionCode code = context.getExpressionCode();
 
         // TODO: lambda
         // TODO: only supported for single source tuple ordinals for now
@@ -198,76 +239,170 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         int targetOrdinal = -1;
         String column = lowerCase(qname.toString());
         int columnOrdinal = -1;
-        if (!CollectionUtils.isEmpty(resolvePaths))
+        DataType type = DataType.ANY;
+        if (resolvePaths != null)
         {
-            targetOrdinal = resolvePaths.get(0).targetTupleOrdinal;
-            columnOrdinal = resolvePaths.get(0).columnOrdinal;
+            targetOrdinal = resolvePaths[0].targetTupleOrdinal;
+            columnOrdinal = resolvePaths[0].columnOrdinal;
             if (columnOrdinal == -1)
             {
-                column = resolvePaths.get(0).unresolvedPath[0];
+                column = resolvePaths[0].unresolvedPath[0];
+            }
+            type = resolvePaths[0].columnType;
+        }
+
+        String typeMethod = TUPLE_ACCESSOR_METHOD.get(type);
+        // Special get-methods on tuple (getInt, getFloat etc.)
+        if (typeMethod != null)
+        {
+            if (targetOrdinal == -1)
+            {
+                /* tupleOrdinal == -1
+                 *
+                 * <primitive> v_X = <default>;
+                 * boolean isNull_X = true;
+                 * {
+                 *   int c = tuple.getColumnOrdinal(-1, "col");
+                 *   isNull_X = c >= 0 ? tuple.isNull(c) : true;
+                 *   v_X = isNull_x ? v_X : tuple.get<Primitive>(-1, c);
+                 * }
+                 */
+                code.setCode(String.format("//%s\n"                      // qname
+                    + "%s %s = %s;\n"                                    // dataType, resVar, defaultDataType
+                    + "boolean %s = true;\n"                             // nullVar
+                    + "{\n"
+                    + "  int c = %s;\n"                                  // columnOrdinal or tuple.getColumnOrdinal(-1, \"%s\"), column
+                    + "  %s = c >= 0 ? %s.isNull(c) : true;\n"           // nullVar, context tupleVar
+                    + "  %s = %s ? %s : %s.%s(c);\n"                     // resVar, nullVar, resVar, context tupleVar, dataType (capitalize)
+                    + "}\n",
+                        qname,
+                        type.getJavaTypeString(), code.getResVar(), type.getJavaDefaultValue(),
+                        code.getNullVar(),
+                        columnOrdinal >= 0 ? columnOrdinal : String.format("%s.getColumnOrdinal(\"%s\")", context.getTupleFieldName(), column),
+                        code.getNullVar(), context.getTupleFieldName(),
+                        code.getResVar(), code.getNullVar(), code.getResVar(), context.getTupleFieldName(), typeMethod));
+            }
+            else
+            {
+                /*
+                 * tupleOrdinal >= 0
+                 *
+                 * Object t_v_X = tuple.getTuple(targetOrdinal);
+                 * boolean isNull_X = true;
+                 * <primitive> v_X = <default>;
+                 * if (t_v_X instanceof Tuple)
+                 * {
+                 *   int c = ((Tuple) t_v_X).getColumnOrdinal(targetOrdinal, "col");
+                 *   isNull_X = c >= 0 ? ((Tuple) t_v_X).isNull(c) : true;
+                 *   v_x = isNull_x ? v_x :  ((Tuple) t_v_X).get<Primitive>(targetOrdinal, c);
+                 * }
+                 */
+                String tupleVar = "t_" + code.getResVar();
+                code.setCode(String.format("//%s\n"
+                    + "Tuple %s = %s.getTuple(%d);\n"                        // tupleVar, context tupleVar, targetOrdinal
+                    + "boolean %s = true;\n"                                 // nullVar
+                    + "%s %s = %s;\n"                                        // dataType, resVar, defaultValue
+                    + "if (%s != null)\n"                                    // tupleVar
+                    + "{\n"
+                    + "  int c = %s;\n"                                      // columnOrdinal else ((Tuple) %s).getColumnOrdinal(\"%s\") => tupleVar, targetOrdinal, columnName
+                    + "  %s = c >= 0 ? %s.isNull(c) : true;\n"               // nullvar,  tupleVar
+                    + "  %s = %s ? %s : %s.%s(c);\n"                         // resVar, nullVar, resVar, tupleVar, dataType (capitalize)
+                    + "}\n",
+                        qname,
+                        tupleVar, context.getTupleFieldName(), targetOrdinal,
+                        code.getNullVar(),
+                        type.getJavaTypeString(), code.getResVar(), type.getJavaDefaultValue(),
+                        tupleVar,
+                        columnOrdinal >= 0 ? columnOrdinal : String.format("%s.getColumnOrdinal(\"%s\")", tupleVar, column),
+                        code.getNullVar(), tupleVar,
+                        code.getResVar(), code.getNullVar(), code.getResVar(), tupleVar, typeMethod));
             }
         }
-
-        StringBuilder sb = new StringBuilder();
-
-        // Expression mode then we don't have a target
-        if (targetOrdinal == -1)
+        else if (targetOrdinal == -1)
         {
-            sb.append(String.format("// %s\n"
-                + "Tuple t_%s = tuple;\n",
+            /* tupleOrdinal == -1
+            *
+            * Object v_X = null;
+            * boolean isNull_X = true;
+            * {
+            *   int c = tuple.getColumnOrdinal(-1, "col");
+            *   v_X = c >= 0 ? tuple.getValue(-1, c) : null;
+            *   isNull_X = v_X == null;
+            * }
+            */
+            code.setCode(String.format("//%s\n"                      // qname
+                + "Object %s = null;\n"                              // resVar
+                + "boolean %s = true;\n"                             // nullVar
+                + "{\n"
+                + "  int c = %s;\n"                                  // columnOrdinal or tuple.getColumnOrdinal(-1, \"%s\"), column
+                + "  %s = c >= 0 ? %s.getValue(c) : null;\n"         // resVar, context tupleVar
+                + "  %s = %s == null;\n"                             // nullVar, resVar
+                + "}\n",
                     qname,
-                    code.getResVar()));
+                    code.getResVar(),
+                    code.getNullVar(),
+                    columnOrdinal >= 0 ? columnOrdinal : String.format("%s.getColumnOrdinal(\"%s\")", context.getTupleFieldName(), column),
+                    code.getResVar(), context.getTupleFieldName(),
+                    code.getNullVar(), code.getResVar()));
         }
         else
         {
             /*
-             * Tuple t_v_2 =  tuple.getTuple(ordinal);
+             * tupleOrdinal >= 0
+             *
+             * Object t_v_X = tuple.getTuple(targetOrdinal);
+             * boolean isNull_X = true;
+             * Object v_X = null;
+             * if (t_v_X instanceof Tuple)
+             * {
+             *   int c = ((Tuple) t_v_X).getColumnOrdinal(targetOrdinal, "col");
+             *   v_X = c >= 0 ? tuple.getValue(-1, c) : null;
+             *   isNull_X = v_X == null;
+             * }
              */
-            sb.append(String.format("// %s\n"
-                + "Tuple t_%s = tuple.getTuple(%d);\n",
+            String tupleVar = "t_" + code.getResVar();
+            code.setCode(String.format("//%s\n"
+                + "Tuple %s = %s.getTuple(%d);\n"                           // tupleVar, context tupleVar, targetOrdinal
+                + "boolean %s = true;\n"                                    // nullVar
+                + "Object %s = null;\n"                                     // resVar
+                + "if (%s != null)\n"                                       // tupleVar
+                + "{\n"
+                + "  int c = %s;\n"                                         // columnOrdinal else ((Tuple) %s).getColumnOrdinal(\"%s\") => tupleVar, columnName
+                + "  %s = c >= 0 ? %s.getValue(c) : null;\n"                // resVar, tupleVar
+                + "  %s = %s == null;\n"                                    // nullvar,  resVar
+                + "}\n",
                     qname,
-                    code.getResVar(), targetOrdinal));
+                    tupleVar, context.getTupleFieldName(), targetOrdinal,
+                    code.getNullVar(),
+                    code.getResVar(),
+                    tupleVar,
+                    columnOrdinal >= 0 ? columnOrdinal : String.format("%s.getColumnOrdinal(\"%s\")", tupleVar, column),
+                    code.getResVar(), tupleVar,
+                    code.getNullVar(), code.getResVar()));
         }
-
-        if (columnOrdinal >= 0)
-        {
-            /*
-             * Object v_2 = t_v_2.getValue(1);
-             */
-            sb.append(String.format("Object %s = t_%s.getValue(%d);\n",
-                    code.getResVar(), code.getResVar(), columnOrdinal));
-        }
-        else
-        {
-            /*
-             * Object v_2 = t_v_2.getValue(t_v_2.getOrdinal("col"));
-             */
-            sb.append(String.format("Object %s = t_%s.getValue(t_%s.getColumnOrdinal(\"%s\"));\n",
-                    code.getResVar(), code.getResVar(), code.getResVar(), column));
-        }
-
-        code.setCode(sb.toString());
         return code;
     }
 
     /** Traverses to the target tuple with provided path */
-    private Tuple resolve(Tuple tuple, ResolvePath path)
+    private Object resolve(Tuple tuple, ResolvePath path)
     {
-        Tuple result = tuple;
-        if (path.getTargetTupleOrdinal() >= 0)
+        Object result = tuple;
+        if (path.targetTupleOrdinal >= 0)
         {
             result = tuple.getTuple(path.targetTupleOrdinal);
         }
+
         if (result == null)
         {
             return null;
         }
-        else if (path.subTupleOrdinals.length > 0)
+
+        if (path.subTupleOrdinals.length > 0)
         {
             int length = path.subTupleOrdinals.length;
             for (int i = 0; i < length; i++)
             {
-                result = result.getSubTuple(path.subTupleOrdinals[i]);
+                result = getTuple(result).getSubTuple(path.subTupleOrdinals[i]);
                 if (result == null)
                 {
                     return null;
@@ -275,6 +410,15 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
             }
         }
         return result;
+    }
+
+    private Tuple getTuple(Object obj)
+    {
+        if (obj != null && !(obj instanceof Tuple))
+        {
+            throw new IllegalArgumentException("Expected a Tuple but got " + obj);
+        }
+        return (Tuple) obj;
     }
 
     /** Resolves value from provided with with provided path */
@@ -362,23 +506,37 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         /** When resolved into a temp tables sub alias, this ordinal points to it */
         final int[] subTupleOrdinals;
 
-        public ResolvePath(int sourceTupleOrdinal, int targetTupleOrdinal, List<String> unresolvedPath)
+        /** Column type if any */
+        final DataType columnType;
+
+        public ResolvePath(ResolvePath source, List<String> unresolvedPath)
         {
-            this(sourceTupleOrdinal, targetTupleOrdinal, unresolvedPath, -1);
+            this(source.sourceTupleOrdinal, source.targetTupleOrdinal, unresolvedPath, source.columnOrdinal, source.subTupleOrdinals, null);
         }
 
         public ResolvePath(int sourceTupleOrdinal, int targetTupleOrdinal, List<String> unresolvedPath, int columnOrdinal)
         {
-            this(sourceTupleOrdinal, targetTupleOrdinal, unresolvedPath, columnOrdinal, ArrayUtils.EMPTY_INT_ARRAY);
+            this(sourceTupleOrdinal, targetTupleOrdinal, unresolvedPath, columnOrdinal, ArrayUtils.EMPTY_INT_ARRAY, null);
+        }
+
+        public ResolvePath(int sourceTupleOrdinal, int targetTupleOrdinal, List<String> unresolvedPath, int columnOrdinal, DataType columnType)
+        {
+            this(sourceTupleOrdinal, targetTupleOrdinal, unresolvedPath, columnOrdinal, ArrayUtils.EMPTY_INT_ARRAY, columnType);
         }
 
         public ResolvePath(int sourceTupleOrdinal, int targetTupleOrdinal, List<String> unresolvedPath, int columnOrdinal, int[] subTupleOrdinals)
+        {
+            this(sourceTupleOrdinal, targetTupleOrdinal, unresolvedPath, columnOrdinal, subTupleOrdinals, null);
+        }
+
+        public ResolvePath(int sourceTupleOrdinal, int targetTupleOrdinal, List<String> unresolvedPath, int columnOrdinal, int[] subTupleOrdinals, DataType columnType)
         {
             this.sourceTupleOrdinal = sourceTupleOrdinal;
             this.targetTupleOrdinal = targetTupleOrdinal;
             this.unresolvedPath = requireNonNull(unresolvedPath, "unresolvedPath").toArray(ArrayUtils.EMPTY_STRING_ARRAY);
             this.columnOrdinal = columnOrdinal;
             this.subTupleOrdinals = subTupleOrdinals;
+            this.columnType = columnType != null ? columnType : DataType.ANY;
         }
 
         public int getSourceTupleOrdinal()

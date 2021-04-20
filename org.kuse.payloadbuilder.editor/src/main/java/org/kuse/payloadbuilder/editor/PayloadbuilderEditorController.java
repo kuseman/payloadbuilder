@@ -265,7 +265,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
     private String getMemoryString()
     {
         Runtime runtime = Runtime.getRuntime();
-        return String.format("%s / %s", byteCountToDisplaySize(runtime.totalMemory()), byteCountToDisplaySize(runtime.freeMemory()));
+        return String.format("%s / %s", byteCountToDisplaySize(runtime.totalMemory()), byteCountToDisplaySize(runtime.totalMemory() - runtime.freeMemory()));
     }
 
     private void saveConfig()

@@ -6,6 +6,7 @@ import java.util.Iterator;
 import java.util.Objects;
 
 import org.apache.commons.lang3.ArrayUtils;
+import org.kuse.payloadbuilder.core.operator.TemporaryTable.Row;
 import org.kuse.payloadbuilder.core.parser.Table;
 
 /** Temporary table scan operator */
@@ -39,7 +40,8 @@ public class TemporaryTableScanOperator extends AOperator
             @Override
             public Tuple next()
             {
-                return new TemporaryTableTuple(temporaryTable.getColumns(), it.next(), table.getTableAlias().getTupleOrdinal());
+                Row row = it.next();
+                return new TemporaryTableTuple(table.getTableAlias().getTupleOrdinal(), row.getTuple(), temporaryTable.getColumns(), row.getValues());
             }
 
             @Override
@@ -89,35 +91,18 @@ public class TemporaryTableScanOperator extends AOperator
         private final String[] columns;
         private final Object[] values;
 
-        private TemporaryTableTuple(String[] columns, TemporaryTable.Row row, int tupleOrdinal)
+        private TemporaryTableTuple(int tupleOrdinal, Tuple tuple, String[] columns, Object[] values)
         {
-            this.tuple = row.getTuple();
-            this.columns = columns;
-            this.values = row.getValues();
             this.tupleOrdinal = tupleOrdinal;
+            this.tuple = requireNonNull(tuple);
+            this.columns = requireNonNull(columns);
+            this.values = requireNonNull(values);
         }
 
         @Override
         public int getTupleOrdinal()
         {
             return tupleOrdinal;
-        }
-
-        @Override
-        public Tuple getTuple(int tupleOrdinal)
-        {
-            if (this.tupleOrdinal == tupleOrdinal)
-            {
-                return this;
-            }
-
-            return null;
-        }
-
-        @Override
-        public Tuple getSubTuple(int tupleOrdinal)
-        {
-            return tuple.getTuple(tupleOrdinal);
         }
 
         @Override
@@ -133,9 +118,15 @@ public class TemporaryTableScanOperator extends AOperator
         }
 
         @Override
-        public String getColumn(int ordinal)
+        public String getColumn(int columnOrdinal)
         {
-            return columns[ordinal];
+            return columns[columnOrdinal];
+        }
+
+        @Override
+        public Tuple getSubTuple(int tupleOrdinal)
+        {
+            return tuple.getTuple(tupleOrdinal);
         }
 
         @Override
@@ -145,6 +136,7 @@ public class TemporaryTableScanOperator extends AOperator
             {
                 return null;
             }
+
             return values[ordinal];
         }
     }

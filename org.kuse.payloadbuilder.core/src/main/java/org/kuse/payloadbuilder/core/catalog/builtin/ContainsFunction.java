@@ -6,6 +6,7 @@ import java.util.List;
 
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
+import org.kuse.payloadbuilder.core.catalog.TableMeta;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
@@ -34,6 +35,12 @@ class ContainsFunction extends ScalarFunctionInfo
     }
 
     @Override
+    public TableMeta.DataType getDataType(List<Expression> arguments)
+    {
+        return TableMeta.DataType.BOOLEAN;
+    }
+
+    @Override
     public Object eval(ExecutionContext context, List<Expression> arguments)
     {
         // Function has a declared getInputTypes method that guards against wrong argument count
@@ -52,17 +59,18 @@ class ContainsFunction extends ScalarFunctionInfo
     @Override
     public ExpressionCode generateCode(CodeGeneratorContext context, List<Expression> arguments)
     {
-        ExpressionCode code = context.getCode();
+        ExpressionCode code = context.getExpressionCode();
         context.addImport("org.kuse.payloadbuilder.core.utils.ObjectUtils");
 
         ExpressionCode arg0Code = arguments.get(0).generateCode(context);
         ExpressionCode arg1Code = arguments.get(1).generateCode(context);
 
-        String template = "%s%s"
-            + "Boolean %s = ObjectUtils.contains(%s, %s);\n";
+        String template = "%s%s"                                    // arg0Code, arg1Code
+            + "boolean %s = false;\n"                               // nullVar
+            + "boolean %s = ObjectUtils.contains(%s, %s);\n";       // arg0 resVar, org1 resVar
         code.setCode(String.format(template,
-                arg0Code.getCode(),
-                arg1Code.getCode(),
+                arg0Code.getCode(), arg1Code.getCode(),
+                code.getNullVar(),
                 code.getResVar(), arg0Code.getResVar(), arg1Code.getResVar()));
         return code;
     }

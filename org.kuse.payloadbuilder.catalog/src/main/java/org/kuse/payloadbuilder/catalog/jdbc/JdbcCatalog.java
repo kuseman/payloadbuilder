@@ -52,7 +52,7 @@ public class JdbcCatalog extends Catalog
     public List<String> getTables(QuerySession session, String catalogAlias)
     {
         List<String> tables = new ArrayList<>();
-        String database = (String) session.getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE);
+        String database = session.getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE);
         try (Connection connection = getConnection(session, catalogAlias);
                 ResultSet rs = connection.getMetaData().getTables(database, null, null, null);)
         {
@@ -153,14 +153,14 @@ public class JdbcCatalog extends Catalog
     /** Get connection for provided session/catalog alias */
     Connection getConnection(QuerySession session, String catalogAlias)
     {
-        final String driverClassName = (String) session.getCatalogProperty(catalogAlias, JdbcCatalog.DRIVER_CLASSNAME);
-        final String url = (String) session.getCatalogProperty(catalogAlias, JdbcCatalog.URL);
+        final String driverClassName = session.getCatalogProperty(catalogAlias, JdbcCatalog.DRIVER_CLASSNAME);
+        final String url = session.getCatalogProperty(catalogAlias, JdbcCatalog.URL);
         if (isBlank(url))
         {
             throw new IllegalArgumentException("Missing URL in catalog properties for " + catalogAlias);
         }
 
-        final String username = (String) session.getCatalogProperty(catalogAlias, JdbcCatalog.USERNAME);
+        final String username = session.getCatalogProperty(catalogAlias, JdbcCatalog.USERNAME);
         final String password = getPassword(session, catalogAlias);
         if (isBlank(username) || isBlank(password))
         {

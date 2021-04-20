@@ -2,6 +2,9 @@ package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Objects.requireNonNull;
 
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
+import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
+import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.utils.ExpressionMath;
 
@@ -34,7 +37,7 @@ public class ArithmeticUnaryExpression extends Expression
     }
 
     @Override
-    public Class<?> getDataType()
+    public DataType getDataType()
     {
         return expression.getDataType();
     }
@@ -66,43 +69,71 @@ public class ArithmeticUnaryExpression extends Expression
         return result != null ? ExpressionMath.negate(result) : null;
     }
 
-    //    @Override
-    //    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)
-    //    {
-    //        ExpressionCode childCode = expression.generateCode(context, parentCode);
-    //        ExpressionCode code = ExpressionCode.code(context);
-    //
-    //        String method = null;
-    //        //CSOFF
-    //        switch (type)
-    //        //CSON
-    //        {
-    //            case MINUS:
-    //                method = "ExpressionMath.negate";
-    //                break;
-    //            case PLUS:
-    //                throw new NotImplementedException("unary plus");
-    //        }
-    //
-    //        String template = "%s"
-    //            + "Object %s = null;\n"
-    //            + "boolean %s = true;\n"
-    //            + "if (!%s)\n"
-    //            + "{\n"
-    //            + "  %s = %s(%s);\n"
-    //            + "  %s = false;\n"
-    //            + "}\n";
-    //
-    //        code.setCode(String.format(template,
-    //                childCode.getCode(),
-    //                code.getResVar(),
-    //                code.getIsNull(),
-    //                childCode.getIsNull(),
-    //                code.getResVar(), method, childCode.getResVar(),
-    //                code.getIsNull()));
-    //
-    //        return code;
-    //    }
+    @Override
+    public boolean isCodeGenSupported()
+    {
+        return expression.isCodeGenSupported();
+    }
+
+    @Override
+    public ExpressionCode generateCode(CodeGeneratorContext context)
+    {
+        ExpressionCode childCode = expression.generateCode(context);
+        ExpressionCode code = context.getExpressionCode();
+
+        DataType dataType = getDataType();
+        if (dataType == DataType.ANY)
+        {
+            context.addImport("org.kuse.payloadbuilder.core.utils.ExpressionMath");
+            String method = null;
+            //CSOFF
+            switch (type)
+            //CSON
+            {
+                case MINUS:
+                    method = "ExpressionMath.negate";
+                    break;
+                case PLUS:
+                    throw new IllegalArgumentException("unary plus");
+            }
+
+            String template = "%s"              // childCode
+                + "Object %s = null;\n"         // resVar
+                + "boolean %s = true;\n"        // nullVar
+                + "if (!%s)\n"                  // childCode nullVar
+                + "{\n"
+                + "  %s = %s(%s);\n"            // resVar, method, childCode resVar
+                + "  %s = false;\n"             // nullVar
+                + "}\n";
+
+            code.setCode(String.format(template,
+                    childCode.getCode(),
+                    code.getResVar(),
+                    code.getNullVar(),
+                    childCode.getNullVar(),
+                    code.getResVar(), method, childCode.getResVar(),
+                    code.getNullVar()));
+        }
+        else
+        {
+            String template = "%s"              // childCode
+                + "%s %s = %s;\n"               // dataType resVar default
+                + "boolean %s = %s;\n"          // nullVar, childCode nullVar
+                + "if (!%s)\n"                  // childCode nullVar
+                + "{\n"
+                + "  %s = -%s;\n"               // resVar, childCode resVar
+                + "}\n";
+
+            code.setCode(String.format(template,
+                    childCode.getCode(),
+                    dataType.getJavaTypeString(), code.getResVar(), dataType.getJavaDefaultValue(),
+                    code.getNullVar(), childCode.getNullVar(),
+                    childCode.getNullVar(),
+                    code.getResVar(), childCode.getResVar()));
+        }
+
+        return code;
+    }
 
     @Override
     public <TR, TC> TR accept(ExpressionVisitor<TR, TC> visitor, TC context)

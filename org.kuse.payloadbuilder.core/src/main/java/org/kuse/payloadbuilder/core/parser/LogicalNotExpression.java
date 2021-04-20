@@ -5,6 +5,7 @@ import static org.kuse.payloadbuilder.core.parser.LiteralBooleanExpression.FALSE
 import static org.kuse.payloadbuilder.core.parser.LiteralBooleanExpression.TRUE_LITERAL;
 import static org.kuse.payloadbuilder.core.parser.LiteralNullExpression.NULL_LITERAL;
 
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
@@ -47,7 +48,7 @@ public class LogicalNotExpression extends Expression
     }
 
     @Override
-    public Class<?> getDataType()
+    public DataType getDataType()
     {
         return expression.getDataType();
     }
@@ -72,16 +73,16 @@ public class LogicalNotExpression extends Expression
 
         /*
          * Object v1 = null;
-         * v1 = v1 != null ? !(Boolean) v1 : false;
-         *
+         * v1 = !n1 ? !(Boolean) v1 : f
          */
 
-        String template = "// NOT\n%s\n"
-            + "%s = %s != null ? !(Boolean)%s : null;\n";
+        String template = "// NOT\n"
+            + "%s"                                          // childCode
+            + "if (!%s) %s = !%s%s;\n";                     // child nullVar, child resVar, cast, child resVar
 
         childCode.setCode(String.format(template,
                 childCode.getCode(),
-                childCode.getResVar(), childCode.getResVar(), childCode.getResVar()));
+                childCode.getNullVar(), childCode.getResVar(), expression.getDataType() != DataType.BOOLEAN ? "(Boolean)" : "", childCode.getResVar()));
 
         return childCode;
     }

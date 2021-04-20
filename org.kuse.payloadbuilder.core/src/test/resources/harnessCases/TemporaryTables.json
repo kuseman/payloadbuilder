@@ -42,7 +42,10 @@
     {
       "name": "Select into",
       "query": [
-        "select col1 * 2 newCol1, col2 * 10 newCol2 into #temp from source",
+        "select col1 * 2 newCol1, col2 * 10 newCol2 ",
+        "into #temp ",
+        "from source",
+        "",
         "select * from #temp"
       ],
       "expectedResultSets": [
@@ -50,6 +53,77 @@
           [{ "key": "newCol1", "value": 2 }, { "key": "newCol2", "value": 20 } ],
           [{ "key": "newCol1", "value": 6 }, { "key": "newCol2", "value": 40 } ],
           [{ "key": "newCol1", "value": 10 }, { "key": "newCol2", "value": 60 } ]
+        ]
+      ]
+    },
+    {
+      "name": "Select into with cache",
+      "query": [
+        "select 1 col ",
+        "into #temp with (cacheName = 'temp', cacheKey = 'key') ",
+        "from source",
+        "",
+        "show caches",
+        "cache flush temptable/temp",
+        "show caches",
+        "cache remove temptable/temp",
+        "show caches"
+        
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "Name", "value": "temp" }, { "key": "Size", "value": 1 },{"key": "Hits", "value": 0 }, { "key": "Hit ratio", "value": 0.0 },{ "key": "Misses", "value": 1 }, { "key": "Miss ratio", "value": 1.0 }, { "key": "Type", "value": "TEMPTABLE" }, { "key": "Provider", "value": "Session" } ]
+        ],
+        [
+          [{ "key": "Name", "value": "temp" }, { "key": "Size", "value": 0 },{"key": "Hits", "value": 0 }, { "key": "Hit ratio", "value": 0.0 },{ "key": "Misses", "value": 1 }, { "key": "Miss ratio", "value": 1.0 }, { "key": "Type", "value": "TEMPTABLE" }, { "key": "Provider", "value": "Session" } ]
+        ],
+        []
+      ]
+    },
+    {
+      "name": "Select into with cache, flush/remove all",
+      "query": [
+        "select 1 col ",
+        "into #temp with (cacheName = 'temp', cacheKey = 'key') ",
+        "from source",
+        "",
+        "show caches",
+        "cache flush temptable/*",
+        "show caches",
+        "cache remove temptable/*",
+        "show caches"
+        
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "Name", "value": "temp" }, { "key": "Size", "value": 1 },{"key": "Hits", "value": 0 }, { "key": "Hit ratio", "value": 0.0 },{ "key": "Misses", "value": 1 }, { "key": "Miss ratio", "value": 1.0 }, { "key": "Type", "value": "TEMPTABLE" }, { "key": "Provider", "value": "Session" } ]
+        ],
+        [
+          [{ "key": "Name", "value": "temp" }, { "key": "Size", "value": 0 },{"key": "Hits", "value": 0 }, { "key": "Hit ratio", "value": 0.0 },{ "key": "Misses", "value": 1 }, { "key": "Miss ratio", "value": 1.0 }, { "key": "Type", "value": "TEMPTABLE" }, { "key": "Provider", "value": "Session" } ]
+        ],
+        []
+      ]
+    },
+    {
+      "name": "Select into with cache, flush key",
+      "query": [
+        "select 1 col ",
+        "into #temp with (cacheName = 'temp', cacheKey = 'key') ",
+        "from source ",
+        "select 2 col ",
+        "into #temp2 with (cacheName = 'temp', cacheKey = 'key2') ",
+        "from source",
+        "",
+        "show caches",
+        "cache flush temptable/temp 'key'",
+        "show caches"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "Name", "value": "temp" }, { "key": "Size", "value": 2 },{"key": "Hits", "value": 0 }, { "key": "Hit ratio", "value": 0.0 },{ "key": "Misses", "value": 2 }, { "key": "Miss ratio", "value": 1.0 }, { "key": "Type", "value": "TEMPTABLE" }, { "key": "Provider", "value": "Session" } ]
+        ],
+        [
+          [{ "key": "Name", "value": "temp" }, { "key": "Size", "value": 1 },{"key": "Hits", "value": 0 }, { "key": "Hit ratio", "value": 0.0 },{ "key": "Misses", "value": 2 }, { "key": "Miss ratio", "value": 1.0 }, { "key": "Type", "value": "TEMPTABLE" }, { "key": "Provider", "value": "Session" } ]
         ]
       ]
     },
@@ -237,6 +311,20 @@
           [{ "key": "obj", "value": {"calc": 8 } }, { "key": "calc", "value": 8 }, { "key": "col1", "value": 3 }, { "key": "data", "value": "3_2" }],
           [{ "key": "obj", "value": {"calc": 12 } },{ "key": "calc", "value": 12 }, { "key": "col1", "value": 3 }, { "key": "data", "value": "3_3" }]
         ]
+	  ]    
+    },
+    {
+      "name": "Empty temp table",
+      "query": [
+        "select 10 col ",
+        "into #temp ",
+        "where false",
+        " ",
+        "select col ",
+        "from #temp t "
+	  ],
+	  "expectedResultSets": [
+        []
 	  ]    
     }
   ]

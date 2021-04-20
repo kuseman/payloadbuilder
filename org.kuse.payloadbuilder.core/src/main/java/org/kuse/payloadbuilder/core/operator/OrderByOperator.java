@@ -49,13 +49,25 @@ class OrderByOperator extends AOperator
     {
         List<Tuple> tuples = new ArrayList<>();
         RowIterator it = target.open(context);
-        while (it.hasNext())
+        if (it instanceof RowList)
         {
-            tuples.add(it.next());
+            RowList list = (RowList) it;
+            int size = list.size();
+            for (int i = 0; i < size; i++)
+            {
+                tuples.add(list.get(i));
+            }
         }
-        it.close();
+        else
+        {
+            while (it.hasNext())
+            {
+                tuples.add(it.next());
+            }
+            it.close();
+        }
         Collections.sort(tuples, (a, b) -> comparator.compare(context, a, b));
-        context.setTuple(null);
+        context.getStatementContext().setTuple(null);
         return RowIterator.wrap(tuples.iterator());
     }
 

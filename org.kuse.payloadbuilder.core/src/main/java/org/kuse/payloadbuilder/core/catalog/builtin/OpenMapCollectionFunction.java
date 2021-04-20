@@ -74,7 +74,7 @@ class OpenMapCollectionFunction extends TableFunctionInfo
         //CSON
         {
             private Set<String> addedColumns;
-            private String[] columns = tableAlias.isAsteriskColumns() ? null : tableAlias.getColumns();
+            private String[] columns;
             private int pos;
             private Tuple next;
 
@@ -111,23 +111,19 @@ class OpenMapCollectionFunction extends TableFunctionInfo
                         continue;
                     }
 
-                    if (tableAlias.isAsteriskColumns())
+                    if (addedColumns == null)
                     {
-                        if (addedColumns == null)
-                        {
-                            addedColumns = new LinkedHashSet<>(item.keySet());
-                            columns = addedColumns.toArray(EMPTY_STRING_ARRAY);
-                        }
-                        else if (addedColumns.addAll(item.keySet()))
-                        {
-                            columns = addedColumns.toArray(EMPTY_STRING_ARRAY);
-                        }
+                        addedColumns = new LinkedHashSet<>(item.keySet());
+                        columns = addedColumns.toArray(EMPTY_STRING_ARRAY);
                     }
-
+                    else if (addedColumns.addAll(item.keySet()))
+                    {
+                        columns = addedColumns.toArray(EMPTY_STRING_ARRAY);
+                    }
                     next = Row.of(tableAlias, pos++, columns, new Row.MapValues(item, columns));
                 }
 
-                return next != null;
+                return true;
             }
         };
     }

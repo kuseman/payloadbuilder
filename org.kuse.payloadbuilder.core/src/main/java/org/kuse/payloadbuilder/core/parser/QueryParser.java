@@ -28,7 +28,9 @@ import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.atn.PredictionMode;
 import org.antlr.v4.runtime.misc.ParseCancellationException;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.kuse.payloadbuilder.core.cache.CacheProvider;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.FunctionInfo;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
@@ -43,6 +45,9 @@ import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.AnalyzeStat
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ArithmeticBinaryContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ArithmeticUnaryContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.BracketExpressionContext;
+import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.CacheFlushContext;
+import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.CacheNameContext;
+import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.CacheRemoveContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.CaseExpressionContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ColumnReferenceContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ComparisonExpressionContext;
@@ -52,6 +57,7 @@ import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.DropTableSt
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.FunctionArgumentContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.FunctionCallContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.FunctionCallExpressionContext;
+import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.IdentifierContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.IfStatementContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.InExpressionContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.JoinPartContext;
@@ -261,6 +267,25 @@ public class QueryParser
         }
 
         @Override
+        public Object visitCacheFlush(CacheFlushContext ctx)
+        {
+            CacheProvider.Type type = CacheProvider.Type.valueOf(StringUtils.upperCase(getIdentifier(ctx.type)));
+            QualifiedName cacheName = getQualifiedName(ctx.name);
+            boolean isAll = ctx.all != null;
+            Expression key = getExpression(ctx.expression());
+            return new CacheFlushRemoveStatement(type, cacheName, isAll, true, key);
+        }
+
+        @Override
+        public Object visitCacheRemove(CacheRemoveContext ctx)
+        {
+            CacheProvider.Type type = CacheProvider.Type.valueOf(StringUtils.upperCase(getIdentifier(ctx.type)));
+            QualifiedName cacheName = getQualifiedName(ctx.name);
+            boolean isAll = ctx.all != null;
+            return new CacheFlushRemoveStatement(type, cacheName, isAll, false, null);
+        }
+
+        @Override
         public Object visitTopSelect(TopSelectContext ctx)
         {
             return ((SelectStatement) visit(ctx.selectStatement())).getSelect();
@@ -445,14 +470,17 @@ public class QueryParser
                 {
                     throw new ParseException("Expected a TABLE function for " + functionCallInfo.functionInfo.toString(), ctx.start);
                 }
+
+                TableFunctionInfo tableFunctionInfo = (TableFunctionInfo) functionCallInfo.functionInfo;
                 TableAlias tableAlias = TableAliasBuilder
                         .of(tupleOrdinal++, TableAlias.Type.FUNCTION, QualifiedName.of(functionCallInfo.functionInfo.getName()), defaultIfNull(alias, ""), ctx.functionCall().start)
                         .parent(getParentTableAlias())
+                        .tableMeta(tableFunctionInfo.getTableMeta())
                         .build();
                 return new TableFunction(
                         functionCallInfo.catalogAlias,
                         tableAlias,
-                        (TableFunctionInfo) functionCallInfo.functionInfo,
+                        tableFunctionInfo,
                         functionCallInfo.arguments,
                         options,
                         ctx.functionCall().start);
@@ -1070,10 +1098,30 @@ public class QueryParser
 
         private QualifiedName getQualifiedName(QnameContext ctx)
         {
-            List<String> parts = ctx.identifier()
+            if (ctx == null)
+            {
+                return null;
+            }
+            return getQualifiedName(ctx.identifier());
+        }
+
+        private QualifiedName getQualifiedName(CacheNameContext ctx)
+        {
+            if (ctx == null)
+            {
+                return null;
+            }
+            return getQualifiedName(ctx.identifier());
+        }
+
+        private QualifiedName getQualifiedName(List<IdentifierContext> identifier)
+        {
+            int size = identifier.size();
+            List<String> parts = new ArrayList<>(size);
+            identifier
                     .stream()
                     .map(i -> getIdentifierString(i.getText()))
-                    .collect(toList());
+                    .forEach(i -> parts.add(i));
 
             return new QualifiedName(parts);
         }

@@ -8,6 +8,7 @@ import java.util.Map;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+import org.kuse.payloadbuilder.core.operator.Operator.RowList;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Counts input */
@@ -24,7 +25,15 @@ class CountFunction extends ScalarFunctionInfo
     {
         Object obj = arguments.get(0).eval(context);
         int count = 0;
-        if (obj instanceof Iterator)
+        if (obj instanceof RowList)
+        {
+            return ((RowList) obj).size();
+        }
+        else if (obj instanceof Collection)
+        {
+            count = ((Collection<Object>) obj).size();
+        }
+        else if (obj instanceof Iterator)
         {
             Iterator<Object> it = (Iterator<Object>) obj;
             while (it.hasNext())
@@ -32,10 +41,6 @@ class CountFunction extends ScalarFunctionInfo
                 it.next();
                 count++;
             }
-        }
-        else if (obj instanceof Collection)
-        {
-            count = ((Collection<Object>) obj).size();
         }
         else if (obj instanceof Map)
         {

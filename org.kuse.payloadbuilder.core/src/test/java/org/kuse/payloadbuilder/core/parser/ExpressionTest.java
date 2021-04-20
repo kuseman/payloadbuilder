@@ -6,17 +6,40 @@ import static java.util.Collections.emptyMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.ToIntBiFunction;
 
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
+import org.kuse.payloadbuilder.core.codegen.CodeGenerator;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+import org.kuse.payloadbuilder.core.operator.ExpressionHashFunction;
+import org.kuse.payloadbuilder.core.operator.Tuple;
 
 /** Test of various expression evaluations */
 public class ExpressionTest extends AParserTest
 {
+    @Test
+    public void test_codeGen_hashFunction()
+    {
+        List<Expression> list = asList(
+                e("10"),
+                e("10l"),
+                e("10f"),
+                e("10d"),
+                e("null"),
+                e("true"),
+                e("'test'"));
+        CodeGenerator g = new CodeGenerator();
+        ToIntBiFunction<ExecutionContext, Tuple> function = g.generateHashFunction(list);
+        assertEquals(1166284934, function.applyAsInt(context, null));
+
+        function = new ExpressionHashFunction(list);
+        assertEquals(1166284934, function.applyAsInt(context, null));
+    }
+
     @Test
     public void test_auto_cast_strings() throws Exception
     {
@@ -110,8 +133,11 @@ public class ExpressionTest extends AParserTest
             @Override
             public ExpressionCode generateCode(CodeGeneratorContext context, List<Expression> arguments)
             {
-                ExpressionCode code = context.getCode();
-                code.setCode(String.format("String %s = java.util.UUID.randomUUID().toString();\n",
+                ExpressionCode code = context.getExpressionCode();
+                code.setCode(String.format(
+                        "boolean %s = false;\n"
+                        + "String %s = java.util.UUID.randomUUID().toString();\n",
+                        code.getNullVar(),
                         code.getResVar()));
                 return code;
             }
@@ -154,6 +180,10 @@ public class ExpressionTest extends AParserTest
         values.put("c", false);
         values.put("d", false);
         values.put("e", false);
+        values.put("f", 1);
+        values.put("g", 1L);
+        values.put("h", 1F);
+        values.put("i", 1D);
 
         assertExpression(1, values, "1");
         assertExpression(Long.MAX_VALUE, values, Long.toString(Long.MAX_VALUE));
@@ -163,6 +193,18 @@ public class ExpressionTest extends AParserTest
         assertExpression(null, values, "null");
         assertExpression(false, values, "false");
         assertExpression(true, values, "true");
+
+        assertExpression(-2, values, "-(f+1)");
+        assertExpression(-2L, values, "-(f+1l)");
+        assertExpression(-2f, values, "-(f+1f)");
+        assertExpression(-2d, values, "-(f+1d)");
+
+        assertExpression(-1, values, "-f");
+        assertExpression(-1L, values, "-g");
+        assertExpression(-1f, values, "-h");
+        assertExpression(-1d, values, "-i");
+
+        assertExpressionFail(IllegalArgumentException.class, "Cannot negate false", values, "-b");
     }
 
     @Test
@@ -224,96 +266,96 @@ public class ExpressionTest extends AParserTest
     }
 
     @Test
-    public void test_booleanExpression() throws Exception
+    public void test_booleanExpression_predicate() throws Exception
     {
+        Map<String, Object> values = new HashMap<>();
+        values.put("a", true);
+        values.put("b", false);
+        values.put("c", null);
+        values.put("d", 10);
+
         String[] expression = new String[] {"true", "false", "null", "a", "b", "c"};
         String[] operators = new String[] {"and", "or"};
 
-        Object[] results = new Object[] {
+        Boolean[] results = new Boolean[] {
                 // true true
                 true, true,
                 // true false
                 false, true,
                 // true null
-                null, true,
+                false, true,
                 // true a
                 true, true,
                 // true b
                 false, true,
                 // true c
-                null, true,
+                false, true,
 
                 // false true
                 false, true,
                 // false false
                 false, false,
                 // false null
-                false, null,
+                false, false,
                 // false a
                 false, true,
                 // false b
                 false, false,
                 // false c
-                false, null,
+                false, false,
 
                 // null true
-                null, true,
+                false, true,
                 // null false
-                false, null,
+                false, false,
                 // null null
-                null, null,
+                false, false,
                 // null a
-                null, true,
+                false, true,
                 // null b
-                false, null,
+                false, false,
                 // null c
-                null, null,
+                false, false,
 
                 // a true
                 true, true,
                 // a false
                 false, true,
                 // a null
-                null, true,
+                false, true,
                 // a a
                 true, true,
                 // a b
                 false, true,
                 // a c
-                null, true,
+                false, true,
 
                 // b true
                 false, true,
                 // b false
                 false, false,
                 // b null
-                false, null,
+                false, false,
                 // b a
                 false, true,
                 // b b
                 false, false,
                 // b c
-                false, null,
+                false, false,
 
                 // c true
-                null, true,
+                false, true,
                 // c false
-                false, null,
+                false, false,
                 // c null
-                null, null,
+                false, false,
                 // c a
-                null, true,
+                false, true,
                 // c b
-                false, null,
+                false, false,
                 // c c
-                null, null,
+                false, false,
         };
-
-        Map<String, Object> values = new HashMap<>();
-        values.put("a", true);
-        values.put("b", false);
-        values.put("c", null);
-        values.put("d", 10);
 
         int index = 0;
         for (String l : expression)
@@ -322,7 +364,7 @@ public class ExpressionTest extends AParserTest
             {
                 for (String o : operators)
                 {
-                    assertExpression(results[index++], values, l + " " + o + " " + r);
+                    assertPredicate(results[index++], values, l + " " + o + " " + r);
                 }
             }
         }

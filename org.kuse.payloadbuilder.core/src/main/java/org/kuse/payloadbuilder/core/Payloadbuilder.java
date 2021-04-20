@@ -2,7 +2,6 @@ package org.kuse.payloadbuilder.core;
 
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.parser.QueryParser;
-import org.kuse.payloadbuilder.core.parser.QueryStatement;
 
 /** Main */
 public class Payloadbuilder
@@ -13,16 +12,9 @@ public class Payloadbuilder
     {
     }
 
-    /** Perform query with provided query string */
-    public static QueryResult query(String queryString)
+    /** Compile provided query qith with provided catgory registry */
+    public static CompiledQuery compile(String query, CatalogRegistry registry)
     {
-        return query(new QuerySession(new CatalogRegistry()), queryString);
-    }
-
-    /** Perform query with provided session and query string */
-    public static QueryResult query(QuerySession session, String queryString)
-    {
-        QueryStatement query = PARSER.parseQuery(session.getCatalogRegistry(), queryString);
-        return new QueryResultImpl(session, query);
+        return new CompiledQuery(PARSER.parseQuery(registry, query));
     }
 }

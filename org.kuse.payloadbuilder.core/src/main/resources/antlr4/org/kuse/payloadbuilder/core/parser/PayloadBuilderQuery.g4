@@ -30,6 +30,7 @@ miscStatement
  | describeStatement
  | analyzeStatement
  | showStatement
+ | cacheFlushStatement
  ;
 
 setStatement
@@ -58,8 +59,20 @@ showStatement
  	  VARIABLES 
  	| (catalog=identifier '#')? TABLES 
  	| (catalog=identifier '#')? FUNCTIONS
+ 	| CACHES
  )
  ;
+
+cacheFlushStatement
+  : CACHE FLUSH type=identifier '/' (name=cacheName | all='*') key=expression?  #cacheFlush
+  | CACHE REMOVE type=identifier '/' (name=cacheName | all='*') 				#cacheRemove
+  ;
+
+// Cannot use qname above, that causes some mismatched input in antlr
+// don't know how to resolve
+cacheName
+  : parts+=identifier ('.' parts+=identifier)*
+  ;
 
 controlFlowStatement
  : ifStatement
@@ -271,23 +284,39 @@ booleanLiteral
  ;
  
 nonReserved
- : FROM | FIRST | TABLE | TABLES | LIKE | OBJECT | ARRAY | OBJECT_ARRAY | FOR
+ : FROM 
+ | FIRST 
+ | TABLE 
+ | TABLES 
+ | LIKE 
+ | OBJECT 
+ | ARRAY 
+ | OBJECT_ARRAY 
+ | FOR 
+ | ALL
+ | CACHE
+ | FLUSH
+ | REMOVE
  ;
  
 // Tokens
 
+ALL          : A L L;
 AND		     : A N D;
 ANALYZE      : A N A L Y Z E;
 ARRAY	     : A R R A Y;
 AS		     : A S;
 ASC		     : A S C;
 APPLY	     : A P P L Y;
+CACHE        : C A C H E;
+CACHES       : C A C H E S;
 CASE         : C A S E;
 CROSS        : C R O S S;
 DESC	     : D E S C;
 DESCRIBE	 : D E S C R I B E;
 DROP		 : D R O P;
 ELSE		 : E L S E;
+FLUSH        : F L U S H;
 END			 : E N D;
 ESCAPE		 : E S C A P E;
 EXISTS       : E X I S T S;
@@ -319,6 +348,7 @@ ORDERBY	     : O R D E R ' ' B Y;
 OUTER        : O U T E R;
 PARAMETERS   : P A R A M E T E R S;
 PRINT        : P R I N T;
+REMOVE       : R E M O V E;
 SELECT	     : S E L E C T;
 SESSION		 : S E S S I O N;
 SET			 : S E T;

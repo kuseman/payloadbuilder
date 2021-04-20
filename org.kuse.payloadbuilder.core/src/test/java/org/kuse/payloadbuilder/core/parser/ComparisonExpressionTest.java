@@ -3,12 +3,386 @@ package org.kuse.payloadbuilder.core.parser;
 import static org.kuse.payloadbuilder.core.parser.LiteralBooleanExpression.FALSE_LITERAL;
 import static org.kuse.payloadbuilder.core.parser.LiteralBooleanExpression.TRUE_LITERAL;
 import static org.kuse.payloadbuilder.core.parser.LiteralNullExpression.NULL_LITERAL;
+import static org.mockito.Mockito.mock;
 
+import java.util.function.Predicate;
+
+import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Test;
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+import org.kuse.payloadbuilder.core.operator.Tuple;
+import org.kuse.payloadbuilder.core.utils.MapUtils;
 
 /** Unit test of {@link ComparisonExpression} */
 public class ComparisonExpressionTest extends AParserTest
 {
+    @Test
+    public void test_codeGen_eq()
+    {
+        Tuple tuple = mock(Tuple.class);
+        context.getStatementContext().setTuple(tuple);
+        Expression e;
+        Predicate<ExecutionContext> p;
+
+        // int = null
+        e = e("1 = a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.INT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertFalse(p.test(context));
+
+        // int = int
+        e = e("10 = a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.INT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int = long
+        e = e("10 = a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10L, DataType.LONG))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int = float
+        e = e("10 = a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10F, DataType.FLOAT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int = double
+        e = e("10 = a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10D, DataType.DOUBLE))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int = Object (int)
+        e = e("10 = a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.ANY))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // boolean = boolean
+        e = e("true = a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(true, DataType.BOOLEAN))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // boolean = null
+        e = e("true = a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.BOOLEAN))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertFalse(p.test(context));
+    }
+
+    @Test
+    public void test_codeGen_neq()
+    {
+        Tuple tuple = mock(Tuple.class);
+        context.getStatementContext().setTuple(tuple);
+        Expression e;
+        Predicate<ExecutionContext> p;
+
+        // int != null
+        e = e("9 != a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.INT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertFalse(p.test(context));
+
+        // int != int
+        e = e("9 != a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.INT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int != long
+        e = e("9 != a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10L, DataType.LONG))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int != float
+        e = e("9 != a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10F, DataType.FLOAT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int != double
+        e = e("9 != a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10D, DataType.DOUBLE))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int != Object (int)
+        e = e("9 != a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.ANY))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // boolean != boolean
+        e = e("false != a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(true, DataType.BOOLEAN))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // boolean != null
+        e = e("true != a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.BOOLEAN))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertFalse(p.test(context));
+    }
+
+    @Test
+    public void test_codeGen_gt()
+    {
+        Tuple tuple = mock(Tuple.class);
+        context.getStatementContext().setTuple(tuple);
+        Expression e;
+        Predicate<ExecutionContext> p;
+
+        // int > null
+        e = e("11 > a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.INT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertFalse(p.test(context));
+
+        // int > int
+        e = e("11 > a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.INT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int > long
+        e = e("11 > a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10L, DataType.LONG))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int > float
+        e = e("11 > a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10F, DataType.FLOAT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int > double
+        e = e("11 > a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10D, DataType.DOUBLE))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int > Object (int)
+        e = e("11 > a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.ANY))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // double > int
+        e = e("11d > a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.INT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // boolean > boolean
+        e = e("false > a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(true, DataType.BOOLEAN))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertFalse(p.test(context));
+
+        // boolean > null
+        e = e("true > a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.BOOLEAN))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertFalse(p.test(context));
+    }
+
+    @Test
+    public void test_codeGen_gte()
+    {
+        Tuple tuple = mock(Tuple.class);
+        context.getStatementContext().setTuple(tuple);
+        Expression e;
+        Predicate<ExecutionContext> p;
+
+        // int >= null
+        e = e("10 >= a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.INT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertFalse(p.test(context));
+
+        // int >= int
+        e = e("10 >= a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.INT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int >= long
+        e = e("10 >= a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10L, DataType.LONG))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int >= float
+        e = e("10 >= a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10F, DataType.FLOAT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int >= double
+        e = e("10 >= a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10D, DataType.DOUBLE))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int >= Object (int)
+        e = e("10 >= a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.ANY))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // double >= int
+        e = e("10d >= a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.INT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // boolean >= boolean
+        e = e("false >= a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(true, DataType.BOOLEAN))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertFalse(p.test(context));
+
+        // boolean >= null
+        e = e("true >= a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.BOOLEAN))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertFalse(p.test(context));
+    }
+
+    @Test
+    public void test_codeGen_lt()
+    {
+        Tuple tuple = mock(Tuple.class);
+        context.getStatementContext().setTuple(tuple);
+        Expression e;
+        Predicate<ExecutionContext> p;
+
+        // int < null
+        e = e("9 < a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.INT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertFalse(p.test(context));
+
+        // int < int
+        e = e("9 < a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.INT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int < long
+        e = e("9 < a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10L, DataType.LONG))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int < float
+        e = e("9 < a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10F, DataType.FLOAT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int < double
+        e = e("9 < a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10D, DataType.DOUBLE))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int < Object (int)
+        e = e("9 < a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.ANY))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // double < int
+        e = e("9d < a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.INT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // boolean < boolean
+        e = e("false < a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(true, DataType.BOOLEAN))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // boolean < null
+        e = e("true < a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.BOOLEAN))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertFalse(p.test(context));
+    }
+
+    @Test
+    public void test_codeGen_lte()
+    {
+        Tuple tuple = mock(Tuple.class);
+        context.getStatementContext().setTuple(tuple);
+        Expression e;
+        Predicate<ExecutionContext> p;
+
+        // int <= null
+        e = e("9 <= a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.INT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertFalse(p.test(context));
+
+        // int <= int
+        e = e("9 <= a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.INT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int <= long
+        e = e("9 <= a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10L, DataType.LONG))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int <= float
+        e = e("9 <= a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10F, DataType.FLOAT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int <= double
+        e = e("9 <= a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10D, DataType.DOUBLE))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // int <= Object (int)
+        e = e("9 <= a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.ANY))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // double <= int
+        e = e("9d <= a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.INT))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // boolean <= boolean
+        e = e("false <= a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(true, DataType.BOOLEAN))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertTrue(p.test(context));
+
+        // boolean <= null
+        e = e("true <= a");
+        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.BOOLEAN))));
+        p = CODE_GENERATOR.generatePredicate(e);
+        assertFalse(p.test(context));
+    }
+
     @Test
     public void test_fold()
     {

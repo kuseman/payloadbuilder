@@ -59,6 +59,12 @@ public abstract class ScalarFunctionInfo extends FunctionInfo
         return false;
     }
 
+    /** Returns true if this function is contant */
+    public boolean isConstant(List<Expression> arguments)
+    {
+        return arguments.stream().allMatch(e -> e.isConstant());
+    }
+
     /**
      * Generate code for this function. Default is fallback to eval.
      *
@@ -67,11 +73,20 @@ public abstract class ScalarFunctionInfo extends FunctionInfo
      **/
     public ExpressionCode generateCode(CodeGeneratorContext context, List<Expression> arguments)
     {
-        Class<?> clazz = getClass();
-        if (clazz.isAnonymousClass())
-        {
-            clazz = clazz.getSuperclass();
-        }
-        throw new NotImplementedException("generate code: " + clazz.getSimpleName());
+        context.addImport("org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo");
+        context.addImport("java.util.List");
+
+        int index = context.addReference(this);
+        int index2 = context.addReference(arguments);
+        ExpressionCode code = context.getExpressionCode();
+        code.setCode(String.format(
+                "boolean %s = true;\n"                                                                               // nullVar
+                    + "Object %s = ((ScalarFunctionInfo) references[%d]).eval(context, ((List) references[%d]));\n"  // resVar, index, index2
+                    + "%s = %s == null;\n",                                                                          // nullVar, resVar
+                code.getNullVar(),
+                code.getResVar(), index, index2,
+                code.getNullVar(), code.getResVar()));
+
+        return code;
     }
 }

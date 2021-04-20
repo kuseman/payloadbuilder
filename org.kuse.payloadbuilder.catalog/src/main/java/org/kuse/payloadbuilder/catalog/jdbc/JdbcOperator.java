@@ -15,19 +15,20 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Stream;
 
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.AOperator;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory.IIndexValues;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.InExpression;
+import org.kuse.payloadbuilder.core.parser.LikeExpression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 import org.kuse.payloadbuilder.core.parser.SortItem;
@@ -95,7 +96,9 @@ class JdbcOperator extends AOperator
     //CSON
     {
         StringBuilder sb = new StringBuilder("SELECT ");
-        sb.append(tableAlias.isAsteriskColumns() ? "*" : Stream.of(tableAlias.getColumns()).collect(joining(",")));
+        sb.append(tableAlias.getTableMeta() == null
+            ? "*"
+            : tableAlias.getTableMeta().getColumns().stream().map(c -> c.getName()).collect(joining(",")));
         sb.append(" FROM ");
         sb.append(tableAlias.getTable().toString()).append(" y ");
 
@@ -146,6 +149,12 @@ class JdbcOperator extends AOperator
                                 .collect(joining(",")));
                         sb.append(")");
                         break;
+                    case LIKE:
+                        LikeExpression le = (LikeExpression) pair.getRight().getExpression();
+                        sb.append(qname);
+                        sb.append(" LIKE ");
+                        sb.append(convertValue(le.getPatternExpression().eval(context)));
+                        break;
                     case NULL:
                         sb.append(qname);
                         sb.append(" IS NULL");
@@ -172,10 +181,10 @@ class JdbcOperator extends AOperator
 
             int size = index.getColumns().size();
             sb.append(whereAdded ? " AND (" : " WHERE (");
-            Iterator<Object[]> it = context.getOperatorContext().getOuterIndexValues();
+            Iterator<IIndexValues> it = context.getStatementContext().getOuterIndexValues();
             while (it.hasNext())
             {
-                Object[] values = it.next();
+                IIndexValues values = it.next();
                 sb.append("(");
                 for (int i = 0; i < size; i++)
                 {
@@ -184,7 +193,7 @@ class JdbcOperator extends AOperator
                         sb.append(" AND ");
                     }
                     sb.append(index.getColumns().get(i)).append("=");
-                    Object value = convertValue(values[i]);
+                    Object value = convertValue(values.getValue(i));
                     sb.append(value);
                 }
                 sb.append(")");
@@ -273,7 +282,7 @@ class JdbcOperator extends AOperator
             String query,
             List<Object> parameters)
     {
-        final String database = (String) context.getSession().getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE);
+        final String database = context.getSession().getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE);
 
         //CSOFF
         return new RowIterator()

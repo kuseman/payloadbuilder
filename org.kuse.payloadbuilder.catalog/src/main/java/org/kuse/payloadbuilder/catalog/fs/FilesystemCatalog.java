@@ -170,6 +170,7 @@ public class FilesystemCatalog extends Catalog
                         }
                         catch (Exception e)
                         {
+                            e.printStackTrace();
                         }
                     }
                 }
@@ -194,6 +195,7 @@ public class FilesystemCatalog extends Catalog
             }
             catch (IOException e)
             {
+                e.printStackTrace();
             }
 
             Object[] values = new Object[] {

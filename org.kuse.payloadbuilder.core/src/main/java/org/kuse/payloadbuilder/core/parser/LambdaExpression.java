@@ -6,6 +6,7 @@ import static java.util.stream.Collectors.joining;
 import java.util.Arrays;
 import java.util.List;
 
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 
@@ -58,7 +59,7 @@ public class LambdaExpression extends Expression
     }
 
     @Override
-    public Class<?> getDataType()
+    public DataType getDataType()
     {
         throw new IllegalArgumentException("Labmda expressions");
     }

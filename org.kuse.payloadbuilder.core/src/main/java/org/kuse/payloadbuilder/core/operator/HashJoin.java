@@ -23,11 +23,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.function.ToIntBiFunction;
 
-import org.apache.commons.collections.iterators.IteratorChain;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.lang3.time.StopWatch;
-import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
+import org.kuse.payloadbuilder.core.operator.StatementContext.NodeData;
 
 /**
  * Hash match operator. Hashes outer operator and probes the inner operator
@@ -83,7 +82,7 @@ class HashJoin extends AOperator
     @Override
     public Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
-        Data data = context.getOperatorContext().getNodeData(nodeId);
+        Data data = context.getStatementContext().getNodeData(nodeId);
 
         Map<String, Object> result = ofEntries(true,
                 entry(LOGICAL_OPERATOR, logicalOperator),
@@ -102,13 +101,12 @@ class HashJoin extends AOperator
         return result;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public RowIterator open(ExecutionContext context)
     {
-        Tuple contextOuter = context.getTuple();
+        Tuple contextOuter = context.getStatementContext().getTuple();
         JoinTuple joinTuple = new JoinTuple(contextOuter);
-        Data data = context.getOperatorContext().getNodeData(nodeId, Data::new);
+        Data data = context.getStatementContext().getOrCreateNodeData(nodeId, Data::new);
         Map<IntKey, List<TupleHolder>> table = hash(context, joinTuple, data);
         if (table.isEmpty())
         {
@@ -137,12 +135,57 @@ class HashJoin extends AOperator
         // Left join
         // 1. Probe matched rows
         // 2. Probe non matched rows from table
-        return RowIterator.wrap(new IteratorChain(
-                probeIterator,
-                tableIterator(table, TableIteratorType.NON_MATCHED)), () ->
+
+        final RowIterator it1 = probeIterator;
+        final RowIterator it2 = tableIterator(table, TableIteratorType.NON_MATCHED);
+        //CSOFF
+        return new RowIterator()
+        //CSON
+        {
+            RowIterator current = it1;
+            Tuple next;
+
+            @Override
+            public Tuple next()
+            {
+                Tuple result = next;
+                next = null;
+                return result;
+            }
+
+            @Override
+            public boolean hasNext()
+            {
+                return setNext();
+            }
+
+            private boolean setNext()
+            {
+                while (next == null)
                 {
-                    probeIterator.close();
-                });
+                    if (!current.hasNext())
+                    {
+                        if (current == it2)
+                        {
+                            return false;
+                        }
+                        current = it2;
+                    }
+                    else
+                    {
+                        next = current.next();
+                    }
+                }
+
+                return true;
+            }
+
+            @Override
+            public void close()
+            {
+                probeIterator.close();
+            }
+        };
     };
 
     private Map<IntKey, List<TupleHolder>> hash(ExecutionContext context, JoinTuple joinTuple, Data data)
@@ -260,9 +303,9 @@ class HashJoin extends AOperator
                     joinTuple.setOuter(currentOuter.tuple);
 
                     data.predicateTime.resume();
-                    context.setTuple(joinTuple);
+                    context.getStatementContext().setTuple(joinTuple);
                     boolean result = predicate.test(context);
-                    context.setTuple(null);
+                    context.getStatementContext().setTuple(null);
                     data.predicateTime.suspend();
 
                     if (result)

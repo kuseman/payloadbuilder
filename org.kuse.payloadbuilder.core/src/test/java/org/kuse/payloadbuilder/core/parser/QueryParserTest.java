@@ -38,6 +38,8 @@ public class QueryParserTest extends AParserTest
 
         assertQuery("select top 10 1");
         assertQuery("select top (@a) 1");
+
+        assertQuery("cache flush batch/cache.name");
     }
 
     @Test

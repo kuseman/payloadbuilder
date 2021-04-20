@@ -6,7 +6,7 @@ import java.util.Arrays;
 import java.util.Map;
 
 import org.apache.commons.lang3.ArrayUtils;
-import org.kuse.payloadbuilder.core.parser.QualifiedName;
+import org.kuse.payloadbuilder.core.catalog.TableMeta.Column;
 
 /**
  * Row implementation of a {@link Tuple}. Columns and values simply
@@ -17,24 +17,45 @@ public class Row implements Tuple
     static final int POS_ORDINAL = Integer.MAX_VALUE;
 
     private final int pos;
-    private final QualifiedName table;
-    private final int tupleOrdinal;
-    private final String[] columns;
+    final String[] columns;
+    final TableAlias tableAlias;
     private final RowValues values;
 
-    private Row(TableAlias alias, int pos, String[] columns, RowValues values)
+    /** Array used if this row gets optimized */
+    final Object[] optimizedValues;
+
+    Row(TableAlias alias, int pos, String[] columns, RowValues values)
     {
-        this.table = requireNonNull(alias, "alias").getTable();
-        this.tupleOrdinal = alias.getTupleOrdinal();
+        this.tableAlias = requireNonNull(alias, "alias");
         this.pos = pos;
         this.columns = requireNonNull(columns, "columns");
         this.values = requireNonNull(values);
+        this.optimizedValues = null;
+    }
+
+    /** Columns from table meta in table alias */
+    Row(TableAlias alias, int pos, RowValues values)
+    {
+        this.tableAlias = requireNonNull(alias, "alias");
+        this.pos = pos;
+        this.columns = null;
+        this.values = requireNonNull(values);
+        this.optimizedValues = null;
+    }
+
+    Row(TableAlias alias, int pos, String[] columns, Object[] optimizedValues)
+    {
+        this.tableAlias = requireNonNull(alias, "alias");
+        this.pos = pos;
+        this.columns = columns;
+        this.values = null;
+        this.optimizedValues = requireNonNull(optimizedValues);
     }
 
     @Override
     public int getTupleOrdinal()
     {
-        return tupleOrdinal;
+        return tableAlias.getTupleOrdinal();
     }
 
     @Override
@@ -55,7 +76,7 @@ public class Row implements Tuple
          * ) x
          *
          */
-        if (ordinal <= tupleOrdinal)
+        if (ordinal <= tableAlias.getTupleOrdinal())
         {
             return this;
         }
@@ -65,35 +86,83 @@ public class Row implements Tuple
     @Override
     public int getColumnCount()
     {
-        return columns.length;
+        return columns != null ? columns.length : tableAlias.getTableMeta().getColumns().size();
     }
 
     @Override
     public int getColumnOrdinal(String column)
     {
-        if (POS.equalsIgnoreCase(column))
+        if (POS.equals(column))
         {
             return POS_ORDINAL;
         }
 
-        return ArrayUtils.indexOf(columns, column);
+        if (columns != null)
+        {
+            return ArrayUtils.indexOf(columns, column);
+        }
+
+        Column col = tableAlias.getTableMeta().getColumn(column);
+        return col != null ? col.getOrdinal() : -1;
     }
 
     @Override
     public String getColumn(int ordinal)
     {
-        return ordinal < columns.length ? columns[ordinal] : null;
+        if (columns != null)
+        {
+            return columns[ordinal];
+        }
+
+        Column col = tableAlias.getTableMeta().getColumn(ordinal);
+        return col != null ? col.getName() : null;
     }
 
     @Override
-    public Object getValue(int ordinal)
+    public Object getValue(int columnOrdinal)
     {
-        if (ordinal == POS_ORDINAL)
+        if (columnOrdinal < 0)
+        {
+            return null;
+        }
+        else if (columnOrdinal == POS_ORDINAL)
         {
             return pos;
         }
+        else if (optimizedValues != null)
+        {
+            return optimizedValues[columnOrdinal];
+        }
 
-        return values.getValue(ordinal);
+        return values.getValue(columnOrdinal);
+    }
+
+    @Override
+    public Tuple optimize(ExecutionContext context)
+    {
+        if (optimizedValues != null)
+        {
+            return this;
+        }
+
+        Object[] optimizedValues;
+        if (!(values instanceof ObjectValues))
+        {
+            int length = columns.length;
+            optimizedValues = new Object[length];
+            for (int i = 0; i < length; i++)
+            {
+                optimizedValues[i] = this.values.getValue(i);
+            }
+        }
+        else
+        {
+            optimizedValues = ((ObjectValues) values).values;
+        }
+
+        // Intern the values
+        context.intern(optimizedValues);
+        return new Row(tableAlias, pos, columns, optimizedValues);
     }
 
     @Override
@@ -109,8 +178,7 @@ public class Row implements Tuple
         {
             Row that = (Row) obj;
             return pos == that.pos
-                && table.equals(that.table)
-                && tupleOrdinal == that.tupleOrdinal;
+                && tableAlias.equals(that.tableAlias);
         }
         return false;
     }
@@ -118,13 +186,24 @@ public class Row implements Tuple
     @Override
     public String toString()
     {
-        return table + "(" + tupleOrdinal + ") pos: " + pos;
+        return tableAlias + ", pos: " + pos;
     }
 
     /** {@link Row#of(TableAlias, int, String[], RowValues)}} */
     public static Row of(TableAlias alias, int pos, Object[] values)
     {
-        return of(alias, pos, alias.getColumns(), values);
+        return of(alias, pos, new ObjectValues(values));
+    }
+
+    /** {@link Row#of(TableAlias, int, String[], RowValues)}} */
+    public static Row of(TableAlias alias, int pos, RowValues values)
+    {
+        if (alias.getTableMeta() == null)
+        {
+            throw new IllegalArgumentException("Cannot construct a Row without columns.");
+        }
+
+        return new Row(alias, pos, values);
     }
 
     /** {@link Row#of(TableAlias, int, String[], RowValues)}} */
@@ -203,11 +282,10 @@ public class Row implements Tuple
         @Override
         public Object getValue(int ordinal)
         {
-            if (ordinal < 0 || ordinal >= values.length)
+            if (ordinal >= values.length)
             {
-                return null;
+                System.out.println();
             }
-
             return values[ordinal];
         }
 

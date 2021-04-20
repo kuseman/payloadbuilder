@@ -21,12 +21,12 @@ class ExpressionValuesExtractor implements ValuesExtractor
     @Override
     public void extract(ExecutionContext context, Tuple tuple, Object[] values)
     {
-        context.setTuple(tuple);
+        context.getStatementContext().setTuple(tuple);
         for (int i = 0; i < size; i++)
         {
             values[i] = expressions.get(i).eval(context);
         }
-        context.setTuple(null);
+        context.getStatementContext().setTuple(null);
     }
 
     @Override

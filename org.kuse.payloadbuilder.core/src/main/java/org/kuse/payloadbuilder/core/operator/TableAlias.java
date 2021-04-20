@@ -6,15 +6,13 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.IntStream;
 
 import org.antlr.v4.runtime.Token;
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.kuse.payloadbuilder.core.catalog.TableMeta;
 import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
@@ -86,12 +84,11 @@ import org.kuse.payloadbuilder.core.parser.QualifiedName;
  **/
 public class TableAlias
 {
-    private static final String[] NOT_SET = ArrayUtils.EMPTY_STRING_ARRAY;
-
     private final TableAlias parent;
     private final QualifiedName table;
     private final String alias;
     private final List<TableAlias> childAliases = new ArrayList<>();
+    private final TableMeta tableMeta;
 
     /**
      * Unique ordinal of this alias
@@ -103,9 +100,6 @@ public class TableAlias
      **/
     private final int tupleOrdinal;
     private final Type type;
-    private String[] columns;
-    /** Is all columns wanted for this table alias. */
-    private boolean asteriskColumns;
 
     TableAlias(
             int tupleOrdinal,
@@ -113,8 +107,7 @@ public class TableAlias
             boolean connectAsChild,
             QualifiedName table,
             String alias,
-            String[] columns,
-            boolean asteriskColumns,
+            TableMeta tableMeta,
             Type type,
             Token token)
     {
@@ -122,9 +115,8 @@ public class TableAlias
         this.parent = parent;
         this.table = requireNonNull(table, "table");
         this.alias = requireNonNull(alias, "alias");
-        this.columns = requireNonNull(columns, "columns");
+        this.tableMeta = tableMeta;
         this.type = requireNonNull(type, "type");
-        this.asteriskColumns = asteriskColumns;
 
         if (parent != null)
         {
@@ -217,6 +209,66 @@ public class TableAlias
     }
 
     /**
+     * Returns the number of tuples on this alias level
+     *
+     * <pre>
+     * Consider a select
+     *
+     * select *
+     * from tableA a
+     * inner join
+     * (
+     *   select *
+     *   from tableC c
+     *   inner join tableD d
+     *     on d.col = c.col
+     * ) b
+     *   b.col = a.col
+     *
+     * The tuple stream will be
+     *
+     * CompositeTuple
+     *   Row (a)
+     *   CompositeTuple
+     *     Row (c)
+     *     Row (d)
+     *
+     * That will be flattened to:
+     *
+     * CompositeTuple
+     *   Row (a)
+     *   Row (c)
+     *   Row (d)
+     *
+     * Count for alias a, b will be 3
+     * Count for alias c, d will be 2
+     * </pre>
+     */
+    public int getTupleCountCountOnLevel()
+    {
+        requireNonNull(parent);
+
+        int count = 0;
+        int size = parent.childAliases.size();
+        for (int i = 0; i < size; i++)
+        {
+            TableAlias alias = parent.childAliases.get(i);
+            if (alias.type == Type.SUBQUERY)
+            {
+                // TODO: when composite sub queries like union etc. comes into play this might need a rewrite
+                count += alias
+                        .childAliases.get(0)
+                        .childAliases.get(0).getTupleCountCountOnLevel();
+            }
+            else
+            {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /**
      * Returns the highest sigling leaf ordinal.
      *
      * <pre>
@@ -289,42 +341,10 @@ public class TableAlias
         return tupleOrdinal;
     }
 
-    /**
-     * Get output columns needed from operator.
-     *
-     * <pre>
-     * A optimized catalog should look at this and only
-     * return columns specified here to not return data that is not needed.
-     * </pre>
-     */
-    public String[] getColumns()
+    /** Return table meta for this alias if any */
+    public TableMeta getTableMeta()
     {
-        return columns;
-    }
-
-    @Deprecated
-    void setColumns(String[] columns)
-    {
-        if (this.columns != NOT_SET)
-        {
-            throw new IllegalArgumentException("Cannot modify coulumns when set.");
-        }
-
-        this.columns = ObjectUtils.defaultIfNull(columns, ArrayUtils.EMPTY_STRING_ARRAY);
-    }
-
-    public boolean isAsteriskColumns()
-    {
-        return asteriskColumns;
-    }
-
-    /**
-     * Mark alias as asterisk A temporary mutator until a 2 phase query build is in place
-     */
-    @Deprecated
-    public void setAsteriskColumns()
-    {
-        this.asteriskColumns = true;
+        return tableMeta;
     }
 
     public int getTupleOrdinal()
@@ -338,9 +358,9 @@ public class TableAlias
         StringBuilder sb = new StringBuilder();
         sb.append(StringUtils.repeat(' ', indent * 2));
         sb.append(toString());
-        if (columns != null)
+        if (tableMeta != null)
         {
-            sb.append(" ").append(Arrays.toString(columns));
+            sb.append(" ").append(tableMeta);
         }
         sb.append(System.lineSeparator());
 
@@ -368,7 +388,7 @@ public class TableAlias
         return tupleOrdinal == other.tupleOrdinal
             && table.equals(other.table)
             && alias.equals(other.alias)
-            && Objects.deepEquals(columns, other.columns)
+            && Objects.equals(tableMeta, other.tableMeta)
             && type == other.type
             && childAliases.size() == other.childAliases.size()
             && IntStream.range(0, childAliases.size()).allMatch(i -> childAliases.get(i).isEqual(other.childAliases.get(i)));
@@ -392,9 +412,8 @@ public class TableAlias
         private final QualifiedName qname;
         private final String alias;
         private TableAlias parent;
-        private String[] columns = NOT_SET;
+        private TableMeta tableMeta;
         private final Token token;
-        private boolean asteriskColumns;
         private List<TableAliasBuilder> childAliases;
         private boolean connectAsChild = true;
 
@@ -420,10 +439,10 @@ public class TableAlias
             this.connectAsChild = connectAsChild;
             return this;
         }
-
-        public TableAliasBuilder columns(String[] columns)
+        
+        public TableAliasBuilder tableMeta(TableMeta tableMeta)
         {
-            this.columns = requireNonNull(columns);
+            this.tableMeta = tableMeta;
             return this;
         }
 
@@ -437,7 +456,7 @@ public class TableAlias
         /** Build alias */
         public TableAlias build()
         {
-            TableAlias result = new TableAlias(tupleOrdinal, parent, connectAsChild, qname, alias, columns, asteriskColumns, type, token);
+            TableAlias result = new TableAlias(tupleOrdinal, parent, connectAsChild, qname, alias, tableMeta, type, token);
             if (childAliases != null)
             {
                 childAliases.forEach(c ->

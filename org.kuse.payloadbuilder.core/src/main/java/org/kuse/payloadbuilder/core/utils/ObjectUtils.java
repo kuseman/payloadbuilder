@@ -52,6 +52,37 @@ public final class ObjectUtils
         return false;
     }
 
+    /** Get hash value from provided value */
+    public static int hash(int val)
+    {
+        // Avoid a method call here
+        return val;
+    }
+
+    /** Get hash value from provided value */
+    public static int hash(long val)
+    {
+        return Long.hashCode(val);
+    }
+
+    /** Get hash value from provided value */
+    public static int hash(float val)
+    {
+        return Float.hashCode(val);
+    }
+
+    /** Get hash value from provided value */
+    public static int hash(double val)
+    {
+        return Double.hashCode(val);
+    }
+
+    /** Get hash value from provided value */
+    public static int hash(boolean val)
+    {
+        return Boolean.hashCode(val);
+    }
+
     /** Get hash value from provided object */
     public static int hash(Object object)
     {

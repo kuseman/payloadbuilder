@@ -61,8 +61,8 @@ public class ESCatalog extends Catalog
     @Override
     public List<String> getTables(QuerySession session, String catalogAlias)
     {
-        String endpoint = (String) session.getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY);
-        String index = (String) session.getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY);
+        String endpoint = session.getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY);
+        String index = session.getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY);
 
         if (isBlank(endpoint) || isBlank(index))
         {
@@ -169,7 +169,7 @@ public class ESCatalog extends Catalog
         while (it.hasNext())
         {
             AnalyzePair pair = it.next();
-            if (pair.getType() == Type.UNDEFINED)
+            if (pair.getType() == Type.UNDEFINED || pair.getType() == Type.NOT_NULL || pair.getType() == Type.NULL)
             {
                 if (isFullTextSearchPredicate(pair.getPredicate()))
                 {

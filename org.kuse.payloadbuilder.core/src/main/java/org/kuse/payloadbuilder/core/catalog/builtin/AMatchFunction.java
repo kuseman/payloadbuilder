@@ -9,6 +9,7 @@ import java.util.List;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.LambdaFunction;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
+import org.kuse.payloadbuilder.core.catalog.TableMeta;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.LambdaExpression;
@@ -35,9 +36,9 @@ class MatchFunction extends ScalarFunctionInfo implements LambdaFunction
     }
 
     @Override
-    public Class<?> getDataType()
+    public TableMeta.DataType getDataType(List<Expression> arguments)
     {
-        return Boolean.class;
+        return TableMeta.DataType.BOOLEAN;
     }
 
     @Override
@@ -60,7 +61,7 @@ class MatchFunction extends ScalarFunctionInfo implements LambdaFunction
         Iterator<Object> it = CollectionUtils.getIterator(argResult);
         while (it.hasNext())
         {
-            context.setLambdaValue(lambdaId, it.next());
+            context.getStatementContext().setLambdaValue(lambdaId, it.next());
             Object obj = le.getExpression().eval(context);
 
             if (!(obj instanceof Boolean))

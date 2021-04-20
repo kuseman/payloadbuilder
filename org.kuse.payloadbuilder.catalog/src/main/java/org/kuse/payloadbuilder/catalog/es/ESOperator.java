@@ -6,8 +6,8 @@ import static java.util.Collections.emptyMap;
 import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
-import static org.apache.commons.lang3.ArrayUtils.indexOf;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.kuse.payloadbuilder.catalog.es.ESCatalog.SINGLE_TYPE_TABLE_NAME;
 import static org.kuse.payloadbuilder.core.DescribeUtils.CATALOG;
@@ -23,7 +23,6 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -59,11 +58,14 @@ import org.apache.http.message.BasicHeader;
 import org.kuse.payloadbuilder.catalog.es.ESCatalog.IdIndex;
 import org.kuse.payloadbuilder.catalog.es.ESCatalog.ParentIndex;
 import org.kuse.payloadbuilder.core.catalog.Index;
+import org.kuse.payloadbuilder.core.catalog.TableMeta;
+import org.kuse.payloadbuilder.core.catalog.TableMeta.Column;
 import org.kuse.payloadbuilder.core.operator.AOperator;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
-import org.kuse.payloadbuilder.core.operator.OperatorContext;
-import org.kuse.payloadbuilder.core.operator.OperatorContext.NodeData;
+import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory.IIndexValues;
 import org.kuse.payloadbuilder.core.operator.Row;
+import org.kuse.payloadbuilder.core.operator.StatementContext;
+import org.kuse.payloadbuilder.core.operator.StatementContext.NodeData;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.utils.ObjectUtils;
 
@@ -160,7 +162,7 @@ class ESOperator extends AOperator
             result.put(INDEX, index);
         }
 
-        Data data = context.getOperatorContext().getNodeData(nodeId);
+        Data data = context.getStatementContext().getNodeData(nodeId);
         if (data != null)
         {
             result.put("Request count", data.requestCount);
@@ -177,7 +179,7 @@ class ESOperator extends AOperator
     {
         ESType esType = ESType.of(context.getSession(), catalogAlias, tableAlias.getTable());
 
-        Data data = context.getOperatorContext().getNodeData(nodeId, Data::new);
+        Data data = context.getStatementContext().getOrCreateNodeData(nodeId, Data::new);
         if (index instanceof IdIndex)
         {
             boolean isSingleType = SINGLE_TYPE_TABLE_NAME.equals(esType.type);
@@ -188,7 +190,7 @@ class ESOperator extends AOperator
                     index,
                     isSingleType);
 
-            DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getOperatorContext(), data);
+            DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getStatementContext(), data);
             MutableBoolean doRequest = new MutableBoolean(true);
             return getIterator(
                     context,
@@ -232,12 +234,13 @@ class ESOperator extends AOperator
         if (index instanceof ParentIndex)
         {
             List<String> parentIds = new ArrayList<>();
-            while (context.getOperatorContext().getOuterIndexValues().hasNext())
+            while (context.getStatementContext().getOuterIndexValues().hasNext())
             {
-                Object[] array = context.getOperatorContext().getOuterIndexValues().next();
-                if (array[0] != null)
+                IIndexValues array = context.getStatementContext().getOuterIndexValues().next();
+                Object obj = array.getValue(0);
+                if (obj != null)
                 {
-                    parentIds.add(String.valueOf(array[0]));
+                    parentIds.add(String.valueOf(obj));
                 }
             }
 
@@ -343,16 +346,17 @@ class ESOperator extends AOperator
             Index operatorIndex,
             boolean isSingleType)
     {
+        TableMeta meta = alias.getTableMeta();
         boolean includeParent = !isSingleType
-            && (alias.isAsteriskColumns()
-                || indexOf(alias.getColumns(), PARENTID) != -1
+            && (meta == null
+                || meta.getColumn(PARENTID) != null
                 || operatorIndex instanceof ParentIndex);
-        boolean includeIndex = alias.isAsteriskColumns()
-            || indexOf(alias.getColumns(), INDEX) != -1;
-        boolean includeType = alias.isAsteriskColumns()
-            || indexOf(alias.getColumns(), TYPE) != -1;
-        boolean includeId = alias.isAsteriskColumns()
-            || indexOf(alias.getColumns(), DOCID) != -1;
+        boolean includeIndex = meta == null
+            || meta.getColumn(INDEX) != null;
+        boolean includeType = meta == null
+            || meta.getColumn(TYPE) != null;
+        boolean includeId = meta == null
+            || meta.getColumn(DOCID) != null;
 
         String filterPath = getFilterPath(filterPathPrefix, includeParent, includeIndex, includeType, includeId);
         String fields = getFields(includeParent);
@@ -362,6 +366,7 @@ class ESOperator extends AOperator
 
     private static String getFields(boolean includeParent)
     {
+        // TODO: version 5 and above then fields is called stored_fields
         return includeParent ? "fields=_source,_parent" : "";
     }
 
@@ -408,9 +413,11 @@ class ESOperator extends AOperator
         return new RowIterator()
         //CSON
         {
-            private final Set<String> columns = tableAlias.isAsteriskColumns() ? emptySet() : new HashSet<>(asList(tableAlias.getColumns()));
+            private final Set<String> metaColumns = tableAlias.getTableMeta() == null
+                ? emptySet()
+                : tableAlias.getTableMeta().getColumns().stream().map(c -> c.getName()).collect(toSet());
             private Set<String> addedColumns;
-            private String[] rowColumns = tableAlias.isAsteriskColumns() ? null : tableAlias.getColumns();
+            private String[] rowColumns;
             private int rowPos;
             private final MutableObject<String> scrollId = new MutableObject<>();
             private Iterator<Doc> docIt;
@@ -439,6 +446,10 @@ class ESOperator extends AOperator
                     closed = true;
                     data.requestCount++;
                     HttpDeleteWithBody delete = new HttpDeleteWithBody(endpoint + "/_search/scroll");
+
+                    // TODO: this doesn't work that good now
+                    // need to have ES version to correctly perform requests
+                    // Version 6.6
                     if (isSingleType)
                     {
                         delete.setEntity(new StringEntity("{\"scroll_id\":\"" + scrollId.getValue() + "\"}", StandardCharsets.UTF_8));
@@ -494,7 +505,7 @@ class ESOperator extends AOperator
                                 throw new RuntimeException("Error query Elastic. " + IOUtils.toString(response.getEntity().getContent()));
                             }
                             CountingInputStream cis = new CountingInputStream(response.getEntity().getContent());
-                            esReponse = READER.withAttribute(FIELDS, columns).readValue(cis);
+                            esReponse = READER.withAttribute(FIELDS, metaColumns).readValue(cis);
                             data.bytesReceived += cis.getByteCount();
                         }
                         catch (IOException e)
@@ -527,7 +538,7 @@ class ESOperator extends AOperator
                         continue;
                     }
 
-                    if (tableAlias.isAsteriskColumns())
+                    if (tableAlias.getTableMeta() == null)
                     {
                         if (addedColumns == null)
                         {
@@ -546,9 +557,12 @@ class ESOperator extends AOperator
                         {
                             rowColumns = addedColumns.toArray(EMPTY_STRING_ARRAY);
                         }
+                        next = Row.of(tableAlias, rowPos++, rowColumns, new DocValues(doc, rowColumns, tableAlias));
                     }
-
-                    next = Row.of(tableAlias, rowPos++, rowColumns, new DocValues(doc, rowColumns, tableAlias.isAsteriskColumns()));
+                    else
+                    {
+                        next = Row.of(tableAlias, rowPos++, new DocValues(doc, null, tableAlias));
+                    }
                 }
                 return true;
             }
@@ -560,13 +574,13 @@ class ESOperator extends AOperator
     {
         private final Doc doc;
         private final String[] columns;
-        private final boolean asterisk;
+        private final TableAlias alias;
 
-        DocValues(Doc doc, String[] columns, boolean asterisk)
+        DocValues(Doc doc, String[] columns, TableAlias alias)
         {
             this.doc = doc;
             this.columns = columns;
-            this.asterisk = asterisk;
+            this.alias = alias;
         }
 
         @Override
@@ -577,7 +591,7 @@ class ESOperator extends AOperator
                 return null;
             }
             // Asterisk column then meta fields are located in the first ordinals
-            if (asterisk)
+            if (alias.getTableMeta() == null)
             {
                 if (ordinal == 0)
                 {
@@ -595,9 +609,28 @@ class ESOperator extends AOperator
                 {
                     return doc.fields != null ? doc.fields.get("_parent") : null;
                 }
+                return doc.source.get(columns[ordinal]);
             }
 
-            return doc.source.get(columns[ordinal]);
+            Column column = alias.getTableMeta().getColumn(ordinal);
+            if (column == null)
+            {
+                return null;
+            }
+            String col = column.getName();
+            if (PARENTID.equals(col))
+            {
+                return doc.fields.get("_parent");
+            }
+            else if (INDEX.equals(col))
+            {
+                return doc.index;
+            }
+            else if (TYPE.equals(col))
+            {
+                return doc.type;
+            }
+            return doc.source.get(col);
         }
     }
 
@@ -739,10 +772,10 @@ class ESOperator extends AOperator
         private static final byte[] COMMA_BYTES = ",".getBytes();
         private static final Header APPLICATION_JSON = new BasicHeader("Content-Type", "application/json");
 
-        private final OperatorContext context;
+        private final StatementContext context;
         private final Data data;
 
-        private DocIdStreamingEntity(OperatorContext context, Data data)
+        private DocIdStreamingEntity(StatementContext context, Data data)
         {
             this.context = context;
             this.data = data;
@@ -787,7 +820,7 @@ class ESOperator extends AOperator
         @Override
         public void writeTo(OutputStream outStream) throws IOException
         {
-            Iterator<Object[]> values = context.getOuterIndexValues();
+            Iterator<IIndexValues> values = context.getOuterIndexValues();
             try (CountingOutputStream bos = new CountingOutputStream(outStream))
             {
                 bos.write(HEADER_BYTES);
@@ -795,7 +828,7 @@ class ESOperator extends AOperator
                 boolean first = true;
                 while (values.hasNext())
                 {
-                    String docId = String.valueOf(values.next()[0]);
+                    String docId = String.valueOf(values.next().getValue(0));
                     if (!first)
                     {
                         bos.write(COMMA_BYTES);

@@ -20,14 +20,11 @@ class OperatorBuilderUtils
 {
     /**
      * Creates a group by operator for provided expressions
-     *
-     * @param nodeId Unique node id for operator
-     * @param groupBys Group by expressions
-     * @param operator Downstream operator to group
      */
     static Operator createGroupBy(
             int nodeId,
             List<Expression> groupBys,
+            IIndexValuesFactory indexValuesFactory,
             Operator operator)
     {
         // Extract column references
@@ -40,12 +37,13 @@ class OperatorBuilderUtils
                 .map(e ->
                 {
                     @SuppressWarnings("deprecation")
-                    List<ResolvePath> paths = e.getResolvePaths();
-                    if (paths.isEmpty())
+                    ResolvePath[] paths = e.getResolvePaths();
+                    if (paths == null)
                     {
                         return null;
                     }
-                    return Pair.of(paths.get(0).getTargetTupleOrdinal(), e.getQname().getLast());
+
+                    return Pair.of(paths[0].getTargetTupleOrdinal(), e.getQname().getLast());
                 })
                 .filter(Objects::nonNull)
                 .collect(groupingBy(Pair::getKey, HashMap::new, mapping(Pair::getValue, toSet())));
@@ -54,7 +52,7 @@ class OperatorBuilderUtils
                 nodeId,
                 operator,
                 columnReferences,
-                new ExpressionValuesExtractor(groupBys),
+                indexValuesFactory,
                 groupBys.size());
     }
 }

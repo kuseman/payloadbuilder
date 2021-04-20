@@ -8,9 +8,11 @@ import static org.kuse.payloadbuilder.core.utils.ExpressionMath.modulo;
 import static org.kuse.payloadbuilder.core.utils.ExpressionMath.multiply;
 import static org.kuse.payloadbuilder.core.utils.ExpressionMath.subtract;
 
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+import org.kuse.payloadbuilder.core.utils.TypeUtils;
 
 /** Arithmetic binary expression */
 public class ArithmeticBinaryExpression extends Expression
@@ -75,9 +77,9 @@ public class ArithmeticBinaryExpression extends Expression
     }
 
     @Override
-    public Class<?> getDataType()
+    public DataType getDataType()
     {
-        return left.getDataType();
+        return TypeUtils.getArithmeticDataType(left.getDataType(), right.getDataType());
     }
 
     @Override
@@ -121,46 +123,77 @@ public class ArithmeticBinaryExpression extends Expression
     @Override
     public ExpressionCode generateCode(CodeGeneratorContext context)
     {
-        ExpressionCode code = context.getCode();
+        ExpressionCode code = context.getExpressionCode();
         ExpressionCode leftCode = left.generateCode(context);
         ExpressionCode rightCode = right.generateCode(context);
 
-        String method = null;
-        //CSOFF
-        switch (type)
-        //CSON
+        DataType dataType = getDataType();
+        // There is a type detected
+        if (dataType != DataType.ANY)
         {
-            case ADD:
-                method = "ExpressionMath.add";
-                break;
-            case SUBTRACT:
-                method = "ExpressionMath.subtract";
-                break;
-            case MULTIPLY:
-                method = "ExpressionMath.multiply";
-                break;
-            case DIVIDE:
-                method = "ExpressionMath.divide";
-                break;
-            case MODULUS:
-                method = "ExpressionMath.modulo";
-                break;
+            code.setCode(String.format("// %s\n"
+                + "%s"                                    // leftCode
+                + "boolean %s = %s;\n"                    // nullVar, leftCode nullVar
+                + "%s %s = %s;\n"                         // dataType, resVar, default
+                + "if (!%s)\n"                            // leftCode nullVar
+                + "{\n"
+                + "  %s"                                  // rightCode
+                + "  if (!%s) %s = %s %s %s;\n"           // rightCode nullVar, resVar, left resVar, op, right resVar
+                + "  %s = %s;\n"                          // nullVar, rightCode nullVar
+                + "}\n",
+                    type.value,
+                    leftCode.getCode(),
+                    code.getNullVar(), leftCode.getNullVar(),
+                    dataType.getJavaTypeString(), code.getResVar(), dataType.getJavaDefaultValue(),
+                    leftCode.getNullVar(),
+                    rightCode.getCode(),
+                    rightCode.getNullVar(), code.getResVar(), leftCode.getResVar(), type.value, rightCode.getResVar(),
+                    code.getNullVar(), rightCode.getNullVar()));
         }
+        else
+        {
+            context.addImport("org.kuse.payloadbuilder.core.utils.ExpressionMath");
+            String method = null;
+            //CSOFF
+            switch (type)
+            //CSON
+            {
+                case ADD:
+                    method = "ExpressionMath.add";
+                    break;
+                case SUBTRACT:
+                    method = "ExpressionMath.subtract";
+                    break;
+                case MULTIPLY:
+                    method = "ExpressionMath.multiply";
+                    break;
+                case DIVIDE:
+                    method = "ExpressionMath.divide";
+                    break;
+                case MODULUS:
+                    method = "ExpressionMath.modulo";
+                    break;
+            }
 
-        //      * Object v1 = tuple.getTuple(1).getValue("country_id");
-        //      * Boolean v3 = false;
-        //      * if (v1 != null)
-        //      * {
-        //      *   Object v2 = tuple.getTuple(0).getValue("country_id");
-        //      *   v3 = v2 != null && ExpressionMath.add(v1, v2);
-        //      * }
-
-        code.setCode(String.format(
-                "%s%s"                                    // Leftcode/rightcode
-                    + "Object %s = %s(%s, %s);\n",            // This result var
-                leftCode.getCode(), rightCode.getCode(),
-                code.getResVar(),
-                method, leftCode.getResVar(), rightCode.getResVar()));
+            code.setCode(String.format("// %s\n"
+                + "%s"                                    // leftCode
+                + "boolean %s = %s;\n"                    // nullVar, leftCode nullVar
+                + "Object %s = null;\n"                   // resVar
+                + "if (!%s)\n"                            // leftCode nullVar
+                + "{\n"
+                + "  %s"                                  // rightCode
+                + "  if (!%s) %s = %s(%s, %s);\n"         // rightCode nullVar, resVar, method, left resVar, right resVar
+                + "  %s = %s;\n"                          // nullVar, rightCode nullVar
+                + "}\n",
+                    type.value,
+                    leftCode.getCode(),
+                    code.getNullVar(), leftCode.getNullVar(),
+                    code.getResVar(),
+                    leftCode.getNullVar(),
+                    rightCode.getCode(),
+                    rightCode.getNullVar(), code.getResVar(), method, leftCode.getResVar(), rightCode.getResVar(),
+                    code.getNullVar(), rightCode.getNullVar()));
+        }
 
         return code;
     }
@@ -195,10 +228,8 @@ public class ArithmeticBinaryExpression extends Expression
         {
             ArithmeticBinaryExpression e = (ArithmeticBinaryExpression) obj;
             return left.equals(e.getLeft())
-                &&
-                right.equals(e.getRight())
-                &&
-                type == e.type;
+                && right.equals(e.getRight())
+                && type == e.type;
         }
         return false;
     }

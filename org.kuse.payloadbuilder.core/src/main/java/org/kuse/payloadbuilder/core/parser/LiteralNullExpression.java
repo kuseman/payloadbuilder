@@ -16,9 +16,10 @@ public class LiteralNullExpression extends LiteralExpression
     @Override
     public ExpressionCode generateCode(CodeGeneratorContext context)
     {
-        ExpressionCode code = context.getCode();
-        String template = "Object %s = null;\n";
-        code.setCode(String.format(template, code.getResVar()));
+        ExpressionCode code = context.getExpressionCode();
+        String template = "Object %s = null;\n"
+                + "boolean %s = true;\n";
+        code.setCode(String.format(template, code.getResVar(), code.getNullVar()));
         return code;
     }
 

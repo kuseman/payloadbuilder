@@ -170,6 +170,9 @@ public abstract class Catalog
         /**
          * <pre>
          * Table alias to retrieve operator for.
+         * NOTE! Properties {@link TableAlias#isAsteriskColumns()} and {@link TableAlias#getColumns()}
+         * is runtime values and should not be considered when creating an operator but rather executing
+         * the operator
          * </pre>
          */
         public TableAlias getTableAlias()

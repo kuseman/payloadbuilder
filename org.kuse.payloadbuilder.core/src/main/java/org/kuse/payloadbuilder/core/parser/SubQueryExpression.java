@@ -8,11 +8,15 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.kuse.payloadbuilder.core.OutputWriter;
+import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
+import org.kuse.payloadbuilder.core.codegen.ProjectionCode;
 import org.kuse.payloadbuilder.core.operator.ComplexValue;
 import org.kuse.payloadbuilder.core.operator.DescribableNode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+import org.kuse.payloadbuilder.core.operator.NoOpTuple;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.RowList;
 import org.kuse.payloadbuilder.core.operator.Projection;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.Select.For;
@@ -26,6 +30,7 @@ public class SubQueryExpression extends Expression implements DescribableNode
     private final String[] columns;
     private final Projection[] projections;
     private final For forOutput;
+    private final ComplexValue complexValue;
 
     public SubQueryExpression(Operator operator, String[] columns, Projection[] projections, Select.For forOutput)
     {
@@ -33,6 +38,7 @@ public class SubQueryExpression extends Expression implements DescribableNode
         this.columns = requireNonNull(columns, "columns");
         this.projections = requireNonNull(projections, "projection");
         this.forOutput = forOutput;
+        this.complexValue = new SubQueryComplexValue();
     }
 
     @Override
@@ -59,83 +65,47 @@ public class SubQueryExpression extends Expression implements DescribableNode
     @Override
     public Object eval(ExecutionContext context)
     {
-        //CSOFF
-        return new ComplexValue()
-        //CSON
+        return complexValue;
+    }
+
+    @Override
+    public ProjectionCode generateProjectionCode(CodeGeneratorContext context)
+    {
+        context.addImport("org.kuse.payloadbuilder.core.parser.SubQueryExpression");
+        context.addImport("java.lang.Runnable");
+        int index = context.addReference(this);
+        ProjectionCode code = context.getProjectionCode();
+
+        boolean writeFieldName = forOutput == For.OBJECT || forOutput == For.OBJECT_ARRAY;
+        int size = columns.length;
+
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("((SubQueryExpression) references[").append(index).append("]).write(writer, context, new Runnable() {\n");
+        sb.append("  public void run() {\n");
+
+        sb.append("    Tuple tuple = context.getStatementContext().getTuple();\n");
+        for (int i = 0; i < size; i++)
         {
-            @Override
-            public void write(OutputWriter outputWriter, ExecutionContext context)
+            if (writeFieldName)
             {
-                RowIterator it = operator.open(context);
-
-                begin(outputWriter);
-
-                HierarchyTuple tuple = new HierarchyTuple(context.getTuple());
-
-                boolean writeFieldName = forOutput == For.OBJECT || forOutput == For.OBJECT_ARRAY;
-                int size = columns.length;
-                while (it.hasNext())
-                {
-                    tuple.setCurrent(it.next());
-                    // Re-set the context tuple in case we have nested complex values
-                    context.setTuple(tuple);
-
-                    if (forOutput == For.OBJECT_ARRAY)
-                    {
-                        outputWriter.startObject();
-                    }
-
-                    // Write the select items
-                    for (int i = 0; i < size; i++)
-                    {
-                        Projection projection = projections[i];
-                        if (writeFieldName)
-                        {
-                            outputWriter.writeFieldName(columns[i]);
-                        }
-
-                        projection.writeValue(outputWriter, context);
-                    }
-
-                    if (forOutput == For.OBJECT_ARRAY)
-                    {
-                        outputWriter.endObject();
-                    }
-
-                    // Objects can only have one "row"
-                    if (forOutput == For.OBJECT)
-                    {
-                        break;
-                    }
-                }
-
-                end(outputWriter);
+                sb.append("    writer.writeFieldName(\"").append(columns[i]).append("\");\n");
             }
 
-            private void begin(OutputWriter writer)
+            if (i > 0)
             {
-                if (forOutput == For.ARRAY || forOutput == For.OBJECT_ARRAY)
-                {
-                    writer.startArray();
-                }
-                else
-                {
-                    writer.startObject();
-                }
+                // Re-set context tuple on each iterator since it can change with nested projections
+                sb.append("context.getStatementContext().setTuple(tuple);\n");
             }
+            context.setTupleFieldName("tuple");
+            sb.append(projections[i].generateCode(context).getCode()).append("\n");
+        }
 
-            private void end(OutputWriter writer)
-            {
-                if (forOutput == For.ARRAY || forOutput == For.OBJECT_ARRAY)
-                {
-                    writer.endArray();
-                }
-                else
-                {
-                    writer.endObject();
-                }
-            }
-        };
+        sb.append("  }\n");
+        sb.append("});\n");
+
+        code.setCode(sb.toString());
+        return code;
     }
 
     @Override
@@ -159,6 +129,136 @@ public class SubQueryExpression extends Expression implements DescribableNode
     }
 
     /**
+     * <pre>
+     * Method used when having a code generated projection. To keep the operator logic
+     * separate from the projection logic
+     * </pre>
+     *
+     * @param outputWriter Writer
+     * @param context Execution context
+     * @param projectionAction Action that is called for each tuple in the sub query.
+     */
+    //CSOFF
+    public void write(OutputWriter outputWriter, ExecutionContext context, Runnable projectionAction)
+    //CSON
+    {
+        begin(outputWriter);
+
+        Tuple contextTuple = context.getStatementContext().getTuple();
+        HierarchyTuple hierarchyTuple = null;
+
+        RowIterator it = operator.open(context);
+        RowList list = it instanceof RowList ? (RowList) it : null;
+        int index = 0;
+        boolean complete = list == null
+            ? !it.hasNext()
+            : index >= list.size();
+
+        while (!complete)
+        {
+            Tuple currentTuple = list == null ? it.next() : list.get(index++);
+
+            // No op tuple, no need to create a hierarchy tuple
+            // just set the context tuple
+            if (currentTuple == NoOpTuple.NO_OP)
+            {
+                context.getStatementContext().setTuple(contextTuple);
+            }
+            else
+            {
+                if (hierarchyTuple == null)
+                {
+                    hierarchyTuple = new HierarchyTuple(contextTuple);
+                }
+                hierarchyTuple.setCurrent(currentTuple);
+                // Re-set the context tuple in case we have nested complex values
+                context.getStatementContext().setTuple(hierarchyTuple);
+            }
+
+            if (forOutput == For.OBJECT_ARRAY)
+            {
+                outputWriter.startObject();
+            }
+
+            projectionAction.run();
+
+            if (forOutput == For.OBJECT_ARRAY)
+            {
+                outputWriter.endObject();
+            }
+
+            // Objects can only have one "row"
+            if (forOutput == For.OBJECT)
+            {
+                break;
+            }
+
+            complete = list == null
+                ? !it.hasNext()
+                : index >= list.size();
+        }
+
+        end(outputWriter);
+        context.getStatementContext().setTuple(contextTuple);
+    }
+
+    /** Complext value implementation for this sub query expression */
+    private class SubQueryComplexValue implements ComplexValue
+    {
+        @Override
+        public void write(OutputWriter outputWriter, ExecutionContext context)
+        {
+            boolean writeFieldName = forOutput == For.OBJECT || forOutput == For.OBJECT_ARRAY;
+            int size = columns.length;
+            SubQueryExpression.this.write(outputWriter, context, () ->
+            {
+                Tuple tuple = context.getStatementContext().getTuple();
+
+                // Write the select items
+                for (int i = 0; i < size; i++)
+                {
+                    if (writeFieldName)
+                    {
+                        outputWriter.writeFieldName(columns[i]);
+                    }
+
+                    if (i > 0)
+                    {
+                        // Re-set tuple after each iterator if it's been altered
+                        context.getStatementContext().setTuple(tuple);
+                    }
+                    Projection projection = projections[i];
+                    projection.writeValue(outputWriter, context);
+                }
+            });
+        }
+    }
+
+    private void begin(OutputWriter writer)
+    {
+        if (forOutput == For.ARRAY || forOutput == For.OBJECT_ARRAY)
+        {
+            writer.startArray();
+        }
+        else
+        {
+            writer.startObject();
+        }
+    }
+
+    private void end(OutputWriter writer)
+    {
+        if (forOutput == For.ARRAY || forOutput == For.OBJECT_ARRAY)
+        {
+            writer.endArray();
+        }
+        else
+        {
+            writer.endObject();
+        }
+    }
+
+    /**
      * Tuple that is used to temporary connect 2 tuples during a complex value iteration
      *
      * <pre>
@@ -170,25 +270,29 @@ public class SubQueryExpression extends Expression implements DescribableNode
      *  we need to temporary connect the outer tuple (tableA) before evaluating
      * </pre>
      **/
-    private static class HierarchyTuple implements Tuple
+    static class HierarchyTuple implements Tuple
     {
         private final Tuple parent;
         private Tuple current;
 
-        private HierarchyTuple(Tuple parent)
+        HierarchyTuple(Tuple parent)
         {
             this.parent = parent;
         }
 
-        private void setCurrent(Tuple current)
+        void setCurrent(Tuple current)
         {
             this.current = current;
         }
 
         @Override
-        public int getTupleOrdinal()
+        public int getColumnOrdinal(String column)
         {
-            return current.getTupleOrdinal();
+            if (current == null)
+            {
+                return -1;
+            }
+            return current.getColumnOrdinal(column);
         }
 
         @Override
@@ -203,41 +307,65 @@ public class SubQueryExpression extends Expression implements DescribableNode
              *              for object
              *        ) obj
              * from tableA a                                    ordinal = 0 (parent)
+             *
+             * select (
+             *       id                     <------ 1
+             *     , c.id                   <------ 2
+             *     from open_rows(b)        <------ 1 (current)
+             *   ) obj
+             * from tableA a                0         (composite parent)
+             * inner join tableB b          1
+             *  on ...
+             * inner join tableC c          2
+             *  on ...
+             *
              */
-
-            int currentTupleOrdinal = current.getTupleOrdinal();
-            if (currentTupleOrdinal >= 0 && tupleOrdinal >= current.getTupleOrdinal())
+            if (tupleOrdinal == -1
+                || current == null
+                || tupleOrdinal == current.getTupleOrdinal())
             {
-                return current.getTuple(tupleOrdinal);
+                return current;
             }
 
+            // Target might be a descendant of current
+            if (tupleOrdinal > current.getTupleOrdinal())
+            {
+                Tuple result = current.getTuple(tupleOrdinal);
+                if (result != null)
+                {
+                    return result;
+                }
+            }
+            // if not found delegate to parent
             return parent.getTuple(tupleOrdinal);
+        }
+
+        @Override
+        public Object getValue(int columnOrdinal)
+        {
+            if (current == null)
+            {
+                return null;
+            }
+            return current.getValue(columnOrdinal);
+        }
+
+        @Override
+        public int getTupleOrdinal()
+        {
+            throw new IllegalArgumentException("Not implemented");
         }
 
         @Override
         public int getColumnCount()
         {
-            // The parent is only for a hierarchy navigation and should
-            // not be involved when fetching columns
-            return current.getColumnCount();
+            throw new IllegalArgumentException("Not implemented");
         }
 
         @Override
-        public int getColumnOrdinal(String column)
+        public String getColumn(int columnOrdinal)
         {
-            return current.getColumnOrdinal(column);
-        }
-
-        @Override
-        public String getColumn(int ordinal)
-        {
-            return current.getColumn(ordinal);
-        }
-
-        @Override
-        public Object getValue(int ordinal)
-        {
-            return current.getValue(ordinal);
+            throw new IllegalArgumentException("Not implemented");
         }
     }
 }

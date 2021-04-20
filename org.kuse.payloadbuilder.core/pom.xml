@@ -15,7 +15,7 @@
         
         <!-- Versions -->
         <antlr4.version>4.7.1</antlr4.version>
-        <jackson.version>2.10.0</jackson.version>
+        <jackson.version>2.12.0</jackson.version>
     </properties>
 
     <dependencies>
@@ -68,6 +68,13 @@
             <version>1.7.30</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
+            <version>3.10.0</version>
+            <scope>test</scope>
+        </dependency>
+                
 
     </dependencies>
 

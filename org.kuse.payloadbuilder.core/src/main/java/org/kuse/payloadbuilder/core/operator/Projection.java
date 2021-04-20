@@ -1,6 +1,9 @@
 package org.kuse.payloadbuilder.core.operator;
 
+import org.apache.commons.lang3.NotImplementedException;
 import org.kuse.payloadbuilder.core.OutputWriter;
+import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
+import org.kuse.payloadbuilder.core.codegen.ProjectionCode;
 
 /** Definition of a projection */
 public interface Projection extends DescribableNode
@@ -26,5 +29,14 @@ public interface Projection extends DescribableNode
     default String toString(int indent)
     {
         return toString();
+    }
+
+    /**
+     * Generate code for this projection
+     * @param context Context used during code generation
+     **/
+    default ProjectionCode generateCode(CodeGeneratorContext context)
+    {
+        throw new NotImplementedException("code gen: " + getClass().getSimpleName());
     }
 }

@@ -16,6 +16,26 @@ public class OutputWriterAdapter implements OutputWriter
     }
 
     @Override
+    public void writeDouble(double value)
+    {
+    }
+
+    @Override
+    public void writeFloat(float value)
+    {
+    }
+
+    @Override
+    public void writeLong(long value)
+    {
+    }
+
+    @Override
+    public void writeInt(int value)
+    {
+    }
+
+    @Override
     public void startObject()
     {
     }

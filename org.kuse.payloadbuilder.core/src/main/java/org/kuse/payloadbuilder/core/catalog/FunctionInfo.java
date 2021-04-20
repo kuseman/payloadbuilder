@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.catalog.builtin.BuiltinCatalog;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
@@ -56,10 +57,12 @@ public abstract class FunctionInfo
         return null;
     }
 
-    /** Data type of this function */
-    public Class<?> getDataType()
+    /** Data type of this function
+     * @param arguments Function arguments
+     */
+    public DataType getDataType(List<Expression> arguments)
     {
-        return Object.class;
+        return DataType.ANY;
     }
 
     /**

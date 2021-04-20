@@ -1,76 +1,122 @@
 package org.kuse.payloadbuilder.core.operator;
 
-/** Result produced by an {@link Operator} */
+/**
+ * Result produced by an {@link Operator}
+ */
 public interface Tuple
 {
     /** Returns this tuple's ordinal */
     int getTupleOrdinal();
 
     /**
+     * Get the ordinal of provided column.
+     * @param column Column to fetch ordinal for
+     */
+    int getColumnOrdinal(String column);
+
+    /**
      * Get tuple by ordinal.
      *
      * <pre>
-     * If this is a composite tuple that consist of other tuples
-     * this method is called to fetch the sub tuple by it's ordinal
-     *
-     * Ie. a query:
-     *
-     * select *
-     * from tableA a
-     * inner join tableB b
-     *   on a.col = b.col
-     *
-     * We will get a composite tuple stream that looks like:
-     *
-     * CompositeTuple
-     *   RowTuple (a)     (ordinal = 0)
-     *   RowTuple (b)     (ordinal = 1)
+     * Return a tuple value with provided tupleOrdinal.
+     * This means that we want to access an alias and not a column
+     * in the table alias hierarchy
      * </pre>
      *
-     * @param tupleOrdinal Ordinal to resolve
+     * @param tupleOrdinal Ordinal to resolve value for.
      */
-    Tuple getTuple(int tupleOrdinal);
-
-    /**
-     * Get sub tuple by ordinal
-     *
-     * <pre>
-     * Special kinds of tuples (like temporary table tuples)
-     * has the target tuple hierarchy embedded inside it self
-     * and this method resolve a tuple within the the target alias
-     * hierarchy.
-     *
-     *  Ie.
-     *
-     *  select *
-     *  into #temp
-     *  from tableA a
-     *  inner join tableB b with (populate=true)
-     *    on b.col = c.col
-     *
-     *  select (select col from open_rows(t.b) for array)
-     *  from #temp t
-     *
-     *  Here we resolve INTO the temp tables sub alias (tableB)
-     *  The expression 't.b' like this:
-     * </pre>
-     *
-     * @param tupleOrdinal The sub tuple ordinal to resolve
-     */
-    default Tuple getSubTuple(int tupleOrdinal)
+    default Tuple getTuple(int tupleOrdinal)
     {
-        throw new IllegalArgumentException(getClass().getSimpleName() + " does not support sub tuples.");
+        if (tupleOrdinal == getTupleOrdinal())
+        {
+            return this;
+        }
+
+        return null;
     }
 
-    /** Return the number of columns that this tuple has */
-    int getColumnCount();
+    /** Resolve sub tuple with provided tuple ordinal. This is a special tuple fetch method
+     * used for temporary table access
+     * @param tupleOrdinal Ordinal to resolve */
+    default Tuple getSubTuple(int tupleOrdinal)
+    {
+        throw new IllegalArgumentException("This tuple does not support sub tuple fetching");
+    }
 
-    /** Get the ordinal of provided column. */
-    int getColumnOrdinal(String column);
+    /**
+     * Get value for provided column ordinal
+     * @param columnOrdinal The ordinal of the column to fetch
+     */
+    Object getValue(int columnOrdinal);
 
-    /** Get the column name of the provided ordinal */
-    String getColumn(int ordinal);
+    /** Returns true if provided column ordinal is null otherwise false
+     * @param columnOrdinal Column ordinal to get null for.
+     * */
+    default boolean isNull(int columnOrdinal)
+    {
+        return getValue(columnOrdinal) == null;
+    }
 
-    /** Get value for provided column ordinal */
-    Object getValue(int ordinal);
+    /** Get int value from provided ordinals */
+    default int getInt(int columnOrdinal)
+    {
+        return (int) getValue(columnOrdinal);
+    }
+
+    /** Get long value from provided ordinals */
+    default long getLong(int columnOrdinal)
+    {
+        return (long) getValue(columnOrdinal);
+    }
+
+    /** Get float value from provided ordinals */
+    default float getFloat(int columnOrdinal)
+    {
+        return (float) getValue(columnOrdinal);
+    }
+
+    /** Get double value from provided ordinals */
+    default double getDouble(int columnOrdinal)
+    {
+        return (double) getValue(columnOrdinal);
+    }
+
+    /** Get bool value from provided ordinals */
+    default boolean getBool(int columnOrdinal)
+    {
+        return (boolean) getValue(columnOrdinal);
+    }
+
+    /**
+     * Get the column name of the provided ordinal
+     * @param columnOrdinal Ordinal of column to return
+     */
+    default String getColumn(int columnOrdinal)
+    {
+        return null;
+    }
+
+    /**
+     * Return the number of columns that this tuple has.
+     */
+    default int getColumnCount()
+    {
+        return 0;
+    }
+
+    /**
+     * Optimize this tuple. Shrink resources etc.
+     *
+     * <pre>
+     * This method is called before the tuple is put to cache to optimize
+     * array sizes etc.
+     * </pre>
+     *
+     * @param context Execution context
+     * @return A optimized tuple
+     */
+    default Tuple optimize(ExecutionContext context)
+    {
+        return this;
+    }
 }

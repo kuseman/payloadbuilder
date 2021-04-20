@@ -107,6 +107,7 @@ public class InExpression extends Expression
         }
         return not ? true : false;
     }
+
     //
     //    @Override
     //    public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode)

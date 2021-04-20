@@ -39,9 +39,9 @@ class GetDateFunction extends ScalarFunctionInfo
     {
         if (utc)
         {
-            return context.getNow().withZoneSameInstant(ZoneOffset.UTC);
+            return context.getStatementContext().getNow().withZoneSameInstant(ZoneOffset.UTC);
         }
 
-        return context.getNow().toLocalDateTime();
+        return context.getStatementContext().getNow().toLocalDateTime();
     }
 }

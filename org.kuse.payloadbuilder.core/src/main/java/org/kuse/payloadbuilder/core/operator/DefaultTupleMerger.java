@@ -7,7 +7,10 @@ class DefaultTupleMerger implements TupleMerger
     private final int limit;
     private final int innerTupleOrdinal;
     /**
-     * Size of composite tuple to create. This is the size of the table aliases the same level
+     * <pre>
+     * Size of composite tuple to create. This is the size of the table aliases the same level including the
+     * the outer table source
+     * </pre>
      */
     private final int compositeTupleCount;
 
@@ -30,40 +33,29 @@ class DefaultTupleMerger implements TupleMerger
             }
 
             CompositeTuple outerTuple = (CompositeTuple) outer;
-
-            // Unwrap the inner tuples and add to outer to
-            // get a flat structure
-            if (inner instanceof CompositeTuple)
-            {
-                outerTuple.addAll((CompositeTuple) inner);
-            }
-            else
-            {
-                outerTuple.add(inner);
-            }
-
-            return outerTuple;
+            return outerTuple.add(inner);
         }
 
         CompositeTuple outerTuple;
         CollectionTuple populatingTuple;
         if (!(outer instanceof CompositeTuple))
         {
-            populatingTuple = new CollectionTuple(inner);
+            populatingTuple = new CollectionTuple(inner, innerTupleOrdinal);
             return new CompositeTuple(outer, populatingTuple, compositeTupleCount);
         }
 
         outerTuple = (CompositeTuple) outer;
 
         // Fetch the populating tuple from the outer
-        Tuple tuple = outerTuple.getTuple(innerTupleOrdinal);
+        Tuple tuple = outerTuple.getCollectionTupleForMerge(innerTupleOrdinal);
 
         // No ordinal found in outer => first tuple of this ordinal
         // create a collection tuple and add it to outer
         if (tuple == null)
         {
-            tuple = new CollectionTuple(innerTupleOrdinal);
+            tuple = new CollectionTuple(inner, innerTupleOrdinal);
             outerTuple.add(tuple);
+            return outerTuple;
         }
         else if (!(tuple instanceof CollectionTuple))
         {
@@ -71,7 +63,7 @@ class DefaultTupleMerger implements TupleMerger
         }
 
         // Append the inner to the collection
-        ((CollectionTuple) tuple).add(inner);
+        ((CollectionTuple) tuple).addTuple(inner);
 
         return outerTuple;
     }

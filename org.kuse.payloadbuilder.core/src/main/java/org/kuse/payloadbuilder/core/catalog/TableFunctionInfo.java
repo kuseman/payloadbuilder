@@ -12,7 +12,7 @@ import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /**
- * Definition of a table valued function These functions are applied row by row.
+ * Definition of a table valued function. These functions are applied row by row.
  **/
 //CSOFF
 public abstract class TableFunctionInfo extends FunctionInfo
@@ -46,6 +46,12 @@ public abstract class TableFunctionInfo extends FunctionInfo
     public Set<TableAlias> resolveAlias(TableAlias alias, Set<TableAlias> parentAliases, List<Set<TableAlias>> argumentAliases)
     {
         return singleton(alias);
+    }
+
+    /** Return table meta for this function */
+    public TableMeta getTableMeta()
+    {
+        return null;
     }
 
     /**

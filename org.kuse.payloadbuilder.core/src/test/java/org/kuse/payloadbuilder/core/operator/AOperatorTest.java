@@ -5,10 +5,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import org.apache.commons.lang3.mutable.MutableObject;
-import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
+import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.OperatorBuilder.BuildResult;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.parser.AParserTest;
 import org.kuse.payloadbuilder.core.parser.SortItem;
@@ -16,6 +19,16 @@ import org.kuse.payloadbuilder.core.parser.SortItem;
 /** Base class of {@link OperatorBuilder} tests. */
 public class AOperatorTest extends AParserTest
 {
+    protected Stream<Tuple> stream(Iterable<Tuple> iterable)
+    {
+        return StreamSupport.stream(iterable.spliterator(), false);
+    }
+
+    protected Operator op1(final Function<ExecutionContext, RowIterator> it)
+    {
+        return op1(it, null);
+    }
+
     protected Operator op(final Function<ExecutionContext, Iterator<Tuple>> it)
     {
         return op(it, null);
@@ -23,12 +36,31 @@ public class AOperatorTest extends AParserTest
 
     protected Operator op(final Function<ExecutionContext, Iterator<Tuple>> itFunc, Runnable closeAction)
     {
+        return op1(ctx -> new RowIterator()
+        {
+            Iterator<Tuple> it = itFunc.apply(ctx);
+            @Override
+            public Tuple next()
+            {
+                return it.next();
+            }
+
+            @Override
+            public boolean hasNext()
+            {
+                return it.hasNext();
+            }
+        }, closeAction);
+    }
+
+    protected Operator op1(final Function<ExecutionContext, RowIterator> itFunc, Runnable closeAction)
+    {
         return new Operator()
         {
             @Override
             public RowIterator open(ExecutionContext context)
             {
-                final Iterator<Tuple> it = itFunc.apply(context);
+                final RowIterator it = itFunc.apply(context);
                 return new RowIterator()
                 {
                     @Override
@@ -117,7 +149,7 @@ public class AOperatorTest extends AParserTest
         };
         session.getCatalogRegistry().registerCatalog("c", c);
         session.getCatalogRegistry().setDefaultCatalog("c");
-        Pair<Operator, Projection> pair = OperatorBuilder.create(session, s(query));
+        BuildResult buildResult = OperatorBuilder.create(session, s(query));
 
         QueryResult result = new QueryResult();
 
@@ -130,10 +162,32 @@ public class AOperatorTest extends AParserTest
             }
             result.alias = alias;
         }
-        result.operator = pair.getLeft();
-        result.projection = pair.getRight();
+        result.operator = buildResult.getOperator();
+        result.projection = buildResult.getProjection();
         result.tableOperators = tableOperators;
         return result;
+    }
+
+    protected Object getValue(Tuple t, int tupleOrdinal, int columnOrdinal)
+    {
+        Tuple tuple = t;
+        if (tupleOrdinal != -1)
+        {
+            tuple = t.getTuple(tupleOrdinal);
+        }
+
+        return tuple != null ? tuple .getValue(columnOrdinal) : null;
+    }
+
+    protected Object getValue(Tuple t, int tupleOrdinal, String column)
+    {
+        Tuple tuple = t;
+        if (tupleOrdinal != -1)
+        {
+            tuple = t.getTuple(tupleOrdinal);
+        }
+
+        return tuple != null ? tuple.getValue(tuple.getColumnOrdinal(column)) : null;
     }
 
     /** Query result */

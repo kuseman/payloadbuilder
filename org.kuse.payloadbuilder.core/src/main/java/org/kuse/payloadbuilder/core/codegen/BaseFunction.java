@@ -7,7 +7,7 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Base class for generated functions */
 //CSOFF
-public abstract class BaseFunction implements Function<ExecutionContext, Object>
+public abstract class BaseFunction extends BaseGeneratedClass implements Function<ExecutionContext, Object>
 //CSON
 {
     private Expression expression;
@@ -17,7 +17,7 @@ public abstract class BaseFunction implements Function<ExecutionContext, Object>
         this.expression = expression;
     }
 
-    public Object getExpression()
+    public Expression getExpression()
     {
         return expression;
     }

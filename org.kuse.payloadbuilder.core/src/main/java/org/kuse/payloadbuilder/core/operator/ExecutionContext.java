@@ -5,109 +5,49 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
 
-import java.time.ZonedDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 import org.kuse.payloadbuilder.core.QuerySession;
 
-/** Context used during execution of a query */
+/** Context used during execution of a query
+ * <pre>
+ * Life cycle is during a whole query and all it's statements
+ * </pre>
+ */
 public class ExecutionContext
 {
     private final QuerySession session;
-    /** Holder for lambda references during evaluation */
-    private List<Object> lambdaValues;
+    private final StatementContext statementContext;
+
+    /** Variables in context */
     private Map<String, Object> variables;
-
-    private final ZonedDateTime now = ZonedDateTime.now();
-    private final OperatorContext operatorContext = new OperatorContext();
-
-    /** Current row count of previous select statement */
-    private int rowCount;
-
-    /** Reference to tuple. Used in projections, correlated sub queries */
-    private Tuple tuple;
+    /** Intern cache. Used during optimization of tuples to reduce duplicate values. Used before stuff is put to cache */
+    private Map<Object, Object> internCache;
+    // /** Catalog properties that only live during one execution of a query */
+    //private Map<String, Map<String, Object>> catalogProperties;
 
     public ExecutionContext(QuerySession session)
     {
         this.session = requireNonNull(session, "session");
         // Copy session variables if any
         this.variables = session.getVariables() != null ? new HashMap<>(session.getVariables()) : null;
+        this.statementContext = new StatementContext();
     }
 
-    /** Get current tuple */
-    public Tuple getTuple()
+    private ExecutionContext(ExecutionContext source)
     {
-        return tuple;
-    }
-
-    /** Set current tuple */
-    public void setTuple(Tuple tuple)
-    {
-        this.tuple = tuple;
+        this.session = source.session;
+        this.variables = source.variables;
+        this.internCache = source.internCache;
+        this.statementContext = new StatementContext(source.statementContext);
     }
 
     /** Return session */
     public QuerySession getSession()
     {
         return session;
-    }
-
-    /** Return current time in local time */
-    public ZonedDateTime getNow()
-    {
-        return now;
-    }
-
-    /** Clear temporary data. Used between statements */
-    public void clear()
-    {
-        operatorContext.clear();
-    }
-
-    public OperatorContext getOperatorContext()
-    {
-        return operatorContext;
-    }
-
-    public int getRowCount()
-    {
-        return rowCount;
-    }
-
-    public void setRowCount(int rowCount)
-    {
-        this.rowCount = rowCount;
-    }
-
-    public String getVersionString()
-    {
-        return ExecutionContext.class.getPackage().getImplementationVersion();
-    }
-
-    /** Get lambda value in scope for provided id */
-    public Object getLambdaValue(int lambdaId)
-    {
-        if (lambdaValues == null)
-        {
-            return null;
-        }
-        ensureSize(lambdaValues, lambdaId);
-        return lambdaValues.get(lambdaId);
-    }
-
-    /** Set lambda value in scope for provided id */
-    public void setLambdaValue(int lambdaId, Object value)
-    {
-        if (lambdaValues == null)
-        {
-            lambdaValues = new ArrayList<>();
-        }
-        ensureSize(lambdaValues, lambdaId);
-        lambdaValues.set(lambdaId, value);
     }
 
     /** Get variables map */
@@ -132,17 +72,37 @@ public class ExecutionContext
         return variables != null ? variables.get(lowerCase(name)) : null;
     }
 
-    private void ensureSize(List<?> list, int itemIndex)
+    public StatementContext getStatementContext()
     {
-        // size = 2, index = 0, 1
-        int size = list.size();
-        if (size > itemIndex)
+        return statementContext;
+    }
+
+    public String getVersionString()
+    {
+        return ExecutionContext.class.getPackage().getImplementationVersion();
+    }
+
+    /**
+     * Intern array values. Used when optimizing tuples to reduce duplicated values when values are put to cache etc.
+     */
+    public void intern(Object[] array)
+    {
+        if (internCache == null)
         {
-            return;
+            internCache = new HashMap<>();
         }
 
-        // size 2, index = 2
-        int diff = itemIndex + 1 - size;
-        list.addAll(Collections.nCopies(diff, null));
+        int length = array.length;
+        for (int i = 0; i < length; i++)
+        {
+            final Object value = array[i];
+            array[i] = internCache.computeIfAbsent(value, Function.identity());
+        }
+    }
+
+    /** Copy this context */
+    public ExecutionContext copy()
+    {
+        return new ExecutionContext(this);
     }
 }

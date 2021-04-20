@@ -33,6 +33,7 @@ import org.apache.commons.io.output.CountingOutputStream;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.tuple.Pair;
+import org.kuse.payloadbuilder.core.CompiledQuery;
 import org.kuse.payloadbuilder.core.CsvOutputWriter;
 import org.kuse.payloadbuilder.core.JsonOutputWriter;
 import org.kuse.payloadbuilder.core.OutputWriter;
@@ -102,7 +103,8 @@ class PayloadbuilderService
                 try
                 {
                     file.getQuerySession().setAbortSupplier(() -> file.getState() == State.ABORTED);
-                    QueryResult queryResult = Payloadbuilder.query(file.getQuerySession(), queryString);
+                    CompiledQuery query = Payloadbuilder.compile(queryString, file.getQuerySession().getCatalogRegistry());
+                    QueryResult queryResult = query.execute(file.getQuerySession());
 
                     writer = getOutputWriter(file, outputFileName.getValue());
 

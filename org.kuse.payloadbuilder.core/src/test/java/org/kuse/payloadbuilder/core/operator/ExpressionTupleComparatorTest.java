@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.Test;
+import org.kuse.payloadbuilder.core.catalog.TableMeta;
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.SortItem;
@@ -18,7 +20,9 @@ public class ExpressionTupleComparatorTest extends AOperatorTest
     @Test
     public void test()
     {
-        TableAlias alias = TableAliasBuilder.of(0, TableAlias.Type.TABLE, QualifiedName.of("table"), "a").columns(new String[] {"col1"}).build();
+        TableAlias alias = TableAliasBuilder.of(0, TableAlias.Type.TABLE, QualifiedName.of("table"), "a")
+                .tableMeta(new TableMeta(asList(new TableMeta.Column("col1", DataType.ANY))))
+                .build();
         Row a, b;
 
         a = Row.of(alias, 0, new Object[] {1});

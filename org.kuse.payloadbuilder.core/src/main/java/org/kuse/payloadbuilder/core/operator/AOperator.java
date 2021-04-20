@@ -1,18 +1,20 @@
 package org.kuse.payloadbuilder.core.operator;
 
+import static java.util.Objects.requireNonNull;
+
 /** Base class for operators */
 public abstract class AOperator implements Operator
 {
-    protected final int nodeId;
+    protected final Integer nodeId;
 
-    protected AOperator(int nodeId)
+    protected AOperator(Integer nodeId)
     {
-        this.nodeId = nodeId;
+        this.nodeId = requireNonNull(nodeId);
     }
 
     @Override
     public int getNodeId()
     {
-        return nodeId;
+        return nodeId.intValue();
     }
 }
