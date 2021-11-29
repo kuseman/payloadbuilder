@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.kuse</groupId>
         <artifactId>org.kuse.payloadbuilder</artifactId>
-        <version>0.0.3</version>
+        <version>0.0.4-SNAPSHOT</version>
     </parent>
     <groupId>org.kuse.payloadbuilder</groupId>
     <artifactId>org.kuse.payloadbuilder.core</artifactId>
