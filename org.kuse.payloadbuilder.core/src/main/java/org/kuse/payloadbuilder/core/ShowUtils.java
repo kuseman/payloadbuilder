@@ -88,9 +88,9 @@ class ShowUtils
             operator = new Operator()
             {
                 @Override
-                public RowIterator open(ExecutionContext context)
+                public TupleIterator open(ExecutionContext context)
                 {
-                    return RowIterator.wrap(variables
+                    return TupleIterator.wrap(variables
                             .entrySet()
                             .stream()
                             .map(e -> (Tuple) Row.of(SHOW_VARIABLES_ALIAS, pos.incrementAndGet(), new Object[] {e.getKey(), e.getValue()}))
@@ -124,9 +124,9 @@ class ShowUtils
             operator = new Operator()
             {
                 @Override
-                public RowIterator open(ExecutionContext context)
+                public TupleIterator open(ExecutionContext context)
                 {
-                    return RowIterator.wrap(tables
+                    return TupleIterator.wrap(tables
                             .stream()
                             .map(table -> (Tuple) Row.of(SHOW_TABLES_ALIAS, pos.incrementAndGet(), new Object[] {table}))
                             .iterator());
@@ -156,9 +156,9 @@ class ShowUtils
             //CSON
             {
                 @Override
-                public RowIterator open(ExecutionContext context)
+                public TupleIterator open(ExecutionContext context)
                 {
-                    return RowIterator.wrap(Stream.concat(
+                    return TupleIterator.wrap(Stream.concat(
                             functions
                                     .stream()
                                     .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName()))
@@ -194,9 +194,9 @@ class ShowUtils
             //CSON
             {
                 @Override
-                public RowIterator open(ExecutionContext context)
+                public TupleIterator open(ExecutionContext context)
                 {
-                    return RowIterator.wrap(
+                    return TupleIterator.wrap(
                             providers
                                     .stream()
                                     .flatMap(p -> p.getCaches().stream().map(c -> Pair.of(p, c)))

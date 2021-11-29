@@ -55,6 +55,7 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicHeader;
+import org.apache.http.util.EntityUtils;
 import org.kuse.payloadbuilder.catalog.es.ESCatalog.IdIndex;
 import org.kuse.payloadbuilder.catalog.es.ESCatalog.ParentIndex;
 import org.kuse.payloadbuilder.core.catalog.Index;
@@ -175,7 +176,7 @@ class ESOperator extends AOperator
     }
 
     @Override
-    public RowIterator open(ExecutionContext context)
+    public TupleIterator open(ExecutionContext context)
     {
         ESType esType = ESType.of(context.getSession(), catalogAlias, tableAlias.getTable());
 
@@ -400,7 +401,7 @@ class ESOperator extends AOperator
     }
 
     //CSOFF
-    static RowIterator getIterator(
+    static TupleIterator getIterator(
             //CSON
             ExecutionContext context,
             TableAlias tableAlias,
@@ -410,7 +411,7 @@ class ESOperator extends AOperator
             Function<MutableObject<String>, HttpUriRequest> requestSupplier)
     {
         //CSOFF
-        return new RowIterator()
+        return new TupleIterator()
         //CSON
         {
             private final Set<String> metaColumns = tableAlias.getTableMeta() == null
@@ -459,18 +460,24 @@ class ESOperator extends AOperator
                         delete.setEntity(new StringEntity(scrollId.getValue(), StandardCharsets.UTF_8));
                     }
 
+                    HttpEntity entity = null;
                     try (CloseableHttpResponse response = CLIENT.execute(delete))
                     {
+                        entity = response.getEntity();
                         int status = response.getStatusLine().getStatusCode();
                         if (!(status == HttpStatus.SC_OK || status == HttpStatus.SC_NOT_FOUND))
                         {
-                            String body = IOUtils.toString(response.getEntity().getContent());
+                            String body = IOUtils.toString(entity.getContent(), StandardCharsets.UTF_8);
                             throw new RuntimeException("Error clearing scroll: " + body);
                         }
                     }
                     catch (IOException e)
                     {
                         throw new RuntimeException("Error deleting scroll", e);
+                    }
+                    finally
+                    {
+                        EntityUtils.consumeQuietly(entity);
                     }
                 }
             }
@@ -498,13 +505,15 @@ class ESOperator extends AOperator
                         ESResponse esReponse;
                         data.requestCount++;
                         data.requestTime.resume();
+                        HttpEntity entity = null;
                         try (CloseableHttpResponse response = CLIENT.execute(request);)
                         {
+                            entity = response.getEntity();
                             if (response.getStatusLine().getStatusCode() != HttpStatus.SC_OK)
                             {
-                                throw new RuntimeException("Error query Elastic. " + IOUtils.toString(response.getEntity().getContent()));
+                                throw new RuntimeException("Error query Elastic. " + IOUtils.toString(response.getEntity().getContent(), StandardCharsets.UTF_8));
                             }
-                            CountingInputStream cis = new CountingInputStream(response.getEntity().getContent());
+                            CountingInputStream cis = new CountingInputStream(entity.getContent());
                             esReponse = READER.withAttribute(FIELDS, metaColumns).readValue(cis);
                             data.bytesReceived += cis.getByteCount();
                         }
@@ -514,6 +523,7 @@ class ESOperator extends AOperator
                         }
                         finally
                         {
+                            EntityUtils.consumeQuietly(entity);
                             data.requestTime.suspend();
                         }
 

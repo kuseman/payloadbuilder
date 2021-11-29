@@ -14,7 +14,7 @@ import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.BatchCacheOperator.CacheSettings;
-import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.OperatorBuilder.BuildResult;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.Select;
@@ -31,7 +31,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             + "("
             + "   select c.col1"
             + "   from tableB c"
-            +  ") b with (cacheName = 'tableB', cacheKey = @param, cacheTTL = 'PT10m') "
+            + ") b with (cacheName = 'tableB', cacheKey = @param, cacheTTL = 'PT10m') "
             + "  on b.col1 = a.col1";
 
         List<Operator> operators = new ArrayList<>();
@@ -126,7 +126,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                                 new DefaultTupleMerger(-1, 3, 2),
                                 true,
                                 false),
-                        asList(e("s.art_id"))),
+                        new ExpressionIndexValuesFactory(asList(e("s.art_id")))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
                 new DefaultTupleMerger(-1, 1, 3),
                 true,
@@ -199,7 +199,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         assertEquals(expected, actual);
 
-        RowIterator it = actual.open(new ExecutionContext(session));
+        TupleIterator it = actual.open(new ExecutionContext(session));
         assertFalse(it.hasNext());
     }
 
@@ -243,7 +243,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         assertEquals(expected, actual);
 
-        RowIterator it = actual.open(new ExecutionContext(session));
+        TupleIterator it = actual.open(new ExecutionContext(session));
         assertFalse(it.hasNext());
     }
 
@@ -287,7 +287,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         assertEquals(expected, actual);
 
-        RowIterator it = actual.open(new ExecutionContext(session));
+        TupleIterator it = actual.open(new ExecutionContext(session));
         assertFalse(it.hasNext());
     }
 
@@ -337,7 +337,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         assertEquals(expected, actual);
 
-        RowIterator it = actual.open(new ExecutionContext(session));
+        TupleIterator it = actual.open(new ExecutionContext(session));
         assertFalse(it.hasNext());
     }
 
@@ -381,7 +381,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         assertEquals(expected, actual);
 
-        RowIterator it = actual.open(new ExecutionContext(session));
+        TupleIterator it = actual.open(new ExecutionContext(session));
         assertFalse(it.hasNext());
     }
 
@@ -435,13 +435,13 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         }
 
         @Override
-        public RowIterator open(ExecutionContext context)
+        public TupleIterator open(ExecutionContext context)
         {
             if (keysByTable.containsKey(name))
             {
                 assertNotNull(context.getStatementContext().getOuterIndexValues());
             }
-            return RowIterator.EMPTY;
+            return TupleIterator.EMPTY;
         }
 
         @Override

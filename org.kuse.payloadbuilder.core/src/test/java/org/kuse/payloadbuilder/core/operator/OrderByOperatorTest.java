@@ -9,7 +9,7 @@ import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.TableMeta;
 import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
-import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.SortItem;
@@ -33,7 +33,7 @@ public class OrderByOperatorTest extends AOperatorTest
                 target,
                 new ExpressionTupleComparator(asList(new SortItem(e("col1"), Order.ASC, NullOrder.UNDEFINED, null))));
 
-        RowIterator it = operator.open(new ExecutionContext(session));
+        TupleIterator it = operator.open(new ExecutionContext(session));
         int prev = -1;
         while (it.hasNext())
         {

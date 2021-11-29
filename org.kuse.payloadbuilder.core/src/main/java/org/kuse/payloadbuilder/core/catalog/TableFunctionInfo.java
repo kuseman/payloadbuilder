@@ -7,7 +7,7 @@ import java.util.Set;
 
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
-import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
@@ -66,5 +66,5 @@ public abstract class TableFunctionInfo extends FunctionInfo
      * @param tableAlias Table alias used for this function
      * @param arguments Arguments to function
      **/
-    public abstract RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments);
+    public abstract TupleIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments);
 }

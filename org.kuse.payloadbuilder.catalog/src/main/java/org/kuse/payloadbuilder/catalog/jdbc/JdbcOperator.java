@@ -1,6 +1,7 @@
 package org.kuse.payloadbuilder.catalog.jdbc;
 
 import static java.util.stream.Collectors.joining;
+import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.kuse.payloadbuilder.core.DescribeUtils.CATALOG;
 import static org.kuse.payloadbuilder.core.DescribeUtils.PREDICATE;
 import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
@@ -16,7 +17,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.AOperator;
@@ -67,14 +67,14 @@ class JdbcOperator extends AOperator
         Map<String, Object> result = ofEntries(true,
                 entry(CATALOG, JdbcCatalog.NAME));
 
-        if (!CollectionUtils.isEmpty(predicatePairs))
+        if (!isEmpty(predicatePairs))
         {
             result.put(PREDICATE, predicatePairs
                     .stream()
                     .map(p -> p.getPredicate().toString())
                     .collect(joining(" AND ")));
         }
-        if (!CollectionUtils.isEmpty(sortItems))
+        if (!isEmpty(sortItems))
         {
             result.put("Sort", sortItems
                     .stream()
@@ -86,7 +86,7 @@ class JdbcOperator extends AOperator
     }
 
     @Override
-    public RowIterator open(ExecutionContext context)
+    public TupleIterator open(ExecutionContext context)
     {
         return getIterator(catalog, context, catalogAlias, tableAlias, buildSql(context), null);
     }
@@ -273,7 +273,7 @@ class JdbcOperator extends AOperator
 
     /** Returns a row iterator with provided query and parameters */
     //CSOFF
-    static RowIterator getIterator(
+    static TupleIterator getIterator(
             //CSOFF
             JdbcCatalog catalog,
             ExecutionContext context,
@@ -285,7 +285,7 @@ class JdbcOperator extends AOperator
         final String database = context.getSession().getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE);
 
         //CSOFF
-        return new RowIterator()
+        return new TupleIterator()
         //CSON
         {
             private PreparedStatement statement;

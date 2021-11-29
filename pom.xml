@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.kuse</groupId>
     <artifactId>org.kuse.payloadbuilder</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>0.0.3-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Payloadbuilder</name>
     <description>Query engine</description>
@@ -15,7 +15,23 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <license.dir>${basedir}</license.dir>
+
+        <!-- Versions -->
+        <junit.version>4.13.1</junit.version>
+        <mockito-core.version>3.10.0</mockito-core.version>
     </properties>
+
+    <issueManagement>
+        <url>https://github.com/kuseman/payloadbuilder/issues</url>
+        <system>GitHub Issues</system>
+    </issueManagement>
+
+    <scm>
+        <url>https://github.com/kuseman/payloadbuilder</url>
+        <connection>scm:git:git@github.com:kuseman/payloadbuilder.git</connection>
+        <developerConnection>scm:git:git@github.com:kuseman/payloadbuilder.git</developerConnection>
+        <tag>HEAD</tag>
+    </scm>
 
     <modules>
         <module>org.kuse.payloadbuilder.core</module>

@@ -1,6 +1,7 @@
 package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.collections4.IteratorUtils.toList;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -11,7 +12,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 
-import org.apache.commons.collections.IteratorUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.mutable.MutableDouble;
 import org.apache.commons.lang3.mutable.MutableFloat;
@@ -43,7 +43,7 @@ public final class EvalUtils
     {
         if (object instanceof Iterator)
         {
-            return IteratorUtils.toList((Iterator<Object>) object);
+            return toList((Iterator<Object>) object);
         }
         else if (object instanceof Reader)
         {

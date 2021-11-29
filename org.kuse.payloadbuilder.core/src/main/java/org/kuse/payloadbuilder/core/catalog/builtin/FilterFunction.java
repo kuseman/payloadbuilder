@@ -6,7 +6,7 @@ import static java.util.Collections.singletonList;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.commons.collections.iterators.FilterIterator;
+import org.apache.commons.collections4.iterators.FilterIterator;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.LambdaFunction;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
@@ -63,7 +63,7 @@ class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
         }
         LambdaExpression le = (LambdaExpression) arguments.get(1);
         int lambdaId = le.getLambdaIds()[0];
-        return new FilterIterator(CollectionUtils.getIterator(argResult), input ->
+        return new FilterIterator<>(CollectionUtils.getIterator(argResult), input ->
         {
             context.getStatementContext().setLambdaValue(lambdaId, input);
             Boolean result = (Boolean) le.getExpression().eval(context);

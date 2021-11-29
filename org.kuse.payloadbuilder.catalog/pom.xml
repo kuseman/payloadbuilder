@@ -4,7 +4,7 @@
     <parent>
         <groupId>org.kuse</groupId>
         <artifactId>org.kuse.payloadbuilder</artifactId>
-        <version>0.0.1-SNAPSHOT</version>
+        <version>0.0.3-SNAPSHOT</version>
     </parent>
     <groupId>org.kuse.payloadbuilder</groupId>
     <artifactId>org.kuse.payloadbuilder.catalog</artifactId>
@@ -43,12 +43,12 @@
         <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
-            <version>3.4.5</version>
+            <version>4.0.3</version>
         </dependency>
         <dependency>
             <groupId>com.microsoft.sqlserver</groupId>
             <artifactId>mssql-jdbc</artifactId>
-            <version>8.4.1.jre8</version>
+            <version>9.4.0.jre8</version>
         </dependency>
         
         <!-- Test -->

@@ -8,10 +8,10 @@ import java.util.Iterator;
 public interface Operator extends DescribableNode
 {
     /** Empty operator */
-    Operator EMPTY_OPERATOR = context -> RowIterator.EMPTY;
+    Operator EMPTY_OPERATOR = context -> TupleIterator.EMPTY;
 
     /** Open iterator */
-    RowIterator open(ExecutionContext context);
+    TupleIterator open(ExecutionContext context);
 
     /**
      * To string with indent. Used when printing operator tree
@@ -24,21 +24,21 @@ public interface Operator extends DescribableNode
     }
 
     /** Definition of a iterator that stream {@link Tuple}'s */
-    public interface RowIterator
+    public interface TupleIterator
     {
-        RowIterator EMPTY = wrap(emptyIterator());
+        TupleIterator EMPTY = wrap(emptyIterator());
 
-        /** Wrap an {@link Iterator} of {@link Tuple} in a {@link RowIterator} */
-        static RowIterator wrap(Iterator<Tuple> iterator)
+        /** Wrap an {@link Iterator} of {@link Tuple} in a {@link TupleIterator} */
+        static TupleIterator wrap(Iterator<Tuple> iterator)
         {
             return wrap(iterator, null);
         }
 
-        /** Wrap an {@link Iterator} of {@link Tuple} in a {@link RowIterator} */
-        static RowIterator wrap(Iterator<Tuple> iterator, Runnable close)
+        /** Wrap an {@link Iterator} of {@link Tuple} in a {@link TupleIterator} */
+        static TupleIterator wrap(Iterator<Tuple> iterator, Runnable close)
         {
             //CSOFF
-            return new RowIterator()
+            return new TupleIterator()
             //CSON
             {
                 @Override
@@ -76,8 +76,8 @@ public interface Operator extends DescribableNode
         }
     }
 
-    /** Extension of {@link RowIterator} that operates over in memory structures */
-    public interface RowList extends RowIterator
+    /** Extension of {@link TupleIterator} that operates over in memory structures */
+    public interface RowList extends TupleIterator
     {
         /** These methods should not be implemented */
         @Override

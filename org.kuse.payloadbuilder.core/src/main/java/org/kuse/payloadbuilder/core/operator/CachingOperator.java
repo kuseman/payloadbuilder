@@ -36,7 +36,7 @@ class CachingOperator extends AOperator
     }
 
     @Override
-    public RowIterator open(ExecutionContext context)
+    public TupleIterator open(ExecutionContext context)
     {
         executionCount++;
 
@@ -45,14 +45,14 @@ class CachingOperator extends AOperator
         if (data.cache == null)
         {
             data.cache = new ArrayList<>();
-            RowIterator it = operator.open(context);
+            TupleIterator it = operator.open(context);
             while (it.hasNext())
             {
                 data.cache.add(it.next());
             }
             it.close();
         }
-        return RowIterator.wrap(data.cache.iterator());
+        return TupleIterator.wrap(data.cache.iterator());
     }
 
     @Override

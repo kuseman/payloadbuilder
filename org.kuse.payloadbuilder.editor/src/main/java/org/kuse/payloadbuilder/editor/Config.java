@@ -1,16 +1,15 @@
 package org.kuse.payloadbuilder.editor;
 
 import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.groupingBy;
 
 import java.io.File;
 import java.lang.reflect.Constructor;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -67,31 +66,41 @@ class Config
             return;
         }
 
-        Map<String, List<Catalog>> catalogsByJar = catalogs.stream().collect(groupingBy(Catalog::getJar));
+        Map<String, URLClassLoader> classLoaderByJar = new HashMap<>();
 
-        for (Entry<String, List<Config.Catalog>> entry : catalogsByJar.entrySet())
+        int size = catalogs.size();
+        for (int i = size - 1; i >= 0; i--)
         {
+            Catalog catalog = catalogs.get(i);
             try
             {
-                URL jar = new File(entry.getKey()).toURI().toURL();
-                @SuppressWarnings("resource")
-                // Should not be closed, otherwise catalogs cannot instantiate new classes
-                URLClassLoader cl = new URLClassLoader(new URL[] {jar}, getClass().getClassLoader());
-                for (Config.Catalog catalog : entry.getValue())
+                URLClassLoader cl = classLoaderByJar.get(catalog.getJar());
+                if (cl == null)
                 {
-                    Class<?> clazz = cl.loadClass(catalog.getClassName());
-                    if (ICatalogExtension.class.isAssignableFrom(clazz))
-                    {
-                        Constructor<?> ctor = clazz.getDeclaredConstructors()[0];
-                        ctor.setAccessible(true);
-                        catalog.setCatalogExtension((ICatalogExtension) ctor.newInstance());
-                    }
+                    URL jar = new File(catalog.getJar()).toURI().toURL();
+                    cl = new URLClassLoader(new URL[] {jar}, getClass().getClassLoader());
+                    classLoaderByJar.put(catalog.getJar(), cl);
+                }
+
+                Class<?> clazz = cl.loadClass(catalog.getClassName());
+                if (ICatalogExtension.class.isAssignableFrom(clazz))
+                {
+                    Constructor<?> ctor = clazz.getDeclaredConstructors()[0];
+                    ctor.setAccessible(true);
+                    catalog.setCatalogExtension((ICatalogExtension) ctor.newInstance());
+                }
+                else
+                {
+                    System.err.println("Class: " + clazz + " does not implement " + ICatalogExtension.class);
                 }
             }
             catch (Exception e)
             {
+                // Remove bad catalog
+                catalogs.remove(i);
+
                 // TODO: log bus
-                throw new RuntimeException("Cannot instansiate extensions from jar: " + entry.getKey(), e);
+                System.err.println("Cannot instantiate extensions from jar: " + catalog.getJar() + ", exception: " + e);
             }
         }
     }

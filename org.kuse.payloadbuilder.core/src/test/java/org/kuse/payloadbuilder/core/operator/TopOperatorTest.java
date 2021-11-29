@@ -5,7 +5,7 @@ import java.util.stream.IntStream;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.LiteralExpression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -25,7 +25,7 @@ public class TopOperatorTest extends AOperatorTest
                 target,
                 LiteralExpression.createLiteralNumericExpression("4"));
 
-        RowIterator it = operator.open(new ExecutionContext(session));
+        TupleIterator it = operator.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {

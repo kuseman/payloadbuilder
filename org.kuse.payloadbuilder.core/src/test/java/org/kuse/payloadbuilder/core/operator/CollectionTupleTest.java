@@ -2,7 +2,7 @@ package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Arrays.asList;
 
-import org.apache.commons.collections.IteratorUtils;
+import org.apache.commons.collections4.IteratorUtils;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.operator.CompositeTupleTest.TestTuple;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;

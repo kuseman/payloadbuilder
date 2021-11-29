@@ -4,7 +4,7 @@ import java.util.stream.IntStream;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.LiteralExpression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -21,7 +21,7 @@ public class BatchLimitOperatorTest extends AOperatorTest
         Operator limitOp = new BatchLimitOperator(0, op, LiteralExpression.create(5));
 
         ExecutionContext ctx = new ExecutionContext(session);
-        RowIterator it = limitOp.open(ctx);
+        TupleIterator it = limitOp.open(ctx);
 
         int count = 0;
         while (it.hasNext())

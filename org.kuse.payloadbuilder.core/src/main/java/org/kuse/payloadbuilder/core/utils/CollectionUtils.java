@@ -9,10 +9,10 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
-import org.apache.commons.collections.iterators.ArrayIterator;
-import org.apache.commons.collections.iterators.EnumerationIterator;
-import org.apache.commons.collections.iterators.ObjectArrayIterator;
-import org.apache.commons.collections.iterators.SingletonIterator;
+import org.apache.commons.collections4.iterators.ArrayIterator;
+import org.apache.commons.collections4.iterators.EnumerationIterator;
+import org.apache.commons.collections4.iterators.ObjectArrayIterator;
+import org.apache.commons.collections4.iterators.SingletonIterator;
 
 /** Collection utils */
 public final class CollectionUtils

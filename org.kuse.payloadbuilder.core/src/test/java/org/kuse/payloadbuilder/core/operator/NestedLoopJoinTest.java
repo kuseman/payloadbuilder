@@ -11,7 +11,7 @@ import org.apache.commons.lang3.mutable.MutableInt;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
-import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
 
@@ -71,7 +71,7 @@ public class NestedLoopJoinTest extends AOperatorTest
         int[] tableCPos = new int[] {400, 500};
 
         int count = 0;
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         while (it.hasNext())
         {
             Tuple tuple = it.next();
@@ -108,7 +108,7 @@ public class NestedLoopJoinTest extends AOperatorTest
 
         assertTrue("A nested loop should have been constructed", op instanceof NestedLoopJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
 
         int[] tableAPos = new int[] {0, 0, 1, 1, 2, 2, 3, 3};
         int[] tableBPos = new int[] {0, 1, 0, 1, 0, 1, 0, 1};
@@ -146,7 +146,7 @@ public class NestedLoopJoinTest extends AOperatorTest
 
         assertTrue("A nested loop should have been constructed", op instanceof NestedLoopJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
 
         int count = 0;
         while (it.hasNext())
@@ -183,7 +183,7 @@ public class NestedLoopJoinTest extends AOperatorTest
 
         assertTrue("A nested loop should have been constructed", op instanceof NestedLoopJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {
@@ -220,7 +220,7 @@ public class NestedLoopJoinTest extends AOperatorTest
 
         assertTrue("A nested loop should have been constructed", op instanceof NestedLoopJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
 
         Integer[] tableAPos = new Integer[] {0, 0, 1, 2, 2, 3};
         Integer[] tableBPos = new Integer[] {0, 1, null, 0, 1, null};
@@ -263,7 +263,7 @@ public class NestedLoopJoinTest extends AOperatorTest
 
         assertTrue("A nested loop should have been constructed", op instanceof NestedLoopJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {
@@ -304,9 +304,9 @@ public class NestedLoopJoinTest extends AOperatorTest
         }
 
         @Override
-        public RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
+        public TupleIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
         {
-            return RowIterator.wrap(IntStream.range(0, to).mapToObj(i -> (Tuple) Row.of(tableAlias, i, new String[] { "Value" }, new Object[] {i + 1})).iterator());
+            return TupleIterator.wrap(IntStream.range(0, to).mapToObj(i -> (Tuple) Row.of(tableAlias, i, new String[] { "Value" }, new Object[] {i + 1})).iterator());
         }
     }
 }

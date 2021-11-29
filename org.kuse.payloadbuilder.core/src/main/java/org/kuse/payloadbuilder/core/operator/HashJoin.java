@@ -102,7 +102,7 @@ class HashJoin extends AOperator
     }
 
     @Override
-    public RowIterator open(ExecutionContext context)
+    public TupleIterator open(ExecutionContext context)
     {
         Tuple contextOuter = context.getStatementContext().getTuple();
         JoinTuple joinTuple = new JoinTuple(contextOuter);
@@ -110,11 +110,11 @@ class HashJoin extends AOperator
         Map<IntKey, List<TupleHolder>> table = hash(context, joinTuple, data);
         if (table.isEmpty())
         {
-            return RowIterator.EMPTY;
+            return TupleIterator.EMPTY;
         }
 
         boolean markOuterRows = populating || emitEmptyOuterRows;
-        RowIterator probeIterator = probeIterator(joinTuple, table, context, data, markOuterRows);
+        TupleIterator probeIterator = probeIterator(joinTuple, table, context, data, markOuterRows);
 
         if (populating)
         {
@@ -136,13 +136,13 @@ class HashJoin extends AOperator
         // 1. Probe matched rows
         // 2. Probe non matched rows from table
 
-        final RowIterator it1 = probeIterator;
-        final RowIterator it2 = tableIterator(table, TableIteratorType.NON_MATCHED);
+        final TupleIterator it1 = probeIterator;
+        final TupleIterator it2 = tableIterator(table, TableIteratorType.NON_MATCHED);
         //CSOFF
-        return new RowIterator()
+        return new TupleIterator()
         //CSON
         {
-            RowIterator current = it1;
+            TupleIterator current = it1;
             Tuple next;
 
             @Override
@@ -192,7 +192,7 @@ class HashJoin extends AOperator
     {
         IntKey key = new IntKey();
         Map<IntKey, List<TupleHolder>> table = new LinkedHashMap<>();
-        RowIterator oi = outer.open(context);
+        TupleIterator oi = outer.open(context);
         while (oi.hasNext())
         {
             Tuple tuple = oi.next();
@@ -226,16 +226,16 @@ class HashJoin extends AOperator
         return table;
     }
 
-    private RowIterator probeIterator(
+    private TupleIterator probeIterator(
             JoinTuple joinTuple,
             Map<IntKey, List<TupleHolder>> table,
             ExecutionContext context,
             Data data,
             boolean markOuterRows)
     {
-        final RowIterator ii = inner.open(context);
+        final TupleIterator ii = inner.open(context);
         //CSOFF
-        return new RowIterator()
+        return new TupleIterator()
         //CSON
         {
             private Tuple next;
@@ -327,13 +327,13 @@ class HashJoin extends AOperator
         };
     }
 
-    private RowIterator tableIterator(
+    private TupleIterator tableIterator(
             Map<IntKey, List<TupleHolder>> table,
             TableIteratorType type)
     {
         final Iterator<List<TupleHolder>> tableIt = table.values().iterator();
         //CSOFF
-        return new RowIterator()
+        return new TupleIterator()
         //CSON
         {
             private Tuple next;

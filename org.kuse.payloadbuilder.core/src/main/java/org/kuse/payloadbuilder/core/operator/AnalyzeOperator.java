@@ -93,7 +93,7 @@ class AnalyzeOperator extends AOperator
     }
 
     @Override
-    public RowIterator open(ExecutionContext context)
+    public TupleIterator open(ExecutionContext context)
     {
         final AnalyzeData data = context.getStatementContext().getOrCreateNodeData(nodeId, AnalyzeData::new);
         data.increaseExecutionCount();
@@ -104,7 +104,7 @@ class AnalyzeOperator extends AOperator
         }
 
         data.resumeNodeTime();
-        final RowIterator it = target.open(context);
+        final TupleIterator it = target.open(context);
         data.suspenNodeTime();
 
         data.iterator.it = it;
@@ -114,10 +114,10 @@ class AnalyzeOperator extends AOperator
     }
 
     /** Analyze iterator */
-    private static class AnalyzeIterator implements RowIterator
+    private static class AnalyzeIterator implements TupleIterator
     {
         private final NodeData data;
-        private RowIterator it;
+        private TupleIterator it;
         private int index;
 
         AnalyzeIterator(NodeData data)

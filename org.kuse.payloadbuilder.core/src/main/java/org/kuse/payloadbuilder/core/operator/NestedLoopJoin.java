@@ -80,20 +80,20 @@ class NestedLoopJoin extends AOperator
     }
 
     @Override
-    public RowIterator open(ExecutionContext context)
+    public TupleIterator open(ExecutionContext context)
     {
         final Data data = context.getStatementContext().getOrCreateNodeData(nodeId, Data::new);
         final Tuple contextParent = context.getStatementContext().getTuple();
         final JoinTuple joinTuple = new JoinTuple(contextParent);
-        final RowIterator it = outer.open(context);
+        final TupleIterator it = outer.open(context);
         //CSOFF
-        return new RowIterator()
+        return new TupleIterator()
         //CSON
         {
             /** Single instance to avoid allocations */
             private Tuple next;
             private Tuple currentOuter;
-            private RowIterator ii;
+            private TupleIterator ii;
             private boolean hit;
 
             @Override

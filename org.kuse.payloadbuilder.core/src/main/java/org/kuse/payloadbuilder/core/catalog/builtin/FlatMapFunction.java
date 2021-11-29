@@ -8,8 +8,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.commons.collections.Transformer;
-import org.apache.commons.collections.iterators.ObjectGraphIterator;
+import org.apache.commons.collections4.Transformer;
+import org.apache.commons.collections4.iterators.ObjectGraphIterator;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.LambdaFunction;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
@@ -66,9 +66,9 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
         }
         LambdaExpression le = (LambdaExpression) arguments.get(1);
         int lambdaId = le.getLambdaIds()[0];
-        return new ObjectGraphIterator(CollectionUtils.getIterator(argResult),
+        return new ObjectGraphIterator<>(CollectionUtils.getIterator(argResult),
                 //CSOFF
-                new Transformer()
+                new Transformer<Object, Object>()
                 //CSON
                 {
                     private Iterator<Object> it;

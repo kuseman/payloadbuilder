@@ -65,10 +65,10 @@ class GroupByOperator extends AOperator
     }
 
     @Override
-    public RowIterator open(ExecutionContext context)
+    public TupleIterator open(ExecutionContext context)
     {
         Map<IIndexValues, List<Tuple>> table = new LinkedHashMap<>();
-        RowIterator it = operator.open(context);
+        TupleIterator it = operator.open(context);
         while (it.hasNext())
         {
             Tuple tuple = it.next();
@@ -99,7 +99,7 @@ class GroupByOperator extends AOperator
 
         final Iterator<List<Tuple>> iterator = table.values().iterator();
         //CSOFF
-        return new RowIterator()
+        return new TupleIterator()
         //CSON
         {
             TIntObjectMap<TIntSet> groupByOrdinals;

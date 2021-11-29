@@ -141,14 +141,14 @@ class BatchHashJoin extends AOperator
     //CSOFF
     @Override
     //CSON
-    public RowIterator open(ExecutionContext context)
+    public TupleIterator open(ExecutionContext context)
     {
         final JoinTuple joinTuple = new JoinTuple(context.getStatementContext().getTuple());
         final Data data = context.getStatementContext().getOrCreateNodeData(nodeId, Data::new);
-        final RowIterator outerIt = outer.open(context);
+        final TupleIterator outerIt = outer.open(context);
         final int batchSize = getBatchSize(context);
         //CSOFF
-        return new RowIterator()
+        return new TupleIterator()
         //CSON
         {
             /** Batched rows */
@@ -390,7 +390,7 @@ class BatchHashJoin extends AOperator
                 }
 
                 context.getStatementContext().setOuterIndexValues(outerValuesIterator);
-                RowIterator it = inner.open(context);
+                TupleIterator it = inner.open(context);
 
                 joinTuple.setOuter(null);
                 boolean tuplesFetched = false;

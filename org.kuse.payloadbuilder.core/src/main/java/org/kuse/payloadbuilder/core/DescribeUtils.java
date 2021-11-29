@@ -127,9 +127,9 @@ public class DescribeUtils
         Operator describeOperator = new Operator()
         {
             @Override
-            public RowIterator open(ExecutionContext context)
+            public TupleIterator open(ExecutionContext context)
             {
-                return RowIterator.wrap(rows.iterator());
+                return TupleIterator.wrap(rows.iterator());
             }
 
             @Override

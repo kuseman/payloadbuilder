@@ -10,7 +10,7 @@ import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.catalog.TableMeta;
 import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
-import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.Expression;
@@ -31,7 +31,7 @@ class RangeFunction extends TableFunctionInfo
     }
 
     @Override
-    public RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
+    public TupleIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
     {
         int from = 0;
         int to = -1;
@@ -51,7 +51,7 @@ class RangeFunction extends TableFunctionInfo
         final int stop = to;
 
         //CSOFF
-        return new RowIterator()
+        return new TupleIterator()
         //CSON
         {
             int pos = start;

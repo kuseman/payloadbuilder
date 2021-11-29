@@ -10,7 +10,7 @@ import java.util.stream.StreamSupport;
 
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
-import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.OperatorBuilder.BuildResult;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.parser.AParserTest;
@@ -24,7 +24,7 @@ public class AOperatorTest extends AParserTest
         return StreamSupport.stream(iterable.spliterator(), false);
     }
 
-    protected Operator op1(final Function<ExecutionContext, RowIterator> it)
+    protected Operator op1(final Function<ExecutionContext, TupleIterator> it)
     {
         return op1(it, null);
     }
@@ -36,7 +36,7 @@ public class AOperatorTest extends AParserTest
 
     protected Operator op(final Function<ExecutionContext, Iterator<Tuple>> itFunc, Runnable closeAction)
     {
-        return op1(ctx -> new RowIterator()
+        return op1(ctx -> new TupleIterator()
         {
             Iterator<Tuple> it = itFunc.apply(ctx);
             @Override
@@ -53,15 +53,15 @@ public class AOperatorTest extends AParserTest
         }, closeAction);
     }
 
-    protected Operator op1(final Function<ExecutionContext, RowIterator> itFunc, Runnable closeAction)
+    protected Operator op1(final Function<ExecutionContext, TupleIterator> itFunc, Runnable closeAction)
     {
         return new Operator()
         {
             @Override
-            public RowIterator open(ExecutionContext context)
+            public TupleIterator open(ExecutionContext context)
             {
-                final RowIterator it = itFunc.apply(context);
-                return new RowIterator()
+                final TupleIterator it = itFunc.apply(context);
+                return new TupleIterator()
                 {
                     @Override
                     public Tuple next()
@@ -131,9 +131,9 @@ public class AOperatorTest extends AParserTest
                     }
 
                     @Override
-                    public RowIterator open(ExecutionContext context)
+                    public TupleIterator open(ExecutionContext context)
                     {
-                        return RowIterator.EMPTY;
+                        return TupleIterator.EMPTY;
                     }
 
                     @Override

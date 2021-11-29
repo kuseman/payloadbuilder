@@ -46,7 +46,7 @@ class BatchRepeatOperator extends AOperator
     }
 
     @Override
-    public RowIterator open(ExecutionContext context)
+    public TupleIterator open(ExecutionContext context)
     {
         // TODO: parallellism
         // Split up into tasks that put rows into queue
@@ -54,10 +54,10 @@ class BatchRepeatOperator extends AOperator
         // poll from queue and before each poll check if all tasks iterators are complete
 
         //CSOFF
-        return new RowIterator()
+        return new TupleIterator()
         //CSON
         {
-            private RowIterator it;
+            private TupleIterator it;
             private Tuple next;
 
             @Override

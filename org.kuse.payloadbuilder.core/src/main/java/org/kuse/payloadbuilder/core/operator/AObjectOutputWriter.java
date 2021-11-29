@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Stack;
 
-import org.apache.commons.collections.IteratorUtils;
+import org.apache.commons.collections4.IteratorUtils;
 import org.kuse.payloadbuilder.core.OutputWriter;
 
 import com.fasterxml.jackson.annotation.JsonCreator;

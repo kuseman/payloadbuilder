@@ -50,7 +50,7 @@ class TableFunctionOperator extends AOperator
     }
 
     @Override
-    public RowIterator open(ExecutionContext context)
+    public TupleIterator open(ExecutionContext context)
     {
         return functionInfo.open(context, catalogAlias, tableAlias, arguments);
     }

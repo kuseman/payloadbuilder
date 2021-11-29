@@ -6,12 +6,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.IntStream;
 
-import org.apache.commons.collections.IteratorUtils;
+import org.apache.commons.collections4.IteratorUtils;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.TableMeta;
 import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
-import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -33,7 +33,7 @@ public class GroupByOperatorTest extends AOperatorTest
         List<Expression> groupBys = asList(e("a.col2", alias));
         Operator gop = OperatorBuilderUtils.createGroupBy(0, groupBys, new ExpressionIndexValuesFactory(groupBys), op);
 
-        RowIterator it = gop.open(new ExecutionContext(session));
+        TupleIterator it = gop.open(new ExecutionContext(session));
 
         List<Object> expected = asList(
                 asList(0, 2, 4, 6, 8),

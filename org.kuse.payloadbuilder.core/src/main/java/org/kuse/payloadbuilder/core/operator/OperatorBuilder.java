@@ -3,7 +3,7 @@ package org.kuse.payloadbuilder.core.operator;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.toSet;
-import static org.apache.commons.collections.CollectionUtils.containsAny;
+import static org.apache.commons.collections4.CollectionUtils.containsAny;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
 import static org.kuse.payloadbuilder.core.operator.OperatorBuilderUtils.createGroupBy;
@@ -829,7 +829,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             // let the inner utilize each nested loops outer rows index values
             else if (hasIndex)
             {
-                inner = context.wrap(new OuterValuesOperator(context.acquireNodeId(), inner, foundation.outerValueExpressions));
+                IIndexValuesFactory outerIndexValuesFactory = createIndexVauesFactory(context.session, foundation.outerValueExpressions);
+                inner = context.wrap(new OuterValuesOperator(context.acquireNodeId(), inner, outerIndexValuesFactory));
             }
 
             return new NestedLoopJoin(
@@ -1289,6 +1290,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     private static class NoOpOperator extends AOperator
     {
         private static final NoOpRowList ROW_LIST = new NoOpRowList();
+
         private NoOpOperator(int nodeId)
         {
             super(nodeId);
@@ -1301,7 +1303,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         }
 
         @Override
-        public RowIterator open(ExecutionContext context)
+        public TupleIterator open(ExecutionContext context)
         {
             return ROW_LIST;
         }

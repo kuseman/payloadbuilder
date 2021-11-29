@@ -8,7 +8,7 @@ import java.util.stream.IntStream;
 
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
 
 /** Test {@link HashJoin} */
@@ -27,7 +27,7 @@ public class HashJoinTest extends AOperatorTest
                 new DefaultTupleMerger(-1, 1, 2),
                 false,
                 false);
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         assertFalse(it.hasNext());
     }
 
@@ -49,7 +49,7 @@ public class HashJoinTest extends AOperatorTest
 
         assertTrue("A hash join should have been constructed", op instanceof HashJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
 
         int[] tableAPos = new int[] {1, 2, 3, 4, 5};
         int[] tableBPos = new int[] {1, 2, 3, 4, 5};
@@ -123,7 +123,7 @@ public class HashJoinTest extends AOperatorTest
         int[] tableCPos = new int[] {400, 500};
 
         int count = 0;
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         while (it.hasNext())
         {
             Tuple tuple = it.next();
@@ -161,7 +161,7 @@ public class HashJoinTest extends AOperatorTest
 
         assertTrue("A hash join should have been constructed", op instanceof HashJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {
@@ -200,7 +200,7 @@ public class HashJoinTest extends AOperatorTest
 
         assertTrue("A hash join should have been constructed", op instanceof HashJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
 
         Integer[] tableAPos = new Integer[] {5, 6, 7, 8, 9, 0, 1, 2, 3, 4};
         Integer[] tableBPos = new Integer[] {5, 6, 7, 8, 9, null, null, null, null, null};
@@ -243,7 +243,7 @@ public class HashJoinTest extends AOperatorTest
 
         assertTrue("A hash join should have been constructed", op instanceof HashJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
 
         int[][] tableBPos = new int[][] {
                 new int[] {4, 9},

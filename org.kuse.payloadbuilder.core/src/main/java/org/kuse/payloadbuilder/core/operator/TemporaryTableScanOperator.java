@@ -27,7 +27,7 @@ public class TemporaryTableScanOperator extends AOperator
     }
 
     @Override
-    public RowIterator open(ExecutionContext context)
+    public TupleIterator open(ExecutionContext context)
     {
         TemporaryTable temporaryTable = context.getSession().getTemporaryTable(table.getTable());
         if (table == null)
@@ -35,7 +35,7 @@ public class TemporaryTableScanOperator extends AOperator
             throw new OperatorException("Data for temporary table " + table.getTable() + " could not be found");
         }
         final Iterator<TemporaryTable.Row> it = temporaryTable.getRows().iterator();
-        return new RowIterator()
+        return new TupleIterator()
         {
             @Override
             public Tuple next()

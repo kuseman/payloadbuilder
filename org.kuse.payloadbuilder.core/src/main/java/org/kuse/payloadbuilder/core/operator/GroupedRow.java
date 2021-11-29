@@ -1,7 +1,7 @@
 package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Objects.requireNonNull;
-import static org.apache.commons.collections.CollectionUtils.isEmpty;
+import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 
 import java.util.AbstractList;
 import java.util.ArrayList;

@@ -78,7 +78,7 @@ class BatchParallelismOperator extends AOperator
         nodeData.batch = outerBatch;
         EXECUTOR.submit(() ->
         {
-            RowIterator it = inner.open(childContext);
+            TupleIterator it = inner.open(childContext);
             while (it.hasNext())
             {
                 if (abort.get())
@@ -102,14 +102,14 @@ class BatchParallelismOperator extends AOperator
     }
 
     @Override
-    public RowIterator open(final ExecutionContext context)
+    public TupleIterator open(final ExecutionContext context)
     {
         final ArrayBlockingQueue<Tuple> queue = new ArrayBlockingQueue<>(1000);
         final AtomicInteger latch = new AtomicInteger();
         final AtomicBoolean abort = new AtomicBoolean();
         final List<ExecutionContext> childContexts = new ArrayList<>();
         List<Tuple> batch = new ArrayList<>(batchSize);
-        RowIterator it = outer.open(context);
+        TupleIterator it = outer.open(context);
         while (it.hasNext())
         {
             batch.add(it.next());
@@ -123,7 +123,7 @@ class BatchParallelismOperator extends AOperator
         it.close();
 
         //CSOFF
-        return new RowIterator()
+        return new TupleIterator()
         //CSON
         {
             @Override
@@ -182,10 +182,10 @@ class BatchParallelismOperator extends AOperator
         }
 
         @Override
-        public RowIterator open(ExecutionContext context)
+        public TupleIterator open(ExecutionContext context)
         {
             final BatchParallelismNodeData data = context.getStatementContext().getNodeData(nodeId);
-            return new RowIterator()
+            return new TupleIterator()
             {
                 int index;
 

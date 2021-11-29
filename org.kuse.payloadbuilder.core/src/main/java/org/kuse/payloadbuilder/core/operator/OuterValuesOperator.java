@@ -8,9 +8,9 @@ import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.collections.iterators.SingletonIterator;
+import org.apache.commons.collections4.iterators.SingletonIterator;
 import org.apache.commons.lang3.StringUtils;
-import org.kuse.payloadbuilder.core.parser.Expression;
+import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory.IIndexValues;
 
 /**
  * Operator used for index access in child operator. Ie.used in FROM operator with index access in where condition
@@ -18,13 +18,13 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 class OuterValuesOperator extends AOperator
 {
     private final Operator operator;
-    private final List<Expression> valueExpressions;
+    private final IIndexValuesFactory indexValuesFactory;
 
-    OuterValuesOperator(int nodeId, Operator operator, List<Expression> valueExpressions)
+    OuterValuesOperator(int nodeId, Operator operator, IIndexValuesFactory indexValuesFactory)
     {
         super(nodeId);
         this.operator = requireNonNull(operator, "operator");
-        this.valueExpressions = requireNonNull(valueExpressions, "valueExpressions");
+        this.indexValuesFactory = requireNonNull(indexValuesFactory, "indexValuesFactory");
     }
 
     @Override
@@ -36,7 +36,7 @@ class OuterValuesOperator extends AOperator
     @Override
     public Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
-        return ofEntries(entry("Values", valueExpressions.toString()));
+        return ofEntries(entry("Values", indexValuesFactory.toString()));
     }
 
     @Override
@@ -45,19 +45,11 @@ class OuterValuesOperator extends AOperator
         return singletonList(operator);
     }
 
-    @SuppressWarnings("unchecked")
     @Override
-    public RowIterator open(ExecutionContext context)
+    public TupleIterator open(ExecutionContext context)
     {
-        int size = valueExpressions.size();
-        Object[] outerValues = new Object[size];
-
-        for (int i = 0; i < size; i++)
-        {
-            outerValues[i] = valueExpressions.get(i).eval(context);
-        }
-
-        context.getStatementContext().setOuterIndexValues(new SingletonIterator(outerValues));
+        IIndexValues indexValues = indexValuesFactory.create(context, context.getStatementContext().getTuple());
+        context.getStatementContext().setOuterIndexValues(new SingletonIterator<>(indexValues));
         return operator.open(context);
     }
 
@@ -74,7 +66,7 @@ class OuterValuesOperator extends AOperator
         {
             OuterValuesOperator that = (OuterValuesOperator) obj;
             return operator.equals(that.operator)
-                && valueExpressions.equals(that.valueExpressions);
+                && indexValuesFactory.equals(that.indexValuesFactory);
         }
         return false;
     }
@@ -83,7 +75,7 @@ class OuterValuesOperator extends AOperator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        String desc = String.format("OUTER VALUES (ID: %d, OUTER VALUES: %s", nodeId, valueExpressions);
+        String desc = String.format("OUTER VALUES (ID: %d, OUTER VALUES: %s", nodeId, indexValuesFactory);
         return desc + System.lineSeparator()
             +
             indentString + operator.toString(indent + 1);

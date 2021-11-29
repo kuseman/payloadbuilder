@@ -4,7 +4,7 @@ import static java.util.Arrays.asList;
 
 import java.util.Iterator;
 
-import org.apache.commons.collections.IteratorUtils;
+import org.apache.commons.collections4.IteratorUtils;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.operator.CompositeTupleTest.TestTuple;
 

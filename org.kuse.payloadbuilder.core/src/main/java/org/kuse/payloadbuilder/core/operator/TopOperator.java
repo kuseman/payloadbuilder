@@ -41,7 +41,7 @@ class TopOperator extends AOperator
     }
 
     @Override
-    public RowIterator open(ExecutionContext context)
+    public TupleIterator open(ExecutionContext context)
     {
         Object obj = topExpression.eval(context);
         if (!(obj instanceof Integer) || (Integer) obj < 0)
@@ -49,10 +49,10 @@ class TopOperator extends AOperator
             throw new OperatorException("Top expression " + topExpression + " should return a zero or positive Integer. Got: " + obj);
         }
         final int top = ((Integer) obj).intValue();
-        final RowIterator it = target.open(context);
+        final TupleIterator it = target.open(context);
         final RowList list = it instanceof RowList ? (RowList) it : null;
         //CSOFF
-        return new RowIterator()
+        return new TupleIterator()
         //CSON
         {
             private int count;

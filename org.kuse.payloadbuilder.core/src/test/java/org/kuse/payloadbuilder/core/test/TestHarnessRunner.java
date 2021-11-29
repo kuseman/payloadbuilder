@@ -296,11 +296,11 @@ public class TestHarnessRunner
         }
 
         @Override
-        public RowIterator open(ExecutionContext context)
+        public TupleIterator open(ExecutionContext context)
         {
             final Iterator<Object[]> it = table.getRows().iterator();
             final String[] columns = table.getColumns().toArray(ArrayUtils.EMPTY_STRING_ARRAY);
-            return new RowIterator()
+            return new TupleIterator()
             {
                 private int pos;
 

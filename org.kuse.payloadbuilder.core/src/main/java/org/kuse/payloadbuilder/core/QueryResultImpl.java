@@ -23,7 +23,7 @@ import org.kuse.payloadbuilder.core.operator.AObjectOutputWriter;
 import org.kuse.payloadbuilder.core.operator.AObjectOutputWriter.ColumnValue;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.Operator;
-import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.Operator.RowList;
 import org.kuse.payloadbuilder.core.operator.OperatorBuilder;
 import org.kuse.payloadbuilder.core.operator.OperatorBuilder.BuildResult;
@@ -395,7 +395,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         int rowCount = 0;
         StatementContext statementContext = context.getStatementContext();
 
-        RowIterator iterator = null;
+        TupleIterator iterator = null;
         try
         {
             iterator = operator.open(context);
@@ -483,7 +483,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     //CSON
     {
         int rowCount = 0;
-        RowIterator iterator = null;
+        TupleIterator iterator = null;
         StatementContext statementContext = context.getStatementContext();
         try
         {

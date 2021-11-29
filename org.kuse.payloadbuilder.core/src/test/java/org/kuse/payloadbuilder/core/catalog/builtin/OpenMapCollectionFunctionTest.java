@@ -8,7 +8,7 @@ import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.operator.AOperatorTest;
 import org.kuse.payloadbuilder.core.operator.Operator;
-import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 
 /** Test {@link OpenMapCollectionFunction} */
@@ -26,7 +26,7 @@ public class OpenMapCollectionFunctionTest extends AOperatorTest
                         ofEntries(true, entry("key", 11), entry("count", 15), entry("id", "value"))))))));
 
         int count = 0;
-        RowIterator it = op.open(context);
+        TupleIterator it = op.open(context);
         while (it.hasNext())
         {
             Tuple tuple = it.next();

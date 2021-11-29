@@ -9,7 +9,7 @@ import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.TableMeta;
 import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
-import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
@@ -32,7 +32,7 @@ public class ComputedColumnsOperatorTest extends AOperatorTest
                 asList("newCol"),
                 asList(e("concat('v-', col1)")));
 
-        RowIterator it = operator.open(new ExecutionContext(session));
+        TupleIterator it = operator.open(new ExecutionContext(session));
         while (it.hasNext())
         {
             Tuple tuple = it.next();

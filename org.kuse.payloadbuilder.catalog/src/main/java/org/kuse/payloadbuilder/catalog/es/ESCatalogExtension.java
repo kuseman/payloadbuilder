@@ -13,6 +13,7 @@ import java.awt.Insets;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -34,9 +35,11 @@ import javax.swing.SwingUtilities;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.http.HttpEntity;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.util.EntityUtils;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.editor.AutoCompletionComboBox;
@@ -193,17 +196,23 @@ class ESCatalogExtension implements ICatalogExtension
                 List<String> indices = new ArrayList<>();
                 indicesByEndpoint.put(endpoint, indices);
                 HttpGet getIndices = new HttpGet(endpoint + "/_aliases");
+                HttpEntity entity = null;
                 try (CloseableHttpResponse response = CLIENT.execute(getIndices))
                 {
+                    entity = response.getEntity();
                     if (response.getStatusLine().getStatusCode() != HttpStatus.SC_OK)
                     {
-                        throw new RuntimeException("Error query Elastic. " + IOUtils.toString(response.getEntity().getContent()));
+                        throw new RuntimeException("Error query Elastic. " + IOUtils.toString(entity.getContent(), StandardCharsets.UTF_8));
                     }
-                    indices.addAll(MAPPER.readValue(response.getEntity().getContent(), Map.class).keySet());
+                    indices.addAll(MAPPER.readValue(entity.getContent(), Map.class).keySet());
                 }
                 catch (IOException e)
                 {
                     errors.add(new RuntimeException("Error fetching instances from endpont " + endpoint, e));
+                }
+                finally
+                {
+                    EntityUtils.consumeQuietly(entity);
                 }
                 indices.sort((a, b) -> String.CASE_INSENSITIVE_ORDER.compare(a, b));
             }

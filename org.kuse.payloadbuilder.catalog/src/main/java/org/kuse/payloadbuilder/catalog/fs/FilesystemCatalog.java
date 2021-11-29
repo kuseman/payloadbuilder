@@ -2,9 +2,10 @@ package org.kuse.payloadbuilder.catalog.fs;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -13,15 +14,16 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.commons.collections.iterators.SingletonIterator;
+import org.apache.commons.collections4.iterators.SingletonListIterator;
 import org.apache.commons.io.FileUtils;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
-import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
+import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /** Catalog providing file system functionality */
@@ -53,18 +55,17 @@ public class FilesystemCatalog extends Catalog
             super(catalog, "file");
         }
 
-        @SuppressWarnings("unchecked")
         @Override
-        public RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
+        public TupleIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
         {
             Object obj = arguments.get(0).eval(context);
             if (obj == null)
             {
-                return RowIterator.EMPTY;
+                return TupleIterator.EMPTY;
             }
             String strPath = String.valueOf(obj);
             Path path = FileSystems.getDefault().getPath(strPath);
-            return RowIterator.wrap(new SingletonIterator(ListFunction.fromPath(tableAlias, 0, path)));
+            return TupleIterator.wrap(new SingletonListIterator<Tuple>(ListFunction.fromPath(tableAlias, 0, path)));
         }
     }
 
@@ -103,7 +104,7 @@ public class FilesystemCatalog extends Catalog
         private final File file;
         FSFileReader(File file) throws FileNotFoundException
         {
-            super(new FileReader(file));
+            super(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8));
             this.file = file;
         }
 
@@ -131,12 +132,12 @@ public class FilesystemCatalog extends Catalog
         }
 
         @Override
-        public RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
+        public TupleIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
         {
             Object obj = arguments.get(0).eval(context);
             if (obj == null)
             {
-                return RowIterator.EMPTY;
+                return TupleIterator.EMPTY;
             }
             String path = String.valueOf(obj);
             boolean recursive = false;
@@ -147,7 +148,7 @@ public class FilesystemCatalog extends Catalog
 
             final Iterator<Path> it = getIterator(path, recursive);
             //CSOFF
-            return new RowIterator()
+            return new TupleIterator()
             //CSON
             {
                 private int pos;

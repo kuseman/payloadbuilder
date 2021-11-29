@@ -45,10 +45,10 @@ class OrderByOperator extends AOperator
     }
 
     @Override
-    public RowIterator open(ExecutionContext context)
+    public TupleIterator open(ExecutionContext context)
     {
         List<Tuple> tuples = new ArrayList<>();
-        RowIterator it = target.open(context);
+        TupleIterator it = target.open(context);
         if (it instanceof RowList)
         {
             RowList list = (RowList) it;
@@ -68,7 +68,7 @@ class OrderByOperator extends AOperator
         }
         Collections.sort(tuples, (a, b) -> comparator.compare(context, a, b));
         context.getStatementContext().setTuple(null);
-        return RowIterator.wrap(tuples.iterator());
+        return TupleIterator.wrap(tuples.iterator());
     }
 
     @Override

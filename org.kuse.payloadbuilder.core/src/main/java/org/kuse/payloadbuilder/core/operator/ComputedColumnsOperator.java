@@ -53,11 +53,11 @@ class ComputedColumnsOperator extends AOperator
     }
 
     @Override
-    public RowIterator open(ExecutionContext context)
+    public TupleIterator open(ExecutionContext context)
     {
-        final RowIterator it = operator.open(context);
+        final TupleIterator it = operator.open(context);
         //CSOFF
-        return new RowIterator()
+        return new TupleIterator()
         //CSON
         {
             @Override

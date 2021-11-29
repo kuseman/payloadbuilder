@@ -19,7 +19,7 @@ import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.BatchCacheOperatorTest.TestCacheProvider;
 import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory.IIndexValues;
-import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
 
@@ -30,8 +30,8 @@ public class BatchHashJoinTest extends AOperatorTest
     public void test_inner_join_empty_outer()
     {
         Index index = new Index(QualifiedName.of("table"), asList("col"), 1);
-        Operator left = op1(ctx -> RowIterator.EMPTY);
-        Operator right = op1(ctx -> RowIterator.EMPTY);
+        Operator left = op1(ctx -> TupleIterator.EMPTY);
+        Operator right = op1(ctx -> TupleIterator.EMPTY);
 
         BatchHashJoin op = new BatchHashJoin(
                 0,
@@ -70,13 +70,13 @@ public class BatchHashJoinTest extends AOperatorTest
                     {
                         ctx.getStatementContext().getOuterIndexValues().next();
                     }
-                    return RowIterator.EMPTY;
+                    return TupleIterator.EMPTY;
                 }, () -> bClose.increment()))),
                 ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new String[] {"col1"}, new Object[] {i})).iterator(), () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         assertFalse(it.hasNext());
         it.close();
         assertEquals(1, aClose.intValue());
@@ -98,7 +98,7 @@ public class BatchHashJoinTest extends AOperatorTest
         Index index = new Index(QualifiedName.of("table"), asList("col1"), 1);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
-                ofEntries(entry("tableB", a -> op1(ctx -> RowIterator.EMPTY, () -> bClose.increment()))),
+                ofEntries(entry("tableB", a -> op1(ctx -> TupleIterator.EMPTY, () -> bClose.increment()))),
                 ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new String[] {"col1"}, new Object[] {i})).iterator(), () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
@@ -170,7 +170,7 @@ public class BatchHashJoinTest extends AOperatorTest
                         ctx.getStatementContext().getOuterIndexValues().next();
                     }
                     ctx.getStatementContext().getOuterIndexValues().next();
-                    return RowIterator.EMPTY;
+                    return TupleIterator.EMPTY;
                 }, () -> bClose.increment()))),
                 ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new String[] {"col1"}, new Object[] {i})).iterator(), () -> aClose.increment()))));
 
@@ -251,7 +251,7 @@ public class BatchHashJoinTest extends AOperatorTest
         int[] tableCPos = new int[] {12, 17};
 
         int count = 0;
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         while (it.hasNext())
         {
             Tuple tuple = it.next();
@@ -305,7 +305,7 @@ public class BatchHashJoinTest extends AOperatorTest
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
 
         int[] expectedOuterPositions = new int[] {
                 7,          // Batch 1
@@ -390,7 +390,7 @@ public class BatchHashJoinTest extends AOperatorTest
         List<Tuple> innerTuples = new ArrayList<>();
 
         int count = 0;
-        RowIterator it = op.open(context);
+        TupleIterator it = op.open(context);
         while (it.hasNext())
         {
             Tuple tuple = it.next();
@@ -483,7 +483,7 @@ public class BatchHashJoinTest extends AOperatorTest
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
 
         int[] expectedOuterPositions = new int[] {
                 0, 1, 2,    // Batch 1
@@ -546,7 +546,7 @@ public class BatchHashJoinTest extends AOperatorTest
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -608,7 +608,7 @@ public class BatchHashJoinTest extends AOperatorTest
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -678,7 +678,7 @@ public class BatchHashJoinTest extends AOperatorTest
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -742,7 +742,7 @@ public class BatchHashJoinTest extends AOperatorTest
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -820,7 +820,7 @@ public class BatchHashJoinTest extends AOperatorTest
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -911,7 +911,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 12, 13, null, null
         };
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {
@@ -964,7 +964,7 @@ public class BatchHashJoinTest extends AOperatorTest
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -1029,7 +1029,7 @@ public class BatchHashJoinTest extends AOperatorTest
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -1096,7 +1096,7 @@ public class BatchHashJoinTest extends AOperatorTest
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
 
         int[] expectedOuterPositions = new int[] {
                 7,
@@ -1162,7 +1162,7 @@ public class BatchHashJoinTest extends AOperatorTest
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
 
         int[] expectedOuterPositions = new int[] {
                 0, 1,
@@ -1243,7 +1243,7 @@ public class BatchHashJoinTest extends AOperatorTest
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -1314,7 +1314,7 @@ public class BatchHashJoinTest extends AOperatorTest
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {

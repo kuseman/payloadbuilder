@@ -6,6 +6,7 @@ import java.beans.PropertyChangeListener;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -69,7 +70,7 @@ class QueryFileModel
         this.filename = file.getAbsolutePath();
         try
         {
-            query = FileUtils.readFileToString(file);
+            query = FileUtils.readFileToString(file, StandardCharsets.UTF_8);
         }
         catch (IOException e)
         {
@@ -208,7 +209,7 @@ class QueryFileModel
     {
         try
         {
-            FileUtils.write(new File(filename), query);
+            FileUtils.write(new File(filename), query, StandardCharsets.UTF_8);
         }
         catch (IOException e)
         {

@@ -9,6 +9,7 @@ import static org.kuse.payloadbuilder.catalog.es.ESOperator.CLIENT;
 import static org.kuse.payloadbuilder.catalog.es.ESOperator.MAPPER;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -20,9 +21,11 @@ import java.util.Optional;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.http.HttpEntity;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.util.EntityUtils;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.Index;
@@ -70,14 +73,16 @@ public class ESCatalog extends Catalog
         }
 
         HttpGet getMappings = new HttpGet(String.format("%s/%s/_mapping", endpoint, index));
+        HttpEntity entity = null;
         try (CloseableHttpResponse response = CLIENT.execute(getMappings))
         {
+            entity = response.getEntity();
             if (response.getStatusLine().getStatusCode() != HttpStatus.SC_OK)
             {
-                throw new RuntimeException("Error query Elastic for mappings." + IOUtils.toString(response.getEntity().getContent()));
+                throw new RuntimeException("Error query Elastic for mappings." + IOUtils.toString(entity.getContent(), StandardCharsets.UTF_8));
             }
 
-            Map<String, Object> map = MAPPER.readValue(response.getEntity().getContent(), Map.class);
+            Map<String, Object> map = MAPPER.readValue(entity.getContent(), Map.class);
             map = (Map<String, Object>) map.get(index);
             map = (Map<String, Object>) map.get("mappings");
 
@@ -94,6 +99,10 @@ public class ESCatalog extends Catalog
         catch (IOException e)
         {
             throw new RuntimeException("Error querying " + endpoint, e);
+        }
+        finally
+        {
+            EntityUtils.consumeQuietly(entity);
         }
     }
 
@@ -374,14 +383,16 @@ public class ESCatalog extends Catalog
         ESType esType = ESType.of(session, catalogAlias, table);
         final boolean isSingleType = SINGLE_TYPE_TABLE_NAME.equals(esType.type);
         HttpGet getMappings = new HttpGet(String.format("%s/%s/%s_mapping", esType.endpoint, esType.index, isSingleType ? "" : esType.type + "/"));
+        HttpEntity entity = null;
         try (CloseableHttpResponse response = CLIENT.execute(getMappings))
         {
+            entity = response.getEntity();
             if (response.getStatusLine().getStatusCode() != HttpStatus.SC_OK)
             {
                 return emptyMap();
             }
 
-            Map<String, Object> map = MAPPER.readValue(response.getEntity().getContent(), Map.class);
+            Map<String, Object> map = MAPPER.readValue(entity.getContent(), Map.class);
             if (map == null)
             {
                 return emptyMap();
@@ -401,6 +412,10 @@ public class ESCatalog extends Catalog
         catch (IOException e)
         {
             throw new RuntimeException("Error fetching mappings from " + esType.endpoint, e);
+        }
+        finally
+        {
+            EntityUtils.consumeQuietly(entity);
         }
     }
 

@@ -9,7 +9,7 @@ import java.util.Set;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
-import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.Operator.RowList;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Tuple;
@@ -73,12 +73,12 @@ class OpenRowsFunction extends TableFunctionInfo
     }
 
     @Override
-    public RowIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
+    public TupleIterator open(ExecutionContext context, String catalogAlias, TableAlias tableAlias, List<Expression> arguments)
     {
         Object value = arguments.get(0).eval(context);
         if (value == null)
         {
-            return RowIterator.EMPTY;
+            return TupleIterator.EMPTY;
         }
         else if (value instanceof RowList)
         {
@@ -87,7 +87,7 @@ class OpenRowsFunction extends TableFunctionInfo
 
         final Iterator<Object> it = CollectionUtils.getIterator(value);
         //CSOFF
-        return new RowIterator()
+        return new TupleIterator()
         //CSON
         {
             private Tuple next;

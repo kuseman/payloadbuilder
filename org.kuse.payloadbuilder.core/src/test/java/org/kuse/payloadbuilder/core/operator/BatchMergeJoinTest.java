@@ -14,7 +14,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory.IIndexValues;
-import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
@@ -32,8 +32,8 @@ public class BatchMergeJoinTest extends AOperatorTest
     @Test
     public void test_inner_join_empty_outer()
     {
-        Operator left = op1(context -> RowIterator.EMPTY);
-        Operator right = op1(context -> RowIterator.EMPTY);
+        Operator left = op1(context -> TupleIterator.EMPTY);
+        Operator right = op1(context -> TupleIterator.EMPTY);
 
         BatchMergeJoin op = new BatchMergeJoin(
                 0, "",
@@ -61,7 +61,7 @@ public class BatchMergeJoinTest extends AOperatorTest
             {
                 context.getStatementContext().getOuterIndexValues().next();
             }
-            return RowIterator.EMPTY;
+            return TupleIterator.EMPTY;
         });
 
         BatchMergeJoin op = new BatchMergeJoin(
@@ -84,7 +84,7 @@ public class BatchMergeJoinTest extends AOperatorTest
     public void test_bad_implementation_of_inner_operator()
     {
         Operator left = op(context -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new Object[] {i})).iterator());
-        Operator right = op1(context -> RowIterator.EMPTY);
+        Operator right = op1(context -> TupleIterator.EMPTY);
 
         BatchMergeJoin op = new BatchMergeJoin(
                 0, "",
@@ -113,7 +113,7 @@ public class BatchMergeJoinTest extends AOperatorTest
                 context.getStatementContext().getOuterIndexValues().next();
             }
             context.getStatementContext().getOuterIndexValues().next();
-            return RowIterator.EMPTY;
+            return TupleIterator.EMPTY;
         });
 
         BatchMergeJoin op = new BatchMergeJoin(
@@ -165,7 +165,7 @@ public class BatchMergeJoinTest extends AOperatorTest
                 index,
                 3);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
 
         int[] expectedOuterPositions = new int[] {
                 7,
@@ -224,7 +224,7 @@ public class BatchMergeJoinTest extends AOperatorTest
                 index,
                 3);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
 
         int[] expectedOuterPositions = new int[] {
                 0, 1, 2,
@@ -283,7 +283,7 @@ public class BatchMergeJoinTest extends AOperatorTest
                 index,
                 2);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -340,7 +340,7 @@ public class BatchMergeJoinTest extends AOperatorTest
                 index,
                 3);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -406,7 +406,7 @@ public class BatchMergeJoinTest extends AOperatorTest
                 index,
                 5);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -467,7 +467,7 @@ public class BatchMergeJoinTest extends AOperatorTest
                 index,
                 3);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -553,7 +553,7 @@ public class BatchMergeJoinTest extends AOperatorTest
                 8, 8, 9, 9
         };
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {
@@ -623,7 +623,7 @@ public class BatchMergeJoinTest extends AOperatorTest
                 12, 12, 13, 13, null, null
         };
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
         while (it.hasNext())
         {
@@ -670,7 +670,7 @@ public class BatchMergeJoinTest extends AOperatorTest
                 index,
                 3);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -731,7 +731,7 @@ public class BatchMergeJoinTest extends AOperatorTest
                 index,
                 3);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -795,7 +795,7 @@ public class BatchMergeJoinTest extends AOperatorTest
                 index,
                 2);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
 
         int[] expectedOuterPositions = new int[] {
                 7,
@@ -856,7 +856,7 @@ public class BatchMergeJoinTest extends AOperatorTest
                 index,
                 2);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
 
         int[] expectedOuterPositions = new int[] {
                 0, 1,
@@ -930,7 +930,7 @@ public class BatchMergeJoinTest extends AOperatorTest
                 index,
                 3);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {
@@ -999,7 +999,7 @@ public class BatchMergeJoinTest extends AOperatorTest
                 index,
                 3);
 
-        RowIterator it = op.open(new ExecutionContext(session));
+        TupleIterator it = op.open(new ExecutionContext(session));
         int count = 0;
 
         int[] expectedOuterPositions = new int[] {

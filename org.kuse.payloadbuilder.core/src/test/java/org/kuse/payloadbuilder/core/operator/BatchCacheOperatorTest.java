@@ -17,7 +17,7 @@ import org.kuse.payloadbuilder.core.catalog.TableMeta;
 import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.BatchCacheOperator.CacheSettings;
 import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory.IIndexValues;
-import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Test of {@link BatchCacheOperator} */
@@ -34,7 +34,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
         context.getSession().setBatchCacheProvider(new TestCacheProvider());
         new BatchCacheOperator(
                 1,
-                op1(ctx -> RowIterator.EMPTY),
+                op1(ctx -> TupleIterator.EMPTY),
                 new ExpressionIndexValuesFactory(asList(e("a.col"))),
                 new CacheSettings(
                         ctx -> null,
@@ -50,9 +50,9 @@ public class BatchCacheOperatorTest extends AOperatorTest
         Operator downstream = new Operator()
         {
             @Override
-            public RowIterator open(ExecutionContext context)
+            public TupleIterator open(ExecutionContext context)
             {
-                return new RowIterator()
+                return new TupleIterator()
                 {
                     private int pos = -1;
 
@@ -105,7 +105,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
                         new ExpressionIndexValuesFactory.IndexValues(new Object[] {3}),
                         new ExpressionIndexValuesFactory.IndexValues(new Object[] {4})).iterator());
 
-        RowIterator it = op.open(context);
+        TupleIterator it = op.open(context);
         assertEquals(4, cacheProvider.cache.get("test_article").size());
         assertEquals(Duration.of(10, ChronoUnit.MINUTES), cacheProvider.ttl);
         assertTrue(closeCalled.booleanValue());
@@ -129,7 +129,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
         Operator downstream = new Operator()
         {
             @Override
-            public RowIterator open(ExecutionContext context)
+            public TupleIterator open(ExecutionContext context)
             {
                 operatorCalls.increment();
                 // Skip one row
@@ -138,7 +138,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
                 pos.incrementAndGet();
                 context.getStatementContext().getOuterIndexValues().next();
 
-                return new RowIterator()
+                return new TupleIterator()
                 {
                     @Override
                     public Tuple next()
@@ -186,7 +186,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
                         new ExpressionIndexValuesFactory.IndexValues(new Object[] {3}),
                         new ExpressionIndexValuesFactory.IndexValues(new Object[] {4})).iterator());
 
-        RowIterator it = op.open(context);
+        TupleIterator it = op.open(context);
         assertEquals(4, cacheProvider.cache.get("test_article").size());
         assertEquals(Duration.of(10, ChronoUnit.MINUTES), cacheProvider.ttl);
         assertEquals(1, operatorCalls.intValue());
@@ -214,9 +214,9 @@ public class BatchCacheOperatorTest extends AOperatorTest
         Operator downstream = new Operator()
         {
             @Override
-            public RowIterator open(ExecutionContext context)
+            public TupleIterator open(ExecutionContext context)
             {
-                return new RowIterator()
+                return new TupleIterator()
                 {
                     private int pos = -1;
 
@@ -269,7 +269,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
                         new ExpressionIndexValuesFactory.IndexValues(new Object[] {3}),
                         new ExpressionIndexValuesFactory.IndexValues(new Object[] {4})).iterator());
 
-        RowIterator it = op.open(context);
+        TupleIterator it = op.open(context);
         assertEquals(4, cache.size());
 
         // First the cache value, then the 3 down stream tuples
@@ -291,7 +291,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
         Operator downstream = new Operator()
         {
             @Override
-            public RowIterator open(ExecutionContext context)
+            public TupleIterator open(ExecutionContext context)
             {
                 // This should not be called
                 throw new RuntimeException("NONO");
@@ -335,7 +335,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
                         new ExpressionIndexValuesFactory.IndexValues(new Object[] {3}),
                         new ExpressionIndexValuesFactory.IndexValues(new Object[] {4})).iterator());
 
-        RowIterator it = op.open(context);
+        TupleIterator it = op.open(context);
         assertEquals(4, cache.size());
         int[] expectedInnerValues = new int[] {1, 2, 3, 4};
         int count = 0;

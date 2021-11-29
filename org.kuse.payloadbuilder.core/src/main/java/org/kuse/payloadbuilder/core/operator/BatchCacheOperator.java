@@ -104,7 +104,7 @@ class BatchCacheOperator extends AOperator
     }
 
     @Override
-    public RowIterator open(ExecutionContext context)
+    public TupleIterator open(ExecutionContext context)
     {
         BatchCacheProvider cacheProvider = context.getSession().getBatchCacheProvider();
         Duration ttl = null;
@@ -127,12 +127,12 @@ class BatchCacheOperator extends AOperator
 
         QualifiedName cacheName = QualifiedName.of(obj);
         Map<CacheKey, List<Tuple>> cachedValues = cacheProvider.getAll(cacheName, getCacheKeyIterable(context, cacheKey));
-        RowIterator it2 = getAndCache(context, readOnly, cacheProvider, cacheName, cacheKey, ttl, cachedValues);
+        TupleIterator it2 = getAndCache(context, readOnly, cacheProvider, cacheName, cacheKey, ttl, cachedValues);
 
         final Iterator<Entry<CacheKey, List<Tuple>>> it1 = cachedValues.entrySet().iterator();
         //CSOFF
         // Return a row iterator that first iterates cached values and then non cached ones
-        return new RowIterator()
+        return new TupleIterator()
         //CSON
         {
             private boolean cachedIterator = true;
@@ -213,7 +213,7 @@ class BatchCacheOperator extends AOperator
     }
 
     /** Get and cache values from down stream operator */
-    private RowIterator getAndCache(
+    private TupleIterator getAndCache(
             ExecutionContext context,
             boolean readOnly,
             BatchCacheProvider cacheProvider,
@@ -227,11 +227,11 @@ class BatchCacheOperator extends AOperator
         // No values to fetch, everything was present in cache
         if (!outerValuesIterator.hasNext())
         {
-            return RowIterator.EMPTY;
+            return TupleIterator.EMPTY;
         }
         context.getStatementContext().setOuterIndexValues(outerValuesIterator);
 
-        RowIterator it = operator.open(context);
+        TupleIterator it = operator.open(context);
 
         if (readOnly)
         {
@@ -263,7 +263,7 @@ class BatchCacheOperator extends AOperator
 
         final Iterator<Entry<CacheKey, List<Tuple>>> valuesIt = values.entrySet().iterator();
         // CSOFF
-        return new RowIterator()
+        return new TupleIterator()
         // CSON
         {
             Tuple next;
@@ -321,7 +321,7 @@ class BatchCacheOperator extends AOperator
 
     private Map<CacheKey, List<Tuple>> getInnerTuples(
             ExecutionContext context,
-            RowIterator it,
+            TupleIterator it,
             Object cacheKey)
     {
         Map<CacheKey, List<Tuple>> values = new LinkedHashMap<>();

@@ -101,19 +101,19 @@ class BatchMergeJoin extends AOperator
     //CSOFF
     @Override
     //CSON
-    public RowIterator open(ExecutionContext context)
+    public TupleIterator open(ExecutionContext context)
     {
-        final RowIterator outerIt = outer.open(context);
+        final TupleIterator outerIt = outer.open(context);
         final JoinTuple joinTuple = new JoinTuple(context.getStatementContext().getTuple());
         //CSOFF
-        return new RowIterator()
+        return new TupleIterator()
         //CSON
         {
             /** Batched rows */
             private List<TupleHolder> outerRows;
             private int outerIndex;
             private TupleHolder batchedLeftOverRow;
-            private RowIterator innerIt;
+            private TupleIterator innerIt;
 
             /** Reference to outer values iterator to verify that implementations of Operator fully uses the index if specified */
             private Iterator<IIndexValues> outerValuesIterator;

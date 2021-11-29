@@ -45,12 +45,12 @@ class FilterOperator extends AOperator
     }
 
     @Override
-    public RowIterator open(ExecutionContext context)
+    public TupleIterator open(ExecutionContext context)
     {
-        final RowIterator iterator = operator.open(context);
+        final TupleIterator iterator = operator.open(context);
         final RowList list = iterator instanceof RowList ? (RowList) iterator : null;
         //CSOFF
-        return new RowIterator()
+        return new TupleIterator()
         //CSON
         {
             /** Index used when iterator is a {@link RowList} */

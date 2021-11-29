@@ -50,7 +50,7 @@ class BatchLimitOperator extends AOperator
     }
 
     @Override
-    public RowIterator open(ExecutionContext context)
+    public TupleIterator open(ExecutionContext context)
     {
         Data data = context.getStatementContext().getOrCreateNodeData(nodeId, Data::new);
         if (data.iterator == null)
@@ -67,9 +67,9 @@ class BatchLimitOperator extends AOperator
         {
             data.count.setValue(0);
         }
-        RowIterator it = data.iterator;
+        TupleIterator it = data.iterator;
         //CSOFF
-        return new RowIterator()
+        return new TupleIterator()
         //CSON
         {
             @Override
@@ -129,7 +129,7 @@ class BatchLimitOperator extends AOperator
     /** Data for this operator */
     private static class Data extends NodeData implements BatchLimitData
     {
-        RowIterator iterator;
+        TupleIterator iterator;
         MutableInt count = new MutableInt();
         int limit;
 

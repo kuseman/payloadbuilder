@@ -15,7 +15,7 @@ import org.kuse.payloadbuilder.core.operator.DescribableNode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.NoOpTuple;
 import org.kuse.payloadbuilder.core.operator.Operator;
-import org.kuse.payloadbuilder.core.operator.Operator.RowIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.Operator.RowList;
 import org.kuse.payloadbuilder.core.operator.Projection;
 import org.kuse.payloadbuilder.core.operator.Tuple;
@@ -147,7 +147,7 @@ public class SubQueryExpression extends Expression implements DescribableNode
         Tuple contextTuple = context.getStatementContext().getTuple();
         HierarchyTuple hierarchyTuple = null;
 
-        RowIterator it = operator.open(context);
+        TupleIterator it = operator.open(context);
         RowList list = it instanceof RowList ? (RowList) it : null;
         int index = 0;
         boolean complete = list == null
