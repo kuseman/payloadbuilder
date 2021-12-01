@@ -13,7 +13,6 @@ import java.util.function.Consumer;
 
 import javax.swing.BorderFactory;
 import javax.swing.ButtonGroup;
-import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JDialog;
@@ -24,13 +23,10 @@ import javax.swing.JTextField;
 import javax.swing.WindowConstants;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
-import org.kordamp.ikonli.fontawesome.FontAwesome;
-import org.kordamp.ikonli.swing.FontIcon;
 
 /** View for extension */
 class CatalogExtensionView extends JPanel
 {
-    private static final Icon COG = FontIcon.of(FontAwesome.COG);
     private final ICatalogExtension extension;
     private final JTextField tfAlias;
     private final JCheckBox cbEnabled;
@@ -89,7 +85,7 @@ class CatalogExtensionView extends JPanel
         });
         defaultGroup.add(rbDefault);
 
-        btnConfig = new JButton(COG);
+        btnConfig = new JButton(PayloadbuilderEditorView.COG);
         cbEnabled = new JCheckBox();
         cbEnabled.setToolTipText("Enable/disable extension");
         cbEnabled.setSelected(true);

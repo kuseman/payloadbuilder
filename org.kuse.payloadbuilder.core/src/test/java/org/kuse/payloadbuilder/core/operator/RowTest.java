@@ -28,7 +28,7 @@ public class RowTest extends AOperatorTest
 
         assertRow(r1);
         r1o = (Row) r1.optimize(context);
-        assertNotSame(r1,  r1o);
+        assertNotSame(r1, r1o);
         assertRow(r1o);
     }
 
@@ -43,7 +43,7 @@ public class RowTest extends AOperatorTest
         assertEquals(Row.POS_ORDINAL, r1.getColumnOrdinal("__pos"));
         assertEquals("col3", r1.getColumn(2));
         assertEquals("col2", r1.getColumn(1));
-        assertEquals("col1",r1.getColumn(0));
+        assertEquals("col1", r1.getColumn(0));
         assertEquals(3, r1.getValue(2));
         assertEquals(2, r1.getValue(1));
         assertEquals(666, r1.getValue(Row.POS_ORDINAL));

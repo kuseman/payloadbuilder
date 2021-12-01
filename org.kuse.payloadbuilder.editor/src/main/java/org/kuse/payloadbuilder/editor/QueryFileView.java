@@ -9,7 +9,12 @@ import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Point;
+import java.awt.Toolkit;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.DataFlavor;
 import java.awt.event.ActionEvent;
+import java.awt.event.InputEvent;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.IOException;
@@ -26,8 +31,10 @@ import java.util.function.Consumer;
 import javax.swing.AbstractAction;
 import javax.swing.Action;
 import javax.swing.Icon;
+import javax.swing.InputMap;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollBar;
@@ -37,6 +44,7 @@ import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JViewport;
+import javax.swing.KeyStroke;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.Timer;
@@ -47,6 +55,7 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableColumn;
 import javax.swing.text.BadLocationException;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea;
@@ -72,6 +81,7 @@ class QueryFileView extends JPanel
     private static final Icon STICKY_NOTE_O = FontIcon.of(FontAwesome.STICKY_NOTE_O);
     private static final Icon FILE_CODE_O = FontIcon.of(FontAwesome.FILE_CODE_O);
     private static final int SCROLLBAR_WIDTH = ((Integer) UIManager.get("ScrollBar.width")).intValue();
+    private static final String PASTE_SPECIAL = "PASTE_SPECIAL";
 
     private final JSplitPane splitPane;
     private final TextEditorPane textEditor;
@@ -109,6 +119,13 @@ class QueryFileView extends JPanel
         textEditor.setTabSize(2);
         textEditor.setTabsEmulated(true);
         textEditor.setText(file.getQuery());
+
+        // Paste special
+        KeyStroke pasteSpecialKeyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_V, InputEvent.CTRL_DOWN_MASK + InputEvent.SHIFT_DOWN_MASK);
+        InputMap inputMap = textEditor.getInputMap();
+        inputMap.put(pasteSpecialKeyStroke, PASTE_SPECIAL);
+        textEditor.getActionMap().put(PASTE_SPECIAL, pasteSpecialAction);
+
         RTextScrollPane sp = new RTextScrollPane(textEditor);
         textEditor.getDocument().addDocumentListener(new ADocumentListenerAdapter()
         {
@@ -172,6 +189,8 @@ class QueryFileView extends JPanel
         file.getQuerySession().setPrintWriter(messagePrintWriter);
         tablePopupMenu.add(viewAsJsonAction);
         tablePopupMenu.add(viewAsXmlAction);
+        tablePopupMenu.addSeparator();
+        tablePopupMenu.add(copyWithoutHeadersAction);
     }
 
     private PrintWriter getPrintWriter()
@@ -506,8 +525,79 @@ class QueryFileView extends JPanel
         });
 
         resultTable.setComponentPopupMenu(tablePopupMenu);
+        resultTable.setTransferHandler(new TableTransferHandler());
         return resultTable;
     }
+
+    //CSOFF
+    private final Action pasteSpecialAction = new AbstractAction(PASTE_SPECIAL)
+    //CSON
+    {
+        @Override
+        public void actionPerformed(ActionEvent e)
+        {
+            Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+            DataFlavor[] flavors = clipboard.getAvailableDataFlavors();
+
+            List<DataFlavor> applicableFlavors = new ArrayList<>();
+            for (DataFlavor df : flavors)
+            {
+                if (String.class.equals(df.getRepresentationClass())
+                    && (df.getPrimaryType().equals("text")
+                        || df.getPrimaryType().equals("plb")))
+                {
+                    applicableFlavors.add(df);
+                }
+            }
+
+            if (applicableFlavors.isEmpty())
+            {
+                return;
+            }
+
+            String[] values = applicableFlavors.stream().map(f -> f.getHumanPresentableName()).toArray(String[]::new);
+            Object selected = JOptionPane.showInputDialog(
+                    QueryFileView.this,
+                    "Paste special",
+                    "Select which type to paste",
+                    JOptionPane.QUESTION_MESSAGE,
+                    null,
+                    values,
+                    values[0]);
+            if (selected != null)
+            {
+                //null if the user cancels.
+                String selectedString = selected.toString();
+                int index = ArrayUtils.indexOf(values, selectedString);
+                if (index <= -1)
+                {
+                    return;
+                }
+
+                DataFlavor selectedFlavor = applicableFlavors.get(index);
+                try
+                {
+                    Object data = clipboard.getData(selectedFlavor);
+                    textEditor.getDocument().insertString(textEditor.getCaretPosition(), String.valueOf(data), null);
+                }
+                catch (Exception ee)
+                {
+                    // Swallow
+                }
+            }
+        }
+    };
+
+    private final Action copyWithoutHeadersAction = new AbstractAction("Copy without headers")
+    {
+        @Override
+        public void actionPerformed(ActionEvent e)
+        {
+            JTable table = (JTable) tablePopupMenu.getInvoker();
+            Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+            clipboard.setContents(TableTransferHandler.generate(table, false), null);
+        }
+    };
 
     //CSOFF
     private final Action viewAsJsonAction = new AbstractAction("View as JSON", STICKY_NOTE_O)

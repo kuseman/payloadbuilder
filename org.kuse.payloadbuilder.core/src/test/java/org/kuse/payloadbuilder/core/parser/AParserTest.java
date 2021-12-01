@@ -319,7 +319,7 @@ public abstract class AParserTest extends Assert
             {
                 String colName = e.getQname().toString();
                 Pair<Object, DataType> pair = types.get(colName);
-                e.setResolvePaths(asList(new ResolvePath(-1, -1, asList(colName), -1,new int[0], pair.getValue())));
+                e.setResolvePaths(asList(new ResolvePath(-1, -1, asList(colName), -1, new int[0], pair.getValue())));
                 when(tuple.getColumnOrdinal(colName)).thenReturn(col);
 
                 boolean isNull = pair.getKey() == null;

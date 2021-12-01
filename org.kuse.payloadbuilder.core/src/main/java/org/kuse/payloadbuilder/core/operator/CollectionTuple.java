@@ -23,7 +23,7 @@ class CollectionTuple extends AbstractList<Tuple> implements Tuple, RowList
      *
      * @param tuple Initial tuple in this collection
      * @param tupleOrdinal
-     * 
+     *
      *            <pre>
      * The ordinal of this collection.
      * If this is a sub query this tuple ordinal is the parent of ordinal of the tuples in this collection

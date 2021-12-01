@@ -25,8 +25,10 @@ import gnu.trove.set.hash.TIntHashSet;
 class GroupByOperator extends AOperator
 {
     private final Operator operator;
-    /** Use an index value factory here for the purpose of creating objects to put in map as key only
-     * They implement hashCode/equals so they fit perfectly here. */
+    /**
+     * Use an index value factory here for the purpose of creating objects to put in map as key only They implement hashCode/equals so they fit
+     * perfectly here.
+     */
     private final IIndexValuesFactory indexValueFactory;
     private final int size;
     private final Map<Integer, Set<String>> columnReferences;

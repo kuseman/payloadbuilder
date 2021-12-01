@@ -136,7 +136,7 @@ public class ExpressionTest extends AParserTest
                 ExpressionCode code = context.getExpressionCode();
                 code.setCode(String.format(
                         "boolean %s = false;\n"
-                        + "String %s = java.util.UUID.randomUUID().toString();\n",
+                            + "String %s = java.util.UUID.randomUUID().toString();\n",
                         code.getNullVar(),
                         code.getResVar()));
                 return code;

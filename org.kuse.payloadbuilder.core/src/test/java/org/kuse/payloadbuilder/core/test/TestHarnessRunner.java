@@ -224,7 +224,9 @@ public class TestHarnessRunner
 
                 if (!equals(expectedColumn, actualColumn))
                 {
-                    fail((codeGen ? "CodeGen: " : "") + "Result set number: " + (number + 1) + ", row: " + i + ", col: " + j + ", expected " + expectedColumn + " but was " + actualColumn + System.lineSeparator() + "Expected: " + System.lineSeparator() + expected.stream().map(Object::toString).collect(joining(System.lineSeparator())) + System.lineSeparator() + ", but was:" + System.lineSeparator() + actual.stream().map(Object::toString).collect(joining(System.lineSeparator())));
+                    fail((codeGen ? "CodeGen: " : "") + "Result set number: " + (number + 1) + ", row: " + i + ", col: " + j + ", expected " + expectedColumn + " but was " + actualColumn
+                        + System.lineSeparator() + "Expected: " + System.lineSeparator() + expected.stream().map(Object::toString).collect(joining(System.lineSeparator())) + System.lineSeparator()
+                        + ", but was:" + System.lineSeparator() + actual.stream().map(Object::toString).collect(joining(System.lineSeparator())));
                 }
             }
         }

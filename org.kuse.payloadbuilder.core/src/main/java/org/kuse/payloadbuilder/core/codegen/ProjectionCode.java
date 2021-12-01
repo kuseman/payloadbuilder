@@ -4,6 +4,7 @@ package org.kuse.payloadbuilder.core.codegen;
 public class ProjectionCode
 {
     private String code = "";
+
     public String getCode()
     {
         return code;

@@ -17,6 +17,7 @@ public interface TempTableCacheProvider extends CacheProvider
 
     /**
      * Get temporary table by cache name and key
+     *
      * @param name Name of cache
      * @param key Cache key to use
      * @param ttl TTL Duration for cache entry. NULL if no TTL

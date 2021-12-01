@@ -32,7 +32,7 @@ public abstract class TableFunctionInfo extends FunctionInfo
      * Range function
      * <b>range(1, 10)</b>
      * Resulting alias will the table alias for the function itself
-
+    
      * Example:
      * Table valued function that opens an alias for row traversal in a sub query expression
      * <b>open(aa)</b>

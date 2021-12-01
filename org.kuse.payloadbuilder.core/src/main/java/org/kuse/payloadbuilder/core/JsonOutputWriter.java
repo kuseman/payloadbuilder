@@ -1,6 +1,7 @@
 package org.kuse.payloadbuilder.core;
 
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -17,13 +18,31 @@ public class JsonOutputWriter implements OutputWriter
 {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private final JsonGenerator generator;
+    private final JsonSettings settings;
     private String currentField;
+    private boolean firstResultSet = true;
+
+    private String rowSeparator;
+    private String resultSetSeparator;
 
     public JsonOutputWriter(Writer writer)
     {
+        this(writer, new JsonSettings());
+    }
+
+    public JsonOutputWriter(Writer writer, JsonSettings settings)
+    {
+        this.settings = settings;
         try
         {
-            this.generator = MAPPER.getFactory().createGenerator(requireNonNull(writer, "writer"));
+            if (settings.prettyPrint)
+            {
+                this.generator = MAPPER.createGenerator(requireNonNull(writer, "writer")).useDefaultPrettyPrinter();
+            }
+            else
+            {
+                this.generator = MAPPER.getFactory().createGenerator(requireNonNull(writer, "writer"));
+            }
         }
         catch (IOException e)
         {
@@ -47,6 +66,11 @@ public class JsonOutputWriter implements OutputWriter
     @Override
     public void close()
     {
+        if (settings.allResultSetsAsOneArray)
+        {
+            endArray();
+        }
+
         flush();
         try
         {
@@ -56,18 +80,68 @@ public class JsonOutputWriter implements OutputWriter
         {
             throw new RuntimeException("Error closing JSON stream", e);
         }
+
+        // Reset
+        firstResultSet = true;
+        rowSeparator = null;
+        resultSetSeparator = null;
+    }
+
+    @Override
+    public void initResult(String[] columns)
+    {
+        // Init separators to avoid creating strings for every row
+        if (rowSeparator == null && !isBlank(settings.rowSeparator))
+        {
+            rowSeparator = settings.rowSeparator
+                    .replace("\\n\\r", System.lineSeparator())
+                    .replace("\\n", "\n")
+                    .replace("\\r", "\r")
+                    .replace("\\t", "\t");
+        }
+        if (resultSetSeparator == null && !isBlank(settings.resultSetSeparator))
+        {
+            resultSetSeparator = settings.resultSetSeparator
+                    .replace("\\n\\r", System.lineSeparator())
+                    .replace("\\n", "\n")
+                    .replace("\\r", "\r")
+                    .replace("\\t", "\t");
+        }
+
+        if (firstResultSet)
+        {
+            if (settings.resultSetsAsArrays || settings.allResultSetsAsOneArray)
+            {
+                startArray();
+            }
+        }
+        else
+        {
+            if (settings.resultSetsAsArrays && !settings.allResultSetsAsOneArray)
+            {
+                endArray();
+            }
+
+            if (!isBlank(rowSeparator))
+            {
+                writeRaw(rowSeparator);
+            }
+
+            if (settings.resultSetsAsArrays && !settings.allResultSetsAsOneArray)
+            {
+                startArray();
+            }
+        }
+
+        firstResultSet = false;
     }
 
     @Override
     public void endRow()
     {
-        try
+        if (!isBlank(rowSeparator))
         {
-            generator.writeRaw(System.lineSeparator());
-        }
-        catch (IOException e)
-        {
-            throw new RuntimeException("Error ending JSON row", e);
+            writeRaw(rowSeparator);
         }
     }
 
@@ -283,5 +357,83 @@ public class JsonOutputWriter implements OutputWriter
         String field = currentField;
         currentField = null;
         generator.writeFieldName(field);
+    }
+
+    private void writeRaw(String value)
+    {
+        try
+        {
+            generator.writeRaw(value);
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Error ending JSON row", e);
+        }
+    }
+
+    /** Json settings */
+    public static class JsonSettings
+    {
+        private String rowSeparator;
+        private String resultSetSeparator;
+
+        /** Pretty print result */
+        private boolean prettyPrint;
+
+        /** Wrap result set rows as an array */
+        private boolean resultSetsAsArrays;
+
+        /** Wrap all result sets rows as an array. Mutual exclusive with {@link #wrapResultSetAsArray} */
+        private boolean allResultSetsAsOneArray;
+
+        public String getRowSeparator()
+        {
+            return rowSeparator;
+        }
+
+        public void setRowSeparator(String rowSeparator)
+        {
+            this.rowSeparator = rowSeparator;
+        }
+
+        public String getResultSetSeparator()
+        {
+            return resultSetSeparator;
+        }
+
+        public void setResultSetSeparator(String resultSetSeparator)
+        {
+            this.resultSetSeparator = resultSetSeparator;
+        }
+
+        public boolean isResultSetsAsArrays()
+        {
+            return resultSetsAsArrays;
+        }
+
+        public void setResultSetsAsArrays(boolean resultSetsAsArrays)
+        {
+            this.resultSetsAsArrays = resultSetsAsArrays;
+        }
+
+        public boolean isAllResultSetsAsOneArray()
+        {
+            return allResultSetsAsOneArray;
+        }
+
+        public void setAllResultSetsAsOneArray(boolean allResultSetsAsOneArray)
+        {
+            this.allResultSetsAsOneArray = allResultSetsAsOneArray;
+        }
+
+        public boolean isPrettyPrint()
+        {
+            return prettyPrint;
+        }
+
+        public void setPrettyPrint(boolean prettyPrint)
+        {
+            this.prettyPrint = prettyPrint;
+        }
     }
 }

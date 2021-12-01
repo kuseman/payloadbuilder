@@ -19,6 +19,7 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 class RangeFunction extends TableFunctionInfo
 {
     private static final TableMeta TABLE_META = new TableMeta(asList(new TableMeta.Column("Value", DataType.INT)));
+
     RangeFunction(Catalog catalog)
     {
         super(catalog, "range");

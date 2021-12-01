@@ -57,7 +57,9 @@ public abstract class FunctionInfo
         return null;
     }
 
-    /** Data type of this function
+    /**
+     * Data type of this function
+     *
      * @param arguments Function arguments
      */
     public DataType getDataType(List<Expression> arguments)

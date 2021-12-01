@@ -36,6 +36,7 @@ import org.kuse.payloadbuilder.core.operator.StatementContext.NodeData;
  *     outerList    (Operator that stream rows from node context set by BatchParallelism operator)
  *     inner
  * </pre>
+ *
  * NOTE! Experimental status
  */
 class BatchParallelismOperator extends AOperator

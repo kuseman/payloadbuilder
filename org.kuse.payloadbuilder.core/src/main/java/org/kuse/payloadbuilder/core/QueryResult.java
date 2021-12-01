@@ -3,8 +3,9 @@ package org.kuse.payloadbuilder.core;
 /** Definition of a query result */
 public interface QueryResult
 {
-    /** Returns true if there are more result sets.
-     * If true then {@link #writeResult(OutputWriter)} is supposed to be called to write current result */
+    /**
+     * Returns true if there are more result sets. If true then {@link #writeResult(OutputWriter)} is supposed to be called to write current result
+     */
     boolean hasMoreResults();
 
     /**

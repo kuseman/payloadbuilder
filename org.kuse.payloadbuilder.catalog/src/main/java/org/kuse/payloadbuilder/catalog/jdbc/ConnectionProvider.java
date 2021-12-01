@@ -5,6 +5,7 @@ import java.util.Map;
 
 /**
  * Definition of a connection provider.
+ *
  * <pre>
  * Used to build specific jdbc urls etc.
  * Provides connection specific UI for configuration and properties
@@ -21,6 +22,6 @@ interface ConnectionProvider
     /** Construct jdbc url from properties */
     String getURL(Map<String, Object> properties);
 
-    /**  Return driver class name for this provider */
+    /** Return driver class name for this provider */
     String getDriverClassName();
 }

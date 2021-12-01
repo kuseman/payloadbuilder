@@ -30,8 +30,7 @@ public class ArithmeticUnaryExpressionTest extends AParserTest
                 MapUtils.entry("e", Pair.of(new Integer(1), DataType.ANY)),
                 MapUtils.entry("f", Pair.of(new Long(1), DataType.ANY)),
                 MapUtils.entry("g", Pair.of(new Float(1), DataType.ANY)),
-                MapUtils.entry("h", Pair.of(new Double(1), DataType.ANY))
-                );
+                MapUtils.entry("h", Pair.of(new Double(1), DataType.ANY)));
         List<Expression> es = asList(
                 e("-a < 0"),
                 e("-b < 0"),
@@ -40,8 +39,7 @@ public class ArithmeticUnaryExpressionTest extends AParserTest
                 e("-e < 0"),
                 e("-f < 0"),
                 e("-g < 0"),
-                e("-h < 0")
-                );
+                e("-h < 0"));
 
         context.getStatementContext().setTuple(tuple);
         for (Expression e : es)

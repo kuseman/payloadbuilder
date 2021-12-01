@@ -394,16 +394,16 @@ class BatchMergeJoin extends AOperator
                     return;
                 }
 
-//                int count = 0;
+                //                int count = 0;
                 int size = batchSize > 0 ? batchSize : 100;
                 outerRows = new ArrayList<>(size);
-//                IIndexValues prevKeyValues = null;
+                //                IIndexValues prevKeyValues = null;
                 if (batchedLeftOverRow != null)
                 {
                     outerRows.add(batchedLeftOverRow);
-//                    prevKeyValues = batchedLeftOverRow.extractedValues;
+                    //                    prevKeyValues = batchedLeftOverRow.extractedValues;
                     batchedLeftOverRow = null;
-//                    count++;
+                    //                    count++;
                 }
 
                 while (outerIt.hasNext())
@@ -414,20 +414,20 @@ class BatchMergeJoin extends AOperator
                     TupleHolder holder = new TupleHolder(tuple);
                     //                    holder.extractedValues = Arrays.copyOf(keyValues, keyValues.length);
 
-//                    if (batchSize > 0 && count >= batchSize)
-//                    {
-//                        // Keep batching until values values start to diff
-//                        // this to avoid fetching the same data twice from downstream
-//                        //                        if (count > batchSize && !Arrays.equals(prevKeyValues, keyValues))
-//                        //                        {
-//                        //                            // Save row for next iteration
-//                        //                            batchedLeftOverRow = holder;
-//                        //                            break;
-//                        //                        }
-//                    }
+                    //                    if (batchSize > 0 && count >= batchSize)
+                    //                    {
+                    //                        // Keep batching until values values start to diff
+                    //                        // this to avoid fetching the same data twice from downstream
+                    //                        //                        if (count > batchSize && !Arrays.equals(prevKeyValues, keyValues))
+                    //                        //                        {
+                    //                        //                            // Save row for next iteration
+                    //                        //                            batchedLeftOverRow = holder;
+                    //                        //                            break;
+                    //                        //                        }
+                    //                    }
                     outerRows.add(holder);
-//                    count++;
-//                    prevKeyValues = holder.extractedValues;
+                    //                    count++;
+                    //                    prevKeyValues = holder.extractedValues;
                 }
             }
 

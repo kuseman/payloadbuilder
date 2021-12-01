@@ -78,7 +78,9 @@ public interface ICatalogExtension
     /** Get the actual catalog implementation for this extension */
     Catalog getCatalog();
 
-    /** Handle provided exception
+    /**
+     * Handle provided exception
+     *
      * @param querySession Current query session
      * @param exception Exception to handle
      **/

@@ -7,8 +7,9 @@ import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
-/** Match function that is applicable in query predicates that uses ES match operator on
- * free text fields */
+/**
+ * Match function that is applicable in query predicates that uses ES match operator on free text fields
+ */
 class MatchFunction extends ScalarFunctionInfo
 {
     static final String NAME = "match";
@@ -24,4 +25,3 @@ class MatchFunction extends ScalarFunctionInfo
         throw new IllegalArgumentException("'match' cannot be used in non Elastic query context.");
     }
 }
-

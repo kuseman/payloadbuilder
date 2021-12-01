@@ -46,9 +46,9 @@ public abstract class BaseIndexValueFactory extends BaseGeneratedClass implement
             {
                 return false;
             }
-            
+
             return isEquals((IIndexValues) obj);
-            
+
 //            if (obj instanceof IIndexValues)
 //            {
 //                // Since these classes are created by different class loaders,

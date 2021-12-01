@@ -25,7 +25,6 @@ public class BatchCacheOperatorTest extends AOperatorTest
 {
     private final TableAlias inner = TableAlias.TableAliasBuilder.of(1, TableAlias.Type.TABLE, QualifiedName.of("tableB"), "b")
             .tableMeta(new TableMeta(asList(new TableMeta.Column("col", DataType.ANY))))
-//            .columns(new String[] {"col"})
             .build();
 
     @Test(expected = OperatorException.class)

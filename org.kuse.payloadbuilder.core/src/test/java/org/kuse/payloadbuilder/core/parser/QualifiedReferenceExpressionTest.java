@@ -56,7 +56,7 @@ public class QualifiedReferenceExpressionTest extends AParserTest
 
         // No sub tuple paths
         e = new QualifiedReferenceExpression(QualifiedName.of("col1"), -1, null);
-        e.setResolvePaths(asList(new ResolvePath(0, 1, emptyList(), 0, new int[] {1,2})));
+        e.setResolvePaths(asList(new ResolvePath(0, 1, emptyList(), 0, new int[] {1, 2})));
         assertFalse(e.isCodeGenSupported());
 
         // No multi part path

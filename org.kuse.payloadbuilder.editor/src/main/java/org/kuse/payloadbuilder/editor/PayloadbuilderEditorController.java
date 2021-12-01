@@ -42,6 +42,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
     private final PayloadbuilderEditorView view;
     private final PayloadbuilderEditorModel model;
     private final VariablesDialog variablesDialog;
+    private final OutputConfigDialog outputConfigDialog;
     private final CaretChangedListener caretChangedListener = new CaretChangedListener();
     private final Config config;
     private final List<CatalogExtensionView> catalogExtensionViews = new ArrayList<>();
@@ -58,6 +59,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         this.model = requireNonNull(model, "model");
         this.model.addPropertyChangeListener(this);
         this.variablesDialog = new VariablesDialog(view);
+        this.outputConfigDialog = new OutputConfigDialog(view);
         init();
     }
 
@@ -133,6 +135,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
             config.appendRecentFile(file);
             saveConfig();
         });
+        view.setConfigOutputAction(this::configOutput);
 
         int y = 0;
         Insets insets = new Insets(0, 0, 3, 0);
@@ -161,6 +164,18 @@ class PayloadbuilderEditorController implements PropertyChangeListener
         new Timer(TIMER_INTERVAL, evt -> view.getMemoryLabel().setText(getMemoryString())).start();
         newQueryListener.run();
         view.setRecentFiles(config.getRecentFiles());
+    }
+
+    private void configOutput()
+    {
+        outputConfigDialog.init(config);
+        outputConfigDialog.setVisible(true);
+
+        if (outputConfigDialog.isOk())
+        {
+            outputConfigDialog.setSettings(config);
+            saveConfig();
+        }
     }
 
     private void exit()
@@ -471,7 +486,7 @@ class PayloadbuilderEditorController implements PropertyChangeListener
                 }
             });
 
-            PayloadbuilderService.executeQuery(fileModel, queryString, () ->
+            PayloadbuilderService.executeQuery(config, fileModel, queryString, () ->
             {
                 QueryFileView current = (QueryFileView) view.getEditorsTabbedPane().getSelectedComponent();
 

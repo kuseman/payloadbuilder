@@ -256,9 +256,7 @@ public class TableAlias
             if (alias.type == Type.SUBQUERY)
             {
                 // TODO: when composite sub queries like union etc. comes into play this might need a rewrite
-                count += alias
-                        .childAliases.get(0)
-                        .childAliases.get(0).getTupleCountCountOnLevel();
+                count += alias.childAliases.get(0).childAliases.get(0).getTupleCountCountOnLevel();
             }
             else
             {
@@ -439,7 +437,7 @@ public class TableAlias
             this.connectAsChild = connectAsChild;
             return this;
         }
-        
+
         public TableAliasBuilder tableMeta(TableMeta tableMeta)
         {
             this.tableMeta = tableMeta;

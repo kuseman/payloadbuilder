@@ -102,6 +102,7 @@ public class FilesystemCatalog extends Catalog
     static class FSFileReader extends BufferedReader
     {
         private final File file;
+
         FSFileReader(File file) throws FileNotFoundException
         {
             super(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8));

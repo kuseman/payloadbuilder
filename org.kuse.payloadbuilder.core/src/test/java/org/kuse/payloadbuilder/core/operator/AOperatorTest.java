@@ -39,6 +39,7 @@ public class AOperatorTest extends AParserTest
         return op1(ctx -> new TupleIterator()
         {
             Iterator<Tuple> it = itFunc.apply(ctx);
+
             @Override
             public Tuple next()
             {
@@ -176,7 +177,7 @@ public class AOperatorTest extends AParserTest
             tuple = t.getTuple(tupleOrdinal);
         }
 
-        return tuple != null ? tuple .getValue(columnOrdinal) : null;
+        return tuple != null ? tuple.getValue(columnOrdinal) : null;
     }
 
     protected Object getValue(Tuple t, int tupleOrdinal, String column)

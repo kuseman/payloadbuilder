@@ -11,7 +11,9 @@ import java.util.function.Function;
 
 import org.kuse.payloadbuilder.core.QuerySession;
 
-/** Context used during execution of a query
+/**
+ * Context used during execution of a query
+ *
  * <pre>
  * Life cycle is during a whole query and all it's statements
  * </pre>

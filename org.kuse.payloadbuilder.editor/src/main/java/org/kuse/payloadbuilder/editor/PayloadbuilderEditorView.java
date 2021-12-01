@@ -76,6 +76,7 @@ class PayloadbuilderEditorView extends JFrame
     private static final Icon ARROWS_H = FontIcon.of(FontAwesome.ARROWS_H);
     private static final Icon INDENT = FontIcon.of(FontAwesome.INDENT);
     private static final Icon EDIT = FontIcon.of(FontAwesome.EDIT);
+    static final Icon COG = FontIcon.of(FontAwesome.COG);
     static final List<? extends Image> APPLICATION_ICONS = asList("icons8-database-administrator-48.png", "icons8-database-administrator-96.png")
             .stream()
             .map(name -> PayloadbuilderEditorView.class.getResource("/icons/" + name))
@@ -118,6 +119,7 @@ class PayloadbuilderEditorView extends JFrame
     private Runnable toggleResultRunnable;
     private Runnable toggleCommentRunnable;
     private Runnable outputChangedRunnable;
+    private Runnable configOutputRunnable;
     private Runnable formatChangedRunnable;
     private Runnable editVariablesRunnable;
     private Consumer<String> openRecentFileConsumer;
@@ -305,7 +307,10 @@ class PayloadbuilderEditorView extends JFrame
         comboFormat.addItemListener(l -> run(formatChangedRunnable));
 
         toolBar.addSeparator();
-        toolBar.add(new JLabel("Output "));
+        JButton configOutputButton = new JButton("Output ", COG);
+        configOutputButton.setToolTipText("Config output");
+        configOutputButton.addActionListener(e -> configOutputRunnable.run());
+        toolBar.add(configOutputButton);
         toolBar.add(comboOutput);
 
         toolBar.addSeparator();
@@ -606,6 +611,11 @@ class PayloadbuilderEditorView extends JFrame
     void setFormatChangedAction(Runnable formatChangedRunnable)
     {
         this.formatChangedRunnable = formatChangedRunnable;
+    }
+
+    public void setConfigOutputAction(Runnable configOutputRunnable)
+    {
+        this.configOutputRunnable = configOutputRunnable;
     }
 
     void setOpenRecentFileConsumer(Consumer<String> openRecentFileConsumer)

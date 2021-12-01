@@ -1,6 +1,7 @@
 package org.kuse.payloadbuilder.core;
 
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -17,14 +18,30 @@ public class CsvOutputWriter implements OutputWriter
     private static final char[] FALSE = "false".toCharArray();
 
     private final Writer writer;
-    private final CsvSettings settings = new CsvSettings();
+    private final CsvSettings settings;
     private boolean firstEntryOnRow = true;
+    private boolean firstResultSet = true;
     private int objectNestCount;
     private boolean singleColumnResult;
 
     public CsvOutputWriter(Writer writer)
     {
+        this(writer, new CsvSettings());
+    }
+
+    public CsvOutputWriter(Writer writer, CsvSettings settings)
+    {
         this.writer = requireNonNull(writer, "writer");
+        this.settings = requireNonNull(settings, "settings");
+        reset();
+    }
+
+    private void reset()
+    {
+        firstEntryOnRow = true;
+        firstResultSet = true;
+        objectNestCount = 0;
+        singleColumnResult = false;
     }
 
     @Override
@@ -52,14 +69,24 @@ public class CsvOutputWriter implements OutputWriter
         {
             throw new RuntimeException("Error closing CSV stream", e);
         }
+        // Reset state when done
+        reset();
     }
 
     @Override
     public void initResult(String[] columns)
     {
+        if (!firstResultSet)
+        {
+            newResultSet();
+        }
+        firstResultSet = false;
         singleColumnResult = columns != null && columns.length == 1;
         // Omit headers if columns are unknown or there are a single column result or explicitly turned off
-        if (columns == null || singleColumnResult || !settings.writeHeaders)
+        if (columns == null
+            || columns.length == 0
+            || singleColumnResult
+            || !settings.writeHeaders)
         {
             return;
         }
@@ -196,18 +223,129 @@ public class CsvOutputWriter implements OutputWriter
         }
     }
 
+    private void newResultSet()
+    {
+        if (!isBlank(settings.resultsetSeparator))
+        {
+            try
+            {
+                // Unescape known escapes
+                writer.write(settings.resultsetSeparator
+                        .replace("\\n\\r", System.lineSeparator())
+                        .replace("\\n", "\n")
+                        .replace("\\r", "\r")
+                        .replace("\\t", "\t"));
+            }
+            catch (IOException e)
+            {
+                throw new RuntimeException("Error writing CSV result set separator", e);
+            }
+        }
+    }
+
     /** Csv writer settings */
-    static class CsvSettings
+    public static class CsvSettings
     {
         // TODO: quoting char
 
-        private final char escapeChar = '\\';
-        private final char separatorChar = ',';
-        private final char arrayStartChar = '[';
-        private final char arrayEndChar = ']';
-        private final char objectStartChar = '{';
-        private final char objectEndChar = '}';
-        private final boolean writeHeaders = true;
-        private final boolean escapeNewLines = true;
+        private char escapeChar = '\\';
+        private char separatorChar = ',';
+        private char arrayStartChar = '[';
+        private char arrayEndChar = ']';
+        private char objectStartChar = '{';
+        private char objectEndChar = '}';
+        private boolean writeHeaders = true;
+        private boolean escapeNewLines = true;
+        private String resultsetSeparator = "\n";
+
+        public char getEscapeChar()
+        {
+            return escapeChar;
+        }
+
+        public void setEscapeChar(char escapeChar)
+        {
+            this.escapeChar = escapeChar;
+        }
+
+        public char getSeparatorChar()
+        {
+            return separatorChar;
+        }
+
+        public void setSeparatorChar(char separatorChar)
+        {
+            this.separatorChar = separatorChar;
+        }
+
+        public char getArrayStartChar()
+        {
+            return arrayStartChar;
+        }
+
+        public void setArrayStartChar(char arrayStartChar)
+        {
+            this.arrayStartChar = arrayStartChar;
+        }
+
+        public char getArrayEndChar()
+        {
+            return arrayEndChar;
+        }
+
+        public void setArrayEndChar(char arrayEndChar)
+        {
+            this.arrayEndChar = arrayEndChar;
+        }
+
+        public char getObjectStartChar()
+        {
+            return objectStartChar;
+        }
+
+        public void setObjectStartChar(char objectStartChar)
+        {
+            this.objectStartChar = objectStartChar;
+        }
+
+        public char getObjectEndChar()
+        {
+            return objectEndChar;
+        }
+
+        public void setObjectEndChar(char objectEndChar)
+        {
+            this.objectEndChar = objectEndChar;
+        }
+
+        public boolean isWriteHeaders()
+        {
+            return writeHeaders;
+        }
+
+        public void setWriteHeaders(boolean writeHeaders)
+        {
+            this.writeHeaders = writeHeaders;
+        }
+
+        public boolean isEscapeNewLines()
+        {
+            return escapeNewLines;
+        }
+
+        public void setEscapeNewLines(boolean escapeNewLines)
+        {
+            this.escapeNewLines = escapeNewLines;
+        }
+
+        public String getResultsetSeparator()
+        {
+            return resultsetSeparator;
+        }
+
+        public void setResultsetSeparator(String resultsetSeparator)
+        {
+            this.resultsetSeparator = resultsetSeparator;
+        }
     }
 }

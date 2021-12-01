@@ -11,6 +11,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.kuse.payloadbuilder.core.CsvOutputWriter.CsvSettings;
+import org.kuse.payloadbuilder.core.JsonOutputWriter.JsonSettings;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -24,6 +27,8 @@ class Config
     private String lastOpenPath;
     @JsonProperty
     private final List<String> recentFiles = new ArrayList<>();
+    @JsonProperty
+    private final OutputConfig outputConfig = new OutputConfig();
 
     List<Catalog> getCatalogs()
     {
@@ -47,6 +52,11 @@ class Config
     List<String> getRecentFiles()
     {
         return recentFiles;
+    }
+
+    public OutputConfig getOutputConfig()
+    {
+        return outputConfig;
     }
 
     void appendRecentFile(String file)
@@ -145,6 +155,25 @@ class Config
         void setCatalogExtension(ICatalogExtension catalogExtension)
         {
             this.catalogExtension = catalogExtension;
+        }
+    }
+
+    /** Output configuration */
+    static class OutputConfig
+    {
+        @JsonProperty
+        private final CsvSettings csvSettings = new CsvSettings();
+        @JsonProperty
+        private final JsonSettings jsonSettings = new JsonSettings();
+
+        public CsvSettings getCsvSettings()
+        {
+            return csvSettings;
+        }
+
+        public JsonSettings getJsonSettings()
+        {
+            return jsonSettings;
         }
     }
 }

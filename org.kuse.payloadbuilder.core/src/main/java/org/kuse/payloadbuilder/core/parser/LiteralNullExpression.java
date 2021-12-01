@@ -18,7 +18,7 @@ public class LiteralNullExpression extends LiteralExpression
     {
         ExpressionCode code = context.getExpressionCode();
         String template = "Object %s = null;\n"
-                + "boolean %s = true;\n";
+            + "boolean %s = true;\n";
         code.setCode(String.format(template, code.getResVar(), code.getNullVar()));
         return code;
     }

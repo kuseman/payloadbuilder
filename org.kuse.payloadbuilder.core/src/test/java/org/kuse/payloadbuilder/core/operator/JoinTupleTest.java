@@ -17,7 +17,8 @@ public class JoinTupleTest extends AOperatorTest
             fail();
         }
         catch (IllegalArgumentException e)
-        {}
+        {
+        }
 
         assertEquals(-1, jt.getColumnOrdinal("col"));
         assertEquals(null, jt.getValue(0));

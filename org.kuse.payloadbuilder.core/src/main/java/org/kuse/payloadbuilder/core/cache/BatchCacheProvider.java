@@ -22,7 +22,7 @@ public interface BatchCacheProvider extends CacheProvider
      * @param name Name of the cache
      * @param keys Keys to fetch from cache
      * @return
-     * 
+     *
      *         <pre>
      * A map with unique keys and their associated list of tuples
      * NOTE! all input keys must provide a value in resulting map, NULL as indicator that value did not exist

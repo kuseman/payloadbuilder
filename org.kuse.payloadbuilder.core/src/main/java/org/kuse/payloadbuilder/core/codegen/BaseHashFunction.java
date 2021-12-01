@@ -13,6 +13,7 @@ public abstract class BaseHashFunction extends BaseGeneratedClass implements ToI
 //CSON
 {
     private List<Expression> expressions;
+
     void setExpressions(List<Expression> expressions)
     {
         this.expressions = expressions;

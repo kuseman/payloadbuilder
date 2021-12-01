@@ -14,6 +14,7 @@ public abstract class BaseProjection extends BaseGeneratedClass implements Proje
 //CSON
 {
     private RootProjection projection;
+
     void setProjection(RootProjection projection)
     {
         this.projection = projection;

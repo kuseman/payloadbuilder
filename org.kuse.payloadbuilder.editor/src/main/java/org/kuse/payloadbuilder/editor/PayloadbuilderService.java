@@ -76,6 +76,7 @@ class PayloadbuilderService
     //CSOFF
     static void executeQuery(
             //CSON
+            Config config,
             QueryFileModel file,
             String queryString,
             Runnable queryFinnishedCallback)
@@ -106,7 +107,7 @@ class PayloadbuilderService
                     CompiledQuery query = Payloadbuilder.compile(queryString, file.getQuerySession().getCatalogRegistry());
                     QueryResult queryResult = query.execute(file.getQuerySession());
 
-                    writer = getOutputWriter(file, outputFileName.getValue());
+                    writer = getOutputWriter(config, file, outputFileName.getValue());
 
                     while (queryResult.hasMoreResults())
                     {
@@ -212,7 +213,10 @@ class PayloadbuilderService
         }
     }
 
-    private static EditorOutputWriter getOutputWriter(QueryFileModel file, String outputFileName)
+    private static EditorOutputWriter getOutputWriter(
+            Config config,
+            QueryFileModel file,
+            String outputFileName)
     {
         if (file.getOutput() == Output.TABLE)
         {
@@ -264,7 +268,7 @@ class PayloadbuilderService
 
             if (file.getFormat() == Format.CSV)
             {
-                writer.setValue(new CsvOutputWriter(output)
+                writer.setValue(new CsvOutputWriter(output, config.getOutputConfig().getCsvSettings())
                 {
                     @Override
                     public void endRow()
@@ -276,7 +280,7 @@ class PayloadbuilderService
             }
             else if (file.getFormat() == Format.JSON)
             {
-                writer.setValue(new JsonOutputWriter(output)
+                writer.setValue(new JsonOutputWriter(output, config.getOutputConfig().getJsonSettings())
                 {
                     @Override
                     public void endRow()
@@ -292,16 +296,7 @@ class PayloadbuilderService
                 throw new RuntimeException("Unsupported format " + file.getFormat());
             }
 
-            return new EditorOutputWriter(writer.getValue(), NO_OP,
-                    () ->
-                    {
-                        //CSOFF
-                        if (countingOutputStream.getValue() == null)
-                        //CSON
-                        {
-                            file.getQuerySession().printLine("");
-                        }
-                    },
+            return new EditorOutputWriter(writer.getValue(), NO_OP, NO_OP,
                     () ->
                     {
                         //CSOFF

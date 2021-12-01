@@ -33,6 +33,7 @@ public interface Projection extends DescribableNode
 
     /**
      * Generate code for this projection
+     *
      * @param context Context used during code generation
      **/
     default ProjectionCode generateCode(CodeGeneratorContext context)

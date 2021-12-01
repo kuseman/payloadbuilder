@@ -542,7 +542,8 @@ public class BatchHashJoinTest extends AOperatorTest
                             .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), new String[] {"col1"}, ar))
                             .iterator();
                 }, () -> bClose.increment()))),
-                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i})).iterator(), () -> aClose.increment()))));
+                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i})).iterator(),
+                        () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
@@ -604,7 +605,8 @@ public class BatchHashJoinTest extends AOperatorTest
                             .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), new String[] {"col1"}, ar))
                             .iterator();
                 }, () -> bClose.increment()))),
-                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i})).iterator(), () -> aClose.increment()))));
+                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i})).iterator(),
+                        () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
@@ -1092,7 +1094,8 @@ public class BatchHashJoinTest extends AOperatorTest
                             .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), new String[] {"col1"}, ar))
                             .iterator();
                 }, () -> bClose.increment()))),
-                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i})).iterator(), () -> aClose.increment()))));
+                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i})).iterator(),
+                        () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 
@@ -1158,7 +1161,8 @@ public class BatchHashJoinTest extends AOperatorTest
                             .map(ar -> (Tuple) Row.of(a, posRight.getAndIncrement(), new String[] {"col1"}, ar))
                             .iterator();
                 }, () -> bClose.increment()))),
-                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i})).iterator(), () -> aClose.increment()))));
+                ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(-2, 12).mapToObj(i -> (Tuple) Row.of(a, posLeft.getAndIncrement(), new String[] {"col1"}, new Object[] {i})).iterator(),
+                        () -> aClose.increment()))));
 
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
 

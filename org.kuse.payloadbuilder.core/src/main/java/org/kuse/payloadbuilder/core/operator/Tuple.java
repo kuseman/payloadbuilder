@@ -10,6 +10,7 @@ public interface Tuple
 
     /**
      * Get the ordinal of provided column.
+     *
      * @param column Column to fetch ordinal for
      */
     int getColumnOrdinal(String column);
@@ -35,9 +36,11 @@ public interface Tuple
         return null;
     }
 
-    /** Resolve sub tuple with provided tuple ordinal. This is a special tuple fetch method
-     * used for temporary table access
-     * @param tupleOrdinal Ordinal to resolve */
+    /**
+     * Resolve sub tuple with provided tuple ordinal. This is a special tuple fetch method used for temporary table access
+     *
+     * @param tupleOrdinal Ordinal to resolve
+     */
     default Tuple getSubTuple(int tupleOrdinal)
     {
         throw new IllegalArgumentException("This tuple does not support sub tuple fetching");
@@ -45,13 +48,16 @@ public interface Tuple
 
     /**
      * Get value for provided column ordinal
+     *
      * @param columnOrdinal The ordinal of the column to fetch
      */
     Object getValue(int columnOrdinal);
 
-    /** Returns true if provided column ordinal is null otherwise false
+    /**
+     * Returns true if provided column ordinal is null otherwise false
+     *
      * @param columnOrdinal Column ordinal to get null for.
-     * */
+     */
     default boolean isNull(int columnOrdinal)
     {
         return getValue(columnOrdinal) == null;
@@ -89,6 +95,7 @@ public interface Tuple
 
     /**
      * Get the column name of the provided ordinal
+     *
      * @param columnOrdinal Ordinal of column to return
      */
     default String getColumn(int columnOrdinal)
