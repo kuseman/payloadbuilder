@@ -3,7 +3,6 @@ package org.kuse.payloadbuilder.core.operator;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
-import static org.apache.commons.lang3.StringUtils.lowerCase;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -71,7 +70,7 @@ public class ExecutionContext
     /** Get variable from context */
     public Object getVariableValue(String name)
     {
-        return variables != null ? variables.get(lowerCase(name)) : null;
+        return variables != null ? variables.get(name) : null;
     }
 
     public StatementContext getStatementContext()

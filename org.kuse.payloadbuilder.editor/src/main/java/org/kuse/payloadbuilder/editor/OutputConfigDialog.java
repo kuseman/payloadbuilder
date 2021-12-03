@@ -40,6 +40,7 @@ class OutputConfigDialog extends JDialog
     private final JTextField csvObjectEndChar;
     private final JCheckBox csvWriteHeaders;
     private final JCheckBox csvEscapeNewLines;
+    private final JTextField csvRowSeparator;
     private final JTextField csvResultSetSeparator;
 
     private final JTextField jsonRowSeparator;
@@ -88,6 +89,7 @@ class OutputConfigDialog extends JDialog
         csvObjectEndChar = new PLBTextField(1);
         csvWriteHeaders = new JCheckBox();
         csvEscapeNewLines = new JCheckBox();
+        csvRowSeparator = new JTextField();
         csvResultSetSeparator = new JTextField();
 
         //CSOFF
@@ -115,11 +117,14 @@ class OutputConfigDialog extends JDialog
         csvSettings.add(new JLabel("Escape new lines"), new GridBagConstraints(0, 7, 1, 1, 0, 0.0, GridBagConstraints.BELOW_BASELINE_LEADING, GridBagConstraints.NONE, new Insets(0, 0, 0, 0), 0, 0));
         csvSettings.add(csvEscapeNewLines, new GridBagConstraints(1, 7, 1, 1, 0.0, 0.0, GridBagConstraints.BELOW_BASELINE_LEADING, GridBagConstraints.NONE, new Insets(0, 0, 0, 0), 0, 0));
 
-        csvSettings.add(new JLabel("Result set separator"), new GridBagConstraints(0, 8, 1, 1, 0, 0.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.NONE, new Insets(0, 0, 0, 0), 0, 0));
-        csvSettings.add(csvResultSetSeparator, new GridBagConstraints(1, 8, 1, 1, 0.0, 0.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
+        csvSettings.add(new JLabel("Row separator"), new GridBagConstraints(0, 8, 1, 1, 0, 0.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.NONE, new Insets(0, 0, 0, 0), 0, 0));
+        csvSettings.add(csvRowSeparator, new GridBagConstraints(1, 8, 1, 1, 0.0, 0.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
+
+        csvSettings.add(new JLabel("Result set separator"), new GridBagConstraints(0, 9, 1, 1, 0, 0.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.NONE, new Insets(0, 0, 0, 0), 0, 0));
+        csvSettings.add(csvResultSetSeparator, new GridBagConstraints(1, 9, 1, 1, 0.0, 0.0, GridBagConstraints.BASELINE_LEADING, GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
 
         // Fill out last with an empty label
-        csvSettings.add(new JLabel(), new GridBagConstraints(0, 8, 1, 1, 0.0, 1.0, GridBagConstraints.BELOW_BASELINE_LEADING, GridBagConstraints.NONE, new Insets(0, 0, 0, 0), 0, 0));
+        csvSettings.add(new JLabel(), new GridBagConstraints(0, 10, 1, 1, 0.0, 1.0, GridBagConstraints.BELOW_BASELINE_LEADING, GridBagConstraints.NONE, new Insets(0, 0, 0, 0), 0, 0));
 
         /* JSON */
         jsonSettings = new JPanel();
@@ -174,7 +179,8 @@ class OutputConfigDialog extends JDialog
         setChar(csvObjectEndChar, csvSettings::setObjectEndChar);
         csvSettings.setWriteHeaders(csvWriteHeaders.isSelected());
         csvSettings.setEscapeNewLines(csvEscapeNewLines.isSelected());
-        csvSettings.setResultsetSeparator(csvResultSetSeparator.getText());
+        csvSettings.setRowSeparator(csvRowSeparator.getText());
+        csvSettings.setResultSetSeparator(csvResultSetSeparator.getText());
 
         JsonSettings jsonSettings = config.getOutputConfig().getJsonSettings();
         jsonSettings.setRowSeparator(jsonRowSeparator.getText());
@@ -198,7 +204,8 @@ class OutputConfigDialog extends JDialog
         csvObjectEndChar.setText(String.valueOf(csvSettings.getObjectEndChar()));
         csvWriteHeaders.setSelected(csvSettings.isWriteHeaders());
         csvEscapeNewLines.setSelected(csvSettings.isEscapeNewLines());
-        csvResultSetSeparator.setText(csvSettings.getResultsetSeparator());
+        csvRowSeparator.setText(csvSettings.getRowSeparator());
+        csvResultSetSeparator.setText(csvSettings.getResultSetSeparator());
 
         JsonSettings jsonSettings = config.getOutputConfig().getJsonSettings();
         jsonRowSeparator.setText(jsonSettings.getRowSeparator());

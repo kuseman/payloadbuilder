@@ -39,6 +39,20 @@
     }
   ],
   "cases": [
+  	{
+      "name": "Test variables are case in-sensetive",
+      "query": [
+        "set @varA = 'test' ",
+        "set @VARB = 'test1' ",
+        "set @vArc = 'test2' ",
+        "select @vara col1,@VARb col2,@vaRc col3 "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": "test" }, { "key": "col2", "value": "test1" }, { "key": "col3", "value": "test2" }]
+        ]
+      ]
+    },
     {
       "name": "Asterisk select",
       "query": [

@@ -2,6 +2,7 @@ package org.kuse.payloadbuilder.core;
 
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.isEmpty;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -91,21 +92,13 @@ public class JsonOutputWriter implements OutputWriter
     public void initResult(String[] columns)
     {
         // Init separators to avoid creating strings for every row
-        if (rowSeparator == null && !isBlank(settings.rowSeparator))
+        if (rowSeparator == null && !isEmpty(settings.rowSeparator))
         {
-            rowSeparator = settings.rowSeparator
-                    .replace("\\n\\r", System.lineSeparator())
-                    .replace("\\n", "\n")
-                    .replace("\\r", "\r")
-                    .replace("\\t", "\t");
+            rowSeparator = CsvOutputWriter.unescape(settings.rowSeparator);
         }
-        if (resultSetSeparator == null && !isBlank(settings.resultSetSeparator))
+        if (resultSetSeparator == null && !isEmpty(settings.resultSetSeparator))
         {
-            resultSetSeparator = settings.resultSetSeparator
-                    .replace("\\n\\r", System.lineSeparator())
-                    .replace("\\n", "\n")
-                    .replace("\\r", "\r")
-                    .replace("\\t", "\t");
+            resultSetSeparator = CsvOutputWriter.unescape(settings.resultSetSeparator);
         }
 
         if (firstResultSet)
@@ -139,7 +132,7 @@ public class JsonOutputWriter implements OutputWriter
     @Override
     public void endRow()
     {
-        if (!isBlank(rowSeparator))
+        if (!isEmpty(rowSeparator))
         {
             writeRaw(rowSeparator);
         }

@@ -1,12 +1,15 @@
 package org.kuse.payloadbuilder.core;
 
 import static java.util.Objects.requireNonNull;
-import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.isEmpty;
 
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
+import java.io.StringWriter;
 import java.io.Writer;
+
+import org.apache.commons.io.IOUtils;
 
 /** Output writer that writes CSV */
 public class CsvOutputWriter implements OutputWriter
@@ -17,12 +20,17 @@ public class CsvOutputWriter implements OutputWriter
     private static final char[] TRUE = "true".toCharArray();
     private static final char[] FALSE = "false".toCharArray();
 
-    private final Writer writer;
+    private Writer writer;
     private final CsvSettings settings;
     private boolean firstEntryOnRow = true;
     private boolean firstResultSet = true;
     private int objectNestCount;
-    private boolean singleColumnResult;
+    private String rowSeparator;
+    private String resultSetSeparator;
+
+    /** If headers is unknown when init, write values into buffer until first row is ready */
+    private StringWriter buffer;
+    private Writer temp;
 
     public CsvOutputWriter(Writer writer)
     {
@@ -41,7 +49,10 @@ public class CsvOutputWriter implements OutputWriter
         firstEntryOnRow = true;
         firstResultSet = true;
         objectNestCount = 0;
-        singleColumnResult = false;
+        rowSeparator = null;
+        resultSetSeparator = null;
+        buffer = null;
+        temp = null;
     }
 
     @Override
@@ -73,21 +84,39 @@ public class CsvOutputWriter implements OutputWriter
         reset();
     }
 
+    //CSOFF
     @Override
+    //CSON
     public void initResult(String[] columns)
     {
+        // Init separators to avoid creating strings for every row
+        if (rowSeparator == null && !isEmpty(settings.rowSeparator))
+        {
+            rowSeparator = unescape(settings.rowSeparator);
+        }
+        if (resultSetSeparator == null && !isEmpty(settings.resultSetSeparator))
+        {
+            resultSetSeparator = unescape(settings.resultSetSeparator);
+        }
+
         if (!firstResultSet)
         {
             newResultSet();
         }
         firstResultSet = false;
-        singleColumnResult = columns != null && columns.length == 1;
-        // Omit headers if columns are unknown or there are a single column result or explicitly turned off
-        if (columns == null
-            || columns.length == 0
-            || singleColumnResult
-            || !settings.writeHeaders)
+
+        if (!settings.writeHeaders)
         {
+            return;
+        }
+
+        // Delayed header writing, switch buffers
+        if (columns == null
+            || columns.length == 0)
+        {
+            buffer = new StringWriter();
+            temp = writer;
+            writer = buffer;
             return;
         }
 
@@ -110,58 +139,48 @@ public class CsvOutputWriter implements OutputWriter
     @Override
     public void endRow()
     {
-        try
+        writeRowSeparator(writer);
+
+        // Delayed write
+        // Now the buffer contains the first rows values
+        // Temp contains the headers
+        if (buffer != null)
         {
-            writer.write(System.lineSeparator());
-        }
-        catch (IOException e)
-        {
-            throw new RuntimeException("Error ending CSV row", e);
+            // End header row with separator
+            writeRowSeparator(temp);
+
+            // Write the buffer (ie. first row values) to output
+            // Skip leading separator char
+            try
+            {
+                IOUtils.copy(new StringReader(buffer.getBuffer().substring(1)), temp);
+            }
+            catch (IOException e)
+            {
+                throw new RuntimeException("Error writing bufferd CSV data", e);
+            }
+
+            // Switch to normal writing
+            writer = temp;
+            temp = null;
+            buffer = null;
         }
     }
 
     @Override
     public void writeFieldName(String name)
     {
-        // Not used for CSV
+        // Buffered write, then write the header to temp which is the real output writer
+        if (buffer != null)
+        {
+            writeValue(temp, name);
+        }
     }
 
     @Override
     public void writeValue(Object value)
     {
-        try
-        {
-            if (!firstEntryOnRow)
-            {
-                writer.write(settings.separatorChar);
-            }
-
-            if (value == null)
-            {
-                writer.write(NULL);
-            }
-            else if (value instanceof Boolean)
-            {
-                char[] chars = ((Boolean) value).booleanValue() ? TRUE : FALSE;
-                writer.write(chars);
-            }
-            else if (value instanceof Reader)
-            {
-                write((Reader) value);
-            }
-            else
-            {
-                // ToString the value as fallback
-                String str = String.valueOf(value);
-                write(new StringReader(str));
-            }
-
-            firstEntryOnRow = false;
-        }
-        catch (IOException e)
-        {
-            throw new RuntimeException("Error writing CSV value", e);
-        }
+        writeValue(writer, value);
     }
 
     @Override
@@ -201,7 +220,59 @@ public class CsvOutputWriter implements OutputWriter
         writeValue(settings.arrayEndChar);
     }
 
-    private void write(Reader reader) throws IOException
+    private void writeValue(Writer writer, Object value)
+    {
+        try
+        {
+            if (!firstEntryOnRow)
+            {
+                writer.write(settings.separatorChar);
+            }
+
+            if (value == null)
+            {
+                writer.write(NULL);
+            }
+            else if (value instanceof Boolean)
+            {
+                char[] chars = ((Boolean) value).booleanValue() ? TRUE : FALSE;
+                writer.write(chars);
+            }
+            else if (value instanceof Reader)
+            {
+                write(writer, (Reader) value);
+            }
+            else
+            {
+                // ToString the value as fallback
+                String str = String.valueOf(value);
+                write(writer, new StringReader(str));
+            }
+
+            firstEntryOnRow = false;
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Error writing CSV value", e);
+        }
+    }
+
+    private void writeRowSeparator(Writer writer)
+    {
+        if (!isEmpty(rowSeparator))
+        {
+            try
+            {
+                writer.write(rowSeparator);
+            }
+            catch (IOException e)
+            {
+                throw new RuntimeException("Error ending CSV row", e);
+            }
+        }
+    }
+
+    private void write(Writer writer, Reader reader) throws IOException
     {
         try (Reader r = reader)
         {
@@ -225,22 +296,26 @@ public class CsvOutputWriter implements OutputWriter
 
     private void newResultSet()
     {
-        if (!isBlank(settings.resultsetSeparator))
+        if (!isEmpty(resultSetSeparator))
         {
             try
             {
-                // Unescape known escapes
-                writer.write(settings.resultsetSeparator
-                        .replace("\\n\\r", System.lineSeparator())
-                        .replace("\\n", "\n")
-                        .replace("\\r", "\r")
-                        .replace("\\t", "\t"));
+                writer.write(resultSetSeparator);
             }
             catch (IOException e)
             {
                 throw new RuntimeException("Error writing CSV result set separator", e);
             }
         }
+    }
+
+    static String unescape(String separator)
+    {
+        return separator
+                .replace("\\n\\r", "\n\r")
+                .replace("\\n", "\n")
+                .replace("\\r", "\r")
+                .replace("\\t", "\t");
     }
 
     /** Csv writer settings */
@@ -256,7 +331,9 @@ public class CsvOutputWriter implements OutputWriter
         private char objectEndChar = '}';
         private boolean writeHeaders = true;
         private boolean escapeNewLines = true;
-        private String resultsetSeparator = "\n";
+
+        private String rowSeparator = "\\n";
+        private String resultSetSeparator = "\\n";
 
         public char getEscapeChar()
         {
@@ -338,14 +415,24 @@ public class CsvOutputWriter implements OutputWriter
             this.escapeNewLines = escapeNewLines;
         }
 
-        public String getResultsetSeparator()
+        public String getRowSeparator()
         {
-            return resultsetSeparator;
+            return rowSeparator;
         }
 
-        public void setResultsetSeparator(String resultsetSeparator)
+        public void setRowSeparator(String rowSeparator)
         {
-            this.resultsetSeparator = resultsetSeparator;
+            this.rowSeparator = rowSeparator;
+        }
+
+        public String getResultSetSeparator()
+        {
+            return resultSetSeparator;
+        }
+
+        public void setResultSetSeparator(String resultSetSeparator)
+        {
+            this.resultSetSeparator = resultSetSeparator;
         }
     }
 }
