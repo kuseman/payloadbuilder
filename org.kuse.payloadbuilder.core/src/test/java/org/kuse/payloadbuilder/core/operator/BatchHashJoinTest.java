@@ -18,7 +18,8 @@ import org.apache.commons.lang3.mutable.MutableInt;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.BatchCacheOperatorTest.TestCacheProvider;
-import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory.IIndexValues;
+import org.kuse.payloadbuilder.core.operator.ExpressionOrdinalValuesFactory.OrdinalValues;
+import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValues;
 import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
@@ -38,7 +39,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 "",
                 left,
                 right,
-                new ExpressionIndexValuesFactory(asList(e("a.col1"))),
+                new ExpressionOrdinalValuesFactory(asList(e("a.col1"))),
                 new ExpressionHashFunction(asList(e("b.col1"))),
                 new ExpressionPredicate(e("b.col1 = a.col1")),
                 new DefaultTupleMerger(-1, 0, 2),
@@ -66,9 +67,9 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op1(ctx ->
                 {
-                    while (ctx.getStatementContext().getOuterIndexValues().hasNext())
+                    while (ctx.getStatementContext().getOuterOrdinalValues().hasNext())
                     {
-                        ctx.getStatementContext().getOuterIndexValues().next();
+                        ctx.getStatementContext().getOuterOrdinalValues().next();
                     }
                     return TupleIterator.EMPTY;
                 }, () -> bClose.increment()))),
@@ -130,8 +131,8 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(ctx ->
                 {
-                    ctx.getStatementContext().getOuterIndexValues().hasNext();
-                    IIndexValues ar = ctx.getStatementContext().getOuterIndexValues().next();
+                    ctx.getStatementContext().getOuterOrdinalValues().hasNext();
+                    IOrdinalValues ar = ctx.getStatementContext().getOuterOrdinalValues().next();
                     return asList((Tuple) Row.of(a, 0, new String[] {"col1"}, new Object[] {ar.getValue(0)})).iterator();
                 }, () -> bClose.increment()))),
                 ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new String[] {"col1"}, new Object[] {i})).iterator(), () -> aClose.increment()))));
@@ -165,11 +166,11 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op1(ctx ->
                 {
-                    while (ctx.getStatementContext().getOuterIndexValues().hasNext())
+                    while (ctx.getStatementContext().getOuterOrdinalValues().hasNext())
                     {
-                        ctx.getStatementContext().getOuterIndexValues().next();
+                        ctx.getStatementContext().getOuterOrdinalValues().next();
                     }
-                    ctx.getStatementContext().getOuterIndexValues().next();
+                    ctx.getStatementContext().getOuterOrdinalValues().next();
                     return TupleIterator.EMPTY;
                 }, () -> bClose.increment()))),
                 ofEntries(entry("tableA", a -> op(ctx -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i, new String[] {"col1"}, new Object[] {i})).iterator(), () -> aClose.increment()))));
@@ -226,7 +227,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableC", index)),
                 ofEntries(entry("tableC", a -> op(ctx ->
                 {
-                    Iterable<IIndexValues> it = () -> ctx.getStatementContext().getOuterIndexValues();
+                    Iterable<IOrdinalValues> it = () -> ctx.getStatementContext().getOuterOrdinalValues();
                     List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
                             .map(ar -> (Integer) ar.getValue(0))
                             .map(val -> (Tuple) Row.of(a, posC.getAndIncrement(), new String[] {"col1", "col2"}, new Object[] {val, "val" + val}))
@@ -288,7 +289,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
+                    Iterable<IOrdinalValues> it = () -> context.getStatementContext().getOuterOrdinalValues();
                     List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
                             .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
@@ -352,7 +353,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
+                    Iterable<IOrdinalValues> it = () -> context.getStatementContext().getOuterOrdinalValues();
                     List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
                             .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
@@ -410,20 +411,20 @@ public class BatchHashJoinTest extends AOperatorTest
         assertEquals(14, cache.size());
 
         Map<Object, List<Tuple>> expectedCache = MapUtils.ofEntries(
-                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {-2})), emptyList()),
-                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {-1})), emptyList()),
-                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {0})), emptyList()),
-                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {1})), emptyList()),
-                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {2})), emptyList()),
-                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {3})), emptyList()),
-                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {4})), emptyList()),
-                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {5})), asList(innerTuples.get(0))),
-                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {6})), asList(innerTuples.get(1))),
-                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {7})), asList(innerTuples.get(2))),
-                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {8})), asList(innerTuples.get(3))),
-                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {9})), asList(innerTuples.get(4))),
-                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {10})), emptyList()),
-                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new ExpressionIndexValuesFactory.IndexValues(new Object[] {11})), emptyList()));
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new OrdinalValues(new Object[] {-2})), emptyList()),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new OrdinalValues(new Object[] {-1})), emptyList()),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new OrdinalValues(new Object[] {0})), emptyList()),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new OrdinalValues(new Object[] {1})), emptyList()),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new OrdinalValues(new Object[] {2})), emptyList()),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new OrdinalValues(new Object[] {3})), emptyList()),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new OrdinalValues(new Object[] {4})), emptyList()),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new OrdinalValues(new Object[] {5})), asList(innerTuples.get(0))),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new OrdinalValues(new Object[] {6})), asList(innerTuples.get(1))),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new OrdinalValues(new Object[] {7})), asList(innerTuples.get(2))),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new OrdinalValues(new Object[] {8})), asList(innerTuples.get(3))),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new OrdinalValues(new Object[] {9})), asList(innerTuples.get(4))),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new OrdinalValues(new Object[] {10})), emptyList()),
+                MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new OrdinalValues(new Object[] {11})), emptyList()));
         assertEquals(expectedCache, cache);
 
         // Open once more and verify that inner operator wasn't opened at all
@@ -466,7 +467,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
+                    Iterable<IOrdinalValues> it = () -> context.getStatementContext().getOuterOrdinalValues();
                     List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
                             .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
@@ -533,7 +534,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
+                    Iterable<IOrdinalValues> it = () -> context.getStatementContext().getOuterOrdinalValues();
                     return StreamSupport.stream(it.spliterator(), false)
                             .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
@@ -596,7 +597,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
+                    Iterable<IOrdinalValues> it = () -> context.getStatementContext().getOuterOrdinalValues();
                     return StreamSupport.stream(it.spliterator(), false)
                             .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
@@ -663,7 +664,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
+                    Iterable<IOrdinalValues> it = () -> context.getStatementContext().getOuterOrdinalValues();
                     List<Tuple> rows = StreamSupport.stream(it.spliterator(), false)
                             .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
@@ -727,7 +728,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
+                    Iterable<IOrdinalValues> it = () -> context.getStatementContext().getOuterOrdinalValues();
                     List<Tuple> rows = StreamSupport.stream(it.spliterator(), false)
                             .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
@@ -804,7 +805,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", a -> op(context ->
                 {
                     // Create 2 rows for each input row
-                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
+                    Iterable<IOrdinalValues> it = () -> context.getStatementContext().getOuterOrdinalValues();
                     List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
                             .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
@@ -873,7 +874,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", a -> op(context ->
                 {
                     // Create 3 rows for each input row
-                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
+                    Iterable<IOrdinalValues> it = () -> context.getStatementContext().getOuterOrdinalValues();
                     List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
                             .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
@@ -949,7 +950,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
+                    Iterable<IOrdinalValues> it = () -> context.getStatementContext().getOuterOrdinalValues();
                     List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
                             .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
@@ -1014,7 +1015,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
+                    Iterable<IOrdinalValues> it = () -> context.getStatementContext().getOuterOrdinalValues();
                     List<Tuple> inner = StreamSupport.stream(it.spliterator(), false)
                             .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
@@ -1085,7 +1086,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
+                    Iterable<IOrdinalValues> it = () -> context.getStatementContext().getOuterOrdinalValues();
                     return StreamSupport.stream(it.spliterator(), false)
                             .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
@@ -1152,7 +1153,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
                 {
-                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
+                    Iterable<IOrdinalValues> it = () -> context.getStatementContext().getOuterOrdinalValues();
                     return StreamSupport.stream(it.spliterator(), false)
                             .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
@@ -1231,7 +1232,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", a -> op(context ->
                 {
                     // Create 2 rows for each input row
-                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
+                    Iterable<IOrdinalValues> it = () -> context.getStatementContext().getOuterOrdinalValues();
                     return StreamSupport.stream(it.spliterator(), false)
                             .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
@@ -1302,7 +1303,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 ofEntries(entry("tableB", a -> op(context ->
                 {
                     // Create 2 rows for each input row
-                    Iterable<IIndexValues> it = () -> context.getStatementContext().getOuterIndexValues();
+                    Iterable<IOrdinalValues> it = () -> context.getStatementContext().getOuterOrdinalValues();
                     return StreamSupport.stream(it.spliterator(), false)
                             .map(ar -> (Integer) ar.getValue(0))
                             .filter(val -> val >= 5 && val <= 9)
@@ -1391,7 +1392,7 @@ public class BatchHashJoinTest extends AOperatorTest
     //                MapUtils.ofEntries(
     //                        MapUtils.entry("tableB", a -> op(context ->
     //                        {
-    //                            Iterable<Object[]> it = () -> context.getStatementContext().getOuterIndexValues();
+    //                            Iterable<Object[]> it = () -> context.getStatementContext().getOuterOrdinalValues();
     //                            return StreamSupport.stream(it.spliterator(), false)
     //                                    .map(ar -> (Integer) ar[0])
     //                                    .flatMap(val -> asList(
@@ -1404,7 +1405,7 @@ public class BatchHashJoinTest extends AOperatorTest
     //                        })),
     //                        MapUtils.entry("tableC", a -> op(context ->
     //                        {
-    //                            Iterable<Object[]> it = () -> context.getStatementContext().getOuterIndexValues();
+    //                            Iterable<Object[]> it = () -> context.getStatementContext().getOuterOrdinalValues();
     //                            return StreamSupport.stream(it.spliterator(), false)
     //                                    .map(ar -> (Integer) ar[0])
     //                                    .flatMap(val -> asList(

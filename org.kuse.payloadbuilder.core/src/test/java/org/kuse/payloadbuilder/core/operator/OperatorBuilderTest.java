@@ -222,7 +222,7 @@ public class OperatorBuilderTest extends AOperatorTest
                 1,
                 queryResult.tableOperators.get(0),
                 ofEntries(entry(0, CollectionUtils.asSet("art_id"))),
-                new ExpressionIndexValuesFactory(asList(e("a.art_id"))),
+                new ExpressionOrdinalValuesFactory(asList(e("a.art_id"))),
                 1);
 
         //                System.out.println(queryResult.operator.toString(1));

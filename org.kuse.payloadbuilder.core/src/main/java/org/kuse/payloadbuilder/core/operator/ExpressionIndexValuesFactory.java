@@ -7,18 +7,18 @@ import java.util.List;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.utils.ObjectUtils;
 
-/** Expression based index values factory. */
-class ExpressionIndexValuesFactory implements IIndexValuesFactory
+/** Expression based ordinal values factory. */
+class ExpressionOrdinalValuesFactory implements IOrdinalValuesFactory
 {
     private final List<Expression> expressions;
 
-    ExpressionIndexValuesFactory(List<Expression> expressions)
+    ExpressionOrdinalValuesFactory(List<Expression> expressions)
     {
         this.expressions = requireNonNull(expressions, "expressions");
     }
 
     @Override
-    public IIndexValues create(ExecutionContext context, Tuple tuple)
+    public IOrdinalValues create(ExecutionContext context, Tuple tuple)
     {
         int size = expressions.size();
         Object[] values = new Object[size];
@@ -28,7 +28,7 @@ class ExpressionIndexValuesFactory implements IIndexValuesFactory
             values[i] = expressions.get(i).eval(context);
         }
         context.getStatementContext().setTuple(null);
-        return new IndexValues(values);
+        return new OrdinalValues(values);
     }
 
     @Override
@@ -40,9 +40,9 @@ class ExpressionIndexValuesFactory implements IIndexValuesFactory
     @Override
     public boolean equals(Object obj)
     {
-        if (obj instanceof ExpressionIndexValuesFactory)
+        if (obj instanceof ExpressionOrdinalValuesFactory)
         {
-            ExpressionIndexValuesFactory that = (ExpressionIndexValuesFactory) obj;
+            ExpressionOrdinalValuesFactory that = (ExpressionOrdinalValuesFactory) obj;
             return expressions.equals(that.expressions);
         }
         return false;
@@ -54,13 +54,13 @@ class ExpressionIndexValuesFactory implements IIndexValuesFactory
         return expressions.toString();
     }
 
-    /** Index values from Object array */
-    static class IndexValues implements IIndexValues
+    /** Ordinal values from Object array */
+    static class OrdinalValues implements IOrdinalValues
     {
         private final Object[] values;
         private final int hashCode;
 
-        IndexValues(Object[] values)
+        OrdinalValues(Object[] values)
         {
             this.values = values;
             this.hashCode = hash();
@@ -87,12 +87,12 @@ class ExpressionIndexValuesFactory implements IIndexValuesFactory
         @Override
         public boolean equals(Object obj)
         {
-            if (!(obj instanceof IIndexValues))
+            if (!(obj instanceof IOrdinalValues))
             {
                 return false;
             }
 
-            return isEquals((IIndexValues) obj);
+            return isEquals((IOrdinalValues) obj);
         }
 
         private int hash()

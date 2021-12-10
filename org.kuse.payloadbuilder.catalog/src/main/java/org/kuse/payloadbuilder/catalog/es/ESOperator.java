@@ -63,7 +63,7 @@ import org.kuse.payloadbuilder.core.catalog.TableMeta;
 import org.kuse.payloadbuilder.core.catalog.TableMeta.Column;
 import org.kuse.payloadbuilder.core.operator.AOperator;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
-import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory.IIndexValues;
+import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValues;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.StatementContext;
 import org.kuse.payloadbuilder.core.operator.StatementContext.NodeData;
@@ -235,9 +235,9 @@ class ESOperator extends AOperator
         if (index instanceof ParentIndex)
         {
             List<String> parentIds = new ArrayList<>();
-            while (context.getStatementContext().getOuterIndexValues().hasNext())
+            while (context.getStatementContext().getOuterOrdinalValues().hasNext())
             {
-                IIndexValues array = context.getStatementContext().getOuterIndexValues().next();
+                IOrdinalValues array = context.getStatementContext().getOuterOrdinalValues().next();
                 Object obj = array.getValue(0);
                 if (obj != null)
                 {
@@ -830,7 +830,7 @@ class ESOperator extends AOperator
         @Override
         public void writeTo(OutputStream outStream) throws IOException
         {
-            Iterator<IIndexValues> values = context.getOuterIndexValues();
+            Iterator<IOrdinalValues> values = context.getOuterOrdinalValues();
             try (CountingOutputStream bos = new CountingOutputStream(outStream))
             {
                 bos.write(HEADER_BYTES);

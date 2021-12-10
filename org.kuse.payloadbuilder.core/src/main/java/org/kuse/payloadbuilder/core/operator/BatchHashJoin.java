@@ -32,7 +32,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.lang3.time.StopWatch;
 import org.kuse.payloadbuilder.core.catalog.Index;
-import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory.IIndexValues;
+import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValues;
 import org.kuse.payloadbuilder.core.operator.StatementContext.NodeData;
 import org.kuse.payloadbuilder.core.parser.Option;
 
@@ -59,7 +59,7 @@ class BatchHashJoin extends AOperator
     private final String logicalOperator;
     private final Operator outer;
     private final Operator inner;
-    private final IIndexValuesFactory outerValuesFactory;
+    private final IOrdinalValuesFactory outerValuesFactory;
     private final ToIntBiFunction<ExecutionContext, Tuple> innerHashFunction;
     private final Predicate<ExecutionContext> predicate;
     private final TupleMerger rowMerger;
@@ -75,7 +75,7 @@ class BatchHashJoin extends AOperator
             String logicalOperator,
             Operator outer,
             Operator inner,
-            IIndexValuesFactory outerValuesFactory,
+            IOrdinalValuesFactory outerValuesFactory,
             ToIntBiFunction<ExecutionContext, Tuple> innerHashFunction,
             Predicate<ExecutionContext> predicate,
             TupleMerger rowMerger,
@@ -158,12 +158,12 @@ class BatchHashJoin extends AOperator
             private int innerRowIndex;
 
             /** Reference to outer values iterator to verify that implementations of Operator fully uses the index if specified */
-            private Iterator<IIndexValues> outerValuesIterator;
+            private Iterator<IOrdinalValues> outerValuesIterator;
 
             /** Table use for hashed inner values */
             private final TIntObjectHashMap<List<Tuple>> table = new TIntObjectHashMap<>(batchSize);
 
-            private final Set<IIndexValues> addedValues = new HashSet<>(batchSize);
+            private final Set<IOrdinalValues> addedValues = new HashSet<>(batchSize);
 
             private Tuple next;
             private TupleHolder outerTuple;
@@ -350,7 +350,7 @@ class BatchHashJoin extends AOperator
                     Tuple tuple = outerIt.next();
 
                     joinTuple.setInner(tuple);
-                    IIndexValues outerValues = outerValuesFactory.create(context, joinTuple);
+                    IOrdinalValues outerValues = outerValuesFactory.create(context, joinTuple);
                     int hash = outerValues.hashCode();
 
                     TupleHolder holder = new TupleHolder(tuple, hash);
@@ -389,7 +389,7 @@ class BatchHashJoin extends AOperator
                     return false;
                 }
 
-                context.getStatementContext().setOuterIndexValues(outerValuesIterator);
+                context.getStatementContext().setOuterOrdinalValues(outerValuesIterator);
                 TupleIterator it = inner.open(context);
 
                 joinTuple.setOuter(null);
@@ -431,7 +431,7 @@ class BatchHashJoin extends AOperator
                 it.close();
 
                 verifyOuterValuesIterator();
-                context.getStatementContext().setOuterIndexValues(null);
+                context.getStatementContext().setOuterOrdinalValues(null);
                 return tuplesFetched;
             }
 
@@ -567,7 +567,7 @@ class BatchHashJoin extends AOperator
         private final int hash;
 
         /** Flag to indicate that this holder should be pushed to downstream operator to be used as index value foundation */
-        private IIndexValues outerValues;
+        private IOrdinalValues outerValues;
         /** Flag to indicate if this tuple got a match or not. Used in populating and left joins */
         private boolean match;
 

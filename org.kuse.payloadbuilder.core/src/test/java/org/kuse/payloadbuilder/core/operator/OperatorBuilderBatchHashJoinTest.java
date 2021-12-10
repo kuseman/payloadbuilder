@@ -68,12 +68,12 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 new BatchCacheOperator(
                         2,
                         operators.get(1),
-                        new ExpressionIndexValuesFactory(asList(e("b.col1"))),
+                        new ExpressionOrdinalValuesFactory(asList(e("b.col1"))),
                         new CacheSettings(
                                 new ExpressionFunction(e("'tableB'")),
                                 new ExpressionFunction(e("@param")),
                                 new ExpressionFunction(e("'PT10m'")))),
-                new ExpressionIndexValuesFactory(asList(e("a.col1"))),
+                new ExpressionOrdinalValuesFactory(asList(e("a.col1"))),
                 new ExpressionHashFunction(asList(e("b.col1"))),
                 new ExpressionPredicate(e("b.col1 = a.col1")),
                 new DefaultTupleMerger(-1, 1, 2),
@@ -126,7 +126,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                                 new DefaultTupleMerger(-1, 3, 2),
                                 true,
                                 false),
-                        new ExpressionIndexValuesFactory(asList(e("s.art_id")))),
+                        new ExpressionOrdinalValuesFactory(asList(e("s.art_id")))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
                 new DefaultTupleMerger(-1, 1, 3),
                 true,
@@ -175,7 +175,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                         "INNER JOIN",
                         new FilterOperator(2, operators.get(1), new ExpressionPredicate(e("a.active_flg = 1"))),
                         new FilterOperator(4, operators.get(2), new ExpressionPredicate(e("aa.active_flg = true"))),
-                        new ExpressionIndexValuesFactory(asList(e("a.art_id"))),
+                        new ExpressionOrdinalValuesFactory(asList(e("a.art_id"))),
                         new ExpressionHashFunction(asList(e("aa.art_id"))),
                         new ExpressionPredicate(e("aa.art_id = a.art_id")),
                         new DefaultTupleMerger(-1, 3, 2),
@@ -183,7 +183,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                         false,
                         c.getIndices(session, "", QualifiedName.of("article_attribute")).get(0),
                         null),
-                new ExpressionIndexValuesFactory(asList(e("1460"), e("0"), e("s.art_id"))),
+                new ExpressionOrdinalValuesFactory(asList(e("1460"), e("0"), e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("1460"), e("0"), e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
                 new DefaultTupleMerger(-1, 1, 3),
@@ -227,7 +227,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 "INNER JOIN",
                 operators.get(0),
                 new FilterOperator(2, operators.get(1), new ExpressionPredicate(e("a.active_flg = 1"))),
-                new ExpressionIndexValuesFactory(asList(e("1460"), e("0"), e("s.art_id"))),
+                new ExpressionOrdinalValuesFactory(asList(e("1460"), e("0"), e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("1460"), e("0"), e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
                 new DefaultTupleMerger(-1, 1, 2),
@@ -271,7 +271,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 "INNER JOIN",
                 operators.get(0),
                 new FilterOperator(2, operators.get(1), new ExpressionPredicate(e("internet_flg = 1 AND a.active_flg = 1"))),
-                new ExpressionIndexValuesFactory(asList(e("1460"), e("0"), e("s.art_id"))),
+                new ExpressionOrdinalValuesFactory(asList(e("1460"), e("0"), e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("1460"), e("0"), e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
                 new DefaultTupleMerger(-1, 1, 2),
@@ -321,7 +321,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 "LEFT JOIN",
                 operators.get(0),
                 new FilterOperator(2, operators.get(1), new ExpressionPredicate(e("internet_flg = 1 AND a.active_flg = 1"))),
-                new ExpressionIndexValuesFactory(asList(e("1460"), e("0"), e("s.art_id"))),
+                new ExpressionOrdinalValuesFactory(asList(e("1460"), e("0"), e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("1460"), e("0"), e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id AND s.flag = true")),
                 new DefaultTupleMerger(-1, 1, 2),
@@ -365,7 +365,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 "LEFT JOIN",
                 operators.get(0),
                 new FilterOperator(2, operators.get(1), new ExpressionPredicate(e("a.active_flg = 1"))),
-                new ExpressionIndexValuesFactory(asList(e("1460"), e("0"), e("s.art_id"))),
+                new ExpressionOrdinalValuesFactory(asList(e("1460"), e("0"), e("s.art_id"))),
                 new ExpressionHashFunction(asList(e("1460"), e("0"), e("a.art_id"))),
                 new ExpressionPredicate(e("a.art_id = s.art_id")),
                 new DefaultTupleMerger(-1, 1, 2),
@@ -439,7 +439,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         {
             if (keysByTable.containsKey(name))
             {
-                assertNotNull(context.getStatementContext().getOuterIndexValues());
+                assertNotNull(context.getStatementContext().getOuterOrdinalValues());
             }
             return TupleIterator.EMPTY;
         }

@@ -11,7 +11,7 @@ import java.util.function.Predicate;
 
 import org.apache.commons.lang3.StringUtils;
 import org.kuse.payloadbuilder.core.catalog.Index;
-import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory.IIndexValues;
+import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValues;
 
 /**
  * <pre>
@@ -116,7 +116,7 @@ class BatchMergeJoin extends AOperator
             private TupleIterator innerIt;
 
             /** Reference to outer values iterator to verify that implementations of Operator fully uses the index if specified */
-            private Iterator<IIndexValues> outerValuesIterator;
+            private Iterator<IOrdinalValues> outerValuesIterator;
 
             private Tuple next;
             /** Current process outer row */
@@ -172,12 +172,12 @@ class BatchMergeJoin extends AOperator
                         if (outerRows.isEmpty())
                         {
                             verifyOuterValuesIterator();
-                            context.getStatementContext().setOuterIndexValues(null);
+                            context.getStatementContext().setOuterOrdinalValues(null);
                             return false;
                         }
 
                         outerValuesIterator = outerValuesIterator();
-                        context.getStatementContext().setOuterIndexValues(outerValuesIterator);
+                        context.getStatementContext().setOuterOrdinalValues(outerValuesIterator);
                         innerIt = inner.open(context);
                         if (!innerIt.hasNext())
                         {
@@ -397,7 +397,7 @@ class BatchMergeJoin extends AOperator
                 //                int count = 0;
                 int size = batchSize > 0 ? batchSize : 100;
                 outerRows = new ArrayList<>(size);
-                //                IIndexValues prevKeyValues = null;
+                //                IOrdinalValues prevKeyValues = null;
                 if (batchedLeftOverRow != null)
                 {
                     outerRows.add(batchedLeftOverRow);
@@ -431,15 +431,15 @@ class BatchMergeJoin extends AOperator
                 }
             }
 
-            private Iterator<IIndexValues> outerValuesIterator()
+            private Iterator<IOrdinalValues> outerValuesIterator()
             {
                 //CSOFF
-                return new Iterator<IIndexValues>()
+                return new Iterator<IOrdinalValues>()
                 //CSON
                 {
                     private int outerRowsIndex;
-                    private IIndexValues nextArray;
-                    private IIndexValues prevArray;
+                    private IOrdinalValues nextArray;
+                    private IOrdinalValues prevArray;
 
                     @Override
                     public boolean hasNext()
@@ -448,14 +448,14 @@ class BatchMergeJoin extends AOperator
                     }
 
                     @Override
-                    public IIndexValues next()
+                    public IOrdinalValues next()
                     {
                         if (nextArray == null)
                         {
                             throw new NoSuchElementException();
                         }
 
-                        IIndexValues result = nextArray;
+                        IOrdinalValues result = nextArray;
                         nextArray = null;
                         return result;
                     }
@@ -539,7 +539,7 @@ class BatchMergeJoin extends AOperator
     static class TupleHolder
     {
         private Tuple tuple;
-        private IIndexValues extractedValues;
+        private IOrdinalValues extractedValues;
         private boolean match;
 
         TupleHolder(Tuple tuple)

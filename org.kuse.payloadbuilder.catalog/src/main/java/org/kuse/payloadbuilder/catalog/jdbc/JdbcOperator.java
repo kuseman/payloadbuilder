@@ -21,7 +21,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.AOperator;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
-import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory.IIndexValues;
+import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValues;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
@@ -181,10 +181,10 @@ class JdbcOperator extends AOperator
 
             int size = index.getColumns().size();
             sb.append(whereAdded ? " AND (" : " WHERE (");
-            Iterator<IIndexValues> it = context.getStatementContext().getOuterIndexValues();
+            Iterator<IOrdinalValues> it = context.getStatementContext().getOuterOrdinalValues();
             while (it.hasNext())
             {
-                IIndexValues values = it.next();
+                IOrdinalValues values = it.next();
                 sb.append("(");
                 for (int i = 0; i < size; i++)
                 {

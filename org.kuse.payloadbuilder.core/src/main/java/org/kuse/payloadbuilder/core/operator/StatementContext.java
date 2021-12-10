@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import org.apache.commons.lang3.time.StopWatch;
-import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory.IIndexValues;
+import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValues;
 
 /**
  * Context used during a statement.
@@ -31,7 +31,7 @@ public class StatementContext
     /** Stores node unique data by node's unique id */
     private final Map<Integer, NodeData> nodeDataById = new ConcurrentHashMap<>();
     /** Iterator of outer row values used when having an indexed inner operator in Batched operators */
-    private Iterator<IIndexValues> outerIndexValues;
+    private Iterator<IOrdinalValues> outerOrdinalValues;
     /** Holder for lambda references during evaluation */
     private List<Object> lambdaValues;
     private ZonedDateTime now = ZonedDateTime.now();
@@ -49,24 +49,24 @@ public class StatementContext
         this.tuple = source.tuple;
     }
 
-    public Iterator<IIndexValues> getOuterIndexValues()
+    public Iterator<IOrdinalValues> getOuterOrdinalValues()
     {
-        return outerIndexValues;
+        return outerOrdinalValues;
     }
 
-    public void setOuterIndexValues(Iterator<IIndexValues> outerIndexValues)
+    public void setOuterOrdinalValues(Iterator<IOrdinalValues> outerOrdinalValues)
     {
-        this.outerIndexValues = outerIndexValues;
+        this.outerOrdinalValues = outerOrdinalValues;
     }
 
     /** Consumes any left outer values */
     public void consumeOuterValues()
     {
-        if (outerIndexValues != null)
+        if (outerOrdinalValues != null)
         {
-            while (outerIndexValues.hasNext())
+            while (outerOrdinalValues.hasNext())
             {
-                outerIndexValues.next();
+                outerOrdinalValues.next();
             }
         }
     }
@@ -78,7 +78,7 @@ public class StatementContext
         tuple = null;
         now = ZonedDateTime.now();
         lambdaValues = null;
-        outerIndexValues = null;
+        outerOrdinalValues = null;
         nodeDataById.clear();
     }
 

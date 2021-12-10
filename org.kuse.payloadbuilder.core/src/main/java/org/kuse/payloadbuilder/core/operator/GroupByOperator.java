@@ -14,7 +14,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
-import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory.IIndexValues;
+import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValues;
 
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
@@ -29,7 +29,7 @@ class GroupByOperator extends AOperator
      * Use an index value factory here for the purpose of creating objects to put in map as key only They implement hashCode/equals so they fit
      * perfectly here.
      */
-    private final IIndexValuesFactory indexValueFactory;
+    private final IOrdinalValuesFactory indexValueFactory;
     private final int size;
     private final Map<Integer, Set<String>> columnReferences;
 
@@ -37,7 +37,7 @@ class GroupByOperator extends AOperator
             int nodeId,
             Operator operator,
             Map<Integer, Set<String>> columnReferences,
-            IIndexValuesFactory indexValueFactory,
+            IOrdinalValuesFactory indexValueFactory,
             int size)
     {
         super(nodeId);
@@ -69,12 +69,12 @@ class GroupByOperator extends AOperator
     @Override
     public TupleIterator open(ExecutionContext context)
     {
-        Map<IIndexValues, List<Tuple>> table = new LinkedHashMap<>();
+        Map<IOrdinalValues, List<Tuple>> table = new LinkedHashMap<>();
         TupleIterator it = operator.open(context);
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            IIndexValues values = indexValueFactory.create(context, tuple);
+            IOrdinalValues values = indexValueFactory.create(context, tuple);
             table.compute(values, (k, v) ->
             {
                 if (v == null)

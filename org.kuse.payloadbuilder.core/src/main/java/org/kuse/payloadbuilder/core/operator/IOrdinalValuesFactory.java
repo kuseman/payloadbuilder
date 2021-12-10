@@ -5,7 +5,7 @@ import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.utils.ExpressionMath;
 
 /**
- * Factory that creates {@link IIndexValues}.
+ * Factory that creates {@link IOrdinalValues}.
  *
  * <pre>
  * This factory creates objects that is used as key in maps for example BatchhashJoin, GroupBy
@@ -21,14 +21,14 @@ import org.kuse.payloadbuilder.core.utils.ExpressionMath;
  *  on b.col1 = a.col1
  *  and b.col2 = @value
  *
- * Here we will create {@link IIndexValues} for each (a.col1, @value) pair
+ * Here we will create {@link IOrdinalValues} for each (a.col1, @value) pair
  * that will be accessible by tableB operator to index into it's rows.
  * </pre>
  */
-public interface IIndexValuesFactory
+public interface IOrdinalValuesFactory
 {
     /** Create an index values instance from provided tuple */
-    IIndexValues create(ExecutionContext context, Tuple tuple);
+    IOrdinalValues create(ExecutionContext context, Tuple tuple);
 
     /**
      * <pre>
@@ -39,7 +39,7 @@ public interface IIndexValuesFactory
      * MOTE! Important to implements hashCode/equals since these values might be put in cache
      * </pre>
      */
-    interface IIndexValues
+    interface IOrdinalValues
     {
         /** Get size of values. */
         int size();
@@ -90,7 +90,7 @@ public interface IIndexValuesFactory
 
         //CSOFF
         //@formatter:off
-        default boolean isEquals(IIndexValues that)
+        default boolean isEquals(IOrdinalValues that)
         {
             // Since these classes are created by different class loaders,
             // we cannot use instanceof of. So make use of accessor methods on the interface instead

@@ -301,7 +301,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         if (!select.getGroupBy().isEmpty())
         {
-            context.setOperator(createGroupBy(context.acquireNodeId(), select.getGroupBy(), createIndexVauesFactory(context.session, select.getGroupBy()), context.getOperator()));
+            context.setOperator(createGroupBy(context.acquireNodeId(), select.getGroupBy(), createOrdinalValuesFactory(context.session, select.getGroupBy()), context.getOperator()));
         }
 
         if (batchLimitOption != null)
@@ -829,8 +829,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             // let the inner utilize each nested loops outer rows index values
             else if (hasIndex)
             {
-                IIndexValuesFactory outerIndexValuesFactory = createIndexVauesFactory(context.session, foundation.outerValueExpressions);
-                inner = context.wrap(new OuterValuesOperator(context.acquireNodeId(), inner, outerIndexValuesFactory));
+                IOrdinalValuesFactory outerOrdinalValuesFactory = createOrdinalValuesFactory(context.session, foundation.outerValueExpressions);
+                inner = context.wrap(new OuterValuesOperator(context.acquireNodeId(), inner, outerOrdinalValuesFactory));
             }
 
             return new NestedLoopJoin(
@@ -883,12 +883,12 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         Operator inner = wrapWithPushDown(context, context.getOperator(), innerTableSource.getTableAlias());
 
         constantalizeValueExtractors(foundation.outerValueExpressions, foundation.innerValueExpressions);
-        IIndexValuesFactory outerIndexValuesFactory = createIndexVauesFactory(context.session, foundation.outerValueExpressions);
+        IOrdinalValuesFactory outerOrdinalValuesFactory = createOrdinalValuesFactory(context.session, foundation.outerValueExpressions);
         ToIntBiFunction<ExecutionContext, Tuple> innerHashFunction = createHashFunction(context.session, foundation.innerValueExpressions);
 
         if (cacheName != null && !batchCacheDisabled(context.session))
         {
-            IIndexValuesFactory innerIndexValuesFactory = createIndexVauesFactory(context.session, foundation.innerValueExpressions);
+            IOrdinalValuesFactory innerOrdinalValuesFactory = createOrdinalValuesFactory(context.session, foundation.innerValueExpressions);
             // When caching we need to have asterisk columns else is will be strange to select different columns
             // then the original query
             BatchCacheOperator.CacheSettings settings = new BatchCacheOperator.CacheSettings(
@@ -899,7 +899,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             inner = context.wrap(new BatchCacheOperator(
                     context.acquireNodeId(),
                     inner,
-                    innerIndexValuesFactory,
+                    innerOrdinalValuesFactory,
                     settings));
         }
 
@@ -919,7 +919,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                             logicalOperator,
                             outerOp,
                             inner,
-                            outerIndexValuesFactory,
+                            outerOrdinalValuesFactory,
                             innerHashFunction,
                             predicate != null ? predicate : ctx -> true,
                             new DefaultTupleMerger(-1, innerTableSource.getTableAlias().getTupleOrdinal(), compositeTupleCountOnLevel),
@@ -937,7 +937,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                     logicalOperator,
                     outer,
                     inner,
-                    outerIndexValuesFactory,
+                    outerOrdinalValuesFactory,
                     innerHashFunction,
                     predicate != null ? predicate : ctx -> true,
                     new DefaultTupleMerger(-1, innerTableSource.getTableAlias().getTupleOrdinal(), compositeTupleCountOnLevel),
@@ -1001,13 +1001,13 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         return new ExpressionPredicate(predicate);
     }
 
-    private IIndexValuesFactory createIndexVauesFactory(QuerySession session, List<Expression> expressions)
+    private IOrdinalValuesFactory createOrdinalValuesFactory(QuerySession session, List<Expression> expressions)
     {
         if (BooleanUtils.isTrue((Boolean) session.getSystemProperty(QuerySession.CODEGEN_ENABLED)) && expressions.stream().allMatch(Expression::isCodeGenSupported))
         {
             try
             {
-                return CODE_GENERATOR.generateIndexValuesFactory(expressions);
+                return CODE_GENERATOR.generateOrdinalValuesFactory(expressions);
             }
             catch (Exception e)
             {
@@ -1017,7 +1017,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             }
         }
 
-        return new ExpressionIndexValuesFactory(expressions);
+        return new ExpressionOrdinalValuesFactory(expressions);
     }
 
     private ToIntBiFunction<ExecutionContext, Tuple> createHashFunction(QuerySession session, List<Expression> expressions)

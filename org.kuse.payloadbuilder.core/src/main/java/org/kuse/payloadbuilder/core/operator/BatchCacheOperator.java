@@ -21,7 +21,7 @@ import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.cache.BatchCacheProvider;
-import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory.IIndexValues;
+import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValues;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /**
@@ -65,19 +65,19 @@ import org.kuse.payloadbuilder.core.parser.QualifiedName;
 class BatchCacheOperator extends AOperator
 {
     private final Operator operator;
-    /** Factory that create {@link IIndexValues} for the inner tuples */
-    private final IIndexValuesFactory innerIndexValuesFactory;
+    /** Factory that create {@link IOrdinalValues} for the inner tuples */
+    private final IOrdinalValuesFactory innerOrdinalValuesFactory;
     private final CacheSettings settings;
 
     BatchCacheOperator(
             int nodeId,
             Operator operator,
-            IIndexValuesFactory innerIndexValuesFactory,
+            IOrdinalValuesFactory innerOrdinalValuesFactory,
             CacheSettings settings)
     {
         super(nodeId);
         this.operator = requireNonNull(operator, "operator");
-        this.innerIndexValuesFactory = requireNonNull(innerIndexValuesFactory, "innerIndexValuesFactory");
+        this.innerOrdinalValuesFactory = requireNonNull(innerOrdinalValuesFactory, "innerOrdinalValuesFactory");
         this.settings = requireNonNull(settings, "settings");
     }
 
@@ -223,13 +223,13 @@ class BatchCacheOperator extends AOperator
             Map<CacheKey, List<Tuple>> cachedValues)
     {
         // Put a non cached outer values iterator to context
-        Iterator<IIndexValues> outerValuesIterator = getOuterValuesIterator(cachedValues);
+        Iterator<IOrdinalValues> outerValuesIterator = getOuterValuesIterator(cachedValues);
         // No values to fetch, everything was present in cache
         if (!outerValuesIterator.hasNext())
         {
             return TupleIterator.EMPTY;
         }
-        context.getStatementContext().setOuterIndexValues(outerValuesIterator);
+        context.getStatementContext().setOuterOrdinalValues(outerValuesIterator);
 
         TupleIterator it = operator.open(context);
 
@@ -330,7 +330,7 @@ class BatchCacheOperator extends AOperator
             Tuple tuple = it.next();
             context.getStatementContext().setTuple(tuple);
 
-            CacheKey key = new CacheKey(cacheKey, innerIndexValuesFactory.create(context, tuple));
+            CacheKey key = new CacheKey(cacheKey, innerOrdinalValuesFactory.create(context, tuple));
             // Optimize the tuple before put to cache
             final Tuple optimizedTuple = tuple.optimize(context);
             values.compute(key, (k, v) ->
@@ -359,19 +359,19 @@ class BatchCacheOperator extends AOperator
      * Get an outer values iterator based on the cached values that will be "sent" to down stream operator Ie. Return outer values for entries that we
      * don't found a cached value for
      */
-    private Iterator<IIndexValues> getOuterValuesIterator(final Map<CacheKey, List<Tuple>> cachedValues)
+    private Iterator<IOrdinalValues> getOuterValuesIterator(final Map<CacheKey, List<Tuple>> cachedValues)
     {
         final Iterator<Entry<CacheKey, List<Tuple>>> iterator = cachedValues.entrySet().iterator();
         //CSOFF
-        return new Iterator<IIndexValues>()
+        return new Iterator<IOrdinalValues>()
         //CSON
         {
-            private IIndexValues next;
+            private IOrdinalValues next;
 
             @Override
-            public IIndexValues next()
+            public IOrdinalValues next()
             {
-                IIndexValues result = next;
+                IOrdinalValues result = next;
                 next = null;
                 return result;
             }
@@ -416,14 +416,14 @@ class BatchCacheOperator extends AOperator
             @Override
             public CacheKey next()
             {
-                IIndexValues indexValues = context.getStatementContext().getOuterIndexValues().next();
-                return new CacheKey(cacheKey, indexValues);
+                IOrdinalValues ordinalValues = context.getStatementContext().getOuterOrdinalValues().next();
+                return new CacheKey(cacheKey, ordinalValues);
             }
 
             @Override
             public boolean hasNext()
             {
-                return context.getStatementContext().getOuterIndexValues().hasNext();
+                return context.getStatementContext().getOuterOrdinalValues().hasNext();
             }
         };
     }
@@ -500,9 +500,9 @@ class BatchCacheOperator extends AOperator
     static class CacheKey
     {
         private final Object cacheKey;
-        private final IIndexValues values;
+        private final IOrdinalValues values;
 
-        CacheKey(Object cacheKey, IIndexValues values)
+        CacheKey(Object cacheKey, IOrdinalValues values)
         {
             this.cacheKey = cacheKey;
             this.values = values;

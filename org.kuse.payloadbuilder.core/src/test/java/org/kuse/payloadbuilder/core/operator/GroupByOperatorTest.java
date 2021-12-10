@@ -31,7 +31,7 @@ public class GroupByOperatorTest extends AOperatorTest
         Operator op = op(ctx -> IntStream.range(0, 10).mapToObj(i -> (Tuple) Row.of(alias, i, new Object[] {i, i % 2})).iterator(), () -> close.setTrue());
 
         List<Expression> groupBys = asList(e("a.col2", alias));
-        Operator gop = OperatorBuilderUtils.createGroupBy(0, groupBys, new ExpressionIndexValuesFactory(groupBys), op);
+        Operator gop = OperatorBuilderUtils.createGroupBy(0, groupBys, new ExpressionOrdinalValuesFactory(groupBys), op);
 
         TupleIterator it = gop.open(new ExecutionContext(session));
 

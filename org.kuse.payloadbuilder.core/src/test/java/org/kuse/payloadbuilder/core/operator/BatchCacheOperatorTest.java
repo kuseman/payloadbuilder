@@ -16,7 +16,8 @@ import org.kuse.payloadbuilder.core.cache.BatchCacheProvider;
 import org.kuse.payloadbuilder.core.catalog.TableMeta;
 import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.BatchCacheOperator.CacheSettings;
-import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory.IIndexValues;
+import org.kuse.payloadbuilder.core.operator.ExpressionOrdinalValuesFactory.OrdinalValues;
+import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValues;
 import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
@@ -34,7 +35,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
         new BatchCacheOperator(
                 1,
                 op1(ctx -> TupleIterator.EMPTY),
-                new ExpressionIndexValuesFactory(asList(e("a.col"))),
+                new ExpressionOrdinalValuesFactory(asList(e("a.col"))),
                 new CacheSettings(
                         ctx -> null,
                         ctx -> asList(1, "const"),
@@ -58,7 +59,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
                     @Override
                     public Tuple next()
                     {
-                        IIndexValues next = context.getStatementContext().getOuterIndexValues().next();
+                        IOrdinalValues next = context.getStatementContext().getOuterOrdinalValues().next();
                         pos++;
                         return Row.of(inner, 10 * pos, new Object[] {next.getValue(0)});
                     }
@@ -66,7 +67,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
                     @Override
                     public boolean hasNext()
                     {
-                        return context.getStatementContext().getOuterIndexValues().hasNext();
+                        return context.getStatementContext().getOuterOrdinalValues().hasNext();
                     }
 
                     @Override
@@ -87,7 +88,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
         BatchCacheOperator op = new BatchCacheOperator(
                 1,
                 downstream,
-                new ExpressionIndexValuesFactory(asList(e("b.col", inner))),
+                new ExpressionOrdinalValuesFactory(asList(e("b.col", inner))),
                 new CacheSettings(
                         ctx -> "article",
                         ctx -> "const",
@@ -98,11 +99,11 @@ public class BatchCacheOperatorTest extends AOperatorTest
 
         // Prepare outer values for cache/downstream
         context.getStatementContext()
-                .setOuterIndexValues(asList(
-                        (IIndexValues) new ExpressionIndexValuesFactory.IndexValues(new Object[] {1}),
-                        new ExpressionIndexValuesFactory.IndexValues(new Object[] {2}),
-                        new ExpressionIndexValuesFactory.IndexValues(new Object[] {3}),
-                        new ExpressionIndexValuesFactory.IndexValues(new Object[] {4})).iterator());
+                .setOuterOrdinalValues(asList(
+                        (IOrdinalValues) new OrdinalValues(new Object[] {1}),
+                        new OrdinalValues(new Object[] {2}),
+                        new OrdinalValues(new Object[] {3}),
+                        new OrdinalValues(new Object[] {4})).iterator());
 
         TupleIterator it = op.open(context);
         assertEquals(4, cacheProvider.cache.get("test_article").size());
@@ -135,14 +136,14 @@ public class BatchCacheOperatorTest extends AOperatorTest
 
                 MutableInt pos = new MutableInt(0);
                 pos.incrementAndGet();
-                context.getStatementContext().getOuterIndexValues().next();
+                context.getStatementContext().getOuterOrdinalValues().next();
 
                 return new TupleIterator()
                 {
                     @Override
                     public Tuple next()
                     {
-                        context.getStatementContext().getOuterIndexValues().next();
+                        context.getStatementContext().getOuterOrdinalValues().next();
                         pos.incrementAndGet();
                         return Row.of(inner, 10 * pos.intValue(), new Object[] {pos.getValue()});
                     }
@@ -150,7 +151,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
                     @Override
                     public boolean hasNext()
                     {
-                        return context.getStatementContext().getOuterIndexValues().hasNext();
+                        return context.getStatementContext().getOuterOrdinalValues().hasNext();
                     }
                 };
             }
@@ -165,7 +166,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
         BatchCacheOperator op = new BatchCacheOperator(
                 1,
                 downstream,
-                new ExpressionIndexValuesFactory(asList(e("b.col", inner))),
+                new ExpressionOrdinalValuesFactory(asList(e("b.col", inner))),
                 new CacheSettings(
                         ctx -> "article",
                         null,
@@ -179,11 +180,11 @@ public class BatchCacheOperatorTest extends AOperatorTest
 
         // Prepare outer values for cache/downstream
         context.getStatementContext()
-                .setOuterIndexValues(asList(
-                        (IIndexValues) new ExpressionIndexValuesFactory.IndexValues(new Object[] {1}),
-                        new ExpressionIndexValuesFactory.IndexValues(new Object[] {2}),
-                        new ExpressionIndexValuesFactory.IndexValues(new Object[] {3}),
-                        new ExpressionIndexValuesFactory.IndexValues(new Object[] {4})).iterator());
+                .setOuterOrdinalValues(asList(
+                        (IOrdinalValues) new OrdinalValues(new Object[] {1}),
+                        new OrdinalValues(new Object[] {2}),
+                        new OrdinalValues(new Object[] {3}),
+                        new OrdinalValues(new Object[] {4})).iterator());
 
         TupleIterator it = op.open(context);
         assertEquals(4, cacheProvider.cache.get("test_article").size());
@@ -222,7 +223,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
                     @Override
                     public Tuple next()
                     {
-                        IIndexValues next = context.getStatementContext().getOuterIndexValues().next();
+                        IOrdinalValues next = context.getStatementContext().getOuterOrdinalValues().next();
                         pos++;
                         return Row.of(inner, 10 * pos, new Object[] {next.getValue(0)});
                     }
@@ -230,7 +231,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
                     @Override
                     public boolean hasNext()
                     {
-                        return context.getStatementContext().getOuterIndexValues().hasNext();
+                        return context.getStatementContext().getOuterOrdinalValues().hasNext();
                     }
                 };
             }
@@ -245,7 +246,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
         BatchCacheOperator op = new BatchCacheOperator(
                 1,
                 downstream,
-                new ExpressionIndexValuesFactory(asList(e("b.col", inner))),
+                new ExpressionOrdinalValuesFactory(asList(e("b.col", inner))),
                 new CacheSettings(
                         ctx -> "inner",
                         ctx -> "value",
@@ -254,7 +255,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
         TestCacheProvider cacheProvider = new TestCacheProvider();
         Map<Object, List<Tuple>> cache = new HashMap<>();
         cacheProvider.cache.put("test_inner", cache);
-        cache.put(new BatchCacheOperator.CacheKey("value", new ExpressionIndexValuesFactory.IndexValues(new Object[] {2})), asList(Row.of(inner, 20, new Object[] {2})));
+        cache.put(new BatchCacheOperator.CacheKey("value", new OrdinalValues(new Object[] {2})), asList(Row.of(inner, 20, new Object[] {2})));
 
         session.setBatchCacheProvider(cacheProvider);
 
@@ -262,11 +263,11 @@ public class BatchCacheOperatorTest extends AOperatorTest
 
         // Prepare outer values for cache/downstream
         context.getStatementContext()
-                .setOuterIndexValues(asList(
-                        (IIndexValues) new ExpressionIndexValuesFactory.IndexValues(new Object[] {1}),
-                        new ExpressionIndexValuesFactory.IndexValues(new Object[] {2}),
-                        new ExpressionIndexValuesFactory.IndexValues(new Object[] {3}),
-                        new ExpressionIndexValuesFactory.IndexValues(new Object[] {4})).iterator());
+                .setOuterOrdinalValues(asList(
+                        (IOrdinalValues) new OrdinalValues(new Object[] {1}),
+                        new OrdinalValues(new Object[] {2}),
+                        new OrdinalValues(new Object[] {3}),
+                        new OrdinalValues(new Object[] {4})).iterator());
 
         TupleIterator it = op.open(context);
         assertEquals(4, cache.size());
@@ -306,7 +307,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
         BatchCacheOperator op = new BatchCacheOperator(
                 1,
                 downstream,
-                new ExpressionIndexValuesFactory(asList(e("b.col", inner))),
+                new ExpressionOrdinalValuesFactory(asList(e("b.col", inner))),
                 new CacheSettings(
                         ctx -> "inner",
                         ctx -> asList(1, "const"),
@@ -316,10 +317,10 @@ public class BatchCacheOperatorTest extends AOperatorTest
 
         Map<Object, List<Tuple>> cache = new HashMap<>();
         cacheProvider.cache.put("test_inner", cache);
-        cache.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new ExpressionIndexValuesFactory.IndexValues(new Object[] {1})), asList(Row.of(inner, 0, new Object[] {1})));
-        cache.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new ExpressionIndexValuesFactory.IndexValues(new Object[] {2})), asList(Row.of(inner, 10, new Object[] {2})));
-        cache.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new ExpressionIndexValuesFactory.IndexValues(new Object[] {3})), asList(Row.of(inner, 20, new Object[] {3})));
-        cache.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new ExpressionIndexValuesFactory.IndexValues(new Object[] {4})), asList(Row.of(inner, 30, new Object[] {4})));
+        cache.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new OrdinalValues(new Object[] {1})), asList(Row.of(inner, 0, new Object[] {1})));
+        cache.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new OrdinalValues(new Object[] {2})), asList(Row.of(inner, 10, new Object[] {2})));
+        cache.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new OrdinalValues(new Object[] {3})), asList(Row.of(inner, 20, new Object[] {3})));
+        cache.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new OrdinalValues(new Object[] {4})), asList(Row.of(inner, 30, new Object[] {4})));
 
         session.setBatchCacheProvider(cacheProvider);
 
@@ -328,11 +329,11 @@ public class BatchCacheOperatorTest extends AOperatorTest
 
         // Prepare outer values for cache/downstream
         context.getStatementContext()
-                .setOuterIndexValues(asList(
-                        (IIndexValues) new ExpressionIndexValuesFactory.IndexValues(new Object[] {1}),
-                        new ExpressionIndexValuesFactory.IndexValues(new Object[] {2}),
-                        new ExpressionIndexValuesFactory.IndexValues(new Object[] {3}),
-                        new ExpressionIndexValuesFactory.IndexValues(new Object[] {4})).iterator());
+                .setOuterOrdinalValues(asList(
+                        (IOrdinalValues) new OrdinalValues(new Object[] {1}),
+                        new OrdinalValues(new Object[] {2}),
+                        new OrdinalValues(new Object[] {3}),
+                        new OrdinalValues(new Object[] {4})).iterator());
 
         TupleIterator it = op.open(context);
         assertEquals(4, cache.size());

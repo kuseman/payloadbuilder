@@ -24,7 +24,7 @@ class OperatorBuilderUtils
     static Operator createGroupBy(
             int nodeId,
             List<Expression> groupBys,
-            IIndexValuesFactory indexValuesFactory,
+            IOrdinalValuesFactory ordinalValuesFactory,
             Operator operator)
     {
         // Extract column references
@@ -52,7 +52,7 @@ class OperatorBuilderUtils
                 nodeId,
                 operator,
                 columnReferences,
-                indexValuesFactory,
+                ordinalValuesFactory,
                 groupBys.size());
     }
 }

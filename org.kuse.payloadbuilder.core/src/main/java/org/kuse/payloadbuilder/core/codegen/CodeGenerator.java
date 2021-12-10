@@ -13,7 +13,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.codehaus.janino.ClassBodyEvaluator;
 import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
-import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory;
+import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory;
 import org.kuse.payloadbuilder.core.operator.Projection;
 import org.kuse.payloadbuilder.core.operator.RootProjection;
 import org.kuse.payloadbuilder.core.operator.Tuple;
@@ -60,21 +60,21 @@ public class CodeGenerator
         + "  %s" + System.lineSeparator()
         + "}";
 
-    private static final String INDEX_VALUE_FACTORY = "\n"
-        + "  public IIndexValues create(ExecutionContext context, Tuple tuple) \n"
+    private static final String ORDINAL_VALUES_FACTORY = "\n"
+        + "  public IOrdinalValues create(ExecutionContext context, Tuple tuple) \n"
         + "  { \n"
         + "    context.getStatementContext().setTuple(tuple); \n"
         + "    %s"
-        + "    IndexValues res = new IndexValues(%s); \n"
+        + "    OrdinalValues res = new OrdinalValues(%s); \n"
         + "    context.getStatementContext().setTuple(null); \n"
         + "    return res; \n"
         + "  } \n"
 
-        + "  private static class IndexValues extends BaseIndexValues\n"
+        + "  private static class OrdinalValues extends BaseOrdinalValues\n"
         + "  {\n"
         + "    private final int hashCode; \n"
         + "    %s"
-        + "    private IndexValues(%s) \n"
+        + "    private OrdinalValues(%s) \n"
         + "    { \n"
         + "      %s"
         + "      this.hashCode = hash(); \n"
@@ -198,15 +198,15 @@ public class CodeGenerator
         return projection;
     }
 
-    /** Generate a {@link IIndexValuesFactory} from provide expressions */
+    /** Generate a {@link IOrdinalValuesFactory} from provide expressions */
     //CSOFF
-    public IIndexValuesFactory generateIndexValuesFactory(List<Expression> expressions)
+    public IOrdinalValuesFactory generateOrdinalValuesFactory(List<Expression> expressions)
     //CSON
     {
         CodeGeneratorContext context = new CodeGeneratorContext();
         context.addImport("java.util.Objects");
         context.addImport("org.kuse.payloadbuilder.core.codegen.BaseGeneratedClass");
-        context.addImport("org.kuse.payloadbuilder.core.operator.IIndexValuesFactory");
+        context.addImport("org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory");
         context.addImport("org.kuse.payloadbuilder.core.utils.ObjectUtils");
         context.addImport("org.kuse.payloadbuilder.core.catalog.TableMeta.DataType");
 
@@ -307,7 +307,7 @@ public class CodeGenerator
             }
         }
 
-        String generatedCode = String.format(INDEX_VALUE_FACTORY,
+        String generatedCode = String.format(ORDINAL_VALUES_FACTORY,
                 expressionCode,
                 argFields,
                 fields,
@@ -323,7 +323,7 @@ public class CodeGenerator
                 getBool,
                 hashCode);
 
-        BaseIndexValueFactory factory = compile(context.getImports(), generatedCode, BaseIndexValueFactory.class, "IndexValuesFactory");
+        BaseOrdinalValuesFactory factory = compile(context.getImports(), generatedCode, BaseOrdinalValuesFactory.class, "OrdinalValuesFactory");
         factory.setExpressions(expressions);
         factory.references = context.references.toArray();
         return factory;

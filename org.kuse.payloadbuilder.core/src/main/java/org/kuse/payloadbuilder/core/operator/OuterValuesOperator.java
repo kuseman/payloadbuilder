@@ -10,7 +10,7 @@ import java.util.Map;
 
 import org.apache.commons.collections4.iterators.SingletonIterator;
 import org.apache.commons.lang3.StringUtils;
-import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory.IIndexValues;
+import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValues;
 
 /**
  * Operator used for index access in child operator. Ie.used in FROM operator with index access in where condition
@@ -18,13 +18,13 @@ import org.kuse.payloadbuilder.core.operator.IIndexValuesFactory.IIndexValues;
 class OuterValuesOperator extends AOperator
 {
     private final Operator operator;
-    private final IIndexValuesFactory indexValuesFactory;
+    private final IOrdinalValuesFactory ordinalValuesFactory;
 
-    OuterValuesOperator(int nodeId, Operator operator, IIndexValuesFactory indexValuesFactory)
+    OuterValuesOperator(int nodeId, Operator operator, IOrdinalValuesFactory ordinalValuesFactory)
     {
         super(nodeId);
         this.operator = requireNonNull(operator, "operator");
-        this.indexValuesFactory = requireNonNull(indexValuesFactory, "indexValuesFactory");
+        this.ordinalValuesFactory = requireNonNull(ordinalValuesFactory, "ordinalValuesFactory");
     }
 
     @Override
@@ -36,7 +36,7 @@ class OuterValuesOperator extends AOperator
     @Override
     public Map<String, Object> getDescribeProperties(ExecutionContext context)
     {
-        return ofEntries(entry("Values", indexValuesFactory.toString()));
+        return ofEntries(entry("Values", ordinalValuesFactory.toString()));
     }
 
     @Override
@@ -48,8 +48,8 @@ class OuterValuesOperator extends AOperator
     @Override
     public TupleIterator open(ExecutionContext context)
     {
-        IIndexValues indexValues = indexValuesFactory.create(context, context.getStatementContext().getTuple());
-        context.getStatementContext().setOuterIndexValues(new SingletonIterator<>(indexValues));
+        IOrdinalValues ordinalValues = ordinalValuesFactory.create(context, context.getStatementContext().getTuple());
+        context.getStatementContext().setOuterOrdinalValues(new SingletonIterator<>(ordinalValues));
         return operator.open(context);
     }
 
@@ -66,7 +66,7 @@ class OuterValuesOperator extends AOperator
         {
             OuterValuesOperator that = (OuterValuesOperator) obj;
             return operator.equals(that.operator)
-                && indexValuesFactory.equals(that.indexValuesFactory);
+                && ordinalValuesFactory.equals(that.ordinalValuesFactory);
         }
         return false;
     }
@@ -75,7 +75,7 @@ class OuterValuesOperator extends AOperator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        String desc = String.format("OUTER VALUES (ID: %d, OUTER VALUES: %s", nodeId, indexValuesFactory);
+        String desc = String.format("OUTER VALUES (ID: %d, OUTER VALUES: %s", nodeId, ordinalValuesFactory);
         return desc + System.lineSeparator()
             +
             indentString + operator.toString(indent + 1);
