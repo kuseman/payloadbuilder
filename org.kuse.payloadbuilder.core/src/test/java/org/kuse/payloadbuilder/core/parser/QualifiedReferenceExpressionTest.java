@@ -97,7 +97,7 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         assertExpression("value", values, "mapCol.key");
         assertExpression(ofEntries(entry("key", "value")), values, "mapCol");
 
-        assertExpressionFail(IllegalArgumentException.class, "Cannot dereference value ", values, "date.value");
+        assertExpressionFail(IllegalArgumentException.class, "Cannot dereference 'value' ", values, "date.value");
     }
 
     @Test
@@ -131,7 +131,7 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         }
         catch (IllegalArgumentException ee)
         {
-            assertTrue(ee.getMessage().contains("Cannot dereference value "));
+            assertTrue(ee.getMessage().contains("Cannot dereference 'value' "));
         }
     }
 
@@ -234,7 +234,7 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         }
         catch (IllegalArgumentException ee)
         {
-            assertTrue(ee.getMessage().contains("Cannot dereference value "));
+            assertTrue(ee.getMessage(), ee.getMessage().contains("Cannot dereference 'subkey' "));
         }
     }
 

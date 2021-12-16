@@ -12,7 +12,6 @@ import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyChangeSupport;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -206,7 +205,7 @@ class ESCatalogExtension implements ICatalogExtension
                     }
                     indices.addAll(MAPPER.readValue(entity.getContent(), Map.class).keySet());
                 }
-                catch (IOException e)
+                catch (Exception e)
                 {
                     errors.add(new RuntimeException("Error fetching instances from endpont " + endpoint, e));
                 }

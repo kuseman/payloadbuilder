@@ -180,7 +180,13 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
                 {
                     value = resolveValue((Tuple) value, path, partIndex);
                 }
-                partIndex++;
+                // Move part index one step if this path don't have a column ordinal
+                //CSOFF
+                if (path.columnOrdinal == -1)
+                    //CSON
+                {
+                    partIndex++;
+                }
             }
         }
 
@@ -197,7 +203,7 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
             return MapUtils.traverse(map, partIndex, parts);
         }
 
-        throw new IllegalArgumentException("Cannot dereference value " + value);
+        throw new IllegalArgumentException("Cannot dereference '" + parts[partIndex] + "' on value " + value);
     }
 
     @Override
@@ -215,6 +221,9 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
             || resolvePaths[0].subTupleOrdinals.length != 0
             // Multi part path ie. map access etc. not supported yet
             || resolvePaths[0].unresolvedPath.length > 1
+            // Multi part with column ordinal
+            || (resolvePaths[0].columnOrdinal >= 0
+                && resolvePaths[0].unresolvedPath.length >= 1)
             // Tuple access not supported yet
             || (resolvePaths[0].unresolvedPath.length == 0
                 && resolvePaths[0].columnOrdinal == -1))

@@ -129,7 +129,7 @@ public class SelectResolverTest extends Assert
         // Value
         assertEquals(asList(new ResolvePath(-1, 2, emptyList(), 0)), asList(actual.getResolvedQualifiers().get(0).getResolvePaths()));
         // x.map.key
-        assertEquals(asList(new ResolvePath(-1, 2, asList("map", "key"), 0)), asList(actual.getResolvedQualifiers().get(1).getResolvePaths()));
+        assertEquals(asList(new ResolvePath(-1, 2, asList("key"), 0)), asList(actual.getResolvedQualifiers().get(1).getResolvePaths()));
         // v.Value
         assertEquals(asList(new ResolvePath(-1, 0, emptyList(), 0)), asList(actual.getResolvedQualifiers().get(2).getResolvePaths()));
 
@@ -229,7 +229,7 @@ public class SelectResolverTest extends Assert
         assertEquals(asList(new ResolvePath(-1, -1, emptyList(), -1, new int[] {4})), asList(actual.getResolvedQualifiers().get(3).getResolvePaths()));
         // t.x.t.bb => resolve into temp table sub query and then into another temp table's alias
         assertEquals(asList(new ResolvePath(-1, -1, emptyList(), -1, new int[] {5, 1})), asList(actual.getResolvedQualifiers().get(4).getResolvePaths()));
-        // t.x.t.aa.col => resolve into temp table sub query and then into another temp table's alias with column
+        // t.x.t.aa.col5 => resolve into temp table sub query and then into another temp table's alias with column
         assertEquals(asList(new ResolvePath(-1, -1, asList("col5"), -1, new int[] {5, 0})), asList(actual.getResolvedQualifiers().get(5).getResolvePaths()));
         // t.x.t.col5
         assertEquals(asList(new ResolvePath(-1, -1, emptyList(), 0, new int[] {5})), asList(actual.getResolvedQualifiers().get(6).getResolvePaths()));
@@ -274,7 +274,7 @@ public class SelectResolverTest extends Assert
     @Test
     public void test_selects_fail()
     {
-        assertSelectFail(ParseException.class, "Unkown reference col1", "select col1,"
+        assertSelectFail(ParseException.class, "Unkown reference 'col1'", "select col1,"
             + "(select col2, col3 where col5 != col6 for object) obj ");
 
         // Make sure that expression sub query table aliases isn't accessible from outer scope
@@ -284,8 +284,41 @@ public class SelectResolverTest extends Assert
             + "from tableA a "
             + "where b.col10 > 10");
 
-        assertSelectFail(ParseException.class, "Unkown reference col1", "select col1");
+        assertSelectFail(ParseException.class, "Unkown reference 'col1'", "select col1");
         assertSelectFail(ParseException.class, "No alias found with name: a", "select a.* from table");
+    }
+
+    @SuppressWarnings("deprecation")
+    @Test
+    public void test_resolve_does_not_resolve_into_temp_table()
+    {
+        TableAlias root = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
+                .children(asList(
+                        TableAliasBuilder.of(0, TableAlias.Type.TEMPORARY_TABLE, QualifiedName.of("temp"), "t"),
+                        TableAliasBuilder.of(1, TableAlias.Type.TABLE, QualifiedName.of("table"), "ta")
+                        ))
+                .build();
+
+        TableAlias temp = root.getChildAlias("t");
+
+        SelectResolver.Context actual;
+        Expression e;
+
+        // Test qualified function along with subscript and dereference
+        e = e("ta.some.nested.list.filter(x -> x.column = 1)[0].value");
+        actual = SelectResolver.resolveTorTest(e, temp);
+        assertEquals(3, actual.getResolvedQualifiers().size());
+
+        // a.some.nested.list
+        assertEquals(-1, actual.getResolvedQualifiers().get(0).getLambdaId());
+        assertEquals(asList(new ResolvePath(-1, 1, asList("some", "nested", "list"), -1)), asList(actual.getResolvedQualifiers().get(0).getResolvePaths()));
+        // x.column
+        assertEquals(0, actual.getResolvedQualifiers().get(1).getLambdaId());
+        assertEquals(asList(new ResolvePath(-1, -1, asList("column"), -1)), asList(actual.getResolvedQualifiers().get(1).getResolvePaths()));
+        // value is unkown and hence should have target tuple -1, ie we
+        // should try to resolve value from whatever is on the left hand side
+        assertEquals(-1, actual.getResolvedQualifiers().get(2).getLambdaId());
+        assertEquals(asList(new ResolvePath(-1, -1, asList("value"), -1)), asList(actual.getResolvedQualifiers().get(2).getResolvePaths()));
     }
 
     @SuppressWarnings("deprecation")
@@ -432,9 +465,9 @@ public class SelectResolverTest extends Assert
         // aa.sku_id
         assertEquals(asList(new ResolvePath(-1, 3, asList("sku_id"), -1)), asList(actual.getResolvedQualifiers().get(1).getResolvePaths()));
 
-        // List refers to source
-        // field Id is a column belonging to List which isn't
-        // among the table hierarchy and hence unknown
+        // list refers to source
+        // field id isn't among the table hierarchy
+        // and therefore is a column and hence unknown at compile time
         e = e("list.filter(l -> l.id > 0)");
         actual = SelectResolver.resolveTorTest(e, source);
         // list
