@@ -42,7 +42,7 @@ public class IsNullFunctionTest extends AParserTest
         // Set data type of reference
         ComparisonExpression ce = (ComparisonExpression) e("isnull(a, 20l) = 20l");
         QualifiedFunctionCallExpression qfe = (QualifiedFunctionCallExpression) ce.getLeft();
-        ((QualifiedReferenceExpression) qfe.getArguments().get(0)).setResolvePaths(asList(new ResolvePath(-1, 0, asList("a"), -1, new int[0], DataType.LONG)));
+        ((QualifiedReferenceExpression) qfe.getArguments().get(0)).setResolvePaths(asList(new ResolvePath(-1, 0, asList("a"), -1, DataType.LONG)));
 
         p = CODE_GENERATOR.generatePredicate(ce);
         assertTrue(p.test(context));

@@ -132,8 +132,6 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
         private Set<Integer> sortByOrdinals = emptySet();
         /** Current select item ordinal */
         private int selectItemOrdinal;
-        /** Column ordinal slot counter */
-        private int columnOrdinalSlot;
 
         /**
          * <pre>
@@ -156,12 +154,6 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
         Map<Integer, List<SelectItem>> getSelectItems()
         {
             return unmodifiableMap(selectItemsByTupleOrdinal);
-        }
-
-        /** Return count of column ordinal slots for this select */
-        int getColumnOrdinalSlotCount()
-        {
-            return columnOrdinalSlot;
         }
 
         /** Return resolved qualifiers. NOTE! Used for tests only */
@@ -595,7 +587,8 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
 
             // If we have multiple aliases at this stage
             // this means we have some form of function the concatenates multiple
-            // aliases ie. 'unionall(aa, ap)'
+            // aliases ie. 'unionall(aa, ap).map(x -> x.column .....)' here x.column will point
+            // to both aa and ap
             // And then we need to check the sourceTupleOrdinal before we
             // can know which targetTupleOrdinal we should use
 
@@ -631,7 +624,7 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
                  */
                 if (tempParts.isEmpty())
                 {
-                    resolvePaths.add(new ResolvePath(sourceTupleOrdinal, targetTupleOrdinal, tempParts, -1));
+                    resolvePaths.add(new ResolvePath(sourceTupleOrdinal, targetTupleOrdinal, emptyList(), -1));
                     output.add(pathAlias);
                     continue;
                 }
@@ -646,11 +639,13 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
                 pathAlias = pathAliasHolder.getValue();
                 int columnOrdinal = -1;
                 DataType dataType = DataType.ANY;
+                TableMeta tableMeta = pathAlias.getTableMeta();
+
                 if (pathAlias.getType() != TableAlias.Type.TEMPORARY_TABLE)
                 {
-                    if (pathAlias.getTableMeta() != null)
+                    if (tableMeta != null)
                     {
-                        TableMeta.Column tableColumn = pathAlias.getTableMeta().getColumn(column);
+                        TableMeta.Column tableColumn = tableMeta.getColumn(column);
                         //CSOFF
                         if (tableColumn != null)
                         //CSON
@@ -666,9 +661,11 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
                                     "Unknown column: '"
                                         + column
                                         + "' in table source: '"
-                                        + pathAlias.getTable() + " " + pathAlias.getAlias()
+                                        + (pathAlias.getType() == TableAlias.Type.TEMPORARY_TABLE ? "#" : "")
+                                        + pathAlias.getTable()
+                                        + (!isBlank(pathAlias.getAlias()) ? (" (" + pathAlias.getAlias() + ")") : "")
                                         + "', expected one of: ["
-                                        + pathAlias.getTableMeta().getColumns().stream().map(Column::getName).collect(joining(", "))
+                                        + tableMeta.getColumns().stream().map(Column::getName).collect(joining(", "))
                                         + "]",
                                     expression.getToken());
                         }
@@ -698,7 +695,7 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
          *    from table a
          * ) x
          *
-         * If the alias is a temp table, the temp tables alias hierarchy is traverse and we will get a multi target resolve path.
+         * If the alias is a temp table, the temp tables alias is traversed to find the destination alias
          * ie.
          *
          * select *
@@ -707,14 +704,13 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
          * inner join tableB b      ordinal = 1
          *   on b.col = a.col
          *
-         * select t.b.col4          <-- this one will get a multi target => 0 (for this selects target) and then 1
-         *                              for the temp tables table alias target above
-         * from #temp               ordinal = 0
+         * select t.b.col4          <-- will point to col4 in tuple ordinal 1
+         * from #temp               ordinal = 2
          * </pre>
          */
         private boolean processPathAlias(
                 Context context,
-                int targetTupleOrdinal,
+                int inputTupleOrdinal,
                 String column,
                 List<String> tempParts,
                 MutableObject<TableAlias> pathAliasHolder,
@@ -723,9 +719,8 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
         {
             // If we are resolving into a temp table, this is the ordinal in the original select hierarchy
             boolean tempTablePath = false;
-            // If we are resolving into a temp-table path, this list will contain the end path
-            List<Integer> subTuplePath = new ArrayList<>();
             int columnIndex = -1;
+            int targetTupleOrdinal = inputTupleOrdinal;
 
             TableAlias pathAlias = pathAliasHolder.getValue();
             while (true)
@@ -798,26 +793,23 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
                     TableAlias alias = getFromQualifiedName(context, table.getTableAlias(), tempParts, token, false);
                     context.highestValidOrdinal = highestValidOrdinal;
 
-                    /*
-                     * pathAlias              - current loop alias
-                     * alias                  - result of traversal
-                     * table.getTableAlias()  - temp table alias
-                     */
-
-                    // We found a nested alias, add to sub tuple path and continue
-                    // alias traversal
                     pathAlias = alias;
+
                     if (alias != table.getTableAlias()
-                        || tempParts.size() == 0
                         || size != tempParts.size())
                     {
-                        subTuplePath.add(alias.getTupleOrdinal());
                         //CSOFF
+                        // If we traversed deeper than the current alias then
+                        // set the target tuple ordinal accordingly
+                        targetTupleOrdinal = alias.getTupleOrdinal();
+                        // No parts left then this means we are accessing a tuple
+                        // and not a column, break before checking
                         if (tempParts.size() == 0)
-                            //CSON
+                        //CSON
                         {
                             break;
                         }
+                        // Temp table and still parts left, continue digging
                         continue;
                     }
 
@@ -827,13 +819,8 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
                     {
                         throw new ParseException("Unkown column '" + col + "' in temporary table #" + table.getName(), token);
                     }
-
-                    break;
                 }
-                else
-                {
-                    break;
-                }
+                break;
             }
 
             // Temp table hit, add resolve path and return true since we're done
@@ -844,8 +831,7 @@ public class SelectResolver extends ASelectVisitor<Void, SelectResolver.Context>
                         -1,
                         targetTupleOrdinal,
                         tempParts,
-                        columnIndex,
-                        subTuplePath.stream().mapToInt(x -> x).toArray()));
+                        columnIndex));
                 return true;
             }
 

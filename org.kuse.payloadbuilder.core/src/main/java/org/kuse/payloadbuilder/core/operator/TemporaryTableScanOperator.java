@@ -124,8 +124,12 @@ public class TemporaryTableScanOperator extends AOperator
         }
 
         @Override
-        public Tuple getSubTuple(int tupleOrdinal)
+        public Tuple getTuple(int tupleOrdinal)
         {
+            if (tupleOrdinal == this.tupleOrdinal)
+            {
+                return this;
+            }
             return tuple.getTuple(tupleOrdinal);
         }
 

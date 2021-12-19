@@ -54,7 +54,7 @@ public class ExpressionProjectionTest extends AParserTest
     private void testPrimitive(boolean nullResult, DataType type)
     {
         QualifiedReferenceExpression qre = new QualifiedReferenceExpression(QualifiedName.of("col"), -1, null);
-        qre.setResolvePaths(asList(new ResolvePath(-1, -1, asList("col"), -1, new int[0], type)));
+        qre.setResolvePaths(asList(new ResolvePath(-1, -1, asList("col"), -1, type)));
         Projection p = new ExpressionProjection(qre);
 
         OutputWriter writer = generateAndWrite(p, tuple ->

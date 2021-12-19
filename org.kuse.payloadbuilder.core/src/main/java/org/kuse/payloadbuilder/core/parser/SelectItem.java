@@ -73,9 +73,6 @@ public abstract class SelectItem extends ASelectNode
         return null;
     }
 
-    /** Write this select item to output writer */
-    //    public abstract void write(OutputWriter writer, ExecutionContext context);
-
     @Override
     public String toString()
     {

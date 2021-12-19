@@ -23,7 +23,7 @@ class NestedLoopJoin extends AOperator
     private final Operator outer;
     private final Operator inner;
     private final Predicate<ExecutionContext> predicate;
-    private final TupleMerger rowMerger;
+    private final TupleMerger tupleMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
 
@@ -33,7 +33,7 @@ class NestedLoopJoin extends AOperator
             Operator outer,
             Operator inner,
             Predicate<ExecutionContext> predicate,
-            TupleMerger rowMerger,
+            TupleMerger tupleMerger,
             boolean populating,
             boolean emitEmptyOuterRows)
     {
@@ -42,7 +42,7 @@ class NestedLoopJoin extends AOperator
         this.outer = requireNonNull(outer, "outer");
         this.inner = requireNonNull(inner, "inner");
         this.predicate = predicate;
-        this.rowMerger = requireNonNull(rowMerger, "rowMerger");
+        this.tupleMerger = requireNonNull(tupleMerger, "tupleMerger");
         this.populating = populating;
         this.emitEmptyOuterRows = emitEmptyOuterRows;
     }
@@ -167,7 +167,7 @@ class NestedLoopJoin extends AOperator
 
                     if (result)
                     {
-                        next = rowMerger.merge(currentOuter, currentInner, populating);
+                        next = tupleMerger.merge(currentOuter, currentInner, populating);
                         if (populating)
                         {
                             currentOuter = next;
@@ -215,7 +215,7 @@ class NestedLoopJoin extends AOperator
                 && outer.equals(that.outer)
                 && inner.equals(that.inner)
                 && Objects.equals(predicate, that.predicate)
-                && rowMerger.equals(that.rowMerger)
+                && tupleMerger.equals(that.tupleMerger)
                 && populating == that.populating
                 && emitEmptyOuterRows == that.emitEmptyOuterRows;
         }

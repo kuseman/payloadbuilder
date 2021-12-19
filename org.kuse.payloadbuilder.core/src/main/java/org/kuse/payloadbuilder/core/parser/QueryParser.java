@@ -171,8 +171,7 @@ public class QueryParser
 
         private void clear(TableAlias parent)
         {
-            tupleOrdinal = -1;
-            TableAliasBuilder builder = TableAliasBuilder.of(this.tupleOrdinal++, TableAlias.Type.ROOT, QualifiedName.of("ROOT"), "ROOT");
+            TableAliasBuilder builder = TableAliasBuilder.of(-1, TableAlias.Type.ROOT, QualifiedName.of("ROOT"), "ROOT");
             if (parent != null)
             {
                 builder.parent(parent);
@@ -508,12 +507,8 @@ public class QueryParser
                         .parent(parentTableAlias)
                         .build();
 
-                // Store previous parent table alias
-                int prevTupleOrdinal = tupleOrdinal;
                 // Start a new alias tree with subquery as parent
                 clear(tableAlias);
-                // Restore tuple ordinal counter since clear resets it
-                tupleOrdinal = prevTupleOrdinal;
 
                 SelectStatement selectStatement = (SelectStatement) visit(ctx.selectStatement());
 
@@ -613,11 +608,18 @@ public class QueryParser
         @Override
         public Object visitFunctionCall(FunctionCallContext ctx)
         {
+            String catalog = lowerCase(ctx.functionName().catalog != null ? ctx.functionName().catalog.getText() : null);
+            String functionName = getIdentifier(ctx.functionName().function);
+
+            Pair<String, FunctionInfo> functionInfo = registry.resolveFunctionInfo(catalog, functionName);
+            if (functionInfo == null)
+            {
+                throw new ParseException("No function found named: " + functionName + " in catalog: " + (isBlank(catalog) ? "BuiltIn" : catalog), ctx.start);
+            }
+
             // Store left dereference
             Expression prevLeftDereference = leftDereference;
             leftDereference = null;
-            String catalog = lowerCase(ctx.functionName().catalog != null ? ctx.functionName().catalog.getText() : null);
-            String function = getIdentifier(ctx.functionName().function);
 
             List<Expression> arguments = ctx.arguments.stream().map(a -> getExpression(a)).collect(toList());
 
@@ -638,11 +640,6 @@ public class QueryParser
                 arguments.add(0, prevLeftDereference);
             }
 
-            Pair<String, FunctionInfo> functionInfo = registry.resolveFunctionInfo(catalog, function);
-            if (functionInfo == null)
-            {
-                throw new ParseException("No function found named: " + function + " in catalog: " + (isBlank(catalog) ? "BuiltIn" : catalog), ctx.start);
-            }
             validateFunction(functionInfo.getValue(), arguments, ctx.start);
             arguments = functionInfo.getValue().foldArguments(arguments);
 
@@ -842,6 +839,7 @@ public class QueryParser
 
                 lambdaParameters.put(i, lambdaParameters.size());
             });
+
             Expression expression = getExpression(ctx.expression());
             int[] uniqueLambdaIds = new int[identifiers.size()];
             for (int i = 0; i < identifiers.size(); i++)

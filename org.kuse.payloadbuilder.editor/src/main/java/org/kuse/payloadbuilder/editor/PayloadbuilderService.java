@@ -134,7 +134,7 @@ class PayloadbuilderService
                 catch (ParseException e)
                 {
                     file.setError(String.format("Syntax error. Line: %d, Column: %d. %s", e.getLine(), e.getColumn(), e.getMessage()));
-                    file.setParseErrorLocation(Pair.of(e.getLine(), e.getColumn()));
+                    file.setParseErrorLocation(Pair.of(e.getLine(), e.getColumn() + 1));
                     file.setState(State.ERROR);
                     completed = true;
                 }

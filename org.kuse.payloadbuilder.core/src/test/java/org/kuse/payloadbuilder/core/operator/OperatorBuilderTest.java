@@ -225,8 +225,8 @@ public class OperatorBuilderTest extends AOperatorTest
                 new ExpressionOrdinalValuesFactory(asList(e("a.art_id"))),
                 1);
 
-        //                System.out.println(queryResult.operator.toString(1));
-        //                System.err.println(expected.toString(1));
+//                        System.out.println(queryResult.operator.toString(1));
+//                        System.err.println(expected.toString(1));
 
         assertEquals(expected, queryResult.operator);
     }
@@ -273,9 +273,9 @@ public class OperatorBuilderTest extends AOperatorTest
                         false),
                 new ExpressionPredicate(e("a.ab.active_flg = true")));
 
-        //                        System.out.println(queryResult.operator.toString(1));
-        //                        System.out.println();
-        //                        System.err.println(expected.toString(1));
+//                                System.out.println(queryResult.operator.toString(1));
+//                                System.out.println();
+//                                System.err.println(expected.toString(1));
 
         assertEquals(expected, queryResult.operator);
     }
@@ -495,7 +495,7 @@ public class OperatorBuilderTest extends AOperatorTest
                 "INNER JOIN",
                 new HashJoin(
                         2,
-                        "",
+                        "INNER JOIN",
                         queryResult.tableOperators.get(0),
                         queryResult.tableOperators.get(1),
                         new ExpressionHashFunction(asList(e("s.art_id"))),
@@ -532,8 +532,8 @@ public class OperatorBuilderTest extends AOperatorTest
                 true,
                 false);
 
-        //                                                System.err.println(expected.toString(1));
-        //                                                System.out.println(queryResult.operator.toString(1));
+//                                                        System.err.println(expected.toString(1));
+//                                                        System.out.println(queryResult.operator.toString(1));
 
         assertEquals(expected, queryResult.operator);
 
@@ -660,8 +660,8 @@ public class OperatorBuilderTest extends AOperatorTest
                                                         TableAliasBuilder.of(11, TableAlias.Type.TABLE, of("attribute1"), "a1")))))))
                 .build();
 
-        //                System.out.println(root.printHierarchy(1));
-        //                System.out.println(result.alias.printHierarchy(1));
+//                        System.out.println(root.printHierarchy(1));
+//                        System.out.println(result.alias.printHierarchy(1));
 
         assertTrue("Alias hierarchy should be equal", root.isEqual(result.alias));
     }

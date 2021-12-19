@@ -39,7 +39,7 @@ class HashJoin extends AOperator
     private final ToIntBiFunction<ExecutionContext, Tuple> outerHashFunction;
     private final ToIntBiFunction<ExecutionContext, Tuple> innerHashFunction;
     private final Predicate<ExecutionContext> predicate;
-    private final TupleMerger rowMerger;
+    private final TupleMerger tupleMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
 
@@ -51,7 +51,7 @@ class HashJoin extends AOperator
             ToIntBiFunction<ExecutionContext, Tuple> outerHashFunction,
             ToIntBiFunction<ExecutionContext, Tuple> innerHashFunction,
             Predicate<ExecutionContext> predicate,
-            TupleMerger rowMerger,
+            TupleMerger tupleMerger,
             boolean populating,
             boolean emitEmptyOuterRows)
     {
@@ -62,7 +62,7 @@ class HashJoin extends AOperator
         this.outerHashFunction = requireNonNull(outerHashFunction, "outerHashFunction");
         this.innerHashFunction = requireNonNull(innerHashFunction, "innerHashFunction");
         this.predicate = requireNonNull(predicate, "predicate");
-        this.rowMerger = requireNonNull(rowMerger, "rowMerger");
+        this.tupleMerger = requireNonNull(tupleMerger, "tupleMerger");
         this.populating = populating;
         this.emitEmptyOuterRows = emitEmptyOuterRows;
     }
@@ -310,7 +310,7 @@ class HashJoin extends AOperator
 
                     if (result)
                     {
-                        next = rowMerger.merge(currentOuter.tuple, currentInner, populating);
+                        next = tupleMerger.merge(currentOuter.tuple, currentInner, populating);
                         if (populating)
                         {
                             currentOuter.tuple = next;
@@ -483,7 +483,7 @@ class HashJoin extends AOperator
                 && outerHashFunction.equals(that.outerHashFunction)
                 && innerHashFunction.equals(that.innerHashFunction)
                 && predicate.equals(that.predicate)
-                && rowMerger.equals(that.rowMerger)
+                && tupleMerger.equals(that.tupleMerger)
                 && populating == that.populating
                 && emitEmptyOuterRows == that.emitEmptyOuterRows;
         }
@@ -494,7 +494,7 @@ class HashJoin extends AOperator
     public String toString(int indent)
     {
         String indentString = StringUtils.repeat("  ", indent);
-        String desc = String.format("HASH JOIN (%s) (ID: %d, POPULATING: %s, OUTER: %s, EXECUTION COUNT: %s, OUTER KEYS: %s, INNER KEYS: %s, PREDICATE: %s)",
+        String desc = String.format("HASH JOIN (%s) (ID: %d, POPULATING: %s, OUTER: %s, EXECUTION COUNT: %s, OUTER KEYS: %s, INNER KEYS: %s, PREDICATE: %s, MERGER: %s)",
                 logicalOperator,
                 nodeId,
                 populating,
@@ -502,7 +502,8 @@ class HashJoin extends AOperator
                 null,
                 outerHashFunction.toString(),
                 innerHashFunction.toString(),
-                predicate.toString());
+                predicate.toString(),
+                tupleMerger.toString());
         return desc + System.lineSeparator()
             +
             indentString + outer.toString(indent + 1) + System.lineSeparator()

@@ -62,7 +62,7 @@ class BatchHashJoin extends AOperator
     private final IOrdinalValuesFactory outerValuesFactory;
     private final ToIntBiFunction<ExecutionContext, Tuple> innerHashFunction;
     private final Predicate<ExecutionContext> predicate;
-    private final TupleMerger rowMerger;
+    private final TupleMerger tupleMerger;
     private final boolean populating;
     private final boolean emitEmptyOuterRows;
     private final Index innerIndex;
@@ -78,7 +78,7 @@ class BatchHashJoin extends AOperator
             IOrdinalValuesFactory outerValuesFactory,
             ToIntBiFunction<ExecutionContext, Tuple> innerHashFunction,
             Predicate<ExecutionContext> predicate,
-            TupleMerger rowMerger,
+            TupleMerger tupleMerger,
             boolean populating,
             boolean emitEmptyOuterRows,
             Index innerIndex,
@@ -91,7 +91,7 @@ class BatchHashJoin extends AOperator
         this.outerValuesFactory = requireNonNull(outerValuesFactory, "outerValuesExtractor");
         this.innerHashFunction = requireNonNull(innerHashFunction, "innerHashFunction");
         this.predicate = requireNonNull(predicate, "predicate");
-        this.rowMerger = requireNonNull(rowMerger, "rowMerger");
+        this.tupleMerger = requireNonNull(tupleMerger, "tupleMerger");
         this.populating = populating;
         this.emitEmptyOuterRows = emitEmptyOuterRows;
         this.innerIndex = requireNonNull(innerIndex, "innerIndex");
@@ -275,7 +275,7 @@ class BatchHashJoin extends AOperator
 
                     if (result)
                     {
-                        next = rowMerger.merge(outerTuple.tuple, innerRow, populating);
+                        next = tupleMerger.merge(outerTuple.tuple, innerRow, populating);
 
                         if (populating)
                         {
@@ -510,7 +510,7 @@ class BatchHashJoin extends AOperator
                 && outerValuesFactory.equals(that.outerValuesFactory)
                 && innerHashFunction.equals(that.innerHashFunction)
                 && predicate.equals(that.predicate)
-                && rowMerger.equals(that.rowMerger)
+                && tupleMerger.equals(that.tupleMerger)
                 && populating == that.populating
                 && emitEmptyOuterRows == that.emitEmptyOuterRows
                 && innerIndex.equals(that.innerIndex)

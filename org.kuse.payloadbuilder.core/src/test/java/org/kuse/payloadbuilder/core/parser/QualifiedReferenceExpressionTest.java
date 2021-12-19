@@ -26,15 +26,15 @@ public class QualifiedReferenceExpressionTest extends AParserTest
     public void test_code_gen()
     {
         QualifiedReferenceExpression e = new QualifiedReferenceExpression(QualifiedName.of("a", "col1"), -1, null);
-        e.setResolvePaths(asList(new ResolvePath(-1, 1, asList("col"), -1, new int[0], DataType.INT)));
+        e.setResolvePaths(asList(new ResolvePath(-1, 1, asList("col"), -1, DataType.INT)));
         assertEquals(DataType.INT, e.getDataType());
 
         e = new QualifiedReferenceExpression(QualifiedName.of("a", "col1"), -1, null);
-        e.setResolvePaths(asList(new ResolvePath(-1, 1, asList("col"), -1, new int[0], DataType.FLOAT)));
+        e.setResolvePaths(asList(new ResolvePath(-1, 1, asList("col"), -1, DataType.FLOAT)));
         assertEquals(DataType.FLOAT, e.getDataType());
 
         e = new QualifiedReferenceExpression(QualifiedName.of("a", "col1"), -1, null);
-        e.setResolvePaths(asList(new ResolvePath(-1, 0, asList("col"), -1, new int[0])));
+        e.setResolvePaths(asList(new ResolvePath(-1, 0, asList("col"), -1)));
         assertEquals(DataType.ANY, e.getDataType());
     }
 
@@ -52,11 +52,6 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         // No multi source
         e = new QualifiedReferenceExpression(QualifiedName.of("col1"), -1, null);
         e.setResolvePaths(asList(new ResolvePath(0, 1, emptyList(), 0), new ResolvePath(1, 1, emptyList(), 0)));
-        assertFalse(e.isCodeGenSupported());
-
-        // No sub tuple paths
-        e = new QualifiedReferenceExpression(QualifiedName.of("col1"), -1, null);
-        e.setResolvePaths(asList(new ResolvePath(0, 1, emptyList(), 0, new int[] {1, 2})));
         assertFalse(e.isCodeGenSupported());
 
         // No multi part path
@@ -277,16 +272,6 @@ public class QualifiedReferenceExpressionTest extends AParserTest
             }
 
             @Override
-            public Tuple getSubTuple(int tupleOrdinal)
-            {
-                if (tupleOrdinal == 666)
-                {
-                    return this;
-                }
-                return null;
-            }
-
-            @Override
             public int getTupleOrdinal()
             {
                 return 0;
@@ -365,17 +350,6 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         e = new QualifiedReferenceExpression(QualifiedName.of(), 0, null);
         // Identity lambda 'x -> x' which is a tuple
         e.setResolvePaths(asList(new ResolvePath(-1, -1, asList(), -1)));
-        assertSame(tuple, e.eval(context));
-
-        tupleByOrdinal.clear();
-        // Sub tuple resolving, non existing sub tuple
-        e = new QualifiedReferenceExpression(QualifiedName.of(), 0, null);
-        e.setResolvePaths(asList(new ResolvePath(-1, -1, asList(), -1, new int[] {0})));
-        assertNull(e.eval(context));
-
-        // Sub tuple resolving
-        e = new QualifiedReferenceExpression(QualifiedName.of(), 0, null);
-        e.setResolvePaths(asList(new ResolvePath(-1, -1, asList(), -1, new int[] {666})));
         assertSame(tuple, e.eval(context));
     }
 }

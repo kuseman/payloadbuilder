@@ -37,16 +37,6 @@ public interface Tuple
     }
 
     /**
-     * Resolve sub tuple with provided tuple ordinal. This is a special tuple fetch method used for temporary table access
-     *
-     * @param tupleOrdinal Ordinal to resolve
-     */
-    default Tuple getSubTuple(int tupleOrdinal)
-    {
-        throw new IllegalArgumentException("This tuple does not support sub tuple fetching");
-    }
-
-    /**
      * Get value for provided column ordinal
      *
      * @param columnOrdinal The ordinal of the column to fetch

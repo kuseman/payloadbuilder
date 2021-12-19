@@ -7,6 +7,7 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.SelectResolver.Context;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.Expression;
@@ -28,7 +29,7 @@ public class SelectResolverTest extends Assert
     public void test_unknowm_column()
     {
         Select s = s("select x.dummy from range(1, 10) x");
-        assertResolveFail(ParseException.class, "Unknown column: 'dummy' in table source: 'range x', expected one of: [Value]", s);
+        assertResolveFail(ParseException.class, "Unknown column: 'dummy' in table source: 'range (x)', expected one of: [Value]", s);
     }
 
     @SuppressWarnings("deprecation")
@@ -38,7 +39,7 @@ public class SelectResolverTest extends Assert
         Select s = s("select x.vAlUe from range(1, 10) x");
         SelectResolver.Context actual = SelectResolver.resolveForTest(session, s);
         // vAlUe
-        assertEquals(asList(new ResolvePath(-1, 0, emptyList(), 0)), asList(actual.getResolvedQualifiers().get(0).getResolvePaths()));
+        assertEquals(asList(new ResolvePath(-1, 0, emptyList(), 0, DataType.INT)), asList(actual.getResolvedQualifiers().get(0).getResolvePaths()));
     }
 
     @SuppressWarnings("deprecation")
@@ -127,7 +128,7 @@ public class SelectResolverTest extends Assert
         actual = SelectResolver.resolveForTest(session, s);
         assertEquals(3, actual.getResolvedQualifiers().size());
         // Value
-        assertEquals(asList(new ResolvePath(-1, 2, emptyList(), 0)), asList(actual.getResolvedQualifiers().get(0).getResolvePaths()));
+        assertEquals(asList(new ResolvePath(-1, 2, emptyList(), 0, DataType.INT)), asList(actual.getResolvedQualifiers().get(0).getResolvePaths()));
         // x.map.key
         assertEquals(asList(new ResolvePath(-1, 2, asList("key"), 0)), asList(actual.getResolvedQualifiers().get(1).getResolvePaths()));
         // v.Value
@@ -158,23 +159,23 @@ public class SelectResolverTest extends Assert
         actual = SelectResolver.resolveForTest(session, s);
         assertEquals(9, actual.getResolvedQualifiers().size());
         // r1.Value
-        assertEquals(asList(new ResolvePath(-1, 3, emptyList(), 0)), asList(actual.getResolvedQualifiers().get(0).getResolvePaths()));
+        assertEquals(asList(new ResolvePath(-1, 3, emptyList(), 0, DataType.INT)), asList(actual.getResolvedQualifiers().get(0).getResolvePaths()));
         // r.Value
-        assertEquals(asList(new ResolvePath(-1, 2, emptyList(), 0)), asList(actual.getResolvedQualifiers().get(1).getResolvePaths()));
+        assertEquals(asList(new ResolvePath(-1, 2, emptyList(), 0, DataType.INT)), asList(actual.getResolvedQualifiers().get(1).getResolvePaths()));
         // x.Value
-        assertEquals(asList(new ResolvePath(-1, 2, emptyList(), 0)), asList(actual.getResolvedQualifiers().get(2).getResolvePaths()));
+        assertEquals(asList(new ResolvePath(-1, 2, emptyList(), 0, DataType.INT)), asList(actual.getResolvedQualifiers().get(2).getResolvePaths()));
         // v.Value
-        assertEquals(asList(new ResolvePath(-1, 0, emptyList(), 0)), asList(actual.getResolvedQualifiers().get(3).getResolvePaths()));
+        assertEquals(asList(new ResolvePath(-1, 0, emptyList(), 0, DataType.INT)), asList(actual.getResolvedQualifiers().get(3).getResolvePaths()));
         // Value (top select)
         assertEquals(asList(new ResolvePath(-1, 0, emptyList(), 0)), asList(actual.getResolvedQualifiers().get(4).getResolvePaths()));
         // x (open_rows(x))
         assertEquals(asList(new ResolvePath(-1, 1, emptyList(), -1)), asList(actual.getResolvedQualifiers().get(5).getResolvePaths()));
         // Value (first sub query select => x.Value)
-        assertEquals(asList(new ResolvePath(-1, 2, emptyList(), 0)), asList(actual.getResolvedQualifiers().get(6).getResolvePaths()));
+        assertEquals(asList(new ResolvePath(-1, 2, emptyList(), 0, DataType.INT)), asList(actual.getResolvedQualifiers().get(6).getResolvePaths()));
         // r1 (open_rows(r1)
         assertEquals(asList(new ResolvePath(-1, 3, emptyList(), -1)), asList(actual.getResolvedQualifiers().get(7).getResolvePaths()));
         // Value (second sub query select -> r1.Value)
-        assertEquals(asList(new ResolvePath(-1, 3, emptyList(), 0)), asList(actual.getResolvedQualifiers().get(8).getResolvePaths()));
+        assertEquals(asList(new ResolvePath(-1, 3, emptyList(), 0, DataType.INT)), asList(actual.getResolvedQualifiers().get(8).getResolvePaths()));
     }
 
     @SuppressWarnings("deprecation")
@@ -222,17 +223,17 @@ public class SelectResolverTest extends Assert
         // col
         assertEquals(asList(new ResolvePath(-1, -1, emptyList(), 0)), asList(actual.getResolvedQualifiers().get(0).getResolvePaths()));
         // t.b
-        assertEquals(asList(new ResolvePath(-1, -1, emptyList(), -1, new int[] {1})), asList(actual.getResolvedQualifiers().get(1).getResolvePaths()));
+        assertEquals(asList(new ResolvePath(-1, 3, emptyList(), -1)), asList(actual.getResolvedQualifiers().get(1).getResolvePaths()));
         // t.b.col3
-        assertEquals(asList(new ResolvePath(-1, -1, asList("col3"), -1, new int[] {1})), asList(actual.getResolvedQualifiers().get(2).getResolvePaths()));
+        assertEquals(asList(new ResolvePath(-1, 3, asList("col3"), -1)), asList(actual.getResolvedQualifiers().get(2).getResolvePaths()));
         // t.x.d => resolve into temp table sub query
-        assertEquals(asList(new ResolvePath(-1, -1, emptyList(), -1, new int[] {4})), asList(actual.getResolvedQualifiers().get(3).getResolvePaths()));
+        assertEquals(asList(new ResolvePath(-1, 6, emptyList(), -1)), asList(actual.getResolvedQualifiers().get(3).getResolvePaths()));
         // t.x.t.bb => resolve into temp table sub query and then into another temp table's alias
-        assertEquals(asList(new ResolvePath(-1, -1, emptyList(), -1, new int[] {5, 1})), asList(actual.getResolvedQualifiers().get(4).getResolvePaths()));
+        assertEquals(asList(new ResolvePath(-1, 1, emptyList(), -1)), asList(actual.getResolvedQualifiers().get(4).getResolvePaths()));
         // t.x.t.aa.col5 => resolve into temp table sub query and then into another temp table's alias with column
-        assertEquals(asList(new ResolvePath(-1, -1, asList("col5"), -1, new int[] {5, 0})), asList(actual.getResolvedQualifiers().get(5).getResolvePaths()));
+        assertEquals(asList(new ResolvePath(-1, 0, asList("col5"), -1)), asList(actual.getResolvedQualifiers().get(5).getResolvePaths()));
         // t.x.t.col5
-        assertEquals(asList(new ResolvePath(-1, -1, emptyList(), 0, new int[] {5})), asList(actual.getResolvedQualifiers().get(6).getResolvePaths()));
+        assertEquals(asList(new ResolvePath(-1, 7, emptyList(), 0)), asList(actual.getResolvedQualifiers().get(6).getResolvePaths()));
     }
 
     @Test
@@ -249,7 +250,8 @@ public class SelectResolverTest extends Assert
 
         Select select = ((SelectStatement) stm.getStatements().get(0)).getSelect();
         TableAlias tempTableAlias = select.getFrom().getTableSource().getTableAlias();
-        TemporaryTable table = new TemporaryTable(select.getInto().getTable(), tempTableAlias, new String[] {"col1", "col2"}, emptyList());
+        TemporaryTable table = new TemporaryTable(select.getInto().getTable(), tempTableAlias,
+                new String[] {"col1", "col2"}, emptyList());
         session.setTemporaryTable(table);
 
         assertResolveFail(ParseException.class, "Unkown column 'col3' in temporary table #temp", ((SelectStatement) stm.getStatements().get(1)).getSelect());
@@ -295,8 +297,7 @@ public class SelectResolverTest extends Assert
         TableAlias root = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
                 .children(asList(
                         TableAliasBuilder.of(0, TableAlias.Type.TEMPORARY_TABLE, QualifiedName.of("temp"), "t"),
-                        TableAliasBuilder.of(1, TableAlias.Type.TABLE, QualifiedName.of("table"), "ta")
-                        ))
+                        TableAliasBuilder.of(1, TableAlias.Type.TABLE, QualifiedName.of("table"), "ta")))
                 .build();
 
         TableAlias temp = root.getChildAlias("t");

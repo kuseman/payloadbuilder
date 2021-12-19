@@ -176,7 +176,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         context.registry = session.getCatalogRegistry();
         select.accept(VISITOR, context);
 
-        return new BuildResult(context.getOperator(), context.projectionResult, resolveContext.getColumnOrdinalSlotCount());
+        return new BuildResult(context.getOperator(), context.projectionResult);
     }
 
     /** Result of operator building */
@@ -184,13 +184,11 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     {
         private final Operator operator;
         private final Projection projection;
-        private final int columnOrdinalSlotCount;
 
-        BuildResult(Operator operator, Projection projection, int columnOrdinalSlotCount)
+        BuildResult(Operator operator, Projection projection)
         {
             this.operator = operator;
             this.projection = projection;
-            this.columnOrdinalSlotCount = columnOrdinalSlotCount;
         }
 
         public Operator getOperator()
@@ -201,11 +199,6 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         public Projection getProjection()
         {
             return projection;
-        }
-
-        public int getColumnOrdinalSlotCount()
-        {
-            return columnOrdinalSlotCount;
         }
     }
 

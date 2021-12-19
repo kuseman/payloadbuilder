@@ -180,7 +180,7 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
                 {
                     value = resolveValue((Tuple) value, path, partIndex);
                 }
-                // Move part index one step if this path don't have a column ordinal
+                // Move partIndex one step if this path don't have a column ordinal
                 //CSOFF
                 if (path.columnOrdinal == -1)
                     //CSON
@@ -218,7 +218,6 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         if (resolvePaths == null
             || lambdaId >= 0
             || resolvePaths.length != 1
-            || resolvePaths[0].subTupleOrdinals.length != 0
             // Multi part path ie. map access etc. not supported yet
             || resolvePaths[0].unresolvedPath.length > 1
             // Multi part with column ordinal
@@ -405,29 +404,7 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         {
             return null;
         }
-
-        if (path.subTupleOrdinals.length > 0)
-        {
-            int length = path.subTupleOrdinals.length;
-            for (int i = 0; i < length; i++)
-            {
-                result = getTuple(result).getSubTuple(path.subTupleOrdinals[i]);
-                if (result == null)
-                {
-                    return null;
-                }
-            }
-        }
         return result;
-    }
-
-    private Tuple getTuple(Object obj)
-    {
-        if (obj != null && !(obj instanceof Tuple))
-        {
-            throw new IllegalArgumentException("Expected a Tuple but got " + obj);
-        }
-        return (Tuple) obj;
     }
 
     /** Resolves value from provided with with provided path */
@@ -512,39 +489,25 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         /** Pre defined column ordinal. Typically a computed expression or similar */
         final int columnOrdinal;
 
-        /** When resolved into a temp tables sub alias, this ordinal points to it */
-        final int[] subTupleOrdinals;
-
         /** Column type if any */
         final DataType columnType;
 
         public ResolvePath(ResolvePath source, List<String> unresolvedPath)
         {
-            this(source.sourceTupleOrdinal, source.targetTupleOrdinal, unresolvedPath, source.columnOrdinal, source.subTupleOrdinals, null);
+            this(source.sourceTupleOrdinal, source.targetTupleOrdinal, unresolvedPath, source.columnOrdinal, null);
         }
 
         public ResolvePath(int sourceTupleOrdinal, int targetTupleOrdinal, List<String> unresolvedPath, int columnOrdinal)
         {
-            this(sourceTupleOrdinal, targetTupleOrdinal, unresolvedPath, columnOrdinal, ArrayUtils.EMPTY_INT_ARRAY, null);
+            this(sourceTupleOrdinal, targetTupleOrdinal, unresolvedPath, columnOrdinal, null);
         }
 
         public ResolvePath(int sourceTupleOrdinal, int targetTupleOrdinal, List<String> unresolvedPath, int columnOrdinal, DataType columnType)
-        {
-            this(sourceTupleOrdinal, targetTupleOrdinal, unresolvedPath, columnOrdinal, ArrayUtils.EMPTY_INT_ARRAY, columnType);
-        }
-
-        public ResolvePath(int sourceTupleOrdinal, int targetTupleOrdinal, List<String> unresolvedPath, int columnOrdinal, int[] subTupleOrdinals)
-        {
-            this(sourceTupleOrdinal, targetTupleOrdinal, unresolvedPath, columnOrdinal, subTupleOrdinals, null);
-        }
-
-        public ResolvePath(int sourceTupleOrdinal, int targetTupleOrdinal, List<String> unresolvedPath, int columnOrdinal, int[] subTupleOrdinals, DataType columnType)
         {
             this.sourceTupleOrdinal = sourceTupleOrdinal;
             this.targetTupleOrdinal = targetTupleOrdinal;
             this.unresolvedPath = requireNonNull(unresolvedPath, "unresolvedPath").toArray(ArrayUtils.EMPTY_STRING_ARRAY);
             this.columnOrdinal = columnOrdinal;
-            this.subTupleOrdinals = subTupleOrdinals;
             this.columnType = columnType != null ? columnType : DataType.ANY;
         }
 
@@ -578,8 +541,7 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
                 return sourceTupleOrdinal == that.sourceTupleOrdinal
                     && targetTupleOrdinal == that.targetTupleOrdinal
                     && columnOrdinal == that.columnOrdinal
-                    && Arrays.equals(unresolvedPath, that.unresolvedPath)
-                    && Arrays.equals(subTupleOrdinals, that.subTupleOrdinals);
+                    && Arrays.equals(unresolvedPath, that.unresolvedPath);
             }
             return false;
         }

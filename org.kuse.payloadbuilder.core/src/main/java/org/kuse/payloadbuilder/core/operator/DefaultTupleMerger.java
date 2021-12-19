@@ -86,4 +86,10 @@ class DefaultTupleMerger implements TupleMerger
         }
         return false;
     }
+
+    @Override
+    public String toString()
+    {
+        return String.format("LIMIT: %d, INNER TUPLE ORDINAL: %d, TUPLE COUNT: %d", limit, innerTupleOrdinal, compositeTupleCount);
+    }
 }

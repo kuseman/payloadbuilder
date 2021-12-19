@@ -65,7 +65,7 @@ public class ArithmeticBinaryExpressionTest extends AParserTest
         assertEquals(DataType.DOUBLE, e.getDataType());
 
         QualifiedReferenceExpression qre = new QualifiedReferenceExpression(QualifiedName.of("col"), -1, null);
-        qre.setResolvePaths(asList(new ResolvePath(-1, 0, asList("col"), -1, new int[0], DataType.FLOAT)));
+        qre.setResolvePaths(asList(new ResolvePath(-1, 0, asList("col"), -1, DataType.FLOAT)));
         e = new ArithmeticBinaryExpression(
                 Type.ADD,
                 qre,
