@@ -18,7 +18,6 @@ import org.kuse.payloadbuilder.core.utils.MapUtils;
 /** Unit test of {@link ArithmeticBinaryExpression} */
 public class ArithmeticBinaryExpressionTest extends AParserTest
 {
-    @SuppressWarnings("deprecation")
     @Test
     public void test_dataType()
     {
@@ -64,8 +63,13 @@ public class ArithmeticBinaryExpressionTest extends AParserTest
 
         assertEquals(DataType.DOUBLE, e.getDataType());
 
-        QualifiedReferenceExpression qre = new QualifiedReferenceExpression(QualifiedName.of("col"), -1, null);
-        qre.setResolvePaths(asList(new ResolvePath(-1, 0, asList("col"), -1, DataType.FLOAT)));
+        QualifiedReferenceExpression qre = new QualifiedReferenceExpression(
+                QualifiedName.of("col"),
+                -1,
+                new ResolvePath[] {
+                        new ResolvePath(-1, 0, asList("col"), -1, DataType.FLOAT)
+                },
+                null);
         e = new ArithmeticBinaryExpression(
                 Type.ADD,
                 qre,
@@ -83,38 +87,32 @@ public class ArithmeticBinaryExpressionTest extends AParserTest
         Predicate<ExecutionContext> p;
 
         // int + null
-        e = e("1 + a = 11");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.INT))));
+        e = e("1 + a = 11", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.INT))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertFalse(p.test(context));
 
         // int + int
-        e = e("1 + a = 11");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.INT))));
+        e = e("1 + a = 11", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.INT))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // int + long
-        e = e("1 + a = 11l");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10L, DataType.LONG))));
+        e = e("1 + a = 11l", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10L, DataType.LONG))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // int + float
-        e = e("1 + a = 11f");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10F, DataType.FLOAT))));
+        e = e("1 + a = 11f", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10F, DataType.FLOAT))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // int + double
-        e = e("1 + a = 11d");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10D, DataType.DOUBLE))));
+        e = e("1 + a = 11d", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10D, DataType.DOUBLE))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // int + Object (int)
-        e = e("1 + a = 11");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.ANY))));
+        e = e("1 + a = 11", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.ANY))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
     }
@@ -128,38 +126,32 @@ public class ArithmeticBinaryExpressionTest extends AParserTest
         Predicate<ExecutionContext> p;
 
         // int - null
-        e = e("1 - a = -9");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.INT))));
+        e = e("1 - a = -9", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.INT))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertFalse(p.test(context));
 
         // int - int
-        e = e("1 - a = -9");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.INT))));
+        e = e("1 - a = -9", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.INT))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // int - long
-        e = e("1 - a = -9l");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10L, DataType.LONG))));
+        e = e("1 - a = -9l", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10L, DataType.LONG))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // int - float
-        e = e("1 - a = -9f");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10F, DataType.FLOAT))));
+        e = e("1 - a = -9f", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10F, DataType.FLOAT))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // int - double
-        e = e("1 - a = -9d");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10D, DataType.DOUBLE))));
+        e = e("1 - a = -9d", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10D, DataType.DOUBLE))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // int - Object (int)
-        e = e("1 - a = -9");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.ANY))));
+        e = e("1 - a = -9", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.ANY))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
     }
@@ -173,38 +165,32 @@ public class ArithmeticBinaryExpressionTest extends AParserTest
         Predicate<ExecutionContext> p;
 
         // int * null
-        e = e("2 * a = 20");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.INT))));
+        e = e("2 * a = 20", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.INT))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertFalse(p.test(context));
 
         // int * int
-        e = e("2 * a = 20");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.INT))));
+        e = e("2 * a = 20", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.INT))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // int * long
-        e = e("2 * a = 20l");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10L, DataType.LONG))));
+        e = e("2 * a = 20l", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10L, DataType.LONG))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // int * float
-        e = e("2 * a = 20f");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10F, DataType.FLOAT))));
+        e = e("2 * a = 20f", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10F, DataType.FLOAT))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // int * double
-        e = e("2 * a = 20d");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10D, DataType.DOUBLE))));
+        e = e("2 * a = 20d", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10D, DataType.DOUBLE))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // int * Object (int)
-        e = e("2 * a = 20");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.ANY))));
+        e = e("2 * a = 20", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.ANY))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
     }
@@ -218,38 +204,32 @@ public class ArithmeticBinaryExpressionTest extends AParserTest
         Predicate<ExecutionContext> p;
 
         // int / null
-        e = e("20 / a = 2");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.INT))));
+        e = e("20 / a = 2", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.INT))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertFalse(p.test(context));
 
         // int / int
-        e = e("20 / a = 2");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.INT))));
+        e = e("20 / a = 2", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.INT))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // int / long
-        e = e("20 / a = 2l");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10L, DataType.LONG))));
+        e = e("20 / a = 2l", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10L, DataType.LONG))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // int / float
-        e = e("20 / a = 2f");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10F, DataType.FLOAT))));
+        e = e("20 / a = 2f", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10F, DataType.FLOAT))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // int / double
-        e = e("20 / a = 2d");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10D, DataType.DOUBLE))));
+        e = e("20 / a = 2d", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10D, DataType.DOUBLE))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // int / Object (int)
-        e = e("20 / a = 2");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.ANY))));
+        e = e("20 / a = 2", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.ANY))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
     }
@@ -263,38 +243,32 @@ public class ArithmeticBinaryExpressionTest extends AParserTest
         Predicate<ExecutionContext> p;
 
         // int % null
-        e = e("31 % a = 1");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.INT))));
+        e = e("31 % a = 1", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(null, DataType.INT))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertFalse(p.test(context));
 
         // int % int
-        e = e("31 % a = 1");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.INT))));
+        e = e("31 % a = 1", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.INT))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // int % long
-        e = e("31 % a = 1l");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10L, DataType.LONG))));
+        e = e("31 % a = 1l", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10L, DataType.LONG))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // int % float
-        e = e("31 % a = 1f");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10F, DataType.FLOAT))));
+        e = e("31 % a = 1f", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10F, DataType.FLOAT))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // int % double
-        e = e("31 % a = 1d");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10D, DataType.DOUBLE))));
+        e = e("31 % a = 1d", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10D, DataType.DOUBLE))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // int % Object (int)
-        e = e("31 % a = 1");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.ANY))));
+        e = e("31 % a = 1", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(10, DataType.ANY))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
     }

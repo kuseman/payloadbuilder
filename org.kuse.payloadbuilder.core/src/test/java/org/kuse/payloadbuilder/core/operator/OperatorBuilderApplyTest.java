@@ -28,8 +28,8 @@ public class OperatorBuilderApplyTest extends AOperatorTest
         assertEquals(
                 new RootProjection(asList("id1", "id2"),
                         asList(
-                                new ExpressionProjection(e("s.id1")),
-                                new ExpressionProjection(e("a.id2")))),
+                                new ExpressionProjection(en("s.id1")),
+                                new ExpressionProjection(en("a.id2")))),
                 result.projection);
     }
 
@@ -57,8 +57,8 @@ public class OperatorBuilderApplyTest extends AOperatorTest
         assertEquals(
                 new RootProjection(asList("id1", "id2"),
                         asList(
-                                new ExpressionProjection(e("s.id1")),
-                                new ExpressionProjection(e("a.id2")))),
+                                new ExpressionProjection(en("s.id1")),
+                                new ExpressionProjection(en("a.id2")))),
                 result.projection);
     }
 
@@ -83,8 +83,8 @@ public class OperatorBuilderApplyTest extends AOperatorTest
         assertEquals(
                 new RootProjection(asList("id1", "id2"),
                         asList(
-                                new ExpressionProjection(e("s.id1")),
-                                new ExpressionProjection(e("a.id2")))),
+                                new ExpressionProjection(en("s.id1")),
+                                new ExpressionProjection(en("a.id2")))),
                 result.projection);
     }
 
@@ -103,7 +103,7 @@ public class OperatorBuilderApplyTest extends AOperatorTest
                         new FilterOperator(
                                 2,
                                 result.tableOperators.get(1),
-                                new ExpressionPredicate(e("a.active_flg = true")))),
+                                new ExpressionPredicate(en("a.active_flg = true")))),
                 null,
                 new DefaultTupleMerger(-1, 1, 2),
                 false,
@@ -117,8 +117,8 @@ public class OperatorBuilderApplyTest extends AOperatorTest
         assertEquals(
                 new RootProjection(asList("id1", "id2"),
                         asList(
-                                new ExpressionProjection(e("s.id1")),
-                                new ExpressionProjection(e("a.id2")))),
+                                new ExpressionProjection(en("s.id1")),
+                                new ExpressionProjection(en("a.id2")))),
                 result.projection);
     }
 
@@ -139,12 +139,12 @@ public class OperatorBuilderApplyTest extends AOperatorTest
                                 new FilterOperator(
                                         2,
                                         result.tableOperators.get(1),
-                                        new ExpressionPredicate(e("a.active_flg = true")))),
+                                        new ExpressionPredicate(en("a.active_flg = true")))),
                         null,
                         new DefaultTupleMerger(-1, 1, 2),
                         false,
                         true),
-                new ExpressionPredicate(e("a.value is null")));
+                new ExpressionPredicate(en("a.value is null")));
 
         //        System.out.println(expected.toString(1));
         //        System.err.println(result.operator.toString(1));
@@ -154,8 +154,8 @@ public class OperatorBuilderApplyTest extends AOperatorTest
         assertEquals(
                 new RootProjection(asList("id1", "id2"),
                         asList(
-                                new ExpressionProjection(e("s.id1")),
-                                new ExpressionProjection(e("a.id2")))),
+                                new ExpressionProjection(en("s.id1")),
+                                new ExpressionProjection(en("a.id2")))),
                 result.projection);
     }
 
@@ -180,8 +180,8 @@ public class OperatorBuilderApplyTest extends AOperatorTest
         assertEquals(
                 new RootProjection(asList("id1", "id2"),
                         asList(
-                                new ExpressionProjection(e("s.id1")),
-                                new ExpressionProjection(e("a.id2")))),
+                                new ExpressionProjection(en("s.id1")),
+                                new ExpressionProjection(en("a.id2")))),
                 result.projection);
     }
 }

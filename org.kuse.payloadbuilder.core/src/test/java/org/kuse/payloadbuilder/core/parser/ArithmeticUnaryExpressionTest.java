@@ -31,21 +31,21 @@ public class ArithmeticUnaryExpressionTest extends AParserTest
                 MapUtils.entry("f", Pair.of(new Long(1), DataType.ANY)),
                 MapUtils.entry("g", Pair.of(new Float(1), DataType.ANY)),
                 MapUtils.entry("h", Pair.of(new Double(1), DataType.ANY)));
-        List<Expression> es = asList(
-                e("-a < 0"),
-                e("-b < 0"),
-                e("-c < 0"),
-                e("-d < 0"),
-                e("-e < 0"),
-                e("-f < 0"),
-                e("-g < 0"),
-                e("-h < 0"));
+        List<String> es = asList(
+                "-a < 0",
+                "-b < 0",
+                "-c < 0",
+                "-d < 0",
+                "-e < 0",
+                "-f < 0",
+                "-g < 0",
+                "-h < 0");
 
         context.getStatementContext().setTuple(tuple);
-        for (Expression e : es)
+        for (String e : es)
         {
-            setup(tuple, e, types);
-            Predicate<ExecutionContext> predicate = CODE_GENERATOR.generatePredicate(e);
+            Expression expr = e(e, tuple, types);
+            Predicate<ExecutionContext> predicate = CODE_GENERATOR.generatePredicate(expr);
             assertTrue(e.toString(), predicate.test(context));
         }
     }

@@ -14,6 +14,8 @@ import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.OperatorBuilder.BuildResult;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.parser.AParserTest;
+import org.kuse.payloadbuilder.core.parser.QueryStatement;
+import org.kuse.payloadbuilder.core.parser.SelectStatement;
 import org.kuse.payloadbuilder.core.parser.SortItem;
 
 /** Base class of {@link OperatorBuilder} tests. */
@@ -104,6 +106,7 @@ public class AOperatorTest extends AParserTest
     {
         List<Operator> tableOperators = new ArrayList<>();
         MutableObject<TableAlias> mAlias = new MutableObject<>();
+        List<TableAlias> aliases = new ArrayList<>();
         Catalog c = new Catalog("Test")
         {
             @Override
@@ -118,6 +121,8 @@ public class AOperatorTest extends AParserTest
                 {
                     sortItemsConsumer.accept(data.getSortItems());
                 }
+
+                aliases.add(data.getTableAlias());
 
                 if (mAlias.getValue() == null)
                 {
@@ -150,7 +155,11 @@ public class AOperatorTest extends AParserTest
         };
         session.getCatalogRegistry().registerCatalog("c", c);
         session.getCatalogRegistry().setDefaultCatalog("c");
-        BuildResult buildResult = OperatorBuilder.create(session, s(query));
+
+        // Assume the last statement is the one we should create operator for
+        QueryStatement stms = q(query);
+        SelectStatement select = (SelectStatement) stms.getStatements().get(stms.getStatements().size() - 1);
+        BuildResult buildResult = OperatorBuilder.create(session, select.getSelect());
 
         QueryResult result = new QueryResult();
 

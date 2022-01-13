@@ -49,9 +49,9 @@ class OrderByOperator extends AOperator
     {
         List<Tuple> tuples = new ArrayList<>();
         TupleIterator it = target.open(context);
-        if (it instanceof RowList)
+        if (it instanceof TupleList)
         {
-            RowList list = (RowList) it;
+            TupleList list = (TupleList) it;
             int size = list.size();
             for (int i = 0; i < size; i++)
             {

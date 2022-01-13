@@ -26,9 +26,7 @@ class JoinTuple implements Tuple
     @Override
     public int getTupleOrdinal()
     {
-        // This is a root tuple that should never be compared to a tuple ordinal
-        // it's only used during a join process
-        throw new IllegalArgumentException("Not implemented");
+        return -1;
     }
 
     @Override
@@ -64,7 +62,7 @@ class JoinTuple implements Tuple
         * tableA                   (to = 0, contextOuter)
         *   tableB                 (to = 1)
         *   tableC                 (to = 2, outer)
-        *     tabbleD              (to = 3)
+        *     tableD               (to = 3)
         *   tableE                 (to = 4, inner)
         */
 

@@ -140,6 +140,12 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
     }
 
     @Override
+    public TR visit(UnresolvedQualifiedReferenceExpression expression, TC context)
+    {
+        return defaultResult(context);
+    }
+
+    @Override
     public TR visit(NestedExpression expression, TC context)
     {
         return visitChildren(context, expression.getExpression());
@@ -165,6 +171,12 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
 
     @Override
     public TR visit(DereferenceExpression expression, TC context)
+    {
+        return visitChildren(context, expression.getLeft(), expression.getRight());
+    }
+
+    @Override
+    public TR visit(UnresolvedDereferenceExpression expression, TC context)
     {
         return visitChildren(context, expression.getLeft(), expression.getRight());
     }

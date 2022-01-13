@@ -49,37 +49,24 @@ class TopOperator extends AOperator
             throw new OperatorException("Top expression " + topExpression + " should return a zero or positive Integer. Got: " + obj);
         }
         final int top = ((Integer) obj).intValue();
-        final TupleIterator it = target.open(context);
-        final RowList list = it instanceof RowList ? (RowList) it : null;
-        //CSOFF
-        return new TupleIterator()
-        //CSON
+
+        return new ATupleIterator(target.open(context))
         {
             private int count;
 
             @Override
-            public Tuple next()
-            {
-                Tuple result = list == null ? it.next() : list.get(count);
-                count++;
-                return result;
-            }
-
-            @Override
             public boolean hasNext()
             {
-                if (list == null)
-                {
-                    return count < top && it.hasNext();
-                }
-
-                return count < top && count < list.size();
+                return count >= top
+                    ? false
+                    : super.hasNext();
             }
 
             @Override
-            public void close()
+            protected boolean setNext(Tuple tuple)
             {
-                it.close();
+                count++;
+                return super.setNext(tuple);
             }
         };
     }

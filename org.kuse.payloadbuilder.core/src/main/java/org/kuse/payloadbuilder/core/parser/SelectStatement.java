@@ -8,7 +8,7 @@ public class SelectStatement extends Statement
     private final Select select;
     private final boolean assignmentSelect;
 
-    SelectStatement(Select select, boolean assignmentSelect)
+    public SelectStatement(Select select, boolean assignmentSelect)
     {
         this.select = requireNonNull(select, "select");
         this.assignmentSelect = assignmentSelect;

@@ -10,9 +10,9 @@ import java.util.Objects;
 
 import org.antlr.v4.runtime.Token;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
+import org.kuse.payloadbuilder.core.QueryException;
 import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
@@ -32,8 +32,6 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
             MapUtils.entry(DataType.DOUBLE, "getDouble"),
             MapUtils.entry(DataType.BOOLEAN, "getBool"));
 
-    private static final ResolvePath[] EMPTY = new ResolvePath[0];
-
     private final QualifiedName qname;
     /**
      * <pre>
@@ -43,16 +41,13 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
      */
     private final int lambdaId;
     private final Token token;
+    private final ResolvePath[] resolvePaths;
 
-    /**
-     * Mutable property. Temporary until query parser is rewritten to and a 2 pass analyze phase is done that resolves this.
-     */
-    private ResolvePath[] resolvePaths;
-
-    public QualifiedReferenceExpression(QualifiedName qname, int lambdaId, Token token)
+    public QualifiedReferenceExpression(QualifiedName qname, int lambdaId, ResolvePath[] resolvePaths, Token token)
     {
         this.qname = requireNonNull(qname, "qname");
         this.lambdaId = lambdaId;
+        this.resolvePaths = requireNonNull(resolvePaths, "resolvePaths");
         this.token = token;
     }
 
@@ -71,26 +66,9 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         return token;
     }
 
-    /** Set resolve path, will be removed when a 2 phase operator build is in place */
-    @Deprecated
-    public void setResolvePaths(List<ResolvePath> resolvePaths)
-    {
-        if (this.resolvePaths != null)
-        {
-            return;
-        }
-        requireNonNull(resolvePaths, "resolvePaths");
-        if (resolvePaths.isEmpty())
-        {
-            throw new IllegalArgumentException("Empty resolve path");
-        }
-        this.resolvePaths = resolvePaths.toArray(EMPTY);
-    }
-
-    @Deprecated
     public ResolvePath[] getResolvePaths()
     {
-        return ObjectUtils.defaultIfNull(resolvePaths, EMPTY);
+        return resolvePaths;
     }
 
     @Override
@@ -127,14 +105,15 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
     @Override
     public Object eval(ExecutionContext context)
     {
-        Object value = null;
         int partIndex = 0;
         String[] parts = ArrayUtils.EMPTY_STRING_ARRAY;
         Tuple tuple = context.getStatementContext().getTuple();
+        Object value = tuple;
+        ResolvePath path = null;
 
         // Expression mode / test mode
         // We have no resolve path, simply use the full qualified name as column
-        if (resolvePaths == null)
+        if (resolvePaths.length == 0)
         {
             parts = qname.getParts().toArray(ArrayUtils.EMPTY_STRING_ARRAY);
             if (lambdaId >= 0)
@@ -150,60 +129,120 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         }
         else
         {
+            // TODO: sorceTupleOrdinal
+            path = resolvePaths[0];
+            parts = path.unresolvedPath;
             if (lambdaId >= 0)
             {
                 value = context.getStatementContext().getLambdaValue(lambdaId);
-
-                // If the lambda value was a Tuple, set tuple field
-                // else null it to not resolve further down
-                //CSOFF
-                if (value instanceof Tuple)
-                //CSON
-                {
-                    tuple = (Tuple) value;
-                }
-                else
-                {
-                    tuple = null;
-                }
-            }
-
-            // TODO: sorceTupleOrdinal
-            ResolvePath path = resolvePaths[0];
-            parts = path.unresolvedPath;
-            if (tuple != null)
-            {
-                value = resolve(tuple, path);
-                //CSOFF
-                if (value instanceof Tuple)
-                //CSON
-                {
-                    value = resolveValue((Tuple) value, path, partIndex);
-                }
-                // Move partIndex one step if this path don't have a column ordinal
-                //CSOFF
-                if (path.columnOrdinal == -1)
-                    //CSON
-                {
-                    partIndex++;
-                }
             }
         }
 
-        if (value == null
-            || partIndex >= parts.length)
+        return resolveValue(value, path, parts, partIndex);
+    }
+
+    /** Resolves value for provided tuple and path */
+    private Object resolveValue(Object value, ResolvePath path, String[] unresolvedParts, int unresolvedPartIndex)
+    {
+        int partIndex = unresolvedPartIndex;
+        /*
+         * 1. Resolve target tuple ordinal
+         * 2. Resolve subPaths
+         *    Sub path can result in either a tuple or a value
+         * 3. Resolve unresolved parts
+         *
+         */
+
+        Object result = value;
+
+        if (path != null)
         {
-            return value;
+            /* Resolve tuple. Both target ordinal and sub paths if any */
+            result = resolveTuple(result, path);
+
+            // Nothing more to resolve here return result
+            if (result == null
+                || (path.columnOrdinal == -1
+                    && path.unresolvedPath.length == 0))
+            {
+                return result;
+            }
+
+            if (result instanceof Tuple)
+            {
+                // Get value for first unresolved part or column ordinal
+                int ordinal = path.columnOrdinal >= 0
+                    ? path.columnOrdinal
+                    : ((Tuple) result).getColumnOrdinal(path.unresolvedPath[partIndex++]);
+
+                result = ((Tuple) result).getValue(ordinal);
+
+                // Keep resolving tuples along the unresolved path
+                while (result instanceof Tuple && partIndex < path.unresolvedPath.length)
+                {
+                    ordinal = ((Tuple) result).getColumnOrdinal(path.unresolvedPath[partIndex++]);
+                    result = ((Tuple) result).getValue(ordinal);
+                }
+            }
         }
 
-        if (value instanceof Map)
+        // Nothing more to resolve
+        if (result == null
+            || partIndex >= unresolvedParts.length)
+        {
+            return result;
+        }
+
+        if (result instanceof Map)
         {
             @SuppressWarnings("unchecked")
-            Map<Object, Object> map = (Map<Object, Object>) value;
-            return MapUtils.traverse(map, partIndex, parts);
+            Map<Object, Object> map = (Map<Object, Object>) result;
+            return MapUtils.traverse(map, partIndex, unresolvedParts);
         }
 
-        throw new IllegalArgumentException("Cannot dereference '" + parts[partIndex] + "' on value " + value);
+        throw new IllegalArgumentException("Cannot dereference '" + unresolvedParts[partIndex] + "' on value " + result);
+    }
+
+    private Object resolveTuple(Object input, ResolvePath path)
+    {
+        if (input == null)
+        {
+            return input;
+        }
+
+        Object result = input;
+        // Resolve target tuple ordinal if needed
+        if (result instanceof Tuple
+            && !(path.targetTupleOrdinal == -1 || path.targetTupleOrdinal == ((Tuple) result).getTupleOrdinal()))
+        {
+            result = ((Tuple) result).getTuple(path.targetTupleOrdinal);
+        }
+
+        int length = path.subPath.length;
+        for (int i = 0; i < length; i++)
+        {
+            if (result == null)
+            {
+                break;
+            }
+            ResolvePath sb = path.subPath[i];
+
+            if (!(result instanceof Tuple))
+            {
+                throw new QueryException("Expected a tuple when travering resolve path but got: " + result);
+            }
+
+            if (sb.targetTupleOrdinal >= 0)
+            {
+                result = ((Tuple) result).getTuple(sb.targetTupleOrdinal);
+            }
+            else if (sb.columnOrdinal >= 0)
+            {
+                result = ((Tuple) result).getValue(sb.columnOrdinal);
+            }
+        }
+
+        return result;
     }
 
     @Override
@@ -218,6 +257,8 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         if (resolvePaths == null
             || lambdaId >= 0
             || resolvePaths.length != 1
+            // No sub paths
+            || resolvePaths[0].subPath.length > 0
             // Multi part path ie. map access etc. not supported yet
             || resolvePaths[0].unresolvedPath.length > 1
             // Multi part with column ordinal
@@ -391,40 +432,6 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         return code;
     }
 
-    /** Traverses to the target tuple with provided path */
-    private Object resolve(Tuple tuple, ResolvePath path)
-    {
-        Object result = tuple;
-        if (path.targetTupleOrdinal >= 0)
-        {
-            result = tuple.getTuple(path.targetTupleOrdinal);
-        }
-
-        if (result == null)
-        {
-            return null;
-        }
-        return result;
-    }
-
-    /** Resolves value from provided with with provided path */
-    private Object resolveValue(Tuple tuple, ResolvePath path, int partIndex)
-    {
-        // Nothing more to resolve here return tuple
-        if (tuple == null
-            || (path.columnOrdinal == -1
-                && path.unresolvedPath.length == 0))
-        {
-            return tuple;
-        }
-
-        // Get value for first part
-        int ordinal = path.columnOrdinal >= 0
-            ? path.columnOrdinal
-            : tuple.getColumnOrdinal(path.unresolvedPath[partIndex]);
-        return tuple.getValue(ordinal);
-    }
-
     @Override
     public int hashCode()
     {
@@ -437,9 +444,8 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         if (obj instanceof QualifiedReferenceExpression)
         {
             QualifiedReferenceExpression that = (QualifiedReferenceExpression) obj;
-            return qname.equals(that.qname)
-                && lambdaId == that.lambdaId;
-            //                && Objects.equals(resolvePaths, that.resolvePaths);
+            return lambdaId == that.lambdaId
+                && Arrays.equals(resolvePaths, that.resolvePaths);
         }
         return false;
     }
@@ -455,6 +461,8 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
      **/
     public static class ResolvePath
     {
+        public static final ResolvePath[] EMPTY_ARRAY = new ResolvePath[0];
+
         /**
          * The source tuple ordinal that this path refers to. In case this qualifier is part of a multi tuple ordinal expression this value specifies
          * if the path to use when the source tuple ordinal matches
@@ -470,7 +478,8 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         final int sourceTupleOrdinal;
 
         /**
-         * The target tuple ordinal that this path refers to.
+         * The target tuple ordinal the qualifier refers to.
+         * </pre>
          */
         final int targetTupleOrdinal;
 
@@ -486,29 +495,93 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
          */
         final String[] unresolvedPath;
 
-        /** Pre defined column ordinal. Typically a computed expression or similar */
+        /**
+         * Pre-defined column ordinal. A computed expression or temp table or a defined table. Then a lookup of column name to ordinal is not needed.
+         */
         final int columnOrdinal;
 
         /** Column type if any */
         final DataType columnType;
 
+        /**
+         * A sub resolve path. This one is set if the current path points to a tuple-type value and destination is another path inside that tuple.
+         */
+        final ResolvePath[] subPath;
+
         public ResolvePath(ResolvePath source, List<String> unresolvedPath)
         {
-            this(source.sourceTupleOrdinal, source.targetTupleOrdinal, unresolvedPath, source.columnOrdinal, null);
+            this(source.sourceTupleOrdinal, source.targetTupleOrdinal, unresolvedPath, source.columnOrdinal, null, source.subPath);
         }
 
-        public ResolvePath(int sourceTupleOrdinal, int targetTupleOrdinal, List<String> unresolvedPath, int columnOrdinal)
+        public ResolvePath(
+                int sourceTupleOrdinal,
+                int targetTupleOrdinal,
+                List<String> unresolvedPath,
+                int columnOrdinal)
         {
-            this(sourceTupleOrdinal, targetTupleOrdinal, unresolvedPath, columnOrdinal, null);
+            this(
+                    sourceTupleOrdinal,
+                    targetTupleOrdinal,
+                    unresolvedPath,
+                    columnOrdinal,
+                    null,
+                    null);
         }
 
-        public ResolvePath(int sourceTupleOrdinal, int targetTupleOrdinal, List<String> unresolvedPath, int columnOrdinal, DataType columnType)
+        public ResolvePath(
+                int sourceTupleOrdinal,
+                int targetTupleOrdinal,
+                List<String> unresolvedPath,
+                int columnOrdinal,
+                ResolvePath[] subPath)
+        {
+            this(
+                    sourceTupleOrdinal,
+                    targetTupleOrdinal,
+                    unresolvedPath,
+                    columnOrdinal,
+                    null,
+                    subPath);
+        }
+
+        public ResolvePath(
+                int sourceTupleOrdinal,
+                int targetTupleOrdinal,
+                List<String> unresolvedPath,
+                int columnOrdinal,
+                DataType dataType)
+        {
+            this(
+                    sourceTupleOrdinal,
+                    targetTupleOrdinal,
+                    unresolvedPath,
+                    columnOrdinal,
+                    dataType,
+                    null);
+        }
+
+        public ResolvePath(
+                int sourceTupleOrdinal,
+                int targetTupleOrdinal,
+                List<String> unresolvedPath,
+                int columnOrdinal,
+                DataType columnType,
+                ResolvePath[] subPath)
         {
             this.sourceTupleOrdinal = sourceTupleOrdinal;
             this.targetTupleOrdinal = targetTupleOrdinal;
             this.unresolvedPath = requireNonNull(unresolvedPath, "unresolvedPath").toArray(ArrayUtils.EMPTY_STRING_ARRAY);
-            this.columnOrdinal = columnOrdinal;
+            this.columnOrdinal = requireNonNull(columnOrdinal, "columnOrdinal");
             this.columnType = columnType != null ? columnType : DataType.ANY;
+            this.subPath = subPath != null ? subPath : EMPTY_ARRAY;
+
+            for (ResolvePath sp : this.subPath)
+            {
+                if (sp.unresolvedPath.length > 0)
+                {
+                    throw new IllegalArgumentException("Cannot unresolved parts on sub paths.");
+                }
+            }
         }
 
         public int getSourceTupleOrdinal()
@@ -521,9 +594,24 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
             return targetTupleOrdinal;
         }
 
+        public int getColumnOrdinal()
+        {
+            return columnOrdinal;
+        }
+
         public String[] getUnresolvedPath()
         {
             return unresolvedPath;
+        }
+
+        public DataType getColumnType()
+        {
+            return columnType;
+        }
+
+        public ResolvePath[] getSubPath()
+        {
+            return subPath;
         }
 
         @Override
@@ -541,7 +629,9 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
                 return sourceTupleOrdinal == that.sourceTupleOrdinal
                     && targetTupleOrdinal == that.targetTupleOrdinal
                     && columnOrdinal == that.columnOrdinal
-                    && Arrays.equals(unresolvedPath, that.unresolvedPath);
+                    && columnType == that.columnType
+                    && Arrays.equals(unresolvedPath, that.unresolvedPath)
+                    && Arrays.equals(subPath, that.subPath);
             }
             return false;
         }

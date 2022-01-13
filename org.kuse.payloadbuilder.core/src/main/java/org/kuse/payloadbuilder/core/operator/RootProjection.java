@@ -2,12 +2,14 @@ package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.kuse.payloadbuilder.core.OutputWriter;
@@ -176,7 +178,9 @@ public class RootProjection implements Projection
     @Override
     public String toString()
     {
-        return Arrays.toString(columns) + System.lineSeparator()
-            + Arrays.toString(projections);
+        int size = columns.length;
+        return IntStream.range(0, size)
+                .mapToObj(i -> columns[i] + " = " + projections[i])
+                .collect(joining(System.lineSeparator()));
     }
 }

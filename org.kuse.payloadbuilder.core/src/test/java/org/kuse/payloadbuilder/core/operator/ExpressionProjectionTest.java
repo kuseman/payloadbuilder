@@ -29,7 +29,7 @@ public class ExpressionProjectionTest extends AParserTest
         ExpressionProjection p;
 
         // Object.class QRE
-        qre = new QualifiedReferenceExpression(QualifiedName.of("col"), -1, null);
+        qre = new QualifiedReferenceExpression(QualifiedName.of("col"), -1, new ResolvePath[0], null);
         p = new ExpressionProjection(qre);
 
         OutputWriter writer = generateAndWrite(p, tuple -> when(tuple.getValue(0)).thenReturn("value"));
@@ -41,7 +41,7 @@ public class ExpressionProjectionTest extends AParserTest
 
         for (DataType type : DataType.values())
         {
-            if (type == DataType.ANY)
+            if (!type.isDefinedValueType())
             {
                 continue;
             }
@@ -50,11 +50,15 @@ public class ExpressionProjectionTest extends AParserTest
         }
     }
 
-    @SuppressWarnings("deprecation")
     private void testPrimitive(boolean nullResult, DataType type)
     {
-        QualifiedReferenceExpression qre = new QualifiedReferenceExpression(QualifiedName.of("col"), -1, null);
-        qre.setResolvePaths(asList(new ResolvePath(-1, -1, asList("col"), -1, type)));
+        QualifiedReferenceExpression qre = new QualifiedReferenceExpression(
+                QualifiedName.of("col"),
+                -1,
+                new ResolvePath[] {
+                        new ResolvePath(-1, -1, asList("col"), -1, type)
+                },
+                null);
         Projection p = new ExpressionProjection(qre);
 
         OutputWriter writer = generateAndWrite(p, tuple ->

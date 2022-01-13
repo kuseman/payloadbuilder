@@ -1,6 +1,5 @@
 package org.kuse.payloadbuilder.core.parser;
 
-import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 
 import java.util.List;
@@ -13,28 +12,22 @@ public class AsteriskSelectItem extends SelectItem
 {
     private final String alias;
     /** Tuple ordinals that this asterisk is resolved into */
-    private List<Integer> aliasTupleOrdinals;
+    private final List<Integer> aliasTupleOrdinals;
 
+    /** 1:st phase constructor */
     public AsteriskSelectItem(String alias, Token token)
     {
         super("", false, token);
         this.alias = alias;
+        this.aliasTupleOrdinals = null;
     }
 
-    /** Temporary setter until parser/analyzer is done in a 2 pahse fashion */
-    @Deprecated
-    public void setAliasTupleOrdinals(List<Integer> aliasTupleOrdinals)
+    /** 2:nd phase constructor */
+    public AsteriskSelectItem(String alias, Token token, List<Integer> aliasTupleOrdinals)
     {
-        if (this.aliasTupleOrdinals != null)
-        {
-            throw new IllegalArgumentException("Cannot set already set property aliasTupleOrdinals");
-        }
-        requireNonNull(aliasTupleOrdinals, "aliasTupleOrdinals");
-        if (aliasTupleOrdinals.isEmpty())
-        {
-            throw new IllegalArgumentException("Empty alias ordinals");
-        }
-        this.aliasTupleOrdinals = unmodifiableList(aliasTupleOrdinals);
+        super("", false, token);
+        this.alias = alias;
+        this.aliasTupleOrdinals = requireNonNull(aliasTupleOrdinals, "aliasTupleOrdinals");
     }
 
     public String getAlias()
@@ -48,8 +41,13 @@ public class AsteriskSelectItem extends SelectItem
         return true;
     }
 
+    /** Get alias tuple ordinals */
     public List<Integer> getAliasTupleOrdinals()
     {
+        if (aliasTupleOrdinals == null)
+        {
+            throw new IllegalArgumentException("Asterisk select not resolved yet");
+        }
         return aliasTupleOrdinals;
     }
 

@@ -19,7 +19,7 @@ public class QualifiedFunctionCallExpression extends Expression
     private final ScalarFunctionInfo functionInfo;
     private final Token token;
 
-    QualifiedFunctionCallExpression(
+    public QualifiedFunctionCallExpression(
             ScalarFunctionInfo functionInfo,
             List<Expression> arguments,
             Token token)

@@ -14,7 +14,12 @@ import java.util.Map;
 
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleList;
+import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.AParserTest;
+import org.kuse.payloadbuilder.core.utils.MapUtils;
+import org.mockito.Mockito;
 
 /** Tests functions etc. in built in catalog */
 public class BuiltinCatalogTest extends AParserTest
@@ -60,6 +65,53 @@ public class BuiltinCatalogTest extends AParserTest
     {
         assertExpression("110.1", null, "concat(null,1,10.1)");
         assertExpression("", null, "concat(null,null)");
+    }
+
+    @Test
+    public void test_function_count() throws Exception
+    {
+        Map<String, Object> values = new HashMap<>();
+        values.put("a", asList(-1, -2, -3, 0, 1, 2, 3));
+        values.put("b", asList(-1, -2, -3, 0, 1, 2, 3).iterator());
+        values.put("c", MapUtils.ofEntries(MapUtils.entry("key", "value"), MapUtils.entry("key1", "value1")));
+        values.put("d", new TupleList()
+        {
+            @Override
+            public int size()
+            {
+                return 3;
+            }
+
+            @Override
+            public Tuple get(int index)
+            {
+                return Mockito.mock(Tuple.class);
+            }
+        });
+        values.put("e", new TupleIterator()
+        {
+            int index;
+            @Override
+            public boolean hasNext()
+            {
+                return index < 5;
+            }
+
+            @Override
+            public Tuple next()
+            {
+                index++;
+                return Mockito.mock(Tuple.class);
+            }
+        });
+
+        assertExpression(7, values, "count(a)");
+        assertExpression(7, values, "count(b)");
+        assertExpression(2, values, "count(c)");
+        assertExpression(1, values, "count(1)");
+        assertExpression(0, values, "count(null)");
+        assertExpression(3, values, "count(d)");
+        assertExpression(5, values, "count(e)");
     }
 
     @Test

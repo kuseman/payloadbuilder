@@ -16,7 +16,7 @@ import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.LiteralStringExpression;
-import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
+import org.kuse.payloadbuilder.core.parser.UnresolvedQualifiedReferenceExpression;
 
 /** Cast and convert function */
 class CastFunction extends ScalarFunctionInfo
@@ -32,9 +32,9 @@ class CastFunction extends ScalarFunctionInfo
     @Override
     public List<Expression> foldArguments(List<Expression> arguments)
     {
-        if (arguments.get(1) instanceof QualifiedReferenceExpression)
+        if (arguments.get(1) instanceof UnresolvedQualifiedReferenceExpression)
         {
-            QualifiedReferenceExpression qre = (QualifiedReferenceExpression) arguments.get(1);
+            UnresolvedQualifiedReferenceExpression qre = (UnresolvedQualifiedReferenceExpression) arguments.get(1);
             if (qre.getLambdaId() >= 0)
             {
                 return arguments;

@@ -122,10 +122,18 @@ public class AStatementVisitor<TR, TC> implements StatementVisitor<TR, TC>, Sele
     public TR visit(Select select, TC context)
     {
         select.getSelectItems().forEach(s -> s.accept(this, context));
-        select.getFrom().accept(this, context);
+        select.getComputedExpressions().forEach(e -> visitExpression(context, e));
+        if (select.getFrom() != null)
+        {
+            select.getFrom().accept(this, context);
+        }
         if (select.getWhere() != null)
         {
             visitExpression(context, select.getWhere());
+        }
+        if (select.getTopExpression() != null)
+        {
+            visitExpression(context, select.getTopExpression());
         }
         select.getGroupBy().forEach(g -> visitExpression(context, g));
         select.getOrderBy().forEach(o -> o.accept(this, context));

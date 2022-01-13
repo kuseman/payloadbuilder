@@ -100,8 +100,7 @@ public class OrdinalValuesFactoryTest extends AParserTest
     public void test_numbers_equals_with_boolean()
     {
         Tuple tuple = mock(Tuple.class);
-        Expression a = e("a");
-        setup(tuple, a, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(true, DataType.ANY))));
+        Expression a = e("a", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(true, DataType.ANY))));
 
         List<Expression> es = asList(e("1"), e("1l"), e("1f"), e("1d"), e("true"), a);
         List<IOrdinalValuesFactory> fs = es
@@ -122,8 +121,7 @@ public class OrdinalValuesFactoryTest extends AParserTest
 
         // Test not equals
         Tuple tupleA = mock(Tuple.class);
-        a = e("a");
-        setup(tupleA, a, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(false, DataType.ANY))));
+        a = e("a", tupleA, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(false, DataType.ANY))));
 
         List<Expression> es1 = asList(e("0"), e("0l"), e("0f"), e("0d"), e("false"), a);
         List<IOrdinalValuesFactory> fs1 = es1
@@ -146,8 +144,7 @@ public class OrdinalValuesFactoryTest extends AParserTest
     public void test_numbers_equals()
     {
         Tuple tuple = mock(Tuple.class);
-        Expression a = e("a");
-        setup(tuple, a, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(100000, DataType.ANY))));
+        Expression a = e("a", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(100000, DataType.ANY))));
 
         // Use high values here to avoid primitive caches
         List<Expression> es = asList(e("100000"), e("100000l"), e("100000f"), e("100000d"), e("'100000'"), a);
@@ -169,8 +166,7 @@ public class OrdinalValuesFactoryTest extends AParserTest
 
         // Test not equals
         Tuple tupleA = mock(Tuple.class);
-        a = e("a");
-        setup(tupleA, a, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(100001, DataType.ANY))));
+        a = e("a", tupleA, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(100001, DataType.ANY))));
 
         List<Expression> es1 = asList(e("100001"), e("100001l"), e("100001f"), e("100001d"), e("'100001'"), a);
         List<IOrdinalValuesFactory> fs1 = es1

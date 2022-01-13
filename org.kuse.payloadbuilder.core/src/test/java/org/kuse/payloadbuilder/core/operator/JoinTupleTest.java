@@ -10,15 +10,8 @@ public class JoinTupleTest extends AOperatorTest
     public void test()
     {
         JoinTuple jt = new JoinTuple(null);
-
-        try
-        {
-            jt.getTupleOrdinal();
-            fail();
-        }
-        catch (IllegalArgumentException e)
-        {
-        }
+        // Ordinal always -1
+        assertEquals(-1, jt.getTupleOrdinal());
 
         assertEquals(-1, jt.getColumnOrdinal("col"));
         assertEquals(null, jt.getValue(0));
@@ -33,6 +26,8 @@ public class JoinTupleTest extends AOperatorTest
 
         TestTuple inner = new TestTuple(666);
         jt.setInner(inner);
+
+        assertEquals(-1, jt.getTupleOrdinal());
 
         assertSame(null, jt.getTuple(-1));
         assertSame(inner, jt.getTuple(666));

@@ -128,7 +128,7 @@ class AnalyzeOperator extends AOperator
         @Override
         public Tuple next()
         {
-            RowList list = it instanceof RowList ? (RowList) it : null;
+            TupleList list = it instanceof TupleList ? (TupleList) it : null;
             data.increaseRowCount();
             data.resumeNodeTime();
             Tuple result = list == null ? it.next() : list.get(index++);
@@ -139,7 +139,7 @@ class AnalyzeOperator extends AOperator
         @Override
         public boolean hasNext()
         {
-            RowList list = it instanceof RowList ? (RowList) it : null;
+            TupleList list = it instanceof TupleList ? (TupleList) it : null;
             data.resumeNodeTime();
             boolean result = list == null ? it.hasNext() : index < list.size();
             data.suspenNodeTime();

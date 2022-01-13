@@ -6,10 +6,13 @@ import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
 
 import java.util.List;
 
+import org.kuse.payloadbuilder.core.operator.TableAlias;
+
 /** Definition of a tables meta data. Columns data types etc. */
 public class TableMeta
 {
     private final List<Column> columns;
+    public static final int MAX_COLUMNS = 1_000_000;
 
     public TableMeta(List<Column> columns)
     {
@@ -19,6 +22,10 @@ public class TableMeta
             throw new IllegalArgumentException("Columns cannot be empty");
         }
         int size = columns.size();
+        if (size >= MAX_COLUMNS)
+        {
+            throw new IllegalArgumentException("Column count cannot exceed " + MAX_COLUMNS);
+        }
         for (int i = 0; i < size; i++)
         {
             columns.get(i).ordinal = i;
@@ -79,12 +86,20 @@ public class TableMeta
     {
         private final String name;
         private final DataType type;
+        /** Optional table alias if {@link type} is {@link DataType#TUPLE} */
+        private final TableAlias tableAlias;
         private int ordinal;
 
         public Column(String name, DataType type)
         {
+            this(name, type, null);
+        }
+
+        public Column(String name, DataType type, TableAlias tableAlias)
+        {
             this.name = requireNonNull(name, "name");
             this.type = requireNonNull(type, "type");
+            this.tableAlias = tableAlias;
         }
 
         public int getOrdinal()
@@ -100,6 +115,11 @@ public class TableMeta
         public DataType getType()
         {
             return type;
+        }
+
+        public TableAlias getTableAlias()
+        {
+            return tableAlias;
         }
 
         @Override
@@ -130,7 +150,9 @@ public class TableMeta
         DOUBLE(3),
         BOOLEAN(-1),
         /** Any object. Will use reflection when using code gen etc. */
-        ANY(-1);
+        ANY(-1),
+        /** A tuple. Is used when returning a nested tuple from a column */
+        TUPLE(-1);
 
         final int promotePrio;
 
@@ -143,6 +165,12 @@ public class TableMeta
         public boolean isNumber()
         {
             return promotePrio != -1;
+        }
+
+        /** Returns true if this type is a defined value type. Ie. not tuple, any etc. */
+        public boolean isDefinedValueType()
+        {
+            return !(this == ANY || this == TUPLE);
         }
 
         /** Return the type with highest promote prio. */

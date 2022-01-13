@@ -47,58 +47,15 @@ class FilterOperator extends AOperator
     @Override
     public TupleIterator open(ExecutionContext context)
     {
-        final TupleIterator iterator = operator.open(context);
-        final RowList list = iterator instanceof RowList ? (RowList) iterator : null;
-        //CSOFF
-        return new TupleIterator()
-        //CSON
+        return new ATupleIterator(operator.open(context))
         {
-            /** Index used when iterator is a {@link RowList} */
-            private int index;
-            private Tuple next;
-
             @Override
-            public Tuple next()
+            protected boolean setNext(Tuple tuple)
             {
-                Tuple result = next;
-                next = null;
+                context.getStatementContext().setTuple(tuple);
+                boolean result = predicate.test(context);
+                context.getStatementContext().setTuple(null);
                 return result;
-            }
-
-            @Override
-            public boolean hasNext()
-            {
-                return setNext();
-            }
-
-            @Override
-            public void close()
-            {
-                iterator.close();
-            }
-
-            private boolean setNext()
-            {
-                while (next == null)
-                {
-                    if (list == null && !iterator.hasNext())
-                    {
-                        return false;
-                    }
-                    else if (list != null && index >= list.size())
-                    {
-                        return false;
-                    }
-
-                    Tuple tuple = list == null ? iterator.next() : list.get(index++);
-                    context.getStatementContext().setTuple(tuple);
-                    if (predicate.test(context))
-                    {
-                        next = tuple;
-                    }
-                    context.getStatementContext().setTuple(null);
-                }
-                return true;
             }
         };
     }

@@ -2,9 +2,9 @@ package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
-import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static org.apache.commons.lang3.StringUtils.join;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
 import static org.apache.commons.lang3.StringUtils.upperCase;
 import static org.kuse.payloadbuilder.core.parser.LiteralExpression.createLiteralDecimalExpression;
@@ -12,9 +12,11 @@ import static org.kuse.payloadbuilder.core.parser.LiteralExpression.createLitera
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 
 import org.antlr.v4.runtime.BaseErrorListener;
@@ -86,8 +88,10 @@ import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.TopExpressi
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.TopSelectContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.UseStatementContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.VariableExpressionContext;
+import org.kuse.payloadbuilder.core.parser.Select.For;
 import org.kuse.payloadbuilder.core.parser.SortItem.NullOrder;
 import org.kuse.payloadbuilder.core.parser.SortItem.Order;
+import org.kuse.payloadbuilder.core.parser.rewrite.StatementResolver;
 
 /** Parser for a payload builder query */
 public class QueryParser
@@ -95,19 +99,28 @@ public class QueryParser
     /** Parse query */
     public QueryStatement parseQuery(CatalogRegistry registry, String query)
     {
-        return getTree(registry, query, p -> p.query());
+        QueryStatement statement = getTree(registry, query, p -> p.query());
+        return StatementResolver.resolve(statement);
     }
 
     /** Parse select */
     public Select parseSelect(CatalogRegistry registry, String query)
     {
-        return getTree(registry, query, p -> p.topSelect());
+        Select select = getTree(registry, query, p -> p.topSelect());
+        return StatementResolver.resolve(select);
     }
 
     /** Parse expression */
     public Expression parseExpression(CatalogRegistry registry, String expression)
     {
-        return getTree(registry, expression, p -> p.topExpression());
+        return parseExpression(registry, expression, true);
+    }
+
+    /** Parse expression */
+    public Expression parseExpression(CatalogRegistry registry, String expression, boolean resolve)
+    {
+        Expression expr = getTree(registry, expression, p -> p.topExpression());
+        return resolve ? StatementResolver.resolve(expr) : expr;
     }
 
     @SuppressWarnings("unchecked")
@@ -157,26 +170,13 @@ public class QueryParser
         private final Map<String, Integer> lambdaParameters = new HashMap<>();
         private Expression leftDereference;
 
-        private TableAlias parentTableAlias;
         private final CatalogRegistry registry;
-        private int tupleOrdinal;
         private boolean insideSelectItems;
         private boolean isRootSelectStatement;
 
         AstBuilder(CatalogRegistry registry)
         {
             this.registry = registry;
-            clear(null);
-        }
-
-        private void clear(TableAlias parent)
-        {
-            TableAliasBuilder builder = TableAliasBuilder.of(-1, TableAlias.Type.ROOT, QualifiedName.of("ROOT"), "ROOT");
-            if (parent != null)
-            {
-                builder.parent(parent);
-            }
-            parentTableAlias = builder.build();
         }
 
         @Override
@@ -184,7 +184,6 @@ public class QueryParser
         {
             // Clear root flag outside of clear function because it's called from within sub query building
             isRootSelectStatement = true;
-            clear(null);
             return super.visitStatement(ctx);
         }
 
@@ -220,7 +219,10 @@ public class QueryParser
         public Object visitSetStatement(SetStatementContext ctx)
         {
             boolean systemProperty = ctx.AT() == null;
-            return new SetStatement(getQualifiedName(ctx.qname()), getExpression(ctx.expression()), systemProperty);
+            return new SetStatement(
+                    lowerCase(join(getQualifiedName(ctx.qname()).getParts(), ".")),
+                    getExpression(ctx.expression()),
+                    systemProperty);
         }
 
         @Override
@@ -321,12 +323,6 @@ public class QueryParser
                 }
             }
 
-            // Point parent to the from table source
-            if (parentTableAlias.getChildAliases().size() > 0)
-            {
-                parentTableAlias = parentTableAlias.getChildAliases().get(0);
-            }
-
             boolean prevInsideSelectItems = insideSelectItems;
             insideSelectItems = true;
             List<SelectItem> selectItems = ctx.selectItem().stream().map(s -> (SelectItem) visit(s)).collect(toList());
@@ -356,6 +352,11 @@ public class QueryParser
                     throw new ParseException("All items must have an identifier when using a SELECT INTO statement", ctx.start);
                 }
 
+                if (selectItems.stream().anyMatch(SelectItem::isAsterisk))
+                {
+                    throw new ParseException("Cannot have asterisk (*) select items when usnig a SELECT INTO statement", ctx.start);
+                }
+
                 TableName tableName = (TableName) visit(ctx.tableName());
                 TableAlias.Type type = tableName.isTempTable() ? TableAlias.Type.TEMPORARY_TABLE : TableAlias.Type.TABLE;
                 TableAlias alias = TableAlias.TableAliasBuilder.of(-1, type, getQualifiedName(ctx.into.qname()), "").build();
@@ -370,7 +371,16 @@ public class QueryParser
                 ? (Select.For.valueOf(upperCase(ctx.forClause().output.getText())))
                 : null;
 
-            Select select = new Select(selectItems, from, into, topExpression, where, groupBy, orderBy, forOutput);
+            Select select = new Select(
+                    selectItems,
+                    from,
+                    into,
+                    topExpression,
+                    where,
+                    groupBy,
+                    orderBy,
+                    forOutput,
+                    emptyList());
             return new SelectStatement(select, assignmentSelect);
         }
 
@@ -393,17 +403,26 @@ public class QueryParser
         @Override
         public Object visitSelectItem(SelectItemContext ctx)
         {
-            String identifier = defaultIfBlank(getIdentifier(ctx.identifier()), "");
             // Expression select item
             if (ctx.expression() != null)
             {
+                String identifier = getIdentifier(ctx.identifier());
                 QualifiedName assignmentQname = ctx.variable() != null ? getQualifiedName(ctx.variable().qname()) : null;
                 if (ctx.variable() != null && ctx.variable().system != null)
                 {
                     throw new ParseException("Cannot assign to system variables", ctx.start);
                 }
                 Expression expression = getExpression(ctx.expression());
-                return new ExpressionSelectItem(expression, identifier, assignmentQname, ctx.expression().start);
+
+                String assignmentName = assignmentQname != null ? join(assignmentQname.getParts(), ".") : null;
+
+                boolean emptyIdentifier = isBlank(identifier);
+                if (isBlank(identifier) && expression instanceof HasIdentifier)
+                {
+                    identifier = ((HasIdentifier) expression).identifier();
+                }
+
+                return new ExpressionSelectItem(expression, emptyIdentifier, defaultIfBlank(identifier, ""), assignmentName, ctx.expression().start);
             }
             // Asterisk select item
             else if (ctx.ASTERISK() != null)
@@ -423,7 +442,8 @@ public class QueryParser
         public Object visitTableSourceJoined(TableSourceJoinedContext ctx)
         {
             TableSource tableSource = (TableSource) visit(ctx.tableSource());
-            if (ctx.joinPart().size() > 0 && isBlank(tableSource.getTableAlias().getAlias()))
+            String alias = getIdentifier(ctx.tableSource().identifier());
+            if (ctx.joinPart().size() > 0 && isBlank(alias))
             {
                 throw new ParseException("Alias is mandatory.", ctx.tableSource().start);
             }
@@ -441,7 +461,8 @@ public class QueryParser
         public Object visitJoinPart(JoinPartContext ctx)
         {
             TableSource tableSource = (TableSource) visit(ctx.tableSource());
-            if (isBlank(tableSource.getTableAlias().getAlias()))
+            String alias = getIdentifier(ctx.tableSource().identifier());
+            if (isBlank(alias))
             {
                 throw new ParseException("Alias is mandatory", ctx.tableSource().start);
             }
@@ -471,11 +492,12 @@ public class QueryParser
                 }
 
                 TableFunctionInfo tableFunctionInfo = (TableFunctionInfo) functionCallInfo.functionInfo;
-                TableAlias tableAlias = TableAliasBuilder
-                        .of(tupleOrdinal++, TableAlias.Type.FUNCTION, QualifiedName.of(functionCallInfo.functionInfo.getName()), defaultIfNull(alias, ""), ctx.functionCall().start)
-                        .parent(getParentTableAlias())
-                        .tableMeta(tableFunctionInfo.getTableMeta())
-                        .build();
+                TableAlias tableAlias = TableAlias.TableAliasBuilder.of(
+                        -1,
+                        TableAlias.Type.FUNCTION,
+                        QualifiedName.of(functionCallInfo.functionInfo.getName()),
+                        alias,
+                        ctx.functionCall().start).build();
                 return new TableFunction(
                         functionCallInfo.catalogAlias,
                         tableAlias,
@@ -494,24 +516,7 @@ public class QueryParser
                 }
 
                 validateTableSourceSubQuery(ctx.selectStatement());
-
-                /*  When visiting a sub query we want to build a new table alias hierarchy
-                    Since this is a complete query.
-                    However since this is contained in another query we must start the tuple ordinal
-                    at the previous one
-                */
-                TableAlias prevParent = parentTableAlias;
-
-                TableAlias tableAlias = TableAliasBuilder
-                        .of(tupleOrdinal++, TableAlias.Type.SUBQUERY, QualifiedName.of("SubQuery"), alias, token)
-                        .parent(parentTableAlias)
-                        .build();
-
-                // Start a new alias tree with subquery as parent
-                clear(tableAlias);
-
                 SelectStatement selectStatement = (SelectStatement) visit(ctx.selectStatement());
-
                 SelectItem noIdentifierItem = selectStatement
                         .getSelect()
                         .getSelectItems()
@@ -525,19 +530,26 @@ public class QueryParser
                     throw new ParseException("Missing identifier for select item", noIdentifierItem.getToken());
                 }
 
-                parentTableAlias = prevParent;
-
+                TableAlias tableAlias = TableAliasBuilder
+                        .of(-1,
+                                TableAlias.Type.SUBQUERY,
+                                QualifiedName.of("SubQuery"),
+                                alias,
+                                token)
+                        .build();
                 return new SubQueryTableSource(tableAlias, selectStatement.getSelect(), options, token);
             }
 
             TableName tableName = (TableName) visit(ctx.tableName());
             TableAlias.Type type = tableName.isTempTable() ? TableAlias.Type.TEMPORARY_TABLE : TableAlias.Type.TABLE;
-
             TableAlias tableAlias = TableAliasBuilder
-                    .of(tupleOrdinal++, type, tableName.getQname(), defaultIfBlank(alias, ""), ctx.tableName().start)
-                    .parent(getParentTableAlias())
+                    .of(
+                            -1,
+                            type,
+                            tableName.getQname(),
+                            defaultIfBlank(alias, ""),
+                            ctx.tableName().start)
                     .build();
-
             return new Table(tableName.getCatalogAlias(), tableAlias, options, ctx.tableName().start);
         }
 
@@ -576,7 +588,7 @@ public class QueryParser
         {
             QualifiedName qname = getQualifiedName(ctx.qname());
             int lambdaId = lambdaParameters.getOrDefault(qname.getFirst(), -1);
-            QualifiedReferenceExpression result = new QualifiedReferenceExpression(qname, lambdaId, ctx.start);
+            UnresolvedQualifiedReferenceExpression result = new UnresolvedQualifiedReferenceExpression(qname, lambdaId, ctx.start);
             return result;
         }
 
@@ -748,47 +760,26 @@ public class QueryParser
 
             validateSelectItemSubQuery(ctx.bracket_expression().selectStatement());
 
-            /*
-             * When building sub query expression table alias hierarchy
-             * we only bind one way, the sub query knows it's parent
-             * but the parent does not know about the sub query as child
-             *
-             * ie.
-             *
-             * select col
-             * ,      (select a.col, b.col from tableB b for object) obj
-             * from tableA a
-             * where b.col > 10     <---- this should not be possible
-             *
-             * Here we will have a table alias hierarchy like this:
-             *
-             * ROOT
-             *      tableA                  <---- Should NOT know about tableB
-             *          tableB              <---- Should know about it's parent
-             *
-             * From a sub query perspective:    we should be able to access everything, ie. traverse upwards
-             * From a table source perspective: we should not be able to access sub query expressions since these are not calculated until after
-             *                                  FROM part is complete
-             */
-            TableAlias prevParent = parentTableAlias;
-
             TableAlias tableAlias = TableAliasBuilder
-                    .of(tupleOrdinal++, TableAlias.Type.SUBQUERY, QualifiedName.of("SubQuery"), "", ctx.bracket_expression().selectStatement().start)
-                    .parent(parentTableAlias, false)
+                    .of(-1, TableAlias.Type.SUBQUERY, QualifiedName.of("SubQuery"), "", ctx.bracket_expression().selectStatement().start)
                     .build();
-
-            // Store previous parent table alias
-            int prevTupleOrdinal = tupleOrdinal;
-            // Start a new alias tree with subquery as parent
-            clear(tableAlias);
-            // Restore tuple ordinal counter since clear resets it
-            tupleOrdinal = prevTupleOrdinal;
 
             SelectStatement selectStatement = (SelectStatement) visit(ctx.bracket_expression().selectStatement());
 
-            parentTableAlias = prevParent;
+            For forOutput = selectStatement.getSelect().getForOutput();
+            for (SelectItem item : selectStatement.getSelect().getSelectItems())
+            {
+                if (forOutput == For.ARRAY && !item.isEmptyIdentifier())
+                {
+                    throw new ParseException("All select items in ARRAY output must have empty identifiers", item.getToken());
+                }
+                else if ((forOutput == For.OBJECT || forOutput == For.OBJECT_ARRAY) && isBlank(item.getIdentifier()))
+                {
+                    throw new ParseException("All select items in OBJECT output must have identifiers", item.getToken());
+                }
+            }
 
-            return new UnresolvedSubQueryExpression(selectStatement);
+            return new UnresolvedSubQueryExpression(selectStatement, tableAlias, ctx.bracket_expression().start);
         }
 
         @Override
@@ -809,7 +800,7 @@ public class QueryParser
             {
                 List<String> parts = new ArrayList<>();
                 parts.add(getIdentifier(ctx.identifier()));
-                result = new DereferenceExpression(left, new QualifiedReferenceExpression(new QualifiedName(parts), -1, ctx.start));
+                result = new UnresolvedDereferenceExpression(left, new UnresolvedQualifiedReferenceExpression(new QualifiedName(parts), -1, ctx.start));
             }
             // Dereferenced function call
             else
@@ -976,6 +967,7 @@ public class QueryParser
                 throw new ParseException("FOR clause are not allowed in sub query context", ctx.forClause().start);
             }
 
+            Set<String> seenColumns = new HashSet<>();
             boolean foundAsteriskSelect = false;
             for (SelectItemContext item : ctx.selectItem())
             {
@@ -995,6 +987,13 @@ public class QueryParser
                 else if (item.variable() != null)
                 {
                     throw new ParseException("Assignment selects are not allowed in sub query context", item.start);
+                }
+
+                String identifier = getIdentifier(item.identifier());
+
+                if (!isBlank(identifier) && !seenColumns.add(lowerCase((identifier))))
+                {
+                    throw new ParseException("Column '" + identifier + "' is defined multiple times", item.start);
                 }
             }
         }
@@ -1029,11 +1028,6 @@ public class QueryParser
                             "Function " + functionInfo.getName() + " expects named parameters", token);
                 }
             }
-        }
-
-        private TableAlias getParentTableAlias()
-        {
-            return parentTableAlias;
         }
 
         private SortItem getSortItem(SortItemContext ctx)

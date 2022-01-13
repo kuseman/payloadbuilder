@@ -83,12 +83,33 @@ public abstract class Expression
             return code;
         }
 
+        context.addImport("org.kuse.payloadbuilder.core.operator.ComplexValue");
         ExpressionCode expressionCode = generateCode(context);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(expressionCode.getCode());
+
         code.setCode(String.format(
-                "%s"                                                                  // expression code
-                    + "if (%s) writer.writeValue(null); else writer.write%s(%s);\n",  // expression nullVar, method, expression resVar
+                "%s"                                                                                    // expression code
+                    + "if (%s) {\n"                                                                     // expression nullVar
+                    + "  writer.writeValue(null);\n"
+                    + "}\n"
+                    + "%s"                                                                              // DataType == ANY
+                    + "else {\n"
+                    + "  writer.write%s(%s);\n"                                                         // method, expression resVar
+                    + "}\n",
                 expressionCode.getCode(),
-                expressionCode.getNullVar(), getWriteMethodSuffix(), expressionCode.getResVar()));
+                expressionCode.getNullVar(),
+
+                getDataType() == DataType.ANY
+                    ? String.format("else if (%s instanceof ComplexValue) {\n"                          // expression resVar
+                        + "  ((ComplexValue) %s).write(writer, context);\n"
+                        + "}\n",                                                                        // expression resVar
+                            expressionCode.getResVar(),
+                            expressionCode.getResVar())
+                    : "",
+
+                getWriteMethodSuffix(), expressionCode.getResVar()));
         return code;
     }
 

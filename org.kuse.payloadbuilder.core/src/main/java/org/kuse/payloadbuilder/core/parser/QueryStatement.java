@@ -9,7 +9,7 @@ public class QueryStatement
 {
     private final List<Statement> statements;
 
-    QueryStatement(List<Statement> statements)
+    public QueryStatement(List<Statement> statements)
     {
         this.statements = requireNonNull(statements, "statements");
     }

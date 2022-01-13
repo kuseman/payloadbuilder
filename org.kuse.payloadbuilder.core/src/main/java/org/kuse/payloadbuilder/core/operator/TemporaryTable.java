@@ -45,18 +45,11 @@ public class TemporaryTable
     /** Temporary table row */
     public static class Row
     {
-        private final Tuple tuple;
         private final Object[] values;
 
-        public Row(Tuple tuple, Object[] values)
+        public Row(Object[] values)
         {
-            this.tuple = requireNonNull(tuple, "tuple");
             this.values = requireNonNull(values, "values");
-        }
-
-        public Tuple getTuple()
-        {
-            return tuple;
         }
 
         public Object[] getValues()

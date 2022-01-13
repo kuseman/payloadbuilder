@@ -23,7 +23,7 @@ public abstract class SelectItem extends ASelectNode
     }
 
     /** Returns true if this items identifier was defined empty */
-    boolean isEmptyIdentifier()
+    public boolean isEmptyIdentifier()
     {
         return emptyIdentifier;
     }
@@ -32,6 +32,12 @@ public abstract class SelectItem extends ASelectNode
     public String getIdentifier()
     {
         return identifier;
+    }
+
+    /** Get qualifier for this select item if any */
+    public QualifiedName getQname()
+    {
+        return null;
     }
 
     public Token getToken()
@@ -71,6 +77,12 @@ public abstract class SelectItem extends ASelectNode
     public Object getAssignmentValue(ExecutionContext context)
     {
         return null;
+    }
+
+    /** Returns true if this select item is a sub query select */
+    public boolean isSubQuery()
+    {
+        return false;
     }
 
     @Override

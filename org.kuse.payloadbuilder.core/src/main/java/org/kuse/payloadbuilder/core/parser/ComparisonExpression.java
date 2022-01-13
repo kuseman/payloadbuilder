@@ -257,10 +257,8 @@ public class ComparisonExpression extends Expression
         {
             ComparisonExpression e = (ComparisonExpression) obj;
             return type.equals(e.type)
-                &&
-                left.equals(e.left)
-                &&
-                right.equals(e.right);
+                && left.equals(e.left)
+                && right.equals(e.right);
         }
         return false;
     }

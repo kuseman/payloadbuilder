@@ -1,8 +1,6 @@
 package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Objects.requireNonNull;
-import static org.apache.commons.lang3.StringUtils.isBlank;
-import static org.apache.commons.lang3.StringUtils.join;
 
 import org.antlr.v4.runtime.Token;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
@@ -14,26 +12,11 @@ public class ExpressionSelectItem extends SelectItem
     private final Expression expression;
     private final String assignmentName;
 
-    public ExpressionSelectItem(Expression expression, String identifier, QualifiedName assignmentQname, Token token)
+    public ExpressionSelectItem(Expression expression, boolean emptyIdentifier, String identifier, String assignmentQname, Token token)
     {
-        super(getIdentifier(expression, identifier), isBlank(identifier), token);
+        super(identifier, emptyIdentifier, token);
         this.expression = requireNonNull(expression, "expression");
-        this.assignmentName = assignmentQname != null ? join(assignmentQname.getParts(), ".") : null;
-    }
-
-    private static String getIdentifier(Expression expression, String identifier)
-    {
-        if (!isBlank(identifier))
-        {
-            return identifier;
-        }
-
-        if (expression instanceof HasIdentifier)
-        {
-            return ((HasIdentifier) expression).identifier();
-        }
-
-        return "";
+        this.assignmentName = assignmentQname;
     }
 
     public Expression getExpression()
@@ -53,7 +36,6 @@ public class ExpressionSelectItem extends SelectItem
         return expression.eval(context);
     }
 
-    @SuppressWarnings("deprecation")
     @Override
     public ResolvePath[] getResolvePaths()
     {
@@ -67,7 +49,29 @@ public class ExpressionSelectItem extends SelectItem
     @Override
     public boolean isComputed()
     {
-        return !(expression instanceof QualifiedReferenceExpression);
+        return !(expression instanceof QualifiedReferenceExpression
+            || expression instanceof UnresolvedQualifiedReferenceExpression
+            || expression instanceof LiteralExpression);
+    }
+
+    @Override
+    public QualifiedName getQname()
+    {
+        if (expression instanceof UnresolvedQualifiedReferenceExpression)
+        {
+            return ((UnresolvedQualifiedReferenceExpression) expression).getQname();
+        }
+        else if (expression instanceof QualifiedReferenceExpression)
+        {
+            ((QualifiedReferenceExpression) expression).getQname();
+        }
+        return null;
+    }
+
+    @Override
+    public boolean isSubQuery()
+    {
+        return expression instanceof UnresolvedSubQueryExpression;
     }
 
     @Override

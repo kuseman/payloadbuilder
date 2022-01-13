@@ -77,7 +77,7 @@ public interface Operator extends DescribableNode
     }
 
     /** Extension of {@link TupleIterator} that operates over in memory structures */
-    public interface RowList extends TupleIterator
+    public interface TupleList extends TupleIterator
     {
         /** These methods should not be implemented */
         @Override

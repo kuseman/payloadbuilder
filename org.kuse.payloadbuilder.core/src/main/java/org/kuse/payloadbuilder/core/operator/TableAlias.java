@@ -266,79 +266,6 @@ public class TableAlias
         return count;
     }
 
-    /**
-     * Returns the highest sigling leaf ordinal.
-     *
-     * <pre>
-     * select *
-     * from tableA a                0
-     * inner join tableB b          1
-     *  on ...
-     * inner join tableC c          2
-     *  on ...
-     * inner join                   3
-     * (
-     *    select *
-     *    from tableD d             4
-     *    inner join tableE e       5
-     *      on ....
-     * ) x
-     * where ....
-     *
-     * If this is tableA we first fetch the last sibling,
-     * inner join ( ... )x, and it's a sub query to ask that alias for it's highest
-     * </pre>
-     */
-    public int getHighestSiblingLeafOrdinal()
-    {
-        // If this is a sub query
-        List<TableAlias> siblingAliases = getSiblingAliases();
-        TableAlias lastSibling = siblingAliases.get(siblingAliases.size() - 1);
-
-        if (lastSibling.type == Type.SUBQUERY)
-        {
-            List<TableAlias> children = lastSibling.getChildAliases()
-                    .get(0)
-                    .getChildAliases();
-
-            // No children => sub query with no selects
-            if (children.size() > 0)
-            {
-                // Recurse the call from the first sub query child
-                return children
-                        .get(0)
-                        .getHighestSiblingLeafOrdinal();
-            }
-        }
-
-        return lastSibling.tupleOrdinal;
-    }
-
-    /**
-     * Returns the highest possible child ordinal that this alias has. For a regular table/function etc. it's the tuple ordinal itself. A sub query is
-     * recursively called
-     */
-    public int getHighestChildOrdinal()
-    {
-        if (type == Type.SUBQUERY)
-        {
-            List<TableAlias> children = getChildAliases()
-                    .get(0)
-                    .getChildAliases();
-
-            // No children => sub query with no selects
-            if (children.size() > 0)
-            {
-                // Recurse the call from the first sub query child
-                return children
-                        .get(0)
-                        .getHighestChildOrdinal();
-            }
-        }
-
-        return tupleOrdinal;
-    }
-
     /** Return table meta for this alias if any */
     public TableMeta getTableMeta()
     {
@@ -427,6 +354,11 @@ public class TableAlias
         //CSOFF
         public TableAliasBuilder parent(TableAlias parent)
         {
+            if (parent == null)
+            {
+                return this;
+            }
+
             parent(parent, true);
             return this;
         }

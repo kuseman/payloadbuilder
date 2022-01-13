@@ -7,6 +7,7 @@ import java.util.List;
 import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.catalog.builtin.BuiltinCatalog;
 import org.kuse.payloadbuilder.core.parser.Expression;
+import org.kuse.payloadbuilder.core.parser.UnresolvedQualifiedReferenceExpression;
 
 /** Definition of a function */
 //CSOFF
@@ -69,6 +70,8 @@ public abstract class FunctionInfo
 
     /**
      * Fold arguments. Is called upon parsing to let functions fold it's arguments. Ie. Replace arguments with other values etc.
+     * NOTE! Arguments are unresolved so for example transforming a QualifiedRefernece then argument
+     * will be {@link UnresolvedQualifiedReferenceExpression}
      */
     public List<Expression> foldArguments(List<Expression> arguments)
     {

@@ -25,10 +25,21 @@ class ExpressionOrdinalValuesFactory implements IOrdinalValuesFactory
         for (int i = 0; i < size; i++)
         {
             context.getStatementContext().setTuple(tuple);
-            values[i] = expressions.get(i).eval(context);
+            Object value = expressions.get(i).eval(context);
+            if (value instanceof ComplexValue)
+            {
+                value = EvalUtils.unwrap(context, value);
+            }
+            values[i] = value;
         }
         context.getStatementContext().setTuple(null);
         return new OrdinalValues(values);
+    }
+
+    @Override
+    public int size()
+    {
+        return expressions.size();
     }
 
     @Override

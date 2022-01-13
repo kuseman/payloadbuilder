@@ -40,6 +40,36 @@
   ],
   "cases": [
   	{
+      "name": "if statement",
+      "query": [
+        "if (true) then ",
+        "  select top 1 id from data ",
+        "else ",
+        " select top 1 col1 from source ",
+        "end if "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 1 }]
+        ]
+      ]
+    },
+    {
+      "name": "if statement (reverse)",
+      "query": [
+        "if (false) then ",
+        "  select top 1 id from data ",
+        "else ",
+        " select top 1 col1 from source ",
+        "end if "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }]
+        ]
+      ]
+    },
+    {
       "name": "Test variables are case in-sensetive",
       "query": [
         "set @varA = 'test' ",
@@ -207,6 +237,15 @@
       "name": "Order by ordinal, asterisk",
       "query": [
         "select * from data order by 1 desc"
+      ],
+      "expectedException": "org.kuse.payloadbuilder.core.parser.ParseException",
+      "expectedMessageContains": "ORDER BY position is not supported for non expression select items"
+    },
+    {
+      "name": "Order by ordinal, asterisk 2",
+      "comment": "Order by ordinal cannot be done if an asterisk select item is placed befor or on the ordinal",
+      "query": [
+        "select *, col from data order by 2 desc"
       ],
       "expectedException": "org.kuse.payloadbuilder.core.parser.ParseException",
       "expectedMessageContains": "ORDER BY position is not supported for non expression select items"
@@ -433,7 +472,7 @@
         ") x"
       ],
       "expectedException": "org.kuse.payloadbuilder.core.parser.ParseException",
-      "expectedMessageContains": "No column defined with name col for alias x"
+      "expectedMessageContains": "Unknown column: 'col' in table source: 'SubQuery (x)', expected one of: [id]"
     },
     {
       "name": "Selects without table source",
@@ -489,8 +528,8 @@
     {
       "name": "Selects with for output and subscript ",
       "description": [
-      	"Ensure that context tuples stay consistent even if they are change during a single projection evaluation.",
-      	"Here the dereference expressions (d[0].data, d2[0].id) changes the context tuple and the projections after should not be affected"
+        "Ensure that context tuples stay consistent even if they are change during a single projection evaluation.",
+        "Here the dereference expressions (d[0].data, st[0].id) changes the context tuple and the projections after should not be affected"
       ],
       "query": [
       	"select d[0].data ",

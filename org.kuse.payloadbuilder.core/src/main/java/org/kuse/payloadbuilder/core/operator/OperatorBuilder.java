@@ -1,7 +1,6 @@
 package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.collections4.CollectionUtils.containsAny;
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -14,7 +13,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -45,7 +43,6 @@ import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.ExpressionSelectItem;
 import org.kuse.payloadbuilder.core.parser.Join;
 import org.kuse.payloadbuilder.core.parser.Join.JoinType;
-import org.kuse.payloadbuilder.core.parser.LiteralIntegerExpression;
 import org.kuse.payloadbuilder.core.parser.Option;
 import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -86,9 +83,6 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         private int nodeId;
         private QuerySession session;
         private CatalogRegistry registry;
-        private Map<Integer, List<SelectItem>> selectItemsByTupleOrdinal;
-        /** Map with computed expressions by target tuple ordinal and identifier */
-        private Map<Integer, Map<SelectItem, Expression>> computedExpressionsByTupleOrdinal;
         /** Resulting operator */
         private Operator operatorResult;
         /** Resulting select items */
@@ -107,6 +101,11 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         private boolean rootSelect = true;
         /** Flag to indicate if we should generate code for root projection */
         private boolean codeGenerateRootProjection = true;
+
+        /**
+         * Flag to indicate if we are inside a sub query expression, if so then a {@link SubQueryExpressionOperator} should wrap the select operator
+         */
+        private boolean insideSubQueryExpression;
 
         /** Acquire next unique node id */
         private int acquireNodeId()
@@ -167,12 +166,6 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         Context context = new Context();
         context.analyze = analyze;
         context.session = session;
-
-        // Start with resolving the select
-        org.kuse.payloadbuilder.core.operator.SelectResolver.Context resolveContext = SelectResolver.resolve(session, select);
-
-        context.selectItemsByTupleOrdinal = resolveContext.getSelectItems();
-        context.computedExpressionsByTupleOrdinal = resolveContext.getComputedExpressions();
         context.registry = session.getCatalogRegistry();
         select.accept(VISITOR, context);
 
@@ -268,6 +261,11 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             context.setOperator(getEmptyTableSourceOperator(context));
         }
 
+        if (context.insideSubQueryExpression)
+        {
+            context.setOperator(new SubQueryExpressionOperator(context.acquireNodeId(), context.getOperator()));
+        }
+
         if (batchLimitOption != null)
         {
             batchLimitId = context.acquireNodeId();
@@ -281,11 +279,16 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         }
 
         // Always use select items from context cause these ones are aggregated in case of sub queries etc.
-        List<SelectItem> selectItems = tableAlias != null ? context.selectItemsByTupleOrdinal.get(tableAlias.getTupleOrdinal()) : select.getSelectItems();
+        List<SelectItem> selectItems = new ArrayList<>(select.getSelectItems());
 
         // Resolve sub query expressions
-        processSubQueryExpressions(context, tableAlias, selectItems);
-        sortItems = pullUpComputedColumns(context, tableAlias, selectItems, sortItems);
+        processSubQueryExpressions(context, selectItems, select.getComputedExpressions());
+
+        // Computed columns must come AFTER group by operator
+        if (select.getGroupBy().isEmpty())
+        {
+            pullUpComputedColumns(context, tableAlias, select.getComputedExpressions());
+        }
 
         if (where != null)
         {
@@ -295,6 +298,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         if (!select.getGroupBy().isEmpty())
         {
             context.setOperator(createGroupBy(context.acquireNodeId(), select.getGroupBy(), createOrdinalValuesFactory(context.session, select.getGroupBy()), context.getOperator()));
+            pullUpComputedColumns(context, tableAlias, select.getComputedExpressions());
         }
 
         if (batchLimitOption != null)
@@ -317,8 +321,6 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             List<String> projectionAliases = new ArrayList<>();
             List<Projection> projections = new ArrayList<>();
 
-            selectItems = tableAlias != null ? context.selectItemsByTupleOrdinal.get(tableAlias.getTupleOrdinal()) : select.getSelectItems();
-
             selectItems.forEach(s ->
             {
                 projectionAliases.add(s.getIdentifier());
@@ -331,18 +333,22 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 context.projectionResult = new AnalyzeProjection(context.acquireNodeId(), context.projectionResult);
             }
         }
+
         return null;
     }
 
     /**
      * Processes sub query expressions and resolves those by building an operator and projection
      */
-    private void processSubQueryExpressions(Context context, TableAlias tableAlias, List<SelectItem> selectItems)
+    private void processSubQueryExpressions(
+            Context context,
+            List<SelectItem> selectItems,
+            List<Expression> computedExpressions)
     {
         Operator operatorResult = context.operatorResult;
         boolean isRootSelect = context.rootSelect;
 
-        // Process select items
+        // Find and process select items who is UnresolvedSubQueryExpression's
         int size = selectItems.size();
         for (int i = 0; i < size; i++)
         {
@@ -354,6 +360,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                 SubQueryExpression resolvedExpression = resolveSubQueryExpression(context, subQueryExpression);
                 selectItems.set(i, new ExpressionSelectItem(
                         resolvedExpression,
+                        item.isEmptyIdentifier(),
                         item.getIdentifier(),
                         null,
                         item.getToken()));
@@ -361,15 +368,13 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         }
 
         // Process computed sub query expressions
-        if (tableAlias != null)
+        size = computedExpressions.size();
+        for (int i = 0; i < size; i++)
         {
-            Map<SelectItem, Expression> map = context.computedExpressionsByTupleOrdinal.getOrDefault(tableAlias.getTupleOrdinal(), emptyMap());
-            for (Entry<SelectItem, Expression> e : map.entrySet())
+            Expression e = computedExpressions.get(i);
+            if (e instanceof UnresolvedSubQueryExpression)
             {
-                if (e.getValue() instanceof UnresolvedSubQueryExpression)
-                {
-                    e.setValue(resolveSubQueryExpression(context, (UnresolvedSubQueryExpression) e.getValue()));
-                }
+                computedExpressions.set(i, resolveSubQueryExpression(context, (UnresolvedSubQueryExpression) e));
             }
         }
 
@@ -384,12 +389,15 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         context.rootSelect = true;
         boolean prevCodeGenerateRootProjection = context.codeGenerateRootProjection;
         context.codeGenerateRootProjection = false;
+        boolean prevInsideSubQueryExpression = context.insideSubQueryExpression;
 
         Select select = expression.getSelectStatement().getSelect();
 
+        context.insideSubQueryExpression = true;
         // Visit
         select.accept(this, context);
 
+        context.insideSubQueryExpression = prevInsideSubQueryExpression;
         context.codeGenerateRootProjection = prevCodeGenerateRootProjection;
 
         // Unwrap analyze node if any
@@ -613,93 +621,20 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
      * @param tableAlias The alias the the computed columns should belong to
      **/
     //CSOFF
-    private List<SortItem> pullUpComputedColumns(Context context, TableAlias tableAlias, List<SelectItem> selectItems, List<SortItem> sortItems)
+    private void pullUpComputedColumns(Context context, TableAlias tableAlias, List<Expression> computedExpressions)
     //CSON
     {
-        if (tableAlias == null)
+        if (tableAlias == null || computedExpressions.size() <= 0)
         {
-            return sortItems;
+            return;
         }
 
         int tupleOrdinal = tableAlias.getTupleOrdinal();
-        Map<SelectItem, Expression> computedExpressionByColumn = context.computedExpressionsByTupleOrdinal.getOrDefault(tupleOrdinal, emptyMap());
-
-        // No computed value and no sort items to process, drop out
-        if (computedExpressionByColumn.isEmpty() && sortItems.isEmpty())
-        {
-            return sortItems;
-        }
-
-        List<String> columns = new ArrayList<>();
-        List<Expression> computedExpressions = new ArrayList<>();
-
-        for (Entry<SelectItem, Expression> e : computedExpressionByColumn.entrySet())
-        {
-            columns.add(e.getKey().getIdentifier());
-            computedExpressions.add(e.getValue());
-        }
-
-        Map<String, Integer> selectItemByColumn = new HashMap<>();
-        int size = selectItems.size();
-        for (int i = 0; i < size; i++)
-        {
-            SelectItem item = selectItems.get(i);
-            String identifier = item.getIdentifier();
-            if (!isBlank(identifier) && item instanceof ExpressionSelectItem)
-            {
-                selectItemByColumn.put(lowerCase(identifier), i);
-            }
-        }
-
-        // Replace sort items with corresponding select item expression
-        // if applicable
-        size = sortItems.size();
-        for (int i = 0; i < size; i++)
-        {
-            SortItem sortItem = sortItems.get(i);
-            Integer selectItemIndex = null;
-
-            // Sort item that references an expression from select items
-            if (sortItem.getExpression() instanceof QualifiedReferenceExpression
-                && ((QualifiedReferenceExpression) sortItem.getExpression()).getQname().getParts().size() == 1)
-            {
-                String column = ((QualifiedReferenceExpression) sortItem.getExpression()).getQname().getFirst();
-                selectItemIndex = selectItemByColumn.get(lowerCase(column));
-            }
-            // Sort item that references an select item by ordinal
-            else if (sortItem.getExpression() instanceof LiteralIntegerExpression)
-            {
-                // 1-based
-                selectItemIndex = ((LiteralIntegerExpression) sortItem.getExpression()).getValue() - 1;
-            }
-
-            // Item does not need modifications
-            if (selectItemIndex == null)
-            {
-                continue;
-            }
-
-            if (selectItemIndex >= selectItems.size())
-            {
-                throw new ParseException("ORDER BY position is out of range", sortItem.getToken());
-            }
-            else if (!(selectItems.get(selectItemIndex) instanceof ExpressionSelectItem))
-            {
-                throw new ParseException("ORDER BY position is not supported for non expression select items", sortItem.getToken());
-            }
-
-            ExpressionSelectItem selectItem = (ExpressionSelectItem) selectItems.get(selectItemIndex);
-
-            // Replace the sort item
-            sortItems.set(i, new SortItem(selectItem.getExpression(), sortItem.getOrder(), sortItem.getNullOrder(), sortItem.getToken()));
-        }
-
-        if (computedExpressions.size() > 0)
-        {
-            context.setOperator(new ComputedColumnsOperator(context.acquireNodeId(), tupleOrdinal, context.getOperator(), columns, computedExpressions));
-        }
-
-        return sortItems;
+        context.setOperator(new ComputedColumnsOperator(
+                context.acquireNodeId(),
+                tupleOrdinal,
+                context.getOperator(),
+                createOrdinalValuesFactory(context.session, computedExpressions)));
     }
 
     /**
@@ -1282,7 +1217,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
      */
     private static class NoOpOperator extends AOperator
     {
-        private static final NoOpRowList ROW_LIST = new NoOpRowList();
+        private static final NoOpTupleList TUPLE_LIST = new NoOpTupleList();
 
         private NoOpOperator(int nodeId)
         {
@@ -1298,11 +1233,11 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         @Override
         public TupleIterator open(ExecutionContext context)
         {
-            return ROW_LIST;
+            return TUPLE_LIST;
         }
 
         /** No op iterator */
-        private static class NoOpRowList implements RowList
+        private static class NoOpTupleList implements TupleList
         {
             @Override
             public int size()
@@ -1329,7 +1264,6 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     {
         private final AExpressionVisitor<Void, Set<Integer>> expressionVisitor = new AExpressionVisitor<Void, Set<Integer>>()
         {
-            @SuppressWarnings("deprecation")
             @Override
             public Void visit(QualifiedReferenceExpression expression, Set<Integer> tupleOrdinals)
             {

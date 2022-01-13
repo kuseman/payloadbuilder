@@ -41,7 +41,7 @@ public class TemporaryTableScanOperator extends AOperator
             public Tuple next()
             {
                 Row row = it.next();
-                return new TemporaryTableTuple(table.getTableAlias().getTupleOrdinal(), row.getTuple(), temporaryTable.getColumns(), row.getValues());
+                return new TemporaryTableTuple(table.getTableAlias().getTupleOrdinal(), temporaryTable.getColumns(), row.getValues());
             }
 
             @Override
@@ -87,14 +87,12 @@ public class TemporaryTableScanOperator extends AOperator
     private static class TemporaryTableTuple implements Tuple
     {
         private final int tupleOrdinal;
-        private final Tuple tuple;
         private final String[] columns;
         private final Object[] values;
 
-        private TemporaryTableTuple(int tupleOrdinal, Tuple tuple, String[] columns, Object[] values)
+        private TemporaryTableTuple(int tupleOrdinal, String[] columns, Object[] values)
         {
             this.tupleOrdinal = tupleOrdinal;
-            this.tuple = requireNonNull(tuple);
             this.columns = requireNonNull(columns);
             this.values = requireNonNull(values);
         }
@@ -130,7 +128,7 @@ public class TemporaryTableScanOperator extends AOperator
             {
                 return this;
             }
-            return tuple.getTuple(tupleOrdinal);
+            return null;
         }
 
         @Override

@@ -30,6 +30,9 @@ public interface IOrdinalValuesFactory
     /** Create an index values instance from provided tuple */
     IOrdinalValues create(ExecutionContext context, Tuple tuple);
 
+    /** Returns the size of the values create by this factory */
+    int size();
+
     /**
      * <pre>
      * Index values used by batch operators such {@link BatchHashJoin}.

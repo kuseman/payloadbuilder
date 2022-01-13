@@ -27,14 +27,12 @@ public class LogicalNotExpressionTest extends AParserTest
         Predicate<ExecutionContext> p;
 
         // not Object (boolean)
-        e = e("not a");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(false, DataType.ANY))));
+        e = e("not a", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(false, DataType.ANY))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
 
         // not boolean
-        e = e("not a");
-        setup(tuple, e, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(false, DataType.ANY))));
+        e = e("not a", tuple, MapUtils.ofEntries(MapUtils.entry("a", Pair.of(false, DataType.ANY))));
         p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
     }

@@ -5,7 +5,7 @@ public class AnalyzeStatement extends Statement
 {
     private final SelectStatement selectStatement;
 
-    AnalyzeStatement(SelectStatement selectStatement)
+    public AnalyzeStatement(SelectStatement selectStatement)
     {
         this.selectStatement = selectStatement;
     }

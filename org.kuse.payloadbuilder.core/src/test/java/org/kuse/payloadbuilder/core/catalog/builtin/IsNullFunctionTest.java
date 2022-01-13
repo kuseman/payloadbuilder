@@ -1,18 +1,19 @@
 package org.kuse.payloadbuilder.core.catalog.builtin;
 
-import static java.util.Arrays.asList;
+import static org.kuse.payloadbuilder.core.utils.MapUtils.entry;
+import static org.kuse.payloadbuilder.core.utils.MapUtils.ofEntries;
 
 import java.util.function.Predicate;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.NoOpTuple;
+import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.AParserTest;
-import org.kuse.payloadbuilder.core.parser.ComparisonExpression;
-import org.kuse.payloadbuilder.core.parser.QualifiedFunctionCallExpression;
-import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
-import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression.ResolvePath;
+import org.kuse.payloadbuilder.core.parser.Expression;
+import org.mockito.Mockito;
 
 /** Test of {@link IsNullFunction} */
 public class IsNullFunctionTest extends AParserTest
@@ -25,7 +26,6 @@ public class IsNullFunctionTest extends AParserTest
         assertEquals(DataType.INT, e("isnull(20, 10)").getDataType());
     }
 
-    @SuppressWarnings("deprecation")
     @Test
     public void test_codeGen()
     {
@@ -40,11 +40,9 @@ public class IsNullFunctionTest extends AParserTest
         assertTrue(p.test(context));
 
         // Set data type of reference
-        ComparisonExpression ce = (ComparisonExpression) e("isnull(a, 20l) = 20l");
-        QualifiedFunctionCallExpression qfe = (QualifiedFunctionCallExpression) ce.getLeft();
-        ((QualifiedReferenceExpression) qfe.getArguments().get(0)).setResolvePaths(asList(new ResolvePath(-1, 0, asList("a"), -1, DataType.LONG)));
+        Expression e = e("isnull(a, 20l) = 20l", Mockito.mock(Tuple.class), ofEntries(entry("a", Pair.of(null, DataType.INT))));
 
-        p = CODE_GENERATOR.generatePredicate(ce);
+        p = CODE_GENERATOR.generatePredicate(e);
         assertTrue(p.test(context));
     }
 }

@@ -11,7 +11,7 @@ public class IfStatement extends Statement
     private final List<Statement> statements;
     private final List<Statement> elseStatements;
 
-    IfStatement(Expression condition, List<Statement> statements, List<Statement> elseStatements)
+    public IfStatement(Expression condition, List<Statement> statements, List<Statement> elseStatements)
     {
         this.condition = requireNonNull(condition, "condition");
         this.statements = requireNonNull(statements, "statements");

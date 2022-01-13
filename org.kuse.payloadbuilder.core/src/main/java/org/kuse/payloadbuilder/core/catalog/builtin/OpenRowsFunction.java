@@ -2,19 +2,15 @@ package org.kuse.payloadbuilder.core.catalog.builtin;
 
 import static java.util.Collections.singletonList;
 
-import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
-import org.kuse.payloadbuilder.core.operator.Operator.RowList;
 import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
-import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.Expression;
-import org.kuse.payloadbuilder.core.utils.CollectionUtils;
 
 /**
  * Table value function that extracts rows from an expression Usually used when accssing table aliases from within sub query expressions
@@ -80,36 +76,11 @@ class OpenRowsFunction extends TableFunctionInfo
         {
             return TupleIterator.EMPTY;
         }
-        else if (value instanceof RowList)
+        else if (value instanceof TupleIterator)
         {
-            return (RowList) value;
+            return (TupleIterator) value;
         }
 
-        final Iterator<Object> it = CollectionUtils.getIterator(value);
-        //CSOFF
-        return new TupleIterator()
-        //CSON
-        {
-            private Tuple next;
-
-            @Override
-            public boolean hasNext()
-            {
-                if (!it.hasNext())
-                {
-                    return false;
-                }
-                next = (Tuple) it.next();
-                return true;
-            }
-
-            @Override
-            public Tuple next()
-            {
-                Tuple r = next;
-                next = null;
-                return r;
-            }
-        };
+        throw new IllegalArgumentException("Expected a tuple iterator from argument to " + getName() + " but got: " + value);
     }
 }

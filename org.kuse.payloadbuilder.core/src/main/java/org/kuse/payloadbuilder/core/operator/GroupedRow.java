@@ -8,20 +8,25 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.kuse.payloadbuilder.core.operator.Operator.RowList;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleList;
 
 import gnu.trove.iterator.TIntObjectIterator;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.TIntSet;
+import gnu.trove.set.hash.TIntHashSet;
 
 /** Grouped row. Result of a {@link GroupByOperator} */
 class GroupedRow implements Tuple
 {
+    private static final TIntSet EMPTY = new TIntHashSet();
+
     private final int tupleOrdinal;
     private final List<Tuple> tuples;
     /** Map of tuple ordinals the it's grouped columns */
     private final TIntObjectMap<GroupedOrdinalRow> ordinalRows;
+    /** Column ordinals of "this" tuple ordial */
+    private final TIntSet currentOrdinals;
 
     GroupedRow(List<Tuple> tuples, TIntObjectMap<TIntSet> columnOrdinals)
     {
@@ -33,13 +38,16 @@ class GroupedRow implements Tuple
         // Ordinal of a group by is the same as the rows
         this.tupleOrdinal = tuples.get(0).getTupleOrdinal();
         this.ordinalRows = getOrdinalRows(requireNonNull(columnOrdinals));
+        TIntSet set = columnOrdinals.get(tupleOrdinal);
+        this.currentOrdinals = set == null ? EMPTY : set;
     }
 
-    private GroupedRow(List<Tuple> tuples, int tupleOrdinal, TIntObjectMap<GroupedOrdinalRow> ordinalRows)
+    private GroupedRow(List<Tuple> tuples, int tupleOrdinal, TIntObjectMap<GroupedOrdinalRow> ordinalRows, TIntSet currentOrdinals)
     {
         this.tuples = tuples;
         this.tupleOrdinal = tupleOrdinal;
         this.ordinalRows = ordinalRows;
+        this.currentOrdinals = currentOrdinals;
     }
 
     private TIntObjectMap<GroupedOrdinalRow> getOrdinalRows(TIntObjectMap<TIntSet> columnOrdinals)
@@ -81,6 +89,11 @@ class GroupedRow implements Tuple
     @Override
     public Tuple getTuple(int tupleOrdinal)
     {
+        if (tupleOrdinal == this.tupleOrdinal)
+        {
+            return this;
+        }
+
         // Grouped ordinal return ordinal row
         GroupedOrdinalRow ordinalRow = ordinalRows.get(tupleOrdinal);
         if (ordinalRow == null)
@@ -97,7 +110,27 @@ class GroupedRow implements Tuple
     @Override
     public Object getValue(int columnOrdinal)
     {
-        return tuples.get(0).getValue(columnOrdinal);
+        if (currentOrdinals.contains(columnOrdinal))
+        {
+            return tuples.get(0).getValue(columnOrdinal);
+        }
+
+        return new Iterator<Object>()
+        {
+            int index;
+
+            @Override
+            public boolean hasNext()
+            {
+                return index < tuples.size();
+            }
+
+            @Override
+            public Object next()
+            {
+                return tuples.get(index++).getValue(columnOrdinal);
+            }
+        };
     }
 
     @Override
@@ -110,7 +143,7 @@ class GroupedRow implements Tuple
             Tuple tuple = tuples.get(i);
             newTuples.add(tuple.optimize(context));
         }
-        return new GroupedRow(newTuples, tupleOrdinal, ordinalRows);
+        return new GroupedRow(newTuples, tupleOrdinal, ordinalRows, currentOrdinals);
     }
 
     /**
@@ -120,7 +153,7 @@ class GroupedRow implements Tuple
      * values from these are returned as single values
      * </pre>
      */
-    private class GroupedOrdinalRow extends AbstractList<Tuple> implements Tuple, RowList
+    private class GroupedOrdinalRow extends AbstractList<Tuple> implements Tuple, TupleList
     {
         private final int rowTupleOrdinal;
         private final TIntSet columnOrdinals;
@@ -131,7 +164,7 @@ class GroupedRow implements Tuple
             this.columnOrdinals = columnOrdinals;
         }
 
-        /* (Row)List implementation */
+        /* TupleList implementation */
 
         @Override
         public Tuple get(int index)
@@ -145,7 +178,7 @@ class GroupedRow implements Tuple
             return tuples.size();
         }
 
-        /* (Row)List implementation */
+        /* TupleList implementation */
 
         @Override
         public int getTupleOrdinal()

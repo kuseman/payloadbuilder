@@ -1,11 +1,11 @@
-package org.kuse.payloadbuilder.core.parser;
+package org.kuse.payloadbuilder.core.operator;
 
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.operator.CompositeTupleTest.TestTuple;
-import org.kuse.payloadbuilder.core.operator.Tuple;
-import org.kuse.payloadbuilder.core.parser.SubQueryExpression.HierarchyTuple;
+import org.kuse.payloadbuilder.core.operator.SubQueryExpressionOperator.HierarchyTuple;
+import org.kuse.payloadbuilder.core.parser.AParserTest;
 
-/** Test of{@link SubQueryExpression.HierarchyTuple} */
+/** Test of{@link SubQueryExpressionOperator.HierarchyTuple} */
 public class HierarchyTupleTest extends AParserTest
 {
     @Test
@@ -31,14 +31,7 @@ public class HierarchyTupleTest extends AParserTest
         {
         }
 
-        try
-        {
-            ht.getTupleOrdinal();
-            fail();
-        }
-        catch (IllegalArgumentException e)
-        {
-        }
+        assertEquals(-1, ht.getTupleOrdinal());
 
         assertEquals(-1, ht.getColumnOrdinal("col"));
         assertNull(ht.getValue(0));
@@ -57,6 +50,8 @@ public class HierarchyTupleTest extends AParserTest
             };
         };
         ht.setCurrent(current);
+
+        assertEquals(15, ht.getTupleOrdinal());
 
         assertSame(current, ht.getTuple(-1));
         assertSame(current, ht.getTuple(15));

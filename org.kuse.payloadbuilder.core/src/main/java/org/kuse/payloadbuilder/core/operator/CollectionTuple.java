@@ -4,12 +4,12 @@ import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.kuse.payloadbuilder.core.operator.Operator.RowList;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleList;
 
 /**
  * Tuple that is composed of tuples of the same table source in a collection. type fashion. Used by populating joins
  **/
-class CollectionTuple extends AbstractList<Tuple> implements Tuple, RowList
+class CollectionTuple extends AbstractList<Tuple> implements Tuple, TupleList
 {
     private static final int DEFAULT_CAPACITY = 10;
     private final int tupleOrdinal;

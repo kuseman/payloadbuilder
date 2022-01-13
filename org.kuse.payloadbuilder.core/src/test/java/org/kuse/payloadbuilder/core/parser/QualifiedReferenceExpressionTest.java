@@ -21,60 +21,114 @@ import org.kuse.payloadbuilder.core.utils.MapUtils;
 /** Test of {@link QualifiedReferenceExpression} */
 public class QualifiedReferenceExpressionTest extends AParserTest
 {
-    @SuppressWarnings("deprecation")
     @Test
     public void test_code_gen()
     {
-        QualifiedReferenceExpression e = new QualifiedReferenceExpression(QualifiedName.of("a", "col1"), -1, null);
-        e.setResolvePaths(asList(new ResolvePath(-1, 1, asList("col"), -1, DataType.INT)));
+        QualifiedReferenceExpression e = new QualifiedReferenceExpression(
+                QualifiedName.of("a", "col1"),
+                -1,
+                new ResolvePath[] {
+                        new ResolvePath(-1, 1, asList("col"), -1, DataType.INT)
+                },
+                null);
         assertEquals(DataType.INT, e.getDataType());
 
-        e = new QualifiedReferenceExpression(QualifiedName.of("a", "col1"), -1, null);
-        e.setResolvePaths(asList(new ResolvePath(-1, 1, asList("col"), -1, DataType.FLOAT)));
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of("a", "col1"),
+                -1,
+                new ResolvePath[] {
+                        new ResolvePath(-1, 1, asList("col"), -1, DataType.FLOAT)
+                },
+                null);
         assertEquals(DataType.FLOAT, e.getDataType());
 
-        e = new QualifiedReferenceExpression(QualifiedName.of("a", "col1"), -1, null);
-        e.setResolvePaths(asList(new ResolvePath(-1, 0, asList("col"), -1)));
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of("a", "col1"),
+                -1,
+                new ResolvePath[] {
+                        new ResolvePath(-1, 0, asList("col"), -1)
+                },
+                null);
         assertEquals(DataType.ANY, e.getDataType());
     }
 
-    @SuppressWarnings("deprecation")
     @Test
     public void test_isCodeGenSupported()
     {
         // No lambda support
-        QualifiedReferenceExpression e = new QualifiedReferenceExpression(QualifiedName.of("x", "col1"), 0, null);
+        QualifiedReferenceExpression e = new QualifiedReferenceExpression(
+                QualifiedName.of("x", "col1"),
+                0,
+                new ResolvePath[] {
+                        new ResolvePath(-1, 1, emptyList(), 0)
+                },
+                null);
         assertFalse(e.isCodeGenSupported());
-        e = new QualifiedReferenceExpression(QualifiedName.of("x", "col1"), 0, null);
-        e.setResolvePaths(asList(new ResolvePath(-1, 1, emptyList(), 0)));
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of("x", "col1"),
+                0,
+                new ResolvePath[0],
+                null);
         assertFalse(e.isCodeGenSupported());
 
         // No multi source
-        e = new QualifiedReferenceExpression(QualifiedName.of("col1"), -1, null);
-        e.setResolvePaths(asList(new ResolvePath(0, 1, emptyList(), 0), new ResolvePath(1, 1, emptyList(), 0)));
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of("col1"),
+                -1,
+                new ResolvePath[] {
+                        new ResolvePath(0, 1, emptyList(), 0),
+                        new ResolvePath(1, 1, emptyList(), 0)
+                },
+                null);
         assertFalse(e.isCodeGenSupported());
 
         // No multi part path
-        e = new QualifiedReferenceExpression(QualifiedName.of("map", "key"), -1, null);
-        e.setResolvePaths(asList(new ResolvePath(0, 1, asList("map", "key"), -1)));
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of("map", "key"),
+                -1,
+                new ResolvePath[] {
+                        new ResolvePath(0, 1, asList("map", "key"), -1)
+                },
+                null);
         assertFalse(e.isCodeGenSupported());
-        e = new QualifiedReferenceExpression(QualifiedName.of("map", "key"), -1, null);
-        e.setResolvePaths(asList(new ResolvePath(0, 1, asList("map", "key"), 0)));
+
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of("map", "key"),
+                -1,
+                new ResolvePath[] {
+                        new ResolvePath(0, 1, asList("map", "key"), 0)
+                },
+                null);
         assertFalse(e.isCodeGenSupported());
 
         // No tuple access
-        e = new QualifiedReferenceExpression(QualifiedName.of("alias"), -1, null);
-        e.setResolvePaths(asList(new ResolvePath(0, 1, emptyList(), -1)));
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of("alias"),
+                -1,
+                new ResolvePath[] {
+                        new ResolvePath(0, 1, emptyList(), -1)
+                },
+                null);
         assertFalse(e.isCodeGenSupported());
 
         // Column ordinal access
-        e = new QualifiedReferenceExpression(QualifiedName.of("t", "col"), -1, null);
-        e.setResolvePaths(asList(new ResolvePath(0, 1, emptyList(), 0)));
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of("t", "col"),
+                -1,
+                new ResolvePath[] {
+                        new ResolvePath(0, 1, emptyList(), 0)
+                },
+                null);
         assertTrue(e.isCodeGenSupported());
 
         // Column access
-        e = new QualifiedReferenceExpression(QualifiedName.of("col"), -1, null);
-        e.setResolvePaths(asList(new ResolvePath(0, 1, asList("col"), -1)));
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of("col"),
+                -1,
+                new ResolvePath[] {
+                        new ResolvePath(0, 1, asList("col"), -1)
+                },
+                null);
         assertTrue(e.isCodeGenSupported());
     }
 
@@ -102,7 +156,11 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         values.put("col1", 1337);
         values.put("mapCol", ofEntries(entry("key", "value")));
 
-        QualifiedReferenceExpression e = new QualifiedReferenceExpression(QualifiedName.of("x", "col1"), 0, null);
+        QualifiedReferenceExpression e = new QualifiedReferenceExpression(
+                QualifiedName.of("x", "col1"),
+                0,
+                new ResolvePath[0],
+                null);
 
         // No Lambda or null => null
         assertEquals(null, e.eval(context));
@@ -111,14 +169,26 @@ public class QualifiedReferenceExpressionTest extends AParserTest
 
         assertEquals(1337, e.eval(context));
 
-        e = new QualifiedReferenceExpression(QualifiedName.of("x", "mapCol", "key"), 0, null);
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of("x", "mapCol", "key"),
+                0,
+                new ResolvePath[0],
+                null);
         assertEquals("value", e.eval(context));
 
-        e = new QualifiedReferenceExpression(QualifiedName.of("x", "mapCol"), 0, null);
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of("x", "mapCol"),
+                0,
+                new ResolvePath[0],
+                null);
         assertEquals(ofEntries(entry("key", "value")), e.eval(context));
 
         context.getStatementContext().setLambdaValue(0, new Date());
-        e = new QualifiedReferenceExpression(QualifiedName.of("x", "value"), 0, null);
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of("x", "value"),
+                0,
+                new ResolvePath[0],
+                null);
         try
         {
             e.eval(context);
@@ -130,14 +200,17 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         }
     }
 
-    @SuppressWarnings("deprecation")
     @Test
     public void test_resolve_path_no_lambda()
     {
-        QualifiedReferenceExpression e = new QualifiedReferenceExpression(QualifiedName.of(), -1, null);
-
-        // Tuple access no column
-        e.setResolvePaths(asList(new ResolvePath(-1, 0, asList(), -1)));
+        QualifiedReferenceExpression e = new QualifiedReferenceExpression(
+                QualifiedName.of(),
+                -1,
+                new ResolvePath[] {
+                        // Tuple access no column
+                        new ResolvePath(-1, 1, asList(), -1)
+                },
+                null);
 
         // To tuple in context
         assertNull(e.eval(context));
@@ -195,13 +268,17 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         assertNull(e.eval(context));
 
         // Tuple access
-        tupleByOrdinal.put(0, tuple);
+        tupleByOrdinal.put(1, tuple);
         assertSame(tuple, e.eval(context));
 
-        e = new QualifiedReferenceExpression(QualifiedName.of(), -1, null);
-
-        // Tuple access with column
-        e.setResolvePaths(asList(new ResolvePath(-1, 0, asList("col"), -1)));
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of(),
+                -1,
+                new ResolvePath[] {
+                        // Tuple access with column
+                        new ResolvePath(-1, 0, asList("col"), -1)
+                },
+                null);
 
         // Null value in path
         assertNull(e.eval(context));
@@ -213,14 +290,24 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         assertEquals(map, e.eval(context));
 
         // Tuple access with column and a map access
-        e = new QualifiedReferenceExpression(QualifiedName.of(), -1, null);
-        e.setResolvePaths(asList(new ResolvePath(-1, 0, asList("col", "subkey"), -1)));
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of(),
+                -1,
+                new ResolvePath[] {
+                        new ResolvePath(-1, 0, asList("col", "subkey"), -1)
+                },
+                null);
 
         assertEquals(1337, e.eval(context));
 
         // Tuple access with column and a map access
-        e = new QualifiedReferenceExpression(QualifiedName.of(), -1, null);
-        e.setResolvePaths(asList(new ResolvePath(-1, 0, asList("date", "subkey"), -1)));
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of(),
+                -1,
+                new ResolvePath[] {
+                        new ResolvePath(-1, 0, asList("date", "subkey"), -1)
+                },
+                null);
 
         try
         {
@@ -233,13 +320,17 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         }
     }
 
-    @SuppressWarnings("deprecation")
     @Test
     public void test_resolve_path_with_lambda()
     {
-        QualifiedReferenceExpression e = new QualifiedReferenceExpression(QualifiedName.of(), 0, null);
-        // Identity lambda 'x -> x'
-        e.setResolvePaths(asList(new ResolvePath(-1, -1, asList(), -1)));
+        QualifiedReferenceExpression e = new QualifiedReferenceExpression(
+                QualifiedName.of(),
+                0,
+                new ResolvePath[] {
+                        // Identity lambda 'x -> x'
+                        new ResolvePath(-1, -1, asList(), -1)
+                },
+                null);
 
         // Null in lambda
         assertNull(e.eval(context));
@@ -248,9 +339,14 @@ public class QualifiedReferenceExpressionTest extends AParserTest
 
         assertEquals("value", e.eval(context));
 
-        e = new QualifiedReferenceExpression(QualifiedName.of(), 0, null);
-        // Unresolved lambda path => map access
-        e.setResolvePaths(asList(new ResolvePath(-1, -1, asList("key"), -1)));
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of(),
+                0,
+                new ResolvePath[] {
+                        // Unresolved lambda path => map access
+                        new ResolvePath(-1, -1, asList("key"), -1)
+                },
+                null);
         context.getStatementContext().setLambdaValue(0, MapUtils.ofEntries(MapUtils.entry("key", "value")));
         assertEquals("value", e.eval(context));
 
@@ -309,16 +405,26 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         // Map access with a tuple in context
         // This to make sure we don't traverse the tuple in context
         // when we have a non tuple in a lambda
-        e = new QualifiedReferenceExpression(QualifiedName.of(), 0, null);
-        // Unresolved lambda path => map access
-        e.setResolvePaths(asList(new ResolvePath(-1, -1, asList("key"), -1)));
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of(),
+                0,
+                new ResolvePath[] {
+                        // Unresolved lambda path => map access
+                        new ResolvePath(-1, -1, asList("key"), -1)
+                },
+                null);
         context.getStatementContext().setTuple(tuple);
         context.getStatementContext().setLambdaValue(0, MapUtils.ofEntries(MapUtils.entry("key", "value")));
         assertEquals("value", e.eval(context));
 
-        e = new QualifiedReferenceExpression(QualifiedName.of(), 0, null);
-        // Tuple access from lambda with non Tuple value
-        e.setResolvePaths(asList(new ResolvePath(-1, 0, asList(), -1)));
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of(),
+                0,
+                new ResolvePath[] {
+                        // Tuple access from lambda with non Tuple value
+                        new ResolvePath(-1, 1, asList(), -1)
+                },
+                null);
         assertEquals(MapUtils.ofEntries(MapUtils.entry("key", "value")), e.eval(context));
 
         context.getStatementContext().setLambdaValue(0, tuple);
@@ -326,19 +432,29 @@ public class QualifiedReferenceExpressionTest extends AParserTest
         // Tuple target ordinal is null
         assertNull(e.eval(context));
 
-        tupleByOrdinal.put(0, tuple);
+        tupleByOrdinal.put(1, tuple);
 
         assertSame(tuple, e.eval(context));
 
-        e = new QualifiedReferenceExpression(QualifiedName.of(), 0, null);
-        // Tuple lambda 'x -> x.a' with target ordinal
-        e.setResolvePaths(asList(new ResolvePath(-1, 0, asList(), -1)));
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of(),
+                0,
+                new ResolvePath[] {
+                        // Tuple lambda 'x -> x.a' with target ordinal
+                        new ResolvePath(-1, 0, asList(), -1)
+                },
+                null);
 
         assertSame(tuple, e.eval(context));
 
-        e = new QualifiedReferenceExpression(QualifiedName.of(), 0, null);
-        // Unresolved path lambda 'x -> x.a.col' with target ordinal
-        e.setResolvePaths(asList(new ResolvePath(-1, 0, asList("col"), -1)));
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of(),
+                0,
+                new ResolvePath[] {
+                        // Unresolved path lambda 'x -> x.a.col' with target ordinal
+                        new ResolvePath(-1, 0, asList("col"), -1)
+                },
+                null);
 
         assertNull(e.eval(context));
 
@@ -347,9 +463,14 @@ public class QualifiedReferenceExpressionTest extends AParserTest
 
         assertEquals(666, e.eval(context));
 
-        e = new QualifiedReferenceExpression(QualifiedName.of(), 0, null);
-        // Identity lambda 'x -> x' which is a tuple
-        e.setResolvePaths(asList(new ResolvePath(-1, -1, asList(), -1)));
+        e = new QualifiedReferenceExpression(
+                QualifiedName.of(),
+                0,
+                new ResolvePath[] {
+                        // Identity lambda 'x -> x' which is a tuple
+                        new ResolvePath(-1, -1, asList(), -1)
+                },
+                null);
         assertSame(tuple, e.eval(context));
     }
 }

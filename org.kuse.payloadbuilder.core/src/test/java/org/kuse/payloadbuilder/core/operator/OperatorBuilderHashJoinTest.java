@@ -18,9 +18,9 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
                 "",
                 result.tableOperators.get(0),
                 result.tableOperators.get(1),
-                new ExpressionHashFunction(asList(e("s.art_id"))),
-                new ExpressionHashFunction(asList(e("a.art_id"))),
-                new ExpressionPredicate(e("s.art_id = a.art_id")),
+                new ExpressionHashFunction(asList(en("s.art_id"))),
+                new ExpressionHashFunction(asList(en("a.art_id"))),
+                new ExpressionPredicate(en("s.art_id = a.art_id")),
                 new DefaultTupleMerger(-1, 1, 2),
                 false,
                 false);
@@ -33,8 +33,8 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         assertEquals(
                 new RootProjection(asList("id1", "id2"),
                         asList(
-                                new ExpressionProjection(e("s.id1")),
-                                new ExpressionProjection(e("a.id2")))),
+                                new ExpressionProjection(en("s.id1")),
+                                new ExpressionProjection(en("a.id2")))),
                 result.projection);
     }
 
@@ -49,9 +49,9 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
                 "",
                 result.tableOperators.get(0),
                 result.tableOperators.get(1),
-                new ExpressionHashFunction(asList(e("s.art_id"))),
-                new ExpressionHashFunction(asList(e("a.art_id"))),
-                new ExpressionPredicate(e("a.art_id = s.art_id")),
+                new ExpressionHashFunction(asList(en("s.art_id"))),
+                new ExpressionHashFunction(asList(en("a.art_id"))),
+                new ExpressionPredicate(en("a.art_id = s.art_id")),
                 new DefaultTupleMerger(-1, 1, 2),
                 true,
                 false);
@@ -64,8 +64,8 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         assertEquals(
                 new RootProjection(asList("id1", "id2"),
                         asList(
-                                new ExpressionProjection(e("s.id1")),
-                                new ExpressionProjection(e("a.id2")))),
+                                new ExpressionProjection(en("s.id1")),
+                                new ExpressionProjection(en("a.id2")))),
                 result.projection);
     }
 
@@ -80,9 +80,9 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
                 "",
                 result.tableOperators.get(0),
                 result.tableOperators.get(1),
-                new ExpressionHashFunction(asList(e("s.art_id"))),
-                new ExpressionHashFunction(asList(e("a.art_id"))),
-                new ExpressionPredicate(e("s.art_id = a.art_id")),
+                new ExpressionHashFunction(asList(en("s.art_id"))),
+                new ExpressionHashFunction(asList(en("a.art_id"))),
+                new ExpressionPredicate(en("s.art_id = a.art_id")),
                 new DefaultTupleMerger(-1, 1, 2),
                 false,
                 true);
@@ -95,8 +95,8 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         assertEquals(
                 new RootProjection(asList("id1", "id2"),
                         asList(
-                                new ExpressionProjection(e("s.id1")),
-                                new ExpressionProjection(e("a.id2")))),
+                                new ExpressionProjection(en("s.id1")),
+                                new ExpressionProjection(en("a.id2")))),
                 result.projection);
     }
 
@@ -113,13 +113,13 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
                         "",
                         result.tableOperators.get(0),
                         result.tableOperators.get(1),
-                        new ExpressionHashFunction(asList(e("s.art_id"))),
-                        new ExpressionHashFunction(asList(e("a.art_id"))),
-                        new ExpressionPredicate(e("s.art_id = a.art_id")),
+                        new ExpressionHashFunction(asList(en("s.art_id"))),
+                        new ExpressionHashFunction(asList(en("a.art_id"))),
+                        new ExpressionPredicate(en("s.art_id = a.art_id")),
                         new DefaultTupleMerger(-1, 1, 2),
                         false,
                         true),
-                new ExpressionPredicate(e("a.value is null")));
+                new ExpressionPredicate(en("a.value is null")));
 
         //                        System.err.println(expected.toString(1));
         //                        System.out.println(result.operator.toString(1));
@@ -129,8 +129,8 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         assertEquals(
                 new RootProjection(asList("id1", "id2"),
                         asList(
-                                new ExpressionProjection(e("s.id1")),
-                                new ExpressionProjection(e("a.id2")))),
+                                new ExpressionProjection(en("s.id1")),
+                                new ExpressionProjection(en("a.id2")))),
                 result.projection);
     }
 
@@ -145,9 +145,9 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
                 "",
                 result.tableOperators.get(0),
                 result.tableOperators.get(1),
-                new ExpressionHashFunction(asList(e("s.art_id"))),
-                new ExpressionHashFunction(asList(e("a.art_id"))),
-                new ExpressionPredicate(e("s.art_id = a.art_id")),
+                new ExpressionHashFunction(asList(en("s.art_id"))),
+                new ExpressionHashFunction(asList(en("a.art_id"))),
+                new ExpressionPredicate(en("s.art_id = a.art_id")),
                 new DefaultTupleMerger(-1, 1, 2),
                 true,
                 true);
@@ -157,8 +157,8 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         assertEquals(
                 new RootProjection(asList("id1", "id2"),
                         asList(
-                                new ExpressionProjection(e("s.id1")),
-                                new ExpressionProjection(e("a.id2")))),
+                                new ExpressionProjection(en("s.id1")),
+                                new ExpressionProjection(en("a.id2")))),
                 result.projection);
     }
 
@@ -171,11 +171,17 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         Operator expected = new HashJoin(
                 4,
                 "INNER JOIN",
-                new FilterOperator(1, result.tableOperators.get(0), new ExpressionPredicate(e("s.id3 > 0"))),
-                new FilterOperator(3, result.tableOperators.get(1), new ExpressionPredicate(e("note_id > 0 AND a.active_flg = true AND a.id2 = 10"))),
-                new ExpressionHashFunction(asList(e("s.art_id"))),
-                new ExpressionHashFunction(asList(e("a.art_id"))),
-                new ExpressionPredicate(e("a.art_id = s.art_id ")),
+                new FilterOperator(
+                        1,
+                        result.tableOperators.get(0),
+                        new ExpressionPredicate(en("s.id3 > 0"))),
+                new FilterOperator(
+                        3,
+                        result.tableOperators.get(1),
+                        new ExpressionPredicate(en("note_id > 0 AND a.active_flg = true AND a.id2 = 10"))),
+                new ExpressionHashFunction(asList(en("s.art_id"))),
+                new ExpressionHashFunction(asList(en("a.art_id"))),
+                new ExpressionPredicate(en("a.art_id = s.art_id ")),
                 new DefaultTupleMerger(-1, 1, 2),
                 true,
                 false);
@@ -188,8 +194,8 @@ public class OperatorBuilderHashJoinTest extends AOperatorTest
         assertEquals(
                 new RootProjection(asList("id1", "id2"),
                         asList(
-                                new ExpressionProjection(e("s.id1")),
-                                new ExpressionProjection(e("a.id2")))),
+                                new ExpressionProjection(en("s.id1")),
+                                new ExpressionProjection(en("a.id2")))),
                 result.projection);
     }
 }

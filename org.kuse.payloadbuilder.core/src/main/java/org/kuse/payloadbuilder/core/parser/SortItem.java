@@ -40,6 +40,13 @@ public class SortItem extends ASelectNode
         return token;
     }
 
+    public boolean isComputed()
+    {
+        return !(expression instanceof QualifiedReferenceExpression
+            || expression instanceof UnresolvedQualifiedReferenceExpression
+            || expression instanceof LiteralExpression);
+    }
+
     @Override
     public <TR, TC> TR accept(SelectVisitor<TR, TC> visitor, TC context)
     {

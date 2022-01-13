@@ -21,10 +21,9 @@ import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.codegen.BaseProjection;
 import org.kuse.payloadbuilder.core.operator.AObjectOutputWriter;
 import org.kuse.payloadbuilder.core.operator.AObjectOutputWriter.ColumnValue;
+import org.kuse.payloadbuilder.core.operator.ATupleIterator;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.Operator;
-import org.kuse.payloadbuilder.core.operator.Operator.RowList;
-import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.OperatorBuilder;
 import org.kuse.payloadbuilder.core.operator.OperatorBuilder.BuildResult;
 import org.kuse.payloadbuilder.core.operator.Projection;
@@ -375,9 +374,8 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             {
                 /* Optimize tuple before storing to table */
                 context.intern(values);
-                tuple = tuple.optimize(context);
             }
-            rows.add(new TemporaryTable.Row(tuple, values));
+            rows.add(new TemporaryTable.Row(values));
         });
 
         return new TemporaryTable(
@@ -395,23 +393,17 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         int rowCount = 0;
         StatementContext statementContext = context.getStatementContext();
 
-        TupleIterator iterator = null;
+        ATupleIterator iterator = null;
         try
         {
-            iterator = operator.open(context);
-            RowList list = iterator instanceof RowList ? (RowList) iterator : null;
-            int index = 0;
-            boolean complete = list == null
-                ? !iterator.hasNext()
-                : index >= list.size();
-
-            while (!complete)
+            iterator = new ATupleIterator(operator.open(context));
+            while (iterator.hasNext())
             {
                 if (session.abortQuery())
                 {
                     break;
                 }
-                Tuple tuple = list == null ? iterator.next() : list.get(index++);
+                Tuple tuple = iterator.next();
                 statementContext.setTuple(tuple);
                 for (int i = 0; i < size; i++)
                 {
@@ -420,10 +412,6 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                     context.setVariable(item.getAssignmentName(), value);
                 }
                 rowCount++;
-
-                complete = list == null
-                    ? !iterator.hasNext()
-                    : index >= list.size();
             }
         }
         finally
@@ -483,7 +471,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     //CSON
     {
         int rowCount = 0;
-        TupleIterator iterator = null;
+        ATupleIterator iterator = null;
         StatementContext statementContext = context.getStatementContext();
         try
         {
@@ -500,22 +488,16 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
 
             // Clear context before opening operator
             statementContext.setTuple(null);
-            iterator = operator.open(context);
-            RowList list = iterator instanceof RowList ? (RowList) iterator : null;
-            int index = 0;
-            boolean complete = list == null
-                ? !iterator.hasNext()
-                : index >= list.size();
-
-            while (!complete)
+            iterator = new ATupleIterator(operator.open(context));
+            while (iterator.hasNext())
             {
                 if (session.abortQuery())
                 {
                     break;
                 }
-                writer.startRow();
-                Tuple tuple = list == null ? iterator.next() : list.get(index++);
+                Tuple tuple = iterator.next();
                 statementContext.setTuple(tuple);
+                writer.startRow();
                 projection.writeValue(writer, context);
                 writer.endRow();
                 if (tupleConsumer != null)
@@ -523,10 +505,6 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                     tupleConsumer.accept(tuple);
                 }
                 rowCount++;
-
-                complete = list == null
-                    ? !iterator.hasNext()
-                    : index >= list.size();
             }
         }
         finally

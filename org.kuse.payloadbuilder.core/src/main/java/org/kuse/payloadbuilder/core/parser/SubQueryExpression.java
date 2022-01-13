@@ -10,13 +10,11 @@ import java.util.List;
 import org.kuse.payloadbuilder.core.OutputWriter;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ProjectionCode;
+import org.kuse.payloadbuilder.core.operator.ATupleIterator;
 import org.kuse.payloadbuilder.core.operator.ComplexValue;
 import org.kuse.payloadbuilder.core.operator.DescribableNode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
-import org.kuse.payloadbuilder.core.operator.NoOpTuple;
 import org.kuse.payloadbuilder.core.operator.Operator;
-import org.kuse.payloadbuilder.core.operator.Operator.RowList;
-import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.Projection;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.Select.For;
@@ -108,26 +106,6 @@ public class SubQueryExpression extends Expression implements DescribableNode
         return code;
     }
 
-    @Override
-    public int hashCode()
-    {
-        return operator.hashCode();
-    }
-
-    @Override
-    public boolean equals(Object obj)
-    {
-        if (obj instanceof SubQueryExpression)
-        {
-            SubQueryExpression that = (SubQueryExpression) obj;
-            return operator.equals(that.operator)
-                && Arrays.equals(columns, that.columns)
-                && Arrays.equals(projections, that.projections)
-                && forOutput == that.forOutput;
-        }
-        return false;
-    }
-
     /**
      * <pre>
      * Method used when having a code generated projection. To keep the operator logic
@@ -145,64 +123,50 @@ public class SubQueryExpression extends Expression implements DescribableNode
         begin(outputWriter);
 
         Tuple contextTuple = context.getStatementContext().getTuple();
-        HierarchyTuple hierarchyTuple = null;
-
-        TupleIterator it = operator.open(context);
-        RowList list = it instanceof RowList ? (RowList) it : null;
-        int index = 0;
-        boolean complete = list == null
-            ? !it.hasNext()
-            : index >= list.size();
-
-        while (!complete)
+        // Use a tuple iterator to easier handle TupleList etc.
+        ATupleIterator it = new ATupleIterator(operator.open(context))
         {
-            Tuple currentTuple = list == null ? it.next() : list.get(index++);
-
-            // No op tuple, no need to create a hierarchy tuple
-            // just set the context tuple
-            if (currentTuple == NoOpTuple.NO_OP)
+            @Override
+            public Tuple process(Tuple tuple)
             {
-                context.getStatementContext().setTuple(contextTuple);
-            }
-            else
-            {
-                if (hierarchyTuple == null)
+                if (forOutput == For.OBJECT_ARRAY)
                 {
-                    hierarchyTuple = new HierarchyTuple(contextTuple);
+                    outputWriter.startObject();
                 }
-                hierarchyTuple.setCurrent(currentTuple);
-                // Re-set the context tuple in case we have nested complex values
-                context.getStatementContext().setTuple(hierarchyTuple);
-            }
 
-            if (forOutput == For.OBJECT_ARRAY)
+                context.getStatementContext().setTuple(tuple);
+                projectionAction.run();
+
+                if (forOutput == For.OBJECT_ARRAY)
+                {
+                    outputWriter.endObject();
+                }
+
+                return tuple;
+            };
+        };
+
+        try
+        {
+            while (it.hasNext())
             {
-                outputWriter.startObject();
+                it.next();
+                // Objects can only have one "row"
+                if (forOutput == For.OBJECT)
+                {
+                    break;
+                }
             }
-
-            projectionAction.run();
-
-            if (forOutput == For.OBJECT_ARRAY)
-            {
-                outputWriter.endObject();
-            }
-
-            // Objects can only have one "row"
-            if (forOutput == For.OBJECT)
-            {
-                break;
-            }
-
-            complete = list == null
-                ? !it.hasNext()
-                : index >= list.size();
         }
-
+        finally
+        {
+            it.close();
+        }
         end(outputWriter);
         context.getStatementContext().setTuple(contextTuple);
     }
 
-    /** Complext value implementation for this sub query expression */
+    /** Complex value implementation for this sub query expression */
     private class SubQueryComplexValue implements ComplexValue
     {
         @Override
@@ -258,114 +222,23 @@ public class SubQueryExpression extends Expression implements DescribableNode
         }
     }
 
-    /**
-     * Tuple that is used to temporary connect 2 tuples during a complex value iteration
-     *
-     * <pre>
-     *  select a.col,
-     *         (select a.col2, b.col3 from tableB for array) arr
-     *  from tableA a
-     *
-     *  To be able to "reach" alias b from within the complex value arr
-     *  we need to temporary connect the outer tuple (tableA) before evaluating
-     * </pre>
-     **/
-    static class HierarchyTuple implements Tuple
+    @Override
+    public int hashCode()
     {
-        private final Tuple parent;
-        private Tuple current;
+        return operator.hashCode();
+    }
 
-        HierarchyTuple(Tuple parent)
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof SubQueryExpression)
         {
-            this.parent = parent;
+            SubQueryExpression that = (SubQueryExpression) obj;
+            return operator.equals(that.operator)
+                && Arrays.equals(columns, that.columns)
+                && Arrays.equals(projections, that.projections)
+                && forOutput == that.forOutput;
         }
-
-        void setCurrent(Tuple current)
-        {
-            this.current = current;
-        }
-
-        @Override
-        public int getColumnOrdinal(String column)
-        {
-            if (current == null)
-            {
-                return -1;
-            }
-            return current.getColumnOrdinal(column);
-        }
-
-        @Override
-        public Tuple getTuple(int tupleOrdinal)
-        {
-            /*
-             * select col
-             * ,      (
-             *              select a.col1, b.col2, c.col
-             *              from tableB b                       ordinal = 1 (current)
-             *              inner join tableC c                 ordinal = 2
-             *              for object
-             *        ) obj
-             * from tableA a                                    ordinal = 0 (parent)
-             *
-             * select (
-             *       id                     <------ 1
-             *     , c.id                   <------ 2
-             *     from open_rows(b)        <------ 1 (current)
-             *   ) obj
-             * from tableA a                0         (composite parent)
-             * inner join tableB b          1
-             *  on ...
-             * inner join tableC c          2
-             *  on ...
-             *
-             */
-            if (tupleOrdinal == -1
-                || current == null
-                || tupleOrdinal == current.getTupleOrdinal())
-            {
-                return current;
-            }
-
-            // Target might be a descendant of current
-            if (tupleOrdinal > current.getTupleOrdinal())
-            {
-                Tuple result = current.getTuple(tupleOrdinal);
-                if (result != null)
-                {
-                    return result;
-                }
-            }
-            // if not found delegate to parent
-            return parent.getTuple(tupleOrdinal);
-        }
-
-        @Override
-        public Object getValue(int columnOrdinal)
-        {
-            if (current == null)
-            {
-                return null;
-            }
-            return current.getValue(columnOrdinal);
-        }
-
-        @Override
-        public int getTupleOrdinal()
-        {
-            throw new IllegalArgumentException("Not implemented");
-        }
-
-        @Override
-        public int getColumnCount()
-        {
-            throw new IllegalArgumentException("Not implemented");
-        }
-
-        @Override
-        public String getColumn(int columnOrdinal)
-        {
-            throw new IllegalArgumentException("Not implemented");
-        }
+        return false;
     }
 }

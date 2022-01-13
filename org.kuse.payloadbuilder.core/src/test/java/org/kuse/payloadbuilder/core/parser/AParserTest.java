@@ -12,6 +12,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -30,10 +31,10 @@ import org.kuse.payloadbuilder.core.operator.EvalUtils;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.OperatorBuilder;
-import org.kuse.payloadbuilder.core.operator.SelectResolver;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression.ResolvePath;
+import org.kuse.payloadbuilder.core.parser.rewrite.StatementResolver;
 
 /** Base class for parser tests */
 public abstract class AParserTest extends Assert
@@ -42,11 +43,6 @@ public abstract class AParserTest extends Assert
     private final QueryParser p = new QueryParser();
     protected final QuerySession session = new QuerySession(new CatalogRegistry());
     protected final ExecutionContext context = new ExecutionContext(session);
-
-    protected QueryStatement q(String query)
-    {
-        return p.parseQuery(session.getCatalogRegistry(), query);
-    }
 
     /** Compile query with provided table creators */
     protected Operator operator(String query, Map<String, Function<TableAlias, Operator>> opByTable)
@@ -61,7 +57,7 @@ public abstract class AParserTest extends Assert
             Map<String, Function<TableAlias, Operator>> indexOpByTable,
             Map<String, Function<TableAlias, Operator>> opByTable)
     {
-        Select select = p.parseSelect(session.getCatalogRegistry(), query);
+        Select select = s(query);
 
         session.getCatalogRegistry().registerCatalog("test", new Catalog("test")
         {
@@ -96,9 +92,58 @@ public abstract class AParserTest extends Assert
         return OperatorBuilder.create(session, select).getOperator();
     }
 
+    protected QueryStatement q(String query)
+    {
+        return p.parseQuery(session.getCatalogRegistry(), query);
+    }
+
     protected Select s(String query)
     {
         return p.parseSelect(session.getCatalogRegistry(), query);
+    }
+
+    /** Parse expression with mocked valued from provided tuple */
+    protected Expression e(String expression, final Tuple tuple, final Map<String, Pair<Object, DataType>> types)
+    {
+        AtomicInteger colCount = new AtomicInteger();
+        return StatementResolver.resolve(p.parseExpression(session.getCatalogRegistry(), expression, false), e ->
+        {
+            int col = colCount.get();
+            String colName = e.getQname().toString();
+            Pair<Object, DataType> pair = types.get(colName);
+
+            ResolvePath[] resolvePaths = new ResolvePath[] {
+                    new ResolvePath(-1, -1, asList(colName), -1, pair.getValue())
+            };
+
+            when(tuple.getColumnOrdinal(colName)).thenReturn(col);
+
+            boolean isNull = pair.getKey() == null;
+            when(tuple.isNull(col)).thenReturn(isNull);
+            if (!isNull && pair.getValue() == DataType.INT)
+            {
+                when(tuple.getInt(col)).thenReturn((Integer) pair.getKey());
+            }
+            else if (!isNull && pair.getValue() == DataType.LONG)
+            {
+                when(tuple.getLong(col)).thenReturn((Long) pair.getKey());
+            }
+            else if (!isNull && pair.getValue() == DataType.FLOAT)
+            {
+                when(tuple.getFloat(col)).thenReturn((Float) pair.getKey());
+            }
+            else if (!isNull && pair.getValue() == DataType.DOUBLE)
+            {
+                when(tuple.getDouble(col)).thenReturn((Double) pair.getKey());
+            }
+            else if (!isNull && pair.getValue() == DataType.BOOLEAN)
+            {
+                when(tuple.getBool(col)).thenReturn((Boolean) pair.getKey());
+            }
+            when(tuple.getValue(col)).thenReturn(pair.getKey());
+            colCount.incrementAndGet();
+            return new QualifiedReferenceExpression(e.getQname(), e.getLambdaId(), resolvePaths, e.getToken());
+        });
     }
 
     protected Expression e(String expression)
@@ -106,12 +151,33 @@ public abstract class AParserTest extends Assert
         return p.parseExpression(session.getCatalogRegistry(), expression);
     }
 
+    /** Parse expression but do no resolving */
+    protected Expression en(String expression)
+    {
+        return p.parseExpression(session.getCatalogRegistry(), expression, false);
+    }
+
     protected Expression e(String expression, TableAlias alias)
     {
-        Expression e = e(expression);
-        // Resolve expression with provided alias
-        SelectResolver.resolveTorTest(e, alias);
-        return e;
+        Expression e = p.parseExpression(session.getCatalogRegistry(), expression, false);
+        return StatementResolver.resolve(e, alias);
+    }
+
+    protected void assertQueryFail(Class<? extends Exception> expected, String messageContains, String query)
+    {
+        try
+        {
+            q(query);
+            fail("Query should fail with " + expected + " containing message: " + messageContains);
+        }
+        catch (Exception e)
+        {
+            if (!expected.isAssignableFrom(e.getClass()))
+            {
+                throw e;
+            }
+            assertTrue(e.getMessage(), e.getMessage().contains(messageContains));
+        }
     }
 
     protected void assertExpressionFail(Class<? extends Exception> e, String messageContains, Map<String, Object> mapValues, String expression)
@@ -245,7 +311,7 @@ public abstract class AParserTest extends Assert
                     @Override
                     public int getColumnOrdinal(String column)
                     {
-                        return ArrayUtils.indexOf(columns, column);
+                        return ArrayUtils.indexOf(columns, lowerCase(column));
                     }
 
                     @Override
@@ -304,50 +370,5 @@ public abstract class AParserTest extends Assert
             e.printStackTrace();
             fail(expression + " " + e.getMessage());
         }
-    }
-
-    /** Set up qualified expressions and tuple with values and types */
-    protected void setup(Tuple tuple, Expression e, Map<String, Pair<Object, DataType>> types)
-    {
-        e.accept(new AExpressionVisitor<Void, Void>()
-        {
-            int col;
-
-            @SuppressWarnings("deprecation")
-            @Override
-            public Void visit(QualifiedReferenceExpression e, Void context)
-            {
-                String colName = e.getQname().toString();
-                Pair<Object, DataType> pair = types.get(colName);
-                e.setResolvePaths(asList(new ResolvePath(-1, -1, asList(colName), -1, pair.getValue())));
-                when(tuple.getColumnOrdinal(colName)).thenReturn(col);
-
-                boolean isNull = pair.getKey() == null;
-                when(tuple.isNull(col)).thenReturn(isNull);
-                if (!isNull && pair.getValue() == DataType.INT)
-                {
-                    when(tuple.getInt(col)).thenReturn((Integer) pair.getKey());
-                }
-                else if (!isNull && pair.getValue() == DataType.LONG)
-                {
-                    when(tuple.getLong(col)).thenReturn((Long) pair.getKey());
-                }
-                else if (!isNull && pair.getValue() == DataType.FLOAT)
-                {
-                    when(tuple.getFloat(col)).thenReturn((Float) pair.getKey());
-                }
-                else if (!isNull && pair.getValue() == DataType.DOUBLE)
-                {
-                    when(tuple.getDouble(col)).thenReturn((Double) pair.getKey());
-                }
-                else if (!isNull && pair.getValue() == DataType.BOOLEAN)
-                {
-                    when(tuple.getBool(col)).thenReturn((Boolean) pair.getKey());
-                }
-                when(tuple.getValue(col)).thenReturn(pair.getKey());
-                col++;
-                return null;
-            }
-        }, null);
     }
 }

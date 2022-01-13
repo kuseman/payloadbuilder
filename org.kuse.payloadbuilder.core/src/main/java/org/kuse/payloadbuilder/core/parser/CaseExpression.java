@@ -10,23 +10,23 @@ import org.apache.commons.lang3.BooleanUtils;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 
 /** CASE WHEN expression */
-class CaseExpression extends Expression
+public class CaseExpression extends Expression
 {
     private final List<WhenClause> whenClauses;
     private final Expression elseExpression;
 
-    CaseExpression(List<WhenClause> whenClauses, Expression elseExpression)
+    public CaseExpression(List<WhenClause> whenClauses, Expression elseExpression)
     {
         this.whenClauses = requireNonNull(whenClauses, "whenClauses");
         this.elseExpression = elseExpression;
     }
 
-    List<WhenClause> getWhenClauses()
+    public List<WhenClause> getWhenClauses()
     {
         return whenClauses;
     }
 
-    Expression getElseExpression()
+    public Expression getElseExpression()
     {
         return elseExpression;
     }
@@ -67,23 +67,23 @@ class CaseExpression extends Expression
     }
 
     /** When clause */
-    static class WhenClause
+    public static class WhenClause
     {
         private final Expression condition;
         private final Expression result;
 
-        WhenClause(Expression condition, Expression result)
+        public WhenClause(Expression condition, Expression result)
         {
             this.condition = requireNonNull(condition, "condition");
             this.result = requireNonNull(result, "result");
         }
 
-        Expression getCondition()
+        public Expression getCondition()
         {
             return condition;
         }
 
-        Expression getResult()
+        public Expression getResult()
         {
             return result;
         }

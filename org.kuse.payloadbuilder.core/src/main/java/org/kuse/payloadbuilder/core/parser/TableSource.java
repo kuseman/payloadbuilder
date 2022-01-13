@@ -17,13 +17,17 @@ public abstract class TableSource extends ASelectNode
     protected final Token token;
     protected final List<Option> options;
 
-    public TableSource(TableAlias tableAlias, List<Option> options, Token token)
+    public TableSource(
+            TableAlias tableAlias,
+            List<Option> options,
+            Token token)
     {
         this.tableAlias = requireNonNull(tableAlias, "tableAlias");
         this.options = requireNonNull(options, "options");
         this.token = token;
     }
 
+    /** Get table alias associated with this table source */
     public TableAlias getTableAlias()
     {
         return tableAlias;

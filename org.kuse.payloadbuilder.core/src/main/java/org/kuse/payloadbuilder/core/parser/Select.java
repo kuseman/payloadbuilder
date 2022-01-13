@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 
 import java.util.List;
+import java.util.Objects;
 
 import org.kuse.payloadbuilder.core.operator.TableAlias.Type;
 
@@ -18,15 +19,18 @@ public class Select extends ASelectNode
     private final List<Expression> groupBy;
     private final List<SortItem> orderBy;
     private final For forOutput;
+    /** Computed expressions found during resolve phase for this select */
+    private final List<Expression> computedExpressions;
 
-    Select(List<SelectItem> selectItems,
+    public Select(List<SelectItem> selectItems,
             TableSourceJoined from,
             Table into,
             Expression topExpression,
             Expression where,
             List<Expression> groupBy,
             List<SortItem> orderBy,
-            For forOutput)
+            For forOutput,
+            List<Expression> computedExpressions)
     {
         this.selectItems = requireNonNull(selectItems, "selectItems");
         this.from = from;
@@ -36,8 +40,9 @@ public class Select extends ASelectNode
         this.groupBy = requireNonNull(groupBy, "groupBy");
         this.orderBy = requireNonNull(orderBy, "orderBy");
         this.forOutput = forOutput;
+        this.computedExpressions = requireNonNull(computedExpressions, "computedExpressions");
 
-        if (into != null && into.getTableAlias().getType() != Type.TEMPORARY_TABLE)
+        if (into != null && into.getTableAlias() != null && into.getTableAlias().getType() != Type.TEMPORARY_TABLE)
         {
             throw new ParseException("Can only insert into temporary tables", into.getToken());
         }
@@ -83,6 +88,11 @@ public class Select extends ASelectNode
         return forOutput;
     }
 
+    public List<Expression> getComputedExpressions()
+    {
+        return computedExpressions;
+    }
+
     @Override
     public <TR, TC> TR accept(SelectVisitor<TR, TC> visitor, TC context)
     {
@@ -101,13 +111,41 @@ public class Select extends ASelectNode
     }
 
     @Override
+    public int hashCode()
+    {
+        return Objects.hash(selectItems, from);
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof Select)
+        {
+            Select that = (Select) obj;
+            return selectItems.equals(that.selectItems)
+                && Objects.equals(from, that.from)
+                && Objects.equals(into, that.into)
+                && Objects.equals(topExpression, that.topExpression)
+                && Objects.equals(where, that.where)
+                && groupBy.equals(that.groupBy)
+                && orderBy.equals(that.orderBy)
+                && forOutput == that.forOutput
+                && computedExpressions.equals(that.computedExpressions);
+        }
+        return false;
+    }
+
+    @Override
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
         sb.append("SELECT");
         sb.append(System.lineSeparator());
         sb.append(selectItems.stream().map(s -> s.toString()).collect(joining("," + System.lineSeparator(), "", System.lineSeparator())));
-        sb.append("FROM ").append(from);
+        if (from != null)
+        {
+            sb.append("FROM ").append(from);
+        }
         if (where != null)
         {
             sb.append(System.lineSeparator());

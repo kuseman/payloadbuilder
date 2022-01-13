@@ -2,18 +2,17 @@ package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.Map;
-
+import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
+import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
-import org.kuse.payloadbuilder.core.operator.Tuple;
 
-/** Dereference expression */
-public class DereferenceExpression extends Expression implements HasIdentifier
+/** Unresolved Dereference expression */
+public class UnresolvedDereferenceExpression extends Expression implements HasIdentifier
 {
     private final Expression left;
-    private final QualifiedReferenceExpression right;
+    private final UnresolvedQualifiedReferenceExpression right;
 
-    public DereferenceExpression(Expression left, QualifiedReferenceExpression right)
+    public UnresolvedDereferenceExpression(Expression left, UnresolvedQualifiedReferenceExpression right)
     {
         this.left = requireNonNull(left, "left");
         this.right = requireNonNull(right, "right");
@@ -24,7 +23,7 @@ public class DereferenceExpression extends Expression implements HasIdentifier
         return left;
     }
 
-    public QualifiedReferenceExpression getRight()
+    public UnresolvedQualifiedReferenceExpression getRight()
     {
         return right;
     }
@@ -38,27 +37,13 @@ public class DereferenceExpression extends Expression implements HasIdentifier
     @Override
     public Object eval(ExecutionContext context)
     {
-        Object leftResult = left.eval(context);
+        throw new IllegalStateException("Cannot evaluate " + getClass().getName());
+    }
 
-        if (leftResult == null)
-        {
-            return null;
-        }
-
-        if (leftResult instanceof Tuple)
-        {
-            context.getStatementContext().setTuple((Tuple) leftResult);
-            return right.eval(context);
-        }
-        else if (leftResult instanceof Map)
-        {
-            @SuppressWarnings("unchecked")
-            Map<Object, Object> map = (Map<Object, Object>) leftResult;
-            // A dereference only has one part so pick first and use as key
-            return map.get(right.getQname().getFirst());
-        }
-
-        throw new IllegalArgumentException("Cannot dereference " + leftResult.getClass().getSimpleName() + " value: " + leftResult);
+    @Override
+    public ExpressionCode generateCode(CodeGeneratorContext context)
+    {
+        throw new IllegalStateException("Cannot generate code for " + getClass().getName());
     }
 
     @Override
@@ -81,9 +66,9 @@ public class DereferenceExpression extends Expression implements HasIdentifier
     @Override
     public boolean equals(Object obj)
     {
-        if (obj instanceof DereferenceExpression)
+        if (obj instanceof UnresolvedDereferenceExpression)
         {
-            DereferenceExpression that = (DereferenceExpression) obj;
+            UnresolvedDereferenceExpression that = (UnresolvedDereferenceExpression) obj;
             return left.equals(that.left)
                 && right.equals(that.right);
         }

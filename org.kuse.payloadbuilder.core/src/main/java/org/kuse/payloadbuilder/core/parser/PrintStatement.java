@@ -7,7 +7,7 @@ public class PrintStatement extends Statement
 {
     private final Expression expression;
 
-    PrintStatement(Expression expression)
+    public PrintStatement(Expression expression)
     {
         this.expression = requireNonNull(expression, "expression");
     }

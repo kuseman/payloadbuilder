@@ -11,7 +11,11 @@ public class Table extends TableSource
 {
     private final String catalogAlias;
 
-    public Table(String catalogAlias, TableAlias tableAlias, List<Option> options, Token token)
+    public Table(
+            String catalogAlias,
+            TableAlias tableAlias,
+            List<Option> options,
+            Token token)
     {
         super(tableAlias, options, token);
         this.catalogAlias = catalogAlias;
@@ -19,7 +23,7 @@ public class Table extends TableSource
 
     public boolean isTempTable()
     {
-        return tableAlias.getType() == Type.TEMPORARY_TABLE;
+        return getTableAlias().getType() == Type.TEMPORARY_TABLE;
     }
 
     @Override

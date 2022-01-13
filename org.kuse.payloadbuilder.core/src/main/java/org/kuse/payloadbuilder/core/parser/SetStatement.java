@@ -1,8 +1,6 @@
 package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Objects.requireNonNull;
-import static org.apache.commons.lang3.StringUtils.join;
-import static org.apache.commons.lang3.StringUtils.lowerCase;
 
 /** Set statement */
 public class SetStatement extends Statement
@@ -11,9 +9,9 @@ public class SetStatement extends Statement
     private final Expression expression;
     private final boolean systemProperty;
 
-    SetStatement(QualifiedName qname, Expression expression, boolean systemProperty)
+    public SetStatement(String name, Expression expression, boolean systemProperty)
     {
-        this.name = lowerCase(join(qname.getParts(), "."));
+        this.name = requireNonNull(name, "name");
         this.expression = requireNonNull(expression, "expression");
         this.systemProperty = systemProperty;
     }

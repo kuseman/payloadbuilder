@@ -8,7 +8,7 @@ public class UseStatement extends Statement
     private final QualifiedName qname;
     private final Expression expression;
 
-    UseStatement(QualifiedName qname, Expression expression)
+    public UseStatement(QualifiedName qname, Expression expression)
     {
         this.qname = requireNonNull(qname, "qname");
         this.expression = expression;

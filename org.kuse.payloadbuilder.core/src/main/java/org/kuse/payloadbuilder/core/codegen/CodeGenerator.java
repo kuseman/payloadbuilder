@@ -69,7 +69,12 @@ public class CodeGenerator
         + "    context.getStatementContext().setTuple(null); \n"
         + "    return res; \n"
         + "  } \n"
-
+        + "\n"
+        + "  public int size() \n"
+        + "  { \n"
+        + "    return %d; \n"
+        + "  } \n"
+        + "\n"
         + "  private static class OrdinalValues extends BaseOrdinalValues\n"
         + "  {\n"
         + "    private final int hashCode; \n"
@@ -294,6 +299,11 @@ public class CodeGenerator
             }
 
             getBuilder.append("if (ordinal == ").append(i).append(") return f_").append(i).append(";").append(System.lineSeparator());
+            // Add all get's to getValue method
+            if (getBuilder != getValue)
+            {
+                getValue.append("if (ordinal == ").append(i).append(") return f_").append(i).append(";").append(System.lineSeparator());
+            }
 
             // hash = hash * 37 + ObjectUtils.hash(f_X);
             hashCode.append("hash = hash * 37 + ");
@@ -310,6 +320,7 @@ public class CodeGenerator
         String generatedCode = String.format(ORDINAL_VALUES_FACTORY,
                 expressionCode,
                 argFields,
+                expressions.size(),
                 fields,
                 ctorArgs,
                 ctorFiels,
