@@ -145,7 +145,7 @@ class BatchHashJoin extends AOperator
     {
         final JoinTuple joinTuple = new JoinTuple(context.getStatementContext().getTuple());
         final Data data = context.getStatementContext().getOrCreateNodeData(nodeId, Data::new);
-        final TupleIterator outerIt = outer.open(context);
+        final TupleIterator outerIt = new ATupleIterator(outer.open(context));
         final int batchSize = getBatchSize(context);
         //CSOFF
         return new TupleIterator()
@@ -390,7 +390,7 @@ class BatchHashJoin extends AOperator
                 }
 
                 context.getStatementContext().setOuterOrdinalValues(outerValuesIterator);
-                TupleIterator it = inner.open(context);
+                TupleIterator it = new ATupleIterator(inner.open(context));
 
                 joinTuple.setOuter(null);
                 boolean tuplesFetched = false;

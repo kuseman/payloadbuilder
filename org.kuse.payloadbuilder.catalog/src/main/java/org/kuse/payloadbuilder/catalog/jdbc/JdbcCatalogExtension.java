@@ -172,7 +172,7 @@ class JdbcCatalogExtension implements ICatalogExtension
             ServerConnection connection = (ServerConnection) propertiesComponent.connections.getSelectedItem();
             String url = querySession.getCatalogProperty(catalogAlias, JdbcCatalog.URL);
 
-            boolean isSelectedConnection = equalsIgnoreCase(url, connection.getURL());
+            boolean isSelectedConnection = connection != null && equalsIgnoreCase(url, connection.getURL());
 
             String connectionDescription = isSelectedConnection ? connection.toString() : url;
             String prefilledUsername = isSelectedConnection ? connection.username : querySession.getCatalogProperty(catalogAlias, JdbcCatalog.USERNAME);

@@ -85,7 +85,7 @@ class NestedLoopJoin extends AOperator
         final Data data = context.getStatementContext().getOrCreateNodeData(nodeId, Data::new);
         final Tuple contextParent = context.getStatementContext().getTuple();
         final JoinTuple joinTuple = new JoinTuple(contextParent);
-        final TupleIterator it = outer.open(context);
+        final TupleIterator it = new ATupleIterator(outer.open(context));
         //CSOFF
         return new TupleIterator()
         //CSON
@@ -137,7 +137,7 @@ class NestedLoopJoin extends AOperator
                     if (ii == null)
                     {
                         context.getStatementContext().setTuple(currentOuter);
-                        ii = inner.open(context);
+                        ii = new ATupleIterator(inner.open(context));
                     }
 
                     if (!ii.hasNext())

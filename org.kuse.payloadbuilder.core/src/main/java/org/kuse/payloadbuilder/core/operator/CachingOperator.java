@@ -45,7 +45,7 @@ class CachingOperator extends AOperator
         if (data.cache == null)
         {
             data.cache = new ArrayList<>();
-            TupleIterator it = operator.open(context);
+            TupleIterator it = new ATupleIterator(operator.open(context));
             while (it.hasNext())
             {
                 data.cache.add(it.next());

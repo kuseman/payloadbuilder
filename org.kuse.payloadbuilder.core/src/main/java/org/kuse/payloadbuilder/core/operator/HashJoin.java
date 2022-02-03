@@ -192,7 +192,7 @@ class HashJoin extends AOperator
     {
         IntKey key = new IntKey();
         Map<IntKey, List<TupleHolder>> table = new LinkedHashMap<>();
-        TupleIterator oi = outer.open(context);
+        TupleIterator oi = new ATupleIterator(outer.open(context));
         while (oi.hasNext())
         {
             Tuple tuple = oi.next();
@@ -233,7 +233,7 @@ class HashJoin extends AOperator
             Data data,
             boolean markOuterRows)
     {
-        final TupleIterator ii = inner.open(context);
+        final TupleIterator ii = new ATupleIterator(inner.open(context));
         //CSOFF
         return new TupleIterator()
         //CSON

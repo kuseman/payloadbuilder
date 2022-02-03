@@ -696,8 +696,11 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         {
             // TODO: needs some refactoring when doing nested unions etc.
             SubQueryTableSource subQuery = (SubQueryTableSource) innerTableSource;
-            catalogAlias = subQuery.getSelect().getFrom().getTableSource().getCatalogAlias();
-            table = subQuery.getSelect().getFrom().getTableSource().getTable();
+            if (subQuery.getSelect().getFrom() != null)
+            {
+                catalogAlias = subQuery.getSelect().getFrom().getTableSource().getCatalogAlias();
+                table = subQuery.getSelect().getFrom().getTableSource().getTable();
+            }
         }
 
         if (table != null)
@@ -718,13 +721,18 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         // with 2 nested filter operators
         if (innerTableSource instanceof SubQueryTableSource)
         {
-            // TODO: needs some refactoring when doing nested unions etc.
-            String alias = ((SubQueryTableSource) innerTableSource).getSelect().getFrom().getTableSource().getTableAlias().getAlias();
+            SubQueryTableSource subQuery = (SubQueryTableSource) innerTableSource;
 
-            // Move any previous push downs from sub query alias to inner table alias
-            List<AnalyzePair> pairs = context.pushDownPredicateByAlias.remove(innerAlias);
-            context.appendPushDownPredicate(alias, pairs);
-            context.appendPushDownPredicate(alias, foundation.pushDownPairs);
+            if (subQuery.getSelect().getFrom() != null)
+            {
+                // TODO: needs some refactoring when doing nested unions etc.
+                String alias = subQuery.getSelect().getFrom().getTableSource().getTableAlias().getAlias();
+
+                // Move any previous push downs from sub query alias to inner table alias
+                List<AnalyzePair> pairs = context.pushDownPredicateByAlias.remove(innerAlias);
+                context.appendPushDownPredicate(alias, pairs);
+                context.appendPushDownPredicate(alias, foundation.pushDownPairs);
+            }
         }
         else
         {

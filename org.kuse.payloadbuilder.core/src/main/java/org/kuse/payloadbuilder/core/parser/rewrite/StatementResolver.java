@@ -36,6 +36,7 @@ import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.operator.TableAlias.Type;
+import org.kuse.payloadbuilder.core.parser.AExpressionVisitor;
 import org.kuse.payloadbuilder.core.parser.AJoin;
 import org.kuse.payloadbuilder.core.parser.ASelectNode;
 import org.kuse.payloadbuilder.core.parser.AnalyzeStatement;
@@ -676,6 +677,11 @@ public class StatementResolver implements StatementVisitor<Statement, StatementR
                     .collect(toList());
 
             Set<TableAlias> fromAlias = context.scopeAliases;
+            // A select with no from then use the parent alias as scope
+            if (fromAlias.isEmpty())
+            {
+                fromAlias = singleton(prevParentAlias);
+            }
 
             List<SelectItem> selectItems = new ArrayList<>(select.getSelectItems().size());
             List<Expression> computedExpressions = new ArrayList<>();
@@ -731,14 +737,50 @@ public class StatementResolver implements StatementVisitor<Statement, StatementR
         @Override
         public ASelectNode visit(ExpressionSelectItem item, Context context)
         {
-            if (context.scopeAliases.isEmpty() && item.getExpression() instanceof UnresolvedQualifiedReferenceExpression)
+            Expression resolvedExpression = resolveE(item.getExpression(), context);
+            // Verify qualifiers got resolved
+            //CSOFF
+            resolvedExpression.accept(new AExpressionVisitor<Void, Void>()
+            //CSON
             {
-                UnresolvedQualifiedReferenceExpression expression = (UnresolvedQualifiedReferenceExpression) item.getExpression();
-                throw new ParseException("Unkown reference '" + expression + "'", expression.getToken());
-            }
+                private boolean validateQre = true;
+
+                @Override
+                public Void visit(DereferenceExpression expression, Void context)
+                {
+                    expression.getLeft().accept(this, null);
+
+                    // Cannot validate the right part since
+                    // the left could be unknown and hence right will also
+                    // be unknown
+                    boolean prevValidateQre = validateQre;
+                    validateQre = false;
+                    expression.getRight().accept(this, null);
+                    validateQre = prevValidateQre;
+                    return null;
+                }
+
+                @Override
+                public Void visit(QualifiedReferenceExpression expression, Void context)
+                {
+                    if (!validateQre)
+                    {
+                        return null;
+                    }
+
+                    for (ResolvePath path : expression.getResolvePaths())
+                    {
+                        if (path.getTargetTupleOrdinal() == -1 && expression.getLambdaId() == -1)
+                        {
+                            throw new ParseException("Unkown reference '" + expression + "'", expression.getToken());
+                        }
+                    }
+                    return null;
+                }
+            }, null);
 
             return new ExpressionSelectItem(
-                    resolveE(item.getExpression(), context),
+                    resolvedExpression,
                     item.isEmptyIdentifier(),
                     item.getIdentifier(),
                     item.getAssignmentName(),

@@ -84,6 +84,57 @@
       ]
     },
     {
+      "name": "Apply with subquery without table",
+      "query": [
+        "select * ",
+        "from source s ",
+        "outer apply ( ",
+        "  select 1 col3 ",
+        ") x "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col3", "value": 1 }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col3", "value": 1 }],
+          [{ "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }, { "key": "col3", "value": 1 }]
+        ]
+      ]
+    },
+    {
+      "name": "Apply with subquery with outer reference",
+      "query": [
+        "select * ",
+        "from source s ",
+        "outer apply ( ",
+        "  select s.col1 col3 ",
+        ") x "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col3", "value": 1 }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col3", "value": 3 }],
+          [{ "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }, { "key": "col3", "value": 5 }]
+        ]
+      ]
+    },
+    {
+      "name": "Apply with subquery with outer computed reference",
+      "query": [
+        "select * ",
+        "from source s ",
+        "outer apply ( ",
+        "  select s.col1 + s.col2 col3 ",
+        ") x "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }, { "key": "col3", "value": 3 }],
+          [{ "key": "col1", "value": 3 }, { "key": "col2", "value": 4 }, { "key": "col3", "value": 7 }],
+          [{ "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }, { "key": "col3", "value": 11 }]
+        ]
+      ]
+    },
+    {
       "name": "Asterisk select",
       "query": [
         "select * from source"

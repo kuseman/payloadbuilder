@@ -255,8 +255,11 @@ public class TableAlias
             TableAlias alias = parent.childAliases.get(i);
             if (alias.type == Type.SUBQUERY)
             {
+                TableAlias subQueryAlias = alias.childAliases.get(0);
                 // TODO: when composite sub queries like union etc. comes into play this might need a rewrite
-                count += alias.childAliases.get(0).childAliases.get(0).getTupleCountCountOnLevel();
+                count += subQueryAlias.getChildAliases().size() > 0
+                    ? subQueryAlias.childAliases.get(0).getTupleCountCountOnLevel()
+                    : 1;
             }
             else
             {

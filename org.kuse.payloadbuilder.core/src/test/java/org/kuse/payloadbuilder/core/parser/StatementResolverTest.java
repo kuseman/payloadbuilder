@@ -685,6 +685,8 @@ public class StatementResolverTest extends AParserTest
         assertQueryFail(ParseException.class, "Unkown reference 'col1'", "select col1,"
             + "(select col2, col3 where col5 != col6 for object) obj ");
 
+        assertQueryFail(ParseException.class, "Unkown reference 'col1'", "select col1 + col2");
+
         // Make sure that expression sub query table aliases isn't accessible from outer scope
         assertQueryFail(ParseException.class, "Invalid table source reference 'b'", ""
             + "select col "
