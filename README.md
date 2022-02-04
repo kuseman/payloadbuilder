@@ -69,19 +69,19 @@ Simple query using multiple catalogs:
         session.setCatalogProperty("es", "index", "myindex");
 
         String query = "select top 10 " +
-            "        d.fileName " + 
-            ",       f.size " + 
-            ",       f.lastModifiedTime " + 
-            "from es#_doc d " + 
-            "cross apply fs#file(concat('/path/to/files/', d.fileName)) f " + 
+            "        d.fileName " +
+            ",       f.size " +
+            ",       f.lastModifiedTime " +
+            "from es#_doc d " +
+            "cross apply fs#file(concat('/path/to/files/', d.fileName)) f " +
             "where d._docType = 'pdfFiles'";
 
-        QueryResult queryResult = Payloadbuilder.query(session, query);
-        JsonStringWriter writer = new JsonStringWriter();
+        CompiledQuery compiledQuery = Payloadbuilder.compile(query, session.getCatalogRegistry());
+        QueryResult queryResult = compiledQuery.execute(session);
+        JsonOutputWriter writer = new JsonOutputWriter(new PrintWriter(System.out));
         while (queryResult.hasMoreResults())
         {
-          queryResult.writeResult(writer);
-          System.out.println(writer.getAndReset());
+            queryResult.writeResult(writer);
         }
 ```
 
@@ -92,7 +92,7 @@ Standalone Query Editor written in Swing
 [Editor](https://github.com/kuseman/payloadbuilder/tree/master/org.kuse.payloadbuilder.editor)
 ![Editor](/documentation/editor.png?raw=true "Editor")
 
-## Raodmap
+## Roadmap
 
 Alot :)
 * Documentation

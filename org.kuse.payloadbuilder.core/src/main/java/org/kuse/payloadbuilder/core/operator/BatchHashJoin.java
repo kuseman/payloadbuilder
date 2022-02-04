@@ -36,7 +36,8 @@ import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValue
 import org.kuse.payloadbuilder.core.operator.StatementContext.NodeData;
 import org.kuse.payloadbuilder.core.parser.Option;
 
-import gnu.trove.map.hash.TIntObjectHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 
 /**
  * <pre>
@@ -161,7 +162,7 @@ class BatchHashJoin extends AOperator
             private Iterator<IOrdinalValues> outerValuesIterator;
 
             /** Table use for hashed inner values */
-            private final TIntObjectHashMap<List<Tuple>> table = new TIntObjectHashMap<>(batchSize);
+            private final Int2ObjectMap<List<Tuple>> table = new Int2ObjectOpenHashMap<>(batchSize);
 
             private final Set<IOrdinalValues> addedValues = new HashSet<>(batchSize);
 

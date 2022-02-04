@@ -8,10 +8,10 @@ import org.apache.commons.collections4.IteratorUtils;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.operator.CompositeTupleTest.TestTuple;
 
-import gnu.trove.map.TIntObjectMap;
-import gnu.trove.map.hash.TIntObjectHashMap;
-import gnu.trove.set.TIntSet;
-import gnu.trove.set.hash.TIntHashSet;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 
 /** Test of {@link GroupedRow} */
 public class GroupedRowTest extends AOperatorTest
@@ -21,7 +21,7 @@ public class GroupedRowTest extends AOperatorTest
     {
         try
         {
-            new GroupedRow(asList(), new TIntObjectHashMap<>());
+            new GroupedRow(asList(), new Int2ObjectOpenHashMap<>());
             fail();
         }
         catch (IllegalArgumentException e)
@@ -31,8 +31,8 @@ public class GroupedRowTest extends AOperatorTest
         TestTuple t1 = new TestTuple(1);
         TestTuple t1_1 = new TestTuple(1);
 
-        TIntObjectMap<TIntSet> columnOrdinals = new TIntObjectHashMap<>();
-        columnOrdinals.put(1, new TIntHashSet(asList(0)));
+        Int2ObjectMap<IntSet> columnOrdinals = new Int2ObjectOpenHashMap<>();
+        columnOrdinals.put(1, new IntOpenHashSet(asList(0)));
 
         GroupedRow gr = new GroupedRow(asList(t1, t1_1), columnOrdinals);
 

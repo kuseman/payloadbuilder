@@ -45,8 +45,8 @@ public class ATupleIterator implements TupleIterator
     }
 
     /**
-     * Returns true if provided tuple should be the next tuple or not
-     * Can be used for filtering purposes
+     * Returns true if provided tuple should be the next tuple or not Can be used for filtering purposes
+     *
      * @param tuple Next tuple to be returned or not
      */
     protected boolean setNext(Tuple tuple)

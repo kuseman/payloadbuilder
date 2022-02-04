@@ -16,10 +16,10 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValues;
 
-import gnu.trove.map.TIntObjectMap;
-import gnu.trove.map.hash.TIntObjectHashMap;
-import gnu.trove.set.TIntSet;
-import gnu.trove.set.hash.TIntHashSet;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 
 /** Operator that groups by a bucket function */
 class GroupByOperator extends AOperator
@@ -104,7 +104,7 @@ class GroupByOperator extends AOperator
         return new TupleIterator()
         //CSON
         {
-            TIntObjectMap<TIntSet> groupByOrdinals;
+            Int2ObjectMap<IntSet> groupByOrdinals;
 
             @Override
             public Tuple next()
@@ -113,17 +113,17 @@ class GroupByOperator extends AOperator
                 // Calculate ordinals from the first tuples data
                 if (groupByOrdinals == null)
                 {
-                    groupByOrdinals = new TIntObjectHashMap<>(columnReferences.size());
+                    groupByOrdinals = new Int2ObjectOpenHashMap<>(columnReferences.size());
                     Tuple firstTuple = tuples.get(0);
                     for (Entry<Integer, Set<String>> e : columnReferences.entrySet())
                     {
                         Tuple t = firstTuple.getTuple(e.getKey());
-                        TIntSet set = new TIntHashSet(e.getValue().size());
+                        IntSet set = new IntOpenHashSet(e.getValue().size());
                         e.getValue()
                                 .stream()
                                 .forEach(c -> set.add(t.getColumnOrdinal(c)));
 
-                        groupByOrdinals.put(e.getKey(), set);
+                        groupByOrdinals.put(e.getKey().intValue(), set);
                     }
                 }
                 return new GroupedRow(tuples, groupByOrdinals);

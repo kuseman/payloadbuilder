@@ -91,6 +91,7 @@ public class BuiltinCatalogTest extends AParserTest
         values.put("e", new TupleIterator()
         {
             int index;
+
             @Override
             public boolean hasNext()
             {

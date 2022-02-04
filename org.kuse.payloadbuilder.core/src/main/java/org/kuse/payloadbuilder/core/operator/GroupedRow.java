@@ -10,25 +10,26 @@ import java.util.List;
 
 import org.kuse.payloadbuilder.core.operator.Operator.TupleList;
 
-import gnu.trove.iterator.TIntObjectIterator;
-import gnu.trove.map.TIntObjectMap;
-import gnu.trove.map.hash.TIntObjectHashMap;
-import gnu.trove.set.TIntSet;
-import gnu.trove.set.hash.TIntHashSet;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap.Entry;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
+import it.unimi.dsi.fastutil.ints.IntSets;
 
 /** Grouped row. Result of a {@link GroupByOperator} */
 class GroupedRow implements Tuple
 {
-    private static final TIntSet EMPTY = new TIntHashSet();
+    private static final IntSet EMPTY = IntSets.unmodifiable(new IntOpenHashSet());
 
     private final int tupleOrdinal;
     private final List<Tuple> tuples;
     /** Map of tuple ordinals the it's grouped columns */
-    private final TIntObjectMap<GroupedOrdinalRow> ordinalRows;
+    private final Int2ObjectMap<GroupedOrdinalRow> ordinalRows;
     /** Column ordinals of "this" tuple ordial */
-    private final TIntSet currentOrdinals;
+    private final IntSet currentOrdinals;
 
-    GroupedRow(List<Tuple> tuples, TIntObjectMap<TIntSet> columnOrdinals)
+    GroupedRow(List<Tuple> tuples, Int2ObjectMap<IntSet> columnOrdinals)
     {
         if (isEmpty(tuples))
         {
@@ -38,11 +39,11 @@ class GroupedRow implements Tuple
         // Ordinal of a group by is the same as the rows
         this.tupleOrdinal = tuples.get(0).getTupleOrdinal();
         this.ordinalRows = getOrdinalRows(requireNonNull(columnOrdinals));
-        TIntSet set = columnOrdinals.get(tupleOrdinal);
+        IntSet set = columnOrdinals.get(tupleOrdinal);
         this.currentOrdinals = set == null ? EMPTY : set;
     }
 
-    private GroupedRow(List<Tuple> tuples, int tupleOrdinal, TIntObjectMap<GroupedOrdinalRow> ordinalRows, TIntSet currentOrdinals)
+    private GroupedRow(List<Tuple> tuples, int tupleOrdinal, Int2ObjectMap<GroupedOrdinalRow> ordinalRows, IntSet currentOrdinals)
     {
         this.tuples = tuples;
         this.tupleOrdinal = tupleOrdinal;
@@ -50,14 +51,14 @@ class GroupedRow implements Tuple
         this.currentOrdinals = currentOrdinals;
     }
 
-    private TIntObjectMap<GroupedOrdinalRow> getOrdinalRows(TIntObjectMap<TIntSet> columnOrdinals)
+    private Int2ObjectMap<GroupedOrdinalRow> getOrdinalRows(Int2ObjectMap<IntSet> columnOrdinals)
     {
-        TIntObjectMap<GroupedOrdinalRow> result = new TIntObjectHashMap<>(columnOrdinals.size());
-        TIntObjectIterator<TIntSet> it = columnOrdinals.iterator();
+        Int2ObjectMap<GroupedOrdinalRow> result = new Int2ObjectOpenHashMap<>(columnOrdinals.size());
+        Iterator<Entry<IntSet>> it = columnOrdinals.int2ObjectEntrySet().iterator();
         while (it.hasNext())
         {
-            it.advance();
-            result.put(it.key(), new GroupedOrdinalRow(it.key(), it.value()));
+            Entry<IntSet> entry = it.next();
+            result.put(entry.getIntKey(), new GroupedOrdinalRow(entry.getIntKey(), entry.getValue()));
         }
         return result;
     }
@@ -156,9 +157,9 @@ class GroupedRow implements Tuple
     private class GroupedOrdinalRow extends AbstractList<Tuple> implements Tuple, TupleList
     {
         private final int rowTupleOrdinal;
-        private final TIntSet columnOrdinals;
+        private final IntSet columnOrdinals;
 
-        private GroupedOrdinalRow(int tupleOrdinal, TIntSet columnOrdinals)
+        private GroupedOrdinalRow(int tupleOrdinal, IntSet columnOrdinals)
         {
             this.rowTupleOrdinal = tupleOrdinal;
             this.columnOrdinals = columnOrdinals;
