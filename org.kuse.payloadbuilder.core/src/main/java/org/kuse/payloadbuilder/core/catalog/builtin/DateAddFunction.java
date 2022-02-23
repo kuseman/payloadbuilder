@@ -15,7 +15,7 @@ import org.kuse.payloadbuilder.core.catalog.builtin.DatePartFunction.Part;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.LiteralStringExpression;
-import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
+import org.kuse.payloadbuilder.core.parser.UnresolvedQualifiedReferenceExpression;
 
 /** DateAdd */
 class DateAddFunction extends ScalarFunctionInfo
@@ -58,9 +58,9 @@ class DateAddFunction extends ScalarFunctionInfo
     @Override
     public List<Expression> foldArguments(List<Expression> arguments)
     {
-        if (arguments.get(0) instanceof QualifiedReferenceExpression)
+        if (arguments.get(0) instanceof UnresolvedQualifiedReferenceExpression)
         {
-            QualifiedReferenceExpression qre = (QualifiedReferenceExpression) arguments.get(0);
+            UnresolvedQualifiedReferenceExpression qre = (UnresolvedQualifiedReferenceExpression) arguments.get(0);
             if (qre.getLambdaId() >= 0)
             {
                 return arguments;
