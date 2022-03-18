@@ -247,7 +247,7 @@ public class QueryParser
             if (ctx.tableName() != null)
             {
                 String catalog = lowerCase(ctx.tableName().catalog != null ? ctx.tableName().catalog.getText() : null);
-                return new DescribeTableStatement(catalog, getQualifiedName(ctx.tableName().qname()));
+                return new DescribeTableStatement(catalog, getQualifiedName(ctx.tableName().qname()), ctx.start);
             }
 
             return new DescribeSelectStatement((SelectStatement) visit(ctx.selectStatement()));

@@ -241,8 +241,9 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         if (tsj != null)
         {
+            String alias = tsj.getTableSource().getTableAlias().getAlias();
             tsj.getTableSource().accept(this, context);
-            List<AnalyzePair> pairs = context.pushDownPredicateByAlias.remove(tsj.getTableSource().getTableAlias().getAlias());
+            List<AnalyzePair> pairs = context.pushDownPredicateByAlias.remove(alias);
             if (pairs != null)
             {
                 Expression predicate = new AnalyzeResult(pairs).getPredicate();
@@ -1069,10 +1070,17 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     /** Class containing information needed to build a index operator */
     private static class IndexOperatorFoundation
     {
+        /** The outer expressions found that matched an index */
         List<Expression> outerValueExpressions;
+        /** The inner expressions found that matched an index */
         List<Expression> innerValueExpressions;
+        /** The resulting predicate found that matched an index. Ie. parts that cannot
+         * be pushed down. This is either a join condition of a where clause */
         AnalyzeResult condition;
+        /** The resulting pairs that can be pushed down to operators. Ie. parts that's not
+         * part of the index that matched */
         List<AnalyzePair> pushDownPairs;
+        /** Resulting index that matched the predicate */
         Index index;
 
         boolean isEqui()

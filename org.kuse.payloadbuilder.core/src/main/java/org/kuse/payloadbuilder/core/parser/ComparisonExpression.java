@@ -105,7 +105,7 @@ public class ComparisonExpression extends Expression
                     code.getNullVar(), leftCode.getNullVar(),
                     leftCode.getNullVar(),
                     rightCode.getCode(),
-                    rightCode.getNullVar(), code.getResVar(), leftCode.getResVar(), type.value, rightCode.getResVar(),
+                    rightCode.getNullVar(), code.getResVar(), leftCode.getResVar(), type.javaOperatorSymbol, rightCode.getResVar(),
                     code.getNullVar(), rightCode.getNullVar()));
         }
         else if (leftType == DataType.BOOLEAN && rightType == DataType.BOOLEAN)
@@ -113,7 +113,7 @@ public class ComparisonExpression extends Expression
             String compareString = null;
             if (type == Type.EQUAL || type == Type.NOT_EQUAL)
             {
-                compareString = String.format("%s %s %s", leftCode.getResVar(), type.value, rightCode.getResVar());
+                compareString = String.format("%s %s %s", leftCode.getResVar(), type.javaOperatorSymbol, rightCode.getResVar());
             }
             else if (type == Type.GREATER_THAN)
             {
@@ -236,7 +236,7 @@ public class ComparisonExpression extends Expression
     @Override
     public String toString()
     {
-        return left.toString() + " " + type.value + " " + right.toString();
+        return left.toString() + " " + type.toString() + " " + right.toString();
     }
 
     @Override
@@ -255,10 +255,10 @@ public class ComparisonExpression extends Expression
     {
         if (obj instanceof ComparisonExpression)
         {
-            ComparisonExpression e = (ComparisonExpression) obj;
-            return type.equals(e.type)
-                && left.equals(e.left)
-                && right.equals(e.right);
+            ComparisonExpression that = (ComparisonExpression) obj;
+            return type.equals(that.type)
+                && left.equals(that.left)
+                && right.equals(that.right);
         }
         return false;
     }
@@ -279,16 +279,33 @@ public class ComparisonExpression extends Expression
         GREATER_THAN(">"),
         GREATER_THAN_EQUAL(">=");
 
-        private final String value;
+        private final String javaOperatorSymbol;
 
         Type(String value)
         {
-            this.value = value;
+            this.javaOperatorSymbol = value;
         }
 
-        public String getValue()
+        @Override
+        public String toString()
         {
-            return value;
+            switch (this)
+            {
+                case EQUAL:
+                    return "=";
+                case GREATER_THAN:
+                    return ">";
+                case GREATER_THAN_EQUAL:
+                    return ">=";
+                case LESS_THAN:
+                    return "<";
+                case LESS_THAN_EQUAL:
+                    return "<=";
+                case NOT_EQUAL:
+                    return "!=";
+                default:
+                    throw new IllegalArgumentException("Unknown type " + this);
+            }
         }
     }
 }

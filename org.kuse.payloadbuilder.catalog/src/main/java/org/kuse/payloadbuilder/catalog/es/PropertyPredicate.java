@@ -45,7 +45,7 @@ class PropertyPredicate
         if (pair.getType() == Type.COMPARISION)
         {
             Pair<Expression, Expression> ePair = pair.getExpressionPair(alias);
-            return property + " " + pair.getComparisonType().getValue() + " " + ePair.getRight().toString();
+            return property + " " + pair.getComparisonType().toString() + " " + ePair.getRight().toString();
         }
         else if (pair.getType() == Type.IN)
         {

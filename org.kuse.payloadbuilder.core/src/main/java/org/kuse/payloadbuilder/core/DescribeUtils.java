@@ -4,16 +4,24 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
+import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
-import org.apache.commons.lang3.NotImplementedException;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.tuple.Pair;
+import org.kuse.payloadbuilder.core.catalog.Catalog;
+import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
+import org.kuse.payloadbuilder.core.catalog.Index;
+import org.kuse.payloadbuilder.core.catalog.TableMeta;
+import org.kuse.payloadbuilder.core.catalog.TableMeta.Column;
+import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.DescribableNode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.Operator;
@@ -24,6 +32,7 @@ import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.DescribeTableStatement;
+import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Utility class for building a describe result set */
@@ -45,23 +54,61 @@ public class DescribeUtils
     public static final String OUTER_HASH_TIME = "Outer hash time";
     public static final String INNER_HASH_TIME = "Inner hash time";
 
+    private static final TableAlias DESCRIBE_TABLE_ALIAS = TableAliasBuilder
+            .of(-1, TableAlias.Type.TABLE, QualifiedName.of("table"), "t")
+            .tableMeta(new TableMeta(asList(
+                    new TableMeta.Column("Type", DataType.ANY),
+                    new TableMeta.Column("Name", DataType.ANY))))
+            .build();
+
     private DescribeUtils()
     {
     }
 
     /**
      * Builds a describe table select
-     *
-     * <pre>
-     * TODO: this needs to be changed and delegated to catalog.
-     * For example Elastic there are alot of different documents
-     * in the same type
-     * </pre>
      **/
-    @SuppressWarnings("unused")
     static Pair<Operator, Projection> getDescribeTable(ExecutionContext context, DescribeTableStatement statement)
     {
-        throw new NotImplementedException("Not implemented");
+        QuerySession session = context.getSession();
+        CatalogRegistry registry = session.getCatalogRegistry();
+
+        String alias = defaultIfBlank(statement.getCatalog(), registry.getDefaultCatalogAlias());
+        if (isBlank(alias))
+        {
+            throw new ParseException("No catalog alias provided.", statement.getToken());
+        }
+        Catalog catalog = registry.getCatalog(alias);
+        if (catalog == null)
+        {
+            throw new ParseException("No catalog found with alias: " + alias, statement.getToken());
+        }
+
+        List<Catalog.Column> columns = catalog.getColumns(session, statement.getCatalog(), statement.getTableName());
+        List<Index> indices = catalog.getIndices(session, statement.getCatalog(), statement.getTableName());
+
+        Stream<Pair<String, String>> columnsStream = columns.stream().map(c -> Pair.of("Column", c.getName()));
+        Stream<Pair<String, String>> indicesStream = indices.stream().map(i -> Pair.of("Index", i.getColumns().toString()));
+        Stream<Pair<String, String>> rows = Stream.concat(columnsStream, indicesStream);
+        Operator describeOperator = new Operator()
+        {
+            int pos;
+
+            @Override
+            public TupleIterator open(ExecutionContext context)
+            {
+                return TupleIterator.wrap(rows.map(r -> (Tuple) Row.of(DESCRIBE_TABLE_ALIAS, pos++, new Object[] {r.getKey(), r.getValue()})).iterator());
+            }
+
+            @Override
+            public int getNodeId()
+            {
+                return 0;
+            }
+        };
+
+        List<String> colList = DESCRIBE_TABLE_ALIAS.getTableMeta().getColumns().stream().map(Column::getName).collect(toList());
+        return Pair.of(describeOperator, getIndexProjection(colList));
     }
 
     /** Build describe select from provided select */

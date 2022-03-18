@@ -54,6 +54,23 @@ public abstract class Catalog
     }
 
     /**
+     * Return columns for provided table <br />
+     * Used when describing a table
+     *
+     * @param session Current query session
+     * @param catalogAlias Alias used for this catalog in the query
+     * @param table Table to retrieve columns for
+     * @return A list of columns
+     */
+    public List<Column> getColumns(
+            QuerySession session,
+            String catalogAlias,
+            QualifiedName table)
+    {
+        return emptyList();
+    }
+
+    /**
      * Return registered functions in this Catalog
      **/
     public Collection<FunctionInfo> getFunctions()
@@ -218,6 +235,22 @@ public abstract class Catalog
         public List<Option> getTableOptions()
         {
             return tableOptions;
+        }
+    }
+
+    /** Column */
+    public static class Column
+    {
+        private final String name;
+
+        public Column(String name)
+        {
+            this.name = name;
+        }
+
+        public String getName()
+        {
+            return name;
         }
     }
 }
