@@ -6,27 +6,27 @@ import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Stream;
 
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.tuple.Pair;
-import org.kuse.payloadbuilder.core.cache.CacheProvider;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
+import org.kuse.payloadbuilder.core.catalog.Catalog.OperatorData;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.FunctionInfo;
-import org.kuse.payloadbuilder.core.catalog.TableMeta;
-import org.kuse.payloadbuilder.core.catalog.TableMeta.Column;
-import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
+import org.kuse.payloadbuilder.core.operator.AsteriskProjection;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.Projection;
+import org.kuse.payloadbuilder.core.operator.RootProjection;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
+import org.kuse.payloadbuilder.core.operator.TableMeta;
+import org.kuse.payloadbuilder.core.operator.TableMeta.Column;
+import org.kuse.payloadbuilder.core.operator.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -35,35 +35,12 @@ import org.kuse.payloadbuilder.core.parser.ShowStatement;
 /** Utils for Show statements */
 class ShowUtils
 {
-    private static final TableAlias SHOW_VARIABLES_ALIAS = TableAliasBuilder
-            .of(-1, TableAlias.Type.TABLE, QualifiedName.of("variables"), "v")
-            .tableMeta(new TableMeta(asList(
-                    new TableMeta.Column("Name", DataType.ANY),
-                    new TableMeta.Column("Value", DataType.ANY))))
-            .build();
-    private static final TableAlias SHOW_TABLES_ALIAS = TableAliasBuilder
-            .of(-1, TableAlias.Type.TABLE, QualifiedName.of("tables"), "t")
-            .tableMeta(new TableMeta(asList(
-                    new TableMeta.Column("Name", DataType.ANY))))
-            .build();
     private static final TableAlias SHOW_FUNCTIONS_ALIAS = TableAliasBuilder
             .of(-1, TableAlias.Type.TABLE, QualifiedName.of("functions"), "f")
             .tableMeta(new TableMeta(asList(
                     new TableMeta.Column("Name", DataType.ANY),
                     new TableMeta.Column("Type", DataType.ANY),
                     new TableMeta.Column("Description", DataType.ANY))))
-            .build();
-    private static final TableAlias SHOW_CACHES_ALIAS = TableAliasBuilder
-            .of(-1, TableAlias.Type.TABLE, QualifiedName.of("caches"), "f")
-            .tableMeta(new TableMeta(asList(
-                    new TableMeta.Column("Name", DataType.ANY),
-                    new TableMeta.Column("Size", DataType.ANY),
-                    new TableMeta.Column("Hits", DataType.ANY),
-                    new TableMeta.Column("Hit ratio", DataType.ANY),
-                    new TableMeta.Column("Misses", DataType.ANY),
-                    new TableMeta.Column("Miss ratio", DataType.ANY),
-                    new TableMeta.Column("Type", DataType.ANY),
-                    new TableMeta.Column("Provider", DataType.ANY))))
             .build();
 
     private ShowUtils()
@@ -76,6 +53,7 @@ class ShowUtils
     //CSON
     {
         Operator operator = null;
+        Projection projection = null;
         MutableInt pos = new MutableInt();
         List<TableMeta.Column> columns = null;
         QuerySession session = context.getSession();
@@ -83,26 +61,21 @@ class ShowUtils
 
         if (statement.getType() == ShowStatement.Type.VARIABLES)
         {
-            Map<String, Object> variables = context.getVariables();
-            columns = SHOW_VARIABLES_ALIAS.getTableMeta().getColumns();
-            operator = new Operator()
-            {
-                @Override
-                public TupleIterator open(ExecutionContext context)
-                {
-                    return TupleIterator.wrap(variables
-                            .entrySet()
-                            .stream()
-                            .map(e -> (Tuple) Row.of(SHOW_VARIABLES_ALIAS, pos.incrementAndGet(), new Object[] {e.getKey(), e.getValue()}))
-                            .iterator());
-                }
+            TableAlias tableAlias = TableAliasBuilder
+                    .of(0, TableAlias.Type.TABLE, QualifiedName.of("variables"), "t")
+                    .build();
 
-                @Override
-                public int getNodeId()
-                {
-                    return 0;
-                }
-            };
+            OperatorData opData = new OperatorData(
+                    session,
+                    0,
+                    "",
+                    tableAlias,
+                    emptyList(),
+                    emptyList(),
+                    emptyList());
+
+            operator = session.getCatalogRegistry().getSystemCatalog().getSystemOperator(opData);
+            projection = new RootProjection(asList(""), asList(new AsteriskProjection(new int[] {0})));
         }
         else if (statement.getType() == ShowStatement.Type.TABLES)
         {
@@ -117,27 +90,21 @@ class ShowUtils
                 throw new ParseException("No catalog found with alias: " + alias, statement.getToken());
             }
 
-            List<String> tables = new ArrayList<>();
-            tables.addAll(session.getTemporaryTableNames().stream().map(t -> "#" + t.toString()).collect(toList()));
-            tables.addAll(catalog.getTables(session, alias));
-            columns = SHOW_TABLES_ALIAS.getTableMeta().getColumns();
-            operator = new Operator()
-            {
-                @Override
-                public TupleIterator open(ExecutionContext context)
-                {
-                    return TupleIterator.wrap(tables
-                            .stream()
-                            .map(table -> (Tuple) Row.of(SHOW_TABLES_ALIAS, pos.incrementAndGet(), new Object[] {table}))
-                            .iterator());
-                }
+            TableAlias tableAlias = TableAliasBuilder
+                    .of(0, TableAlias.Type.TABLE, QualifiedName.of("tables"), "t")
+                    .build();
 
-                @Override
-                public int getNodeId()
-                {
-                    return 0;
-                }
-            };
+            OperatorData opData = new OperatorData(
+                    session,
+                    0,
+                    alias,
+                    tableAlias,
+                    emptyList(),
+                    emptyList(),
+                    emptyList());
+
+            operator = catalog.getSystemOperator(opData);
+            projection = new RootProjection(asList(""), asList(new AsteriskProjection(new int[] {0})));
         }
         else if (statement.getType() == ShowStatement.Type.FUNCTIONS)
         {
@@ -148,7 +115,7 @@ class ShowUtils
                 throw new ParseException("No catalog found with alias: " + statement.getCatalog(), statement.getToken());
             }
 
-            Catalog builtIn = session.getCatalogRegistry().getBuiltin();
+            Catalog system = session.getCatalogRegistry().getSystemCatalog();
             Collection<FunctionInfo> functions = catalog != null ? catalog.getFunctions() : emptyList();
             columns = SHOW_FUNCTIONS_ALIAS.getTableMeta().getColumns();
             //CSOFF
@@ -167,7 +134,7 @@ class ShowUtils
                                     functions.size() > 0
                                         ? Stream.of(Row.of(SHOW_FUNCTIONS_ALIAS, pos.incrementAndGet(), new Object[] {"-- Built in --", "", ""}))
                                         : Stream.empty(),
-                                    builtIn.getFunctions()
+                                    system.getFunctions()
                                             .stream()
                                             .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName()))
                                             .map(function -> Row.of(SHOW_FUNCTIONS_ALIAS, pos.incrementAndGet(), new Object[] {function.getName(), function.getType(), function.getDescription()}))))
@@ -183,48 +150,29 @@ class ShowUtils
         }
         else if (statement.getType() == ShowStatement.Type.CACHES)
         {
-            columns = SHOW_CACHES_ALIAS.getTableMeta().getColumns();
-            final List<CacheProvider> providers = asList(
-                    session.getBatchCacheProvider(),
-                    session.getTempTableCacheProvider(),
-                    session.getCustomCacheProvider());
+            TableAlias tableAlias = TableAliasBuilder
+                    .of(0, TableAlias.Type.TABLE, QualifiedName.of("caches"), "t")
+                    .build();
 
-            //CSOFF
-            operator = new Operator()
-            //CSON
-            {
-                @Override
-                public TupleIterator open(ExecutionContext context)
-                {
-                    return TupleIterator.wrap(
-                            providers
-                                    .stream()
-                                    .flatMap(p -> p.getCaches().stream().map(c -> Pair.of(p, c)))
-                                    .map(p -> (Tuple) Row.of(
-                                            SHOW_CACHES_ALIAS,
-                                            pos.incrementAndGet(),
-                                            new Object[] {
-                                                    p.getValue().getName().toString(),
-                                                    p.getValue().getSize(),
-                                                    p.getValue().getCacheHits(),
-                                                    (float) p.getValue().getCacheHits() / (p.getValue().getCacheHits() + p.getValue().getCacheMisses()),
-                                                    p.getValue().getCacheMisses(),
-                                                    (float) p.getValue().getCacheMisses() / (p.getValue().getCacheHits() + p.getValue().getCacheMisses()),
-                                                    p.getKey().getType().toString(),
-                                                    p.getKey().getName()
-                                            }))
-                                    .iterator());
-                }
+            OperatorData opData = new OperatorData(
+                    session,
+                    0,
+                    "",
+                    tableAlias,
+                    emptyList(),
+                    emptyList(),
+                    emptyList());
 
-                @Override
-                public int getNodeId()
-                {
-                    return 0;
-                }
-            };
+            operator = session.getCatalogRegistry().getSystemCatalog().getSystemOperator(opData);
+            projection = new RootProjection(asList(""), asList(new AsteriskProjection(new int[] {0})));
         }
 
-        List<String> colList = columns.stream().map(Column::getName).collect(toList());
-        return Pair.of(operator, DescribeUtils.getIndexProjection(colList));
+        if (projection == null)
+        {
+            List<String> colList = columns.stream().map(Column::getName).collect(toList());
+            projection = DescribeUtils.getIndexProjection(colList);
+        }
+
+        return Pair.of(operator, projection);
     }
 }

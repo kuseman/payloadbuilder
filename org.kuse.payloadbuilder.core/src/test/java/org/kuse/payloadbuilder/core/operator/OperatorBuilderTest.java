@@ -395,7 +395,7 @@ public class OperatorBuilderTest extends AOperatorTest
             + "  on r2.Value = r.Value";
         QueryResult queryResult = getQueryResult(query);
 
-        TableFunctionInfo range = (TableFunctionInfo) session.getCatalogRegistry().getBuiltin().getFunction("range");
+        TableFunctionInfo range = (TableFunctionInfo) session.getCatalogRegistry().getSystemCatalog().getFunction("range");
 
         TableAlias root = TableAliasBuilder.of(-1, Type.TABLE, QualifiedName.of("ROOT"), "ROOT")
                 .children(asList(
@@ -650,7 +650,7 @@ public class OperatorBuilderTest extends AOperatorTest
 
         QueryResult result = getQueryResult(query);
 
-        TableFunctionInfo rangeFunction = (TableFunctionInfo) session.getCatalogRegistry().getBuiltin().getFunction("range");
+        TableFunctionInfo rangeFunction = (TableFunctionInfo) session.getCatalogRegistry().getSystemCatalog().getFunction("range");
 
         TableAlias root = TableAliasBuilder
                 .of(-1, TableAlias.Type.ROOT, QualifiedName.of("ROOT"), "ROOT")
@@ -827,9 +827,9 @@ public class OperatorBuilderTest extends AOperatorTest
                 true,
                 false);
 
-        //                        System.out.println(expected.toString(1));
-        //                        System.out.println();
-        //                        System.err.println(result.operator.toString(1));
+//                                System.out.println(expected.toString(1));
+//                                System.out.println();
+//                                System.err.println(result.operator.toString(1));
 
         assertEquals(expected, result.operator);
 

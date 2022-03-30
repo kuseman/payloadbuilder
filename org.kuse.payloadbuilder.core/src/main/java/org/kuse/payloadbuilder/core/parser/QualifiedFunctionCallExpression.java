@@ -7,26 +7,34 @@ import java.util.List;
 
 import org.antlr.v4.runtime.Token;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
-import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+import org.kuse.payloadbuilder.core.operator.TableMeta.DataType;
 
 /** Scalar function call */
 public class QualifiedFunctionCallExpression extends Expression
 {
-    private final List<Expression> arguments;
+    private final String catalogAlias;
     private final ScalarFunctionInfo functionInfo;
+    private final List<Expression> arguments;
     private final Token token;
 
     public QualifiedFunctionCallExpression(
+            String catalogAlias,
             ScalarFunctionInfo functionInfo,
             List<Expression> arguments,
             Token token)
     {
-        this.token = token;
+        this.catalogAlias = catalogAlias;
         this.functionInfo = requireNonNull(functionInfo, "functionInfo");
+        this.token = token;
         this.arguments = requireNonNull(arguments, "arguments");
+    }
+
+    public String getCatalogAlias()
+    {
+        return catalogAlias;
     }
 
     public ScalarFunctionInfo getFunctionInfo()

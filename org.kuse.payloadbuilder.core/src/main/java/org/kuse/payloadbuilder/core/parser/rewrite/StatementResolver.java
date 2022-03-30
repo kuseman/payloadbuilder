@@ -25,17 +25,18 @@ import java.util.function.Function;
 
 import org.antlr.v4.runtime.Token;
 import org.apache.commons.lang3.tuple.Pair;
+import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.FunctionInfo;
 import org.kuse.payloadbuilder.core.catalog.LambdaFunction;
 import org.kuse.payloadbuilder.core.catalog.LambdaFunction.LambdaBinding;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
-import org.kuse.payloadbuilder.core.catalog.TableMeta;
-import org.kuse.payloadbuilder.core.catalog.TableMeta.Column;
-import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.operator.TableAlias.Type;
+import org.kuse.payloadbuilder.core.operator.TableMeta;
+import org.kuse.payloadbuilder.core.operator.TableMeta.Column;
+import org.kuse.payloadbuilder.core.operator.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.parser.AExpressionVisitor;
 import org.kuse.payloadbuilder.core.parser.AJoin;
 import org.kuse.payloadbuilder.core.parser.ASelectNode;
@@ -69,6 +70,7 @@ import org.kuse.payloadbuilder.core.parser.LiteralNullExpression;
 import org.kuse.payloadbuilder.core.parser.LiteralStringExpression;
 import org.kuse.payloadbuilder.core.parser.LogicalBinaryExpression;
 import org.kuse.payloadbuilder.core.parser.LogicalNotExpression;
+import org.kuse.payloadbuilder.core.parser.NamedExpression;
 import org.kuse.payloadbuilder.core.parser.NestedExpression;
 import org.kuse.payloadbuilder.core.parser.NullPredicateExpression;
 import org.kuse.payloadbuilder.core.parser.Option;
@@ -95,8 +97,10 @@ import org.kuse.payloadbuilder.core.parser.TableFunction;
 import org.kuse.payloadbuilder.core.parser.TableSource;
 import org.kuse.payloadbuilder.core.parser.TableSourceJoined;
 import org.kuse.payloadbuilder.core.parser.UnresolvedDereferenceExpression;
+import org.kuse.payloadbuilder.core.parser.UnresolvedQualifiedFunctionCallExpression;
 import org.kuse.payloadbuilder.core.parser.UnresolvedQualifiedReferenceExpression;
 import org.kuse.payloadbuilder.core.parser.UnresolvedSubQueryExpression;
+import org.kuse.payloadbuilder.core.parser.UnresolvedTableFunction;
 import org.kuse.payloadbuilder.core.parser.UseStatement;
 import org.kuse.payloadbuilder.core.parser.VariableExpression;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
@@ -132,9 +136,9 @@ public class StatementResolver implements StatementVisitor<Statement, StatementR
     }
 
     /** Resolve an unresolved statement */
-    public static QueryStatement resolve(QueryStatement statement)
+    public static QueryStatement resolve(QueryStatement statement, CatalogRegistry registry)
     {
-        Context context = new Context();
+        Context context = new Context(registry);
         List<Statement> result = new ArrayList<>(statement.getStatements().size());
         for (Statement stm : statement.getStatements())
         {
@@ -145,16 +149,16 @@ public class StatementResolver implements StatementVisitor<Statement, StatementR
     }
 
     /** Resolve expression. Used for testing purpose only */
-    public static Expression resolve(Expression expression)
+    public static Expression resolve(Expression expression, CatalogRegistry registry)
     {
-        Context context = new Context();
+        Context context = new Context(registry);
         return expression.accept(EXPRESSION_RESOLVER, context).getValue();
     }
 
     /** Resolve expression. Used for testing purpose only */
-    public static Expression resolve(Expression expression, Function<UnresolvedQualifiedReferenceExpression, QualifiedReferenceExpression> qualifierConsumer)
+    public static Expression resolve(Expression expression, CatalogRegistry registry, Function<UnresolvedQualifiedReferenceExpression, QualifiedReferenceExpression> qualifierConsumer)
     {
-        Context context = new Context();
+        Context context = new Context(registry);
         context.qualifierConsumer = qualifierConsumer;
         return expression.accept(EXPRESSION_RESOLVER, context).getValue();
     }
@@ -162,23 +166,26 @@ public class StatementResolver implements StatementVisitor<Statement, StatementR
     /** Resolve expression using provided table alias as scope. Used for testing purpose only */
     public static Expression resolve(Expression expression, TableAlias alias)
     {
-        Context context = new Context();
+        Context context = new Context(null);
         context.scopeAliases = singleton(alias);
         return expression.accept(EXPRESSION_RESOLVER, context).getValue();
     }
 
     /** Resolve select. Used for testing purpose only */
-    public static Select resolve(Select select)
+    public static Select resolve(Select select, CatalogRegistry registry)
     {
-        Context context = new Context();
+        Context context = new Context(registry);
         return (Select) select.accept(SELECT_RESOLVER, context);
     }
 
     /** Context used during resolving */
     static class Context
     {
-        Context()
+        private final CatalogRegistry registry;
+
+        Context(CatalogRegistry registry)
         {
+            this.registry = registry;
             newStatement();
         }
 
@@ -483,6 +490,34 @@ public class StatementResolver implements StatementVisitor<Statement, StatementR
         }
 
         @Override
+        public Pair<Set<TableAlias>, Expression> visit(UnresolvedQualifiedFunctionCallExpression expression, Context context)
+        {
+            Pair<String, FunctionInfo> functionInfo = context.registry.resolveFunctionInfo(expression.getCatalogAlias(), expression.getName());
+            if (functionInfo == null)
+            {
+                throw new ParseException(
+                        "No function named: " + expression.getName() + " found.",
+                        expression.getToken());
+            }
+
+            if (!(functionInfo.getValue() instanceof ScalarFunctionInfo))
+            {
+                throw new ParseException("Expected a SCALAR function for " + functionInfo.getValue().toString(), expression.getToken());
+            }
+
+            List<Expression> arguments = expression.getArguments();
+            validateFunction(functionInfo.getValue(), arguments, expression.getToken());
+            arguments = functionInfo.getValue().foldArguments(arguments);
+
+            QualifiedFunctionCallExpression resolvedFunctionCallExpression = new QualifiedFunctionCallExpression(
+                    expression.getCatalogAlias(),
+                    (ScalarFunctionInfo) functionInfo.getValue(),
+                    arguments,
+                    expression.getToken());
+            return visit(resolvedFunctionCallExpression, context);
+        }
+
+        @Override
         public Pair<Set<TableAlias>, Expression> visit(NestedExpression expression, Context context)
         {
             Pair<Set<TableAlias>, Expression> pair = expression.getExpression().accept(this, context);
@@ -502,6 +537,7 @@ public class StatementResolver implements StatementVisitor<Statement, StatementR
         {
             Pair<List<Expression>, Set<TableAlias>> result = resolveFunction(context, null, expression.getFunctionInfo(), expression.getArguments());
             return Pair.of(result.getValue(), new QualifiedFunctionCallExpression(
+                    expression.getCatalogAlias(),
                     expression.getFunctionInfo(),
                     result.getKey(),
                     expression.getToken()));
@@ -821,12 +857,12 @@ public class StatementResolver implements StatementVisitor<Statement, StatementR
         @Override
         public ASelectNode visit(Table table, Context context)
         {
-            String tableName = defaultString(table.getCatalogAlias(), "") + "#" + table.getTable();
+            String tableName = defaultString(table.getCatalogAlias(), "") + "#" + table.getTable().toDotDelimited();
             TableMeta tableMeta = context.tableMetaByName.get(tableName);
 
             if (table.getTableAlias().getType() == Type.TEMPORARY_TABLE && tableMeta == null)
             {
-                throw new ParseException("No temporary table found named '#" + table.getTable() + "'", table.getToken());
+                throw new ParseException("No temporary table found named '#" + table.getTable().toDotDelimited() + "'", table.getToken());
             }
 
             // Recreate alias with proper meta and hierarchy
@@ -842,11 +878,47 @@ public class StatementResolver implements StatementVisitor<Statement, StatementR
 
             context.tableAliasByOrdinal.put(tableAlias.getTupleOrdinal(), tableAlias);
 
+            List<Option> resolvedOptions = table.getOptions()
+                    .stream()
+                    .map(o -> new Option(o.getOption(), resolveE(o.getValueExpression(), context)))
+                    .collect(toList());
+
             return new Table(
                     table.getCatalogAlias(),
                     tableAlias,
-                    table.getOptions(),
+                    resolvedOptions,
                     table.getToken());
+        }
+
+        @Override
+        public ASelectNode visit(UnresolvedTableFunction tableFunction, Context context)
+        {
+            Pair<String, FunctionInfo> functionInfo = context.registry.resolveFunctionInfo(tableFunction.getCatalogAlias(), tableFunction.getName());
+            if (functionInfo == null)
+            {
+                throw new ParseException(
+                        "No function named: " + tableFunction.getName() + " found.",
+                        tableFunction.getToken());
+            }
+
+            if (!(functionInfo.getValue() instanceof TableFunctionInfo))
+            {
+                throw new ParseException("Expected a TABLE function for " + functionInfo.getValue().toString(), tableFunction.getToken());
+            }
+
+            List<Expression> arguments = tableFunction.getArguments();
+            validateFunction(functionInfo.getValue(), arguments, tableFunction.getToken());
+            arguments = functionInfo.getValue().foldArguments(arguments);
+
+            TableFunction resolvedTableFunction = new TableFunction(
+                    tableFunction.getCatalogAlias(),
+                    tableFunction.getTableAlias(),
+                    (TableFunctionInfo) functionInfo.getValue(),
+                    arguments,
+                    tableFunction.getOptions(),
+                    tableFunction.getToken());
+
+            return visit(resolvedTableFunction, context);
         }
 
         @Override
@@ -958,7 +1030,7 @@ public class StatementResolver implements StatementVisitor<Statement, StatementR
                     subQuery.getToken());
         }
 
-        @SuppressWarnings({"unchecked", "rawtypes"})
+        @SuppressWarnings({"unchecked"})
         private <T extends ASelectNode> T rewriteAfter(T source, Context context)
         {
             T result = source;
@@ -1083,16 +1155,48 @@ public class StatementResolver implements StatementVisitor<Statement, StatementR
                 : new ResolveTableMeta(columns, hasAsterisk);
             if (select.getInto() != null)
             {
-                String tableName = "#" + select.getInto().getTable();
+                String tableName = "#" + select.getInto().getTable().toDotDelimited();
                 if (context.tableMetaByName.put(tableName, meta) != null)
                 {
-                    throw new ParseException("Temporary table '#" + select.getInto().getTable() + "' already exists", select.getInto().getToken());
+                    throw new ParseException("Temporary table '#" + select.getInto().getTable().toDotDelimited() + "' already exists", select.getInto().getToken());
                 }
             }
             // Sub query columns
             else
             {
                 context.tableMetaByOrdinal.put(prevParentAlias.getParent().getTupleOrdinal(), meta);
+            }
+        }
+    }
+
+    private static void validateFunction(FunctionInfo functionInfo, List<Expression> arguments, Token token)
+    {
+        if (functionInfo.getInputTypes() != null)
+        {
+            List<Class<? extends Expression>> inputTypes = functionInfo.getInputTypes();
+            int size = inputTypes.size();
+            if (arguments.size() != size)
+            {
+                throw new ParseException("Function " + functionInfo.getName() + " expected " + inputTypes.size() + " parameters, found " + arguments.size(), token);
+            }
+            for (int i = 0; i < size; i++)
+            {
+                Class<? extends Expression> inputType = inputTypes.get(i);
+                if (!inputType.isAssignableFrom(arguments.get(i).getClass()))
+                {
+                    throw new ParseException(
+                            "Function " + functionInfo.getName() + " expects " + inputType.getSimpleName() + " as parameter at index " + i + " but got "
+                                + arguments.get(i).getClass().getSimpleName(),
+                            token);
+                }
+            }
+        }
+        if (functionInfo.requiresNamedArguments() && (arguments.size() <= 0 || arguments.stream().anyMatch(a -> !(a instanceof NamedExpression))))
+        {
+            if (arguments.stream().anyMatch(a -> !(a instanceof NamedExpression)))
+            {
+                throw new ParseException(
+                        "Function " + functionInfo.getName() + " expects named parameters", token);
             }
         }
     }
@@ -1291,7 +1395,7 @@ public class StatementResolver implements StatementVisitor<Statement, StatementR
                                 + column
                                 + "' in table source: '"
                                 + (pathAlias.getType() == TableAlias.Type.TEMPORARY_TABLE ? "#" : "")
-                                + pathAlias.getTable()
+                                + pathAlias.getTable().toDotDelimited()
                                 + (!isBlank(pathAlias.getAlias()) ? (" (" + pathAlias.getAlias() + ")") : "")
                                 + "', expected one of: ["
                                 + tableMeta.getColumns().stream().map(Column::getName).collect(joining(", "))

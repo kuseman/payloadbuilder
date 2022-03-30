@@ -1,6 +1,6 @@
 package org.kuse.payloadbuilder.core.utils;
 
-import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
+import org.kuse.payloadbuilder.core.operator.TableMeta.DataType;
 
 /** Type utils */
 public final class TypeUtils

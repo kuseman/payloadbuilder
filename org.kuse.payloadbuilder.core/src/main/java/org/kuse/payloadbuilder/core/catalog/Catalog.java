@@ -5,13 +5,20 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 import org.kuse.payloadbuilder.core.QuerySession;
+import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.Operator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
+import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
+import org.kuse.payloadbuilder.core.operator.Tuple;
+import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.Option;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.SortItem;
@@ -23,6 +30,22 @@ import org.kuse.payloadbuilder.core.parser.SortItem;
 public abstract class Catalog
 //CSON
 {
+    protected static final String SYS_TABLES = "tables";
+    protected static final String SYS_TABLES_NAME = "name";
+
+    protected static final String SYS_COLUMNS = "columns";
+    protected static final String SYS_COLUMNS_NAME = "name";
+    protected static final String SYS_COLUMNS_TABLE = "table";
+
+    protected static final String SYS_FUNCTIONS = "functions";
+    protected static final String SYS_FUNCTIONS_NAME = "name";
+    protected static final String SYS_FUNCTIONS_DESCRIPTION = "description";
+    protected static final String SYS_FUNCTIONS_TYPE = "type";
+
+    protected static final String SYS_INDICES = "indices";
+    protected static final String SYS_INDICES_TABLE = "table";
+    protected static final String SYS_INDICES_COLUMNS = "columns";
+
     /** Name of the catalog */
     private final String name;
     /** Functions */
@@ -44,6 +67,7 @@ public abstract class Catalog
      * @param session Current query session
      * @param catalogAlias Alias used for this catalog in the query
      * @param table Table to retrieve indices for
+     * @return List of indices for provided table
      **/
     public List<Index> getIndices(
             QuerySession session,
@@ -53,47 +77,10 @@ public abstract class Catalog
         return emptyList();
     }
 
-    /**
-     * Return columns for provided table <br />
-     * Used when describing a table
-     *
-     * @param session Current query session
-     * @param catalogAlias Alias used for this catalog in the query
-     * @param table Table to retrieve columns for
-     * @return A list of columns
-     */
-    public List<Column> getColumns(
-            QuerySession session,
-            String catalogAlias,
-            QualifiedName table)
-    {
-        return emptyList();
-    }
-
-    /**
-     * Return registered functions in this Catalog
-     **/
+    /** Return registered functions for this catalog */
     public Collection<FunctionInfo> getFunctions()
     {
         return functionByName.values();
-    }
-
-    /**
-     * <pre>
-     * Get tables for current session.
-     * Implementations can choose to implement this method
-     * to allow "SHOW tables" statement to list tables in
-     * current catalog.
-     * </pre>
-     *
-     * @param session Current query session
-     * @param catalogAlias Alias used for this catalog in the query
-     */
-    public List<String> getTables(
-            QuerySession session,
-            String catalogAlias)
-    {
-        return emptyList();
     }
 
     /**
@@ -124,6 +111,33 @@ public abstract class Catalog
         throw new IllegalArgumentException("Catalog " + data.catalogAlias + " (" + name + ") doesn't support index operators.");
     }
 
+    /**
+     * <pre>
+     * Get system operator for provided data.
+     * This method should return a system operator for various system tables like:
+     *  - tables
+     *     - Return tables in catalog
+     *     - Preferable to return at least one column 'name'
+     *  - columns
+     *     - Return columns in catalog
+     *     - Preferable to return at least two columns 'table', 'name'
+     *  - indices
+     *     - Return indices in catalog
+     *     - Preferable to return at least two columns 'table', 'columns'
+     *  - functions
+     *     - Return functions in catalog
+     *     - Preferable to return at least two columns 'name', 'description'
+     *
+     * NOTE! It's optional to implement this method, but it's a good way to expose
+     *       things that the catalog supports
+     * NOTE! It's perfectly fine to support other system tables than listed above
+     * </pre>
+     */
+    public Operator getSystemOperator(OperatorData data)
+    {
+        throw new IllegalArgumentException("Catalog " + data.catalogAlias + " (" + name + ") doesn't support system operators.");
+    }
+
     /** Register function */
     public void registerFunction(FunctionInfo functionInfo)
     {
@@ -135,6 +149,22 @@ public abstract class Catalog
     public FunctionInfo getFunction(String name)
     {
         return functionByName.get(requireNonNull(name).toLowerCase());
+    }
+
+    /**
+     * Helper method that returns an operator with registered functions. Can be used by catalog implementations in
+     * {@link #getSystemOperator(OperatorData)}
+     **/
+    protected Operator getFunctionsOperator(int nodeId, TableAlias tableAlias)
+    {
+        return systemOperator(nodeId, SYS_FUNCTIONS, ctx ->
+        {
+            String[] columns = new String[] {SYS_FUNCTIONS_NAME, SYS_FUNCTIONS_TYPE, SYS_FUNCTIONS_DESCRIPTION};
+            return TupleIterator.wrap(functionByName.values()
+                    .stream()
+                    .map(f -> (Tuple) Row.of(tableAlias, -1, columns, new Object[] {f.getName(), f.getType().toString(), f.getDescription()}))
+                    .iterator());
+        });
     }
 
     /** Class containing data used by Catalog implementations to create operators */
@@ -236,21 +266,64 @@ public abstract class Catalog
         {
             return tableOptions;
         }
+
+        /**
+         * Extract right hand side of predicate for provided column
+         *
+         * <pre>
+         *   Ie.
+         *
+         *   select *
+         *   from table t
+         *   where 'val' = t.col
+         *
+         * Calling this method with value 'col' would return in
+         * the literal string expression 'val'
+         * </pre>
+         */
+        public Expression extractPredicate(String column)
+        {
+            if (predicatePairs.isEmpty())
+            {
+                return null;
+            }
+
+            Iterator<AnalyzePair> it = predicatePairs.iterator();
+            while (it.hasNext())
+            {
+                AnalyzePair pair = it.next();
+                if (column.equalsIgnoreCase(pair.getColumn(tableAlias.getAlias())))
+                {
+                    it.remove();
+                    return pair.getExpressionPair(tableAlias.getAlias()).getRight();
+                }
+            }
+            return null;
+        }
     }
 
-    /** Column */
-    public static class Column
+    /** Helper method to create a system operator */
+    protected Operator systemOperator(int nodeId, String name, Function<ExecutionContext, TupleIterator> iterator)
     {
-        private final String name;
-
-        public Column(String name)
+        return new Operator()
         {
-            this.name = name;
-        }
+            @Override
+            public int getNodeId()
+            {
+                return nodeId;
+            }
 
-        public String getName()
-        {
-            return name;
-        }
+            @Override
+            public String getName()
+            {
+                return "System (" + name + ")";
+            }
+
+            @Override
+            public TupleIterator open(ExecutionContext context)
+            {
+                return iterator.apply(context);
+            }
+        };
     }
 }

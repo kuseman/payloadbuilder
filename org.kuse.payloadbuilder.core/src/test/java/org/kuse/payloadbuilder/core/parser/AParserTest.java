@@ -25,13 +25,13 @@ import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.catalog.Index;
-import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGenerator;
 import org.kuse.payloadbuilder.core.operator.EvalUtils;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.OperatorBuilder;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
+import org.kuse.payloadbuilder.core.operator.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression.ResolvePath;
 import org.kuse.payloadbuilder.core.parser.rewrite.StatementResolver;
@@ -64,14 +64,14 @@ public abstract class AParserTest extends Assert
             @Override
             public List<Index> getIndices(QuerySession session, String catalogAlias, QualifiedName table)
             {
-                Index index = indexByTable.get(table.toString());
+                Index index = indexByTable.get(table.toDotDelimited());
                 return index != null ? singletonList(index) : emptyList();
             }
 
             @Override
             public Operator getIndexOperator(OperatorData data, Index index)
             {
-                String table = data.getTableAlias().getTable().toString();
+                String table = data.getTableAlias().getTable().toDotDelimited();
                 return Optional.ofNullable(indexOpByTable.get(table))
                         .map(t -> t.apply(data.getTableAlias()))
                         .orElseThrow(() -> new RuntimeException("No index operator found for " + table + ", check test data."));
@@ -80,7 +80,7 @@ public abstract class AParserTest extends Assert
             @Override
             public Operator getScanOperator(OperatorData data)
             {
-                String table = data.getTableAlias().getTable().toString();
+                String table = data.getTableAlias().getTable().toDotDelimited();
                 return Optional.ofNullable(opByTable.get(table))
                         .map(t -> t.apply(data.getTableAlias()))
                         .orElseThrow(() -> new RuntimeException("No scan operator found for " + table + ", check test data."));
@@ -106,10 +106,10 @@ public abstract class AParserTest extends Assert
     protected Expression e(String expression, final Tuple tuple, final Map<String, Pair<Object, DataType>> types)
     {
         AtomicInteger colCount = new AtomicInteger();
-        return StatementResolver.resolve(p.parseExpression(session.getCatalogRegistry(), expression, false), e ->
+        return StatementResolver.resolve(p.parseExpression(session.getCatalogRegistry(), expression, false), session.getCatalogRegistry(), e ->
         {
             int col = colCount.get();
-            String colName = e.getQname().toString();
+            String colName = e.getQname().toDotDelimited();
             Pair<Object, DataType> pair = types.get(colName);
 
             ResolvePath[] resolvePaths = new ResolvePath[] {

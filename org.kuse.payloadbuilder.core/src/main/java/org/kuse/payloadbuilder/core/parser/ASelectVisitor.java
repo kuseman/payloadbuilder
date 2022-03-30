@@ -67,6 +67,12 @@ public abstract class ASelectVisitor<TR, TC> implements SelectVisitor<TR, TC>
     }
 
     @Override
+    public TR visit(UnresolvedTableFunction tableFunction, TC context)
+    {
+        return null;
+    }
+
+    @Override
     public TR visit(TableFunction tableFunction, TC context)
     {
         tableFunction.getArguments().forEach(a -> visit(a, context));

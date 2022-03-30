@@ -597,6 +597,43 @@
       	  [{"key":"data","value": "3_1"}, {"key": "obj", "value": [ { "id": 3, "row_id": 1, "data": "3_1", "col2": 4 }, { "id": 3, "row_id": 2, "data": "3_2", "col2": 4 }, { "id": 3, "row_id": 3, "data": "3_3", "col2": 4 } ]}]
       	]
       ]
+    },
+    {
+      "name": "System catalog ",
+      "query": [
+        "set @var = 'test' ",
+        "select * from sys#catalogs ",
+        "select * from sys#variables ",
+        "select * from sys#c.tables ",
+        "select * from sys#c.columns ",
+        "select * from sys#c.functions ",
+        "select * from sys#c.indices "
+      ],
+      "expectedResultSets": [
+      	[
+      	  [{"key":"alias","value": "c"}, {"key":"name", "value": "Test#c"}]
+      	],
+      	[
+      	  [{"key":"name","value": "var"}, {"key":"value", "value": "test"}]
+      	],
+      	[
+      	  [{"key":"name","value": "source"}, {"key":"columns","value": ["col1", "col2"]}],
+      	  [{"key":"name","value": "data"}, {"key":"columns","value": ["id", "row_id", "data"]}],
+      	  [{"key":"name","value": "strings"}, {"key":"columns","value": ["id", "string1", "string2"]}]
+      	],
+      	[
+      	  [{"key":"table","value": "source"},{"key":"name","value": "col1"}, {"key":"custom","value": 4}],
+      	  [{"key":"table","value": "source"}, {"key":"name","value": "col2"}, {"key":"custom","value": 4}],
+      	  [{"key":"table","value": "data"}, {"key":"name","value": "id"}, {"key":"custom","value": 2}],
+      	  [{"key":"table","value": "data"},{"key":"name","value": "row_id"}, {"key":"custom","value": 6}],
+      	  [{"key":"table","value": "data"}, {"key":"name","value": "data"}, {"key":"custom","value": 4}],
+      	  [{"key":"table","value": "strings"}, {"key":"name","value": "id"}, {"key":"custom","value": 2}],
+      	  [{"key":"table","value": "strings"}, {"key":"name","value": "string1"}, {"key":"custom","value": 7}],
+      	  [{"key":"table","value": "strings"}, {"key":"name","value": "string2"}, {"key":"custom","value": 7}]
+      	],
+      	[],
+      	[]
+      ]
     }
   ]
 }

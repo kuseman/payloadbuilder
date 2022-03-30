@@ -12,7 +12,7 @@ public class SessionTempTableCacheProvider extends ASessionCacheProvider<Tempora
     @Override
     public TemporaryTable computIfAbsent(QualifiedName name, Object key, Duration ttl, final Supplier<TemporaryTable> supplier)
     {
-        CacheEntry<TemporaryTable> entry = cache.computeIfAbsent(name, k -> new CacheEntry<>());
-        return entry.computeIfAbsent(key, supplier);
+        Cache<TemporaryTable> entry = getCache(name);
+        return entry.computeIfAbsent(key, ttl, supplier);
     }
 }

@@ -138,7 +138,7 @@ public class QuerySession
             || (result = temporaryTables.get(table)) == null)
         //CSON
         {
-            throw new QueryException("No temporary table found with name #" + table);
+            throw new QueryException("No temporary table found with name #" + table.toDotDelimited());
         }
 
         return result;
@@ -158,7 +158,7 @@ public class QuerySession
         }
         if (temporaryTables.containsKey(table.getName()))
         {
-            throw new QueryException("Temporary table #" + table.getName() + " already exists in session");
+            throw new QueryException("Temporary table #" + table.getName().toDotDelimited() + " already exists in session");
         }
         temporaryTables.put(table.getName(), table);
     }
@@ -170,7 +170,7 @@ public class QuerySession
             && (temporaryTables == null
                 || !temporaryTables.containsKey(table)))
         {
-            throw new QueryException("No temporary table found with name #" + table);
+            throw new QueryException("No temporary table found with name #" + table.toDotDelimited());
         }
         else if (temporaryTables != null)
         {
@@ -179,13 +179,13 @@ public class QuerySession
     }
 
     /** Return temporary table names */
-    public Collection<QualifiedName> getTemporaryTableNames()
+    public Collection<TemporaryTable> getTemporaryTables()
     {
         if (temporaryTables == null)
         {
             return emptyList();
         }
-        return temporaryTables.keySet();
+        return temporaryTables.values();
     }
 
     /** Set catalog property */

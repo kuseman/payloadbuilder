@@ -4,6 +4,7 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.join;
 
@@ -24,6 +25,12 @@ public class QualifiedName
     public List<String> getParts()
     {
         return parts;
+    }
+
+    /** Returns size of this qualified name */
+    public int size()
+    {
+        return parts.size();
     }
 
     /**
@@ -67,6 +74,12 @@ public class QualifiedName
         return new QualifiedName(parts.subList(from, parts.size()));
     }
 
+    /** Returns a dot delimited representation of this qualified name */
+    public String toDotDelimited()
+    {
+        return join(parts, '.');
+    }
+
     @Override
     public int hashCode()
     {
@@ -87,7 +100,7 @@ public class QualifiedName
     @Override
     public String toString()
     {
-        return join(parts, ".");
+        return parts.stream().map(p -> "\"" + p + "\"").collect(joining("."));
     }
 
     /** Construct a qualified name from provided parts */

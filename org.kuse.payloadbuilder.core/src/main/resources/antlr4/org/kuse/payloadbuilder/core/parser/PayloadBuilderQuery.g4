@@ -64,8 +64,12 @@ showStatement
  ;
 
 cacheFlushStatement
-  : CACHE FLUSH type=identifier '/' (name=cacheName | all='*') key=expression?  #cacheFlush
-  | CACHE REMOVE type=identifier '/' (name=cacheName | all='*') 				#cacheRemove
+  : CACHE FLUSH cache=fullCacheQualifier key=expression?  #cacheFlush
+  | CACHE REMOVE cache=fullCacheQualifier  				  #cacheRemove
+  ;
+
+fullCacheQualifier
+  : type=identifier '/' (name=cacheName | all='*')
   ;
 
 // Cannot use qname above, that causes some mismatched input in antlr
@@ -285,7 +289,8 @@ booleanLiteral
  
 nonReserved
  : FROM 
- | FIRST 
+ | FIRST
+ | FUNCTIONS
  | TABLE 
  | TABLES 
  | LIKE 
@@ -295,8 +300,10 @@ nonReserved
  | FOR 
  | ALL
  | CACHE
+ | CACHES
  | FLUSH
  | REMOVE
+ | VARIABLES
  ;
  
 // Tokens

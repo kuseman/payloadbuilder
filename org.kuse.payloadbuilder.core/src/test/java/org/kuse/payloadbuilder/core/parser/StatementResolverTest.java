@@ -8,8 +8,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.catalog.TableMeta;
-import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
+import org.kuse.payloadbuilder.core.operator.TableMeta;
+import org.kuse.payloadbuilder.core.operator.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression.ResolvePath;
 import org.kuse.payloadbuilder.core.parser.rewrite.StatementResolver;
 

@@ -281,7 +281,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             for (int i = 0; i < size; i++)
             {
                 Option option = options.get(i);
-                String lowerName = lowerCase(option.getOption().toString());
+                String lowerName = lowerCase(option.getOption().toDotDelimited());
                 if (lowerName.equals("cachename"))
                 {
                     cacheName = QualifiedName.of(option.getValueExpression().eval(context));

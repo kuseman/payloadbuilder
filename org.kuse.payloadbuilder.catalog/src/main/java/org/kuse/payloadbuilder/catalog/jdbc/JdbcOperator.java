@@ -126,13 +126,13 @@ class JdbcOperator extends AOperator
                         throw new IllegalArgumentException("Illegal predicate type");
                     case COMPARISION:
                         Object value = convertValue(expressionPair.getRight().eval(context));
-                        sb.append(qname);
+                        sb.append(qname.toDotDelimited());
                         appendComparisonValue(sb, pair);
                         sb.append(value);
                         break;
                     case IN:
                         InExpression ie = (InExpression) pair.getRight().getExpression();
-                        sb.append(qname);
+                        sb.append(qname.toDotDelimited());
 
                         if (ie.isNot())
                         {
@@ -151,16 +151,16 @@ class JdbcOperator extends AOperator
                         break;
                     case LIKE:
                         LikeExpression le = (LikeExpression) pair.getRight().getExpression();
-                        sb.append(qname);
+                        sb.append(qname.toDotDelimited());
                         sb.append(" LIKE ");
                         sb.append(convertValue(le.getPatternExpression().eval(context)));
                         break;
                     case NULL:
-                        sb.append(qname);
+                        sb.append(qname.toDotDelimited());
                         sb.append(" IS NULL");
                         break;
                     case NOT_NULL:
-                        sb.append(qname);
+                        sb.append(qname.toDotDelimited());
                         sb.append(" IS NOT NULL");
                         break;
                 }

@@ -4,8 +4,8 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 
-import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
-import org.kuse.payloadbuilder.core.catalog.builtin.BuiltinCatalog;
+import org.kuse.payloadbuilder.core.catalog.system.SystemCatalog;
+import org.kuse.payloadbuilder.core.operator.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.UnresolvedQualifiedReferenceExpression;
 
@@ -80,7 +80,7 @@ public abstract class FunctionInfo
     @Override
     public String toString()
     {
-        return (BuiltinCatalog.NAME.equals(catalog.getName()) ? "" : (catalog.getName() + ".")) + name;
+        return (SystemCatalog.NAME.equals(catalog.getName()) ? "" : (catalog.getName() + ".")) + name;
     }
 
     @Override

@@ -6,9 +6,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.catalog.TableMeta;
-import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
+import org.kuse.payloadbuilder.core.operator.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.SortItem;
 import org.kuse.payloadbuilder.core.parser.SortItem.NullOrder;

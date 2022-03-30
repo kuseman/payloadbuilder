@@ -10,8 +10,8 @@ import java.util.function.Consumer;
 
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.OutputWriter;
-import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGenerator;
+import org.kuse.payloadbuilder.core.operator.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.parser.AParserTest;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;

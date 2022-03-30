@@ -176,6 +176,14 @@ public class AStatementVisitor<TR, TC> implements StatementVisitor<TR, TC>, Sele
     }
 
     @Override
+    public TR visit(UnresolvedTableFunction tableFunction, TC context)
+    {
+        tableFunction.getArguments().forEach(a -> visitExpression(context, a));
+        tableFunction.getOptions().forEach(to -> visitExpression(context, to.getValueExpression()));
+        return null;
+    }
+
+    @Override
     public TR visit(TableFunction tableFunction, TC context)
     {
         tableFunction.getArguments().forEach(a -> visitExpression(context, a));

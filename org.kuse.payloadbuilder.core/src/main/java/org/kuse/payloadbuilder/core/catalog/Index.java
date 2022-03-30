@@ -62,6 +62,6 @@ public class Index
     @Override
     public String toString()
     {
-        return table + " " + columns.toString();
+        return table.toDotDelimited() + " " + columns.toString();
     }
 }

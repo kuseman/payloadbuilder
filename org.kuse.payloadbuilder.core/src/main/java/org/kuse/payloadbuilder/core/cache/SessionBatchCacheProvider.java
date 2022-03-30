@@ -14,11 +14,15 @@ public class SessionBatchCacheProvider extends ASessionCacheProvider<List<Tuple>
     @Override
     public <TKey> Map<TKey, List<Tuple>> getAll(QualifiedName name, Iterable<TKey> keys)
     {
-        CacheEntry<List<Tuple>> entry = cache.computeIfAbsent(name, k -> new CacheEntry<>());
+        Cache<List<Tuple>> cache = getCache(name);
         Map<TKey, List<Tuple>> result = new HashMap<>();
         for (TKey key : keys)
         {
-            result.put(key, entry.get(key));
+            CacheEntry<List<Tuple>> entry = cache.get(key);
+            if (entry != null)
+            {
+                result.put(key, entry.value);
+            }
         }
         return result;
     }
@@ -26,7 +30,7 @@ public class SessionBatchCacheProvider extends ASessionCacheProvider<List<Tuple>
     @Override
     public <TKey> void putAll(QualifiedName name, Map<TKey, List<Tuple>> values, Duration ttl)
     {
-        CacheEntry<List<Tuple>> entry = cache.get(name);
-        entry.element.putAll(values);
+        Cache<List<Tuple>> cache = getCache(name);
+        cache.putAll(values, ttl);
     }
 }

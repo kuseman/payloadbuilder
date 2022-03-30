@@ -34,6 +34,7 @@ import org.kuse.payloadbuilder.core.operator.AObjectOutputWriter;
 import org.kuse.payloadbuilder.core.operator.AObjectOutputWriter.ColumnValue;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.Operator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.Tuple;
@@ -60,7 +61,7 @@ public class TestHarnessRunner
         List<String> testFiles = asList(
                 "BaseContructs.json",
                 "Joins.json",
-                "BuiltInFunctions.json",
+                "SystemFunctions.json",
                 "TemporaryTables.json");
 
         List<TestHarness> harnesses = new ArrayList<>();
@@ -248,6 +249,12 @@ public class TestHarnessRunner
             return false;
         }
 
+        // toString-ify the actual if we expect a string
+        if (expected.getValue() instanceof String && !(actual.getValue() instanceof String))
+        {
+            return Objects.equals(expected.getValue(), String.valueOf(actual.getValue()));
+        }
+
         // Use expression math to handle float = double etc.
         if (ExpressionMath.eq(expected.getValue(), actual.getValue(), false))
         {
@@ -269,17 +276,65 @@ public class TestHarnessRunner
         }
 
         @Override
+        public Operator getSystemOperator(OperatorData data)
+        {
+            TableAlias alias = data.getTableAlias();
+            String type = alias.getTable().getLast();
+
+            if (SYS_TABLES.equalsIgnoreCase(type))
+            {
+                return ctx -> getTables(alias);
+            }
+            else if (SYS_COLUMNS.equalsIgnoreCase(type))
+            {
+                return ctx -> getColumns(alias);
+            }
+            else if (SYS_FUNCTIONS.equalsIgnoreCase(type))
+            {
+                return getFunctionsOperator(data.getNodeId(), alias);
+            }
+            else if (SYS_INDICES.equalsIgnoreCase(type))
+            {
+                return Operator.EMPTY_OPERATOR;
+            }
+
+            return super.getSystemOperator(data);
+        }
+
+        @Override
         public Operator getScanOperator(OperatorData data)
         {
+            String operatorTable = data.getTableAlias().getTable().getLast();
             for (TestTable table : catalog.getTables())
             {
-                if (equalsIgnoreCase(table.getName(), data.getTableAlias().getTable().toString()))
+                if (equalsIgnoreCase(table.getName(), operatorTable))
                 {
                     return new TOperator(table, data.getTableAlias(), data.getNodeId());
                 }
             }
 
             throw new IllegalArgumentException("No test table setup with name: " + data.getTableAlias().getTable());
+        }
+
+        private TupleIterator getTables(TableAlias tableAlias)
+        {
+            String[] columns = new String[] {SYS_TABLES_NAME, "columns"};
+            return TupleIterator.wrap(catalog
+                    .getTables()
+                    .stream()
+                    .map(t -> (Tuple) Row.of(tableAlias, -1, columns, new Object[] {t.getName(), t.getColumns()}))
+                    .iterator());
+        }
+
+        private TupleIterator getColumns(TableAlias tableAlias)
+        {
+            String[] columns = new String[] {SYS_COLUMNS_TABLE, SYS_COLUMNS_NAME, "custom"};
+            return TupleIterator.wrap(catalog
+                    .getTables()
+                    .stream()
+                    .flatMap(t -> t.getColumns().stream().map(c -> Pair.of(t, c)))
+                    .map(p -> (Tuple) Row.of(tableAlias, -1, columns, new Object[] {p.getKey().getName(), p.getValue(), p.getValue().length()}))
+                    .iterator());
         }
     }
 

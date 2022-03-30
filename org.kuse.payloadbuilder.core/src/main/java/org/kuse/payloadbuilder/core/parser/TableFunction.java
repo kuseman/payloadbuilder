@@ -2,12 +2,12 @@ package org.kuse.payloadbuilder.core.parser;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.util.List;
 
 import org.antlr.v4.runtime.Token;
 import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
-import org.kuse.payloadbuilder.core.catalog.builtin.BuiltinCatalog;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 
 /** Table function */
@@ -56,8 +56,8 @@ public class TableFunction extends TableSource
     @Override
     public String toString()
     {
-        return (catalogAlias != null ? catalogAlias : BuiltinCatalog.NAME) + "#"
-            + functionInfo
+        return isBlank(catalogAlias) ? "" : (catalogAlias + "#")
+            + functionInfo.getName()
             + "(" + arguments.stream().map(a -> a.toString()).collect(joining(", ")) + ") " + tableAlias.getAlias();
     }
 }

@@ -95,6 +95,6 @@ public class UnresolvedQualifiedReferenceExpression extends Expression implement
     @Override
     public String toString()
     {
-        return qname.toString();
+        return qname.toDotDelimited();
     }
 }

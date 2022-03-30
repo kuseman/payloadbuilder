@@ -21,6 +21,8 @@ public interface SelectVisitor<TR, TC>
 
     TR visit(Table table, TC context);
 
+    TR visit(UnresolvedTableFunction tableFunction, TC context);
+
     TR visit(TableFunction tableFunction, TC context);
 
     TR visit(Join join, TC context);

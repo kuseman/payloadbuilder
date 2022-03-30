@@ -11,11 +11,11 @@ import java.util.function.ToIntBiFunction;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.codehaus.janino.ClassBodyEvaluator;
-import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory;
 import org.kuse.payloadbuilder.core.operator.Projection;
 import org.kuse.payloadbuilder.core.operator.RootProjection;
+import org.kuse.payloadbuilder.core.operator.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
@@ -213,7 +213,7 @@ public class CodeGenerator
         context.addImport("org.kuse.payloadbuilder.core.codegen.BaseGeneratedClass");
         context.addImport("org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory");
         context.addImport("org.kuse.payloadbuilder.core.utils.ObjectUtils");
-        context.addImport("org.kuse.payloadbuilder.core.catalog.TableMeta.DataType");
+        context.addImport("org.kuse.payloadbuilder.core.operator.TableMeta.DataType");
 
         StringBuilder expressionCode = new StringBuilder();
         StringBuilder argFields = new StringBuilder();

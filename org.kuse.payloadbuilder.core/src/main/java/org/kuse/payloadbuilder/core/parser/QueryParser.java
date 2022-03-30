@@ -3,6 +3,7 @@ package org.kuse.payloadbuilder.core.parser;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
+import static org.apache.commons.lang3.StringUtils.defaultString;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.join;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
@@ -31,12 +32,8 @@ import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.atn.PredictionMode;
 import org.antlr.v4.runtime.misc.ParseCancellationException;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.cache.CacheProvider;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
-import org.kuse.payloadbuilder.core.catalog.FunctionInfo;
-import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
-import org.kuse.payloadbuilder.core.catalog.TableFunctionInfo;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
 import org.kuse.payloadbuilder.core.parser.Apply.ApplyType;
@@ -56,6 +53,7 @@ import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.ComparisonE
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.DereferenceContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.DescribeStatementContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.DropTableStatementContext;
+import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.FullCacheQualifierContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.FunctionArgumentContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.FunctionCallContext;
 import org.kuse.payloadbuilder.core.parser.PayloadBuilderQueryParser.FunctionCallExpressionContext;
@@ -99,15 +97,15 @@ public class QueryParser
     /** Parse query */
     public QueryStatement parseQuery(CatalogRegistry registry, String query)
     {
-        QueryStatement statement = getTree(registry, query, p -> p.query());
-        return StatementResolver.resolve(statement);
+        QueryStatement statement = getTree(query, p -> p.query());
+        return StatementResolver.resolve(statement, registry);
     }
 
     /** Parse select */
     public Select parseSelect(CatalogRegistry registry, String query)
     {
-        Select select = getTree(registry, query, p -> p.topSelect());
-        return StatementResolver.resolve(select);
+        Select select = getTree(query, p -> p.topSelect());
+        return StatementResolver.resolve(select, registry);
     }
 
     /** Parse expression */
@@ -119,12 +117,12 @@ public class QueryParser
     /** Parse expression */
     public Expression parseExpression(CatalogRegistry registry, String expression, boolean resolve)
     {
-        Expression expr = getTree(registry, expression, p -> p.topExpression());
-        return resolve ? StatementResolver.resolve(expr) : expr;
+        Expression expr = getTree(expression, p -> p.topExpression());
+        return resolve ? StatementResolver.resolve(expr, registry) : expr;
     }
 
     @SuppressWarnings("unchecked")
-    private <T> T getTree(CatalogRegistry registry, String body, Function<PayloadBuilderQueryParser, ParserRuleContext> function)
+    private <T> T getTree(String body, Function<PayloadBuilderQueryParser, ParserRuleContext> function)
     {
         BaseErrorListener errorListener = new BaseErrorListener()
         {
@@ -160,7 +158,7 @@ public class QueryParser
             tree = function.apply(parser);
         }
 
-        return (T) new AstBuilder(registry).visit(tree);
+        return (T) new AstBuilder().visit(tree);
     }
 
     /** Builds tree */
@@ -170,14 +168,8 @@ public class QueryParser
         private final Map<String, Integer> lambdaParameters = new HashMap<>();
         private Expression leftDereference;
 
-        private final CatalogRegistry registry;
         private boolean insideSelectItems;
         private boolean isRootSelectStatement;
-
-        AstBuilder(CatalogRegistry registry)
-        {
-            this.registry = registry;
-        }
 
         @Override
         public Object visitStatement(StatementContext ctx)
@@ -270,20 +262,31 @@ public class QueryParser
         @Override
         public Object visitCacheFlush(CacheFlushContext ctx)
         {
+            CacheQualifier cache = (CacheQualifier) visit(ctx.cache);
+            Expression key = getExpression(ctx.expression());
+            return new CacheFlushRemoveStatement(cache.type, cache.name, cache.all, true, key);
+        }
+
+        @Override
+        public Object visitFullCacheQualifier(FullCacheQualifierContext ctx)
+        {
             CacheProvider.Type type = CacheProvider.Type.valueOf(StringUtils.upperCase(getIdentifier(ctx.type)));
             QualifiedName cacheName = getQualifiedName(ctx.name);
             boolean isAll = ctx.all != null;
-            Expression key = getExpression(ctx.expression());
-            return new CacheFlushRemoveStatement(type, cacheName, isAll, true, key);
+
+            CacheQualifier cache = new CacheQualifier();
+            cache.type = type;
+            cache.name = cacheName;
+            cache.all = isAll;
+
+            return cache;
         }
 
         @Override
         public Object visitCacheRemove(CacheRemoveContext ctx)
         {
-            CacheProvider.Type type = CacheProvider.Type.valueOf(StringUtils.upperCase(getIdentifier(ctx.type)));
-            QualifiedName cacheName = getQualifiedName(ctx.name);
-            boolean isAll = ctx.all != null;
-            return new CacheFlushRemoveStatement(type, cacheName, isAll, false, null);
+            CacheQualifier cache = (CacheQualifier) visit(ctx.cache);
+            return new CacheFlushRemoveStatement(cache.type, cache.name, cache.all, false, null);
         }
 
         @Override
@@ -486,22 +489,16 @@ public class QueryParser
             if (ctx.functionCall() != null)
             {
                 FunctionCallInfo functionCallInfo = (FunctionCallInfo) visit(ctx.functionCall());
-                if (!(functionCallInfo.functionInfo instanceof TableFunctionInfo))
-                {
-                    throw new ParseException("Expected a TABLE function for " + functionCallInfo.functionInfo.toString(), ctx.start);
-                }
-
-                TableFunctionInfo tableFunctionInfo = (TableFunctionInfo) functionCallInfo.functionInfo;
                 TableAlias tableAlias = TableAlias.TableAliasBuilder.of(
                         -1,
                         TableAlias.Type.FUNCTION,
-                        QualifiedName.of(functionCallInfo.functionInfo.getName()),
+                        QualifiedName.of(functionCallInfo.name),
                         alias,
                         ctx.functionCall().start).build();
-                return new TableFunction(
+                return new UnresolvedTableFunction(
                         functionCallInfo.catalogAlias,
+                        functionCallInfo.name,
                         tableAlias,
-                        tableFunctionInfo,
                         functionCallInfo.arguments,
                         options,
                         ctx.functionCall().start);
@@ -602,11 +599,7 @@ public class QueryParser
         public Object visitFunctionCallExpression(FunctionCallExpressionContext ctx)
         {
             FunctionCallInfo functionCallInfo = (FunctionCallInfo) visit(ctx.functionCall());
-            if (!(functionCallInfo.functionInfo instanceof ScalarFunctionInfo))
-            {
-                throw new ParseException("Expected a SCALAR function for " + functionCallInfo.functionInfo.toString(), ctx.start);
-            }
-            return new QualifiedFunctionCallExpression((ScalarFunctionInfo) functionCallInfo.functionInfo, functionCallInfo.arguments, ctx.functionCall().start);
+            return new UnresolvedQualifiedFunctionCallExpression(functionCallInfo.catalogAlias, functionCallInfo.name, functionCallInfo.arguments, ctx.functionCall().start);
         }
 
         @Override
@@ -622,12 +615,6 @@ public class QueryParser
         {
             String catalog = lowerCase(ctx.functionName().catalog != null ? ctx.functionName().catalog.getText() : null);
             String functionName = getIdentifier(ctx.functionName().function);
-
-            Pair<String, FunctionInfo> functionInfo = registry.resolveFunctionInfo(catalog, functionName);
-            if (functionInfo == null)
-            {
-                throw new ParseException("No function found named: " + functionName + " in catalog: " + (isBlank(catalog) ? "BuiltIn" : catalog), ctx.start);
-            }
 
             // Store left dereference
             Expression prevLeftDereference = leftDereference;
@@ -652,10 +639,7 @@ public class QueryParser
                 arguments.add(0, prevLeftDereference);
             }
 
-            validateFunction(functionInfo.getValue(), arguments, ctx.start);
-            arguments = functionInfo.getValue().foldArguments(arguments);
-
-            return new FunctionCallInfo(functionInfo.getKey(), functionInfo.getValue(), arguments);
+            return new FunctionCallInfo(catalog, functionName, arguments);
         }
 
         @Override
@@ -806,11 +790,7 @@ public class QueryParser
             else
             {
                 FunctionCallInfo functionCallInfo = (FunctionCallInfo) visit(ctx.functionCall());
-                if (!(functionCallInfo.functionInfo instanceof ScalarFunctionInfo))
-                {
-                    throw new ParseException("Expected a SCALAR function for " + functionCallInfo.functionInfo.toString(), ctx.start);
-                }
-                result = new QualifiedFunctionCallExpression((ScalarFunctionInfo) functionCallInfo.functionInfo, functionCallInfo.arguments, ctx.functionCall().start);
+                result = new UnresolvedQualifiedFunctionCallExpression(functionCallInfo.catalogAlias, functionCallInfo.name, functionCallInfo.arguments, ctx.functionCall().start);
             }
 
             leftDereference = null;
@@ -998,38 +978,6 @@ public class QueryParser
             }
         }
 
-        private void validateFunction(FunctionInfo functionInfo, List<Expression> arguments, Token token)
-        {
-            if (functionInfo.getInputTypes() != null)
-            {
-                List<Class<? extends Expression>> inputTypes = functionInfo.getInputTypes();
-                int size = inputTypes.size();
-                if (arguments.size() != size)
-                {
-                    throw new ParseException("Function " + functionInfo.getName() + " expected " + inputTypes.size() + " parameters, found " + arguments.size(), token);
-                }
-                for (int i = 0; i < size; i++)
-                {
-                    Class<? extends Expression> inputType = inputTypes.get(i);
-                    if (!inputType.isAssignableFrom(arguments.get(i).getClass()))
-                    {
-                        throw new ParseException(
-                                "Function " + functionInfo.getName() + " expects " + inputType.getSimpleName() + " as parameter at index " + i + " but got "
-                                    + arguments.get(i).getClass().getSimpleName(),
-                                token);
-                    }
-                }
-            }
-            if (functionInfo.requiresNamedArguments() && (arguments.size() <= 0 || arguments.stream().anyMatch(a -> !(a instanceof NamedExpression))))
-            {
-                if (arguments.stream().anyMatch(a -> !(a instanceof NamedExpression)))
-                {
-                    throw new ParseException(
-                            "Function " + functionInfo.getName() + " expects named parameters", token);
-                }
-            }
-        }
-
         private SortItem getSortItem(SortItemContext ctx)
         {
             Expression expression = getExpression(ctx.expression());
@@ -1118,16 +1066,24 @@ public class QueryParser
             return new QualifiedName(parts);
         }
 
+        /** Cache qualifier with type and name */
+        private static class CacheQualifier
+        {
+            CacheProvider.Type type;
+            QualifiedName name;
+            boolean all;
+        }
+
         private static class FunctionCallInfo
         {
             String catalogAlias;
-            FunctionInfo functionInfo;
+            String name;
             List<Expression> arguments;
 
-            FunctionCallInfo(String catalogAlias, FunctionInfo functionInfo, List<Expression> arguments)
+            FunctionCallInfo(String catalogAlias, String name, List<Expression> arguments)
             {
-                this.catalogAlias = catalogAlias;
-                this.functionInfo = functionInfo;
+                this.catalogAlias = defaultString(catalogAlias, "");
+                this.name = name;
                 this.arguments = arguments;
             }
         }

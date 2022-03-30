@@ -303,7 +303,7 @@ public final class ExpressionMath
         {
             if (throwIfNotComparable)
             {
-                throw new IllegalArgumentException("Cannot compare " + left + " and " + right);
+                throw new IllegalArgumentException(String.format("Cannot compare %s (%s) and %s (%s)", left, left.getClass().getSimpleName(), right, right.getClass().getSimpleName()));
             }
 
             return false;

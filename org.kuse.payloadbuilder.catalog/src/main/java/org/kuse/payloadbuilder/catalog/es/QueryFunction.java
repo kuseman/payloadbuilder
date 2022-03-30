@@ -24,8 +24,9 @@ class QueryFunction extends ScalarFunctionInfo
     @Override
     public String getDescription()
     {
-        return "Function that is used in Elastic search query context (predicates) and utilizes Elastic match operator. " + System.lineSeparator()
-            + "ex. match(<fields expression>, <match expression>, [<options expression>)";
+        return "Function that is used in Elastic search query context (predicates) and utilizes Elastic 'query_string' query. " + System.lineSeparator()
+            + "ex. query(<query expression>) "  + System.lineSeparator()
+            + "See: https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html";
     }
 
     @Override

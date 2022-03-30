@@ -63,19 +63,22 @@
         "into #temp with (cacheName = 'temp', cacheKey = 'key') ",
         "from source",
         "",
-        "show caches",
+        "show caches ",
+        "select * from sys#cachekeys ",
         "cache flush temptable/temp",
         "show caches",
         "cache remove temptable/temp",
         "show caches"
-        
       ],
       "expectedResultSets": [
         [
-          [{ "key": "Name", "value": "temp" }, { "key": "Size", "value": 1 },{"key": "Hits", "value": 0 }, { "key": "Hit ratio", "value": 0.0 },{ "key": "Misses", "value": 1 }, { "key": "Miss ratio", "value": 1.0 }, { "key": "Type", "value": "TEMPTABLE" }, { "key": "Provider", "value": "Session" } ]
+          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 1 }, {"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "Session" } ]
         ],
         [
-          [{ "key": "Name", "value": "temp" }, { "key": "Size", "value": 0 },{"key": "Hits", "value": 0 }, { "key": "Hit ratio", "value": 0.0 },{ "key": "Misses", "value": 1 }, { "key": "Miss ratio", "value": 1.0 }, { "key": "Type", "value": "TEMPTABLE" }, { "key": "Provider", "value": "Session" } ]
+          [{ "key": "name", "value": "\"temp\"" }, { "key": "key", "value": "key" }, {"key": "expire_time", "value": null }, { "key": "type", "value": "TEMPTABLE" },{ "key": "provider", "value": "Session" } ]
+        ],
+        [
+          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 0 }, {"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "Session" } ]
         ],
         []
       ]
@@ -96,10 +99,10 @@
       ],
       "expectedResultSets": [
         [
-          [{ "key": "Name", "value": "temp" }, { "key": "Size", "value": 1 },{"key": "Hits", "value": 0 }, { "key": "Hit ratio", "value": 0.0 },{ "key": "Misses", "value": 1 }, { "key": "Miss ratio", "value": 1.0 }, { "key": "Type", "value": "TEMPTABLE" }, { "key": "Provider", "value": "Session" } ]
+          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 1 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "Session" } ]
         ],
         [
-          [{ "key": "Name", "value": "temp" }, { "key": "Size", "value": 0 },{"key": "Hits", "value": 0 }, { "key": "Hit ratio", "value": 0.0 },{ "key": "Misses", "value": 1 }, { "key": "Miss ratio", "value": 1.0 }, { "key": "Type", "value": "TEMPTABLE" }, { "key": "Provider", "value": "Session" } ]
+          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 0 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "Session" } ]
         ],
         []
       ]
@@ -116,14 +119,14 @@
         "",
         "show caches",
         "cache flush temptable/temp 'key'",
-        "show caches"
+        "select * from sys#caches"
       ],
       "expectedResultSets": [
         [
-          [{ "key": "Name", "value": "temp" }, { "key": "Size", "value": 2 },{"key": "Hits", "value": 0 }, { "key": "Hit ratio", "value": 0.0 },{ "key": "Misses", "value": 2 }, { "key": "Miss ratio", "value": 1.0 }, { "key": "Type", "value": "TEMPTABLE" }, { "key": "Provider", "value": "Session" } ]
+          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 2 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 2 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "Session" } ]
         ],
         [
-          [{ "key": "Name", "value": "temp" }, { "key": "Size", "value": 1 },{"key": "Hits", "value": 0 }, { "key": "Hit ratio", "value": 0.0 },{ "key": "Misses", "value": 2 }, { "key": "Miss ratio", "value": 1.0 }, { "key": "Type", "value": "TEMPTABLE" }, { "key": "Provider", "value": "Session" } ]
+          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 1 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 2 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "Session" } ]
         ]
       ]
     },

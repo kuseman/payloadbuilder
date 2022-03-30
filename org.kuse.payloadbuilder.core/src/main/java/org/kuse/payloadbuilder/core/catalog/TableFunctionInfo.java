@@ -9,6 +9,7 @@ import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
+import org.kuse.payloadbuilder.core.operator.TableMeta;
 import org.kuse.payloadbuilder.core.parser.Expression;
 
 /**

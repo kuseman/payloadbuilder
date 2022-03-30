@@ -1,5 +1,6 @@
 package org.kuse.payloadbuilder.core.operator;
 
+import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 
 import java.util.List;
@@ -19,7 +20,7 @@ public class TemporaryTable
         this.name = requireNonNull(name, "name");
         this.tableAlias = requireNonNull(tableAlias, "tableAlias");
         this.columns = requireNonNull(columns, "columns");
-        this.rows = requireNonNull(rows, "rows");
+        this.rows = unmodifiableList(requireNonNull(rows, "rows"));
     }
 
     public QualifiedName getName()

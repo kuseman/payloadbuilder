@@ -2,11 +2,11 @@ package org.kuse.payloadbuilder.core.parser;
 
 import org.apache.commons.lang3.NotImplementedException;
 import org.kuse.payloadbuilder.core.OutputWriter;
-import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 import org.kuse.payloadbuilder.core.codegen.ProjectionCode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+import org.kuse.payloadbuilder.core.operator.TableMeta.DataType;
 
 /** Base class for expressions */
 //CSOFF

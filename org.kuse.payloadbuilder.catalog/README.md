@@ -3,9 +3,38 @@
 
 ## Table of Contents
 
+* [System](#system)
 * [Filesystem](#filesystem)
 * [Elasticsearch](#elasticsearch)
 * [Jdbc](#jdbc)
+
+## System
+
+Catalog that add support for various system tables
+
+- catalogs (List registered catalogs in session)
+- functions (List built in functions)
+- tables (List temp tables in session)
+- caches (List sessions caches)
+- cachekeys (List sessions cache keys)
+
+This table also redirects table queries to other registered catalogs (if they implement it).
+For example:
+```sql
+-- List various system tables for catalog registed with alias 'es'
+
+select *
+from sys#es.tables
+
+select *
+from sys#es.columns
+
+select *
+from sys#es.indices
+```
+
+These table queries can be implemented by catalogs via Catalog#getSystemOperator
+The system catalog is automatically registered in the session with alias `sys` 
 
 ## Filesystem
 
@@ -34,9 +63,11 @@ Catalog that provides access to elasticsearch.
 
 | Name          |  Description              |
 |:------------- |:--------------------------|
-| endpoint      | Endpoint to elasticsearch |
-| index         | Index in elasticsearch    |
-| type          | Type in index             |
+| endpoint      | (string) Endpoint to elasticsearch |
+| index         | (string) Index in elasticsearch    |
+| type          | (string) Type in index             |
+| cache.mappings.ttl | (integer) Cache TTL for mappings. To avoid excessive queries against ES for mappings etc. that is needed
+to properly utilize indices, predicate push downs, order by's etc. that information is put to PLB's CUSTOM cache. Defaults to 60 minutes. |
 
 
 #### Qualified name
@@ -56,8 +87,9 @@ NOTE! For ES versions where type is not longer present the qualified name **_doc
 |:----------------|:--------------|:---------------------------------------------------|:------------------------------|---------|
 | mustachecompile | Scalar        | Compiles provided mustasch template with arguments | template (Sting), model (Map) |         |
 | search          | Table         | Queries Elasticsearch with a nativ query           | **Named arguments:**<br/> endpoint (String) (Optional if provided in catalog properties <br/>index (String) (Optional if provided in catalog properties <br/>type (String) <br/>body (String) Mutual exclusive with template <br/>template (String) Mutual exclusive with body <br/>scroll (Boolean)<br/>params (Map) Model provided to template| use es.endpoint = 'http://localhost:9200'<br/>use es.index='myIndex'<br/><br/>select *<br/>from es#search(<br/>body: '{ "filter": { "match_all": {} }',<br/>scroll: true<br/>) |
-|match|Scalar|Function that utilizes ES match operator as a predicate. NOTE! Only applicable in query predicates for ES catalog tables.|matchFields (Qualified name or String with comma separated field names. If multiple fields are used then a multi_match query is used.)<br/>query (String)|select *<br/>from es#_doc<br/>where match(name, 'some phrase')<br/><br/>select *<br/>from es#_doc<br/>where es#match('name,message', 'some phrase')|
+|match|Scalar|Function that utilizes ES match operator as a predicate. NOTE! Only applicable in query predicates for ES catalog tables.|matchFields (Qualified name or String with comma separated field names. If multiple fields are used then a multi_match query is used.)<br/>field(s) (String), query (String)|select *<br/>from es#_doc<br/>where match(name, 'some phrase')<br/><br/>select *<br/>from es#_doc<br/>where es#match('name,message', 'some phrase')|
 |query|Scalar|Function that utilizes ES query_string operator as a predicate. NOTE! Only applicable in query predicates for ES catalog tables.|query (String)<br/>|select *<br/>from es#_doc<br/>where es#query('type:log AND severity:200')|
+|cat|Table|Function that exposes elastic search cat-api as a table|optional endpoint (String), catspec (String)|select * from es#cat('nodes?s=name:desc')|
 
 #### Misc
 

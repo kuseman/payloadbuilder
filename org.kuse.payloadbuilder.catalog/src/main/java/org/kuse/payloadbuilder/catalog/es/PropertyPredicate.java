@@ -29,13 +29,20 @@ class PropertyPredicate
 {
     final String alias;
     final String property;
+    final String nestedPath;
     final AnalyzePair pair;
     final boolean fullTextPredicate;
 
     PropertyPredicate(String alias, String property, AnalyzePair pair, boolean fullTextPredicate)
     {
+        this(alias, property, null, pair, fullTextPredicate);
+    }
+
+    PropertyPredicate(String alias, String property, String nestedPath, AnalyzePair pair, boolean fullTextPredicate)
+    {
         this.alias = alias;
         this.property = requireNonNull(property, "property");
+        this.nestedPath = nestedPath;
         this.pair = requireNonNull(pair, "pair");
         this.fullTextPredicate = fullTextPredicate;
     }
@@ -85,6 +92,7 @@ class PropertyPredicate
 
                 return;
             }
+
             String stringValue = quote(value);
             //CSOFF
             switch (pair.getComparisonType())
@@ -94,12 +102,17 @@ class PropertyPredicate
                 case EQUAL:
                     //CSON
                     // { "term": { "property": value }}
-                    (pair.getComparisonType() == ComparisonExpression.Type.NOT_EQUAL ? filterMustNot : filterMust)
+                    StringBuilder sb = pair.getComparisonType() == ComparisonExpression.Type.NOT_EQUAL
+                        ? filterMustNot
+                        : filterMust;
+                    prependNested(sb);
+                    sb
                             .append("{\"term\":{\"")
                             .append(property)
                             .append("\":")
                             .append(stringValue)
                             .append("}}");
+                    appendNested(sb);
                     return;
                 case GREATER_THAN:
                 case GREATER_THAN_EQUAL:
@@ -107,6 +120,7 @@ class PropertyPredicate
                 case LESS_THAN_EQUAL:
 
                     // { "range": { "property": { "gt": 100 }}}
+                    prependNested(filterMust);
                     filterMust.append("{\"range\":{\"")
                             .append(property)
                             .append("\":{\"")
@@ -114,6 +128,7 @@ class PropertyPredicate
                             .append("\":")
                             .append(stringValue)
                             .append("}}}");
+                    appendNested(filterMust);
             }
         }
         else if (pair.getType() == Type.IN)
@@ -122,6 +137,7 @@ class PropertyPredicate
             InExpression ie = (InExpression) pair.getRight().getExpression();
             StringBuilder sb = ie.isNot() ? filterMustNot : filterMust;
 
+            prependNested(sb);
             sb.append("{\"terms\":{\"")
                     .append(property)
                     .append("\":[");
@@ -135,6 +151,7 @@ class PropertyPredicate
                     .collect(joining(",")));
 
             sb.append("]}}");
+            appendNested(sb);
         }
         else if (pair.getType() == Type.LIKE)
         {
@@ -150,17 +167,42 @@ class PropertyPredicate
                     // Replace LIKE syntax to wildcard syntax
                     .replace("%", "*")
                     .replace("_", "?");
+
+            prependNested(sb);
             sb.append("{\"wildcard\":{\"")
                     .append(property)
                     .append("\":{\"value\":\"")
                     .append(query)
                     .append("\"")
                     .append("}}}");
+            appendNested(sb);
         }
         else if (fullTextPredicate)
         {
             appendFullTextOperator(context, pair.getPredicate(), filterMust);
         }
+    }
+
+    private void prependNested(StringBuilder sb)
+    {
+        if (nestedPath == null)
+        {
+            return;
+        }
+        // Wrap filter in nested
+        // { "nested": { "path": "....", "query": {
+        sb.append("{\"nested\":{\"path\":\"")
+                .append(nestedPath)
+                .append("\", \"query\":");
+    }
+
+    private void appendNested(StringBuilder sb)
+    {
+        if (nestedPath == null)
+        {
+            return;
+        }
+        sb.append("}}");
     }
 
     private void appendFullTextOperator(ExecutionContext context, Expression expression, StringBuilder sb)
@@ -174,7 +216,7 @@ class PropertyPredicate
             // Qualified reference, pick the Qname as fields
             if (arguments.get(0) instanceof QualifiedReferenceExpression)
             {
-                arg0 = ((QualifiedReferenceExpression) arguments.get(0)).getQname().toString();
+                arg0 = ((QualifiedReferenceExpression) arguments.get(0)).getQname().toDotDelimited();
             }
             else
             {
@@ -185,6 +227,7 @@ class PropertyPredicate
             String[] fields = arg0.split(",");
 
             // TODO: - options argument
+            prependNested(sb);
             if (fields.length == 1)
             {
                 sb.append("{\"match\":{\"")
@@ -207,6 +250,7 @@ class PropertyPredicate
                         .append("\"")
                         .append("}}");
             }
+            appendNested(sb);
 
             return;
         }

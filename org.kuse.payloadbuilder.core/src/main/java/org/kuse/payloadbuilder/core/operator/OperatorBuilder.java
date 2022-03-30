@@ -646,7 +646,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         return ts
                 .getOptions()
                 .stream()
-                .filter(o -> name.equals(lowerCase(o.getOption().toString())))
+                .filter(o -> name.equals(lowerCase(o.getOption().toDotDelimited())))
                 .findFirst()
                 .orElse(null);
     }

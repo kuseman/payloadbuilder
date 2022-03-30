@@ -6,9 +6,9 @@ import static java.util.stream.Collectors.joining;
 import java.util.Arrays;
 import java.util.List;
 
-import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
+import org.kuse.payloadbuilder.core.operator.TableMeta.DataType;
 
 /** Lambda expression */
 public class LambdaExpression extends Expression
@@ -83,10 +83,8 @@ public class LambdaExpression extends Expression
         {
             LambdaExpression le = (LambdaExpression) obj;
             return identifiers.equals(le.identifiers)
-                &&
-                expression.equals(le.expression)
-                &&
-                Arrays.equals(lambdaIds, le.lambdaIds);
+                && expression.equals(le.expression)
+                && Arrays.equals(lambdaIds, le.lambdaIds);
         }
         return false;
     }

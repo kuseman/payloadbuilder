@@ -14,14 +14,19 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.Operator;
+import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair.Type;
+import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
+import org.kuse.payloadbuilder.core.operator.Tuple;
+import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QualifiedReferenceExpression;
 import org.kuse.payloadbuilder.core.parser.SortItem;
@@ -49,30 +54,40 @@ public class JdbcCatalog extends Catalog
     }
 
     @Override
-    public List<String> getTables(QuerySession session, String catalogAlias)
-    {
-        List<String> tables = new ArrayList<>();
-        String database = session.getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE);
-        try (Connection connection = getConnection(session, catalogAlias);
-                ResultSet rs = connection.getMetaData().getTables(database, null, null, null);)
-        {
-            while (rs.next())
-            {
-                tables.add(rs.getString(3));
-            }
-        }
-        catch (SQLException e)
-        {
-            throw new RuntimeException("Error listing tables", e);
-        }
-
-        return tables;
-    }
-
-    @Override
     public List<Index> getIndices(QuerySession session, String catalogAlias, QualifiedName table)
     {
         return singletonList(new Index(table, Index.ALL_COLUMNS, BATCH_SIZE));
+    }
+
+    @Override
+    public Operator getSystemOperator(OperatorData data)
+    {
+        final QuerySession session = data.getSession();
+        final String catalogAlias = data.getCatalogAlias();
+        final TableAlias alias = data.getTableAlias();
+        String type = alias.getTable().getLast();
+
+        if (SYS_TABLES.equalsIgnoreCase(type))
+        {
+            return systemOperator(data.getNodeId(), type, ctx -> getTupleIterator(session, catalogAlias, alias, null, true));
+        }
+        else if (SYS_COLUMNS.equalsIgnoreCase(type))
+        {
+            final Expression tableFilter = data.extractPredicate(SYS_COLUMNS_TABLE);
+            return systemOperator(data.getNodeId(), type, ctx ->
+            {
+                String table = tableFilter != null
+                    ? String.valueOf(tableFilter.eval(ctx))
+                    : null;
+                return getTupleIterator(session, catalogAlias, alias, table, false);
+            });
+        }
+        else if (SYS_FUNCTIONS.equalsIgnoreCase(type))
+        {
+            return getFunctionsOperator(data.getNodeId(), alias);
+        }
+
+        throw new RuntimeException(type + " is not supported");
     }
 
     @Override
@@ -218,5 +233,95 @@ public class JdbcCatalog extends Catalog
             return new String((char[]) obj);
         }
         return null;
+    }
+
+    private TupleIterator getTupleIterator(QuerySession session, String catalogAlias, TableAlias tableAlias, String tableFilter, boolean tables)
+    {
+        String database = session.getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE);
+        AtomicReference<Connection> connection = new AtomicReference<>();
+        AtomicReference<ResultSet> rs = new AtomicReference<>();
+        try
+        {
+            connection.set(getConnection(session, catalogAlias));
+            if (tables)
+            {
+                rs.set(connection.get().getMetaData().getTables(database, null, null, null));
+            }
+            else
+            {
+                rs.set(connection.get().getMetaData().getColumns(database, null, tableFilter, null));
+            }
+            final int count = rs.get().getMetaData().getColumnCount();
+            final String[] columns = new String[count];
+            final int[] ordinals = new int[count];
+            int index = tables ? 1 : 2;
+            for (int i = 0; i < count; i++)
+            {
+                String columnName = rs.get().getMetaData().getColumnName(i + 1);
+                if ("TABLE_NAME".equalsIgnoreCase(columnName))
+                {
+                    columns[0] = tables ? SYS_TABLES_NAME : SYS_COLUMNS_TABLE;
+                    ordinals[0] = i + 1;
+                }
+                else if (!tables && "COLUMN_NAME".equalsIgnoreCase(columnName))
+                {
+                    columns[1] = SYS_COLUMNS_NAME;
+                    ordinals[1] = i + 1;
+                }
+                else
+                {
+                    ordinals[index] = i + 1;
+                    columns[index++] = columnName;
+                }
+            }
+
+            //CSOFF
+            return new TupleIterator()
+            //CSON
+            {
+                @Override
+                public Tuple next()
+                {
+                    Object[] values = new Object[count];
+                    try
+                    {
+                        for (int i = 0; i < count; i++)
+                        {
+                            values[i] = rs.get().getString(ordinals[i]);
+                        }
+                    }
+                    catch (SQLException e)
+                    {
+                        throw new RuntimeException("Error reading resultset", e);
+                    }
+
+                    return Row.of(tableAlias, -1, columns, values);
+                }
+
+                @Override
+                public boolean hasNext()
+                {
+                    try
+                    {
+                        return rs.get().next();
+                    }
+                    catch (SQLException e)
+                    {
+                        throw new RuntimeException("Error advancing resultset", e);
+                    }
+                }
+
+                @Override
+                public void close()
+                {
+                    Utils.closeQuiet(connection.get(), rs.get());
+                }
+            };
+        }
+        catch (Exception e)
+        {
+            Utils.closeQuiet(connection.get(), rs.get());
+            throw new RuntimeException("Error listing tables", e);
+        }
     }
 }

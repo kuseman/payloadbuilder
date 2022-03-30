@@ -164,6 +164,12 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
     }
 
     @Override
+    public TR visit(UnresolvedQualifiedFunctionCallExpression expression, TC context)
+    {
+        return visitChildren(context, expression.getArguments(), (Expression[]) null);
+    }
+
+    @Override
     public TR visit(QualifiedFunctionCallExpression expression, TC context)
     {
         return visitChildren(context, expression.getArguments(), (Expression[]) null);

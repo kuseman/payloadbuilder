@@ -13,10 +13,10 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.kuse.payloadbuilder.core.QueryException;
-import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.codegen.CodeGeneratorContext;
 import org.kuse.payloadbuilder.core.codegen.ExpressionCode;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+import org.kuse.payloadbuilder.core.operator.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.Tuple;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
 
@@ -142,7 +142,9 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
     }
 
     /** Resolves value for provided tuple and path */
+    //CSOFF
     private Object resolveValue(Object value, ResolvePath path, String[] unresolvedParts, int unresolvedPartIndex)
+    //CSON
     {
         int partIndex = unresolvedPartIndex;
         /*
@@ -175,7 +177,9 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
                     ? path.columnOrdinal
                     : ((Tuple) result).getColumnOrdinal(path.unresolvedPath[partIndex++]);
 
-                result = ((Tuple) result).getValue(ordinal);
+                result = ordinal >= 0
+                    ? ((Tuple) result).getValue(ordinal)
+                    : null;
 
                 // Keep resolving tuples along the unresolved path
                 while (result instanceof Tuple && partIndex < path.unresolvedPath.length)
@@ -286,7 +290,7 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         // TODO: map access etc.
 
         int targetOrdinal = -1;
-        String column = lowerCase(qname.toString());
+        String column = lowerCase(qname.toDotDelimited());
         int columnOrdinal = -1;
         DataType type = DataType.ANY;
         if (resolvePaths != null)
@@ -453,7 +457,7 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
     @Override
     public String toString()
     {
-        return qname.toString();
+        return qname.toDotDelimited();
     }
 
     /**

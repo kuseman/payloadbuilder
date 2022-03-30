@@ -4,33 +4,39 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.kuse.payloadbuilder.core.catalog.builtin.BuiltinCatalog;
+import org.kuse.payloadbuilder.core.catalog.system.SystemCatalog;
 
 /** Catalog registry */
 public class CatalogRegistry
 {
     public static final String DEFAULTCATALOG = "defaultCatalog";
-    private final Map<String, Catalog> catalogByAlias = new HashMap<>();
-    private final Catalog builtinCatalog;
+    private final Map<String, Catalog> catalogByAlias = new LinkedHashMap<>();
+    private final Catalog systemCatalog = SystemCatalog.get();
     private String defaultCatalogAlias;
 
     public CatalogRegistry()
     {
-        builtinCatalog = BuiltinCatalog.get();
     }
 
-    public Catalog getBuiltin()
+    public Catalog getSystemCatalog()
     {
-        return builtinCatalog;
+        return systemCatalog;
     }
 
     /** Register catalog */
     public void registerCatalog(String alias, Catalog catalog)
     {
+        if (SystemCatalog.ALIAS.equals(lowerCase(alias)))
+        {
+            throw new IllegalArgumentException("Cannot register a catalog with reserved alias 'sys'");
+        }
+
         requireNonNull(catalog, "catalog");
         if (isBlank(alias))
         {
@@ -42,7 +48,11 @@ public class CatalogRegistry
     /** Get catalog */
     public Catalog getCatalog(String alias)
     {
-        return isBlank(alias) ? builtinCatalog : catalogByAlias.get(alias);
+        if (SystemCatalog.ALIAS.equals(lowerCase(alias)))
+        {
+            return systemCatalog;
+        }
+        return isBlank(alias) ? systemCatalog : catalogByAlias.get(alias);
     }
 
     /** Clears registered catalogs */
@@ -73,6 +83,12 @@ public class CatalogRegistry
         defaultCatalogAlias = alias;
     }
 
+    /** Return set of registered catalogs */
+    public Set<Entry<String, Catalog>> getCatalogs()
+    {
+        return catalogByAlias.entrySet();
+    }
+
     /**
      * Resolves function info from provided
      */
@@ -94,7 +110,7 @@ public class CatalogRegistry
                 }
             }
 
-            catalog = getBuiltin();
+            catalog = systemCatalog;
         }
         else
         {

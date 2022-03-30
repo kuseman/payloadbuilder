@@ -43,7 +43,7 @@ public class ExpressionTest extends AParserTest
     @Test
     public void test_auto_cast_strings() throws Exception
     {
-        assertExpressionFail(IllegalArgumentException.class, "Cannot compare true and", null, "true = '1.0'");
+        assertExpressionFail(IllegalArgumentException.class, "Cannot compare true (Boolean) and", null, "true = '1.0'");
         assertExpressionFail(IllegalArgumentException.class, "Cannot convert value 1.0 to", null, "1 = '1.0'");
 
         assertExpression(true, null, "1 = '1'");

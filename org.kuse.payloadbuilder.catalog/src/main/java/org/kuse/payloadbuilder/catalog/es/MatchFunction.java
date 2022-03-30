@@ -20,6 +20,14 @@ class MatchFunction extends ScalarFunctionInfo
     }
 
     @Override
+    public String getDescription()
+    {
+        return "Function that is used in Elastic search query context (predicates) and utilizes Elastic 'match/multi_match' query. " + System.lineSeparator()
+            + "ex. match(<fields expression>, <match expression>, [<options expression>]) "  + System.lineSeparator()
+            + "See: https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-match-query.html";
+    }
+
+    @Override
     public Object eval(ExecutionContext context, List<Expression> arguments)
     {
         throw new IllegalArgumentException("'match' cannot be used in non Elastic query context.");

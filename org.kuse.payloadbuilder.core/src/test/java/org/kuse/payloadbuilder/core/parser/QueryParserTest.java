@@ -110,9 +110,11 @@ public class QueryParserTest extends AParserTest
         assertExpression("a.filter(x -> x.val > 0)");
 
         QualifiedFunctionCallExpression expected = new QualifiedFunctionCallExpression(
+                "",
                 (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "map").getValue(),
                 asList(
                         new QualifiedFunctionCallExpression(
+                                "",
                                 (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "flatMap").getValue(),
                                 asList(
                                         new QualifiedReferenceExpression(
@@ -136,6 +138,7 @@ public class QueryParserTest extends AParserTest
                         new LambdaExpression(
                                 asList("x"),
                                 new QualifiedFunctionCallExpression(
+                                        "",
                                         (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "cast").getValue(),
                                         asList(
                                                 new QualifiedReferenceExpression(
@@ -156,7 +159,7 @@ public class QueryParserTest extends AParserTest
     @Test
     public void test_dereference()
     {
-        session.getCatalogRegistry().getBuiltin().registerFunction(new ScalarFunctionInfo(session.getCatalogRegistry().getBuiltin(), "func")
+        session.getCatalogRegistry().getSystemCatalog().registerFunction(new ScalarFunctionInfo(session.getCatalogRegistry().getSystemCatalog(), "func")
         {
         });
         session.getCatalogRegistry().registerCatalog("utils", new Catalog("utils")
@@ -182,6 +185,7 @@ public class QueryParserTest extends AParserTest
                 null));
         assertExpression("@list.filter(x -> x.value)",
                 new QualifiedFunctionCallExpression(
+                        "",
                         (ScalarFunctionInfo) session.getCatalogRegistry().resolveFunctionInfo("", "filter").getValue(),
                         asList(
                                 new VariableExpression(QualifiedName.of("list")),
@@ -196,6 +200,7 @@ public class QueryParserTest extends AParserTest
                                         new int[] {0})),
                         null));
         assertExpression("a.hash()", new QualifiedFunctionCallExpression(
+                "",
                 hashFunction,
                 asList(new QualifiedReferenceExpression(
                         QualifiedName.of("a"),
@@ -208,14 +213,14 @@ public class QueryParserTest extends AParserTest
         assertExpression("a.hash() + hash(a)",
                 new ArithmeticBinaryExpression(
                         Type.ADD,
-                        new QualifiedFunctionCallExpression(hashFunction, asList(new QualifiedReferenceExpression(
+                        new QualifiedFunctionCallExpression("", hashFunction, asList(new QualifiedReferenceExpression(
                                 QualifiedName.of("a"),
                                 -1,
                                 new ResolvePath[] {
                                         new ResolvePath(-1, -1, asList("a"), -1)
                                 },
                                 null)), null),
-                        new QualifiedFunctionCallExpression(hashFunction, asList(new QualifiedReferenceExpression(
+                        new QualifiedFunctionCallExpression("", hashFunction, asList(new QualifiedReferenceExpression(
                                 QualifiedName.of("a"),
                                 -1,
                                 new ResolvePath[] {
@@ -224,7 +229,7 @@ public class QueryParserTest extends AParserTest
                                 null)), null)));
         assertExpression("a.b.c.hash().value",
                 new DereferenceExpression(
-                        new QualifiedFunctionCallExpression(hashFunction, asList(new QualifiedReferenceExpression(
+                        new QualifiedFunctionCallExpression("", hashFunction, asList(new QualifiedReferenceExpression(
                                 QualifiedName.of("a", "b", "c"),
                                 -1,
                                 new ResolvePath[] {
@@ -239,8 +244,8 @@ public class QueryParserTest extends AParserTest
                                 },
                                 null)));
         assertExpression("a.b.c.hash().hash()",
-                new QualifiedFunctionCallExpression(hashFunction,
-                        asList(new QualifiedFunctionCallExpression(hashFunction, asList(new QualifiedReferenceExpression(
+                new QualifiedFunctionCallExpression("", hashFunction,
+                        asList(new QualifiedFunctionCallExpression("", hashFunction, asList(new QualifiedReferenceExpression(
                                 QualifiedName.of("a", "b", "c"),
                                 -1,
                                 new ResolvePath[] {
@@ -249,9 +254,9 @@ public class QueryParserTest extends AParserTest
                                 null)), null)),
                         null));
         assertExpression("a.b.c.hash().hash(123)",
-                new QualifiedFunctionCallExpression(hashFunction,
+                new QualifiedFunctionCallExpression("", hashFunction,
                         asList(
-                                new QualifiedFunctionCallExpression(hashFunction, asList(
+                                new QualifiedFunctionCallExpression("", hashFunction, asList(
                                         new QualifiedReferenceExpression(
                                                 QualifiedName.of("a", "b", "c"),
                                                 -1,
@@ -395,7 +400,7 @@ public class QueryParserTest extends AParserTest
         assertExpressionFail(ParseException.class, "Expected a SCALAR function for open_rows", "open_rows(10)");
         assertExpressionFail(ParseException.class, "Expected a SCALAR function for open_rows", "'string'.open_rows()");
 
-        assertExpressionFail(ParseException.class, "No function found named: nonono in catalog: BuiltIn", "nonono()");
+        assertExpressionFail(ParseException.class, "No function named: nonono found.", "nonono()");
     }
 
     @Test

@@ -11,11 +11,11 @@ import org.kuse.payloadbuilder.core.codegen.ProjectionCode;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
 
 /** Projection for asterisk selects */
-class AsteriskProjection extends AProjection
+public class AsteriskProjection extends AProjection
 {
     private final int[] tupleOrdinals;
 
-    AsteriskProjection(int[] tupleOrdinals)
+    public AsteriskProjection(int[] tupleOrdinals)
     {
         this.tupleOrdinals = requireNonNull(tupleOrdinals);
     }

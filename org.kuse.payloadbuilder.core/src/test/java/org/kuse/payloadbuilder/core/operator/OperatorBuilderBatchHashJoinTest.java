@@ -412,7 +412,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             @Override
             public List<Index> getIndices(QuerySession session, String catalogAlias, QualifiedName table)
             {
-                List<String> keys = keysByTable.get(table.toString());
+                List<String> keys = keysByTable.get(table.toDotDelimited());
                 return keys != null ? asList(new Index(table, keys, 100)) : emptyList();
             }
 

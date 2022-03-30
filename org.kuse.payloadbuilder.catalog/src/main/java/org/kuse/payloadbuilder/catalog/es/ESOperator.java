@@ -21,7 +21,6 @@ import java.io.OutputStream;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -39,7 +38,6 @@ import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.lang3.time.StopWatch;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHeaders;
@@ -56,11 +54,9 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.util.EntityUtils;
-import org.kuse.payloadbuilder.catalog.es.ESCatalog.IdIndex;
-import org.kuse.payloadbuilder.catalog.es.ESCatalog.ParentIndex;
+import org.kuse.payloadbuilder.catalog.es.ESCatalog.MappedProperty;
+import org.kuse.payloadbuilder.catalog.es.ESUtils.SortItemMeta;
 import org.kuse.payloadbuilder.core.catalog.Index;
-import org.kuse.payloadbuilder.core.catalog.TableMeta;
-import org.kuse.payloadbuilder.core.catalog.TableMeta.Column;
 import org.kuse.payloadbuilder.core.operator.AOperator;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValues;
@@ -68,6 +64,8 @@ import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.StatementContext;
 import org.kuse.payloadbuilder.core.operator.StatementContext.NodeData;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
+import org.kuse.payloadbuilder.core.operator.TableMeta;
+import org.kuse.payloadbuilder.core.operator.TableMeta.Column;
 import org.kuse.payloadbuilder.core.utils.ObjectUtils;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -115,22 +113,26 @@ class ESOperator extends AOperator
 
     private final TableAlias tableAlias;
     private final Index index;
+    /** The mapped property used for the index */
+    private final MappedProperty indexProperty;
     private final String catalogAlias;
     private final List<PropertyPredicate> propertyPredicates;
-    private final List<Pair<String, String>> sortItems;
+    private final List<SortItemMeta> sortItems;
 
     ESOperator(
             int nodeId,
             String catalogAlias,
             TableAlias tableAlias,
             Index index,
+            MappedProperty indexProperty,
             List<PropertyPredicate> propertyPredicates,
-            List<Pair<String, String>> sortItems)
+            List<SortItemMeta> sortItems)
     {
         super(nodeId);
         this.catalogAlias = catalogAlias;
         this.tableAlias = tableAlias;
         this.index = index;
+        this.indexProperty = indexProperty;
         this.propertyPredicates = requireNonNull(propertyPredicates, "propertyPredicates");
         this.sortItems = requireNonNull(sortItems, "sortItems");
     }
@@ -154,8 +156,8 @@ class ESOperator extends AOperator
                         .collect(joining(" AND "))),
                 entry("Sort", sortItems
                         .stream()
-                        .map(i -> i.getKey() + ":" + i.getValue())
-                        .collect(joining(","))),
+                        .map(Object::toString)
+                        .collect(joining(", "))),
                 entry("Query", ESUtils.getSearchBody(sortItems, propertyPredicates, SINGLE_TYPE_TABLE_NAME.equals(esType.type), context)));
 
         if (index != null)
@@ -181,37 +183,9 @@ class ESOperator extends AOperator
         ESType esType = ESType.of(context.getSession(), catalogAlias, tableAlias.getTable());
 
         Data data = context.getStatementContext().getOrCreateNodeData(nodeId, Data::new);
-        if (index instanceof IdIndex)
+        if (index != null)
         {
-            boolean isSingleType = SINGLE_TYPE_TABLE_NAME.equals(esType.type);
-            String mgetUrl = getUrl(
-                    String.format("%s/%s/%s/_mget?", esType.endpoint, esType.index, esType.type),
-                    "docs",
-                    tableAlias,
-                    index,
-                    isSingleType);
-
-            DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getStatementContext(), data);
-            MutableBoolean doRequest = new MutableBoolean(true);
-            return getIterator(
-                    context,
-                    tableAlias,
-                    esType.endpoint,
-                    ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(esType.type),
-                    data,
-                    scrollId ->
-                    {
-                        if (doRequest.isTrue())
-                        {
-                            data.bytesSent += mgetUrl.length();
-                            HttpPost post = new HttpPost(mgetUrl);
-                            post.setEntity(entity);
-                            doRequest.setFalse();
-                            return post;
-                        }
-
-                        return null;
-                    });
+            return getIndexOperator(context, esType, data);
         }
 
         final boolean isSingleType = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(esType.type);
@@ -222,37 +196,15 @@ class ESOperator extends AOperator
                 1000,
                 2,
                 tableAlias,
-                index);
+                null);
         final String scrollUrl = getScrollUrl(
                 esType.endpoint,
                 esType.type,
                 2,
                 tableAlias,
-                index);
+                null);
 
-        String body;
-        // Parent index, query parents
-        if (index instanceof ParentIndex)
-        {
-            List<String> parentIds = new ArrayList<>();
-            while (context.getStatementContext().getOuterOrdinalValues().hasNext())
-            {
-                IOrdinalValues array = context.getStatementContext().getOuterOrdinalValues().next();
-                Object obj = array.getValue(0);
-                if (obj != null)
-                {
-                    parentIds.add(String.valueOf(obj));
-                }
-            }
-
-            body = "{ \"filter\": { \"terms\": { \"_parent\": [ " + parentIds.stream().collect(joining(",")) + " ] } } }";
-        }
-        else
-        {
-            body = ESUtils.getSearchBody(sortItems, propertyPredicates, isSingleType, context);
-        }
-
-        final String actualBody = body;
+        String body = ESUtils.getSearchBody(sortItems, propertyPredicates, isSingleType, context);
         return getIterator(
                 context,
                 tableAlias,
@@ -263,15 +215,15 @@ class ESOperator extends AOperator
                 {
                     if (scrollId.getValue() == null)
                     {
-                        data.bytesSent += searchUrl.length() + actualBody.length();
+                        data.bytesSent += searchUrl.length() + body.length();
                         HttpPost post = new HttpPost(searchUrl);
-                        post.setEntity(new StringEntity(actualBody, UTF_8));
+                        post.setEntity(new StringEntity(body, UTF_8));
                         return post;
                     }
                     else
                     {
                         String id = scrollId.getValue();
-                        data.bytesSent += scrollUrl.length() + actualBody.length();
+                        data.bytesSent += scrollUrl.length() + body.length();
                         scrollId.setValue(null);
                         HttpPost post = new HttpPost(scrollUrl);
                         if (isSingleType)
@@ -288,6 +240,101 @@ class ESOperator extends AOperator
                 });
     }
 
+    private TupleIterator getIndexOperator(ExecutionContext context, ESType esType, Data data)
+    {
+        String column = index.getColumns().get(0);
+        String field = column;
+
+        // Fix field name for special fields
+        if (DOCID.equalsIgnoreCase(column))
+        {
+            field = "_id";
+        }
+        else if (PARENTID.equalsIgnoreCase(column))
+        {
+            field = "_parent";
+        }
+        else
+        {
+            // Translate to non freetext
+            if (indexProperty.isFreeTextMapping())
+            {
+                MappedProperty nonFreeTextField = indexProperty.getNonFreeTextField();
+                field = nonFreeTextField.name;
+            }
+        }
+
+        boolean isSingleType = SINGLE_TYPE_TABLE_NAME.equals(esType.type);
+        MutableBoolean doRequest = new MutableBoolean(true);
+
+        // Multi indices query or non _id index then use terms-filter since
+        // mget is not supported
+        if (esType.index.contains("*")
+            || esType.index.contains(".")
+            || !"_id".equalsIgnoreCase(field))
+        {
+            String searchUrl = getSearchUrl(
+                    esType.endpoint,
+                    esType.index,
+                    esType.type,
+                    index.getBatchSize(),
+                    null,
+                    tableAlias,
+                    field);
+
+            final String finalField = field;
+            return getIterator(
+                    context,
+                    tableAlias,
+                    esType.endpoint,
+                    isSingleType,
+                    data,
+                    scroll ->
+                    {
+                        if (doRequest.isTrue())
+                        {
+                            boolean quoteValues = indexProperty == null
+                                || indexProperty.shouldQuoteValues();
+                            String body = ESUtils.getIndexSearchBody(context, quoteValues, finalField, isSingleType);
+                            data.bytesSent += body.length();
+                            HttpPost post = new HttpPost(searchUrl);
+                            post.setEntity(new StringEntity(body, UTF_8));
+                            doRequest.setFalse();
+                            return post;
+                        }
+                        return null;
+                    });
+        }
+
+        String mgetUrl = getUrl(
+                String.format("%s/%s/%s/_mget?", esType.endpoint, esType.index, esType.type),
+                "docs",
+                tableAlias,
+                null,
+                isSingleType);
+
+        DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getStatementContext(), data);
+        return getIterator(
+                context,
+                tableAlias,
+                esType.endpoint,
+                ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(esType.type),
+                data,
+                scrollId ->
+                {
+                    if (doRequest.isTrue())
+                    {
+                        data.bytesSent += mgetUrl.length();
+                        HttpPost post = new HttpPost(mgetUrl);
+                        post.setEntity(entity);
+                        doRequest.setFalse();
+                        return post;
+                    }
+
+                    return null;
+                });
+    }
+
     static String getSearchUrl(
             String endpoint,
             String index,
@@ -295,7 +342,7 @@ class ESOperator extends AOperator
             Integer size,
             Integer scrollMinutes,
             TableAlias alias,
-            Index operatorIndex)
+            String indexField)
     {
         boolean isSingleType = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(type);
         ObjectUtils.requireNonBlank(endpoint, "endpoint is required");
@@ -304,7 +351,7 @@ class ESOperator extends AOperator
                 isBlank(index) ? "*" : index,
                 isBlank(type) ? "" : ("/" + type),
                 scrollMinutes != null ? ("scroll=" + scrollMinutes + "m") : "",
-                size != null ? ("&size=" + size) : ""), "hits.hits", alias, operatorIndex, isSingleType);
+                size != null ? ("&size=" + size) : ""), "hits.hits", alias, indexField, isSingleType);
     }
 
     static String getSearchTemplateUrl(
@@ -314,7 +361,7 @@ class ESOperator extends AOperator
             Integer size,
             Integer scrollMinutes,
             TableAlias alias,
-            Index operatorIndex)
+            String indexField)
     {
         boolean isSingleType = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(type);
         ObjectUtils.requireNonBlank(endpoint, "endpoint is required");
@@ -323,7 +370,7 @@ class ESOperator extends AOperator
                 isBlank(index) ? "*" : index,
                 isBlank(type) ? "" : (type + "/"),
                 scrollMinutes != null ? ("scroll=" + scrollMinutes + "m") : "",
-                size != null ? ("&size=" + size) : ""), "hits.hits", alias, operatorIndex, isSingleType);
+                size != null ? ("&size=" + size) : ""), "hits.hits", alias, indexField, isSingleType);
     }
 
     static String getScrollUrl(
@@ -331,27 +378,27 @@ class ESOperator extends AOperator
             String type,
             int scrollMinutes,
             TableAlias alias,
-            Index operatorIndex)
+            String indexField)
     {
         boolean isSingleType = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(type);
         ObjectUtils.requireNonBlank(endpoint, "endpoint is required");
         return getUrl(String.format("%s/_search/scroll?scroll=%dm",
                 endpoint,
-                scrollMinutes), "hits.hits", alias, operatorIndex, isSingleType);
+                scrollMinutes), "hits.hits", alias, indexField, isSingleType);
     }
 
     private static String getUrl(
             String prefix,
             String filterPathPrefix,
             TableAlias alias,
-            Index operatorIndex,
+            String indexField,
             boolean isSingleType)
     {
         TableMeta meta = alias.getTableMeta();
         boolean includeParent = !isSingleType
             && (meta == null
                 || meta.getColumn(PARENTID) != null
-                || operatorIndex instanceof ParentIndex);
+                || "_parent".equalsIgnoreCase(indexField));
         boolean includeIndex = meta == null
             || meta.getColumn(INDEX) != null;
         boolean includeType = meta == null

@@ -5,8 +5,8 @@ import static java.util.Objects.requireNonNull;
 import java.util.Objects;
 
 import org.apache.commons.lang3.StringUtils;
-import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+import org.kuse.payloadbuilder.core.operator.TableMeta.DataType;
 
 /** A named expression used as function arguments etc. */
 public class NamedExpression extends Expression

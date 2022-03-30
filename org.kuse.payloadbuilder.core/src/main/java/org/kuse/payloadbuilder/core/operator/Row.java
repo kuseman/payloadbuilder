@@ -6,7 +6,7 @@ import java.util.Arrays;
 import java.util.Map;
 
 import org.apache.commons.lang3.ArrayUtils;
-import org.kuse.payloadbuilder.core.catalog.TableMeta.Column;
+import org.kuse.payloadbuilder.core.operator.TableMeta.Column;
 
 /**
  * Row implementation of a {@link Tuple}. Columns and values simply
@@ -284,7 +284,7 @@ public class Row implements Tuple
         {
             if (ordinal >= values.length)
             {
-                System.out.println();
+                return null;
             }
             return values[ordinal];
         }

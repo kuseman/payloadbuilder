@@ -7,10 +7,9 @@ import java.util.stream.IntStream;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.catalog.TableMeta;
-import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.TableAlias.TableAliasBuilder;
+import org.kuse.payloadbuilder.core.operator.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Test of {@link ComputedColumnsOperator} */

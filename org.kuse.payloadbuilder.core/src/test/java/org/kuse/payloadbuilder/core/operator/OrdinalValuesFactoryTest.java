@@ -12,8 +12,8 @@ import java.util.function.ToIntBiFunction;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValues;
+import org.kuse.payloadbuilder.core.operator.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.parser.AParserTest;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.utils.MapUtils;

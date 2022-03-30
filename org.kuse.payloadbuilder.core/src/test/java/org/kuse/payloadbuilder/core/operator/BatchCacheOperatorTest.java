@@ -13,12 +13,11 @@ import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.cache.BatchCacheProvider;
-import org.kuse.payloadbuilder.core.catalog.TableMeta;
-import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.BatchCacheOperator.CacheSettings;
 import org.kuse.payloadbuilder.core.operator.ExpressionOrdinalValuesFactory.OrdinalValues;
 import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValues;
 import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
+import org.kuse.payloadbuilder.core.operator.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 
 /** Test of {@link BatchCacheOperator} */
@@ -364,7 +363,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
         @Override
         public <TKey> Map<TKey, List<Tuple>> getAll(QualifiedName cacheName, Iterable<TKey> keys)
         {
-            Map<Object, List<Tuple>> currentCache = cache.computeIfAbsent("test_" + cacheName, k -> new HashMap<>());
+            Map<Object, List<Tuple>> currentCache = cache.computeIfAbsent("test_" + cacheName.toDotDelimited(), k -> new HashMap<>());
             Map<TKey, List<Tuple>> result = new HashMap<>();
             for (TKey key : keys)
             {
@@ -378,7 +377,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
         public <TKey> void putAll(QualifiedName cacheName, Map<TKey, List<Tuple>> values, Duration ttl)
         {
             this.ttl = ttl;
-            Map<Object, List<Tuple>> currentCache = cache.computeIfAbsent("test_" + cacheName, k -> new HashMap<>());
+            Map<Object, List<Tuple>> currentCache = cache.computeIfAbsent("test_" + cacheName.toDotDelimited(), k -> new HashMap<>());
             for (Entry<TKey, List<Tuple>> entry : values.entrySet())
             {
                 TKey cacheKey = entry.getKey();

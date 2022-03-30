@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.lang3.StringUtils;
-import org.kuse.payloadbuilder.core.catalog.TableMeta;
 import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValues;
 import org.kuse.payloadbuilder.core.utils.MapUtils;
 

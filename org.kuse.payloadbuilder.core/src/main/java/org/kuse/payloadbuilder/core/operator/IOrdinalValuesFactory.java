@@ -1,7 +1,7 @@
 package org.kuse.payloadbuilder.core.operator;
 
 import org.kuse.payloadbuilder.core.catalog.Catalog;
-import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
+import org.kuse.payloadbuilder.core.operator.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.utils.ExpressionMath;
 
 /**

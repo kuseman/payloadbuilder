@@ -2,6 +2,7 @@ package org.kuse.payloadbuilder.core.cache;
 
 import static java.util.Collections.emptyList;
 
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
@@ -23,6 +24,13 @@ public interface CacheProvider
 
     /** Return cache infos for this cache provider */
     default List<CacheInfo> getCaches()
+    {
+        return emptyList();
+    }
+
+    /** Return cache entry infos for this cache provider
+     * @param cacheName Name of cache to return entry infos for */
+    default List<CacheEntryInfo> getCacheEntries(QualifiedName cacheName)
     {
         return emptyList();
     }
@@ -84,6 +92,29 @@ public interface CacheProvider
         public int getCacheMisses()
         {
             return cacheMisses;
+        }
+    }
+
+    /** Info about a cache entry */
+    class CacheEntryInfo
+    {
+        private final Object key;
+        private final ZonedDateTime expireTime;
+
+        CacheEntryInfo(Object key, ZonedDateTime expireTime)
+        {
+            this.key = key;
+            this.expireTime = expireTime;
+        }
+
+        public Object getKey()
+        {
+            return key;
+        }
+
+        public ZonedDateTime getExpireTime()
+        {
+            return expireTime;
         }
     }
 }

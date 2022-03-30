@@ -47,6 +47,8 @@ public interface ExpressionVisitor<TR, TC>
 
     TR visit(QualifiedFunctionCallExpression expression, TC context);
 
+    TR visit(UnresolvedQualifiedFunctionCallExpression expression, TC context);
+
     TR visit(DereferenceExpression expression, TC context);
 
     TR visit(UnresolvedDereferenceExpression expression, TC context);
@@ -61,5 +63,6 @@ public interface ExpressionVisitor<TR, TC>
 
     TR visit(UnresolvedSubQueryExpression expression, TC context);
     //CSOFF
+
 
 }

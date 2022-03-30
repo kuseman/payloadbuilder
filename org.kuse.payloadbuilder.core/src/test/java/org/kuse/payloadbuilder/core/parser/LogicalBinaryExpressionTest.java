@@ -10,9 +10,9 @@ import java.util.function.Predicate;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Test;
-import org.kuse.payloadbuilder.core.catalog.TableMeta.DataType;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.Tuple;
+import org.kuse.payloadbuilder.core.operator.TableMeta.DataType;
 
 /** Unit test of {@link LogicalBinaryExpression} */
 public class LogicalBinaryExpressionTest extends AParserTest

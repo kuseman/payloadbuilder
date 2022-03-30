@@ -12,7 +12,6 @@ import java.util.stream.IntStream;
 
 import org.antlr.v4.runtime.Token;
 import org.apache.commons.lang3.StringUtils;
-import org.kuse.payloadbuilder.core.catalog.TableMeta;
 import org.kuse.payloadbuilder.core.parser.ParseException;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 

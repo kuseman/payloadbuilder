@@ -2,12 +2,15 @@ package org.kuse.payloadbuilder.catalog.es;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
-import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.kuse.payloadbuilder.catalog.es.ESCatalog.MappedProperty;
+import org.kuse.payloadbuilder.catalog.es.ESUtils.SortItemMeta;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
@@ -17,6 +20,8 @@ import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.TableAlias.Type;
 import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QueryParser;
+import org.kuse.payloadbuilder.core.parser.SortItem.NullOrder;
+import org.kuse.payloadbuilder.core.parser.SortItem.Order;
 
 /** Test of {@link ESUtils} */
 public class ESUtilsTest extends Assert
@@ -36,8 +41,18 @@ public class ESUtilsTest extends Assert
     public void test_search_body_singleType()
     {
         assertEquals("{\"sort\":[\"_doc\"]}", ESUtils.getSearchBody(emptyList(), emptyList(), true, context));
-        assertEquals("{\"sort\":[{\"@timestamp\":{\"order\":\"desc\"}},{\"count\":{\"order\":\"asc\"}}]}",
-                ESUtils.getSearchBody(asList(Pair.of("@timestamp", "desc"), Pair.of("count", "asc")), emptyList(), true, context));
+        assertEquals(
+                "{\"sort\":[{\"@timestamp\":{\"order\":\"desc\",\"missing\":\"_last\"}},{\"count\":{\"order\":\"asc\"}},{\"nested.object.value\":{\"order\":\"asc\",\"nested\":{\"path\":\"nested.object\"}}},{\"text.keyword\":{\"order\":\"asc\"}}]}",
+                ESUtils.getSearchBody(asList(
+                        // Null order
+                        sortItem("@timestamp", "int", null, Order.DESC, NullOrder.LAST),
+                        // No null order
+                        sortItem("count", "text", null, Order.ASC, NullOrder.UNDEFINED),
+                        // Nested
+                        sortItem("nested.object.value", "int", "nested.object", Order.ASC, NullOrder.UNDEFINED),
+                        // Free-text property with a non free text field, then we should sort on the non-free-text variant
+                        sortItem("text", "text", null, Order.ASC, NullOrder.UNDEFINED, prop("text.keyword", "keyword", null))),
+                        emptyList(), true, context));
 
         TableAlias alias = TableAlias.TableAliasBuilder.of(-1, Type.TABLE, QualifiedName.of("table"), "t").build();
         AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(parser.parseExpression(registry,
@@ -128,8 +143,18 @@ public class ESUtilsTest extends Assert
     public void test_search_body()
     {
         assertEquals("{\"sort\":[\"_doc\"]}", ESUtils.getSearchBody(emptyList(), emptyList(), false, context));
-        assertEquals("{\"sort\":[{\"@timestamp\":{\"order\":\"desc\"}},{\"count\":{\"order\":\"asc\"}}]}",
-                ESUtils.getSearchBody(asList(Pair.of("@timestamp", "desc"), Pair.of("count", "asc")), emptyList(), false, context));
+        assertEquals(
+                "{\"sort\":[{\"@timestamp\":{\"order\":\"desc\",\"missing\":\"_first\"}},{\"count\":{\"order\":\"asc\"}},{\"nested.object.value\":{\"order\":\"asc\",\"nested_path\":\"nested.object\"}},{\"text.raw\":{\"order\":\"asc\"}}]}",
+                ESUtils.getSearchBody(asList(
+                        // Null order
+                        sortItem("@timestamp", "int", null, Order.DESC, NullOrder.FIRST),
+                        // No null order
+                        sortItem("count", "string", null, Order.ASC, NullOrder.UNDEFINED),
+                        // Nested
+                        sortItem("nested.object.value", "int", "nested.object", Order.ASC, NullOrder.UNDEFINED),
+                        // Free-text property with a non free text field, then we should sort on the non-free-text variant
+                        sortItem("text", "string", null, Order.ASC, NullOrder.UNDEFINED, prop("text.raw", "string", "not_analyzed"))),
+                        emptyList(), false, context));
 
         TableAlias alias = TableAlias.TableAliasBuilder.of(-1, Type.TABLE, QualifiedName.of("table"), "t").build();
         AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(parser.parseExpression(registry,
@@ -239,5 +264,21 @@ public class ESUtilsTest extends Assert
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", "", p, true)).collect(toList()),
                         false,
                         context));
+    }
+
+    private SortItemMeta sortItem(String name, String type, String nestedPath, Order order, NullOrder nullOrder)
+    {
+        return sortItem(name, type, nestedPath, order, nullOrder, null);
+    }
+
+    private SortItemMeta sortItem(String name, String type, String nestedPath, Order order, NullOrder nullOrder, ESCatalog.MappedProperty field)
+    {
+        ESCatalog.MappedProperty prop = new ESCatalog.MappedProperty(name, type, null, nestedPath, field != null ? singletonList(field) : emptyList(), emptyMap());
+        return new SortItemMeta(prop, order, nullOrder);
+    }
+
+    static MappedProperty prop(String name, String type, Object index)
+    {
+        return new MappedProperty(name, type, index, null, emptyList(), emptyMap());
     }
 }

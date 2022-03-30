@@ -47,7 +47,7 @@ public class SubscriptExpression extends Expression implements HasIdentifier
         return visitor.visit(this, context);
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({"unchecked"})
     @Override
     public Object eval(ExecutionContext context)
     {
