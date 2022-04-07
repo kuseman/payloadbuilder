@@ -33,7 +33,7 @@ select *
 from sys#es.indices
 ```
 
-These table queries can be implemented by catalogs via Catalog#getSystemOperator
+These table queries can be implemented by catalogs via Catalog#getSystemOperator<br/>
 The system catalog is automatically registered in the session with alias `sys` 
 
 ## Filesystem
@@ -66,8 +66,7 @@ Catalog that provides access to elasticsearch.
 | endpoint      | (string) Endpoint to elasticsearch |
 | index         | (string) Index in elasticsearch    |
 | type          | (string) Type in index             |
-| cache.mappings.ttl | (integer) Cache TTL for mappings. To avoid excessive queries against ES for mappings etc. that is needed
-to properly utilize indices, predicate push downs, order by's etc. that information is put to PLB's CUSTOM cache. Defaults to 60 minutes. |
+| cache.mappings.ttl | (integer) Cache TTL for mappings. To avoid excessive queries against ES for mappings etc. that is needed to properly utilize indices, predicate push downs, order by's etc. that information is put to PLB's CUSTOM cache. Defaults to 60 minutes. |
 
 
 #### Qualified name
