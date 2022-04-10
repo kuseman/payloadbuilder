@@ -212,7 +212,7 @@ public class SystemCatalog extends Catalog
                 .getCatalogRegistry()
                 .getCatalogs()
                 .stream()
-                .map(e -> (Tuple) Row.of(tableAlias, -1, columns, new Object[] {e.getKey(), e.getValue().getName()}))
+                .map(e -> (Tuple) Row.of(tableAlias, columns, new Object[] {e.getKey(), e.getValue().getName()}))
                 .iterator());
     }
 
@@ -222,7 +222,7 @@ public class SystemCatalog extends Catalog
         return TupleIterator.wrap(session
                 .getTemporaryTables()
                 .stream()
-                .map(e -> (Tuple) Row.of(tableAlias, -1, columns, new Object[] {e, e.getRows().size()}))
+                .map(e -> (Tuple) Row.of(tableAlias, columns, new Object[] {e, e.getRows().size()}))
                 .iterator());
     }
 
@@ -237,7 +237,7 @@ public class SystemCatalog extends Catalog
         return TupleIterator.wrap(providers
                 .stream()
                 .flatMap(p -> p.getCaches().stream().map(c -> Pair.of(p, c)))
-                .map(p -> (Tuple) Row.of(tableAlias, -1, columns, new Object[] {
+                .map(p -> (Tuple) Row.of(tableAlias, columns, new Object[] {
                         p.getValue().getName(),
                         p.getValue().getSize(),
                         p.getValue().getCacheHits(),
@@ -275,7 +275,7 @@ public class SystemCatalog extends Catalog
                     || cacheName.equalsIgnoreCase(p.getValue().getName().toDotDelimited())
                     || cacheName.equalsIgnoreCase(p.getValue().getName().toString()))
                 .flatMap(p -> p.getKey().getCacheEntries(p.getValue().getName()).stream().map(ce -> Pair.of(p, ce)))
-                .map(p -> (Tuple) Row.of(tableAlias, -1, columns, new Object[] {
+                .map(p -> (Tuple) Row.of(tableAlias, columns, new Object[] {
                         p.getKey().getValue().getName(),
                         p.getValue().getKey(),
                         p.getValue().getExpireTime(),
@@ -291,7 +291,7 @@ public class SystemCatalog extends Catalog
         return TupleIterator.wrap(ctx.getVariables()
                 .entrySet()
                 .stream()
-                .map(e -> (Tuple) Row.of(tableAlias, -1, columns, new Object[] {e.getKey(), e.getValue()}))
+                .map(e -> (Tuple) Row.of(tableAlias, columns, new Object[] {e.getKey(), e.getValue()}))
                 .iterator());
     }
 }

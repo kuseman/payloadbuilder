@@ -86,6 +86,9 @@ class ESOperator extends AOperator
     private static final int DEFAULT_CONNECT_TIMEOUT = 500;
     static final Charset UTF_8 = Charset.forName("UTF-8");
     private static final String FIELDS = "fields";
+    private static final String PARENT = "_parent";
+    private static final String ID = "_id";
+
     static final String INDEX = "__index";
     static final String TYPE = "__type";
     static final String DOCID = "__id";
@@ -148,6 +151,10 @@ class ESOperator extends AOperator
     {
         ESType esType = ESType.of(context.getSession(), catalogAlias, tableAlias.getTable());
 
+        String indexField = getIndexField();
+        boolean quoteValues = indexProperty == null
+            || indexProperty.shouldQuoteValues();
+
         Map<String, Object> result = ofEntries(true,
                 entry(CATALOG, ESCatalog.NAME),
                 entry(PREDICATE, propertyPredicates
@@ -158,7 +165,7 @@ class ESOperator extends AOperator
                         .stream()
                         .map(Object::toString)
                         .collect(joining(", "))),
-                entry("Query", ESUtils.getSearchBody(sortItems, propertyPredicates, SINGLE_TYPE_TABLE_NAME.equals(esType.type), context)));
+                entry("Query", ESUtils.getSearchBody(sortItems, propertyPredicates, indexField, quoteValues, SINGLE_TYPE_TABLE_NAME.equals(esType.type), context)));
 
         if (index != null)
         {
@@ -181,14 +188,15 @@ class ESOperator extends AOperator
     public TupleIterator open(ExecutionContext context)
     {
         ESType esType = ESType.of(context.getSession(), catalogAlias, tableAlias.getTable());
-
+        String indexField = getIndexField();
         Data data = context.getStatementContext().getOrCreateNodeData(nodeId, Data::new);
-        if (index != null)
+        // mget index
+        if (useMgets(esType, indexField))
         {
-            return getIndexOperator(context, esType, data);
+            return getMgetIndexOperator(context, esType, data);
         }
 
-        final boolean isSingleType = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(esType.type);
+        boolean isSingleType = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(esType.type);
         final String searchUrl = getSearchUrl(
                 esType.endpoint,
                 esType.index,
@@ -196,15 +204,17 @@ class ESOperator extends AOperator
                 1000,
                 2,
                 tableAlias,
-                null);
-        final String scrollUrl = getScrollUrl(
+                indexField);
+        String scrollUrl = getScrollUrl(
                 esType.endpoint,
                 esType.type,
                 2,
                 tableAlias,
-                null);
+                indexField);
 
-        String body = ESUtils.getSearchBody(sortItems, propertyPredicates, isSingleType, context);
+        boolean quoteValues = indexProperty == null
+            || indexProperty.shouldQuoteValues();
+        String body = ESUtils.getSearchBody(sortItems, propertyPredicates, indexField, quoteValues, isSingleType, context);
         return getIterator(
                 context,
                 tableAlias,
@@ -240,72 +250,47 @@ class ESOperator extends AOperator
                 });
     }
 
-    private TupleIterator getIndexOperator(ExecutionContext context, ESType esType, Data data)
+    private String getIndexField()
     {
+        if (index == null)
+        {
+            return null;
+        }
+
         String column = index.getColumns().get(0);
         String field = column;
 
         // Fix field name for special fields
         if (DOCID.equalsIgnoreCase(column))
         {
-            field = "_id";
+            field = ID;
         }
         else if (PARENTID.equalsIgnoreCase(column))
         {
-            field = "_parent";
+            field = PARENT;
         }
-        else
+        else if (indexProperty.isFreeTextMapping())
         {
             // Translate to non freetext
-            if (indexProperty.isFreeTextMapping())
-            {
-                MappedProperty nonFreeTextField = indexProperty.getNonFreeTextField();
-                field = nonFreeTextField.name;
-            }
+            MappedProperty nonFreeTextField = indexProperty.getNonFreeTextField();
+            field = nonFreeTextField.name;
         }
 
-        boolean isSingleType = SINGLE_TYPE_TABLE_NAME.equals(esType.type);
+        return field;
+    }
+
+    private boolean useMgets(ESType esType, String indexField)
+    {
+        // _id index field and no multi index query => mgets
+        return ID.equalsIgnoreCase(indexField)
+            && !esType.index.contains("*")
+            && !esType.index.contains(",");
+    }
+
+    private TupleIterator getMgetIndexOperator(ExecutionContext context, ESType esType, Data data)
+    {
         MutableBoolean doRequest = new MutableBoolean(true);
-
-        // Multi indices query or non _id index then use terms-filter since
-        // mget is not supported
-        if (esType.index.contains("*")
-            || esType.index.contains(".")
-            || !"_id".equalsIgnoreCase(field))
-        {
-            String searchUrl = getSearchUrl(
-                    esType.endpoint,
-                    esType.index,
-                    esType.type,
-                    index.getBatchSize(),
-                    null,
-                    tableAlias,
-                    field);
-
-            final String finalField = field;
-            return getIterator(
-                    context,
-                    tableAlias,
-                    esType.endpoint,
-                    isSingleType,
-                    data,
-                    scroll ->
-                    {
-                        if (doRequest.isTrue())
-                        {
-                            boolean quoteValues = indexProperty == null
-                                || indexProperty.shouldQuoteValues();
-                            String body = ESUtils.getIndexSearchBody(context, quoteValues, finalField, isSingleType);
-                            data.bytesSent += body.length();
-                            HttpPost post = new HttpPost(searchUrl);
-                            post.setEntity(new StringEntity(body, UTF_8));
-                            doRequest.setFalse();
-                            return post;
-                        }
-                        return null;
-                    });
-        }
-
+        boolean isSingleType = SINGLE_TYPE_TABLE_NAME.equals(esType.type);
         String mgetUrl = getUrl(
                 String.format("%s/%s/%s/_mget?", esType.endpoint, esType.index, esType.type),
                 "docs",
@@ -354,25 +339,6 @@ class ESOperator extends AOperator
                 size != null ? ("&size=" + size) : ""), "hits.hits", alias, indexField, isSingleType);
     }
 
-    static String getSearchTemplateUrl(
-            String endpoint,
-            String index,
-            String type,
-            Integer size,
-            Integer scrollMinutes,
-            TableAlias alias,
-            String indexField)
-    {
-        boolean isSingleType = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(type);
-        ObjectUtils.requireNonBlank(endpoint, "endpoint is required");
-        return getUrl(String.format("%s/%s/%s_search/template?%s",
-                endpoint,
-                isBlank(index) ? "*" : index,
-                isBlank(type) ? "" : (type + "/"),
-                scrollMinutes != null ? ("scroll=" + scrollMinutes + "m") : "",
-                size != null ? ("&size=" + size) : ""), "hits.hits", alias, indexField, isSingleType);
-    }
-
     static String getScrollUrl(
             String endpoint,
             String type,
@@ -387,7 +353,7 @@ class ESOperator extends AOperator
                 scrollMinutes), "hits.hits", alias, indexField, isSingleType);
     }
 
-    private static String getUrl(
+    static String getUrl(
             String prefix,
             String filterPathPrefix,
             TableAlias alias,
@@ -398,7 +364,7 @@ class ESOperator extends AOperator
         boolean includeParent = !isSingleType
             && (meta == null
                 || meta.getColumn(PARENTID) != null
-                || "_parent".equalsIgnoreCase(indexField));
+                || PARENT.equalsIgnoreCase(indexField));
         boolean includeIndex = meta == null
             || meta.getColumn(INDEX) != null;
         boolean includeType = meta == null
@@ -466,7 +432,6 @@ class ESOperator extends AOperator
                 : tableAlias.getTableMeta().getColumns().stream().map(c -> c.getName()).collect(toSet());
             private Set<String> addedColumns;
             private String[] rowColumns;
-            private int rowPos;
             private final MutableObject<String> scrollId = new MutableObject<>();
             private Iterator<Doc> docIt;
             private Row next;
@@ -614,11 +579,11 @@ class ESOperator extends AOperator
                         {
                             rowColumns = addedColumns.toArray(EMPTY_STRING_ARRAY);
                         }
-                        next = Row.of(tableAlias, rowPos++, rowColumns, new DocValues(doc, rowColumns, tableAlias));
+                        next = Row.of(tableAlias, rowColumns, new DocValues(doc, rowColumns, tableAlias));
                     }
                     else
                     {
-                        next = Row.of(tableAlias, rowPos++, new DocValues(doc, null, tableAlias));
+                        next = Row.of(tableAlias, new DocValues(doc, null, tableAlias));
                     }
                 }
                 return true;
@@ -664,7 +629,7 @@ class ESOperator extends AOperator
                 }
                 else if (ordinal == 3)
                 {
-                    return doc.fields != null ? doc.fields.get("_parent") : null;
+                    return doc.fields != null ? doc.fields.get(PARENT) : null;
                 }
                 return doc.source.get(columns[ordinal]);
             }
@@ -677,7 +642,7 @@ class ESOperator extends AOperator
             String col = column.getName();
             if (PARENTID.equals(col))
             {
-                return doc.fields.get("_parent");
+                return doc.fields.get(PARENT);
             }
             else if (INDEX.equals(col))
             {
@@ -740,7 +705,7 @@ class ESOperator extends AOperator
         String index;
         @JsonProperty("_type")
         String type;
-        @JsonProperty("_id")
+        @JsonProperty(ID)
         String docId;
         @JsonProperty("found")
         Boolean found;

@@ -19,6 +19,7 @@ import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.parser.Expression;
 import org.kuse.payloadbuilder.core.parser.NamedExpression;
+import org.kuse.payloadbuilder.core.utils.ObjectUtils;
 
 /** Search ES */
 class SearchFunction extends TableFunctionInfo
@@ -117,14 +118,15 @@ class SearchFunction extends TableFunctionInfo
             throw new IllegalArgumentException("'template' and 'body' arguments are mutual exclusive for function " + getName());
         }
 
-        final String searchUrl = !isBlank(template) ? ESOperator.getSearchTemplateUrl(
-                endpoint,
-                index,
-                type,
-                scroll ? SCROLL_SIZE : null,
-                scroll ? 2 : null,
-                tableAlias,
-                null)
+        final String searchUrl = !isBlank(template)
+            ? getSearchTemplateUrl(
+                    endpoint,
+                    index,
+                    type,
+                    scroll ? SCROLL_SIZE : null,
+                    scroll ? 2 : null,
+                    tableAlias,
+                    null)
             : ESOperator.getSearchUrl(
                     endpoint,
                     index,
@@ -165,6 +167,25 @@ class SearchFunction extends TableFunctionInfo
 
                     return null;
                 });
+    }
+
+    private static String getSearchTemplateUrl(
+            String endpoint,
+            String index,
+            String type,
+            Integer size,
+            Integer scrollMinutes,
+            TableAlias alias,
+            String indexField)
+    {
+        boolean isSingleType = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(type);
+        ObjectUtils.requireNonBlank(endpoint, "endpoint is required");
+        return ESOperator.getUrl(String.format("%s/%s/%s_search/template?%s",
+                endpoint,
+                isBlank(index) ? "*" : index,
+                isBlank(type) ? "" : (type + "/"),
+                scrollMinutes != null ? ("scroll=" + scrollMinutes + "m") : "",
+                size != null ? ("&size=" + size) : ""), "hits.hits", alias, indexField, isSingleType);
     }
 
     private String getBody(String body, String template, String params)

@@ -24,7 +24,9 @@ import org.kuse.payloadbuilder.core.parser.QualifiedName;
 public class BatchCacheOperatorTest extends AOperatorTest
 {
     private final TableAlias inner = TableAlias.TableAliasBuilder.of(1, TableAlias.Type.TABLE, QualifiedName.of("tableB"), "b")
-            .tableMeta(new TableMeta(asList(new TableMeta.Column("col", DataType.ANY))))
+            .tableMeta(new TableMeta(asList(
+                    new TableMeta.Column("pos", DataType.INT),
+                    new TableMeta.Column("col", DataType.ANY))))
             .build();
 
     @Test(expected = OperatorException.class)
@@ -60,7 +62,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
                     {
                         IOrdinalValues next = context.getStatementContext().getOuterOrdinalValues().next();
                         pos++;
-                        return Row.of(inner, 10 * pos, new Object[] {next.getValue(0)});
+                        return Row.of(inner, new Object[] {10 * pos, next.getValue(0)});
                     }
 
                     @Override
@@ -114,7 +116,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(expectedInnerPositions[count], (int) tuple.getValue(Row.POS_ORDINAL), 0);
+            assertEquals(expectedInnerPositions[count], (int) tuple.getValue(0), 0);
             count++;
         }
 
@@ -144,7 +146,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
                     {
                         context.getStatementContext().getOuterOrdinalValues().next();
                         pos.incrementAndGet();
-                        return Row.of(inner, 10 * pos.intValue(), new Object[] {pos.getValue()});
+                        return Row.of(inner, new Object[] {10 * pos.intValue(), pos.getValue()});
                     }
 
                     @Override
@@ -195,7 +197,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals("Count: " + count, expectedInnerPositions[count], tuple.getValue(Row.POS_ORDINAL));
+            assertEquals("Count: " + count, expectedInnerPositions[count], tuple.getValue(0));
             count++;
         }
 
@@ -224,7 +226,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
                     {
                         IOrdinalValues next = context.getStatementContext().getOuterOrdinalValues().next();
                         pos++;
-                        return Row.of(inner, 10 * pos, new Object[] {next.getValue(0)});
+                        return Row.of(inner, new Object[] {10 * pos, next.getValue(0)});
                     }
 
                     @Override
@@ -254,7 +256,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
         TestCacheProvider cacheProvider = new TestCacheProvider();
         Map<Object, List<Tuple>> cache = new HashMap<>();
         cacheProvider.cache.put("test_inner", cache);
-        cache.put(new BatchCacheOperator.CacheKey("value", new OrdinalValues(new Object[] {2})), asList(Row.of(inner, 20, new Object[] {2})));
+        cache.put(new BatchCacheOperator.CacheKey("value", new OrdinalValues(new Object[] {2})), asList(Row.of(inner, new Object[] {20, 2})));
 
         session.setBatchCacheProvider(cacheProvider);
 
@@ -316,10 +318,10 @@ public class BatchCacheOperatorTest extends AOperatorTest
 
         Map<Object, List<Tuple>> cache = new HashMap<>();
         cacheProvider.cache.put("test_inner", cache);
-        cache.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new OrdinalValues(new Object[] {1})), asList(Row.of(inner, 0, new Object[] {1})));
-        cache.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new OrdinalValues(new Object[] {2})), asList(Row.of(inner, 10, new Object[] {2})));
-        cache.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new OrdinalValues(new Object[] {3})), asList(Row.of(inner, 20, new Object[] {3})));
-        cache.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new OrdinalValues(new Object[] {4})), asList(Row.of(inner, 30, new Object[] {4})));
+        cache.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new OrdinalValues(new Object[] {1})), asList(Row.of(inner, new Object[] {0, 1})));
+        cache.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new OrdinalValues(new Object[] {2})), asList(Row.of(inner, new Object[] {10, 2})));
+        cache.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new OrdinalValues(new Object[] {3})), asList(Row.of(inner, new Object[] {20, 3})));
+        cache.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new OrdinalValues(new Object[] {4})), asList(Row.of(inner, new Object[] {30, 4})));
 
         session.setBatchCacheProvider(cacheProvider);
 

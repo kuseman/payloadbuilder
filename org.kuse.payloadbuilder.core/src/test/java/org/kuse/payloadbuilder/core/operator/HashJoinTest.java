@@ -43,7 +43,7 @@ public class HashJoinTest extends AOperatorTest
 
         Map<String, Function<TableAlias, Operator>> opByTable = MapUtils.ofEntries(
                 MapUtils.entry("tableA",
-                        a -> op(context -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, i - 1, new String[] {"col1"}, new Object[] {i})).iterator(), () -> leftClose.increment())));
+                        a -> op(context -> IntStream.range(1, 10).mapToObj(i -> (Tuple) Row.of(a, new String[] {"col1"}, new Object[] {i})).iterator(), () -> leftClose.increment())));
 
         Operator op = operator(query, opByTable);
 
@@ -105,12 +105,13 @@ public class HashJoinTest extends AOperatorTest
 
         Map<String, Function<TableAlias, Operator>> opByTable = MapUtils.ofEntries(
                 MapUtils.entry("tableA",
-                        a -> op(ctx -> IntStream.of(1, 2, 3, 4, 5).mapToObj(i -> (Tuple) Row.of(a, i, new String[] {"col1", "col2"}, new Object[] {i, "val" + i})).iterator(),
+                        a -> op(ctx -> IntStream.of(1, 2, 3, 4, 5).mapToObj(i -> (Tuple) Row.of(a, new String[] {"pos", "col1", "col2"}, new Object[] {i, i, "val" + i})).iterator(),
                                 () -> aCloseCount.increment())),
                 MapUtils.entry("tableB",
-                        a -> op(ctx -> IntStream.of(4, 5, 6, 7).mapToObj(i -> (Tuple) Row.of(a, 10 * i, new String[] {"col1", "col2"}, new Object[] {i})).iterator(), () -> bCloseCount.increment())),
+                        a -> op(ctx -> IntStream.of(4, 5, 6, 7).mapToObj(i -> (Tuple) Row.of(a, new String[] {"pos", "col1", "col2"}, new Object[] {10 * i, i})).iterator(),
+                                () -> bCloseCount.increment())),
                 MapUtils.entry("tableC",
-                        a -> op(ctx -> IntStream.of(1, 2, 3, 4, 5, 6, 7).mapToObj(i -> (Tuple) Row.of(a, 100 * i, new String[] {"col1", "col2"}, new Object[] {i, "val" + i})).iterator(),
+                        a -> op(ctx -> IntStream.of(1, 2, 3, 4, 5, 6, 7).mapToObj(i -> (Tuple) Row.of(a, new String[] {"pos", "col1", "col2"}, new Object[] {100 * i, i, "val" + i})).iterator(),
                                 () -> cCloseCount.increment())));
 
         Operator op = operator(query, opByTable);
@@ -127,9 +128,9 @@ public class HashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(tableAPos[count], getValue(tuple, 0, Row.POS_ORDINAL));
-            assertEquals(tableBPos[count], getValue(tuple, 2, Row.POS_ORDINAL));
-            assertEquals(tableCPos[count], getValue(tuple, 3, Row.POS_ORDINAL));
+            assertEquals(tableAPos[count], getValue(tuple, 0, 0));
+            assertEquals(tableBPos[count], getValue(tuple, 2, 0));
+            assertEquals(tableCPos[count], getValue(tuple, 3, 0));
             count++;
         }
         it.close();
@@ -155,7 +156,8 @@ public class HashJoinTest extends AOperatorTest
 
         Map<String, Function<TableAlias, Operator>> opByTable = MapUtils.ofEntries(
                 MapUtils.entry("tableB",
-                        a -> op(context -> IntStream.range(1, 20).mapToObj(i -> (Tuple) Row.of(a, i - 1, new String[] {"Value"}, new Object[] {i % 10})).iterator(), () -> leftClose.increment())));
+                        a -> op(context -> IntStream.range(1, 20).mapToObj(i -> (Tuple) Row.of(a, new String[] {"pos", "Value"}, new Object[] {i - 1, i % 10})).iterator(),
+                                () -> leftClose.increment())));
 
         Operator op = operator(query, opByTable);
 
@@ -170,7 +172,7 @@ public class HashJoinTest extends AOperatorTest
 
             @SuppressWarnings("unchecked")
             Iterable<Tuple> col = (Iterable<Tuple>) tuple.getTuple(1);
-            assertArrayEquals(new int[] {count, count + 10}, stream(col).mapToInt(t -> (int) t.getValue(Row.POS_ORDINAL)).toArray());
+            assertArrayEquals(new int[] {count, count + 10}, stream(col).mapToInt(t -> (int) t.getValue(0)).toArray());
             count++;
         }
         it.close();
@@ -192,9 +194,9 @@ public class HashJoinTest extends AOperatorTest
 
         Map<String, Function<TableAlias, Operator>> opByTable = MapUtils.ofEntries(
                 MapUtils.entry("tableA",
-                        a -> op(context -> IntStream.range(0, 10).mapToObj(i -> (Tuple) Row.of(a, i, new String[] {"Value"}, new Object[] {i})).iterator(), () -> leftClose.increment())),
+                        a -> op(context -> IntStream.range(0, 10).mapToObj(i -> (Tuple) Row.of(a, new String[] {"pos", "Value"}, new Object[] {i, i})).iterator(), () -> leftClose.increment())),
                 MapUtils.entry("tableB",
-                        a -> op(context -> IntStream.range(5, 15).mapToObj(i -> (Tuple) Row.of(a, i, new String[] {"Value"}, new Object[] {i})).iterator(), () -> rightClose.increment())));
+                        a -> op(context -> IntStream.range(5, 15).mapToObj(i -> (Tuple) Row.of(a, new String[] {"pos", "Value"}, new Object[] {i, i})).iterator(), () -> rightClose.increment())));
 
         Operator op = operator(query, opByTable);
 
@@ -209,9 +211,9 @@ public class HashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            assertEquals(tableAPos[count], tuple.getValue(Row.POS_ORDINAL));
+            assertEquals(tableAPos[count], tuple.getValue(0));
 
-            Integer val = (Integer) getValue(tuple, 1, Row.POS_ORDINAL);
+            Integer val = (Integer) getValue(tuple, 1, 0);
             assertEquals(tableBPos[count], val);
             count++;
         }
@@ -235,9 +237,10 @@ public class HashJoinTest extends AOperatorTest
 
         Map<String, Function<TableAlias, Operator>> opByTable = MapUtils.ofEntries(
                 MapUtils.entry("tableA",
-                        a -> op(context -> IntStream.range(0, 10).mapToObj(i -> (Tuple) Row.of(a, i, new String[] {"Value"}, new Object[] {i})).iterator(), () -> leftClose.increment())),
+                        a -> op(context -> IntStream.range(0, 10).mapToObj(i -> (Tuple) Row.of(a, new String[] {"pos", "Value"}, new Object[] {i, i})).iterator(), () -> leftClose.increment())),
                 MapUtils.entry("tableB",
-                        a -> op(context -> IntStream.range(5, 15).mapToObj(i -> (Tuple) Row.of(a, i - 1, new String[] {"Value"}, new Object[] {i % 5 + 2})).iterator(), () -> rightClose.increment())));
+                        a -> op(context -> IntStream.range(5, 15).mapToObj(i -> (Tuple) Row.of(a, new String[] {"pos", "Value"}, new Object[] {i - 1, i % 5 + 2})).iterator(),
+                                () -> rightClose.increment())));
 
         Operator op = operator(query, opByTable);
 
@@ -257,7 +260,7 @@ public class HashJoinTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            int pos = (int) tuple.getValue(Row.POS_ORDINAL);
+            int pos = (int) tuple.getValue(0);
             assertEquals(count, pos);
 
             @SuppressWarnings("unchecked")
@@ -265,7 +268,7 @@ public class HashJoinTest extends AOperatorTest
 
             if (pos >= 2 && pos <= 6)
             {
-                assertArrayEquals("Count: " + count, tableBPos[pos - 2], stream(col).mapToInt(t -> (int) t.getValue(Row.POS_ORDINAL)).toArray());
+                assertArrayEquals("Count: " + count, tableBPos[pos - 2], stream(col).mapToInt(t -> (int) t.getValue(0)).toArray());
             }
             else
             {

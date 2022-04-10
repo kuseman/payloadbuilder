@@ -322,7 +322,7 @@ public class TestHarnessRunner
             return TupleIterator.wrap(catalog
                     .getTables()
                     .stream()
-                    .map(t -> (Tuple) Row.of(tableAlias, -1, columns, new Object[] {t.getName(), t.getColumns()}))
+                    .map(t -> (Tuple) Row.of(tableAlias, columns, new Object[] {t.getName(), t.getColumns()}))
                     .iterator());
         }
 
@@ -333,7 +333,7 @@ public class TestHarnessRunner
                     .getTables()
                     .stream()
                     .flatMap(t -> t.getColumns().stream().map(c -> Pair.of(t, c)))
-                    .map(p -> (Tuple) Row.of(tableAlias, -1, columns, new Object[] {p.getKey().getName(), p.getValue(), p.getValue().length()}))
+                    .map(p -> (Tuple) Row.of(tableAlias, columns, new Object[] {p.getKey().getName(), p.getValue(), p.getValue().length()}))
                     .iterator());
         }
     }
@@ -359,12 +359,10 @@ public class TestHarnessRunner
             final String[] columns = table.getColumns().toArray(ArrayUtils.EMPTY_STRING_ARRAY);
             return new TupleIterator()
             {
-                private int pos;
-
                 @Override
                 public Tuple next()
                 {
-                    return Row.of(alias, pos++, columns, it.next());
+                    return Row.of(alias, columns, it.next());
                 }
 
                 @Override

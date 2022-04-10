@@ -75,7 +75,6 @@ class OpenMapCollectionFunction extends TableFunctionInfo
         {
             private Set<String> addedColumns;
             private String[] columns;
-            private int pos;
             private Tuple next;
 
             @Override
@@ -120,7 +119,7 @@ class OpenMapCollectionFunction extends TableFunctionInfo
                     {
                         columns = addedColumns.toArray(EMPTY_STRING_ARRAY);
                     }
-                    next = Row.of(tableAlias, pos++, columns, new Row.MapValues(item, columns));
+                    next = Row.of(tableAlias, columns, new Row.MapValues(item, columns));
                 }
 
                 return true;

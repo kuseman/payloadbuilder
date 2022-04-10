@@ -30,12 +30,11 @@ public class OpenMapCollectionFunctionTest extends AOperatorTest
         while (it.hasNext())
         {
             Tuple tuple = it.next();
-            int pos = (int) getValue(tuple, 0, "__pos");
-
-            if (pos == 0)
+            if (count == 0)
             {
                 assertEquals(10, getValue(tuple, 0, "key"));
                 assertEquals(20, getValue(tuple, 0, "count"));
+                assertNull(getValue(tuple, 0, "id"));
             }
             else
             {

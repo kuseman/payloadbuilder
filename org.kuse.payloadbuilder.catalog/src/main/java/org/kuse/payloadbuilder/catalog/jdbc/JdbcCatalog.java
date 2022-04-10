@@ -93,9 +93,7 @@ public class JdbcCatalog extends Catalog
     @Override
     public Operator getScanOperator(OperatorData data)
     {
-        List<AnalyzePair> pairs = getPredicatePairs(data);
-        List<SortItem> sortItems = getSortItems(data);
-        return new JdbcOperator(this, data.getNodeId(), data.getCatalogAlias(), data.getTableAlias(), pairs, sortItems, null);
+        return getIndexOperator(data, null);
     }
 
     @Override
@@ -295,7 +293,7 @@ public class JdbcCatalog extends Catalog
                         throw new RuntimeException("Error reading resultset", e);
                     }
 
-                    return Row.of(tableAlias, -1, columns, values);
+                    return Row.of(tableAlias, columns, values);
                 }
 
                 @Override

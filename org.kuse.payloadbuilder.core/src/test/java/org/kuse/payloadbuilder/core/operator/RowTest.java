@@ -14,14 +14,15 @@ public class RowTest extends AOperatorTest
     @Test
     public void test()
     {
-        String[] columns = new String[] {"col1", "col2", "col3"};
-        Row r1 = Row.of(alias, 666, columns, new Object[] {1, 2, 3});
+        String[] columns = new String[] {"pos", "col1", "col2", "col3"};
+        Row r1 = Row.of(alias, columns, new Object[] {666, 1, 2, 3});
         assertRow(r1);
         Row r1o = (Row) r1.optimize(context);
         assertRow(r1o);
         assertSame(r1o, r1o.optimize(context));
 
-        r1 = Row.of(alias, 666, columns, new Row.MapValues(MapUtils.ofEntries(
+        r1 = Row.of(alias, columns, new Row.MapValues(MapUtils.ofEntries(
+                MapUtils.entry("pos", 666),
                 MapUtils.entry("col1", 1),
                 MapUtils.entry("col2", 2),
                 MapUtils.entry("col3", 3)), columns));
@@ -37,17 +38,20 @@ public class RowTest extends AOperatorTest
         assertEquals(0, r1.getTupleOrdinal());
         assertEquals(r1, r1.getTuple(0));
         assertNull(r1.getTuple(1));
-        assertEquals(3, r1.getColumnCount());
-        assertEquals(2, r1.getColumnOrdinal("col3"));
-        assertEquals(1, r1.getColumnOrdinal("col2"));
-        assertEquals(Row.POS_ORDINAL, r1.getColumnOrdinal("__pos"));
-        assertEquals("col3", r1.getColumn(2));
-        assertEquals("col2", r1.getColumn(1));
-        assertEquals("col1", r1.getColumn(0));
-        assertEquals(3, r1.getValue(2));
-        assertEquals(2, r1.getValue(1));
-        assertEquals(666, r1.getValue(Row.POS_ORDINAL));
+        assertEquals(4, r1.getColumnCount());
+        assertEquals(0, r1.getColumnOrdinal("pos"));
+        assertEquals(1, r1.getColumnOrdinal("col1"));
+        assertEquals(2, r1.getColumnOrdinal("col2"));
+        assertEquals(3, r1.getColumnOrdinal("col3"));
+        assertEquals("pos", r1.getColumn(0));
+        assertEquals("col1", r1.getColumn(1));
+        assertEquals("col2", r1.getColumn(2));
+        assertEquals("col3", r1.getColumn(3));
+        assertEquals(3, r1.getValue(3));
+        assertEquals(2, r1.getValue(2));
+        assertEquals(666, r1.getValue(0));
         assertNull(r1.getValue(-1));
-        assertEquals(1, r1.getValue(0));
+        assertEquals(1, r1.getValue(1));
+        assertEquals(666, r1.getValue(0));
     }
 }

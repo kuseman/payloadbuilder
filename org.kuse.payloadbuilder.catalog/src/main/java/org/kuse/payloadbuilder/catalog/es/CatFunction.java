@@ -106,7 +106,7 @@ class CatFunction extends TableFunctionInfo
         }
 
         String[] columns = result.get(0).keySet().toArray(ArrayUtils.EMPTY_STRING_ARRAY);
-        return TupleIterator.wrap(result.stream().map(map -> (Tuple) Row.of(tableAlias, -1, columns, new Row.MapValues(map, columns))).iterator());
+        return TupleIterator.wrap(result.stream().map(map -> (Tuple) Row.of(tableAlias, columns, new Row.MapValues(map, columns))).iterator());
     }
 
     private String getCatUrl(String endpoint, String catspec)

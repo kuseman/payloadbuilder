@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.kuse.payloadbuilder.core.operator.TableMeta.Column;
@@ -13,10 +14,6 @@ import org.kuse.payloadbuilder.core.operator.TableMeta.Column;
  */
 public class Row implements Tuple
 {
-    private static final String POS = "__pos";
-    static final int POS_ORDINAL = Integer.MAX_VALUE;
-
-    private final int pos;
     final String[] columns;
     final TableAlias tableAlias;
     private final RowValues values;
@@ -24,29 +21,26 @@ public class Row implements Tuple
     /** Array used if this row gets optimized */
     final Object[] optimizedValues;
 
-    Row(TableAlias alias, int pos, String[] columns, RowValues values)
+    Row(TableAlias alias, String[] columns, RowValues values)
     {
         this.tableAlias = requireNonNull(alias, "alias");
-        this.pos = pos;
         this.columns = requireNonNull(columns, "columns");
         this.values = requireNonNull(values);
         this.optimizedValues = null;
     }
 
     /** Columns from table meta in table alias */
-    Row(TableAlias alias, int pos, RowValues values)
+    Row(TableAlias alias, RowValues values)
     {
         this.tableAlias = requireNonNull(alias, "alias");
-        this.pos = pos;
         this.columns = null;
         this.values = requireNonNull(values);
         this.optimizedValues = null;
     }
 
-    Row(TableAlias alias, int pos, String[] columns, Object[] optimizedValues)
+    Row(TableAlias alias, String[] columns, Object[] optimizedValues)
     {
         this.tableAlias = requireNonNull(alias, "alias");
-        this.pos = pos;
         this.columns = columns;
         this.values = null;
         this.optimizedValues = requireNonNull(optimizedValues);
@@ -92,11 +86,6 @@ public class Row implements Tuple
     @Override
     public int getColumnOrdinal(String column)
     {
-        if (POS.equals(column))
-        {
-            return POS_ORDINAL;
-        }
-
         if (columns != null)
         {
             return ArrayUtils.indexOf(columns, column);
@@ -124,10 +113,6 @@ public class Row implements Tuple
         if (columnOrdinal < 0)
         {
             return null;
-        }
-        else if (columnOrdinal == POS_ORDINAL)
-        {
-            return pos;
         }
         else if (optimizedValues != null)
         {
@@ -162,13 +147,17 @@ public class Row implements Tuple
 
         // Intern the values
         context.intern(optimizedValues);
-        return new Row(tableAlias, pos, columns, optimizedValues);
+        return new Row(tableAlias, columns, optimizedValues);
     }
 
     @Override
     public int hashCode()
     {
-        return pos;
+        if (optimizedValues != null)
+        {
+            return Arrays.hashCode(optimizedValues);
+        }
+        return values.hashCode();
     }
 
     @Override
@@ -177,8 +166,8 @@ public class Row implements Tuple
         if (obj instanceof Row)
         {
             Row that = (Row) obj;
-            return pos == that.pos
-                && tableAlias.equals(that.tableAlias);
+            return Arrays.equals(optimizedValues, that.optimizedValues)
+                && Objects.equals(values, that.values);
         }
         return false;
     }
@@ -186,34 +175,34 @@ public class Row implements Tuple
     @Override
     public String toString()
     {
-        return tableAlias + ", pos: " + pos;
+        return tableAlias.toString();
     }
 
-    /** {@link Row#of(TableAlias, int, String[], RowValues)}} */
-    public static Row of(TableAlias alias, int pos, Object[] values)
+    /** {@link Row#of(TableAlias, String[], RowValues)}} */
+    public static Row of(TableAlias alias, Object[] values)
     {
-        return of(alias, pos, new ObjectValues(values));
+        return of(alias, new ObjectValues(values));
     }
 
-    /** {@link Row#of(TableAlias, int, String[], RowValues)}} */
-    public static Row of(TableAlias alias, int pos, RowValues values)
+    /** {@link Row#of(TableAlias, String[], RowValues)}} */
+    public static Row of(TableAlias alias, RowValues values)
     {
         if (alias.getTableMeta() == null)
         {
             throw new IllegalArgumentException("Cannot construct a Row without columns.");
         }
 
-        return new Row(alias, pos, values);
+        return new Row(alias, values);
     }
 
-    /** {@link Row#of(TableAlias, int, String[], RowValues)}} */
-    public static Row of(TableAlias alias, int pos, String[] columns, Object[] values)
+    /** {@link Row#of(TableAlias, String[], RowValues)}} */
+    public static Row of(TableAlias alias, String[] columns, Object[] values)
     {
-        return of(alias, pos, columns, new ObjectValues(values));
+        return of(alias, columns, new ObjectValues(values));
     }
 
     /**
-     * Construct a row with provided alias, columns, values and position
+     * Construct a row with provided alias, columns, values
      *
      * <pre>
      * NOTE! Row of the same table alias type must have all their columns
@@ -231,9 +220,9 @@ public class Row implements Tuple
      * etc.
      * </pre>
      */
-    public static Row of(TableAlias alias, int pos, String[] columns, RowValues values)
+    public static Row of(TableAlias alias, String[] columns, RowValues values)
     {
-        return new Row(alias, pos, columns, values);
+        return new Row(alias, columns, values);
     }
 
     /**
@@ -287,6 +276,23 @@ public class Row implements Tuple
                 return null;
             }
             return values[ordinal];
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Arrays.hashCode(values);
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (obj instanceof ObjectValues)
+            {
+                ObjectValues that = (ObjectValues) obj;
+                return Arrays.equals(values, that.values);
+            }
+            return false;
         }
 
         @Override

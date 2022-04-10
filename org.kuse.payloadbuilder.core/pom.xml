@@ -22,9 +22,6 @@
         <commons-lang3.version>3.12.0</commons-lang3.version>
         <fastutil.version>8.5.6</fastutil.version>
         <janino.version>3.1.6</janino.version>
-
-        <!-- Test versions -->
-        <slf4j.version>1.7.30</slf4j.version>
     </properties>
 
     <dependencies>
@@ -68,19 +65,16 @@
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
-            <version>${junit.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-log4j12</artifactId>
-            <version>${slf4j.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
-            <version>${mockito-core.version}</version>
             <scope>test</scope>
         </dependency>
 

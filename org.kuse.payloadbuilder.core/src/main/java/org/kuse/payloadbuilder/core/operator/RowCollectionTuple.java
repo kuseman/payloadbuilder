@@ -56,7 +56,7 @@ class RowCollectionTuple implements Tuple, Iterable<Tuple>
     {
         if (row != null)
         {
-            return IteratorUtils.singletonIterator(new Row(tableAlias, 0, columns, row));
+            return IteratorUtils.singletonIterator(new Row(tableAlias, columns, row));
         }
         // CSOFF
         return new Iterator<Tuple>()
@@ -85,8 +85,8 @@ class RowCollectionTuple implements Tuple, Iterable<Tuple>
                         values[i] = vals[index];
                     }
                 }
-
-                return new Row(tableAlias, index++, columns, values);
+                index++;
+                return new Row(tableAlias, columns, values);
             }
 
             @Override

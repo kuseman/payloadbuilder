@@ -10,7 +10,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.stream.Stream;
 
-import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.Catalog.OperatorData;
@@ -54,7 +53,6 @@ class ShowUtils
     {
         Operator operator = null;
         Projection projection = null;
-        MutableInt pos = new MutableInt();
         List<TableMeta.Column> columns = null;
         QuerySession session = context.getSession();
         CatalogRegistry registry = session.getCatalogRegistry();
@@ -129,15 +127,15 @@ class ShowUtils
                             functions
                                     .stream()
                                     .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName()))
-                                    .map(function -> (Tuple) Row.of(SHOW_FUNCTIONS_ALIAS, pos.incrementAndGet(), new Object[] {function.getName(), function.getType(), function.getDescription()})),
+                                    .map(function -> (Tuple) Row.of(SHOW_FUNCTIONS_ALIAS, new Object[] {function.getName(), function.getType(), function.getDescription()})),
                             Stream.concat(
                                     functions.size() > 0
-                                        ? Stream.of(Row.of(SHOW_FUNCTIONS_ALIAS, pos.incrementAndGet(), new Object[] {"-- Built in --", "", ""}))
+                                        ? Stream.of(Row.of(SHOW_FUNCTIONS_ALIAS, new Object[] {"-- Built in --", "", ""}))
                                         : Stream.empty(),
                                     system.getFunctions()
                                             .stream()
                                             .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName()))
-                                            .map(function -> Row.of(SHOW_FUNCTIONS_ALIAS, pos.incrementAndGet(), new Object[] {function.getName(), function.getType(), function.getDescription()}))))
+                                            .map(function -> Row.of(SHOW_FUNCTIONS_ALIAS, new Object[] {function.getName(), function.getType(), function.getDescription()}))))
                             .iterator());
                 }
 

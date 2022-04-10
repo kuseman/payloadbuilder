@@ -501,14 +501,85 @@ class PayloadbuilderService
         @Override
         public void endRow()
         {
+            if (parent.isEmpty())
+            {
+                return;
+            }
+
             // Adjust columns
             PairList pairList = getValue(resultModel.getRowCount() + 1);
-            if (resultModel.getColumnCount() < pairList.size())
+            // Adjust columns in model
+            if (!pairList.matchesModelColumns)
             {
-                resultModel.setColumns(pairList.columns.toArray(ArrayUtils.EMPTY_STRING_ARRAY));
+                int count = resultModel.getColumnCount();
+                int listCount = pairList.size();
+                int newColumnsAdjust = 0;
+                boolean changeModelColumns = count != listCount;
+
+                // Don't need to check row_id (first) columns
+                for (int i = 1; i < count; i++)
+                {
+                    String modelColumn = resultModel.getColumnName(i);
+                    String listColumn = (i + newColumnsAdjust) < listCount
+                        ? pairList.get(i + newColumnsAdjust).getKey()
+                        : null;
+
+                    // New column that is about to be added last, mark
+                    // model to be changed and move on
+                    if (listColumn == null)
+                    {
+                        changeModelColumns = true;
+                        continue;
+                    }
+
+                    // Find out if we should pad previous values or new rows values
+                    if (!modelColumn.equalsIgnoreCase(listColumn))
+                    {
+                        // Step forward in pairList until we find the current column
+                        int c = findListColumn(pairList, modelColumn, i + newColumnsAdjust);
+                        //CSOFF
+                        if (c == -1)
+                        //CSON
+                        {
+                            // Pad current row with null
+                            pairList.add(i + newColumnsAdjust, Pair.of(modelColumn, null));
+                        }
+                        else
+                        {
+                            changeModelColumns = true;
+                            newColumnsAdjust += c;
+                            resultModel.moveValues(i, c);
+                        }
+                    }
+                }
+
+                if (changeModelColumns)
+                {
+                    resultModel.setColumns(pairList.columns.toArray(ArrayUtils.EMPTY_STRING_ARRAY));
+                }
             }
 
             resultModel.addRow(pairList);
+        }
+
+        /**
+         * Tries to find provided column in povided list starting at start index.
+         *
+         * @return Returns number of steps away or -1 if not found
+         */
+        private int findListColumn(PairList list, String column, int startIndex)
+        {
+            int size = list.size();
+            int steps = 0;
+            for (int i = startIndex; i < size; i++)
+            {
+                if (column.equalsIgnoreCase(list.get(i).getKey()))
+                {
+                    return steps;
+                }
+                steps++;
+            }
+            return -1;
         }
 
         @Override
@@ -597,7 +668,26 @@ class PayloadbuilderService
 
             if (p instanceof PairList)
             {
-                ((PairList) p).add(Pair.of(currentField.pop(), value));
+                // Find out where to put this entry
+                PairList list = (PairList) p;
+                String column = currentField.pop();
+                int columnIndex = list.size();
+                // Adjust for row_id column
+                if (resultModel.getRowCount() > 0)
+                {
+                    columnIndex++;
+                }
+
+                // Flag that the list is not matching model columns
+                // model needs to adjust later on
+                if (list.matchesModelColumns
+                    && (columnIndex >= resultModel.getColumnCount()
+                        || !column.equalsIgnoreCase(resultModel.getColumnName(columnIndex))))
+                {
+                    list.matchesModelColumns = false;
+                }
+
+                list.add(Pair.of(column, value));
             }
             else if (p instanceof Map)
             {
@@ -614,6 +704,7 @@ class PayloadbuilderService
         {
             static final PairList EMPTY = new PairList(0);
             private final List<String> columns;
+            private boolean matchesModelColumns = true;
 
             private PairList(int capacity)
             {

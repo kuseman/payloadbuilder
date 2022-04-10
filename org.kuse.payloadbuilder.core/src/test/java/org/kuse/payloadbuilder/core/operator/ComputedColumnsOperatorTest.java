@@ -20,10 +20,11 @@ public class ComputedColumnsOperatorTest extends AOperatorTest
     {
         Random rnd = new Random();
         TableAlias alias = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("table"), "a")
-                .tableMeta(new TableMeta(asList(new TableMeta.Column("col1", DataType.ANY))))
+                .tableMeta(new TableMeta(asList(
+                        new TableMeta.Column("col1", DataType.ANY))))
                 .build();
         MutableBoolean close = new MutableBoolean();
-        Operator target = op(ctx -> IntStream.range(0, 100).mapToObj(i -> (Tuple) Row.of(alias, i, new Object[] {rnd.nextInt(100)})).iterator(), () -> close.setTrue());
+        Operator target = op(ctx -> IntStream.range(0, 100).mapToObj(i -> (Tuple) Row.of(alias, new Object[] {rnd.nextInt(100)})).iterator(), () -> close.setTrue());
         ComputedColumnsOperator operator = new ComputedColumnsOperator(
                 0,
                 -1,
@@ -52,10 +53,11 @@ public class ComputedColumnsOperatorTest extends AOperatorTest
     {
         Random rnd = new Random();
         TableAlias alias = TableAliasBuilder.of(-1, TableAlias.Type.TABLE, QualifiedName.of("table"), "a")
-                .tableMeta(new TableMeta(asList(new TableMeta.Column("col1", DataType.ANY))))
+                .tableMeta(new TableMeta(asList(
+                        new TableMeta.Column("col1", DataType.ANY))))
                 .build();
         MutableBoolean close = new MutableBoolean();
-        Operator target = op(ctx -> IntStream.range(0, 100).mapToObj(i -> (Tuple) Row.of(alias, i, new Object[] {rnd.nextInt(100)})).iterator(), () -> close.setTrue());
+        Operator target = op(ctx -> IntStream.range(0, 100).mapToObj(i -> (Tuple) Row.of(alias, new Object[] {rnd.nextInt(100)})).iterator(), () -> close.setTrue());
         ComputedColumnsOperator operator = new ComputedColumnsOperator(
                 0,
                 -1,

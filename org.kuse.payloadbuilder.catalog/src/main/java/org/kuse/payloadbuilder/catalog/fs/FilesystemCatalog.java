@@ -65,7 +65,7 @@ public class FilesystemCatalog extends Catalog
             }
             String strPath = String.valueOf(obj);
             Path path = FileSystems.getDefault().getPath(strPath);
-            return TupleIterator.wrap(new SingletonListIterator<Tuple>(ListFunction.fromPath(tableAlias, 0, path)));
+            return TupleIterator.wrap(new SingletonListIterator<Tuple>(ListFunction.fromPath(tableAlias, path)));
         }
     }
 
@@ -152,13 +152,11 @@ public class FilesystemCatalog extends Catalog
             return new TupleIterator()
             //CSON
             {
-                private int pos;
-
                 @Override
                 public Row next()
                 {
                     Path p = it.next();
-                    return fromPath(tableAlias, pos++, p);
+                    return fromPath(tableAlias, p);
                 }
 
                 @Override
@@ -179,7 +177,7 @@ public class FilesystemCatalog extends Catalog
             };
         }
 
-        static Row fromPath(TableAlias alias, int pos, Path path)
+        static Row fromPath(TableAlias alias, Path path)
         {
             long creationTime = 0;
             long lastAccessTime = 0;
@@ -210,7 +208,7 @@ public class FilesystemCatalog extends Catalog
                     lastModifiedTime,
                     isDirectory
             };
-            return Row.of(alias, pos, COLUMNS, values);
+            return Row.of(alias, COLUMNS, values);
         }
 
         private Iterator<Path> getIterator(String strPath, boolean recursive)

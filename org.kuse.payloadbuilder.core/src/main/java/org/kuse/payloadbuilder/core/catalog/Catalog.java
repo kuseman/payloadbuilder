@@ -162,7 +162,7 @@ public abstract class Catalog
             String[] columns = new String[] {SYS_FUNCTIONS_NAME, SYS_FUNCTIONS_TYPE, SYS_FUNCTIONS_DESCRIPTION};
             return TupleIterator.wrap(functionByName.values()
                     .stream()
-                    .map(f -> (Tuple) Row.of(tableAlias, -1, columns, new Object[] {f.getName(), f.getType().toString(), f.getDescription()}))
+                    .map(f -> (Tuple) Row.of(tableAlias, columns, new Object[] {f.getName(), f.getType().toString(), f.getDescription()}))
                     .iterator());
         });
     }

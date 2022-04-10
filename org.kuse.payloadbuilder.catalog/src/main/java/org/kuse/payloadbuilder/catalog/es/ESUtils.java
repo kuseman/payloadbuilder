@@ -11,6 +11,7 @@ import java.util.List;
 import org.apache.http.client.utils.URIBuilder;
 import org.kuse.payloadbuilder.catalog.es.ESCatalog.MappedProperty;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory;
 import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValues;
 import org.kuse.payloadbuilder.core.parser.SortItem.NullOrder;
 import org.kuse.payloadbuilder.core.parser.SortItem.Order;
@@ -50,44 +51,135 @@ final class ESUtils
     static String getSearchBody(
             List<SortItemMeta> sortItems,
             List<PropertyPredicate> propertyPredicates,
+            String indexField,
+            boolean quoteIndexFieldValues,
             boolean isSingleType,
             ExecutionContext context)
     {
         StringBuilder sb = new StringBuilder("{");
         appendSortItems(sortItems, sb, isSingleType);
-        appendPropertyPredicates(propertyPredicates, isSingleType, sb, context);
+        appendPropertyPredicates(propertyPredicates, indexField, quoteIndexFieldValues, isSingleType, sb, context);
         sb.append("}");
         return sb.toString();
     }
 
-    /** Build search body for index query with terms. Used when mgets cannot be used */
-    static String getIndexSearchBody(
-            ExecutionContext context,
-            boolean quoteValues,
-            String field,
-            boolean isSingleType)
+    private static void appendPropertyPredicates(
+            List<PropertyPredicate> propertyPredicates,
+            String indexField,
+            boolean quoteIndexFieldValues,
+            boolean isSingleType,
+            StringBuilder sb,
+            ExecutionContext context)
     {
-        StringBuilder sb = new StringBuilder("{");
+        StringBuilder filterMust = new StringBuilder();
+        StringBuilder filterMustNot = new StringBuilder();
+        appendIndexSearchFilter(filterMust, context, quoteIndexFieldValues, indexField);
+
+        if (!propertyPredicates.isEmpty())
+        {
+            if (filterMust.length() > 0)
+            {
+                filterMust.append(",");
+            }
+
+            List<StringBuilder> sbs = asList(filterMust, filterMustNot);
+            int length = sbs.size();
+            for (PropertyPredicate predicate : propertyPredicates)
+            {
+                predicate.appendBooleanClause(
+                        filterMust,
+                        filterMustNot,
+                        context);
+
+                for (int i = 0; i < length; i++)
+                {
+                    StringBuilder sbp = sbs.get(i);
+                    if (sbp.length() > 1 && sbp.charAt(sbp.length() - 1) != ',')
+                    {
+                        sbp.append(",");
+                    }
+                }
+            }
+
+            for (int i = 0; i < length; i++)
+            {
+                stripLastComma(sbs.get(i));
+            }
+        }
+
+        if (filterMust.length() == 0 && filterMustNot.length() == 0)
+        {
+            return;
+        }
+
+        sb.append(",");
 
         if (isSingleType)
         {
-            sb.append("\"query\":{\"bool\":{\"must\":[{\"terms\":{\"");
+            appendSingleTypePredicates(sb, filterMust, filterMustNot);
         }
         else
         {
-            sb.append("\"filter\":{\"bool\":{\"must\":[{\"terms\":{\"");
+            appendNonSingleTypePredicate(sb, filterMust, filterMustNot);
+        }
+    }
+
+    /** Append search body for index values */
+    private static void appendIndexSearchFilter(
+            StringBuilder sb,
+            ExecutionContext context,
+            boolean quoteValues,
+            String field)
+    {
+        if (field == null)
+        {
+            return;
         }
 
-        sb.append(field)
+        Iterator<IOrdinalValues> it = context.getStatementContext().getOuterOrdinalValues();
+
+        // No iterator here, that means we have a describe/analyze-call
+        // so add a dummy value
+        if (it == null)
+        {
+            IOrdinalValues dummy = new IOrdinalValuesFactory.IOrdinalValues()
+            {
+                @Override
+                public int size()
+                {
+                    return 1;
+                }
+
+                @Override
+                public Object getValue(int ordinal)
+                {
+                    return "<index values>";
+                }
+            };
+
+            it = asList(dummy).iterator();
+        }
+
+        if (!it.hasNext())
+        {
+            return;
+        }
+
+        sb.append("{\"terms\":{\"")
+                .append(field)
                 .append("\":[");
 
-        Iterator<IOrdinalValues> it = context.getStatementContext().getOuterOrdinalValues();
+        boolean first = true;
         while (it.hasNext())
         {
             Object val = it.next().getValue(0);
             if (val == null)
             {
                 continue;
+            }
+            if (!first)
+            {
+                sb.append(",");
             }
 
             if (quoteValues)
@@ -101,64 +193,10 @@ final class ESUtils
             {
                 sb.append("\"");
             }
-            if (it.hasNext())
-            {
-                sb.append(",");
-            }
+            first = false;
         }
 
-        sb.append("]}}]}}}");
-        return sb.toString();
-    }
-
-    private static void appendPropertyPredicates(
-            List<PropertyPredicate> propertyPredicates,
-            boolean isSingleType,
-            StringBuilder sb,
-            ExecutionContext context)
-    {
-        if (propertyPredicates.isEmpty())
-        {
-            return;
-        }
-
-        sb.append(",");
-
-        StringBuilder filterMust = new StringBuilder();
-        StringBuilder filterMustNot = new StringBuilder();
-
-        List<StringBuilder> sbs = asList(filterMust, filterMustNot);
-        int length = sbs.size();
-        for (PropertyPredicate predicate : propertyPredicates)
-        {
-            predicate.appendBooleanClause(
-                    filterMust,
-                    filterMustNot,
-                    context);
-
-            for (int i = 0; i < length; i++)
-            {
-                StringBuilder sbp = sbs.get(i);
-                if (sbp.length() > 1 && sbp.charAt(sbp.length() - 1) != ',')
-                {
-                    sbp.append(",");
-                }
-            }
-        }
-
-        for (int i = 0; i < length; i++)
-        {
-            stripLastComma(sbs.get(i));
-        }
-
-        if (isSingleType)
-        {
-            appendSingleTypePredicates(sb, filterMust, filterMustNot);
-        }
-        else
-        {
-            appendNonSingleTypePredicate(sb, filterMust, filterMustNot);
-        }
+        sb.append("]}}");
     }
 
     private static void appendSortItems(List<SortItemMeta> sortItems, StringBuilder sb, boolean isSingleType)

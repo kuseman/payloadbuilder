@@ -2,6 +2,8 @@ package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Arrays.asList;
 
+import java.util.Iterator;
+
 import org.apache.commons.collections4.IteratorUtils;
 import org.junit.Test;
 import org.kuse.payloadbuilder.core.operator.CompositeTupleTest.TestTuple;
@@ -33,8 +35,8 @@ public class CollectionTupleTest extends AOperatorTest
     @Test
     public void test_no_pull_up_with_different_column_sets()
     {
-        Row r1 = Row.of(alias, 0, new String[] {"col1", "col2", "col3"}, new Object[] {1, 2, 3});
-        Row r2 = Row.of(alias, 1, new String[] {"col1", "col2", "col3"}, new Object[] {4, 5, 6});
+        Row r1 = Row.of(alias, new String[] {"pos", "col1", "col2", "col3"}, new Object[] {0, 1, 2, 3});
+        Row r2 = Row.of(alias, new String[] {"pos", "col1", "col2", "col3"}, new Object[] {1, 4, 5, 6});
         CollectionTuple ct = new CollectionTuple(r1, 0);
         ct.addTuple(r2);
 
@@ -44,36 +46,39 @@ public class CollectionTupleTest extends AOperatorTest
     @Test
     public void test_pullUp_of_single_row()
     {
-        String[] columns = new String[] {"col1", "col2", "col3"};
-        Row r1 = Row.of(alias, 0, columns, new Object[] {1, 2, 3});
+        String[] columns = new String[] {"pos", "col1", "col2", "col3"};
+        Row r1 = Row.of(alias, columns, new Object[] {0, 1, 2, 3});
         CollectionTuple ct = new CollectionTuple(r1, 0);
         RowCollectionTuple rct = (RowCollectionTuple) ct.optimize(context);
         assertEquals(0, rct.getTupleOrdinal());
         assertSame(rct, rct.getTuple(0));
         assertNull(rct.getTuple(1));
-        assertEquals(asList(r1), IteratorUtils.toList(rct.iterator()));
-        assertEquals(3, rct.getColumnCount());
+        assertEquals(r1.getValue(0), rct.iterator().next().getValue(0));
+        assertEquals(4, rct.getColumnCount());
 
-        assertEquals(0, rct.getColumnOrdinal("col1"));
-        assertEquals(1, rct.getColumnOrdinal("col2"));
-        assertEquals(2, rct.getColumnOrdinal("col3"));
+        assertEquals(0, rct.getColumnOrdinal("pos"));
+        assertEquals(1, rct.getColumnOrdinal("col1"));
+        assertEquals(2, rct.getColumnOrdinal("col2"));
+        assertEquals(3, rct.getColumnOrdinal("col3"));
 
-        assertEquals("col1", rct.getColumn(0));
-        assertEquals("col2", rct.getColumn(1));
-        assertEquals("col3", rct.getColumn(2));
+        assertEquals("pos", rct.getColumn(0));
+        assertEquals("col1", rct.getColumn(1));
+        assertEquals("col2", rct.getColumn(2));
+        assertEquals("col3", rct.getColumn(3));
 
         assertNull(rct.getValue(-10));
-        assertEquals(1, rct.getValue(0));
-        assertEquals(2, rct.getValue(1));
-        assertEquals(3, rct.getValue(2));
+        assertEquals(0, rct.getValue(0));
+        assertEquals(1, rct.getValue(1));
+        assertEquals(2, rct.getValue(2));
+        assertEquals(3, rct.getValue(3));
     }
 
     @Test
     public void test_pullUp_of_multiple_row()
     {
-        String[] columns = new String[] {"col1", "col2", "col3"};
-        Row r1 = Row.of(alias, 0, columns, new Object[] {1, 2, 3});
-        Row r2 = Row.of(alias, 1, columns, new Object[] {4, 2, 6});
+        String[] columns = new String[] {"pos", "col1", "col2", "col3"};
+        Row r1 = Row.of(alias, columns, new Object[] {0, 1, 2, 3});
+        Row r2 = Row.of(alias, columns, new Object[] {1, 4, 2, 6});
         CollectionTuple ct = new CollectionTuple(r1, 0);
         ct.addTuple(r2);
 
@@ -81,21 +86,29 @@ public class CollectionTupleTest extends AOperatorTest
         assertEquals(0, rct.getTupleOrdinal());
         assertSame(rct, rct.getTuple(0));
         assertNull(rct.getTuple(1));
-        assertEquals(asList(r1, r2), IteratorUtils.toList(rct.iterator()));
-        assertEquals(3, rct.getColumnCount());
 
-        assertEquals(0, rct.getColumnOrdinal("col1"));
-        assertEquals(1, rct.getColumnOrdinal("col2"));
-        assertEquals(2, rct.getColumnOrdinal("col3"));
+        Iterator<Tuple> it = rct.iterator();
 
-        assertEquals("col1", rct.getColumn(0));
-        assertEquals("col2", rct.getColumn(1));
-        assertEquals("col3", rct.getColumn(2));
+        assertEquals(r1.getValue(0), it.next().getValue(0));
+        assertEquals(r2.getValue(0), it.next().getValue(0));
+
+        assertEquals(4, rct.getColumnCount());
+
+        assertEquals(0, rct.getColumnOrdinal("pos"));
+        assertEquals(1, rct.getColumnOrdinal("col1"));
+        assertEquals(2, rct.getColumnOrdinal("col2"));
+        assertEquals(3, rct.getColumnOrdinal("col3"));
+
+        assertEquals("pos", rct.getColumn(0));
+        assertEquals("col1", rct.getColumn(1));
+        assertEquals("col2", rct.getColumn(2));
+        assertEquals("col3", rct.getColumn(3));
 
         assertNull(rct.getValue(-10));
-        assertEquals(1, rct.getValue(0));
-        assertEquals(2, rct.getValue(1));
-        assertEquals(3, rct.getValue(2));
+        assertEquals(0, rct.getValue(0));
+        assertEquals(1, rct.getValue(1));
+        assertEquals(2, rct.getValue(2));
+        assertEquals(3, rct.getValue(3));
     }
 
     @Test

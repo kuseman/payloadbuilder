@@ -27,7 +27,6 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpEntity;
@@ -111,71 +110,57 @@ public class ESCatalog extends Catalog
     @Override
     public Operator getScanOperator(OperatorData data)
     {
-        List<PropertyPredicate> propertyPredicates = emptyList();
-        List<SortItemMeta> sortItems = emptyList();
-        // Extract potential predicate to send to ES
-        if (!data.getPredicatePairs().isEmpty() || !data.getSortItems().isEmpty())
-        {
-            ESType esType = ESType.of(data.getSession(), data.getCatalogAlias(), data.getTableAlias().getTable());
-
-            // Fetch analyzed properties
-            Map<String, MappedType> mappedTypes = getProperties(data.getSession(), data.getCatalogAlias(), esType.endpoint, esType.index);
-            Map<String, MappedProperty> properties = Optional.of(mappedTypes.get(esType.type))
-                    .map(m -> m.properties)
-                    .orElse(emptyMap());
-
-            if (!data.getPredicatePairs().isEmpty())
-            {
-                propertyPredicates = new ArrayList<>();
-                collectPredicates(
-                        data.getTableAlias(),
-                        data.getPredicatePairs(),
-                        properties,
-                        propertyPredicates);
-            }
-
-            if (!data.getSortItems().isEmpty())
-            {
-                sortItems = collectSortItems(data.getTableAlias(), properties, data.getSortItems());
-            }
-        }
-
-        return new ESOperator(
-                data.getNodeId(),
-                data.getCatalogAlias(),
-                data.getTableAlias(),
-                null,
-                null,
-                propertyPredicates,
-                sortItems);
+        return getIndexOperator(data, null);
     }
 
     @Override
     public Operator getIndexOperator(OperatorData data, Index index)
     {
-        if (index.getColumns().size() != 1)
+        ESType esType = ESType.of(data.getSession(), data.getCatalogAlias(), data.getTableAlias().getTable());
+        List<PropertyPredicate> propertyPredicates = emptyList();
+        List<SortItemMeta> sortItems = emptyList();
+        MappedProperty indexProperty = null;
+
+        // Fetch analyzed properties
+        Map<String, MappedType> mappedTypes = getProperties(data.getSession(), data.getCatalogAlias(), esType.endpoint, esType.index);
+        Map<String, MappedProperty> properties = Optional.ofNullable(mappedTypes.get(esType.type))
+                .map(m -> m.properties)
+                .orElse(emptyMap());
+        if (index != null)
         {
-            throw new IllegalArgumentException("Invalid index, catalog only supports single column indices");
+            if (index.getColumns().size() != 1)
+            {
+                throw new IllegalArgumentException("Invalid index, catalog only supports single column indices");
+            }
+
+            String indexColumn = index.getColumns().get(0);
+            // Fetch mapped property for index column. Not needed for _id, _parent_id
+            if (!(ESOperator.DOCID.equalsIgnoreCase(indexColumn)
+                || ESOperator.PARENTID.equalsIgnoreCase(indexColumn)))
+            {
+                indexProperty = properties.get(indexColumn);
+                //CSOFF
+                if (indexProperty == null)
+                //CSON
+                {
+                    throw new IllegalArgumentException("Invalid index column: " + indexColumn);
+                }
+            }
         }
 
-        String indexColumn = index.getColumns().get(0);
-        MappedProperty indexProperty = null;
-        // Fetch mapped property for index column
-        if (!(ESOperator.DOCID.equalsIgnoreCase(indexColumn) || ESOperator.PARENTID.equalsIgnoreCase(indexColumn)))
+        if (!data.getPredicatePairs().isEmpty())
         {
-            ESType esType = ESType.of(data.getSession(), data.getCatalogAlias(), data.getTableAlias().getTable());
+            propertyPredicates = new ArrayList<>();
+            collectPredicates(
+                    data.getTableAlias(),
+                    data.getPredicatePairs(),
+                    properties,
+                    propertyPredicates);
+        }
 
-            // Fetch analyzed properties
-            Map<String, MappedType> mappedTypes = getProperties(data.getSession(), data.getCatalogAlias(), esType.endpoint, esType.index);
-            Map<String, MappedProperty> properties = Optional.of(mappedTypes.get(esType.type))
-                    .map(m -> m.properties)
-                    .orElse(emptyMap());
-
-            indexProperty = properties.get(indexColumn);
-            if (indexProperty == null)
-            {
-                throw new IllegalArgumentException("Invalid index column: " + indexColumn);
-            }
+        if (!data.getSortItems().isEmpty())
+        {
+            sortItems = collectSortItems(data.getTableAlias(), properties, data.getSortItems());
         }
 
         return new ESOperator(
@@ -184,8 +169,8 @@ public class ESCatalog extends Catalog
                 data.getTableAlias(),
                 index,
                 indexProperty,
-                emptyList(),
-                emptyList());
+                propertyPredicates,
+                sortItems);
     };
 
     private void collectPredicates(
@@ -276,7 +261,7 @@ public class ESCatalog extends Catalog
         return getIndices(table, properties);
     }
 
-    private <T> T get(String endpoint, String index, String path, Function<Map<String, Object>, T> resultConsumer)
+    private <T> Map<String, Object> get(String endpoint, String index, String path)
     {
         HttpEntity entity = null;
         HttpGet getAlias = new HttpGet(String.format("%s/%s/%s", endpoint, index, path));
@@ -287,8 +272,7 @@ public class ESCatalog extends Catalog
             {
                 throw new RuntimeException("Error query Elastic: " + IOUtils.toString(entity.getContent(), StandardCharsets.UTF_8));
             }
-            Map<String, Object> map = MAPPER.readValue(entity.getContent(), Map.class);
-            return resultConsumer.apply(map);
+            return MAPPER.readValue(entity.getContent(), Map.class);
         }
         catch (IOException e)
         {
@@ -298,28 +282,6 @@ public class ESCatalog extends Catalog
         {
             EntityUtils.consumeQuietly(entity);
         }
-    }
-
-    private Map<String, Object> getMappings(String endpoint, String index)
-    {
-        if (isBlank(endpoint) || isBlank(index))
-        {
-            throw new IllegalArgumentException("Missing endpoint/index in catalog properties.");
-        }
-
-        String actualIndex = get(endpoint, index, "_alias", map ->
-        {
-            if (map.size() > 0)
-            {
-                return map.keySet().iterator().next();
-            }
-            else
-            {
-                return index;
-            }
-        });
-
-        return get(endpoint, actualIndex, "_mappings", map -> map);
     }
 
     private boolean isFullTextSearchPredicate(Expression expression)
@@ -402,48 +364,72 @@ public class ESCatalog extends Catalog
     @SuppressWarnings("unchecked")
     private Map<String, MappedType> getProperties(QuerySession session, String catalogAlias, String endpoint, String index)
     {
+        if (isBlank(endpoint) || isBlank(index))
+        {
+            throw new IllegalArgumentException("Missing endpoint/index in catalog properties.");
+        }
         Integer ttl = session.getCatalogProperty(catalogAlias, CACHE_MAPPINGS_TTL);
         QualifiedName cacheName = QualifiedName.of(NAME, endpoint, index);
         return session.getCustomCacheProvider().computIfAbsent(cacheName, "mappings", Duration.ofMinutes(ttl != null ? ttl : MAPPINGS_CACHE_TTL), () ->
         {
-            final Map<String, MappedType> result = new HashMap<>();
-            Map<String, Object> map = getMappings(endpoint, index);
+            Map<String, Object> map = get(endpoint, index, "_mappings");
+            Map<String, MappedType> result = new HashMap<>();
 
-            // If index is wildcard then pick the first matching index
-            // this might get wierd results since we might miss an index setting
-            // not present in the first map, but best we can do
-            if (index.contains("*"))
+            // Traverse all indices matching mappings
+            // if this is a multi indices query like wildcard (*) or
+            // comma separated then we will have multiple indices to fetch properties
+            // for and should be merged
+            for (Object obj : map.values())
             {
-                map = (Map<String, Object>) map.values().iterator().next();
-            }
-            else
-            {
-                map = (Map<String, Object>) map.get(index);
-            }
-            Map<String, Object> mappings = (Map<String, Object>) map.get("mappings");
-            Map<String, Object> properties = (Map<String, Object>) mappings.get("properties");
+                Map<String, Object> currentIndexMappings = (Map<String, Object>) obj;
+                Map<String, Object> mappings = (Map<String, Object>) currentIndexMappings.get("mappings");
+                Map<String, Object> properties = (Map<String, Object>) mappings.get("properties");
 
-            // Single type ES version, return dummy table_name
-            if (properties != null && !properties.containsKey("properties"))
-            {
-                Map<String, MappedProperty> typeResult = new HashMap<>();
-                populateAnalyzedFields(typeResult, properties, false, null);
-                result.put(SINGLE_TYPE_TABLE_NAME, new MappedType(mappings, typeResult));
-            }
-            else
-            {
-                // Old es version with types
-                for (Entry<String, Object> e : mappings.entrySet())
+                // Single type ES version, return dummy table_name
+                if (properties != null && !properties.containsKey("properties"))
                 {
-                    Map<String, MappedProperty> typeResult = new HashMap<>();
-                    mappings = (Map<String, Object>) e.getValue();
-                    properties = (Map<String, Object>) mappings.get("properties");
-                    populateAnalyzedFields(typeResult, properties, false, null);
-                    result.put(e.getKey(), new MappedType(mappings, typeResult));
+                    mergeProperties(result, SINGLE_TYPE_TABLE_NAME, mappings, properties);
+                }
+                else
+                {
+                    // Old es version with types
+                    for (Entry<String, Object> e : mappings.entrySet())
+                    {
+                        Map<String, Object> currentMappings = (Map<String, Object>) e.getValue();
+                        properties = (Map<String, Object>) currentMappings.get("properties");
+                        mergeProperties(result, e.getKey(), currentMappings, properties);
+                    }
                 }
             }
 
             return result;
+        });
+    }
+
+    private void mergeProperties(
+            Map<String, MappedType> result,
+            String type,
+            Map<String, Object> mappings,
+            Map<String, Object> properties)
+    {
+        result.compute(type, (k, v) ->
+        {
+            MappedType r;
+            Map<String, MappedProperty> typeResult;
+
+            if (v != null)
+            {
+                typeResult = v.properties;
+                r = v;
+            }
+            else
+            {
+                typeResult = new HashMap<>();
+                r = new MappedType(mappings, typeResult);
+            }
+
+            populateAnalyzedFields(typeResult, properties, false, null);
+            return r;
         });
     }
 
@@ -525,7 +511,7 @@ public class ESCatalog extends Catalog
         String[] columnsArray = columns.toArray(EMPTY_STRING_ARRAY);
         return TupleIterator.wrap(result.stream().map(map ->
         {
-            return (Tuple) Row.of(tableAlias, -1, columnsArray, new Row.MapValues(map, columnsArray));
+            return (Tuple) Row.of(tableAlias, columnsArray, new Row.MapValues(map, columnsArray));
         }).iterator());
     }
 
@@ -569,7 +555,7 @@ public class ESCatalog extends Catalog
         String[] columnsArray = columns.toArray(EMPTY_STRING_ARRAY);
         return TupleIterator.wrap(result.stream().map(map ->
         {
-            return (Tuple) Row.of(tableAlias, -1, columnsArray, new Row.MapValues(map, columnsArray));
+            return (Tuple) Row.of(tableAlias, columnsArray, new Row.MapValues(map, columnsArray));
         }).iterator());
     }
 
@@ -583,7 +569,7 @@ public class ESCatalog extends Catalog
                 .entrySet()
                 .stream()
                 .flatMap(e -> getIndices(QualifiedName.of(e.getKey()), e.getValue().properties).stream())
-                .map(i -> (Tuple) Row.of(tableAlias, -1, columns, new Object[] {i.getTable().getLast(), i.getColumns()}))
+                .map(i -> (Tuple) Row.of(tableAlias, columns, new Object[] {i.getTable().getLast(), i.getColumns()}))
                 .iterator());
     }
 

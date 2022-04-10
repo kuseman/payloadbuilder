@@ -26,7 +26,7 @@ public class OrderByOperatorTest extends AOperatorTest
                 .tableMeta(new TableMeta(asList(new TableMeta.Column("col1", DataType.ANY))))
                 .build();
         MutableBoolean close = new MutableBoolean();
-        Operator target = op(ctx -> IntStream.range(0, 100).mapToObj(i -> (Tuple) Row.of(alias, i, new Object[] {rnd.nextInt(100)})).iterator(), () -> close.setTrue());
+        Operator target = op(ctx -> IntStream.range(0, 100).mapToObj(i -> (Tuple) Row.of(alias, new Object[] {rnd.nextInt(100)})).iterator(), () -> close.setTrue());
         OrderByOperator operator = new OrderByOperator(
                 0,
                 target,

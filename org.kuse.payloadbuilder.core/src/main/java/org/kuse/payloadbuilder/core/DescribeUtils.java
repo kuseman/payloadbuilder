@@ -99,7 +99,6 @@ public class DescribeUtils
         String[] columns = describeColumns.toArray(EMPTY_STRING_ARRAY);
         // Result set rows
         List<Tuple> rows = new ArrayList<>(describeRows.size());
-        int pos = 0;
         int size = describeColumns.size();
         for (DescribableRow dRow : describeRows)
         {
@@ -115,7 +114,7 @@ public class DescribeUtils
                 values[i] = dRow.properties.get(describeColumns.get(i));
             }
 
-            rows.add(Row.of(alias, pos++, columns, values));
+            rows.add(Row.of(alias, columns, values));
         }
 
         Operator describeOperator = new Operator()

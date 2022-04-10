@@ -7,12 +7,14 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import javax.swing.SwingUtilities;
 import javax.swing.table.AbstractTableModel;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.editor.QueryFileModel.Output;
 
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -99,6 +101,21 @@ class ResultModel extends AbstractTableModel
     int getActualRowCount()
     {
         return rows.size();
+    }
+
+    /** Move values, inserting nulls at 'atIndex' 'length' times */
+    void moveValues(int atIndex, int length)
+    {
+        List<Pair<String, Object>> padding = Collections.nCopies(length, Pair.of(null, null));
+        for (int i = 0; i < getRowCount(); i++)
+        {
+            rows.get(i).addAll(atIndex, padding);
+        }
+    }
+
+    String[] getColumns()
+    {
+        return columns;
     }
 
     @Override

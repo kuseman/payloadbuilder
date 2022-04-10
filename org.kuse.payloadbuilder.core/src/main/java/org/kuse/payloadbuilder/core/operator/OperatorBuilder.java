@@ -1,7 +1,6 @@
 package org.kuse.payloadbuilder.core.operator;
 
 import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.toSet;
 import static org.apache.commons.collections4.CollectionUtils.containsAny;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
@@ -13,7 +12,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.function.ToIntBiFunction;
@@ -976,31 +974,6 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         return new ExpressionHashFunction(expressions);
     }
 
-    /** Fetch index from provided equi pairs and indices list */
-    private static Index getIndex(List<AnalyzePair> equiPairs, String alias, List<Index> indices)
-    {
-        /* Extract all references inner columns from equi items */
-        Set<String> columnItems = equiPairs
-                .stream()
-                .map(pair -> pair.getColumn(alias))
-                .filter(Objects::nonNull)
-                .collect(toSet());
-
-        Index index = null;
-
-        if (!columnItems.isEmpty())
-        {
-            /* Find the first matching index from extracted columns above */
-            index = indices
-                    .stream()
-                    .filter(i -> i.getColumns() == Index.ALL_COLUMNS || columnItems.containsAll(i.getColumns()))
-                    .findFirst()
-                    .orElse(null);
-        }
-
-        return index;
-    }
-
     /**
      * <pre>
      * Replicates constants from left/right value extractors
@@ -1065,161 +1038,6 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         }
 
         return Pair.of(catalogAlias, catalog);
-    }
-
-    /** Class containing information needed to build a index operator */
-    private static class IndexOperatorFoundation
-    {
-        /** The outer expressions found that matched an index */
-        List<Expression> outerValueExpressions;
-        /** The inner expressions found that matched an index */
-        List<Expression> innerValueExpressions;
-        /** The resulting predicate found that matched an index. Ie. parts that cannot
-         * be pushed down. This is either a join condition of a where clause */
-        AnalyzeResult condition;
-        /** The resulting pairs that can be pushed down to operators. Ie. parts that's not
-         * part of the index that matched */
-        List<AnalyzePair> pushDownPairs;
-        /** Resulting index that matched the predicate */
-        Index index;
-
-        boolean isEqui()
-        {
-            return outerValueExpressions != null && outerValueExpressions.size() > 0;
-        }
-
-        //CSOFF
-        IndexOperatorFoundation(
-                //CSON
-                String alias,
-                List<Index> indices,
-                AnalyzeResult analyzeResult)
-        {
-            int size = analyzeResult.getPairs().size();
-            List<AnalyzePair> equiItems = new ArrayList<>(size);
-            List<AnalyzePair> leftOverEquiItems = new ArrayList<>(size);
-            for (int i = 0; i < size; i++)
-            {
-                AnalyzePair pair = analyzeResult.getPairs().get(i);
-                if (pair.isEqui(alias))
-                {
-                    equiItems.add(pair);
-                }
-                else
-                {
-                    leftOverEquiItems.add(pair);
-                }
-            }
-
-            if (equiItems.size() == 0)
-            {
-                Pair<List<AnalyzePair>, AnalyzeResult> pair = analyzeResult.extractPushdownPairs(alias);
-                pushDownPairs = pair.getKey();
-                condition = pair.getValue();
-                return;
-            }
-
-            /*
-             * Populates value extractors for provided index.
-             *
-             * Example
-             *
-             *   Index [club_id, country_id, art_id]
-             *   Condition
-             *   a.art_id = s.art_id
-             *   a.country_id = 0
-             *   a.club_id = 10
-             *
-             * Result:
-             *  outerValueExpressions: [10,        0,            s.art_id]
-             *  innerValueExpressions: [a.club_id, a.country_id, a.art_id]
-             *  indexPairs:
-             *    [a.art_id,      s.art_id],
-             *    [a.country_id,  0],
-             *    [a.club_id,     10]
-            */
-            index = getIndex(equiItems, alias, indices);
-            size = equiItems.size();
-            List<String> indexColumns = null;
-            outerValueExpressions = new ArrayList<>(size);
-            innerValueExpressions = new ArrayList<>(size);
-            Set<String> processedColumns = new HashSet<>();
-            for (int i = 0; i < size; i++)
-            {
-                AnalyzePair pair = equiItems.get(i);
-                boolean isPushdown = pair.isPushdown(alias);
-                String column = pair.getColumn(alias);
-                int columnIndex = 0;
-                boolean isIndexPair = false;
-                if (index != null && column != null)
-                {
-                    if (index.getColumns() == Index.ALL_COLUMNS)
-                    {
-                        //CSOFF
-                        if (indexColumns == null)
-                        //CSON
-                        {
-                            indexColumns = new ArrayList<>(size);
-                        }
-                        columnIndex = indexColumns.size();
-                        indexColumns.add(column);
-                    }
-                    else
-                    {
-                        columnIndex = index.getColumns().indexOf(column);
-                        //CSOFF
-                        if (columnIndex == -1)
-                        //CSON
-                        {
-                            leftOverEquiItems.add(pair);
-                            continue;
-                        }
-                        //CSOFF
-                        if (!processedColumns.add(column))
-                        //CSON
-                        {
-                            // TODO: pick the best available expression
-                            // Ie. Expression#isConstant over any other
-                            continue;
-                        }
-                    }
-
-                    isIndexPair = true;
-                }
-
-                if (isIndexPair || !isPushdown)
-                {
-                    Pair<Expression, Expression> p = pair.getExpressionPair(alias);
-                    if (outerValueExpressions.size() > columnIndex)
-                    {
-                        outerValueExpressions.add(columnIndex, p.getRight());
-                        innerValueExpressions.add(columnIndex, p.getLeft());
-                    }
-                    else
-                    {
-                        outerValueExpressions.add(p.getRight());
-                        innerValueExpressions.add(p.getLeft());
-                    }
-                }
-
-                // Don't re-add pair if it's a index-pushdown item
-                if (!(isIndexPair && pair.isPushdown(alias)))
-                {
-                    leftOverEquiItems.add(pair);
-                }
-            }
-
-            // Create a new index with current columns
-            if (indexColumns != null)
-            {
-                index = new Index(index.getTable(), indexColumns, index.getBatchSize());
-            }
-
-            AnalyzeResult result = new AnalyzeResult(leftOverEquiItems);
-            Pair<List<AnalyzePair>, AnalyzeResult> pair = result.extractPushdownPairs(alias);
-            pushDownPairs = pair.getKey();
-            condition = pair.getValue();
-        }
     }
 
     /** Create a dummy operator for selects without a FROM clause */

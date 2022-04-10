@@ -109,6 +109,9 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         Select select = s(queryString);
         BuildResult buildResult = OperatorBuilder.create(session, select);
 
+        // TODO: the inner operator here should
+        //       be a cached nested loop and not a hash join
+        //       would yield a much more effective plan
         Operator expected = new NestedLoopJoin(
                 5,
                 "INNER JOIN",
@@ -132,8 +135,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 true,
                 false);
 
-        //                System.out.println(pair.getKey().toString(1));
-        //                System.out.println(expected.toString(1));
+//                        System.err.println(buildResult.getOperator().toString(1));
+//                        System.out.println(expected.toString(1));
 
         assertEquals(expected, buildResult.getOperator());
     }
@@ -200,8 +203,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         Operator actual = buildResult.getOperator();
 
-        //                System.out.println(actual.toString(1));
-        //                System.err.println(expected.toString(1));
+//                        System.out.println(actual.toString(1));
+//                        System.err.println(expected.toString(1));
 
         assertEquals(expected, actual);
 
@@ -249,6 +252,101 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         //        System.out.println(actual.toString(1));
         //        System.err.println(expected.toString(1));
+
+        assertEquals(expected, actual);
+
+        TupleIterator it = actual.open(new ExecutionContext(session));
+        assertFalse(it.hasNext());
+    }
+
+    @Test
+    public void test_inner_join_with_pushdown_and_all_columns_index()
+    {
+        String queryString = "SELECT a.art_id " +
+            "FROM source s " +
+            "INNER JOIN article a " +
+            "  ON a.art_id = s.art_id " +
+            "  AND a.club_id = 1337 + 123 " +
+            "  AND a.country_id = 0 " +
+            "  AND a.active_flg = 1 " +
+            "  AND a.art_id = 1337";
+
+        List<Operator> operators = new ArrayList<>();
+        Catalog c = catalog(ofEntries(entry("article", Index.ALL_COLUMNS)), operators);
+        session.getCatalogRegistry().registerCatalog("c", c);
+        session.getCatalogRegistry().setDefaultCatalog("c");
+
+        Select select = s(queryString);
+        BuildResult buildResult = OperatorBuilder.create(session, select);
+
+        Operator expected = new BatchHashJoin(
+                3,
+                "INNER JOIN",
+                operators.get(0),
+                new FilterOperator(
+                        2,
+                        operators.get(1),
+                        new ExpressionPredicate(en("a.club_id = 1460 and a.country_id = 0 AND a.active_flg = 1 AND a.art_id = 1337"))),
+                new ExpressionOrdinalValuesFactory(asList(en("s.art_id"))),
+                new ExpressionHashFunction(asList(en("a.art_id"))),
+                new ExpressionPredicate(en("a.art_id = s.art_id")),
+                new DefaultTupleMerger(-1, 1, 2),
+                false,
+                false,
+                new Index(QualifiedName.of("article"), asList("art_id"), 100),
+                null);
+
+        Operator actual = buildResult.getOperator();
+
+//                System.out.println(actual.toString(1));
+//                System.err.println(expected.toString(1));
+
+        assertEquals(expected, actual);
+
+        TupleIterator it = actual.open(new ExecutionContext(session));
+        assertFalse(it.hasNext());
+    }
+
+    @Test
+    public void test_inner_join_with_pushdown_and_index_on_same_column()
+    {
+        String queryString = "SELECT a.art_id " +
+            "FROM source s " +
+            "INNER JOIN article a " +
+            "  ON a.art_id = s.art_id " +
+            "  AND a.club_id = 1337 + 123 " +
+            "  AND a.country_id = 0 " +
+            "  AND a.art_id = 10 ";
+
+        List<Operator> operators = new ArrayList<>();
+        Catalog c = catalog(ofEntries(entry("article", asList("club_id", "country_id", "art_id"))), operators);
+        session.getCatalogRegistry().registerCatalog("c", c);
+        session.getCatalogRegistry().setDefaultCatalog("c");
+
+        Select select = s(queryString);
+        BuildResult buildResult = OperatorBuilder.create(session, select);
+
+        Operator expected = new BatchHashJoin(
+                3,
+                "INNER JOIN",
+                operators.get(0),
+                new FilterOperator(
+                        2,
+                        operators.get(1),
+                        new ExpressionPredicate(en("a.art_id = 10"))),
+                new ExpressionOrdinalValuesFactory(asList(e("1460"), e("0"), en("s.art_id"))),
+                new ExpressionHashFunction(asList(e("1460"), e("0"), en("a.art_id"))),
+                new ExpressionPredicate(en("a.art_id = s.art_id")),
+                new DefaultTupleMerger(-1, 1, 2),
+                false,
+                false,
+                c.getIndices(session, "", QualifiedName.of("article")).get(0),
+                null);
+
+        Operator actual = buildResult.getOperator();
+
+//                System.out.println(actual.toString(1));
+//                System.err.println(expected.toString(1));
 
         assertEquals(expected, actual);
 

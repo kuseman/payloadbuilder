@@ -1,5 +1,6 @@
 package org.kuse.payloadbuilder.catalog.jdbc;
 
+import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.joining;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
 import static org.kuse.payloadbuilder.core.DescribeUtils.CATALOG;
@@ -21,6 +22,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.AOperator;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory;
 import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValues;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.Row;
@@ -81,6 +83,8 @@ class JdbcOperator extends AOperator
                     .map(Objects::toString)
                     .collect(joining(",")));
         }
+
+        result.put("Query", buildSql(context));
 
         return result;
     }
@@ -182,6 +186,28 @@ class JdbcOperator extends AOperator
             int size = index.getColumns().size();
             sb.append(whereAdded ? " AND (" : " WHERE (");
             Iterator<IOrdinalValues> it = context.getStatementContext().getOuterOrdinalValues();
+            // No iterator here, that means we have a describe/analyze-call
+            // so add a dummy value
+            if (it == null)
+            {
+                IOrdinalValues dummy = new IOrdinalValuesFactory.IOrdinalValues()
+                {
+                    @Override
+                    public int size()
+                    {
+                        return 1;
+                    }
+
+                    @Override
+                    public Object getValue(int ordinal)
+                    {
+                        return "<index values>";
+                    }
+                };
+
+                it = asList(dummy).iterator();
+            }
+
             while (it.hasNext())
             {
                 IOrdinalValues values = it.next();
@@ -291,7 +317,6 @@ class JdbcOperator extends AOperator
             private PreparedStatement statement;
             private ResultSet rs;
             private String[] columns;
-            private int pos;
 
             @Override
             public Tuple next()
@@ -315,7 +340,7 @@ class JdbcOperator extends AOperator
                     }
                 }
 
-                return Row.of(tableAlias, pos, columns, values);
+                return Row.of(tableAlias, columns, values);
             }
 
             @Override
@@ -351,7 +376,6 @@ class JdbcOperator extends AOperator
                     statement = null;
                     rs = null;
                     columns = null;
-                    pos = 0;
                 }
             }
 
