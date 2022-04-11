@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.Index;
+import org.kuse.payloadbuilder.core.operator.IndexPredicate;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
@@ -56,7 +57,7 @@ public class JdbcCatalog extends Catalog
     @Override
     public List<Index> getIndices(QuerySession session, String catalogAlias, QualifiedName table)
     {
-        return singletonList(new Index(table, Index.ALL_COLUMNS, BATCH_SIZE));
+        return singletonList(new Index(table, emptyList(), Index.ColumnsType.WILDCARD, BATCH_SIZE));
     }
 
     @Override
@@ -97,11 +98,11 @@ public class JdbcCatalog extends Catalog
     }
 
     @Override
-    public Operator getIndexOperator(OperatorData data, Index index)
+    public Operator getIndexOperator(OperatorData data, IndexPredicate indexPredicate)
     {
         List<AnalyzePair> pairs = getPredicatePairs(data);
         List<SortItem> sortItems = getSortItems(data);
-        return new JdbcOperator(this, data.getNodeId(), data.getCatalogAlias(), data.getTableAlias(), pairs, sortItems, index);
+        return new JdbcOperator(this, data.getNodeId(), data.getCatalogAlias(), data.getTableAlias(), pairs, sortItems, indexPredicate);
     }
 
     private List<AnalyzePair> getPredicatePairs(OperatorData data)

@@ -13,6 +13,7 @@ import org.junit.Test;
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.Index;
+import org.kuse.payloadbuilder.core.catalog.Index.ColumnsType;
 import org.kuse.payloadbuilder.core.operator.BatchCacheOperator.CacheSettings;
 import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.OperatorBuilder.BuildResult;
@@ -135,8 +136,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 true,
                 false);
 
-//                        System.err.println(buildResult.getOperator().toString(1));
-//                        System.out.println(expected.toString(1));
+        //                        System.err.println(buildResult.getOperator().toString(1));
+        //                        System.out.println(expected.toString(1));
 
         assertEquals(expected, buildResult.getOperator());
     }
@@ -203,8 +204,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         Operator actual = buildResult.getOperator();
 
-//                        System.out.println(actual.toString(1));
-//                        System.err.println(expected.toString(1));
+        //                        System.out.println(actual.toString(1));
+        //                        System.err.println(expected.toString(1));
 
         assertEquals(expected, actual);
 
@@ -260,7 +261,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
     }
 
     @Test
-    public void test_inner_join_with_pushdown_and_all_columns_index()
+    public void test_inner_join_with_pushdown_and_wildcard_columns_index()
     {
         String queryString = "SELECT a.art_id " +
             "FROM source s " +
@@ -272,7 +273,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             "  AND a.art_id = 1337";
 
         List<Operator> operators = new ArrayList<>();
-        Catalog c = catalog(ofEntries(entry("article", Index.ALL_COLUMNS)), operators);
+        Catalog c = catalog(ofEntries(entry("article", WILDCARD_COLUMNS)), operators);
         session.getCatalogRegistry().registerCatalog("c", c);
         session.getCatalogRegistry().setDefaultCatalog("c");
 
@@ -293,13 +294,13 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
                 new DefaultTupleMerger(-1, 1, 2),
                 false,
                 false,
-                new Index(QualifiedName.of("article"), asList("art_id"), 100),
+                new Index(QualifiedName.of("article"), emptyList(), ColumnsType.WILDCARD, 100),
                 null);
 
         Operator actual = buildResult.getOperator();
 
-//                System.out.println(actual.toString(1));
-//                System.err.println(expected.toString(1));
+        //                System.out.println(actual.toString(1));
+        //                System.err.println(expected.toString(1));
 
         assertEquals(expected, actual);
 
@@ -345,8 +346,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         Operator actual = buildResult.getOperator();
 
-//                System.out.println(actual.toString(1));
-//                System.err.println(expected.toString(1));
+        //                System.out.println(actual.toString(1));
+        //                System.err.println(expected.toString(1));
 
         assertEquals(expected, actual);
 
@@ -501,6 +502,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         assertFalse(it.hasNext());
     }
 
+    static final List<String> WILDCARD_COLUMNS = asList();
     private Catalog catalog(
             Map<String, List<String>> keysByTable,
             List<Operator> operators)
@@ -511,7 +513,11 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             public List<Index> getIndices(QuerySession session, String catalogAlias, QualifiedName table)
             {
                 List<String> keys = keysByTable.get(table.toDotDelimited());
-                return keys != null ? asList(new Index(table, keys, 100)) : emptyList();
+                if (keys == WILDCARD_COLUMNS)
+                {
+                    return asList(new Index(table, keys, Index.ColumnsType.WILDCARD, 100));
+                }
+                return keys != null ? asList(new Index(table, keys, Index.ColumnsType.ALL, 100)) : emptyList();
             }
 
             @Override
@@ -523,7 +529,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             }
 
             @Override
-            public Operator getIndexOperator(OperatorData data, Index index)
+            public Operator getIndexOperator(OperatorData data, IndexPredicate indexPredicate)
             {
                 Operator op = new TestOperator("index " + data.getTableAlias().getTable().toString(), keysByTable);
                 operators.add(op);

@@ -1,6 +1,6 @@
 package org.kuse.payloadbuilder.core.catalog;
 
-import static java.util.Collections.emptyList;
+import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 
 import java.util.List;
@@ -12,18 +12,22 @@ import org.kuse.payloadbuilder.core.parser.QualifiedName;
  **/
 public class Index
 {
-    /** Marker list of an index which has all possible columns defined. */
-    public static final List<String> ALL_COLUMNS = emptyList();
-
     private final QualifiedName table;
     private final List<String> columns;
     private final int batchSize;
+    private final ColumnsType columnsType;
 
-    public Index(QualifiedName table, List<String> columns, int batchSize)
+    public Index(QualifiedName table, List<String> columns, ColumnsType columnsType, int batchSize)
     {
         this.table = requireNonNull(table, "table");
-        this.columns = requireNonNull(columns, "columns");
+        this.columns = unmodifiableList(requireNonNull(columns, "columns"));
+        this.columnsType = requireNonNull(columnsType, "columnsType");
         this.batchSize = batchSize;
+
+        if (columnsType == ColumnsType.ANY)
+        {
+            throw new IllegalArgumentException("ANY columns is not supported yet.");
+        }
     }
 
     public QualifiedName getTable()
@@ -34,6 +38,11 @@ public class Index
     public List<String> getColumns()
     {
         return columns;
+    }
+
+    public ColumnsType getColumnsType()
+    {
+        return columnsType;
     }
 
     public int getBatchSize()
@@ -53,8 +62,10 @@ public class Index
         if (obj instanceof Index)
         {
             Index that = (Index) obj;
-            return columns.equals(that.columns)
-                && batchSize == that.batchSize;
+            return table.equals(that.table)
+                && columns.equals(that.columns)
+                && batchSize == that.batchSize
+                && columnsType == that.columnsType;
         }
         return false;
     }
@@ -62,6 +73,26 @@ public class Index
     @Override
     public String toString()
     {
-        return table.toDotDelimited() + " " + columns.toString();
+        return table.toDotDelimited() + " " + columns.toString() + " (" + columnsType + ")";
+    }
+
+    /** Type of columns this index supports. */
+    public enum ColumnsType
+    {
+        /**
+         * A special type of index used by catalogs that can use all found columns for a table. Shortcut type to skip listing all the columns that the
+         * table has. Used for example in JDBC-catalog.
+         */
+        WILDCARD,
+
+        /**
+         * Type that specifies that ALL columns must be used to be able to utilize this index
+         */
+        ALL,
+
+        /**
+         * Type that specifies that at least one column (ANY) must be used to be able to utilize this index
+         */
+        ANY
     }
 }

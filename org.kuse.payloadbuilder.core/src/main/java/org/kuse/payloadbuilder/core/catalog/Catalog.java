@@ -12,6 +12,7 @@ import java.util.function.Function;
 
 import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+import org.kuse.payloadbuilder.core.operator.IndexPredicate;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
@@ -104,9 +105,9 @@ public abstract class Catalog
      * thread in execution state.
      * </pre>
      *
-     * @param index Index to use
+     * @param indexPredicate Predicate to use
      */
-    public Operator getIndexOperator(OperatorData data, Index index)
+    public Operator getIndexOperator(OperatorData data, IndexPredicate indexPredicate)
     {
         throw new IllegalArgumentException("Catalog " + data.catalogAlias + " (" + name + ") doesn't support index operators.");
     }

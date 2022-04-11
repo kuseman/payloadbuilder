@@ -39,6 +39,7 @@ import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.Catalog;
 import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.catalog.ScalarFunctionInfo;
+import org.kuse.payloadbuilder.core.operator.IndexPredicate;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.Operator.TupleIterator;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
@@ -114,7 +115,7 @@ public class ESCatalog extends Catalog
     }
 
     @Override
-    public Operator getIndexOperator(OperatorData data, Index index)
+    public Operator getIndexOperator(OperatorData data, IndexPredicate indexPredicate)
     {
         ESType esType = ESType.of(data.getSession(), data.getCatalogAlias(), data.getTableAlias().getTable());
         List<PropertyPredicate> propertyPredicates = emptyList();
@@ -126,14 +127,14 @@ public class ESCatalog extends Catalog
         Map<String, MappedProperty> properties = Optional.ofNullable(mappedTypes.get(esType.type))
                 .map(m -> m.properties)
                 .orElse(emptyMap());
-        if (index != null)
+        if (indexPredicate != null)
         {
-            if (index.getColumns().size() != 1)
+            if (indexPredicate.getIndexColumns().size() != 1)
             {
                 throw new IllegalArgumentException("Invalid index, catalog only supports single column indices");
             }
 
-            String indexColumn = index.getColumns().get(0);
+            String indexColumn = indexPredicate.getIndexColumns().get(0);
             // Fetch mapped property for index column. Not needed for _id, _parent_id
             if (!(ESOperator.DOCID.equalsIgnoreCase(indexColumn)
                 || ESOperator.PARENTID.equalsIgnoreCase(indexColumn)))
@@ -167,7 +168,7 @@ public class ESCatalog extends Catalog
                 data.getNodeId(),
                 data.getCatalogAlias(),
                 data.getTableAlias(),
-                index,
+                indexPredicate,
                 indexProperty,
                 propertyPredicates,
                 sortItems);
@@ -255,7 +256,7 @@ public class ESCatalog extends Catalog
         ESType esType = ESType.of(session, catalogAlias, table);
         // All indexed non-free-text fields are index candidates
         Map<String, MappedType> mappedTypes = getProperties(session, catalogAlias, esType.endpoint, esType.index);
-        Map<String, MappedProperty> properties = Optional.of(mappedTypes.get(esType.type))
+        Map<String, MappedProperty> properties = Optional.ofNullable(mappedTypes.get(esType.type))
                 .map(m -> m.properties)
                 .orElse(emptyMap());
         return getIndices(table, properties);
@@ -577,8 +578,8 @@ public class ESCatalog extends Catalog
     {
         List<Index> result = new ArrayList<>(2 + properties.size());
         // All tables have a doc id index
-        result.add(new Index(table, singletonList(ESOperator.DOCID), BATCH_SIZE));
-        result.add(new Index(table, singletonList(ESOperator.PARENTID), BATCH_SIZE));
+        result.add(new Index(table, singletonList(ESOperator.DOCID), Index.ColumnsType.ALL, BATCH_SIZE));
+        result.add(new Index(table, singletonList(ESOperator.PARENTID), Index.ColumnsType.ALL, BATCH_SIZE));
 
         for (MappedProperty p : properties.values())
         {
@@ -596,7 +597,7 @@ public class ESCatalog extends Catalog
                 continue;
             }
 
-            result.add(new Index(table, singletonList(field), BATCH_SIZE));
+            result.add(new Index(table, singletonList(field), Index.ColumnsType.ALL, BATCH_SIZE));
         }
 
         return result;

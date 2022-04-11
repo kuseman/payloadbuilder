@@ -49,26 +49,14 @@ public class StatementContext
         this.tuple = source.tuple;
     }
 
-    public Iterator<IOrdinalValues> getOuterOrdinalValues()
+    Iterator<IOrdinalValues> getOuterOrdinalValues()
     {
         return outerOrdinalValues;
     }
 
-    public void setOuterOrdinalValues(Iterator<IOrdinalValues> outerOrdinalValues)
+    void setOuterOrdinalValues(Iterator<IOrdinalValues> outerOrdinalValues)
     {
         this.outerOrdinalValues = outerOrdinalValues;
-    }
-
-    /** Consumes any left outer values */
-    public void consumeOuterValues()
-    {
-        if (outerOrdinalValues != null)
-        {
-            while (outerOrdinalValues.hasNext())
-            {
-                outerOrdinalValues.next();
-            }
-        }
     }
 
     /** Clear context state */

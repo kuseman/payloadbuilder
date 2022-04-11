@@ -28,6 +28,7 @@ import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.codegen.CodeGenerator;
 import org.kuse.payloadbuilder.core.operator.EvalUtils;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
+import org.kuse.payloadbuilder.core.operator.IndexPredicate;
 import org.kuse.payloadbuilder.core.operator.Operator;
 import org.kuse.payloadbuilder.core.operator.OperatorBuilder;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
@@ -69,7 +70,7 @@ public abstract class AParserTest extends Assert
             }
 
             @Override
-            public Operator getIndexOperator(OperatorData data, Index index)
+            public Operator getIndexOperator(OperatorData data, IndexPredicate index)
             {
                 String table = data.getTableAlias().getTable().toDotDelimited();
                 return Optional.ofNullable(indexOpByTable.get(table))

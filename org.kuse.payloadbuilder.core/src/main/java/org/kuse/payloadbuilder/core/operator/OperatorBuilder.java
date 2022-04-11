@@ -85,8 +85,8 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         private Operator operatorResult;
         /** Resulting select items */
         private Projection projectionResult;
-        /** Index if any that should be picked up when creating table operator */
-        private Index index;
+        /** IndexPredicate if any that should be picked up when creating table operator */
+        private IndexPredicate indexPredicate;
         /** Predicate pushed down from join to table source */
         private final Map<String, List<AnalyzePair>> pushDownPredicateByAlias = new HashMap<>();
         /** Sort items. Sent to catalog to for usage if supported. */
@@ -471,7 +471,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         int nodeId = context.acquireNodeId();
         String alias = table.getTableAlias().getAlias();
         List<AnalyzePair> predicatePairs = ObjectUtils.defaultIfNull(context.pushDownPredicateByAlias.get(alias), emptyList());
-        if (context.index != null)
+        if (context.indexPredicate != null)
         {
             Operator catalogOperator = pair.getValue()
                     .getIndexOperator(new OperatorData(
@@ -482,7 +482,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                             predicatePairs,
                             emptyList(),
                             table.getOptions()),
-                            context.index);
+                            context.indexPredicate);
 
             if (catalogOperator == null)
             {
@@ -490,7 +490,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
             }
 
             context.setOperator(catalogOperator);
-            context.index = null;
+            context.indexPredicate = null;
         }
         else
         {
@@ -713,7 +713,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(joinCondition, innerTableSource.getTableAlias());
         IndexOperatorFoundation foundation = new IndexOperatorFoundation(innerAlias, indices, analyzeResult);
-        Index index = foundation.index;
+        IndexPredicate indexPredicate = foundation.indexPredicate;
         Expression condition = foundation.condition.getPredicate();
         // This is a sub query => assign push down to inner table source alias
         // else the inner table source won't pick up the pushdown and we end up
@@ -743,12 +743,12 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         /* No equi items in condition or a correlated query => NestedLoop */
         if (isCorrelated || !foundation.isEqui())
         {
-            boolean hasIndex = index != null;
-            context.index = index;
+            boolean hasIndex = indexPredicate != null;
+            context.indexPredicate = indexPredicate;
             innerTableSource.accept(this, context);
-            if (context.index != null)
+            if (context.indexPredicate != null)
             {
-                throw new RuntimeException("Index " + index + " should have been consumed by " + innerTableSource.getTable());
+                throw new RuntimeException("Index " + indexPredicate.getIndex() + " should have been consumed by " + innerTableSource.getTable());
             }
 
             Operator inner = wrapWithPushDown(context, context.getOperator(), innerTableSource.getTableAlias());
@@ -780,7 +780,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         }
 
         // No indices for inner -> HashJoin
-        if (index == null || forceHashJoin(context.session))
+        if (indexPredicate == null || forceHashJoin(context.session))
         {
             innerTableSource.accept(this, context);
             Operator inner = wrapWithPushDown(context, context.getOperator(), innerTableSource.getTableAlias());
@@ -799,7 +799,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                     emitEmptyOuterRows);
         }
 
-        context.index = index;
+        context.indexPredicate = indexPredicate;
 
         Option cacheName = getOption(innerTableSource, "cachename");
         Option cacheKey = getOption(innerTableSource, "cachekey");
@@ -810,9 +810,9 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
         //          TODO: not cacheFilter then extract predicates before visiting inner table source
 
         innerTableSource.accept(this, context);
-        if (context.index != null)
+        if (context.indexPredicate != null)
         {
-            throw new RuntimeException("Index " + index + " should have been consumed by " + innerTableSource.getTable());
+            throw new RuntimeException("Index " + indexPredicate.getIndex() + " should have been consumed by " + innerTableSource.getTable());
         }
 
         Operator inner = wrapWithPushDown(context, context.getOperator(), innerTableSource.getTableAlias());
@@ -860,10 +860,10 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                             new DefaultTupleMerger(-1, innerTableSource.getTableAlias().getTupleOrdinal(), compositeTupleCountOnLevel),
                             populating,
                             emitEmptyOuterRows,
-                            index,
+                            indexPredicate.getIndex(),
                             batchSizeOption)),
                     batchParallelismOuterNodeId,
-                    index.getBatchSize());
+                    indexPredicate.getIndex().getBatchSize());
         }
         else
         {
@@ -878,7 +878,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
                     new DefaultTupleMerger(-1, innerTableSource.getTableAlias().getTupleOrdinal(), compositeTupleCountOnLevel),
                     populating,
                     emitEmptyOuterRows,
-                    index,
+                    indexPredicate.getIndex(),
                     batchSizeOption);
         }
     }

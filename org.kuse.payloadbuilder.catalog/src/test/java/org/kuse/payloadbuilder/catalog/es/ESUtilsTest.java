@@ -5,6 +5,8 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 import java.util.List;
 
@@ -17,6 +19,7 @@ import org.kuse.payloadbuilder.core.QuerySession;
 import org.kuse.payloadbuilder.core.catalog.CatalogRegistry;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory;
+import org.kuse.payloadbuilder.core.operator.IndexPredicate;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzeResult;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
@@ -25,6 +28,7 @@ import org.kuse.payloadbuilder.core.parser.QualifiedName;
 import org.kuse.payloadbuilder.core.parser.QueryParser;
 import org.kuse.payloadbuilder.core.parser.SortItem.NullOrder;
 import org.kuse.payloadbuilder.core.parser.SortItem.Order;
+import org.mockito.Mockito;
 
 /** Test of {@link ESUtils} */
 public class ESUtilsTest extends Assert
@@ -43,6 +47,7 @@ public class ESUtilsTest extends Assert
     @Test
     public void test_search_body_singleType_with_index()
     {
+
         TableAlias alias = TableAlias.TableAliasBuilder.of(-1, Type.TABLE, QualifiedName.of("table"), "t").build();
         AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(parser.parseExpression(registry,
                 "field1 != 20 "),
@@ -54,13 +59,15 @@ public class ESUtilsTest extends Assert
                 ESUtils.getSearchBody(
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", p.getColumn("t"), p, false)).collect(toList()),
+                        null,
                         "index.keyword",
                         true,
                         true,
                         context));
 
+        IndexPredicate indexPredicate = Mockito.mock(IndexPredicate.class);
         List<IOrdinalValuesFactory.IOrdinalValues> outerValues = asList();
-        context.getStatementContext().setOuterOrdinalValues(outerValues.iterator());
+        when(indexPredicate.getOuterValuesIterator(any())).thenReturn(outerValues.iterator());
 
         // Empty outer values should not yield any
         assertEquals(
@@ -68,13 +75,14 @@ public class ESUtilsTest extends Assert
                 ESUtils.getSearchBody(
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", p.getColumn("t"), p, false)).collect(toList()),
+                        indexPredicate,
                         "index.keyword",
                         false,
                         true,
                         context));
 
         outerValues = asList(new OuterValues(1), new OuterValues(2), new OuterValues(null));
-        context.getStatementContext().setOuterOrdinalValues(outerValues.iterator());
+        when(indexPredicate.getOuterValuesIterator(any())).thenReturn(outerValues.iterator());
 
         // Non quote
         assertEquals(
@@ -82,18 +90,20 @@ public class ESUtilsTest extends Assert
                 ESUtils.getSearchBody(
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", p.getColumn("t"), p, false)).collect(toList()),
+                        indexPredicate,
                         "index.keyword",
                         false,
                         true,
                         context));
 
         // Quote
-        context.getStatementContext().setOuterOrdinalValues(outerValues.iterator());
+        when(indexPredicate.getOuterValuesIterator(any())).thenReturn(outerValues.iterator());
         assertEquals(
                 "{\"sort\":[\"_doc\"],\"query\":{\"bool\":{\"filter\":[{\"terms\":{\"index.keyword\":[\"1\",\"2\"]}}],\"must_not\":[{\"term\":{\"field1\":20}}]}}}",
                 ESUtils.getSearchBody(
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", p.getColumn("t"), p, false)).collect(toList()),
+                        indexPredicate,
                         "index.keyword",
                         true,
                         true,
@@ -106,6 +116,7 @@ public class ESUtilsTest extends Assert
         assertEquals("{\"sort\":[\"_doc\"]}", ESUtils.getSearchBody(
                 emptyList(),
                 emptyList(),
+                null,
                 null,
                 false,
                 true,
@@ -122,6 +133,7 @@ public class ESUtilsTest extends Assert
                         // Free-text property with a non free text field, then we should sort on the non-free-text variant
                         sortItem("text", "text", null, Order.ASC, NullOrder.UNDEFINED, prop("text.keyword", "keyword", null))),
                         emptyList(),
+                        null,
                         null,
                         false,
                         true,
@@ -149,6 +161,7 @@ public class ESUtilsTest extends Assert
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", p.getColumn("t"), p, false)).collect(toList()),
                         null,
+                        null,
                         false,
                         true,
                         context));
@@ -162,6 +175,7 @@ public class ESUtilsTest extends Assert
                 ESUtils.getSearchBody(
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", p.getColumn("t"), p, false)).collect(toList()),
+                        null,
                         null,
                         false,
                         true,
@@ -177,6 +191,7 @@ public class ESUtilsTest extends Assert
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", p.getColumn("t"), p, false)).collect(toList()),
                         null,
+                        null,
                         false,
                         true,
                         context));
@@ -190,6 +205,7 @@ public class ESUtilsTest extends Assert
                 ESUtils.getSearchBody(
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", p.getColumn("t"), p, false)).collect(toList()),
+                        null,
                         null,
                         false,
                         true,
@@ -205,6 +221,7 @@ public class ESUtilsTest extends Assert
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", "", p, true)).collect(toList()),
                         null,
+                        null,
                         false,
                         true,
                         context));
@@ -219,6 +236,7 @@ public class ESUtilsTest extends Assert
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", "", p, true)).collect(toList()),
                         null,
+                        null,
                         false,
                         true,
                         context));
@@ -232,8 +250,9 @@ public class ESUtilsTest extends Assert
                 "field1 != 20 "),
                 alias);
 
+        IndexPredicate indexPredicate = Mockito.mock(IndexPredicate.class);
         List<IOrdinalValuesFactory.IOrdinalValues> outerValues = asList();
-        context.getStatementContext().setOuterOrdinalValues(outerValues.iterator());
+        when(indexPredicate.getOuterValuesIterator(any())).thenReturn(outerValues.iterator());
 
         // Empty outer values should not yield any
         assertEquals(
@@ -241,13 +260,14 @@ public class ESUtilsTest extends Assert
                 ESUtils.getSearchBody(
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", p.getColumn("t"), p, false)).collect(toList()),
+                        indexPredicate,
                         "index.keyword",
                         false,
                         false,
                         context));
 
         outerValues = asList(new OuterValues(1), new OuterValues(2));
-        context.getStatementContext().setOuterOrdinalValues(outerValues.iterator());
+        when(indexPredicate.getOuterValuesIterator(any())).thenReturn(outerValues.iterator());
 
         // Non quote
         assertEquals(
@@ -255,18 +275,20 @@ public class ESUtilsTest extends Assert
                 ESUtils.getSearchBody(
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", p.getColumn("t"), p, false)).collect(toList()),
+                        indexPredicate,
                         "index.keyword",
                         false,
                         false,
                         context));
 
         // Quote
-        context.getStatementContext().setOuterOrdinalValues(outerValues.iterator());
+        when(indexPredicate.getOuterValuesIterator(any())).thenReturn(outerValues.iterator());
         assertEquals(
                 "{\"sort\":[\"_doc\"],\"filter\":{\"bool\":{\"must\":[{\"terms\":{\"index.keyword\":[\"1\",\"2\"]}}],\"must_not\":[{\"term\":{\"field1\":20}}]}}}",
                 ESUtils.getSearchBody(
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", p.getColumn("t"), p, false)).collect(toList()),
+                        indexPredicate,
                         "index.keyword",
                         true,
                         false,
@@ -279,6 +301,7 @@ public class ESUtilsTest extends Assert
         assertEquals("{\"sort\":[\"_doc\"]}", ESUtils.getSearchBody(
                 emptyList(),
                 emptyList(),
+                null,
                 null,
                 false,
                 false,
@@ -295,6 +318,7 @@ public class ESUtilsTest extends Assert
                         // Free-text property with a non free text field, then we should sort on the non-free-text variant
                         sortItem("text", "string", null, Order.ASC, NullOrder.UNDEFINED, prop("text.raw", "string", "not_analyzed"))),
                         emptyList(),
+                        null,
                         null,
                         false,
                         false,
@@ -323,6 +347,7 @@ public class ESUtilsTest extends Assert
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", p.getColumn("t"), p, false)).collect(toList()),
                         null,
+                        null,
                         false,
                         false,
                         context));
@@ -336,6 +361,7 @@ public class ESUtilsTest extends Assert
                 ESUtils.getSearchBody(
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", p.getColumn("t"), p, false)).collect(toList()),
+                        null,
                         null,
                         false,
                         false,
@@ -351,6 +377,7 @@ public class ESUtilsTest extends Assert
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", p.getColumn("t"), p, false)).collect(toList()),
                         null,
+                        null,
                         false,
                         false,
                         context));
@@ -364,6 +391,7 @@ public class ESUtilsTest extends Assert
                 ESUtils.getSearchBody(
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", p.getColumn("t"), p, false)).collect(toList()),
+                        null,
                         null,
                         false,
                         false,
@@ -379,6 +407,7 @@ public class ESUtilsTest extends Assert
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", p.getColumn("t"), p, false)).collect(toList()),
                         null,
+                        null,
                         false,
                         false,
                         context));
@@ -392,6 +421,7 @@ public class ESUtilsTest extends Assert
                 ESUtils.getSearchBody(
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", "", p, true)).collect(toList()),
+                        null,
                         null,
                         false,
                         false,
@@ -407,6 +437,7 @@ public class ESUtilsTest extends Assert
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", "", p, true)).collect(toList()),
                         null,
+                        null,
                         false,
                         false,
                         context));
@@ -420,6 +451,7 @@ public class ESUtilsTest extends Assert
                 ESUtils.getSearchBody(
                         emptyList(),
                         analyzeResult.getPairs().stream().map(p -> new PropertyPredicate("t", "", p, true)).collect(toList()),
+                        null,
                         null,
                         false,
                         false,

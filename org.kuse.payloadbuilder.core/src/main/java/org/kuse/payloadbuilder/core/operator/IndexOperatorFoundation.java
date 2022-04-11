@@ -25,8 +25,8 @@ class IndexOperatorFoundation
     AnalyzeResult condition;
     /** The resulting pairs that can be pushed down to operators. Ie. parts that's not part of the index that matched */
     List<AnalyzePair> pushDownPairs;
-    /** Resulting index that matched the predicate */
-    Index index;
+    /** Resulting index predicate that matched the provided predicate */
+    IndexPredicate indexPredicate;
 
     boolean isEqui()
     {
@@ -86,9 +86,11 @@ class IndexOperatorFoundation
         */
 
         SplitResult splitResult = splitEquiPairs(equiItems, alias, indices);
-        index = splitResult.index;
+        indexPredicate = splitResult.index != null
+            ? new IndexPredicate(splitResult.index, splitResult.indexColumns)
+            : null;
 
-        List<AnalyzePair> valueExpressionsPairs = index != null
+        List<AnalyzePair> valueExpressionsPairs = indexPredicate != null
             ? splitResult.indexPairs
             : splitResult.conditionPairs;
 
@@ -144,15 +146,15 @@ class IndexOperatorFoundation
         List<String> columns = new ArrayList<>();
         for (Index index : indices)
         {
-            // All columns index that means we simply pick all conditions
-            if (index.getColumns() == Index.ALL_COLUMNS)
+            // Wildcard index that means we simply pick all conditions
+            if (index.getColumnsType() == Index.ColumnsType.WILDCARD)
             {
                 List<String> conditionColumns = new ArrayList<>(conditionPairs.size());
                 for (AnalyzePair pair : conditionPairs)
                 {
                     conditionColumns.add(pair.getColumn(alias));
                 }
-                return new SplitResult(new Index(index.getTable(), conditionColumns, index.getBatchSize()), conditionPairs, conditionPairs, pushDownPairs);
+                return new SplitResult(index, conditionColumns, conditionPairs, conditionPairs, pushDownPairs);
             }
 
             indexPairs.clear();
@@ -196,12 +198,12 @@ class IndexOperatorFoundation
             // At least one condition and all columns found => index match
             if (conditionCount > 0 && indexPairs.size() == index.getColumns().size())
             {
-                return new SplitResult(index, indexPairs, conditionPairs, tempPushDown);
+                return new SplitResult(index, index.getColumns(), indexPairs, conditionPairs, tempPushDown);
             }
         }
 
         // No index found
-        return new SplitResult(null, emptyList(), conditionPairs, pushDownPairs);
+        return new SplitResult(null, emptyList(), emptyList(), conditionPairs, pushDownPairs);
     }
 
     /**
@@ -250,7 +252,10 @@ class IndexOperatorFoundation
      */
     private static class SplitResult
     {
+        /** Found index */
         final Index index;
+        /** Columns utilized from index */
+        final List<String> indexColumns;
         /** Matched index pairs */
         final List<AnalyzePair> indexPairs;
         /** Condition pairs used when joining */
@@ -258,9 +263,10 @@ class IndexOperatorFoundation
         /** Push down pairs not matching index / condition */
         final List<AnalyzePair> pushDownPairs;
 
-        SplitResult(Index index, List<AnalyzePair> indexPairs, List<AnalyzePair> conditionPairs, List<AnalyzePair> pushDownPairs)
+        SplitResult(Index index, List<String> indexColumns, List<AnalyzePair> indexPairs, List<AnalyzePair> conditionPairs, List<AnalyzePair> pushDownPairs)
         {
             this.index = index;
+            this.indexColumns = indexColumns;
             this.indexPairs = indexPairs;
             this.conditionPairs = conditionPairs;
             this.pushDownPairs = pushDownPairs;

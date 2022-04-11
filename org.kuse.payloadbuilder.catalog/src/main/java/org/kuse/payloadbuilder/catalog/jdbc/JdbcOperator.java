@@ -19,11 +19,11 @@ import java.util.Map;
 import java.util.Objects;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.kuse.payloadbuilder.core.catalog.Index;
 import org.kuse.payloadbuilder.core.operator.AOperator;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory;
 import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValues;
+import org.kuse.payloadbuilder.core.operator.IndexPredicate;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.Row;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
@@ -44,9 +44,9 @@ class JdbcOperator extends AOperator
     private final String catalogAlias;
     private final List<AnalyzePair> predicatePairs;
     private final List<SortItem> sortItems;
-    private final Index index;
+    private final IndexPredicate indexPredicate;
 
-    JdbcOperator(JdbcCatalog catalog, int nodeId, String catalogAlias, TableAlias tableAlias, List<AnalyzePair> predicatePairs, List<SortItem> sortItems, Index index)
+    JdbcOperator(JdbcCatalog catalog, int nodeId, String catalogAlias, TableAlias tableAlias, List<AnalyzePair> predicatePairs, List<SortItem> sortItems, IndexPredicate indexPredicate)
     {
         super(nodeId);
         this.catalog = catalog;
@@ -54,13 +54,13 @@ class JdbcOperator extends AOperator
         this.tableAlias = tableAlias;
         this.predicatePairs = predicatePairs;
         this.sortItems = sortItems;
-        this.index = index;
+        this.indexPredicate = indexPredicate;
     }
 
     @Override
     public String getName()
     {
-        return (index != null ? "index" : "scan") + " (" + tableAlias.getTable() + ")";
+        return (indexPredicate != null ? "index" : "scan") + " (" + tableAlias.getTable() + ")";
     }
 
     @Override
@@ -171,7 +171,7 @@ class JdbcOperator extends AOperator
             }
         }
 
-        if (index != null)
+        if (indexPredicate != null)
         {
             /* Build index sql from context values
              *
@@ -183,9 +183,9 @@ class JdbcOperator extends AOperator
              *
              */
 
-            int size = index.getColumns().size();
+            int size = indexPredicate.getIndexColumns().size();
             sb.append(whereAdded ? " AND (" : " WHERE (");
-            Iterator<IOrdinalValues> it = context.getStatementContext().getOuterOrdinalValues();
+            Iterator<IOrdinalValues> it = indexPredicate.getOuterValuesIterator(context);
             // No iterator here, that means we have a describe/analyze-call
             // so add a dummy value
             if (it == null)
@@ -218,7 +218,7 @@ class JdbcOperator extends AOperator
                     {
                         sb.append(" AND ");
                     }
-                    sb.append(index.getColumns().get(i)).append("=");
+                    sb.append(indexPredicate.getIndexColumns().get(i)).append("=");
                     Object value = convertValue(values.getValue(i));
                     sb.append(value);
                 }

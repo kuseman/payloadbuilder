@@ -13,6 +13,7 @@ import org.kuse.payloadbuilder.catalog.es.ESCatalog.MappedProperty;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory;
 import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValues;
+import org.kuse.payloadbuilder.core.operator.IndexPredicate;
 import org.kuse.payloadbuilder.core.parser.SortItem.NullOrder;
 import org.kuse.payloadbuilder.core.parser.SortItem.Order;
 
@@ -51,6 +52,7 @@ final class ESUtils
     static String getSearchBody(
             List<SortItemMeta> sortItems,
             List<PropertyPredicate> propertyPredicates,
+            IndexPredicate indexPredicate,
             String indexField,
             boolean quoteIndexFieldValues,
             boolean isSingleType,
@@ -58,13 +60,14 @@ final class ESUtils
     {
         StringBuilder sb = new StringBuilder("{");
         appendSortItems(sortItems, sb, isSingleType);
-        appendPropertyPredicates(propertyPredicates, indexField, quoteIndexFieldValues, isSingleType, sb, context);
+        appendPropertyPredicates(propertyPredicates, indexPredicate, indexField, quoteIndexFieldValues, isSingleType, sb, context);
         sb.append("}");
         return sb.toString();
     }
 
     private static void appendPropertyPredicates(
             List<PropertyPredicate> propertyPredicates,
+            IndexPredicate indexPredicate,
             String indexField,
             boolean quoteIndexFieldValues,
             boolean isSingleType,
@@ -73,7 +76,7 @@ final class ESUtils
     {
         StringBuilder filterMust = new StringBuilder();
         StringBuilder filterMustNot = new StringBuilder();
-        appendIndexSearchFilter(filterMust, context, quoteIndexFieldValues, indexField);
+        appendIndexSearchFilter(filterMust, indexPredicate, context, quoteIndexFieldValues, indexField);
 
         if (!propertyPredicates.isEmpty())
         {
@@ -125,8 +128,11 @@ final class ESUtils
     }
 
     /** Append search body for index values */
+    //CSOFF
     private static void appendIndexSearchFilter(
+            //CSON
             StringBuilder sb,
+            IndexPredicate indexPredicate,
             ExecutionContext context,
             boolean quoteValues,
             String field)
@@ -136,7 +142,9 @@ final class ESUtils
             return;
         }
 
-        Iterator<IOrdinalValues> it = context.getStatementContext().getOuterOrdinalValues();
+        Iterator<IOrdinalValues> it = indexPredicate != null
+            ? indexPredicate.getOuterValuesIterator(context)
+            : null;
 
         // No iterator here, that means we have a describe/analyze-call
         // so add a dummy value

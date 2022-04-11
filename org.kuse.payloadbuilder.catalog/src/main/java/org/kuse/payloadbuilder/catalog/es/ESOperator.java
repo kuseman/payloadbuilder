@@ -56,12 +56,12 @@ import org.apache.http.message.BasicHeader;
 import org.apache.http.util.EntityUtils;
 import org.kuse.payloadbuilder.catalog.es.ESCatalog.MappedProperty;
 import org.kuse.payloadbuilder.catalog.es.ESUtils.SortItemMeta;
-import org.kuse.payloadbuilder.core.catalog.Index;
+import org.kuse.payloadbuilder.core.DescribeUtils;
 import org.kuse.payloadbuilder.core.operator.AOperator;
 import org.kuse.payloadbuilder.core.operator.ExecutionContext;
 import org.kuse.payloadbuilder.core.operator.IOrdinalValuesFactory.IOrdinalValues;
+import org.kuse.payloadbuilder.core.operator.IndexPredicate;
 import org.kuse.payloadbuilder.core.operator.Row;
-import org.kuse.payloadbuilder.core.operator.StatementContext;
 import org.kuse.payloadbuilder.core.operator.StatementContext.NodeData;
 import org.kuse.payloadbuilder.core.operator.TableAlias;
 import org.kuse.payloadbuilder.core.operator.TableMeta;
@@ -115,7 +115,7 @@ class ESOperator extends AOperator
             .build();
 
     private final TableAlias tableAlias;
-    private final Index index;
+    private final IndexPredicate indexPredicate;
     /** The mapped property used for the index */
     private final MappedProperty indexProperty;
     private final String catalogAlias;
@@ -126,7 +126,7 @@ class ESOperator extends AOperator
             int nodeId,
             String catalogAlias,
             TableAlias tableAlias,
-            Index index,
+            IndexPredicate indexPredicate,
             MappedProperty indexProperty,
             List<PropertyPredicate> propertyPredicates,
             List<SortItemMeta> sortItems)
@@ -134,7 +134,7 @@ class ESOperator extends AOperator
         super(nodeId);
         this.catalogAlias = catalogAlias;
         this.tableAlias = tableAlias;
-        this.index = index;
+        this.indexPredicate = indexPredicate;
         this.indexProperty = indexProperty;
         this.propertyPredicates = requireNonNull(propertyPredicates, "propertyPredicates");
         this.sortItems = requireNonNull(sortItems, "sortItems");
@@ -143,7 +143,7 @@ class ESOperator extends AOperator
     @Override
     public String getName()
     {
-        return (index != null ? "index" : "scan") + " (" + tableAlias.getTable() + ")";
+        return (indexPredicate != null ? "index" : "scan") + " (" + tableAlias.getTable() + ")";
     }
 
     @Override
@@ -165,11 +165,11 @@ class ESOperator extends AOperator
                         .stream()
                         .map(Object::toString)
                         .collect(joining(", "))),
-                entry("Query", ESUtils.getSearchBody(sortItems, propertyPredicates, indexField, quoteValues, SINGLE_TYPE_TABLE_NAME.equals(esType.type), context)));
+                entry("Query", ESUtils.getSearchBody(sortItems, propertyPredicates, indexPredicate, indexField, quoteValues, SINGLE_TYPE_TABLE_NAME.equals(esType.type), context)));
 
-        if (index != null)
+        if (indexPredicate != null)
         {
-            result.put(INDEX, index);
+            result.put(DescribeUtils.INDEX, indexPredicate.getIndex());
         }
 
         Data data = context.getStatementContext().getNodeData(nodeId);
@@ -214,7 +214,7 @@ class ESOperator extends AOperator
 
         boolean quoteValues = indexProperty == null
             || indexProperty.shouldQuoteValues();
-        String body = ESUtils.getSearchBody(sortItems, propertyPredicates, indexField, quoteValues, isSingleType, context);
+        String body = ESUtils.getSearchBody(sortItems, propertyPredicates, indexPredicate, indexField, quoteValues, isSingleType, context);
         return getIterator(
                 context,
                 tableAlias,
@@ -252,12 +252,12 @@ class ESOperator extends AOperator
 
     private String getIndexField()
     {
-        if (index == null)
+        if (indexPredicate == null)
         {
             return null;
         }
 
-        String column = index.getColumns().get(0);
+        String column = indexPredicate.getIndexColumns().get(0);
         String field = column;
 
         // Fix field name for special fields
@@ -298,7 +298,7 @@ class ESOperator extends AOperator
                 null,
                 isSingleType);
 
-        DocIdStreamingEntity entity = new DocIdStreamingEntity(context.getStatementContext(), data);
+        DocIdStreamingEntity entity = new DocIdStreamingEntity(indexPredicate, context, data);
         return getIterator(
                 context,
                 tableAlias,
@@ -749,7 +749,7 @@ class ESOperator extends AOperator
     @Override
     public String toString()
     {
-        return String.format("ID: %d, %s", nodeId, (index != null ? "index" : "scan") + " (" + tableAlias.toString() + ")");
+        return String.format("ID: %d, %s", nodeId, (indexPredicate != null ? "index" : "scan") + " (" + tableAlias.toString() + ")");
     }
 
     /** Node data with stats */
@@ -794,11 +794,13 @@ class ESOperator extends AOperator
         private static final byte[] COMMA_BYTES = ",".getBytes();
         private static final Header APPLICATION_JSON = new BasicHeader("Content-Type", "application/json");
 
-        private final StatementContext context;
+        private final IndexPredicate indexPredicate;
+        private final ExecutionContext context;
         private final Data data;
 
-        private DocIdStreamingEntity(StatementContext context, Data data)
+        private DocIdStreamingEntity(IndexPredicate indexPredicate, ExecutionContext context, Data data)
         {
+            this.indexPredicate = indexPredicate;
             this.context = context;
             this.data = data;
         }
@@ -842,7 +844,8 @@ class ESOperator extends AOperator
         @Override
         public void writeTo(OutputStream outStream) throws IOException
         {
-            Iterator<IOrdinalValues> values = context.getOuterOrdinalValues();
+            // Retrieve the outer values from predicate
+            Iterator<IOrdinalValues> values = indexPredicate.getOuterValuesIterator(context);
             try (CountingOutputStream bos = new CountingOutputStream(outStream))
             {
                 bos.write(HEADER_BYTES);

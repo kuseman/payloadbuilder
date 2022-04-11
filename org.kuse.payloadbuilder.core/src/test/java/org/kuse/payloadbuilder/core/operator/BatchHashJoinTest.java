@@ -30,7 +30,7 @@ public class BatchHashJoinTest extends AOperatorTest
     @Test
     public void test_inner_join_empty_outer()
     {
-        Index index = new Index(QualifiedName.of("table"), asList("col"), 1);
+        Index index = new Index(QualifiedName.of("table"), asList("col"), Index.ColumnsType.ALL, 1);
         Operator left = op1(ctx -> TupleIterator.EMPTY);
         Operator right = op1(ctx -> TupleIterator.EMPTY);
 
@@ -62,7 +62,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt aClose = new MutableInt();
         MutableInt bClose = new MutableInt();
 
-        Index index = new Index(QualifiedName.of("table"), asList("col1"), 1);
+        Index index = new Index(QualifiedName.of("table"), asList("col1"), Index.ColumnsType.ALL, 1);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op1(ctx ->
@@ -96,7 +96,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt aClose = new MutableInt();
         MutableInt bClose = new MutableInt();
 
-        Index index = new Index(QualifiedName.of("table"), asList("col1"), 1);
+        Index index = new Index(QualifiedName.of("table"), asList("col1"), Index.ColumnsType.ALL, 1);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op1(ctx -> TupleIterator.EMPTY, () -> bClose.increment()))),
@@ -111,7 +111,7 @@ public class BatchHashJoinTest extends AOperatorTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage().contains("Check implementation of operator with index: table [col1] not all outer values was processed."));
+            assertTrue(e.getMessage(), e.getMessage().contains("Check implementation of operator with index: table [col1] (ALL) not all outer values was processed."));
         }
     }
 
@@ -126,7 +126,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt aClose = new MutableInt();
         MutableInt bClose = new MutableInt();
 
-        Index index = new Index(QualifiedName.of("table"), asList("col1"), 2);
+        Index index = new Index(QualifiedName.of("table"), asList("col1"), Index.ColumnsType.ALL, 2);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(ctx ->
@@ -146,7 +146,7 @@ public class BatchHashJoinTest extends AOperatorTest
         }
         catch (IllegalArgumentException e)
         {
-            assertTrue(e.getMessage(), e.getMessage().contains("Check implementation of operator with index: table [col1] not all outer values was processed."));
+            assertTrue(e.getMessage(), e.getMessage().contains("Check implementation of operator with index: table [col1] (ALL) not all outer values was processed."));
         }
     }
 
@@ -161,7 +161,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt aClose = new MutableInt();
         MutableInt bClose = new MutableInt();
 
-        Index index = new Index(QualifiedName.of("table"), asList("col1"), 2);
+        Index index = new Index(QualifiedName.of("table"), asList("col1"), Index.ColumnsType.ALL, 2);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op1(ctx ->
@@ -221,7 +221,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt bCloseCount = new MutableInt();
         MutableInt cCloseCount = new MutableInt();
 
-        Index index = new Index(QualifiedName.of("tableC"), asList("col1"), 3);
+        Index index = new Index(QualifiedName.of("tableC"), asList("col1"), Index.ColumnsType.ALL, 3);
         AtomicInteger posC = new AtomicInteger();
         Operator op = operator(query,
                 ofEntries(entry("tableC", index)),
@@ -285,7 +285,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
 
-        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), Index.ColumnsType.ALL, 3);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
@@ -349,7 +349,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
 
-        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), Index.ColumnsType.ALL, 3);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
@@ -463,7 +463,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
 
-        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), Index.ColumnsType.ALL, 3);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
@@ -530,7 +530,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
 
-        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), Index.ColumnsType.ALL, 3);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
@@ -594,7 +594,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
 
-        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), Index.ColumnsType.ALL, 3);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
@@ -661,7 +661,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
 
-        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 5);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), Index.ColumnsType.ALL, 5);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
@@ -725,7 +725,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
 
-        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), Index.ColumnsType.ALL, 3);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
@@ -801,7 +801,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
 
-        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), Index.ColumnsType.ALL, 3);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
@@ -870,7 +870,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
 
-        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), Index.ColumnsType.ALL, 3);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
@@ -948,7 +948,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
 
-        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), Index.ColumnsType.ALL, 3);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
@@ -1013,7 +1013,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
 
-        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), Index.ColumnsType.ALL, 3);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
@@ -1084,7 +1084,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
 
-        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), Index.ColumnsType.ALL, 3);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
@@ -1151,7 +1151,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
 
-        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), Index.ColumnsType.ALL, 3);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
@@ -1229,7 +1229,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
 
-        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), Index.ColumnsType.ALL, 3);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
@@ -1300,7 +1300,7 @@ public class BatchHashJoinTest extends AOperatorTest
         MutableInt posLeft = new MutableInt();
         MutableInt posRight = new MutableInt();
 
-        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), 3);
+        Index index = new Index(QualifiedName.of("tableB"), asList("col1"), Index.ColumnsType.ALL, 3);
         Operator op = operator(query,
                 ofEntries(entry("tableB", index)),
                 ofEntries(entry("tableB", a -> op(context ->
