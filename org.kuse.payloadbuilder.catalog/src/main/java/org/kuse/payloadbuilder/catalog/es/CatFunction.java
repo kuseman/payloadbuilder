@@ -9,6 +9,7 @@ import java.util.Map;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpHeaders;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -81,6 +82,7 @@ class CatFunction extends TableFunctionInfo
         List<Map<String, Object>> result;
         HttpEntity entity = null;
         HttpGet get = new HttpGet(getCatUrl(endpoint, catspec));
+        get.addHeader(HttpHeaders.ACCEPT_ENCODING, "gzip");
         try (CloseableHttpResponse response = ESOperator.CLIENT.execute(get))
         {
             entity = response.getEntity();

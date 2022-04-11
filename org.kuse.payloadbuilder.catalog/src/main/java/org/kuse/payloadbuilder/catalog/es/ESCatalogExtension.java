@@ -35,6 +35,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpHeaders;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -195,6 +196,7 @@ class ESCatalogExtension implements ICatalogExtension
                 List<String> indices = new ArrayList<>();
                 indicesByEndpoint.put(endpoint, indices);
                 HttpGet getIndices = new HttpGet(endpoint + "/_aliases");
+                getIndices.addHeader(HttpHeaders.ACCEPT_ENCODING, "gzip");
                 HttpEntity entity = null;
                 try (CloseableHttpResponse response = CLIENT.execute(getIndices))
                 {

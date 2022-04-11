@@ -30,6 +30,7 @@ import java.util.Set;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpEntity;
+import org.apache.http.HttpHeaders;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
@@ -266,6 +267,7 @@ public class ESCatalog extends Catalog
     {
         HttpEntity entity = null;
         HttpGet getAlias = new HttpGet(String.format("%s/%s/%s", endpoint, index, path));
+        getAlias.addHeader(HttpHeaders.ACCEPT_ENCODING, "gzip");
         try (CloseableHttpResponse response = CLIENT.execute(getAlias))
         {
             entity = response.getEntity();
@@ -273,6 +275,7 @@ public class ESCatalog extends Catalog
             {
                 throw new RuntimeException("Error query Elastic: " + IOUtils.toString(entity.getContent(), StandardCharsets.UTF_8));
             }
+
             return MAPPER.readValue(entity.getContent(), Map.class);
         }
         catch (IOException e)

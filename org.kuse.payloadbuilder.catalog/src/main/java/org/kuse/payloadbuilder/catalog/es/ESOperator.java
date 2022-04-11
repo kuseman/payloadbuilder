@@ -508,7 +508,6 @@ class ESOperator extends AOperator
                     if (docIt == null)
                     {
                         HttpUriRequest request = requestSupplier.apply(scrollId);
-
                         if (request == null)
                         {
                             return false;
@@ -518,6 +517,7 @@ class ESOperator extends AOperator
                         data.requestCount++;
                         data.requestTime.resume();
                         HttpEntity entity = null;
+                        request.addHeader(HttpHeaders.ACCEPT_ENCODING, "gzip");
                         try (CloseableHttpResponse response = CLIENT.execute(request);)
                         {
                             entity = response.getEntity();
