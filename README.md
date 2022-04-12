@@ -11,7 +11,7 @@ SQL query engine with plugable catalogs (data sources)
   * [Built With](#built-with)
 * [Usage](#usage)
 * [Getting Started](#getting-started)
-  * [Editor](#editor)
+  * [Queryeer IDE](#queryeer-ide)
 * [Roadmap](#roadmap)
 * [Contributing](#contributing)
 * [License](#license)
@@ -31,7 +31,7 @@ Supports:
 * Multiple statements
 * Control-flow statements
 
-[Grammar](https://github.com/kuseman/payloadbuilder/blob/master/org.kuse.payloadbuilder.core/src/main/resources/antlr4/org/kuse/payloadbuilder/core/parser/PayloadBuilderQuery.g4)
+[Grammar](https://github.com/kuseman/payloadbuilder/blob/master/payloadbuilder-core/src/main/resources/antlr4/se/kuseman/payloadbuilder/core/parser/PayloadBuilderQuery.g4)
 
 ### Catalogs
 
@@ -39,7 +39,7 @@ Catalogs is the extension point where external data is provided.
 A catalog implementation can provide scalar functions, table valued functions,
 data operators for tables.
 
-[Provided catalogs](https://github.com/kuseman/payloadbuilder/tree/master/org.kuse.payloadbuilder.catalog)
+[Provided catalogs](https://github.com/kuseman/payloadbuilder/tree/master/payloadbuilder-catalog)
 
 ### Built With
 
@@ -50,8 +50,8 @@ data operators for tables.
 
 * mvn install
 * Add Reference 
-  * **org.kuse.payloadbuilder.core/target/org.kuse.payloadbuilder.core-{version}.jar**
-  * **org.kuse.payloadbuilder.catalog/target/org.kuse.payloadbuilder.catalog-{version}.jar**
+  * **payloadbuilder-core/target/payloadbuilder-core-{version}.jar**
+  * **payloadbuilder-catalog/target/payloadbuilder-catalog-{version}.jar**
     * Contains bundled Catalog implementations
   * Release to Central is coming soon
 
@@ -85,12 +85,12 @@ Simple query using multiple catalogs:
         }
 ```
 
-### Editor
+### Queryeer IDE
 
-Standalone Query Editor written in Swing
+Standalone Query IDE written in Swing
 
-[Editor](https://github.com/kuseman/payloadbuilder/tree/master/org.kuse.payloadbuilder.editor)
-![Editor](/documentation/editor.png?raw=true "Editor")
+[Queryeer](https://github.com/kuseman/Queryeer)
+![Queryeer](/documentation/queryeer.png?raw=true "Queryeer")
 
 ## Roadmap
 

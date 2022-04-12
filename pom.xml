@@ -1,12 +1,12 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>org.kuse</groupId>
-    <artifactId>org.kuse.payloadbuilder</artifactId>
-    <version>0.7.0-SNAPSHOT</version>
+    <groupId>se.kuseman</groupId>
+    <artifactId>payloadbuilder</artifactId>
+    <version>0.8.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Payloadbuilder</name>
-    <description>Query engine</description>
+    <description>SQL Query engine</description>
+    <url>http://github.com/kuseman/payloadbuilder</url>
 
     <properties>
         <!-- Build -->
@@ -14,18 +14,32 @@
         <maven.compiler.target>1.8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <license.dir>${basedir}</license.dir>
 
         <!-- Versions -->
         <junit.version>4.13.1</junit.version>
         <mockito-core.version>4.3.1</mockito-core.version>
-        <slf4j.version>1.7.30</slf4j.version>
+        <spotless.version>2.22.0</spotless.version>
+        <jackson.version>2.13.2.1</jackson.version>
+        <commons-io.version>2.11.0</commons-io.version>
+        <commons-lang3.version>3.12.0</commons-lang3.version>
+        <commons-collections4.version>4.4</commons-collections4.version>
     </properties>
 
     <issueManagement>
         <url>https://github.com/kuseman/payloadbuilder/issues</url>
         <system>GitHub Issues</system>
     </issueManagement>
+
+    <distributionManagement>
+        <snapshotRepository>
+            <id>ossrh</id>
+            <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
+        </snapshotRepository>
+        <repository>
+            <id>ossrh</id>
+            <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
+    </distributionManagement>
 
     <scm>
         <url>https://github.com/kuseman/payloadbuilder</url>
@@ -34,10 +48,25 @@
         <tag>HEAD</tag>
     </scm>
 
+    <licenses>
+        <license>
+            <name>The Apache License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>Marcus Henriksson</name>
+            <email>kuseman80@gmail.com</email>
+            <url>https://github.com/kuseman</url>
+        </developer>
+    </developers>
+
     <modules>
-        <module>org.kuse.payloadbuilder.core</module>
-        <module>org.kuse.payloadbuilder.catalog</module>
-        <module>org.kuse.payloadbuilder.editor</module>
+        <module>payloadbuilder-api</module>
+        <module>payloadbuilder-core</module>
+        <module>payloadbuilder-catalog</module>
     </modules>
 
     <dependencyManagement>
@@ -49,31 +78,169 @@
                 <scope>test</scope>
             </dependency>
             <dependency>
-                <groupId>org.slf4j</groupId>
-                <artifactId>slf4j-log4j12</artifactId>
-                <version>${slf4j.version}</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
                 <groupId>org.mockito</groupId>
                 <artifactId>mockito-core</artifactId>
                 <version>${mockito-core.version}</version>
                 <scope>test</scope>
             </dependency>
+            <dependency>
+                <groupId>commons-io</groupId>
+                <artifactId>commons-io</artifactId>
+                <version>${commons-io.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>${commons-lang3.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-collections4</artifactId>
+                <version>${commons-collections4.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
+    <profiles>
+        <profile>
+            <id>release</id>
+            <activation>
+                <property>
+                    <name>performRelease</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.2.1</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>3.4.0</version>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                                <configuration>
+                                    <additionalparam>-Xdoclint:all -Xdoclint:-missing</additionalparam>
+                                    <additionalOptions>-Xdoclint:all -Xdoclint:-missing</additionalOptions>
+                                    <additionalJOptions>
+                                        <additionalJOption>-Xdoclint:all</additionalJOption>
+                                        <additionalJOption>-Xdoclint:-missing</additionalJOption>
+                                    </additionalJOptions>
+                                    <failOnError>false</failOnError>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.0.1</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                                <configuration>
+                                    <!-- This is necessary for gpg to not try to use the pinentry programs -->
+                                    <gpgArguments>
+                                        <arg>--pinentry-mode</arg>
+                                        <arg>loopback</arg>
+                                    </gpgArguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+
     <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.10.1</version>
+                    <configuration>
+                        <compilerArgs>
+                            <!-- Enable all warnings -->
+                            <compilerArg>-Xlint:all</compilerArg>
+                            <!-- Disable options warning because we will have differences between the compiler and source code level-->
+                            <compilerArg>-Xlint:-options</compilerArg>
+                            <!-- Disable serialversionuid warnings -->
+                            <compilerArg>-Xlint:-serial</compilerArg>
+                            <!--compilerArg>-Werror</compilerArg-->
+                        </compilerArgs>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>com.diffplug.spotless</groupId>
+                    <artifactId>spotless-maven-plugin</artifactId>
+                    <version>${spotless.version}</version>
+                    <configuration>
+                        <java>
+                            <removeUnusedImports />
+                            <importOrder>
+                                <file>${maven.multiModuleProjectDirectory}/eclipse-importorder.cfg</file>
+                            </importOrder>
+                            <eclipse>
+                                <file>${maven.multiModuleProjectDirectory}/eclipse-code-formatter.xml</file>
+                            </eclipse>
+                        </java>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
         <plugins>
+
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <phase>validate</phase>
+                        <goals>
+                            <goal>apply</goal>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-checkstyle-plugin</artifactId>
-                <version>2.17</version>
+                <version>3.1.2</version>
                 <dependencies>
                     <dependency>
                         <groupId>com.puppycrawl.tools</groupId>
                         <artifactId>checkstyle</artifactId>
-                        <version>8.18</version>
+                        <version>9.3</version>
                     </dependency>
                 </dependencies>
                 <configuration>
@@ -86,31 +253,15 @@
                         <goals>
                             <goal>check</goal>
                         </goals>
-                        <phase>verify</phase>
+                        <phase>validate</phase>
                         <configuration>
                             <sourceDirectories>
-                                <sourceDirectory>src/main/java/</sourceDirectory>
+                                <sourceDirectory>src/</sourceDirectory>
                             </sourceDirectories>
                             <includeResources>true</includeResources>
                             <includeTestResources>false</includeTestResources>
                             <configLocation>checkstyle.xml</configLocation>
                             <outputFile>${project.build.directory}/checkstyle-result.xml</outputFile>
-                        </configuration>
-                    </execution>
-                    <execution>
-                        <id>checkstyle-test</id>
-                        <goals>
-                            <goal>check</goal>
-                        </goals>
-                        <phase>verify</phase>
-                        <configuration>
-                            <sourceDirectories>
-                                <sourceDirectory>src/test/java/</sourceDirectory>
-                            </sourceDirectories>
-                            <includeResources>false</includeResources>
-                            <includeTestResources>true</includeTestResources>
-                            <configLocation>checkstyle-test.xml</configLocation>
-                            <outputFile>${project.build.directory}/checkstyle-result-test.xml</outputFile>
                         </configuration>
                     </execution>
                 </executions>
