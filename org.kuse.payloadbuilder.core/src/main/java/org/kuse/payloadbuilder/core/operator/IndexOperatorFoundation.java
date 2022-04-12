@@ -8,6 +8,7 @@ import java.util.List;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.kuse.payloadbuilder.core.catalog.Index;
+import org.kuse.payloadbuilder.core.catalog.Index.ColumnsType;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzePair;
 import org.kuse.payloadbuilder.core.operator.PredicateAnalyzer.AnalyzeResult;
 import org.kuse.payloadbuilder.core.parser.Expression;
@@ -144,6 +145,7 @@ class IndexOperatorFoundation
 
         List<AnalyzePair> tempPushDown = new ArrayList<>();
         List<String> columns = new ArrayList<>();
+        List<String> indexColumns = new ArrayList<>();
         for (Index index : indices)
         {
             // Wildcard index that means we simply pick all conditions
@@ -162,6 +164,7 @@ class IndexOperatorFoundation
             tempPushDown.addAll(pushDownPairs);
             columns.clear();
             columns.addAll(index.getColumns());
+            indexColumns.clear();
 
             int conditionCount = 0;
             columnsLoop: while (columns.size() > 0)
@@ -171,11 +174,24 @@ class IndexOperatorFoundation
                 {
                     if (column.equalsIgnoreCase(pair.getColumn(alias)))
                     {
+                        indexColumns.add(column);
                         conditionCount++;
                         indexPairs.add(pair);
                         // Move on to next column
                         continue columnsLoop;
                     }
+                }
+
+                // ANY index type then we are only interested in condition pairs
+                // so move on to next column
+                if (index.getColumnsType() == ColumnsType.ANY)
+                {
+                    continue;
+                }
+                // ANY_IN_ORDER then we break here and use what ever we found
+                else if (index.getColumnsType() == ColumnsType.ANY_IN_ORDER)
+                {
+                    break;
                 }
 
                 // No match on condition, try pushDown
@@ -185,6 +201,7 @@ class IndexOperatorFoundation
                     AnalyzePair pair = it.next();
                     if (column.equalsIgnoreCase(pair.getColumn(alias)))
                     {
+                        indexColumns.add(column);
                         indexPairs.add(pair);
                         // Remove since these should not be used as pushdown
                         // because they are covered by the index
@@ -195,10 +212,17 @@ class IndexOperatorFoundation
                 }
             }
 
-            // At least one condition and all columns found => index match
-            if (conditionCount > 0 && indexPairs.size() == index.getColumns().size())
+            // At least one condition => index match
+            if (conditionCount > 0)
             {
-                return new SplitResult(index, index.getColumns(), indexPairs, conditionPairs, tempPushDown);
+                if (index.getColumnsType() == ColumnsType.ALL && indexColumns.size() == index.getColumns().size())
+                {
+                    return new SplitResult(index, indexColumns, indexPairs, conditionPairs, tempPushDown);
+                }
+                else
+                {
+                    return new SplitResult(index, indexColumns, indexPairs, conditionPairs, pushDownPairs);
+                }
             }
         }
 

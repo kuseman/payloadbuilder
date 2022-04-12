@@ -37,7 +37,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         List<Operator> operators = new ArrayList<>();
         Catalog c = catalog(ofEntries(
-                entry("tableB", asList("col1"))), operators);
+                entry("tableB", all("tableB", asList("col1")))), operators);
         session.getCatalogRegistry().registerCatalog("c", c);
         session.getCatalogRegistry().setDefaultCatalog("c");
 
@@ -55,7 +55,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         List<Operator> operators = new ArrayList<>();
         Catalog c = catalog(ofEntries(
-                entry("tableB", asList("col1"))), operators);
+                entry("tableB", all("tableB", asList("col1")))), operators);
         session.getCatalogRegistry().registerCatalog("c", c);
         session.getCatalogRegistry().setDefaultCatalog("c");
 
@@ -103,7 +103,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         List<Operator> operators = new ArrayList<>();
         Catalog c = catalog(ofEntries(
-                entry("article", asList("art_id"))), operators);
+                entry("article", all("article", asList("art_id")))), operators);
         session.getCatalogRegistry().registerCatalog("c", c);
         session.getCatalogRegistry().setDefaultCatalog("c");
 
@@ -162,8 +162,8 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
 
         List<Operator> operators = new ArrayList<>();
         Catalog c = catalog(ofEntries(
-                entry("article", asList("club_id", "country_id", "art_id")),
-                entry("article_attribute", asList("art_id"))), operators);
+                entry("article", all("article", asList("club_id", "country_id", "art_id"))),
+                entry("article_attribute", all("article_attribute", asList("art_id")))), operators);
         session.getCatalogRegistry().registerCatalog("c", c);
         session.getCatalogRegistry().setDefaultCatalog("c");
 
@@ -225,7 +225,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             "  AND a.active_flg = 1";
 
         List<Operator> operators = new ArrayList<>();
-        Catalog c = catalog(ofEntries(entry("article", asList("club_id", "country_id", "art_id"))), operators);
+        Catalog c = catalog(ofEntries(entry("article", all("article", asList("club_id", "country_id", "art_id")))), operators);
         session.getCatalogRegistry().registerCatalog("c", c);
         session.getCatalogRegistry().setDefaultCatalog("c");
 
@@ -273,7 +273,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             "  AND a.art_id = 1337";
 
         List<Operator> operators = new ArrayList<>();
-        Catalog c = catalog(ofEntries(entry("article", WILDCARD_COLUMNS)), operators);
+        Catalog c = catalog(ofEntries(entry("article", wildcard("article"))), operators);
         session.getCatalogRegistry().registerCatalog("c", c);
         session.getCatalogRegistry().setDefaultCatalog("c");
 
@@ -320,7 +320,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             "  AND a.art_id = 10 ";
 
         List<Operator> operators = new ArrayList<>();
-        Catalog c = catalog(ofEntries(entry("article", asList("club_id", "country_id", "art_id"))), operators);
+        Catalog c = catalog(ofEntries(entry("article", all("article", asList("club_id", "country_id", "art_id")))), operators);
         session.getCatalogRegistry().registerCatalog("c", c);
         session.getCatalogRegistry().setDefaultCatalog("c");
 
@@ -356,6 +356,156 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
     }
 
     @Test
+    public void test_inner_join_with_any_index()
+    {
+        String queryString = "SELECT a.art_id " +
+            "FROM source s " +
+            "INNER JOIN article a " +
+            "  ON a.art_id = s.art_id " +
+            "  AND a.club_id = s.id " +
+            "  AND a.country_id = 0 " +
+            "  AND a.art_id = 10 ";
+
+        List<Operator> operators = new ArrayList<>();
+        Catalog c = catalog(ofEntries(entry("article", any("article", asList("club_id", "country_id", "art_id")))), operators);
+        session.getCatalogRegistry().registerCatalog("c", c);
+        session.getCatalogRegistry().setDefaultCatalog("c");
+
+        Select select = s(queryString);
+        BuildResult buildResult = OperatorBuilder.create(session, select);
+
+        // Verify that correct columns got picked for index predicate
+        assertEquals(asList("club_id", "art_id"), ((TestOperator) operators.get(1)).indexPredicate.getIndexColumns());
+
+        Operator expected = new BatchHashJoin(
+                3,
+                "INNER JOIN",
+                operators.get(0),
+                new FilterOperator(
+                        2,
+                        operators.get(1),
+                        new ExpressionPredicate(en("a.country_id = 0 AND a.art_id = 10"))),
+                new ExpressionOrdinalValuesFactory(asList(en("s.id"), en("s.art_id"))),
+                new ExpressionHashFunction(asList(en("a.club_id"), en("a.art_id"))),
+                new ExpressionPredicate(en("a.art_id = s.art_id and a.club_id = s.id")),
+                new DefaultTupleMerger(-1, 1, 2),
+                false,
+                false,
+                c.getIndices(session, "", QualifiedName.of("article")).get(0),
+                null);
+
+        Operator actual = buildResult.getOperator();
+
+        //                        System.out.println(actual.toString(1));
+        //                        System.err.println(expected.toString(1));
+
+        assertEquals(expected, actual);
+
+        TupleIterator it = actual.open(new ExecutionContext(session));
+        assertFalse(it.hasNext());
+    }
+
+    @Test
+    public void test_inner_join_with_any_in_order_index()
+    {
+        String queryString = "SELECT a.art_id " +
+            "FROM source s " +
+            "INNER JOIN article a " +
+            "  ON a.art_id = s.art_id " +
+            "  AND a.club_id = s.id " +
+            "  AND a.country_id = 0 " +
+            "  AND a.art_id = 10 ";
+
+        List<Operator> operators = new ArrayList<>();
+        Catalog c = catalog(ofEntries(entry("article", anyInOrder("article", asList("art_id", "dummy", "club_id")))), operators);
+        session.getCatalogRegistry().registerCatalog("c", c);
+        session.getCatalogRegistry().setDefaultCatalog("c");
+
+        Select select = s(queryString);
+        BuildResult buildResult = OperatorBuilder.create(session, select);
+
+        // Verify that correct columns got picked for index predicate
+        // Only art_id matches in order
+        assertEquals(asList("art_id"), ((TestOperator) operators.get(1)).indexPredicate.getIndexColumns());
+
+        Operator expected = new BatchHashJoin(
+                3,
+                "INNER JOIN",
+                operators.get(0),
+                new FilterOperator(
+                        2,
+                        operators.get(1),
+                        new ExpressionPredicate(en("a.country_id = 0 AND a.art_id = 10"))),
+                new ExpressionOrdinalValuesFactory(asList(en("s.art_id"))),
+                new ExpressionHashFunction(asList(en("a.art_id"))),
+                new ExpressionPredicate(en("a.art_id = s.art_id and a.club_id = s.id")),
+                new DefaultTupleMerger(-1, 1, 2),
+                false,
+                false,
+                c.getIndices(session, "", QualifiedName.of("article")).get(0),
+                null);
+
+        Operator actual = buildResult.getOperator();
+
+        //                        System.out.println(actual.toString(1));
+        //                        System.err.println(expected.toString(1));
+
+        assertEquals(expected, actual);
+
+        TupleIterator it = actual.open(new ExecutionContext(session));
+        assertFalse(it.hasNext());
+    }
+
+    @Test
+    public void test_inner_join_with_any_in_order_index_with_no_first_hit()
+    {
+        String queryString = "SELECT a.art_id " +
+            "FROM source s " +
+            "INNER JOIN article a " +
+            "  ON a.art_id = s.art_id " +
+            "  AND a.club_id = s.id " +
+            "  AND a.country_id = 0 " +
+            "  AND a.art_id = 10 ";
+
+        List<Operator> operators = new ArrayList<>();
+        Catalog c = catalog(ofEntries(entry("article", anyInOrder("article", asList("dummy", "art_id", "club_id")))), operators);
+        session.getCatalogRegistry().registerCatalog("c", c);
+        session.getCatalogRegistry().setDefaultCatalog("c");
+
+        Select select = s(queryString);
+        BuildResult buildResult = OperatorBuilder.create(session, select);
+
+        // No index should be used here
+        assertNull(((TestOperator) operators.get(1)).indexPredicate);
+
+        // Since no index then no batch hash join
+        Operator expected = new HashJoin(
+                3,
+                "INNER JOIN",
+                operators.get(0),
+                new FilterOperator(
+                        2,
+                        operators.get(1),
+                        new ExpressionPredicate(en("a.country_id = 0 AND a.art_id = 10"))),
+                new ExpressionHashFunction(asList(en("s.id"), en("s.art_id"))),
+                new ExpressionHashFunction(asList(en("a.club_id"), en("a.art_id"))),
+                new ExpressionPredicate(en("a.art_id = s.art_id and a.club_id = s.id")),
+                new DefaultTupleMerger(-1, 1, 2),
+                false,
+                false);
+
+        Operator actual = buildResult.getOperator();
+
+        //                        System.out.println(actual.toString(1));
+        //                        System.err.println(expected.toString(1));
+
+        assertEquals(expected, actual);
+
+        TupleIterator it = actual.open(new ExecutionContext(session));
+        assertFalse(it.hasNext());
+    }
+
+    @Test
     public void test_inner_join_with_populate_and_filter_and_join_pushdown()
     {
         String queryString = "SELECT a.art_id " +
@@ -367,7 +517,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             "  AND a.active_flg = 1";
 
         List<Operator> operators = new ArrayList<>();
-        Catalog c = catalog(ofEntries(entry("article", asList("club_id", "country_id", "art_id"))), operators);
+        Catalog c = catalog(ofEntries(entry("article", all("article", asList("club_id", "country_id", "art_id")))), operators);
         session.getCatalogRegistry().registerCatalog("c", c);
         session.getCatalogRegistry().setDefaultCatalog("c");
 
@@ -420,7 +570,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             "  AND s.flag";
 
         List<Operator> operators = new ArrayList<>();
-        Catalog c = catalog(ofEntries(entry("article", asList("club_id", "country_id", "art_id"))), operators);
+        Catalog c = catalog(ofEntries(entry("article", all("article", asList("club_id", "country_id", "art_id")))), operators);
         session.getCatalogRegistry().registerCatalog("c", c);
         session.getCatalogRegistry().setDefaultCatalog("c");
 
@@ -467,7 +617,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             "  AND a.active_flg = 1";
 
         List<Operator> operators = new ArrayList<>();
-        Catalog c = catalog(ofEntries(entry("article", asList("club_id", "country_id", "art_id"))), operators);
+        Catalog c = catalog(ofEntries(entry("article", all("article", asList("club_id", "country_id", "art_id")))), operators);
         session.getCatalogRegistry().registerCatalog("c", c);
         session.getCatalogRegistry().setDefaultCatalog("c");
 
@@ -502,9 +652,29 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         assertFalse(it.hasNext());
     }
 
-    static final List<String> WILDCARD_COLUMNS = asList();
+    private Index all(String table, List<String> columns)
+    {
+        return new Index(QualifiedName.of(table), columns, Index.ColumnsType.ALL, 100);
+    }
+
+    private Index wildcard(String table)
+    {
+        return new Index(QualifiedName.of(table), emptyList(), Index.ColumnsType.WILDCARD, 100);
+    }
+
+    private Index any(String table, List<String> columns)
+    {
+        return new Index(QualifiedName.of(table), columns, Index.ColumnsType.ANY, 100);
+    }
+
+    private Index anyInOrder(String table, List<String> columns)
+    {
+        return new Index(QualifiedName.of(table), columns, Index.ColumnsType.ANY_IN_ORDER, 100);
+    }
+
+    //    static final List<String> WILDCARD_COLUMNS = asList();
     private Catalog catalog(
-            Map<String, List<String>> keysByTable,
+            Map<String, Index> indexByTable,
             List<Operator> operators)
     {
         return new Catalog("TEST")
@@ -512,18 +682,14 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             @Override
             public List<Index> getIndices(QuerySession session, String catalogAlias, QualifiedName table)
             {
-                List<String> keys = keysByTable.get(table.toDotDelimited());
-                if (keys == WILDCARD_COLUMNS)
-                {
-                    return asList(new Index(table, keys, Index.ColumnsType.WILDCARD, 100));
-                }
-                return keys != null ? asList(new Index(table, keys, Index.ColumnsType.ALL, 100)) : emptyList();
+                Index index = indexByTable.get(table.toDotDelimited());
+                return index != null ? asList(index) : emptyList();
             }
 
             @Override
             public Operator getScanOperator(OperatorData data)
             {
-                Operator op = new TestOperator("scan " + data.getTableAlias().getTable().toString(), keysByTable);
+                Operator op = new TestOperator("scan " + data.getTableAlias().getTable().toString(), null);
                 operators.add(op);
                 return op;
             }
@@ -531,7 +697,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
             @Override
             public Operator getIndexOperator(OperatorData data, IndexPredicate indexPredicate)
             {
-                Operator op = new TestOperator("index " + data.getTableAlias().getTable().toString(), keysByTable);
+                Operator op = new TestOperator("index " + data.getTableAlias().getTable().toString(), indexPredicate);
                 operators.add(op);
                 return op;
             }
@@ -542,12 +708,12 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
     private static class TestOperator implements Operator
     {
         private final String name;
-        private final Map<String, List<String>> keysByTable;
+        private final IndexPredicate indexPredicate;
 
-        TestOperator(String name, Map<String, List<String>> keysByTable)
+        TestOperator(String name, IndexPredicate indexPredicate)
         {
             this.name = name;
-            this.keysByTable = keysByTable;
+            this.indexPredicate = indexPredicate;
         }
 
         @Override
@@ -559,7 +725,7 @@ public class OperatorBuilderBatchHashJoinTest extends AOperatorTest
         @Override
         public TupleIterator open(ExecutionContext context)
         {
-            if (keysByTable.containsKey(name))
+            if (indexPredicate != null)
             {
                 assertNotNull(context.getStatementContext().getOuterOrdinalValues());
             }

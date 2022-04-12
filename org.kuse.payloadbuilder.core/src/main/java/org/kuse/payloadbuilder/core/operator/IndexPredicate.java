@@ -1,5 +1,6 @@
 package org.kuse.payloadbuilder.core.operator;
 
+import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 
 import java.util.Iterator;
@@ -21,7 +22,7 @@ public class IndexPredicate
     IndexPredicate(Index index, List<String> indexColumns)
     {
         this.index = requireNonNull(index, "index");
-        this.indexColumns = requireNonNull(indexColumns);
+        this.indexColumns = unmodifiableList(requireNonNull(indexColumns, "indexColumns"));
     }
 
     public Index getIndex()

@@ -23,11 +23,6 @@ public class Index
         this.columns = unmodifiableList(requireNonNull(columns, "columns"));
         this.columnsType = requireNonNull(columnsType, "columnsType");
         this.batchSize = batchSize;
-
-        if (columnsType == ColumnsType.ANY)
-        {
-            throw new IllegalArgumentException("ANY columns is not supported yet.");
-        }
     }
 
     public QualifiedName getTable()
@@ -93,6 +88,12 @@ public class Index
         /**
          * Type that specifies that at least one column (ANY) must be used to be able to utilize this index
          */
-        ANY
+        ANY,
+
+        /**
+         * Type that specifies that at least one column (ANY) must be used to be able to utilize this index but
+         * columns must be used in order from left to right.
+         */
+        ANY_IN_ORDER
     }
 }
