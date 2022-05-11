@@ -4,40 +4,33 @@ on:
     tags:
     - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
-name: Create release and upload Release Asset
+name: Publish version tags to maven central
 
 jobs:
-  build:
-    name: Upload Release Asset
+  publish:
     runs-on: ubuntu-latest
     steps:
       - name: Set version
         run: |
           TAG=${GITHUB_REF#refs/tags/}
           echo "VERSION=${TAG/v/}" >> $GITHUB_ENV
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Verify
-        run: mvn -B clean verify test --file pom.xml
-      - name: Build project
-        run: mvn -B clean install -DskipTests=true -Pdist --file pom.xml
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: echo "Will start a Maven Central upload with tag ${{ VERSION }}"
+
+      - uses: actions/checkout@v2
+
+      - name: Set up Maven Central Repository
+        uses: actions/setup-java@v1
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
-      - name: Upload Release Asset
-        id: upload-release-asset 
-        uses: actions/upload-release-asset@v1
+          java-version: 11
+          server-id: ossrh
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+
+      - name: Publish package
+        run: mvn --batch-mode clean deploy -DperformRelease=true -DskipTests=true -Dcheckstyle.skip
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
-          asset_path: ./payloadbuilder-editor/target/payloadbuilder-editor-${VERSION}-dist.zip
-          asset_name: payloadbuilder-editor-${VERSION}-dist.zip
-          asset_content_type: application/zip
+          MAVEN_USERNAME: ${{ secrets.OSS_SONATYPE_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.OSS_SONATYPE_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
