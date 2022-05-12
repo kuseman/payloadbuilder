@@ -117,6 +117,11 @@ class CatFunction extends TableFunctionInfo
             EntityUtils.consumeQuietly(entity);
         }
 
+        if (result.isEmpty())
+        {
+            return TupleIterator.EMPTY;
+        }
+
         String[] columns = result.get(0)
                 .keySet()
                 .toArray(ArrayUtils.EMPTY_STRING_ARRAY);

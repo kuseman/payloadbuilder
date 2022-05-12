@@ -33,6 +33,53 @@ class SearchFunction extends TableFunctionInfo
     }
 
     @Override
+    public String getDescription()
+    {
+        return "Table function that enables a raw elasticsearch query to be made. " + System.lineSeparator()
+               + "Function requires named parameters: "
+               + System.lineSeparator()
+               + " - endpoint (Optional String): Endpoint to elasticsearch. (*)"
+               + System.lineSeparator()
+               + " - index (Optional String): Index in elasticsearch. (*)"
+               + System.lineSeparator()
+               + " - type (Optional String): Type in elasticsearch. Defaults to _doc"
+               + System.lineSeparator()
+               + " - body (String): Search body to use. Mutual exclusive with 'template'"
+               + System.lineSeparator()
+               + " - template (String): Search template to use. Mutual exclusive with 'body'."
+               + System.lineSeparator()
+               + " - params (Optional String): A map expression with template parameters. Only applicable when using 'template'"
+               + System.lineSeparator()
+               + " (*) - If not provided then value is resolved from catalog properties."
+               + System.lineSeparator()
+               + System.lineSeparator()
+               + "Example with body: "
+               + System.lineSeparator()
+               + "    select * "
+               + System.lineSeparator()
+               + "    from es#search("
+               + System.lineSeparator()
+               + "      body: '{ \"query\": { \"term\": { \"field\": 123 } } }'"
+               + System.lineSeparator()
+               + "    )"
+               + System.lineSeparator()
+               + System.lineSeparator()
+               + "Example with template: "
+               + System.lineSeparator()
+               + "    select * "
+               + System.lineSeparator()
+               + "    from es#search("
+               + System.lineSeparator()
+               + "      template: 'searchTemplate',"
+               + System.lineSeparator()
+               + "      params: '{ \"key\": 123, \"key2\": \"value\" }'"
+               + System.lineSeparator()
+               + "    )"
+               + System.lineSeparator()
+               + System.lineSeparator();
+    }
+
+    @Override
     public boolean requiresNamedArguments()
     {
         return true;
@@ -116,7 +163,7 @@ class SearchFunction extends TableFunctionInfo
 
         if (type == null)
         {
-            throw new IllegalArgumentException("'type' argument must be specified for function " + getName());
+            type = ESCatalog.SINGLE_TYPE_TABLE_NAME;
         }
 
         if (template == null

@@ -6,7 +6,6 @@ import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Function;
 
 import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 import se.kuseman.payloadbuilder.core.QuerySession;
@@ -25,10 +24,6 @@ public class ExecutionContext implements IExecutionContext
 
     /** Variables in context */
     private Map<String, Object> variables;
-    /** Intern cache. Used during optimization of tuples to reduce duplicate values. Used before stuff is put to cache */
-    private Map<Object, Object> internCache;
-    // /** Catalog properties that only live during one execution of a query */
-    // private Map<String, Map<String, Object>> catalogProperties;
 
     public ExecutionContext(QuerySession session)
     {
@@ -43,7 +38,6 @@ public class ExecutionContext implements IExecutionContext
     {
         this.session = source.session;
         this.variables = source.variables;
-        this.internCache = source.internCache;
         this.statementContext = new StatementContext(source.statementContext);
     }
 
@@ -87,25 +81,6 @@ public class ExecutionContext implements IExecutionContext
     {
         return ExecutionContext.class.getPackage()
                 .getImplementationVersion();
-    }
-
-    /**
-     * Intern array values. Used when optimizing tuples to reduce duplicated values when values are put to cache etc.
-     */
-    @Override
-    public void intern(Object[] array)
-    {
-        if (internCache == null)
-        {
-            internCache = new HashMap<>();
-        }
-
-        int length = array.length;
-        for (int i = 0; i < length; i++)
-        {
-            final Object value = array[i];
-            array[i] = internCache.computeIfAbsent(value, Function.identity());
-        }
     }
 
     /** Copy this context */

@@ -16,12 +16,6 @@ public interface CacheProvider
     /** Get type of provider */
     Type getType();
 
-    /** Name of the custom cache type */
-    default String getCustomType()
-    {
-        return null;
-    }
-
     /** Return cache infos for this cache provider */
     default List<CacheInfo> getCaches()
     {

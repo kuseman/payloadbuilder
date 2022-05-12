@@ -33,6 +33,7 @@ import se.kuseman.payloadbuilder.api.operator.Operator.TupleIterator;
 import se.kuseman.payloadbuilder.api.operator.Row;
 import se.kuseman.payloadbuilder.api.operator.Tuple;
 import se.kuseman.payloadbuilder.api.session.IQuerySession;
+import se.kuseman.payloadbuilder.catalog.CredentialsException;
 
 /** Jdbc catalog */
 public class JdbcCatalog extends Catalog
@@ -212,8 +213,9 @@ public class JdbcCatalog extends Catalog
                     }
                     ds.setRegisterMbeans(true);
                     // CSOFF
-                    ds.setPoolName(url.replace(':', '_')
-                            .substring(0, 40));
+                    ds.setPoolName(url.length() > 40 ? url.replace(':', '_')
+                            .substring(0, 40)
+                            : url);
                     // CSON
                     ds.setJdbcUrl(url);
                     ds.setUsername(username);

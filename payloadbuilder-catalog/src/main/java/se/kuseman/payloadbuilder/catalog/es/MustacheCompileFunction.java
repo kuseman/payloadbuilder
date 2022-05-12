@@ -39,13 +39,6 @@ class MustacheCompileFunction extends ScalarFunctionInfo
         return 2;
     }
 
-    // @Override
-    // public List<Class<? extends Expression>> getInputTypes()
-    // {
-    // return asList(Expression.class, Expression.class);
-    // }
-    //
-
     @Override
     public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
     {

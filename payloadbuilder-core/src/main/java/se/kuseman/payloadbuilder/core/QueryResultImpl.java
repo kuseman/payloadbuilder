@@ -389,12 +389,6 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                     columns[i] = value.getKey();
                 }
             }
-
-            if (cache)
-            {
-                /* Optimize tuple before storing to table */
-                context.intern(values);
-            }
             rows.add(new TemporaryTable.Row(values));
         });
 

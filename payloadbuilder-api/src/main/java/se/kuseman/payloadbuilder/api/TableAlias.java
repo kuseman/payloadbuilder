@@ -10,8 +10,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.IntStream;
 
-import se.kuseman.payloadbuilder.api.utils.StringUtils;
-
 /**
  * Domain of a table alias
  *
@@ -267,27 +265,6 @@ public class TableAlias
     public int getTupleOrdinal()
     {
         return tupleOrdinal;
-    }
-
-    /** Print alias hierarchy */
-    String printHierarchy(int indent)
-    {
-        StringBuilder sb = new StringBuilder();
-        sb.append(StringUtils.repeat(' ', indent * 2));
-        sb.append(toString());
-        if (tableMeta != null)
-        {
-            sb.append(" ")
-                    .append(tableMeta);
-        }
-        sb.append(System.lineSeparator());
-
-        if (childAliases != null)
-        {
-            childAliases.forEach(a -> sb.append(a.printHierarchy(indent + 1)));
-        }
-
-        return sb.toString();
     }
 
     // NOTE! No hashCode or equals since

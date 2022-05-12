@@ -10,6 +10,4 @@ public interface IExecutionContext
 
     /** Return the statement context */
     IStatementContext getStatementContext();
-
-    void intern(Object[] optimizedValues);
 }
