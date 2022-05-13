@@ -48,12 +48,20 @@ data operators for tables.
 
 ## Usage
 
-* mvn install
-* Add Reference 
-  * **payloadbuilder-core/target/payloadbuilder-core-{version}.jar**
-  * **payloadbuilder-catalog/target/payloadbuilder-catalog-{version}.jar**
-    * Contains bundled Catalog implementations
-  * Release to Central is coming soon
+Maven
+```xml
+  <dependency>
+    <groupId>se.kuseman.payloadbuilder</groupId>
+    <artifactId>payloadbuilder-core</artifactId>
+    <version>${payloadbuilder.version}</version>
+  </dependency>
+  <!-- Optionally add bundled catalogs -->
+  <dependency>
+    <groupId>se.kuseman.payloadbuilder</groupId>
+    <artifactId>payloadbuilder-catalog</artifactId>
+    <version>${payloadbuilder.version}</version>
+  </dependency>
+```
 
 ## Getting Started
 
@@ -62,21 +70,22 @@ Simple query using multiple catalogs:
 ```java
         QuerySession session = new QuerySession(new CatalogRegistry());
         session.setPrintWriter(new OutputStreamWriter(System.out));
-        session.getCatalogRegistry().registerCatalog("es", new ESCatalog());
-        session.getCatalogRegistry().registerCatalog("fs", new FileSystemCatalog());
+        session.getCatalogRegistry()
+                .registerCatalog("es", new ESCatalog());
+        session.getCatalogRegistry()
+                .registerCatalog("fs", new FilesystemCatalog());
 
-        session.setCatalogProperty("es", "endpoint", "http://localhost:9200");
-        session.setCatalogProperty("es", "index", "myindex");
+        session.setCatalogProperty("es", "endpoint", "http://localhost:19200");
+        session.setCatalogProperty("es", "index", "myIndex");
 
-        String query = "select top 10 " +
-            "        d.fileName " +
-            ",       f.size " +
-            ",       f.lastModifiedTime " +
-            "from es#_doc d " +
-            "cross apply fs#file(concat('/path/to/files/', d.fileName)) f " +
-            "where d._docType = 'pdfFiles'";
+        String query = "select top 10 " + "        d.fileName "
+                       + ",       f.size "
+                       + ",       f.lastModifiedTime "
+                       + "from es#_doc d "
+                       + "outer apply fs#file(concat('/path/to/files/', d.fileName)) f "
+                       + "where d._docType = 'pdfFiles'";
 
-        CompiledQuery compiledQuery = Payloadbuilder.compile(query, session.getCatalogRegistry());
+        CompiledQuery compiledQuery = Payloadbuilder.compile(query);
         QueryResult queryResult = compiledQuery.execute(session);
         JsonOutputWriter writer = new JsonOutputWriter(new PrintWriter(System.out));
         while (queryResult.hasMoreResults())
@@ -107,4 +116,3 @@ Patches, discussions about features, changes etc. welcome.
 ## License
 
 Distributed under the Apache License Version 2.0. See `LICENSE` for more information.
-
