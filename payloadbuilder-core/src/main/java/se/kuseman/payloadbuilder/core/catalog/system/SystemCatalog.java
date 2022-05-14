@@ -18,9 +18,10 @@ import se.kuseman.payloadbuilder.api.operator.Operator;
 import se.kuseman.payloadbuilder.api.operator.Operator.TupleIterator;
 import se.kuseman.payloadbuilder.api.operator.Row;
 import se.kuseman.payloadbuilder.api.operator.Tuple;
-import se.kuseman.payloadbuilder.api.session.CacheProvider;
 import se.kuseman.payloadbuilder.api.session.IQuerySession;
 import se.kuseman.payloadbuilder.core.QuerySession;
+import se.kuseman.payloadbuilder.core.cache.Cache;
+import se.kuseman.payloadbuilder.core.cache.CacheType;
 import se.kuseman.payloadbuilder.core.catalog.system.AMatchFunction.MatchType;
 import se.kuseman.payloadbuilder.core.catalog.system.TrimFunction.Type;
 import se.kuseman.payloadbuilder.core.operator.ExecutionContext;
@@ -127,11 +128,10 @@ public class SystemCatalog extends Catalog
                             : null;
                     String cacheName = nameExpression != null ? String.valueOf(nameExpression.eval(ctx))
                             : null;
-
-                    CacheProvider.Type providerType = typeName != null ? CacheProvider.Type.valueOf(upperCase(typeName))
+                    CacheType cacheType = typeName != null ? CacheType.valueOf(upperCase(typeName))
                             : null;
 
-                    return getCacheKeysIterator(ctx.getSession(), alias, providerType, cacheName);
+                    return getCacheKeysIterator(ctx.getSession(), alias, cacheType, cacheName);
                 });
             }
             else if ("variables".equalsIgnoreCase(type))
@@ -219,7 +219,7 @@ public class SystemCatalog extends Catalog
     private TupleIterator getCachesIterator(IQuerySession apiSession, TableAlias tableAlias)
     {
         QuerySession session = (QuerySession) apiSession;
-        final List<CacheProvider> providers = asList(session.getBatchCacheProvider(), session.getTempTableCacheProvider(), session.getCustomCacheProvider());
+        final List<Cache> providers = asList(session.getBatchCache(), session.getTempTableCache(), session.getGenericCache());
 
         String[] columns = new String[] { "name", "size", "hits", "hit_ratio", "misses", "miss_ratio", "type", "provider" };
         return TupleIterator.wrap(providers.stream()
@@ -247,25 +247,23 @@ public class SystemCatalog extends Catalog
                                         .getCacheHits()
                                         + p.getValue()
                                                 .getCacheMisses()),
-                        p.getKey()
-                                .getType(),
-                        p.getKey()
+                        CacheType.from(p.getKey()), p.getKey()
                                 .getName() }))
                 .iterator());
     }
 
-    private TupleIterator getCacheKeysIterator(IQuerySession apiSession, TableAlias tableAlias, CacheProvider.Type type, String cacheName)
+    private TupleIterator getCacheKeysIterator(IQuerySession apiSession, TableAlias tableAlias, CacheType type, String cacheName)
     {
         QuerySession session = (QuerySession) apiSession;
-        List<CacheProvider> providers;
+        List<Cache> providers;
 
         if (type != null)
         {
-            providers = singletonList(session.getCacheProvider(type));
+            providers = singletonList(session.getCache(type));
         }
         else
         {
-            providers = asList(session.getBatchCacheProvider(), session.getTempTableCacheProvider(), session.getCustomCacheProvider());
+            providers = asList(session.getBatchCache(), session.getTempTableCache(), session.getGenericCache());
         }
 
         String[] columns = new String[] { "name", "key", "expire_time", "type", "provider" };
@@ -294,9 +292,8 @@ public class SystemCatalog extends Catalog
                                 .getKey(),
                         p.getValue()
                                 .getExpireTime(),
-                        p.getKey()
-                                .getKey()
-                                .getType(),
+                        CacheType.from(p.getKey()
+                                .getKey()),
                         p.getKey()
                                 .getKey()
                                 .getName() }))

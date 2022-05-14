@@ -6,17 +6,10 @@ import java.util.Map;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.operator.Tuple;
-import se.kuseman.payloadbuilder.api.session.CacheProvider;
 
 /** Cache provider for the {@link se.kuseman.payloadbuilder.core.operator.BatchCacheOperator} */
-public interface BatchCacheProvider extends CacheProvider
+public interface BatchCache extends Cache
 {
-    @Override
-    default Type getType()
-    {
-        return Type.BATCH;
-    }
-
     /**
      * Get all cached values for provided iterable with keys
      *

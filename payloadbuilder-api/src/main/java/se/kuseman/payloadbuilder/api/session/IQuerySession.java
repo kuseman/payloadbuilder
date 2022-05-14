@@ -14,8 +14,8 @@ public interface IQuerySession
     /** Set catalog property */
     void setCatalogProperty(String catalogAlias, String key, Object value);
 
-    /** Get the custom cache provider */
-    CustomCacheProvider getCustomCacheProvider();
+    /** Get the generic cache */
+    GenericCache getGenericCache();
 
     /** Returns true if the query should be aborted */
     boolean abortQuery();

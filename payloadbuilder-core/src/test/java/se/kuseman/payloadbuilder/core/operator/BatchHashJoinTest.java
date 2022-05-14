@@ -25,7 +25,7 @@ import se.kuseman.payloadbuilder.api.operator.Operator.TupleIterator;
 import se.kuseman.payloadbuilder.api.operator.Row;
 import se.kuseman.payloadbuilder.api.operator.Tuple;
 import se.kuseman.payloadbuilder.api.utils.MapUtils;
-import se.kuseman.payloadbuilder.core.operator.BatchCacheOperatorTest.TestCacheProvider;
+import se.kuseman.payloadbuilder.core.operator.BatchCacheOperatorTest.TestCache;
 import se.kuseman.payloadbuilder.core.operator.ExpressionOrdinalValuesFactory.OrdinalValues;
 
 /** Test {@link BatchHashJoin} */
@@ -354,8 +354,8 @@ public class BatchHashJoinTest extends AOperatorTest
         assertTrue("BatchHashJoin should have been constructed", op instanceof BatchHashJoin);
         assertTrue("Inner operator should be of BatchCache type", ((BatchHashJoin) op).getInner() instanceof BatchCacheOperator);
 
-        TestCacheProvider cacheProvider = new BatchCacheOperatorTest.TestCacheProvider();
-        session.setBatchCacheProvider(cacheProvider);
+        TestCache cache = new BatchCacheOperatorTest.TestCache();
+        session.setBatchCache(cache);
         ExecutionContext context = new ExecutionContext(session);
         context.setVariable("param", 1337);
 
@@ -389,9 +389,9 @@ public class BatchHashJoinTest extends AOperatorTest
         assertEquals(1, aClose.intValue());
         assertEquals(5, bClose.intValue());
 
-        Map<Object, List<Tuple>> cache = cacheProvider.cache.get("test_tableB");
+        Map<Object, List<Tuple>> cacheMap = cache.cache.get("test_tableB");
         // 14 outer values should be cached
-        assertEquals(14, cache.size());
+        assertEquals(14, cacheMap.size());
 
         Map<Object, List<Tuple>> expectedCache = MapUtils.ofEntries(MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new OrdinalValues(new Object[] { -2 })), emptyList()),
                 MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new OrdinalValues(new Object[] { -1 })), emptyList()),
@@ -407,7 +407,7 @@ public class BatchHashJoinTest extends AOperatorTest
                 MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new OrdinalValues(new Object[] { 9 })), asList(innerTuples.get(4))),
                 MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new OrdinalValues(new Object[] { 10 })), emptyList()),
                 MapUtils.entry(new BatchCacheOperator.CacheKey(1337, new OrdinalValues(new Object[] { 11 })), emptyList()));
-        assertEquals(expectedCache, cache);
+        assertEquals(expectedCache, cacheMap);
 
         // Open once more and verify that inner operator wasn't opened at all
         posLeft.setValue(0);

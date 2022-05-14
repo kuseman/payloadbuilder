@@ -24,7 +24,7 @@ import se.kuseman.payloadbuilder.api.TableAlias.TableAliasBuilder;
 import se.kuseman.payloadbuilder.api.operator.NodeData;
 import se.kuseman.payloadbuilder.api.operator.Operator;
 import se.kuseman.payloadbuilder.api.operator.Tuple;
-import se.kuseman.payloadbuilder.api.session.CacheProvider;
+import se.kuseman.payloadbuilder.core.cache.Cache;
 import se.kuseman.payloadbuilder.core.codegen.BaseProjection;
 import se.kuseman.payloadbuilder.core.operator.AObjectOutputWriter;
 import se.kuseman.payloadbuilder.core.operator.AObjectOutputWriter.ColumnValue;
@@ -209,8 +209,8 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     @Override
     public Void visit(CacheFlushRemoveStatement statement, Void ctx)
     {
-        CacheProvider provider = context.getSession()
-                .getCacheProvider(statement.getType());
+        Cache provider = context.getSession()
+                .getCache(statement.getType());
         if (statement.isFlush())
         {
             if (statement.isAll())
@@ -321,7 +321,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         if (cacheName != null)
         {
             table = context.getSession()
-                    .getTempTableCacheProvider()
+                    .getTempTableCache()
                     .computIfAbsent(cacheName, cacheKey, ttl, () -> createTempTable(select, buildResult, true));
         }
         else

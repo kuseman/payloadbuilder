@@ -9,7 +9,7 @@ import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.operator.Tuple;
 
 /** Implementation of batch cache that stores values in memory in the session */
-public class SessionBatchCacheProvider extends ASessionCacheProvider<List<Tuple>> implements BatchCacheProvider
+public class SessionBatchCache extends ASessionCache<List<Tuple>> implements BatchCache
 {
     @Override
     public <TKey> Map<TKey, List<Tuple>> getAll(QualifiedName name, Iterable<TKey> keys)

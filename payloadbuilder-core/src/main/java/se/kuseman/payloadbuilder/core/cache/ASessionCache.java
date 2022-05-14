@@ -14,14 +14,13 @@ import java.util.Map.Entry;
 import java.util.function.Supplier;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.api.session.CacheProvider;
 
 /**
  * Base class for session based caches. Implemented using a simple HashMap
  *
  * @param <TValue> Type of value in the cache
  */
-abstract class ASessionCacheProvider<TValue> implements CacheProvider
+abstract class ASessionCache<TValue> implements Cache
 {
     protected final Map<QualifiedName, Cache<TValue>> caches = new HashMap<>();
 

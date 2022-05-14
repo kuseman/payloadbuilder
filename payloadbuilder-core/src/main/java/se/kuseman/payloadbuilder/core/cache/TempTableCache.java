@@ -4,18 +4,11 @@ import java.time.Duration;
 import java.util.function.Supplier;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.api.session.CacheProvider;
 import se.kuseman.payloadbuilder.core.operator.TemporaryTable;
 
 /** Cache provider for temporary tables */
-public interface TempTableCacheProvider extends CacheProvider
+public interface TempTableCache extends Cache
 {
-    @Override
-    default Type getType()
-    {
-        return Type.TEMPTABLE;
-    }
-
     /**
      * Get temporary table by cache name and key
      *

@@ -372,7 +372,7 @@ public class ESCatalog extends Catalog
         }
         Integer ttl = session.getCatalogProperty(catalogAlias, CACHE_MAPPINGS_TTL);
         QualifiedName cacheName = QualifiedName.of(NAME, endpoint, index);
-        return session.getCustomCacheProvider()
+        return session.getGenericCache()
                 .computIfAbsent(cacheName, "mappings", Duration.ofMinutes(ttl != null ? ttl
                         : MAPPINGS_CACHE_TTL), () ->
                         {

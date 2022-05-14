@@ -4,10 +4,9 @@ import java.time.Duration;
 import java.util.function.Supplier;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.api.session.CustomCacheProvider;
 
 /** Implementation of custom cache that stores data in session */
-public class SessionCustomCacheProvider extends ASessionCacheProvider<Object> implements CustomCacheProvider
+public class SessionGenericCache extends ASessionCache<Object> implements GenericCache
 {
     @SuppressWarnings("unchecked")
     @Override

@@ -3,18 +3,18 @@ package se.kuseman.payloadbuilder.core.parser;
 import static java.util.Objects.requireNonNull;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.api.session.CacheProvider;
+import se.kuseman.payloadbuilder.core.cache.CacheType;
 
 /** Statement for "cache flush/remove" statements */
 public class CacheFlushRemoveStatement extends Statement
 {
-    private final CacheProvider.Type type;
+    private final CacheType type;
     private final QualifiedName name;
     private final boolean isAll;
     private final boolean isFlush;
     private final Expression key;
 
-    CacheFlushRemoveStatement(CacheProvider.Type type, QualifiedName name, boolean isAll, boolean isFlush, Expression key)
+    CacheFlushRemoveStatement(CacheType type, QualifiedName name, boolean isAll, boolean isFlush, Expression key)
     {
         this.type = requireNonNull(type, "type");
         this.name = name;
@@ -30,7 +30,7 @@ public class CacheFlushRemoveStatement extends Statement
         }
     }
 
-    public CacheProvider.Type getType()
+    public CacheType getType()
     {
         return type;
     }

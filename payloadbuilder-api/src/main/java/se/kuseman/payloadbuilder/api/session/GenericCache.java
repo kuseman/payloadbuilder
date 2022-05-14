@@ -6,16 +6,10 @@ import java.util.function.Supplier;
 import se.kuseman.payloadbuilder.api.QualifiedName;
 
 /**
- * Definition of a custom cache provider. Allowing for storing arbitrary data for catalog etc.
+ * Definition of a generic cache. Allowing for storing arbitrary data in catalogs etc.
  */
-public interface CustomCacheProvider extends CacheProvider
+public interface GenericCache
 {
-    @Override
-    default Type getType()
-    {
-        return Type.CUSTOM;
-    }
-
     /**
      * Compute or get cached value
      *

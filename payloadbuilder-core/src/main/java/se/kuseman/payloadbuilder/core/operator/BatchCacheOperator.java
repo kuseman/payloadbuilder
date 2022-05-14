@@ -28,7 +28,7 @@ import se.kuseman.payloadbuilder.api.operator.IOrdinalValues;
 import se.kuseman.payloadbuilder.api.operator.Operator;
 import se.kuseman.payloadbuilder.api.operator.Tuple;
 import se.kuseman.payloadbuilder.core.QuerySession;
-import se.kuseman.payloadbuilder.core.cache.BatchCacheProvider;
+import se.kuseman.payloadbuilder.core.cache.BatchCache;
 
 /**
  * <pre>
@@ -128,11 +128,11 @@ class BatchCacheOperator extends AOperator
         Object cacheKey = settings.cacheKeyExpression != null ? settings.cacheKeyExpression.apply(context)
                 : null;
 
-        BatchCacheProvider cacheProvider = context.getSession()
-                .getBatchCacheProvider();
+        BatchCache cache = context.getSession()
+                .getBatchCache();
         QualifiedName cacheName = QualifiedName.of(obj);
-        Map<CacheKey, List<Tuple>> cachedValues = cacheProvider.getAll(cacheName, getCacheKeyIterable(context, cacheKey));
-        TupleIterator it2 = getAndCache(context, readOnly, cacheProvider, cacheName, cacheKey, ttl, cachedValues);
+        Map<CacheKey, List<Tuple>> cachedValues = cache.getAll(cacheName, getCacheKeyIterable(context, cacheKey));
+        TupleIterator it2 = getAndCache(context, readOnly, cache, cacheName, cacheKey, ttl, cachedValues);
 
         final Iterator<Entry<CacheKey, List<Tuple>>> it1 = cachedValues.entrySet()
                 .iterator();
@@ -221,7 +221,7 @@ class BatchCacheOperator extends AOperator
     }
 
     /** Get and cache values from down stream operator */
-    private TupleIterator getAndCache(ExecutionContext context, boolean readOnly, BatchCacheProvider cacheProvider, QualifiedName cacheName, Object cacheKey, Duration ttl,
+    private TupleIterator getAndCache(ExecutionContext context, boolean readOnly, BatchCache cache, QualifiedName cacheName, Object cacheKey, Duration ttl,
             Map<CacheKey, List<Tuple>> cachedValues)
     {
         // Put a non cached outer values iterator to context
@@ -262,7 +262,7 @@ class BatchCacheOperator extends AOperator
             }
         }
 
-        cacheProvider.putAll(cacheName, values, ttl);
+        cache.putAll(cacheName, values, ttl);
 
         final Iterator<Entry<CacheKey, List<Tuple>>> valuesIt = values.entrySet()
                 .iterator();

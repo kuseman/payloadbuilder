@@ -23,7 +23,7 @@ import se.kuseman.payloadbuilder.api.operator.Operator;
 import se.kuseman.payloadbuilder.api.operator.Operator.TupleIterator;
 import se.kuseman.payloadbuilder.api.operator.Row;
 import se.kuseman.payloadbuilder.api.operator.Tuple;
-import se.kuseman.payloadbuilder.core.cache.BatchCacheProvider;
+import se.kuseman.payloadbuilder.core.cache.BatchCache;
 import se.kuseman.payloadbuilder.core.operator.BatchCacheOperator.CacheSettings;
 import se.kuseman.payloadbuilder.core.operator.ExpressionOrdinalValuesFactory.OrdinalValues;
 
@@ -39,7 +39,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
     public void test_bad_cache_name_expression()
     {
         context.getSession()
-                .setBatchCacheProvider(new TestCacheProvider());
+                .setBatchCache(new TestCache());
         new BatchCacheOperator(1, op1(ctx -> TupleIterator.EMPTY), new ExpressionOrdinalValuesFactory(asList(e("a.col"))), new CacheSettings(ctx -> null, ctx -> asList(1, "const"), ctx -> "PT10m"))
                 .open(new ExecutionContext(session));
     }
@@ -48,8 +48,8 @@ public class BatchCacheOperatorTest extends AOperatorTest
     public void test()
     {
         final MutableBoolean closeCalled = new MutableBoolean(false);
-        TestCacheProvider cacheProvider = new TestCacheProvider();
-        session.setBatchCacheProvider(cacheProvider);
+        TestCache cache = new TestCache();
+        session.setBatchCache(cache);
 
         // Prepare outer values for cache/downstream
         context.getStatementContext()
@@ -112,9 +112,9 @@ public class BatchCacheOperatorTest extends AOperatorTest
             count++;
         }
 
-        assertEquals(4, cacheProvider.cache.get("test_article")
+        assertEquals(4, cache.cache.get("test_article")
                 .size());
-        assertEquals(Duration.of(10, ChronoUnit.MINUTES), cacheProvider.ttl);
+        assertEquals(Duration.of(10, ChronoUnit.MINUTES), cache.ttl);
         assertTrue(closeCalled.booleanValue());
 
         assertEquals(4, count);
@@ -125,8 +125,8 @@ public class BatchCacheOperatorTest extends AOperatorTest
     {
         final MutableInt operatorCalls = new MutableInt(0);
 
-        TestCacheProvider cacheProvider = new TestCacheProvider();
-        session.setBatchCacheProvider(cacheProvider);
+        TestCache cache = new TestCache();
+        session.setBatchCache(cache);
 
         ExecutionContext context = new ExecutionContext(session);
         context.setVariable("param", "some-value");
@@ -191,15 +191,15 @@ public class BatchCacheOperatorTest extends AOperatorTest
             count++;
         }
 
-        assertEquals(4, cacheProvider.cache.get("test_article")
+        assertEquals(4, cache.cache.get("test_article")
                 .size());
-        assertEquals(Duration.of(10, ChronoUnit.MINUTES), cacheProvider.ttl);
+        assertEquals(Duration.of(10, ChronoUnit.MINUTES), cache.ttl);
         assertEquals(1, operatorCalls.intValue());
         assertEquals(3, count);
 
         // Open once again, and down stream op should not be called again
         it = op.open(context);
-        assertEquals(4, cacheProvider.cache.get("test_article")
+        assertEquals(4, cache.cache.get("test_article")
                 .size());
         assertEquals(1, operatorCalls.intValue());
     }
@@ -207,12 +207,12 @@ public class BatchCacheOperatorTest extends AOperatorTest
     @Test
     public void test_with_partial_cached_data()
     {
-        TestCacheProvider cacheProvider = new TestCacheProvider();
-        Map<Object, List<Tuple>> cache = new HashMap<>();
-        cacheProvider.cache.put("test_inner", cache);
-        cache.put(new BatchCacheOperator.CacheKey("value", new OrdinalValues(new Object[] { 2 })), asList(Row.of(inner, new Object[] { 20, 2 })));
+        TestCache cache = new TestCache();
+        Map<Object, List<Tuple>> cacheMap = new HashMap<>();
+        cache.cache.put("test_inner", cacheMap);
+        cacheMap.put(new BatchCacheOperator.CacheKey("value", new OrdinalValues(new Object[] { 2 })), asList(Row.of(inner, new Object[] { 20, 2 })));
 
-        session.setBatchCacheProvider(cacheProvider);
+        session.setBatchCache(cache);
 
         ExecutionContext context = new ExecutionContext(session);
 
@@ -260,7 +260,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
 
         BatchCacheOperator op = new BatchCacheOperator(1, downstream, new ExpressionOrdinalValuesFactory(asList(e("b.col", inner))), new CacheSettings(ctx -> "inner", ctx -> "value", ctx -> null));
         TupleIterator it = op.open(context);
-        assertEquals(4, cache.size());
+        assertEquals(4, cacheMap.size());
 
         // First the cache value, then the 3 down stream tuples
         int[] expectedInnerValues = new int[] { 2, 1, 3, 4 };
@@ -278,16 +278,16 @@ public class BatchCacheOperatorTest extends AOperatorTest
     @Test
     public void test_with_full_cached_data()
     {
-        TestCacheProvider cacheProvider = new TestCacheProvider();
+        TestCache cache = new TestCache();
 
-        Map<Object, List<Tuple>> cache = new HashMap<>();
-        cacheProvider.cache.put("test_inner", cache);
-        cache.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new OrdinalValues(new Object[] { 1 })), asList(Row.of(inner, new Object[] { 0, 1 })));
-        cache.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new OrdinalValues(new Object[] { 2 })), asList(Row.of(inner, new Object[] { 10, 2 })));
-        cache.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new OrdinalValues(new Object[] { 3 })), asList(Row.of(inner, new Object[] { 20, 3 })));
-        cache.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new OrdinalValues(new Object[] { 4 })), asList(Row.of(inner, new Object[] { 30, 4 })));
+        Map<Object, List<Tuple>> cacheMap = new HashMap<>();
+        cache.cache.put("test_inner", cacheMap);
+        cacheMap.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new OrdinalValues(new Object[] { 1 })), asList(Row.of(inner, new Object[] { 0, 1 })));
+        cacheMap.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new OrdinalValues(new Object[] { 2 })), asList(Row.of(inner, new Object[] { 10, 2 })));
+        cacheMap.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new OrdinalValues(new Object[] { 3 })), asList(Row.of(inner, new Object[] { 20, 3 })));
+        cacheMap.put(new BatchCacheOperator.CacheKey(asList(1, "const"), new OrdinalValues(new Object[] { 4 })), asList(Row.of(inner, new Object[] { 30, 4 })));
 
-        session.setBatchCacheProvider(cacheProvider);
+        session.setBatchCache(cache);
 
         ExecutionContext context = new ExecutionContext(session);
         context.setVariable("param", "some-value");
@@ -316,7 +316,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
         BatchCacheOperator op = new BatchCacheOperator(1, downstream, new ExpressionOrdinalValuesFactory(asList(e("b.col", inner))),
                 new CacheSettings(ctx -> "inner", ctx -> asList(1, "const"), ctx -> null));
         TupleIterator it = op.open(context);
-        assertEquals(4, cache.size());
+        assertEquals(4, cacheMap.size());
         int[] expectedInnerValues = new int[] { 1, 2, 3, 4 };
         int count = 0;
         while (it.hasNext())
@@ -330,7 +330,7 @@ public class BatchCacheOperatorTest extends AOperatorTest
     }
 
     /** Test provider */
-    static class TestCacheProvider implements BatchCacheProvider
+    static class TestCache implements BatchCache
     {
         Map<String, Map<Object, List<Tuple>>> cache = new HashMap<>();
         Duration ttl;

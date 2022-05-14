@@ -1,4 +1,4 @@
-package se.kuseman.payloadbuilder.api.session;
+package se.kuseman.payloadbuilder.core.cache;
 
 import static java.util.Collections.emptyList;
 
@@ -7,14 +7,11 @@ import java.util.List;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 
-/** Base for cache provider */
-public interface CacheProvider
+/** Base definition of a cache */
+public interface Cache
 {
     /** Name of the provider */
     String getName();
-
-    /** Get type of provider */
-    Type getType();
 
     /** Return cache infos for this cache provider */
     default List<CacheInfo> getCaches()
@@ -46,51 +43,6 @@ public interface CacheProvider
 
     /** Remove cache with provided name from this provider */
     void remove(QualifiedName name);
-
-    /** Cache type */
-    enum Type
-    {
-        BATCH,
-        TEMPTABLE,
-        CUSTOM
-    }
-
-    /** Cache info */
-    class CacheInfo
-    {
-        private final QualifiedName name;
-        private final int size;
-        private final int cacheHits;
-        private final int cacheMisses;
-
-        public CacheInfo(QualifiedName name, int size, int cacheHits, int cacheMisses)
-        {
-            this.name = name;
-            this.size = size;
-            this.cacheHits = cacheHits;
-            this.cacheMisses = cacheMisses;
-        }
-
-        public QualifiedName getName()
-        {
-            return name;
-        }
-
-        public int getSize()
-        {
-            return size;
-        }
-
-        public int getCacheHits()
-        {
-            return cacheHits;
-        }
-
-        public int getCacheMisses()
-        {
-            return cacheMisses;
-        }
-    }
 
     /** Info about a cache entry */
     class CacheEntryInfo

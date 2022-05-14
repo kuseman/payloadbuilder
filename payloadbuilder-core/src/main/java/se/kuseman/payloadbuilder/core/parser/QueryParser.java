@@ -39,7 +39,7 @@ import se.kuseman.payloadbuilder.api.TableAlias.TableAliasBuilder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
-import se.kuseman.payloadbuilder.api.session.CacheProvider;
+import se.kuseman.payloadbuilder.core.cache.CacheType;
 import se.kuseman.payloadbuilder.core.parser.Apply.ApplyType;
 import se.kuseman.payloadbuilder.core.parser.CaseExpression.WhenClause;
 import se.kuseman.payloadbuilder.core.parser.Join.JoinType;
@@ -97,14 +97,12 @@ public class QueryParser
     public QueryStatement parseQuery(String query)
     {
         return getTree(query, p -> p.query());
-        // return StatementResolver.resolve(statement, session);
     }
 
     /** Parse select */
     public Select parseSelect(String query)
     {
         return getTree(query, p -> p.topSelect());
-        // return StatementResolver.resolve(select, session);
     }
 
     /** Parse expression */
@@ -112,14 +110,6 @@ public class QueryParser
     {
         return getTree(expression, p -> p.topExpression());
     }
-
-    // /** Parse expression */
-    // public Expression parseExpression(String expression, boolean resolve)
-    // {
-    // Expression expr = getTree(expression, p -> p.topExpression());
-    // return resolve ? StatementResolver.resolve(expr, session)
-    // : expr;
-    // }
 
     @SuppressWarnings("unchecked")
     private <T> T getTree(String body, Function<PayloadBuilderQueryParser, ParserRuleContext> function)
@@ -281,7 +271,7 @@ public class QueryParser
         @Override
         public Object visitFullCacheQualifier(FullCacheQualifierContext ctx)
         {
-            CacheProvider.Type type = CacheProvider.Type.valueOf(StringUtils.upperCase(getIdentifier(ctx.type)));
+            CacheType type = CacheType.valueOf(StringUtils.upperCase(getIdentifier(ctx.type)));
             QualifiedName cacheName = getQualifiedName(ctx.name);
             boolean isAll = ctx.all != null;
 
@@ -1106,7 +1096,7 @@ public class QueryParser
         /** Cache qualifier with type and name */
         private static class CacheQualifier
         {
-            CacheProvider.Type type;
+            CacheType type;
             QualifiedName name;
             boolean all;
         }

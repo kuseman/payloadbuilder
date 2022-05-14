@@ -18,14 +18,15 @@ import org.apache.commons.lang3.tuple.Pair;
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo;
-import se.kuseman.payloadbuilder.api.session.CacheProvider;
-import se.kuseman.payloadbuilder.api.session.CustomCacheProvider;
 import se.kuseman.payloadbuilder.api.session.IQuerySession;
-import se.kuseman.payloadbuilder.core.cache.BatchCacheProvider;
-import se.kuseman.payloadbuilder.core.cache.SessionBatchCacheProvider;
-import se.kuseman.payloadbuilder.core.cache.SessionCustomCacheProvider;
-import se.kuseman.payloadbuilder.core.cache.SessionTempTableCacheProvider;
-import se.kuseman.payloadbuilder.core.cache.TempTableCacheProvider;
+import se.kuseman.payloadbuilder.core.cache.BatchCache;
+import se.kuseman.payloadbuilder.core.cache.Cache;
+import se.kuseman.payloadbuilder.core.cache.CacheType;
+import se.kuseman.payloadbuilder.core.cache.GenericCache;
+import se.kuseman.payloadbuilder.core.cache.SessionBatchCache;
+import se.kuseman.payloadbuilder.core.cache.SessionGenericCache;
+import se.kuseman.payloadbuilder.core.cache.SessionTempTableCache;
+import se.kuseman.payloadbuilder.core.cache.TempTableCache;
 import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
 import se.kuseman.payloadbuilder.core.operator.TemporaryTable;
 import se.kuseman.payloadbuilder.core.parser.VariableExpression;
@@ -66,9 +67,9 @@ public class QuerySession implements IQuerySession
     private BooleanSupplier abortSupplier;
     private Map<QualifiedName, TemporaryTable> temporaryTables;
 
-    private BatchCacheProvider batchCacheProvider = new SessionBatchCacheProvider();
-    private TempTableCacheProvider tempTableCacheProvider = new SessionTempTableCacheProvider();
-    private CustomCacheProvider customCacheProvider = new SessionCustomCacheProvider();
+    private BatchCache batchCache = new SessionBatchCache();
+    private TempTableCache tempTableCache = new SessionTempTableCache();
+    private GenericCache genericCache = new SessionGenericCache();
 
     public QuerySession(CatalogRegistry catalogRegistry)
     {
@@ -308,65 +309,53 @@ public class QuerySession implements IQuerySession
     }
 
     /** Return batch cache provider */
-    public BatchCacheProvider getBatchCacheProvider()
+    public BatchCache getBatchCache()
     {
-        return batchCacheProvider;
+        return batchCache;
     }
 
-    /** Set batch cache provider */
-    public void setBatchCacheProvider(BatchCacheProvider batchCacheProvider)
+    /** Set batch cache */
+    public void setBatchCache(BatchCache batchCache)
     {
-        this.batchCacheProvider = requireNonNull(batchCacheProvider, "Cache provider cannot be null");
-        if (batchCacheProvider.getType() != CacheProvider.Type.BATCH)
-        {
-            throw new IllegalArgumentException("Wrong type of cache provider");
-        }
+        this.batchCache = requireNonNull(batchCache, "Cache cannot be null");
     }
 
-    /** Return temp table cache provider */
-    public TempTableCacheProvider getTempTableCacheProvider()
+    /** Return temp table cache */
+    public TempTableCache getTempTableCache()
     {
-        return tempTableCacheProvider;
+        return tempTableCache;
     }
 
-    /** Set temp table cache provider */
-    public void setTempTableCacheProvider(TempTableCacheProvider tempTableCacheProvider)
+    /** Set temp table cache */
+    public void setTempTableCache(TempTableCache tempTableCache)
     {
-        this.tempTableCacheProvider = requireNonNull(tempTableCacheProvider, "Cache provider cannot be null");
-        if (tempTableCacheProvider.getType() != CacheProvider.Type.TEMPTABLE)
-        {
-            throw new IllegalArgumentException("Wrong type of cache provider");
-        }
+        this.tempTableCache = requireNonNull(tempTableCache, "Cache cannot be null");
     }
 
-    /** Return custom cache provider */
+    /** Return generic cache */
     @Override
-    public CustomCacheProvider getCustomCacheProvider()
+    public GenericCache getGenericCache()
     {
-        return customCacheProvider;
+        return genericCache;
     }
 
-    /** Set custom cache provider */
-    public void setCustomCacheProvider(CustomCacheProvider customCacheProvider)
+    /** Set generic cache */
+    public void setGenericCache(GenericCache genericCache)
     {
-        this.customCacheProvider = requireNonNull(customCacheProvider, "Cache provider cannot be null");
-        if (customCacheProvider.getType() != CacheProvider.Type.CUSTOM)
-        {
-            throw new IllegalArgumentException("Wrong type of cache provider");
-        }
+        this.genericCache = requireNonNull(genericCache, "Cache cannot be null");
     }
 
-    /** Return cache provider with provided type */
-    public CacheProvider getCacheProvider(CacheProvider.Type type)
+    /** Return cache with provided type */
+    public Cache getCache(CacheType type)
     {
         switch (type)
         {
             case BATCH:
-                return batchCacheProvider;
+                return batchCache;
             case CUSTOM:
-                return customCacheProvider;
+                return genericCache;
             case TEMPTABLE:
-                return tempTableCacheProvider;
+                return tempTableCache;
             default:
                 throw new IllegalArgumentException("Unknown cache type " + type);
         }

@@ -7,7 +7,7 @@ import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.core.operator.TemporaryTable;
 
 /** Implementation of temp table cache that stores data in session */
-public class SessionTempTableCacheProvider extends ASessionCacheProvider<TemporaryTable> implements TempTableCacheProvider
+public class SessionTempTableCache extends ASessionCache<TemporaryTable> implements TempTableCache
 {
     @Override
     public TemporaryTable computIfAbsent(QualifiedName name, Object key, Duration ttl, final Supplier<TemporaryTable> supplier)
