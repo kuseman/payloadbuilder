@@ -221,8 +221,7 @@ class BatchCacheOperator extends AOperator
     }
 
     /** Get and cache values from down stream operator */
-    private TupleIterator getAndCache(ExecutionContext context, boolean readOnly, BatchCache cache, QualifiedName cacheName, Object cacheKey, Duration ttl,
-            Map<CacheKey, List<Tuple>> cachedValues)
+    private TupleIterator getAndCache(ExecutionContext context, boolean readOnly, BatchCache cache, QualifiedName cacheName, Object cacheKey, Duration ttl, Map<CacheKey, List<Tuple>> cachedValues)
     {
         // Put a non cached outer values iterator to context
         Iterator<IOrdinalValues> outerValuesIterator = getOuterValuesIterator(cachedValues);

@@ -9,7 +9,7 @@ public enum CacheType
 
     /**
      * Return cache type from provided provider.
-     * 
+     *
      * @return Type or null if no matching type could be found
      */
     public static CacheType from(Cache provider)
