@@ -162,7 +162,7 @@ class ESOperator extends AOperator
 
         boolean isSingleType = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(esType.type);
         final String searchUrl = getSearchUrl(esType.endpoint, esType.index, esType.type, 1000, 2, indexField);
-        String scrollUrl = getScrollUrl(esType.endpoint, esType.type, 2, indexField);
+        String scrollUrl = getScrollUrl(esType.endpoint, 2);
 
         boolean quoteValues = indexProperty == null
                 || indexProperty.shouldQuoteValues();
@@ -233,7 +233,7 @@ class ESOperator extends AOperator
     private TupleIterator getMgetIndexOperator(IExecutionContext context, ESType esType, Data data)
     {
         MutableBoolean doRequest = new MutableBoolean(true);
-        String mgetUrl = String.format("%s/%s/%s/_mget?filter_path=_scroll_id,hits.hits", esType.endpoint, esType.index, esType.type);
+        String mgetUrl = getMgetUrl(esType.endpoint, esType.index, esType.type);
         DocIdStreamingEntity entity = new DocIdStreamingEntity(indexPredicate, context, data);
         return getIterator(context, catalogAlias, tableAlias, esType.endpoint, ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(esType.type), data, scrollId ->
         {
@@ -250,20 +250,28 @@ class ESOperator extends AOperator
         });
     }
 
+    static String getMgetUrl(String endpoint, String index, String type)
+    {
+        StringUtils.requireNonBlank(endpoint, "endpoint is required");
+        StringUtils.requireNonBlank(index, "index is required");
+        StringUtils.requireNonBlank(type, "type is required");
+        return String.format("%s/%s/%s/_mget", endpoint, index, type);
+    }
+
     static String getSearchUrl(String endpoint, String index, String type, Integer size, Integer scrollMinutes, String indexField)
     {
         StringUtils.requireNonBlank(endpoint, "endpoint is required");
-        return String.format("%s/%s%s/_search?%s%s&filter_path=_scroll_id,hits.hits", endpoint, isBlank(index) ? "*"
+        return String.format("%s/%s%s/_search?filter_path=_scroll_id,hits.hits%s%s", endpoint, isBlank(index) ? "*"
                 : index,
                 isBlank(type) ? ""
                         : ("/" + type),
-                scrollMinutes != null ? ("scroll=" + scrollMinutes + "m")
+                scrollMinutes != null ? ("&scroll=" + scrollMinutes + "m")
                         : "",
                 size != null ? ("&size=" + size)
                         : "");
     }
 
-    static String getScrollUrl(String endpoint, String type, int scrollMinutes, String indexField)
+    static String getScrollUrl(String endpoint, int scrollMinutes)
     {
         StringUtils.requireNonBlank(endpoint, "endpoint is required");
         return String.format("%s/_search/scroll?scroll=%dm&filter_path=_scroll_id,hits.hits", endpoint, scrollMinutes);
@@ -377,10 +385,22 @@ class ESOperator extends AOperator
                             if (response.getStatusLine()
                                     .getStatusCode() != HttpStatus.SC_OK)
                             {
-                                throw new RuntimeException("Error query Elastic. Status: " + response.getStatusLine()
-                                                           + ". "
-                                                           + IOUtils.toString(response.getEntity()
-                                                                   .getContent(), StandardCharsets.UTF_8));
+                                String body = IOUtils.toString(response.getEntity()
+                                        .getContent(), StandardCharsets.UTF_8);
+
+                                try
+                                {
+                                    // Try to parse and format json error
+                                    Object parsedBody = MAPPER.readValue(body, Object.class);
+                                    body = MAPPER.writerWithDefaultPrettyPrinter()
+                                            .writeValueAsString(parsedBody);
+                                }
+                                catch (IOException e)
+                                {
+                                    // SWALLOW
+                                }
+
+                                throw new RuntimeException("Error query Elastic. Status: " + response.getStatusLine() + "." + System.lineSeparator() + body);
                             }
                             CountingInputStream cis = new CountingInputStream(entity.getContent());
                             esReponse = READER.readValue(cis);

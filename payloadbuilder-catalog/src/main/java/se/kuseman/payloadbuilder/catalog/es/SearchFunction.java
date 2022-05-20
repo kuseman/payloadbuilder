@@ -187,7 +187,7 @@ class SearchFunction extends TableFunctionInfo
                         scroll ? 2
                                 : null,
                         null);
-        final String scrollUrl = scroll ? ESOperator.getScrollUrl(endpoint, type, 2, null)
+        final String scrollUrl = scroll ? ESOperator.getScrollUrl(endpoint, 2)
                 : null;
 
         AtomicLong sentBytes = new AtomicLong();
