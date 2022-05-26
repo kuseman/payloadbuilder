@@ -483,7 +483,7 @@ class BatchCacheOperator extends AOperator
         if (obj instanceof BatchCacheOperator)
         {
             BatchCacheOperator that = (BatchCacheOperator) obj;
-            return nodeId == that.nodeId
+            return nodeId.equals(that.nodeId)
                     && operator.equals(that.operator)
                     && settings.equals(that.settings);
         }

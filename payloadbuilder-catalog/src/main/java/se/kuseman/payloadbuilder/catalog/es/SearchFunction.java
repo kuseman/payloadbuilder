@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
+import org.apache.http.HttpHeaders;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 
@@ -193,6 +194,7 @@ class SearchFunction extends TableFunctionInfo
         AtomicLong sentBytes = new AtomicLong();
         String actualBody = getBody(body, template, defaultIfBlank(params, "{}"));
         MutableBoolean doRequest = new MutableBoolean(true);
+        boolean isSingleType = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(type);
         return ESOperator.getIterator(context, catalogAlias, tableAlias, endpoint, ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(type), new ESOperator.Data(), scrollId ->
         {
             if (doRequest.getValue())
@@ -208,7 +210,15 @@ class SearchFunction extends TableFunctionInfo
                 String id = scrollId.getValue();
                 scrollId.setValue(null);
                 HttpPost post = new HttpPost(scrollUrl);
-                post.setEntity(new StringEntity(id, UTF_8));
+                if (isSingleType)
+                {
+                    post.setEntity(new StringEntity("{\"scroll_id\":\"" + id + "\" }", UTF_8));
+                }
+                else
+                {
+                    post.removeHeaders(HttpHeaders.CONTENT_TYPE);
+                    post.setEntity(new StringEntity(id, UTF_8));
+                }
                 return post;
             }
 
@@ -216,15 +226,14 @@ class SearchFunction extends TableFunctionInfo
         });
     }
 
-    private static String getSearchTemplateUrl(String endpoint, String index, String type, Integer size, Integer scrollMinutes)
+    static String getSearchTemplateUrl(String endpoint, String index, String type, Integer size, Integer scrollMinutes)
     {
-        // boolean isSingleType = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(type);
         StringUtils.requireNonBlank(endpoint, "endpoint is required");
-        return String.format("%s/%s/%s_search/template?%s&filter_path=_scroll_id,hits.hits", endpoint, isBlank(index) ? "*"
+        return String.format("%s/%s/%s_search/template?filter_path=_scroll_id,hits.hits%s%s", endpoint, isBlank(index) ? "*"
                 : index,
                 isBlank(type) ? ""
                         : (type + "/"),
-                scrollMinutes != null ? ("scroll=" + scrollMinutes + "m")
+                scrollMinutes != null ? ("&scroll=" + scrollMinutes + "m")
                         : "",
                 size != null ? ("&size=" + size)
                         : "");

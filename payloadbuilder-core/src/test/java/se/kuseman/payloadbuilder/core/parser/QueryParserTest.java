@@ -16,6 +16,24 @@ import se.kuseman.payloadbuilder.core.parser.QualifiedReferenceExpression.Resolv
 public class QueryParserTest extends AParserTest
 {
     @Test
+    public void test_backtick()
+    {
+        assertExpression("'hello'+`world ${a+b}`",
+                new ArithmeticBinaryExpression(Type.ADD, LiteralStringExpression.create("hello"),
+                        new TemplateStringExpression(asList(new LiteralStringExpression("world "), new ArithmeticBinaryExpression(Type.ADD,
+                                new UnresolvedQualifiedReferenceExpression(QualifiedName.of("a"), -1, null), new UnresolvedQualifiedReferenceExpression(QualifiedName.of("b"), -1, null))))));
+
+        // Test nested back tick
+        assertExpression("`hello ${a+` world ${b}`}`",
+                new TemplateStringExpression(
+                        asList(new LiteralStringExpression("hello "), new ArithmeticBinaryExpression(Type.ADD, new UnresolvedQualifiedReferenceExpression(QualifiedName.of("a"), -1, null),
+                                new TemplateStringExpression(asList(new LiteralStringExpression(" world "), new UnresolvedQualifiedReferenceExpression(QualifiedName.of("b"), -1, null)))))));
+
+        assertExpression("`hello`", new LiteralStringExpression("hello"));
+        assertExpression("`${'hello'}`", new LiteralStringExpression("hello"));
+    }
+
+    @Test
     public void test_set()
     {
         assertQuery("set @var = 10");

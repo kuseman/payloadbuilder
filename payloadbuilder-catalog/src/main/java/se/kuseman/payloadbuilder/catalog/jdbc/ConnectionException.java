@@ -5,7 +5,7 @@ import java.sql.SQLException;
 import se.kuseman.payloadbuilder.api.catalog.CatalogException;
 
 /** Connection exception thrown for when an connection couldn't be created */
-class ConnectionException extends CatalogException
+public class ConnectionException extends CatalogException
 {
     private final SQLException exception;
 

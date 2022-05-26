@@ -1064,7 +1064,7 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
     /**
      * Detects correlated queries by analyzing qualified expression references in child join to see if any aliases from outer context is referenced.
      */
-    private class CorrelatedDetector extends AStatementVisitor<Void, Set<Integer>>
+    private static class CorrelatedDetector extends AStatementVisitor<Void, Set<Integer>>
     {
         private final AExpressionVisitor<Void, Set<Integer>> expressionVisitor = new AExpressionVisitor<Void, Set<Integer>>()
         {

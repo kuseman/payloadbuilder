@@ -157,16 +157,18 @@ class DatePartFunction extends ScalarFunctionInfo
         NANOSECOND(ChronoField.NANO_OF_SECOND),
         NS(NANOSECOND);
 
-        ChronoField chronoField;
-        Part abbreviationFor;
+        final ChronoField chronoField;
+        final Part abbreviationFor;
 
         Part(Part abbreviationFor)
         {
             this.abbreviationFor = abbreviationFor;
+            this.chronoField = null;
         }
 
         Part(ChronoField chronoField)
         {
+            this.abbreviationFor = null;
             this.chronoField = chronoField;
         }
 

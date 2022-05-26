@@ -120,7 +120,7 @@ public class RootProjection implements Projection
             Projection projection = projections[i];
 
             // An asterisk selection has no column so skip
-            if (!(projection.isAsterisk()))
+            if (!projection.isAsterisk())
             {
                 writer.writeFieldName(columns[i]);
             }

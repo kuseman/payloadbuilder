@@ -105,7 +105,7 @@ class SubQueryExpressionOperator extends AOperator
         if (obj instanceof SubQueryExpressionOperator)
         {
             SubQueryExpressionOperator that = (SubQueryExpressionOperator) obj;
-            return nodeId == that.nodeId
+            return nodeId.equals(that.nodeId)
                     && target.equals(that.target);
         }
         return super.equals(obj);

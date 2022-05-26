@@ -496,7 +496,7 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
             this.sourceTupleOrdinal = sourceTupleOrdinal;
             this.targetTupleOrdinal = targetTupleOrdinal;
             this.unresolvedPath = requireNonNull(unresolvedPath, "unresolvedPath").toArray(ArrayUtils.EMPTY_STRING_ARRAY);
-            this.columnOrdinal = requireNonNull(columnOrdinal, "columnOrdinal");
+            this.columnOrdinal = columnOrdinal;
             this.columnType = columnType != null ? columnType
                     : DataType.ANY;
             this.subPath = subPath != null ? subPath

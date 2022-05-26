@@ -77,7 +77,7 @@ class FilterOperator extends AOperator
         if (obj instanceof FilterOperator)
         {
             FilterOperator that = (FilterOperator) obj;
-            return nodeId == that.nodeId
+            return nodeId.equals(that.nodeId)
                     && operator.equals(that.operator)
                     && predicate.equals(that.predicate);
         }

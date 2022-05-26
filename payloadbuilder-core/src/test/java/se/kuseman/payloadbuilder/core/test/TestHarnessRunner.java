@@ -17,8 +17,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 
-import junit.textui.TestRunner;
-
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Assert;
@@ -66,7 +64,7 @@ public class TestHarnessRunner
         for (String file : testFiles)
         {
             String resource = "/harnessCases/" + file;
-            InputStream stream = TestRunner.class.getResourceAsStream(resource);
+            InputStream stream = TestHarnessRunner.class.getResourceAsStream(resource);
             if (stream == null)
             {
                 Assert.fail("No harness resouce found: " + resource);

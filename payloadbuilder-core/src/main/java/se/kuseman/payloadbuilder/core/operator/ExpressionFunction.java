@@ -5,7 +5,6 @@ import static java.util.Objects.requireNonNull;
 import java.util.function.Function;
 
 import se.kuseman.payloadbuilder.core.codegen.BaseFunction;
-import se.kuseman.payloadbuilder.core.codegen.BasePredicate;
 import se.kuseman.payloadbuilder.core.parser.Expression;
 
 /** Function that operates over an expression */
@@ -40,7 +39,7 @@ class ExpressionFunction implements Function<ExecutionContext, Object>
         else if (obj instanceof BaseFunction)
         {
             // Equal against BaseFunction to get easier test code
-            return expression.equals(((BasePredicate) obj).getExpression());
+            return expression.equals(((BaseFunction) obj).getExpression());
         }
         return false;
     }

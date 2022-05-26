@@ -40,11 +40,11 @@ public class JdbcCatalog extends Catalog
 {
     private static final int BATCH_SIZE = 500;
     public static final String NAME = "JdbcCatalog";
-    static final String DRIVER_CLASSNAME = "driverclassname";
-    static final String URL = "url";
-    static final String USERNAME = "username";
-    static final String PASSWORD = "password";
-    static final String DATABASE = "database";
+    public static final String DRIVER_CLASSNAME = "driverclassname";
+    public static final String URL = "url";
+    public static final String USERNAME = "username";
+    public static final String PASSWORD = "password";
+    public static final String DATABASE = "database";
 
     private final Map<String, HikariDataSource> dataSourceByURL = new ConcurrentHashMap<>();
 

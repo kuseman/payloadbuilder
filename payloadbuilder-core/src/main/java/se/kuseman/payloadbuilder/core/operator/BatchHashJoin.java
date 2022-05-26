@@ -30,9 +30,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.lang3.time.StopWatch;
 
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-
 import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.operator.AOperator;
 import se.kuseman.payloadbuilder.api.operator.DescribableNode;
@@ -42,6 +39,9 @@ import se.kuseman.payloadbuilder.api.operator.NodeData;
 import se.kuseman.payloadbuilder.api.operator.Operator;
 import se.kuseman.payloadbuilder.api.operator.Tuple;
 import se.kuseman.payloadbuilder.core.parser.Option;
+
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 
 /**
  * <pre>
@@ -497,7 +497,7 @@ class BatchHashJoin extends AOperator
         if (obj instanceof BatchHashJoin)
         {
             BatchHashJoin that = (BatchHashJoin) obj;
-            return nodeId == that.nodeId
+            return nodeId.equals(that.nodeId)
                     && logicalOperator.equals(that.logicalOperator)
                     && outer.equals(that.outer)
                     && inner.equals(that.inner)

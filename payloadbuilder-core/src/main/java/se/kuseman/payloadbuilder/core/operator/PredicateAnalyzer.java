@@ -284,7 +284,7 @@ public class PredicateAnalyzer
         {
             if (type == Type.COMPARISION)
             {
-                return new ComparisonExpression(to(comparisonType), left.expression, right.expression);
+                return new ComparisonExpression(comparisonType, left.expression, right.expression);
             }
             else if (type == Type.NOT_NULL
                     || type == Type.NULL)
@@ -575,7 +575,7 @@ public class PredicateAnalyzer
 
                 if (!sameAlias)
                 {
-                    return new AnalyzePair(IAnalyzePair.Type.COMPARISION, from(ce.getType()), leftItem, rightItem);
+                    return new AnalyzePair(IAnalyzePair.Type.COMPARISION, ce.getType(), leftItem, rightItem);
                 }
             }
             else if (expression instanceof NullPredicateExpression)
@@ -627,7 +627,7 @@ public class PredicateAnalyzer
                 // Turn this into a comparison expression
                 // ie. active_flg = true
 
-                return AnalyzePair.of(tableAlias, new ComparisonExpression(ComparisonExpression.Type.EQUAL, expression, LiteralBooleanExpression.TRUE_LITERAL));
+                return AnalyzePair.of(tableAlias, new ComparisonExpression(IComparisonExpression.Type.EQUAL, expression, LiteralBooleanExpression.TRUE_LITERAL));
             }
             else if (expression instanceof LogicalNotExpression
                     && ((LogicalNotExpression) expression).getExpression() instanceof QualifiedReferenceExpression)
@@ -636,7 +636,7 @@ public class PredicateAnalyzer
                 // Turn this into a comparison expression
                 // ie. not active_flg
                 return AnalyzePair.of(tableAlias,
-                        new ComparisonExpression(ComparisonExpression.Type.EQUAL, ((LogicalNotExpression) expression).getExpression(), LiteralBooleanExpression.FALSE_LITERAL));
+                        new ComparisonExpression(IComparisonExpression.Type.EQUAL, ((LogicalNotExpression) expression).getExpression(), LiteralBooleanExpression.FALSE_LITERAL));
             }
 
             Set<String> aliases = new HashSet<>();
@@ -697,48 +697,6 @@ public class PredicateAnalyzer
         }
     }
 
-    static IComparisonExpression.Type from(ComparisonExpression.Type type)
-    {
-        switch (type)
-        {
-            case EQUAL:
-                return IComparisonExpression.Type.EQUAL;
-            case GREATER_THAN:
-                return IComparisonExpression.Type.GREATER_THAN;
-            case GREATER_THAN_EQUAL:
-                return IComparisonExpression.Type.GREATER_THAN_EQUAL;
-            case LESS_THAN:
-                return IComparisonExpression.Type.LESS_THAN;
-            case LESS_THAN_EQUAL:
-                return IComparisonExpression.Type.LESS_THAN_EQUAL;
-            case NOT_EQUAL:
-                return IComparisonExpression.Type.NOT_EQUAL;
-            default:
-                throw new IllegalArgumentException("Unkown type " + type);
-        }
-    }
-
-    static ComparisonExpression.Type to(IComparisonExpression.Type type)
-    {
-        switch (type)
-        {
-            case EQUAL:
-                return ComparisonExpression.Type.EQUAL;
-            case GREATER_THAN:
-                return ComparisonExpression.Type.GREATER_THAN;
-            case GREATER_THAN_EQUAL:
-                return ComparisonExpression.Type.GREATER_THAN_EQUAL;
-            case LESS_THAN:
-                return ComparisonExpression.Type.LESS_THAN;
-            case LESS_THAN_EQUAL:
-                return ComparisonExpression.Type.LESS_THAN_EQUAL;
-            case NOT_EQUAL:
-                return ComparisonExpression.Type.NOT_EQUAL;
-            default:
-                throw new IllegalArgumentException("Unkown type " + type);
-        }
-    }
-
     /** Analyzed item in a pair */
     public static class AnalyzeItem
     {
@@ -748,7 +706,7 @@ public class PredicateAnalyzer
         final Set<String> aliases;
 
         /**
-         * Qualified name (if any) referenced by this item If set then {@link #alias} is omitted from qname.
+         * Qualified name (if any).
          **/
         private final QualifiedName qname;
 

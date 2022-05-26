@@ -1,12 +1,13 @@
 package se.kuseman.payloadbuilder.core.operator;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Stack;
 
 import org.apache.commons.collections4.IteratorUtils;
 
@@ -18,7 +19,7 @@ import se.kuseman.payloadbuilder.api.OutputWriter;
 /** Output writer that builds an internal object structure with values/lists/maps */
 public abstract class AObjectOutputWriter implements OutputWriter
 {
-    private final Stack<Object> complextValueStack = new Stack<>();
+    private final Deque<Object> complexValueStack = new ArrayDeque<>();
     private List<ColumnValue> row;
     private String column;
     private boolean rootObject = true;
@@ -31,7 +32,7 @@ public abstract class AObjectOutputWriter implements OutputWriter
     {
         rootObject = true;
         row = new ArrayList<>();
-        complextValueStack.clear();
+        complexValueStack.clear();
     }
 
     @Override
@@ -52,13 +53,13 @@ public abstract class AObjectOutputWriter implements OutputWriter
         Object result = unwrap(value);
 
         // Root
-        if (complextValueStack.size() == 0)
+        if (complexValueStack.size() == 0)
         {
             row.add(new ColumnValue(column, result));
             return;
         }
 
-        appendToComplextValue(complextValueStack.peek(), column, result);
+        appendToComplextValue(complexValueStack.peekFirst(), column, result);
     }
 
     @Override
@@ -71,9 +72,10 @@ public abstract class AObjectOutputWriter implements OutputWriter
             return;
         }
 
-        Object complexValue = complextValueStack.size() > 0 ? complextValueStack.peek()
+        Object complexValue = complexValueStack.size() > 0 ? complexValueStack.peekFirst()
                 : null;
-        Object object = complextValueStack.push(new LinkedHashMap<>());
+        Object object = new LinkedHashMap<>();
+        complexValueStack.addFirst(object);
         // This was the added on root add it to result
         if (complexValue == null)
         {
@@ -88,18 +90,19 @@ public abstract class AObjectOutputWriter implements OutputWriter
     @Override
     public void endObject()
     {
-        if (complextValueStack.size() > 0)
+        if (complexValueStack.size() > 0)
         {
-            complextValueStack.pop();
+            complexValueStack.removeFirst();
         }
     }
 
     @Override
     public void startArray()
     {
-        Object complexValue = complextValueStack.size() > 0 ? complextValueStack.peek()
+        Object complexValue = complexValueStack.size() > 0 ? complexValueStack.peekFirst()
                 : null;
-        Object object = complextValueStack.push(new ArrayList<>());
+        Object object = new ArrayList<>();
+        complexValueStack.addFirst(object);
         // This was the added on root add it to result
         if (complexValue == null)
         {
@@ -114,7 +117,7 @@ public abstract class AObjectOutputWriter implements OutputWriter
     @Override
     public void endArray()
     {
-        complextValueStack.pop();
+        complexValueStack.pop();
     }
 
     @SuppressWarnings("unchecked")

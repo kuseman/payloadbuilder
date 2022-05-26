@@ -73,7 +73,7 @@ class CachingOperator extends AOperator
         if (obj instanceof CachingOperator)
         {
             CachingOperator that = (CachingOperator) obj;
-            return nodeId == that.nodeId
+            return nodeId.equals(that.nodeId)
                     && operator.equals(that.operator);
         }
         return super.equals(obj);

@@ -1,5 +1,6 @@
 package se.kuseman.payloadbuilder.catalog.es;
 
+import static org.apache.commons.lang3.StringUtils.defaultString;
 import static se.kuseman.payloadbuilder.catalog.es.HttpClientUtils.execute;
 
 import java.nio.charset.StandardCharsets;
@@ -130,14 +131,19 @@ class CatFunction extends TableFunctionInfo
                 .iterator());
     }
 
-    private String getCatUrl(String endpoint, String catspec)
+    static String getCatUrl(String endpoint, String catspec)
     {
         URIBuilder builder = ESUtils.uriBuilder(endpoint);
+        String existingPath = defaultString(builder.getPath(), "");
+        if (!existingPath.endsWith("/"))
+        {
+            existingPath = existingPath + "/";
+        }
         int index = catspec.indexOf("?");
         if (index >= 0)
         {
             // indices?s=doc.count&
-            builder.setPath("_cat/" + catspec.substring(0, index));
+            builder.setPath(existingPath + "_cat/" + catspec.substring(0, index));
             String catargs = catspec.substring(index + 1);
             String[] args = catargs.split("&");
             for (String arg : args)
@@ -149,7 +155,7 @@ class CatFunction extends TableFunctionInfo
         }
         else
         {
-            builder.setPath("_cat/" + catspec);
+            builder.setPath(existingPath + "_cat/" + catspec);
         }
         builder.addParameter("format", "json");
         return ESUtils.toUrl(builder);

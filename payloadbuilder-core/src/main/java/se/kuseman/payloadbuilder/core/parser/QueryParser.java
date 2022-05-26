@@ -36,6 +36,7 @@ import org.apache.commons.lang3.StringUtils;
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.TableAlias;
 import se.kuseman.payloadbuilder.api.TableAlias.TableAliasBuilder;
+import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
@@ -83,6 +84,8 @@ import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableName
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceJoinedContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceOptionContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.TemplateStringAtomContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.TemplateStringLiteralContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.TopCountContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.TopExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.TopSelectContext;
@@ -156,7 +159,7 @@ public class QueryParser
     }
 
     /** Builds tree */
-    private static class AstBuilder extends PayloadBuilderQueryBaseVisitor<Object>
+    private static class AstBuilder extends PayloadBuilderQueryParserBaseVisitor<Object>
     {
         /** Lambda parameters and slot id in current scope */
         private final Map<String, Integer> lambdaParameters = new HashMap<>();
@@ -396,7 +399,7 @@ public class QueryParser
                     .map(si -> getSortItem(si))
                     .collect(toList())
                     : emptyList();
-            Select.For forOutput = ctx.forClause() != null ? (Select.For.valueOf(upperCase(ctx.forClause().output.getText())))
+            Select.For forOutput = ctx.forClause() != null ? Select.For.valueOf(upperCase(ctx.forClause().output.getText()))
                     : null;
 
             Select select = new Select(selectItems, from, into, topExpression, where, groupBy, orderBy, forOutput, emptyList());
@@ -669,7 +672,7 @@ public class QueryParser
         {
             Expression left = getExpression(ctx.left);
             Expression right = getExpression(ctx.right);
-            ComparisonExpression.Type type = null;
+            IComparisonExpression.Type type = null;
 
             switch (ctx.op.getType())
             {
@@ -918,6 +921,10 @@ public class QueryParser
                 return createLiteralDecimalExpression(ctx.decimalLiteral()
                         .getText());
             }
+            else if (ctx.templateStringLiteral() != null)
+            {
+                return visit(ctx.templateStringLiteral());
+            }
 
             String text = ctx.stringLiteral()
                     .getText();
@@ -925,6 +932,40 @@ public class QueryParser
             // Remove escaped single quotes
             text = text.replaceAll("''", "'");
             return new LiteralStringExpression(text);
+        }
+
+        @Override
+        public Object visitTemplateStringLiteral(TemplateStringLiteralContext ctx)
+        {
+            List<Expression> expressions = new ArrayList<>();
+            StringBuilder sb = new StringBuilder();
+
+            for (TemplateStringAtomContext actx : ctx.templateStringAtom())
+            {
+                // While we have plain strings keep adding to string builder
+                if (actx.TEMPLATESTRINGATOM() != null)
+                {
+                    sb.append(actx.getText());
+                    continue;
+                }
+
+                // Expresion then add eventual literal string gathered previously
+                if (sb.length() > 0)
+                {
+                    expressions.add(new LiteralStringExpression(sb.toString()));
+                    sb.setLength(0);
+                }
+
+                expressions.add(getExpression(actx.expression()));
+            }
+
+            // Add last literal if any
+            if (sb.length() > 0)
+            {
+                expressions.add(new LiteralStringExpression(sb.toString()));
+            }
+
+            return new TemplateStringExpression(expressions);
         }
 
         /**
@@ -997,7 +1038,7 @@ public class QueryParser
                 String identifier = getIdentifier(item.identifier());
 
                 if (!isBlank(identifier)
-                        && !seenColumns.add(lowerCase((identifier))))
+                        && !seenColumns.add(lowerCase(identifier)))
                 {
                     throw new ParseException("Column '" + identifier + "' is defined multiple times", item.start);
                 }
@@ -1007,8 +1048,8 @@ public class QueryParser
         private SortItem getSortItem(SortItemContext ctx)
         {
             Expression expression = getExpression(ctx.expression());
-            SortItem.Order order = Order.ASC;
-            SortItem.NullOrder nullOrder = NullOrder.UNDEFINED;
+            ISortItem.Order order = Order.ASC;
+            ISortItem.NullOrder nullOrder = NullOrder.UNDEFINED;
 
             int orderType = ctx.order != null ? ctx.order.getType()
                     : -1;

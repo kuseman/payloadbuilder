@@ -216,7 +216,8 @@ class ESOperator extends AOperator
         {
             // Translate to non freetext
             MappedProperty nonFreeTextField = indexProperty.getNonFreeTextField();
-            field = nonFreeTextField.name;
+            field = nonFreeTextField != null ? nonFreeTextField.name
+                    : null;
         }
 
         return field;
@@ -328,7 +329,7 @@ class ESOperator extends AOperator
                     }
 
                     HttpEntity entity = null;
-                    try (CloseableHttpResponse response = execute(context.getSession(), catalogAlias, (delete)))
+                    try (CloseableHttpResponse response = execute(context.getSession(), catalogAlias, delete))
                     {
                         entity = response.getEntity();
                         int status = response.getStatusLine()
@@ -649,10 +650,10 @@ class ESOperator extends AOperator
     /** Class the streams doc id's to _mget endpoint in ES */
     private static class DocIdStreamingEntity extends AbstractHttpEntity
     {
-        private static final byte[] HEADER_BYTES = "{\"ids\":[".getBytes();
-        private static final byte[] FOOTER_BYTES = "]}".getBytes();
-        private static final byte[] QUOTE_BYTES = "\"".getBytes();
-        private static final byte[] COMMA_BYTES = ",".getBytes();
+        private static final byte[] HEADER_BYTES = "{\"ids\":[".getBytes(StandardCharsets.UTF_8);
+        private static final byte[] FOOTER_BYTES = "]}".getBytes(StandardCharsets.UTF_8);
+        private static final byte[] QUOTE_BYTES = "\"".getBytes(StandardCharsets.UTF_8);
+        private static final byte[] COMMA_BYTES = ",".getBytes(StandardCharsets.UTF_8);
         private static final Header APPLICATION_JSON = new BasicHeader("Content-Type", "application/json");
 
         private final IIndexPredicate indexPredicate;
@@ -722,7 +723,7 @@ class ESOperator extends AOperator
                     bos.write(QUOTE_BYTES);
                     String docId = String.valueOf(values.next()
                             .getValue(0));
-                    bos.write(docId.getBytes());
+                    bos.write(docId.getBytes(StandardCharsets.UTF_8));
                     bos.write(QUOTE_BYTES);
                 }
 

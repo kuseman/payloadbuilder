@@ -7,15 +7,15 @@ import java.util.AbstractList;
 import java.util.Iterator;
 import java.util.List;
 
+import se.kuseman.payloadbuilder.api.operator.Operator.TupleList;
+import se.kuseman.payloadbuilder.api.operator.Tuple;
+
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap.Entry;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.ints.IntSets;
-
-import se.kuseman.payloadbuilder.api.operator.Operator.TupleList;
-import se.kuseman.payloadbuilder.api.operator.Tuple;
 
 /** Grouped row. Result of a {@link GroupByOperator} */
 class GroupedRow implements Tuple

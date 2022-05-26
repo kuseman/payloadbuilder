@@ -205,6 +205,12 @@ public abstract class AExpressionVisitor<TR, TC> implements ExpressionVisitor<TR
         return visitChildren(context, expression.getExpression());
     }
 
+    @Override
+    public TR visit(TemplateStringExpression expression, TC context)
+    {
+        return visitChildren(context, expression.getExpressions());
+    }
+
     private TR visitChildren(TC context, Expression... args)
     {
         return visitChildren(context, null, args);

@@ -385,7 +385,7 @@ public class JsonOutputWriter implements OutputWriter
         /** Wrap result set rows as an array */
         private boolean resultSetsAsArrays;
 
-        /** Wrap all result sets rows as an array. Mutual exclusive with {@link #wrapResultSetAsArray} */
+        /** Wrap all result sets rows as an array. Mutual exclusive with {@link #resultSetsAsArrays} */
         private boolean allResultSetsAsOneArray;
 
         public String getRowSeparator()

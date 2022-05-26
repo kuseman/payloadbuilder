@@ -22,6 +22,11 @@ public interface OutputWriter
     {
     }
 
+    /** Ends a result set */
+    default void endResult()
+    {
+    }
+
     /** Start a new row. Called each time before a new row is to be written. */
     default void startRow()
     {

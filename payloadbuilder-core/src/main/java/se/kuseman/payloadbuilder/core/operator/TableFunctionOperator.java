@@ -83,7 +83,7 @@ class TableFunctionOperator extends AOperator
         if (obj instanceof TableFunctionOperator)
         {
             TableFunctionOperator that = (TableFunctionOperator) obj;
-            return nodeId == that.nodeId
+            return nodeId.equals(that.nodeId)
                     && tableAlias.isEqual(that.tableAlias)
                     && functionInfo.equals(that.functionInfo)
                     && arguments.equals(that.arguments);

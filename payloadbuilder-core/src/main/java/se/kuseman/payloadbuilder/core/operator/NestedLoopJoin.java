@@ -220,7 +220,7 @@ class NestedLoopJoin extends AOperator
         if (obj instanceof NestedLoopJoin)
         {
             NestedLoopJoin that = (NestedLoopJoin) obj;
-            return nodeId == that.nodeId
+            return nodeId.equals(that.nodeId)
                     && outer.equals(that.outer)
                     && inner.equals(that.inner)
                     && Objects.equals(predicate, that.predicate)

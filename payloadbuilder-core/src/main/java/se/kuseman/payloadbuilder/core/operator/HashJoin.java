@@ -372,8 +372,8 @@ class HashJoin extends AOperator
                     TupleHolder holder = list.get(index++);
                     if ((type == TableIteratorType.MATCHED
                             && holder.match)
-                            || type == TableIteratorType.NON_MATCHED
-                                    && !holder.match
+                            || (type == TableIteratorType.NON_MATCHED
+                                    && !holder.match)
                             || type == TableIteratorType.BOTH)
                     {
                         next = holder.tuple;
@@ -471,7 +471,7 @@ class HashJoin extends AOperator
         if (obj instanceof HashJoin)
         {
             HashJoin that = (HashJoin) obj;
-            return nodeId == that.nodeId
+            return nodeId.equals(that.nodeId)
                     && outer.equals(that.outer)
                     && inner.equals(that.inner)
                     && outerHashFunction.equals(that.outerHashFunction)

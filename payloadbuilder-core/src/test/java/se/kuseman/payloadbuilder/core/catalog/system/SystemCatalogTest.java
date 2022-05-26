@@ -7,6 +7,7 @@ import static java.util.Collections.emptyMap;
 import java.io.StringReader;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
@@ -248,8 +249,16 @@ public class SystemCatalogTest extends AParserTest
         values.put("b", LocalDateTime.parse("2000-10-10T10:10:10"));
         values.put("c", ZonedDateTime.parse("2000-10-10T12:10:10+02:00"));
 
-        assertExpression(ZonedDateTime.parse("2000-10-09T22:00:00Z"), values, "attimezone(a, 'Z')");
-        assertExpression(ZonedDateTime.parse("2000-10-10T08:10:10Z"), values, "attimezone(b, 'Z')");
+        Object expected = ZonedDateTime.of(LocalDate.parse("2000-10-10"), LocalTime.parse("00:00:00"), ZoneId.systemDefault())
+                .withZoneSameInstant(ZoneId.of("Z"));
+
+        assertExpression(expected, values, "attimezone(a, 'Z')");
+
+        expected = ZonedDateTime.of(LocalDateTime.parse("2000-10-10T10:10:10"), ZoneId.systemDefault())
+                .withZoneSameInstant(ZoneId.of("Z"));
+
+        assertExpression(expected, values, "attimezone(b, 'Z')");
+
         assertExpression(ZonedDateTime.parse("2000-10-10T10:10:10Z"), values, "attimezone(c, 'Z')");
     }
 

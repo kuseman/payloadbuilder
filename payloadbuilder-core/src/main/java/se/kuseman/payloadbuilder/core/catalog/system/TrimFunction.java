@@ -65,8 +65,8 @@ class TrimFunction extends ScalarFunctionInfo
         LEFT("ltrim", "left trimmed"),
         RIGHT("rtrim", "right trimmed");
 
-        String name;
-        String descriptiveName;
+        final String name;
+        final String descriptiveName;
 
         Type(String name, String descriptiveName)
         {

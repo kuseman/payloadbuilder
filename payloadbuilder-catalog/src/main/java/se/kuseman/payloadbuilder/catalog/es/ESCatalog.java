@@ -56,14 +56,14 @@ import se.kuseman.payloadbuilder.catalog.es.ESUtils.SortItemMeta;
 public class ESCatalog extends Catalog
 {
     static final String NAME = "Elastic search";
-    static final String TRUSTCERTIFICATE_KEY = "trustCertificate";
-    static final String CONNECT_TIMEOUT_KEY = "connectTimeout";
-    static final String RECEIVE_TIMEOUT_KEY = "receiveTimeout";
-    static final String AUTH_TYPE_KEY = "authType";
-    static final String AUTH_USERNAME_KEY = "authUsername";
-    static final String AUTH_PASSWORD_KEY = "authPassword";
-    static final String ENDPOINT_KEY = "endpoint";
-    static final String INDEX_KEY = "index";
+    public static final String TRUSTCERTIFICATE_KEY = "trustCertificate";
+    public static final String CONNECT_TIMEOUT_KEY = "connectTimeout";
+    public static final String RECEIVE_TIMEOUT_KEY = "receiveTimeout";
+    public static final String AUTH_TYPE_KEY = "authType";
+    public static final String AUTH_USERNAME_KEY = "authUsername";
+    public static final String AUTH_PASSWORD_KEY = "authPassword";
+    public static final String ENDPOINT_KEY = "endpoint";
+    public static final String INDEX_KEY = "index";
     private static final String CACHE_MAPPINGS_TTL = "cache.mappings.ttl";
     /** Default cache time for mappings */
     static final int MAPPINGS_CACHE_TTL = 60;
@@ -188,7 +188,7 @@ public class ESCatalog extends Catalog
                 // has a field ".text" with type text that should
                 // be used in full text search instead
                 String alias = tableAlias.getAlias();
-                if (isFullTextSearchPredicate(pair, alias))
+                if (isFullTextSearchPredicate(pair))
                 {
                     propertyPredicates.add(new PropertyPredicate(alias, "", pair, true));
                     it.remove();
@@ -289,7 +289,7 @@ public class ESCatalog extends Catalog
         }
     }
 
-    private boolean isFullTextSearchPredicate(IAnalyzePair pair, String alias)
+    private boolean isFullTextSearchPredicate(IAnalyzePair pair)
     {
         if (pair.getType() != Type.UNDEFINED)
         {
@@ -668,7 +668,7 @@ public class ESCatalog extends Catalog
             return ("string".equals(type)
                     && !"not_analyzed".equals(index))
                     // New ES version style
-                    || ("text".equals(type));
+                    || "text".equals(type);
         }
 
         /** Returns true if this property values should be quoted when used in queries */

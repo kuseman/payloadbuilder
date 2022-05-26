@@ -63,4 +63,6 @@ public interface ExpressionVisitor<TR, TC>
     TR visit(UnresolvedSubQueryExpression expression, TC context);
 
     TR visit(NamedExpression expression, TC context);
+
+    TR visit(TemplateStringExpression expression, TC context);
 }

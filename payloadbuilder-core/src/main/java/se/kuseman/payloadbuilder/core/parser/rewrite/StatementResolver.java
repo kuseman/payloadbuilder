@@ -98,6 +98,7 @@ import se.kuseman.payloadbuilder.core.parser.Table;
 import se.kuseman.payloadbuilder.core.parser.TableFunction;
 import se.kuseman.payloadbuilder.core.parser.TableSource;
 import se.kuseman.payloadbuilder.core.parser.TableSourceJoined;
+import se.kuseman.payloadbuilder.core.parser.TemplateStringExpression;
 import se.kuseman.payloadbuilder.core.parser.UnresolvedDereferenceExpression;
 import se.kuseman.payloadbuilder.core.parser.UnresolvedQualifiedFunctionCallExpression;
 import se.kuseman.payloadbuilder.core.parser.UnresolvedQualifiedReferenceExpression;
@@ -545,6 +546,12 @@ public class StatementResolver implements StatementVisitor<Statement, StatementR
         public Pair<Set<TableAlias>, Expression> visit(VariableExpression expression, Context context)
         {
             return Pair.of(emptySet(), expression);
+        }
+
+        @Override
+        public Pair<Set<TableAlias>, Expression> visit(TemplateStringExpression expression, Context context)
+        {
+            return Pair.of(emptySet(), new TemplateStringExpression(resolveEs(expression.getExpressions(), context)));
         }
 
         @Override

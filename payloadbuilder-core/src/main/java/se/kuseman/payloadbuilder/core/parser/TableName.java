@@ -48,7 +48,7 @@ public class TableName
         {
             TableName that = (TableName) obj;
             return Objects.equals(catalogAlias, that.catalogAlias)
-                    && qname.equals(qname)
+                    && qname.equals(that.qname)
                     && tempTable == that.tempTable;
         }
         return false;

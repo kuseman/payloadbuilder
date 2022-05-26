@@ -438,7 +438,7 @@
           [{ "key": "calc", "value": 3 }],
           [{ "key": "calc", "value": 4 }],
           [{ "key": "calc", "value": 5 }],
-          [{ "key": "calc", "value": 6 }]          
+          [{ "key": "calc", "value": 6 }]
         ]
       ]
     },
@@ -448,18 +448,18 @@
         "select calc ",
         "from ",
         "( ",
-        "  select id + row_id calc ",
+        "  select `value: ${id + row_id}` calc ",
         "  from data ",
         ") x"
       ],
       "expectedResultSets": [
         [
-          [{ "key": "calc", "value": 2 }],
-          [{ "key": "calc", "value": 3 }],
-          [{ "key": "calc", "value": 3 }],
-          [{ "key": "calc", "value": 4 }],
-          [{ "key": "calc", "value": 5 }],
-          [{ "key": "calc", "value": 6 }]          
+          [{ "key": "calc", "value": "value: 2" }],
+          [{ "key": "calc", "value": "value: 3" }],
+          [{ "key": "calc", "value": "value: 3" }],
+          [{ "key": "calc", "value": "value: 4" }],
+          [{ "key": "calc", "value": "value: 5" }],
+          [{ "key": "calc", "value": "value: 6" }]
         ]
       ]
     },

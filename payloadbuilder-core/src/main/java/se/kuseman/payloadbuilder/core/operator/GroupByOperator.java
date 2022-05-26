@@ -15,17 +15,17 @@ import java.util.Set;
 
 import org.apache.commons.lang3.StringUtils;
 
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.ints.IntSet;
-
 import se.kuseman.payloadbuilder.api.operator.AOperator;
 import se.kuseman.payloadbuilder.api.operator.DescribableNode;
 import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 import se.kuseman.payloadbuilder.api.operator.IOrdinalValues;
 import se.kuseman.payloadbuilder.api.operator.Operator;
 import se.kuseman.payloadbuilder.api.operator.Tuple;
+
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 
 /** Operator that groups by a bucket function */
 class GroupByOperator extends AOperator
@@ -151,7 +151,7 @@ class GroupByOperator extends AOperator
         if (obj instanceof GroupByOperator)
         {
             GroupByOperator that = (GroupByOperator) obj;
-            return nodeId == that.nodeId
+            return nodeId.equals(that.nodeId)
                     && operator.equals(that.operator)
                     && columnReferences.equals(that.columnReferences)
                     && indexValueFactory.equals(that.indexValueFactory)

@@ -515,7 +515,7 @@ class BatchMergeJoin extends AOperator
         if (obj instanceof BatchMergeJoin)
         {
             BatchMergeJoin that = (BatchMergeJoin) obj;
-            return nodeId == that.nodeId
+            return nodeId.equals(that.nodeId)
                     && outer.equals(that.outer)
                     && inner.equals(that.inner)
                     && outerValuesExtractor.equals(that.outerValuesExtractor)

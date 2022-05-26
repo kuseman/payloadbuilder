@@ -5,12 +5,13 @@ import static org.apache.commons.collections4.IteratorUtils.toList;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Stack;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.mutable.MutableDouble;
@@ -96,18 +97,18 @@ public final class EvalUtils
     public static class ComplexValueWriter implements OutputWriter
     {
         private final ExecutionContext context;
-        private final Stack<Object> current;
+        private final Deque<Object> current;
         private String fieldName;
 
         ComplexValueWriter(ExecutionContext context)
         {
             this.context = context;
-            this.current = new Stack<>();
+            this.current = new ArrayDeque<>();
         }
 
         Object getValue()
         {
-            return current.peek();
+            return current.peekFirst();
         }
 
         @Override
@@ -120,7 +121,7 @@ public final class EvalUtils
         public void writeValue(Object value)
         {
             requireNonNull(current);
-            Object obj = current.peek();
+            Object obj = current.peekFirst();
             if (obj instanceof Map)
             {
                 @SuppressWarnings("unchecked")
@@ -138,7 +139,7 @@ public final class EvalUtils
         @Override
         public void startObject()
         {
-            current.push(new LinkedHashMap<>());
+            current.addFirst(new LinkedHashMap<>());
         }
 
         @Override
@@ -147,14 +148,14 @@ public final class EvalUtils
             // Keep the first object on the stack
             if (current.size() > 1)
             {
-                current.pop();
+                current.removeFirst();
             }
         }
 
         @Override
         public void startArray()
         {
-            current.push(new ArrayList<>());
+            current.addFirst(new ArrayList<>());
         }
 
         @Override
@@ -163,7 +164,7 @@ public final class EvalUtils
             // Keep the first object on the stack
             if (current.size() > 1)
             {
-                current.pop();
+                current.removeFirst();
             }
         }
     }

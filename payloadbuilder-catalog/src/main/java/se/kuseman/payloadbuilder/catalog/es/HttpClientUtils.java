@@ -6,7 +6,6 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 import java.io.IOException;
 import java.util.List;
 
-import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
 import org.apache.http.HttpHeaders;
 import org.apache.http.HttpStatus;
@@ -27,7 +26,7 @@ import se.kuseman.payloadbuilder.api.session.IQuerySession;
 import se.kuseman.payloadbuilder.catalog.CredentialsException;
 
 /** Client utils */
-final class HttpClientUtils
+public final class HttpClientUtils
 {
     static final int DEFAULT_RECIEVE_TIMEOUT = 15000;
     static final int DEFAULT_CONNECT_TIMEOUT = 500;
@@ -39,8 +38,8 @@ final class HttpClientUtils
      *
      * @throws IOException Throws IOException
      */
-    static CloseableHttpResponse execute(String catalogAlias, HttpRequestBase request, Boolean trustCertificate, Integer connectTimeout, Integer recieveTimeout, AuthType authType, String authUsername,
-            Object authPassword) throws IOException
+    public static CloseableHttpResponse execute(String catalogAlias, HttpRequestBase request, Boolean trustCertificate, Integer connectTimeout, Integer recieveTimeout, AuthType authType,
+            String authUsername, Object authPassword) throws IOException
     {
         CloseableHttpClient client = getClient(catalogAlias, trustCertificate, connectTimeout, recieveTimeout, authType, authUsername, getPassword(authPassword));
         CloseableHttpResponse response = client.execute(request);
@@ -71,8 +70,6 @@ final class HttpClientUtils
 
     /**
      * Create a client from provided components
-     *
-     * @param basicAuthPasswordObj Is either a password string or a char[]
      */
     private static CloseableHttpClient getClient(String catalogAlias, Boolean trustCertificate, Integer connectTimeout, Integer recieveTimeout, AuthType authType, String authUsername,
             String authPassword)
@@ -130,21 +127,5 @@ final class HttpClientUtils
             return new String((char[]) password);
         }
         return null;
-    }
-
-    /** Auth type */
-    enum AuthType
-    {
-        NONE,
-        BASIC;
-
-        static AuthType from(Object value)
-        {
-            if (value == null)
-            {
-                return NONE;
-            }
-            return AuthType.valueOf(StringUtils.upperCase(String.valueOf(value)));
-        }
     }
 }

@@ -49,8 +49,6 @@ class CompositeTuple implements Tuple
 
     /**
      * Add provided tuple to this composite tuple
-     *
-     * @param tupleOrdinal The tuple ordinal slot that we should add provided tuple to. If that slot is taken a copy is returned
      */
     CompositeTuple add(Tuple tuple)
     {

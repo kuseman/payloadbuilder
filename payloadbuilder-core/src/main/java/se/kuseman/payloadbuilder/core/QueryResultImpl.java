@@ -322,18 +322,18 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         {
             table = context.getSession()
                     .getTempTableCache()
-                    .computIfAbsent(cacheName, cacheKey, ttl, () -> createTempTable(select, buildResult, true));
+                    .computIfAbsent(cacheName, cacheKey, ttl, () -> createTempTable(select, buildResult));
         }
         else
         {
-            table = createTempTable(select, buildResult, false);
+            table = createTempTable(select, buildResult);
         }
 
         this.context.getSession()
                 .setTemporaryTable(table);
     }
 
-    private TemporaryTable createTempTable(Select select, BuildResult buildResult, final boolean cache)
+    private TemporaryTable createTempTable(Select select, BuildResult buildResult)
     {
         // Use the select's table source if there is one else create a dummy
         TableAlias tableAlias = select.getFrom() != null ? select.getFrom()
@@ -520,6 +520,9 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                 }
                 rowCount++;
             }
+
+            writer.flush();
+            writer.endResult();
         }
         finally
         {
