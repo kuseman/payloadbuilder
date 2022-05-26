@@ -83,6 +83,7 @@ public class SystemCatalog extends Catalog
         catalog.registerFunction(new ListOfFunction(catalog));
         catalog.registerFunction(new UnionFunction(catalog, true));
         catalog.registerFunction(new ContainsFunction(catalog));
+        catalog.registerFunction(new AtTimeZoneFunction(catalog));
 
         // Table functions
         catalog.registerFunction(new RangeFunction(catalog));

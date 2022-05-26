@@ -46,10 +46,16 @@
             <artifactId>httpclient</artifactId>
             <version>4.5.13</version>
         </dependency>
+        <!-- Overwrite httpclients vurn. dep. -->
+        <dependency>
+            <groupId>commons-codec</groupId>
+            <artifactId>commons-codec</artifactId>
+            <version>1.15</version>
+        </dependency>
         <dependency>
             <groupId>com.github.spullara.mustache.java</groupId>
             <artifactId>compiler</artifactId>
-            <version>0.8.13</version>
+            <version>0.9.10</version>
         </dependency>
         <dependency>
             <groupId>com.zaxxer</groupId>

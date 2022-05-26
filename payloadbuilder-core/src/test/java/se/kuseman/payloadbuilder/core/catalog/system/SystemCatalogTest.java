@@ -5,10 +5,12 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 
 import java.io.StringReader;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
+import java.time.zone.ZoneRulesException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -231,6 +233,24 @@ public class SystemCatalogTest extends AParserTest
         assertExpression(1, null, "isblank(null, 1)");
         assertExpression(1, null, "isblank('', 1)");
         assertExpression("str", null, "isblank('str', null)");
+    }
+
+    @Test
+    public void test_attimezone() throws Exception
+    {
+        assertExpression(null, null, "attimezone(null, null)");
+        assertExpression(null, null, "attimezone(getdate(), null)");
+        assertExpressionFail(ZoneRulesException.class, "Unknown time-zone ID: dummy", null, "attimezone(getdate(), 'dummy')");
+        assertExpressionFail(IllegalArgumentException.class, "Cannot change time zone of value: hello", null, "attimezone('hello', 'Z')");
+
+        Map<String, Object> values = new HashMap<>();
+        values.put("a", LocalDate.parse("2000-10-10"));
+        values.put("b", LocalDateTime.parse("2000-10-10T10:10:10"));
+        values.put("c", ZonedDateTime.parse("2000-10-10T12:10:10+02:00"));
+
+        assertExpression(ZonedDateTime.parse("2000-10-09T22:00:00Z"), values, "attimezone(a, 'Z')");
+        assertExpression(ZonedDateTime.parse("2000-10-10T08:10:10Z"), values, "attimezone(b, 'Z')");
+        assertExpression(ZonedDateTime.parse("2000-10-10T10:10:10Z"), values, "attimezone(c, 'Z')");
     }
 
     @Test
