@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.api.utils;
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.Objects;
 
 /**
  * Math methods used when evaluating expressions TODO: Overflows aren't taken care of in arithmetic operations
@@ -270,6 +271,11 @@ public final class ExpressionMath
         {
             return Integer.compare(((Number) left).intValue(), ((Number) right).intValue());
         }
+        else if (left instanceof CharSequence
+                && right instanceof CharSequence)
+        {
+            return compare((CharSequence) left, (CharSequence) right);
+        }
         else if (left.getClass() != right.getClass()
                 || !(left instanceof Comparable))
         {
@@ -317,7 +323,15 @@ public final class ExpressionMath
         {
             return ((Boolean) left).booleanValue() == ((Boolean) right).booleanValue();
         }
-
+        else if (left.getClass() == right.getClass())
+        {
+            return left.equals(right);
+        }
+        else if (left instanceof CharSequence
+                && right instanceof CharSequence)
+        {
+            return compare((CharSequence) left, (CharSequence) right) == 0;
+        }
         if (left.getClass() != right.getClass()
                 || !(left instanceof Comparable))
         {
@@ -565,5 +579,33 @@ public final class ExpressionMath
             return true;
         }
         return false;
+    }
+
+    /** Compare two char sequences */
+    private static int compare(CharSequence cs1, CharSequence cs2)
+    {
+        if (Objects.requireNonNull(cs1) == Objects.requireNonNull(cs2))
+        {
+            return 0;
+        }
+
+        for (int i = 0, len = Math.min(cs1.length(), cs2.length()); i < len; i++)
+        {
+            char a = cs1.charAt(i);
+            char b = cs2.charAt(i);
+            if (a != b)
+            {
+                return a - b < 0 ? -1
+                        : 1;
+            }
+        }
+
+        int c = cs1.length() - cs2.length();
+        if (c == 0)
+        {
+            return 0;
+        }
+        return c < 0 ? -1
+                : 1;
     }
 }

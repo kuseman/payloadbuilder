@@ -289,6 +289,20 @@ public class ExpressionMathTest extends Assert
         assertFail(IllegalArgumentException.class, "Cannot compare ", () -> ExpressionMath.cmp(new ExpressionMathTest(), new ExpressionMathTest()));
     }
 
+    @Test
+    public void test_charsequences()
+    {
+        assertEquals(0, ExpressionMath.cmp("test", new TestCharSequence("test")));
+        assertEquals(0, ExpressionMath.cmp(new TestCharSequence("test"), "test"));
+        assertTrue(ExpressionMath.eq("test", new TestCharSequence("test")));
+        assertTrue(ExpressionMath.eq(new TestCharSequence("test"), "test"));
+
+        assertEquals(-1, ExpressionMath.cmp("one", new TestCharSequence("two")));
+        assertEquals(1, ExpressionMath.cmp(new TestCharSequence("two"), "one"));
+        assertFalse(ExpressionMath.eq("one", new TestCharSequence("two")));
+        assertFalse(ExpressionMath.eq(new TestCharSequence("two"), "one"));
+    }
+
     private void assertFail(Class<? extends Exception> expected, String messageContains, Runnable r)
     {
         try
@@ -306,6 +320,34 @@ public class ExpressionMathTest extends Assert
 
             assertTrue("Expected exception message to contain " + messageContains + " but was: " + e.getMessage(), e.getMessage()
                     .contains(messageContains));
+        }
+    }
+
+    private static class TestCharSequence implements CharSequence
+    {
+        private String value;
+
+        TestCharSequence(String value)
+        {
+            this.value = value;
+        }
+
+        @Override
+        public int length()
+        {
+            return value.length();
+        }
+
+        @Override
+        public char charAt(int index)
+        {
+            return value.charAt(index);
+        }
+
+        @Override
+        public CharSequence subSequence(int start, int end)
+        {
+            return value.subSequence(start, end);
         }
     }
 }

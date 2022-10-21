@@ -19,10 +19,8 @@ public class SessionBatchCache extends ASessionCache<List<Tuple>> implements Bat
         for (TKey key : keys)
         {
             CacheEntry<List<Tuple>> entry = cache.get(key);
-            if (entry != null)
-            {
-                result.put(key, entry.value);
-            }
+            result.put(key, entry != null ? entry.value
+                    : null);
         }
         return result;
     }

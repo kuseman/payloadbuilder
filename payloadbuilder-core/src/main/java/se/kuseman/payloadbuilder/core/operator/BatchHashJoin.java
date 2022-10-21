@@ -16,12 +16,10 @@ import static se.kuseman.payloadbuilder.core.DescribeUtils.POPULATING;
 import static se.kuseman.payloadbuilder.core.DescribeUtils.PREDICATE_TIME;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.function.ToIntBiFunction;
@@ -42,6 +40,8 @@ import se.kuseman.payloadbuilder.core.parser.Option;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 
 /**
  * <pre>
@@ -148,6 +148,7 @@ class BatchHashJoin extends AOperator
         // CSON
         {
             /** Batched rows */
+            private boolean outerTuplesResized;
             private List<TupleHolder> outerTuples;
             private int outerTupleIndex;
             private List<Tuple> innerTuples;
@@ -157,9 +158,10 @@ class BatchHashJoin extends AOperator
             private Iterator<IOrdinalValues> outerValuesIterator;
 
             /** Table use for hashed inner values */
-            private final Int2ObjectMap<List<Tuple>> table = new Int2ObjectOpenHashMap<>(batchSize);
+            private Int2ObjectMap<List<Tuple>> table;
 
-            private final Set<IOrdinalValues> addedValues = new HashSet<>(batchSize);
+            private boolean addedValuesResized;
+            private ObjectSet<IOrdinalValues> addedValues = new ObjectOpenHashSet<>(10);
 
             private Tuple next;
             private TupleHolder outerTuple;
@@ -201,6 +203,13 @@ class BatchHashJoin extends AOperator
 
                     if (outerTuples == null)
                     {
+                        // Clear tables before processing next batch
+                        addedValues.clear();
+                        if (table != null)
+                        {
+                            table.clear();
+                        }
+
                         batchOuterRows();
                         if (outerTuples.isEmpty())
                         {
@@ -304,8 +313,7 @@ class BatchHashJoin extends AOperator
                 int count = 0;
                 int size = batchSize > 0 ? batchSize
                         : 100;
-                outerTuples = new ArrayList<>(size + (prevOuterTuple != null ? 1
-                        : 0));
+                outerTuples = new ArrayList<>(10);
 
                 // Adapt for eventual prev tuple
                 if (prevOuterTuple != null)
@@ -320,17 +328,31 @@ class BatchHashJoin extends AOperator
                 // changes, this to avoid calling down stream operator
                 // multiple times with the same values
                 /*
+                 * @formatter:off
+                  /*
                  * ie.
                  *
-                 * outer value 1 1 Batch 1 2 -------- 2 3 Batch 2 3
+                 * outer value
+                 * 1
+                 * 1             Batch 1
+                 * 2
+                 * --------
+                 * 2
+                 * 3             Batch 2
+                 * 3
                  *
                  *
                  * Here we should fetch batches like this:
                  *
-                 * 1 1 2 Batch 1 2 -------- 3 Batch 2 3
+                 * 1
+                 * 1
+                 * 2             Batch 1
+                 * 2
+                 * --------
+                 * 3             Batch 2
+                 * 3
                  *
-                 *
-                 *
+                 * @formatter:on
                  */
                 boolean batchComplete = false;
 
@@ -345,6 +367,17 @@ class BatchHashJoin extends AOperator
                     TupleHolder holder = new TupleHolder(tuple, hash);
                     batchComplete = count >= size;
 
+                    if (!addedValuesResized
+                            && addedValues.size() >= 10)
+                    {
+                        ObjectSet<IOrdinalValues> set = addedValues;
+                        addedValues = new ObjectOpenHashSet<>(batchSize);
+                        addedValues.addAll(set);
+                        addedValuesResized = true;
+                    }
+
+                    // TODO: If the outer values ordinals is unique (contains index columns, only one needed?)
+                    // then this set is not needed since we know that all outer values will provide unique values
                     // If current tuple yielded unique values
                     // use it when opening the down stream operator
                     if (addedValues.add(outerValues))
@@ -360,6 +393,15 @@ class BatchHashJoin extends AOperator
                         }
                     }
 
+                    // If we had more tuples that initial capacity then ensure that capacity is equal to batch size
+                    // This to not allocate to large object arrays if the outer tuples was < 10 rows
+                    if (!outerTuplesResized
+                            && outerTuples.size() >= 10)
+                    {
+                        ((ArrayList<TupleHolder>) outerTuples).ensureCapacity(batchSize + 1);
+                        outerTuplesResized = true;
+                    }
+
                     outerTuples.add(holder);
                     count++;
                 }
@@ -367,6 +409,11 @@ class BatchHashJoin extends AOperator
 
             private boolean fetchInnerBatch()
             {
+                if (table == null)
+                {
+                    table = new Int2ObjectOpenHashMap<>(outerTuples.size());
+                }
+
                 outerValuesIterator = outerTuples.stream()
                         .filter(o -> o.outerValues != null)
                         .map(o -> o.outerValues)

@@ -18,7 +18,7 @@ import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.ints.IntSets;
 
 /** Grouped row. Result of a {@link GroupByOperator} */
-class GroupedRow implements Tuple
+class GroupedRow implements Tuple, IGroupedRow
 {
     private static final IntSet EMPTY = IntSets.unmodifiable(new IntOpenHashSet());
 
@@ -132,6 +132,12 @@ class GroupedRow implements Tuple
                         .getValue(columnOrdinal);
             }
         };
+    }
+
+    @Override
+    public List<Tuple> getContainedRows()
+    {
+        return tuples;
     }
 
     /**
