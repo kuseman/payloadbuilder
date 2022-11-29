@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 import java.time.zone.ZoneRulesException;
@@ -234,6 +235,20 @@ public class SystemCatalogTest extends AParserTest
         assertExpression(1, null, "isblank(null, 1)");
         assertExpression(1, null, "isblank('', 1)");
         assertExpression("str", null, "isblank('str', null)");
+    }
+
+    @Test
+    public void test_getdate() throws Exception
+    {
+        ZonedDateTime now = context.getStatementContext()
+                .getNow()
+                .withZoneSameInstant(ZoneOffset.UTC);
+
+        LocalDateTime nowLocal = now.withZoneSameInstant(ZoneOffset.systemDefault())
+                .toLocalDateTime();
+
+        assertExpression(now, null, "getutcdate()");
+        assertExpression(nowLocal, null, "getdate()");
     }
 
     @Test

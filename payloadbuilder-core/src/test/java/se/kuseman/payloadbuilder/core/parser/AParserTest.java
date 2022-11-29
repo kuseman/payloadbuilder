@@ -304,7 +304,6 @@ public abstract class AParserTest extends Assert
         {
             Expression expr = parser.parseExpression(expression);
             expr = StatementResolver.resolve(expr, session);
-            ExecutionContext context = new ExecutionContext(session);
             if (mapValues != null)
             {
                 String[] columns = new String[mapValues.size()];

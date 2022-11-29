@@ -31,6 +31,108 @@ public class ESUtilsTest extends Assert
 {
     private IExecutionContext context = Mockito.mock(IExecutionContext.class);
 
+    @Test(
+            expected = IllegalArgumentException.class)
+    public void test_getSearchTemplateUrl_fail()
+    {
+        ESUtils.getSearchTemplateUrl(true, "", "myindex", "_doc", 100, null);
+    }
+
+    @Test
+    public void test_getSearchTemplateUrl()
+    {
+        assertEquals("http://localhost:9200/*/_doc/_search/template?filter_path=_scroll_id,hits.hits", ESUtils.getSearchTemplateUrl(true, "http://localhost:9200", null, "_doc", null, null));
+        assertEquals("http://localhost:9200/myIndex/_doc/_search/template?filter_path=_scroll_id,hits.hits",
+                ESUtils.getSearchTemplateUrl(true, "http://localhost:9200", "myIndex", "_doc", null, null));
+        assertEquals("http://localhost:9200/myIndex/_doc/_search/template?filter_path=_scroll_id,hits.hits&size=100",
+                ESUtils.getSearchTemplateUrl(true, "http://localhost:9200", "myIndex", "_doc", 100, null));
+        assertEquals("http://localhost:9200/myIndex/_doc/_search/template?filter_path=_scroll_id,hits.hits&scroll=2m",
+                ESUtils.getSearchTemplateUrl(true, "http://localhost:9200", "myIndex", "_doc", null, 2));
+        assertEquals("http://localhost:9200/myIndex/_doc/_search/template?filter_path=_scroll_id,hits.hits&scroll=2m&size=300",
+                ESUtils.getSearchTemplateUrl(true, "http://localhost:9200", "myIndex", "_doc", 300, 2));
+
+        // No use of _doc type
+        assertEquals("http://localhost:9200/*/_search/template?filter_path=_scroll_id,hits.hits", ESUtils.getSearchTemplateUrl(false, "http://localhost:9200", null, "_doc", null, null));
+        assertEquals("http://localhost:9200/myIndex/_search/template?filter_path=_scroll_id,hits.hits", ESUtils.getSearchTemplateUrl(false, "http://localhost:9200", "myIndex", "_doc", null, null));
+        assertEquals("http://localhost:9200/myIndex/_search/template?filter_path=_scroll_id,hits.hits&size=100",
+                ESUtils.getSearchTemplateUrl(false, "http://localhost:9200", "myIndex", "_doc", 100, null));
+        assertEquals("http://localhost:9200/myIndex/_search/template?filter_path=_scroll_id,hits.hits&scroll=2m",
+                ESUtils.getSearchTemplateUrl(false, "http://localhost:9200", "myIndex", "_doc", null, 2));
+        assertEquals("http://localhost:9200/myIndex/_search/template?filter_path=_scroll_id,hits.hits&scroll=2m&size=300",
+                ESUtils.getSearchTemplateUrl(false, "http://localhost:9200", "myIndex", "_doc", 300, 2));
+    }
+
+    @Test
+    public void test_getSearchUrl()
+    {
+        assertEquals("http://localhost:9200/*/_doc/_search?filter_path=_scroll_id,hits.hits", ESUtils.getSearchUrl(true, "http://localhost:9200", null, "_doc", null, null, null));
+        assertEquals("http://localhost:9200/myindex/_search?filter_path=_scroll_id,hits.hits", ESUtils.getSearchUrl(true, "http://localhost:9200", "myindex", null, null, null, null));
+        assertEquals("http://localhost:9200/myindex/_doc/_search?filter_path=_scroll_id,hits.hits", ESUtils.getSearchUrl(true, "http://localhost:9200", "myindex", "_doc", null, null, null));
+        assertEquals("http://localhost:9200/myindex/_doc/_search?filter_path=_scroll_id,hits.hits&size=100", ESUtils.getSearchUrl(true, "http://localhost:9200", "myindex", "_doc", 100, null, null));
+        assertEquals("http://localhost:9200/myindex/_doc/_search?filter_path=_scroll_id,hits.hits&scroll=2m", ESUtils.getSearchUrl(true, "http://localhost:9200", "myindex", "_doc", null, 2, null));
+        assertEquals("http://localhost:9200/myindex/_doc/_search?filter_path=_scroll_id,hits.hits&scroll=2m&size=200",
+                ESUtils.getSearchUrl(true, "http://localhost:9200", "myindex", "_doc", 200, 2, null));
+
+        // No use of _doc type
+        assertEquals("http://localhost:9200/*/_search?filter_path=_scroll_id,hits.hits", ESUtils.getSearchUrl(false, "http://localhost:9200", null, "_doc", null, null, null));
+        assertEquals("http://localhost:9200/myindex/_search?filter_path=_scroll_id,hits.hits", ESUtils.getSearchUrl(false, "http://localhost:9200", "myindex", null, null, null, null));
+        assertEquals("http://localhost:9200/myindex/_search?filter_path=_scroll_id,hits.hits", ESUtils.getSearchUrl(false, "http://localhost:9200", "myindex", "_doc", null, null, null));
+        assertEquals("http://localhost:9200/myindex/_search?filter_path=_scroll_id,hits.hits&size=100", ESUtils.getSearchUrl(false, "http://localhost:9200", "myindex", "_doc", 100, null, null));
+        assertEquals("http://localhost:9200/myindex/_search?filter_path=_scroll_id,hits.hits&scroll=2m", ESUtils.getSearchUrl(false, "http://localhost:9200", "myindex", "_doc", null, 2, null));
+        assertEquals("http://localhost:9200/myindex/_search?filter_path=_scroll_id,hits.hits&scroll=2m&size=200",
+                ESUtils.getSearchUrl(false, "http://localhost:9200", "myindex", "_doc", 200, 2, null));
+    }
+
+    @Test(
+            expected = IllegalArgumentException.class)
+    public void test_getSearchUrl_fail()
+    {
+        ESUtils.getSearchUrl(true, "", "myindex", "_doc", 100, null, null);
+    }
+
+    @Test
+    public void test_getScrollUrl()
+    {
+        assertEquals("http://localhost:9200/_search/scroll?scroll=2m&filter_path=_scroll_id,hits.hits", ESUtils.getScrollUrl("http://localhost:9200", 2));
+    }
+
+    @Test(
+            expected = IllegalArgumentException.class)
+    public void test_getScrollUrl_fail()
+    {
+        ESUtils.getScrollUrl("", 2);
+    }
+
+    @Test
+    public void test_getMgetUrl()
+    {
+        assertEquals("http://localhost:9200/myindex/type/_mget", ESUtils.getMgetUrl(true, "http://localhost:9200", "myindex", "type"));
+        assertEquals("http://localhost:9200/myindex/type/_mget", ESUtils.getMgetUrl(false, "http://localhost:9200", "myindex", "type"));
+        assertEquals("http://localhost:9200/myindex/_doc/_mget", ESUtils.getMgetUrl(true, "http://localhost:9200", "myindex", "_doc"));
+        assertEquals("http://localhost:9200/myindex/_mget", ESUtils.getMgetUrl(false, "http://localhost:9200", "myindex", "_doc"));
+    }
+
+    @Test(
+            expected = IllegalArgumentException.class)
+    public void test_getMgetUrl_fail()
+    {
+        ESUtils.getMgetUrl(true, "", "", "");
+    }
+
+    @Test(
+            expected = IllegalArgumentException.class)
+    public void test_getMgetUrl_fail_1()
+    {
+        ESUtils.getMgetUrl(true, "index", "", "");
+    }
+
+    @Test(
+            expected = IllegalArgumentException.class)
+    public void test_getMgetUrl_fail_2()
+    {
+        ESUtils.getMgetUrl(true, "index", "type", "");
+    }
+
     @Test
     public void test_search_body_singleType_with_index()
     {
@@ -260,27 +362,4 @@ public class ESUtilsTest extends Assert
     {
         return new MappedProperty(name, type, index, null, emptyList(), emptyMap());
     }
-
-    // /** Mock out values */
-    // static class OuterValues implements IOrdinalValues
-    // {
-    // private final Object value;
-    //
-    // OuterValues(Object value)
-    // {
-    // this.value = value;
-    // }
-    //
-    // @Override
-    // public int size()
-    // {
-    // return 1;
-    // }
-    //
-    // @Override
-    // public Object getValue(int ordinal)
-    // {
-    // return value;
-    // }
-    // }
 }

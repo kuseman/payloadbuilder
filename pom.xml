@@ -2,7 +2,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>se.kuseman</groupId>
     <artifactId>payloadbuilder</artifactId>
-    <version>0.8.5-RC1</version>
+    <version>0.8.5-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Payloadbuilder</name>
     <description>SQL Query engine</description>
@@ -19,7 +19,7 @@
         <junit.version>4.13.1</junit.version>
         <mockito-core.version>4.3.1</mockito-core.version>
         <spotless.version>2.22.0</spotless.version>
-        <jackson.version>2.13.4.1</jackson.version>
+        <jackson.version>2.13.4.2</jackson.version>
         <commons-io.version>2.11.0</commons-io.version>
         <commons-lang3.version>3.12.0</commons-lang3.version>
         <commons-collections4.version>4.4</commons-collections4.version>
@@ -45,7 +45,7 @@
         <url>https://github.com/kuseman/payloadbuilder</url>
         <connection>scm:git:git@github.com:kuseman/payloadbuilder.git</connection>
         <developerConnection>scm:git:git@github.com:kuseman/payloadbuilder.git</developerConnection>
-        <tag>v0.8.5-RC1</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <licenses>

@@ -25,7 +25,7 @@ class RegexpMatchFunction extends ScalarFunctionInfo
     {
         //@formatter:off
         return "Matches first argument to regex provided in second argument." + System.lineSeparator()
-               + "Ex. regexp_match(expression, stringExpression [ ,patternExpression])." + System.lineSeparator()
+               + "Ex. regexp_match(expression, stringExpression)." + System.lineSeparator()
                + "This returns an array of values with matched gorups." + System.lineSeparator()
                + System.lineSeparator()
                + "Returns a list of values.";
