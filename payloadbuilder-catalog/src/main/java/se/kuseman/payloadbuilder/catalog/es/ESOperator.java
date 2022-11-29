@@ -8,6 +8,9 @@ import static org.apache.commons.lang3.StringUtils.isBlank;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.entry;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
 import static se.kuseman.payloadbuilder.catalog.es.ESCatalog.SINGLE_TYPE_TABLE_NAME;
+import static se.kuseman.payloadbuilder.catalog.es.ESUtils.getMgetUrl;
+import static se.kuseman.payloadbuilder.catalog.es.ESUtils.getScrollUrl;
+import static se.kuseman.payloadbuilder.catalog.es.ESUtils.getSearchUrl;
 import static se.kuseman.payloadbuilder.catalog.es.HttpClientUtils.execute;
 
 import java.io.IOException;
@@ -65,7 +68,6 @@ import se.kuseman.payloadbuilder.api.operator.IIndexPredicate;
 import se.kuseman.payloadbuilder.api.operator.IOrdinalValues;
 import se.kuseman.payloadbuilder.api.operator.NodeData;
 import se.kuseman.payloadbuilder.api.operator.Row;
-import se.kuseman.payloadbuilder.api.utils.StringUtils;
 import se.kuseman.payloadbuilder.catalog.es.ESCatalog.MappedProperty;
 import se.kuseman.payloadbuilder.catalog.es.ESUtils.SortItemMeta;
 
@@ -154,6 +156,7 @@ class ESOperator extends AOperator
         String indexField = getIndexField();
         Data data = context.getStatementContext()
                 .getOrCreateNodeData(nodeId, Data::new);
+
         // mget index
         if (useMgets(esType, indexField))
         {
@@ -161,7 +164,8 @@ class ESOperator extends AOperator
         }
 
         boolean isSingleType = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(esType.type);
-        final String searchUrl = getSearchUrl(esType.endpoint, esType.index, esType.type, 1000, 2, indexField);
+        boolean useDocType = ESUtils.getUseDocType(context.getSession(), catalogAlias);
+        final String searchUrl = getSearchUrl(useDocType, esType.endpoint, esType.index, esType.type, 1000, 2, indexField);
         String scrollUrl = getScrollUrl(esType.endpoint, 2);
 
         boolean quoteValues = indexProperty == null
@@ -234,7 +238,8 @@ class ESOperator extends AOperator
     private TupleIterator getMgetIndexOperator(IExecutionContext context, ESType esType, Data data)
     {
         MutableBoolean doRequest = new MutableBoolean(true);
-        String mgetUrl = getMgetUrl(esType.endpoint, esType.index, esType.type);
+        boolean useDocType = ESUtils.getUseDocType(context.getSession(), catalogAlias);
+        String mgetUrl = getMgetUrl(useDocType, esType.endpoint, esType.index, esType.type);
         DocIdStreamingEntity entity = new DocIdStreamingEntity(indexPredicate, context, data);
         return getIterator(context, catalogAlias, tableAlias, esType.endpoint, ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(esType.type), data, scrollId ->
         {
@@ -249,33 +254,6 @@ class ESOperator extends AOperator
 
             return null;
         });
-    }
-
-    static String getMgetUrl(String endpoint, String index, String type)
-    {
-        StringUtils.requireNonBlank(endpoint, "endpoint is required");
-        StringUtils.requireNonBlank(index, "index is required");
-        StringUtils.requireNonBlank(type, "type is required");
-        return String.format("%s/%s/%s/_mget", endpoint, index, type);
-    }
-
-    static String getSearchUrl(String endpoint, String index, String type, Integer size, Integer scrollMinutes, String indexField)
-    {
-        StringUtils.requireNonBlank(endpoint, "endpoint is required");
-        return String.format("%s/%s%s/_search?filter_path=_scroll_id,hits.hits%s%s", endpoint, isBlank(index) ? "*"
-                : index,
-                isBlank(type) ? ""
-                        : ("/" + type),
-                scrollMinutes != null ? ("&scroll=" + scrollMinutes + "m")
-                        : "",
-                size != null ? ("&size=" + size)
-                        : "");
-    }
-
-    static String getScrollUrl(String endpoint, int scrollMinutes)
-    {
-        StringUtils.requireNonBlank(endpoint, "endpoint is required");
-        return String.format("%s/_search/scroll?scroll=%dm&filter_path=_scroll_id,hits.hits", endpoint, scrollMinutes);
     }
 
     static TupleIterator getIterator(IExecutionContext context, String catalogAlias, TableAlias tableAlias, String endpoint, boolean isSingleType, Data data,

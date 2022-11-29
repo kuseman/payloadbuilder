@@ -64,6 +64,7 @@ public class ESCatalog extends Catalog
     public static final String AUTH_PASSWORD_KEY = "authPassword";
     public static final String ENDPOINT_KEY = "endpoint";
     public static final String INDEX_KEY = "index";
+    public static final String USE_DOC_TYPE_KEY = "use_doc_type";
     private static final String CACHE_MAPPINGS_TTL = "cache.mappings.ttl";
     /** Default cache time for mappings */
     static final int MAPPINGS_CACHE_TTL = 60;

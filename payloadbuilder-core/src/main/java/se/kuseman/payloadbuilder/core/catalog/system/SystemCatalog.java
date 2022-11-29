@@ -64,6 +64,7 @@ public class SystemCatalog extends Catalog
         catalog.registerFunction(new CastFunction(catalog, "cast"));
         catalog.registerFunction(new CastFunction(catalog, "convert"));
         catalog.registerFunction(new RegexpLikeFunction(catalog));
+        catalog.registerFunction(new RegexpMatchFunction(catalog));
         catalog.registerFunction(new LowerUpperFunction(catalog, true));
         catalog.registerFunction(new LowerUpperFunction(catalog, false));
         catalog.registerFunction(new SubstringFunction(catalog));

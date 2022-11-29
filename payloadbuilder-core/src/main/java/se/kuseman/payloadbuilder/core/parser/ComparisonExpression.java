@@ -103,7 +103,7 @@ public class ComparisonExpression extends Expression implements IComparisonExpre
                                        + "  %s = %s;\n" // nullVar, right nullVar
                                        + "}\n",
                     leftCode.getCode(), code.getResVar(), code.getNullVar(), leftCode.getNullVar(), leftCode.getNullVar(), rightCode.getCode(), rightCode.getNullVar(), code.getResVar(),
-                    leftCode.getResVar(), toJavaOperatorSymboc(), rightCode.getResVar(), code.getNullVar(), rightCode.getNullVar()));
+                    leftCode.getResVar(), toJavaOperatorSymbol(), rightCode.getResVar(), code.getNullVar(), rightCode.getNullVar()));
         }
         else if (leftType == DataType.BOOLEAN
                 && rightType == DataType.BOOLEAN)
@@ -112,7 +112,7 @@ public class ComparisonExpression extends Expression implements IComparisonExpre
             if (type == Type.EQUAL
                     || type == Type.NOT_EQUAL)
             {
-                compareString = String.format("%s %s %s", leftCode.getResVar(), toJavaOperatorSymboc(), rightCode.getResVar());
+                compareString = String.format("%s %s %s", leftCode.getResVar(), toJavaOperatorSymbol(), rightCode.getResVar());
             }
             else if (type == Type.GREATER_THAN)
             {
@@ -257,7 +257,7 @@ public class ComparisonExpression extends Expression implements IComparisonExpre
         return visitor.visit(this, context);
     }
 
-    private String toJavaOperatorSymboc()
+    private String toJavaOperatorSymbol()
     {
         switch (type)
         {
@@ -277,39 +277,4 @@ public class ComparisonExpression extends Expression implements IComparisonExpre
                 throw new IllegalArgumentException("Unknown type " + this);
         }
     }
-    //
-    // /** Type */
-    // public enum Type
-    // {
-    // EQUAL("=="), NOT_EQUAL("!="), LESS_THAN("<"), LESS_THAN_EQUAL("<="), GREATER_THAN(">"), GREATER_THAN_EQUAL(">=");
-    //
-    // private final String javaOperatorSymbol;
-    //
-    // Type(String value)
-    // {
-    // this.javaOperatorSymbol = value;
-    // }
-    //
-    // @Override
-    // public String toString()
-    // {
-    // switch (this)
-    // {
-    // case EQUAL:
-    // return "=";
-    // case GREATER_THAN:
-    // return ">";
-    // case GREATER_THAN_EQUAL:
-    // return ">=";
-    // case LESS_THAN:
-    // return "<";
-    // case LESS_THAN_EQUAL:
-    // return "<=";
-    // case NOT_EQUAL:
-    // return "!=";
-    // default:
-    // throw new IllegalArgumentException("Unknown type " + this);
-    // }
-    // }
-    // }
 }

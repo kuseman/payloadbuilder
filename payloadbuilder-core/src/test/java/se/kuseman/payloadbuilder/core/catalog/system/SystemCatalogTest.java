@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 import java.time.zone.ZoneRulesException;
@@ -237,6 +238,20 @@ public class SystemCatalogTest extends AParserTest
     }
 
     @Test
+    public void test_getdate() throws Exception
+    {
+        ZonedDateTime now = context.getStatementContext()
+                .getNow()
+                .withZoneSameInstant(ZoneOffset.UTC);
+
+        LocalDateTime nowLocal = now.withZoneSameInstant(ZoneOffset.systemDefault())
+                .toLocalDateTime();
+
+        assertExpression(now, null, "getutcdate()");
+        assertExpression(nowLocal, null, "getdate()");
+    }
+
+    @Test
     public void test_attimezone() throws Exception
     {
         assertExpression(null, null, "attimezone(null, null)");
@@ -334,5 +349,29 @@ public class SystemCatalogTest extends AParserTest
         assertExpression("åäöello xxx", values, "replace(a, 'h', 'åäö')");
         values.put("a", new StringReader("hello xyz"));
         assertExpression("hello xyåäö", values, "replace(a, 'z', 'åäö')");
+    }
+
+    @Test
+    public void test_function_regexp_like() throws Exception
+    {
+        assertExpression(null, null, "regexp_like(null, '')");
+        assertExpression(true, null, "regexp_like('text', '')");
+        assertExpression(false, null, "regexp_like('text', 'nono')");
+        assertExpressionFail(IllegalArgumentException.class, "Expected a String pattern for function", null, "regexp_like('text', 1234)");
+    }
+
+    @Test
+    public void test_function_regexp_match() throws Exception
+    {
+        assertExpression(null, null, "regexp_match(null, '')");
+        assertExpression(emptyList(), null, "regexp_match('text', '')");
+        assertExpressionFail(IllegalArgumentException.class, "Expected a String pattern for function", null, "regexp_match('text', 1234)");
+        assertExpression(emptyList(), null, "regexp_match('text', 'nono')");
+        assertExpression(asList("123", "456"), null, "regexp_match('123-456-abc', '([0-9][0-9][0-9])')");
+        assertExpression(asList("123", "abc", "798", "def"), null, "regexp_match('123-456-abc 798-103-def', '([0-9]{3})-[0-9]{3}-([a-z]{3})')");
+        assertExpression(asList("123"), null, "regexp_match('123-456-abc 798-103-def', '^([0-9]{3})-[0-9]{3}.*$')");
+        assertExpression(asList("456", "103"), null, "regexp_match('123-456-abc 798-103-def', '[0-9]{3}-([0-9]{3})')");
+        assertExpression(emptyList(), null, "regexp_match('123-456-abc 798-103-def', '[i-k]{3}-([i-k]{3})')");
+        assertExpression("abc", null, "regexp_match('123-456-abc 798-103-def', '([a-z]{3})')[0]");
     }
 }

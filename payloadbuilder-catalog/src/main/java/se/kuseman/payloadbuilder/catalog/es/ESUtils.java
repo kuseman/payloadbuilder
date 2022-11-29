@@ -2,6 +2,7 @@ package se.kuseman.payloadbuilder.catalog.es;
 
 import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
@@ -15,6 +16,8 @@ import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
 import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 import se.kuseman.payloadbuilder.api.operator.IIndexPredicate;
 import se.kuseman.payloadbuilder.api.operator.IOrdinalValues;
+import se.kuseman.payloadbuilder.api.session.IQuerySession;
+import se.kuseman.payloadbuilder.api.utils.StringUtils;
 import se.kuseman.payloadbuilder.catalog.es.ESCatalog.MappedProperty;
 
 /** Utils for ESCatalog */
@@ -48,6 +51,80 @@ final class ESUtils
         {
             throw new RuntimeException("Error creating URL", e);
         }
+    }
+
+    /** Get use doc type property from query session */
+    static boolean getUseDocType(IQuerySession session, String catalogAlias)
+    {
+        Boolean useDocType = session.getCatalogProperty(catalogAlias, ESCatalog.USE_DOC_TYPE_KEY);
+        return useDocType == null ? false
+                : useDocType;
+    }
+
+    /** Build search url */
+    static String getSearchUrl(boolean useDocType, String endpoint, String index, String type, Integer size, Integer scrollMinutes, String indexField)
+    {
+        if (ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(type)
+                && !useDocType)
+        {
+            type = "";
+        }
+
+        StringUtils.requireNonBlank(endpoint, "endpoint is required");
+        return String.format("%s/%s%s/_search?filter_path=_scroll_id,hits.hits%s%s", endpoint, isBlank(index) ? "*"
+                : index,
+                isBlank(type) ? ""
+                        : ("/" + type),
+                scrollMinutes != null ? ("&scroll=" + scrollMinutes + "m")
+                        : "",
+                size != null ? ("&size=" + size)
+                        : "");
+    }
+
+    /** Build scroll url */
+    static String getScrollUrl(String endpoint, int scrollMinutes)
+    {
+        StringUtils.requireNonBlank(endpoint, "endpoint is required");
+        return String.format("%s/_search/scroll?scroll=%dm&filter_path=_scroll_id,hits.hits", endpoint, scrollMinutes);
+    }
+
+    /** Build search template url */
+    static String getSearchTemplateUrl(boolean useDocType, String endpoint, String index, String type, Integer size, Integer scrollMinutes)
+    {
+        if (ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(type)
+                && !useDocType)
+        {
+            type = "";
+        }
+
+        StringUtils.requireNonBlank(endpoint, "endpoint is required");
+        return String.format("%s/%s/%s_search/template?filter_path=_scroll_id,hits.hits%s%s", endpoint, isBlank(index) ? "*"
+                : index,
+                isBlank(type) ? ""
+                        : (type + "/"),
+                scrollMinutes != null ? ("&scroll=" + scrollMinutes + "m")
+                        : "",
+                size != null ? ("&size=" + size)
+                        : "");
+    }
+
+    /** Build mget url */
+    static String getMgetUrl(boolean useDocType, String endpoint, String index, String type)
+    {
+        if (ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(type)
+                && !useDocType)
+        {
+            type = "";
+        }
+        else
+        {
+            StringUtils.requireNonBlank(type, "type is required");
+        }
+
+        StringUtils.requireNonBlank(endpoint, "endpoint is required");
+        StringUtils.requireNonBlank(index, "index is required");
+        return String.format("%s/%s/%s_mget", endpoint, index, !isBlank(type) ? (type + "/")
+                : "");
     }
 
     /** Build search body **/

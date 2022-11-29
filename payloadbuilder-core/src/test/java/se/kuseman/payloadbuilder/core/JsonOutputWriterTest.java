@@ -1,6 +1,10 @@
 package se.kuseman.payloadbuilder.core;
 
+import java.io.StringReader;
 import java.io.StringWriter;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Assert;
@@ -52,14 +56,63 @@ public class JsonOutputWriterTest extends Assert
         p.getValue()
                 .writeValue("hello " + (char) 10 + " wor,ld");
         p.getValue()
+                .writeFieldName("iter");
+        p.getValue()
+                .writeValue(Arrays.asList(0, 1, 2)
+                        .iterator());
+        p.getValue()
+                .writeFieldName("col");
+        p.getValue()
+                .writeValue(Arrays.asList(3, 4, 5));
+        p.getValue()
+                .writeFieldName("map");
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("key", "value");
+        m.put("key1", 10.20);
+        p.getValue()
+                .writeValue(m);
+        p.getValue()
+                .writeFieldName("reader");
+        p.getValue()
+                .writeValue(new StringReader("test"));
+        p.getValue()
+                .writeFieldName("sequence");
+        p.getValue()
+                .writeValue(new CharSequence()
+                {
+                    String value = "sequence-value";
+
+                    @Override
+                    public CharSequence subSequence(int start, int end)
+                    {
+                        return null;
+                    }
+
+                    @Override
+                    public int length()
+                    {
+                        return value.length();
+                    }
+
+                    @Override
+                    public char charAt(int index)
+                    {
+                        return value.charAt(index);
+                    }
+                });
+        p.getValue()
                 .endObject();
         p.getValue()
                 .endRow();
         p.getValue()
                 .close();
 
-        assertEquals("{\"col1\":null,\"col2\":true,\"col3\":1,\"col4\":1.1,\"col5\":false,\"col6\":\"hello \\n wor,ld\"}", p.getKey()
-                .toString());
+        // CSOFF
+        assertEquals(
+                "{\"col1\":null,\"col2\":true,\"col3\":1,\"col4\":1.1,\"col5\":false,\"col6\":\"hello \\n wor,ld\",\"iter\":[0,1,2],\"col\":[3,4,5],\"map\":{\"key\":\"value\",\"key1\":10.2},\"reader\":\"test\",\"sequence\":\"sequence-value\"}",
+                p.getKey()
+                        .toString());
+        // CSON
 
         JsonSettings settings = new JsonSettings();
         settings.setResultSetSeparator("new resultSet\n\n\n");

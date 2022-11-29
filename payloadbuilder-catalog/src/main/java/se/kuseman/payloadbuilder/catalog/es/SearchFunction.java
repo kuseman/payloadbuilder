@@ -3,6 +3,9 @@ package se.kuseman.payloadbuilder.catalog.es;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.isBlank;
+import static se.kuseman.payloadbuilder.catalog.es.ESUtils.getScrollUrl;
+import static se.kuseman.payloadbuilder.catalog.es.ESUtils.getSearchTemplateUrl;
+import static se.kuseman.payloadbuilder.catalog.es.ESUtils.getSearchUrl;
 
 import java.io.IOException;
 import java.util.List;
@@ -21,7 +24,6 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.INamedExpression;
 import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 import se.kuseman.payloadbuilder.api.operator.Operator.TupleIterator;
-import se.kuseman.payloadbuilder.api.utils.StringUtils;
 
 /** Search ES */
 class SearchFunction extends TableFunctionInfo
@@ -179,16 +181,17 @@ class SearchFunction extends TableFunctionInfo
             throw new IllegalArgumentException("'template' and 'body' arguments are mutual exclusive for function " + getName());
         }
 
-        final String searchUrl = !isBlank(template) ? getSearchTemplateUrl(endpoint, index, type, scroll ? SCROLL_SIZE
+        boolean useDocType = ESUtils.getUseDocType(context.getSession(), catalogAlias);
+        final String searchUrl = !isBlank(template) ? getSearchTemplateUrl(useDocType, endpoint, index, type, scroll ? SCROLL_SIZE
                 : null,
                 scroll ? 2
                         : null)
-                : ESOperator.getSearchUrl(endpoint, index, type, scroll ? SCROLL_SIZE
+                : getSearchUrl(useDocType, endpoint, index, type, scroll ? SCROLL_SIZE
                         : null,
                         scroll ? 2
                                 : null,
                         null);
-        final String scrollUrl = scroll ? ESOperator.getScrollUrl(endpoint, 2)
+        final String scrollUrl = scroll ? getScrollUrl(endpoint, 2)
                 : null;
 
         AtomicLong sentBytes = new AtomicLong();
@@ -224,19 +227,6 @@ class SearchFunction extends TableFunctionInfo
 
             return null;
         });
-    }
-
-    static String getSearchTemplateUrl(String endpoint, String index, String type, Integer size, Integer scrollMinutes)
-    {
-        StringUtils.requireNonBlank(endpoint, "endpoint is required");
-        return String.format("%s/%s/%s_search/template?filter_path=_scroll_id,hits.hits%s%s", endpoint, isBlank(index) ? "*"
-                : index,
-                isBlank(type) ? ""
-                        : (type + "/"),
-                scrollMinutes != null ? ("&scroll=" + scrollMinutes + "m")
-                        : "",
-                size != null ? ("&size=" + size)
-                        : "");
     }
 
     private String getBody(String body, String template, String params)

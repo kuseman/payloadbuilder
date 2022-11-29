@@ -309,11 +309,16 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         {
             if (targetOrdinal == -1)
             {
-                /*
+                /* @formatter:off
                  * tupleOrdinal == -1
                  *
-                 * <primitive> v_X = <default>; boolean isNull_X = true; { int c = tuple.getColumnOrdinal(-1, "col"); isNull_X = c >= 0 ? tuple.isNull(c) : true; v_X = isNull_x ? v_X :
-                 * tuple.get<Primitive>(-1, c); }
+                 * <primitive> v_X = <default>;
+                 * boolean isNull_X = true;
+                 * {
+                 *   int c = tuple.getColumnOrdinal(-1, "col");
+                 *   isNull_X = c >= 0 ? tuple.isNull(c) : true; v_X = isNull_x ? v_X : tuple.get<Primitive>(-1, c);
+                 * }
+                 * @formatter:on
                  */
                 code.setCode(String.format("//%s\n" // qname
                                            + "%s %s = %s;\n" // dataType, resVar, defaultDataType
@@ -330,10 +335,19 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
             else
             {
                 /*
+                 * @formatter:off
                  * tupleOrdinal >= 0
                  *
-                 * Object t_v_X = tuple.getTuple(targetOrdinal); boolean isNull_X = true; <primitive> v_X = <default>; if (t_v_X instanceof Tuple) { int c = ((Tuple)
-                 * t_v_X).getColumnOrdinal(targetOrdinal, "col"); isNull_X = c >= 0 ? ((Tuple) t_v_X).isNull(c) : true; v_x = isNull_x ? v_x : ((Tuple) t_v_X).get<Primitive>(targetOrdinal, c); }
+                 * Object t_v_X = tuple.getTuple(targetOrdinal);
+                 * boolean isNull_X = true;
+                 * <primitive> v_X = <default>;
+                 * if (t_v_X instanceof Tuple)
+                 * {
+                 *   int c = ((Tuple) t_v_X).getColumnOrdinal(targetOrdinal, "col");
+                 *   isNull_X = c >= 0 ? ((Tuple) t_v_X).isNull(c) : true;
+                 *   v_x = isNull_x ? v_x : ((Tuple) t_v_X).get<Primitive>(targetOrdinal, c);
+                 * }
+                 * @formatter:on
                  */
                 String tupleVar = "t_" + code.getResVar();
                 code.setCode(String.format("//%s\n" + "Tuple %s = %s.getTuple(%d);\n" // tupleVar, context tupleVar, targetOrdinal
@@ -354,9 +368,19 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         else if (targetOrdinal == -1)
         {
             /*
+             * @formatter:off
+             *
              * tupleOrdinal == -1
              *
-             * Object v_X = null; boolean isNull_X = true; { int c = tuple.getColumnOrdinal(-1, "col"); v_X = c >= 0 ? tuple.getValue(-1, c) : null; isNull_X = v_X == null; }
+             * Object v_X = null;
+             * boolean isNull_X = true;
+             * {
+             *   int c = tuple.getColumnOrdinal(-1, "col");
+             *   v_X = c >= 0 ? tuple.getValue(-1, c) : null;
+             *   isNull_X = v_X == null;
+             * }
+             *
+             * @formatter:on
              */
             code.setCode(String.format("//%s\n" // qname
                                        + "Object %s = null;\n" // resVar
@@ -373,10 +397,21 @@ public class QualifiedReferenceExpression extends Expression implements HasIdent
         else
         {
             /*
+             * @formatter:off
+             *
              * tupleOrdinal >= 0
              *
-             * Object t_v_X = tuple.getTuple(targetOrdinal); boolean isNull_X = true; Object v_X = null; if (t_v_X instanceof Tuple) { int c = ((Tuple) t_v_X).getColumnOrdinal(targetOrdinal, "col");
-             * v_X = c >= 0 ? tuple.getValue(-1, c) : null; isNull_X = v_X == null; }
+             * Object t_v_X = tuple.getTuple(targetOrdinal);
+             * boolean isNull_X = true;
+             * Object v_X = null;
+             * if (t_v_X instanceof Tuple)
+             * {
+             *   int c = ((Tuple) t_v_X).getColumnOrdinal(targetOrdinal, "col");
+             *   v_X = c >= 0 ? tuple.getValue(-1, c) : null;
+             *   isNull_X = v_X == null;
+             * }
+             *
+             * @formatter:on
              */
             String tupleVar = "t_" + code.getResVar();
             code.setCode(String.format("//%s\n" + "Tuple %s = %s.getTuple(%d);\n" // tupleVar, context tupleVar, targetOrdinal

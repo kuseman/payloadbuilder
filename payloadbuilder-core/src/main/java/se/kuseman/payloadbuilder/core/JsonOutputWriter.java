@@ -7,8 +7,11 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+
+import org.apache.commons.io.input.CharSequenceReader;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -213,9 +216,29 @@ public class JsonOutputWriter implements OutputWriter
                 }
                 endArray();
             }
+            else if (value instanceof Iterator)
+            {
+                currentField = null;
+                @SuppressWarnings("unchecked")
+                Iterator<Object> it = (Iterator<Object>) value;
+
+                startArray();
+                while (it.hasNext())
+                {
+                    writeValue(it.next());
+                }
+                endArray();
+            }
             else if (value instanceof Reader)
             {
                 try (Reader reader = (Reader) value)
+                {
+                    generator.writeString(reader, -1);
+                }
+            }
+            else if (value instanceof CharSequence)
+            {
+                try (Reader reader = new CharSequenceReader((CharSequence) value))
                 {
                     generator.writeString(reader, -1);
                 }

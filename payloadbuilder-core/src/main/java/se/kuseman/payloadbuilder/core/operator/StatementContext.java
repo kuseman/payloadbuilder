@@ -1,5 +1,6 @@
 package se.kuseman.payloadbuilder.core.operator;
 
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -33,7 +34,7 @@ public class StatementContext implements IStatementContext
     private Iterator<IOrdinalValues> outerOrdinalValues;
     /** Holder for lambda references during evaluation */
     private List<Object> lambdaValues;
-    private ZonedDateTime now = ZonedDateTime.now();
+    private ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
     /** Current row count of previous select statement */
     private int rowCount;
     /** Reference to current context tuple. Used when evaluating expression through out a query */
@@ -63,7 +64,7 @@ public class StatementContext implements IStatementContext
     {
         rowCount = 0;
         tuple = null;
-        now = ZonedDateTime.now();
+        now = ZonedDateTime.now(ZoneOffset.UTC);
         lambdaValues = null;
         outerOrdinalValues = null;
         nodeDataById.clear();
@@ -101,6 +102,7 @@ public class StatementContext implements IStatementContext
     }
 
     /** Get or create node data provided id */
+    @Override
     @SuppressWarnings("unchecked")
     public <T extends NodeData> T getOrCreateNodeData(Integer nodeId)
     {
