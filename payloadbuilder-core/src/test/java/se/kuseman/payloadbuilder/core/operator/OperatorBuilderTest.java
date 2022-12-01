@@ -320,10 +320,12 @@ public class OperatorBuilderTest extends AOperatorTest
 
         assertEquals(expected, queryResult.operator);
 
+        TableAlias subQueryAlias = queryResult.aliases.get(queryResult.aliases.size() - 1);
+
         Projection expectedProjection = new RootProjection(asList("mul", "r", "r1", "r2", "r1A"),
                 asList(new ExpressionProjection(en("r.Value * r1.Value * r2.Value")), new ExpressionProjection(en("r.Value")),
                         new ExpressionProjection(en("r1.filter(x -> x.Value > 10).map(x -> x.Value)")), new ExpressionProjection(en("r2.Value")),
-                        new ExpressionProjection(new SubQueryExpression(new SubQueryExpressionOperator(7, queryResult.tableOperators.get(0)), new String[] { "Value" },
+                        new ExpressionProjection(new SubQueryExpression(new SubQueryExpressionOperator(7, subQueryAlias, queryResult.tableOperators.get(0)), new String[] { "Value" },
                                 new ExpressionProjection[] { new ExpressionProjection(en("Value")) }, For.ARRAY))));
 
         // System.err.println(expected.toString(1));
@@ -431,7 +433,7 @@ public class OperatorBuilderTest extends AOperatorTest
                        + "    select"
                        + "    art_id,"
                        + "    note_id "
-                       + "    from open_rows(aa.unionall(aa.ap))"
+                       + "    from open_rows(aa.ap)"
                        + "    for object"
                        + "  ) arr2 "
                        + "from article a "
@@ -620,9 +622,13 @@ public class OperatorBuilderTest extends AOperatorTest
 
         assertEquals(expected, result.operator);
 
+        // The last alias added is the subquery one
+        TableAlias subQueryAlias = result.aliases.get(result.aliases.size() - 1);
+
         Projection expectedProjection = new RootProjection(asList("arr"),
-                asList(new ExpressionProjection(new SubQueryExpression(new FilterOperator(7, new SubQueryExpressionOperator(6, result.tableOperators.get(2)), new ExpressionPredicate(en("s.id4 > 0"))),
-                        new String[] { "id1", "id2" }, new Projection[] { new ExpressionProjection(en("s.id1")), new ExpressionProjection(en("a.id2")) }, Select.For.ARRAY))));
+                asList(new ExpressionProjection(
+                        new SubQueryExpression(new FilterOperator(7, new SubQueryExpressionOperator(6, subQueryAlias, result.tableOperators.get(2)), new ExpressionPredicate(en("s.id4 > 0"))),
+                                new String[] { "id1", "id2" }, new Projection[] { new ExpressionProjection(en("s.id1")), new ExpressionProjection(en("a.id2")) }, Select.For.ARRAY))));
 
         assertEquals(expectedProjection, result.projection);
     }

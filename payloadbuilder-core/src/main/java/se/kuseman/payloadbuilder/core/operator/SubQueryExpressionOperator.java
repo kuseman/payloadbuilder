@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.Map;
 
+import se.kuseman.payloadbuilder.api.TableAlias;
 import se.kuseman.payloadbuilder.api.operator.AOperator;
 import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 import se.kuseman.payloadbuilder.api.operator.Operator;
@@ -45,10 +46,17 @@ import se.kuseman.payloadbuilder.api.operator.Tuple;
 class SubQueryExpressionOperator extends AOperator
 {
     private final Operator target;
+    private final TableAlias alias;
 
-    SubQueryExpressionOperator(int nodeId, Operator target)
+    /**
+     * @param nodeId Id of the node
+     * @param alias The (optional) alias that this subquery targets. This is used to know if parent tuple should be delegated to or not when asking for a tuple ordinal.
+     * @param target Target operator
+     */
+    SubQueryExpressionOperator(int nodeId, TableAlias alias, Operator target)
     {
         super(nodeId);
+        this.alias = alias;
         this.target = requireNonNull(target, "target");
     }
 
@@ -84,7 +92,9 @@ class SubQueryExpressionOperator extends AOperator
                 {
                     if (hierarchyTuple == null)
                     {
-                        hierarchyTuple = new HierarchyTuple(contextTuple);
+                        int maxTupleOrdinal = alias != null ? alias.getMaxTupleOrdinal()
+                                : -1;
+                        hierarchyTuple = new HierarchyTuple(maxTupleOrdinal, contextTuple);
                     }
                     hierarchyTuple.setCurrent(tuple);
                     return hierarchyTuple;
@@ -105,10 +115,17 @@ class SubQueryExpressionOperator extends AOperator
         if (obj instanceof SubQueryExpressionOperator)
         {
             SubQueryExpressionOperator that = (SubQueryExpressionOperator) obj;
+
+            int thisTupleOrdinal = alias != null ? alias.getTupleOrdinal()
+                    : -1;
+            int thatTupleOrdinal = that.alias != null ? that.alias.getTupleOrdinal()
+                    : -1;
+
             return nodeId.equals(that.nodeId)
+                    && thisTupleOrdinal == thatTupleOrdinal
                     && target.equals(that.target);
         }
-        return super.equals(obj);
+        return false;
     }
 
     /**
@@ -125,11 +142,13 @@ class SubQueryExpressionOperator extends AOperator
      **/
     static class HierarchyTuple implements Tuple
     {
+        private final int maxTupleOrdinal;
         private final Tuple parent;
         private Tuple current;
 
-        HierarchyTuple(Tuple parent)
+        HierarchyTuple(int maxTupleOrdinal, Tuple parent)
         {
+            this.maxTupleOrdinal = maxTupleOrdinal;
             this.parent = parent;
         }
 
@@ -151,11 +170,27 @@ class SubQueryExpressionOperator extends AOperator
         @Override
         public Tuple getTuple(int tupleOrdinal)
         {
-            /*
-             * select col , ( select a.col1, b.col2, c.col from tableB b ordinal = 1 (current) inner join tableC c ordinal = 2 for object ) obj from tableA a ordinal = 0 (parent)
+            /*@formatter:off
+             * select col ,
+             * (
+             *   select a.col1, b.col2, c.col
+             *   from tableB b                           ordinal = 1 (current)
+             *   inner join tableC c                     ordinal = 2
+             *   for object
+             * ) obj
+             * from tableA a                             ordinal = 0 (parent)
              *
-             * select ( id <------ 1 , c.id <------ 2 from open_rows(b) <------ 1 (current) ) obj from tableA a 0 (composite parent) inner join tableB b 1 on ... inner join tableC c 2 on ...
-             *
+             * select
+             * (
+             *   id                        <------ 1
+             *   , c.id                    <------ 2
+             *   from open_rows(b)         <------ 1 (current)
+             * ) obj
+             * from tableA a               0 (composite parent)
+             * inner join tableB b         1
+             *   on ...
+             * inner join tableC c         2 on ...
+             *@formatter:on
              */
             if (tupleOrdinal == -1
                     || current == null
@@ -172,6 +207,15 @@ class SubQueryExpressionOperator extends AOperator
                 {
                     return result;
                 }
+
+                // If the target ordinal is supposed to be below current
+                // then return result since we don't need to ask parent
+                if (maxTupleOrdinal >= 0
+                        && tupleOrdinal <= maxTupleOrdinal)
+                {
+                    return result;
+                }
+
             }
             // if not found delegate to parent
             return parent.getTuple(tupleOrdinal);

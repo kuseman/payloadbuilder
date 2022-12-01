@@ -172,6 +172,7 @@ public class AOperatorTest extends AParserTest
         BuildResult buildResult = OperatorBuilder.create(session, select.getSelect());
 
         QueryResult result = new QueryResult();
+        result.aliases = aliases;
 
         if (operatorAlias.getValue() != null)
         {
@@ -220,5 +221,6 @@ public class AOperatorTest extends AParserTest
         Operator operator;
         Projection projection;
         TableAlias alias;
+        List<TableAlias> aliases;
     }
 }

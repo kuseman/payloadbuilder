@@ -277,7 +277,10 @@ public class OperatorBuilder extends ASelectVisitor<Void, OperatorBuilder.Contex
 
         if (context.insideSubQueryExpression)
         {
-            context.setOperator(new SubQueryExpressionOperator(context.acquireNodeId(), context.getOperator()));
+            // Use the linked alias if any
+            TableAlias link = tableAlias != null ? ObjectUtils.defaultIfNull(tableAlias.getLinkAlias(), tableAlias)
+                    : null;
+            context.setOperator(new SubQueryExpressionOperator(context.acquireNodeId(), link, context.getOperator()));
         }
 
         if (batchLimitOption != null)

@@ -36,7 +36,7 @@ public abstract class TableFunctionInfo extends FunctionInfo
     
      * Example:
      * Table valued function that opens an alias for row traversal in a sub query expression
-     * <b>open(aa)</b>
+     * <b>open_rows(aa)</b>
      * Resulting alias will the argument result ie. [aa]
      * </pre>
      *

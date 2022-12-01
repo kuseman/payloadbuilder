@@ -79,6 +79,7 @@ import java.util.stream.IntStream;
 public class TableAlias
 {
     private final TableAlias parent;
+    private final TableAlias linkAlias;
     private final QualifiedName table;
     private final String alias;
     private final List<TableAlias> childAliases = new ArrayList<>();
@@ -94,16 +95,20 @@ public class TableAlias
      **/
     private final int tupleOrdinal;
     private final Type type;
+    private int maxTupleOrdinal = -1;
 
-    TableAlias(int tupleOrdinal, TableAlias parent, boolean connectAsChild, QualifiedName table, String alias, TableMeta tableMeta, Type type)
+    TableAlias(int tupleOrdinal, TableAlias parent, TableAlias linkAlias, boolean connectAsChild, QualifiedName table, String alias, TableMeta tableMeta, Type type)
     {
         this.tupleOrdinal = tupleOrdinal;
         this.parent = parent;
+        this.linkAlias = linkAlias;
         this.table = requireNonNull(table, "table");
         this.alias = requireNonNull(alias, "alias");
         this.tableMeta = tableMeta;
         this.type = requireNonNull(type, "type");
 
+        // Init max as the ordinal
+        this.maxTupleOrdinal = tupleOrdinal;
         if (parent != null)
         {
             // Verify no siblings has the same alias
@@ -116,6 +121,23 @@ public class TableAlias
             {
                 parent.childAliases.add(this);
             }
+        }
+        setMaxTupleOrdinal(tupleOrdinal);
+    }
+
+    private void setMaxTupleOrdinal(int tupleOrdinal)
+    {
+        // Only set max if we have actual children.
+        // There can be a connection from a child to a parent
+        // that is not connection in the opposite direction. Example
+        // when having subquery expressions.
+        if (!childAliases.isEmpty())
+        {
+            maxTupleOrdinal = Math.max(maxTupleOrdinal, tupleOrdinal);
+        }
+        if (parent != null)
+        {
+            parent.setMaxTupleOrdinal(tupleOrdinal);
         }
     }
 
@@ -139,9 +161,20 @@ public class TableAlias
         return parent;
     }
 
+    public TableAlias getLinkAlias()
+    {
+        return linkAlias;
+    }
+
     public List<TableAlias> getChildAliases()
     {
         return unmodifiableList(childAliases);
+    }
+
+    /** Get the max tuple ordinal contained within this alias including children */
+    public int getMaxTupleOrdinal()
+    {
+        return maxTupleOrdinal;
     }
 
     /** Get child alias for provided alias */
@@ -317,6 +350,7 @@ public class TableAlias
         private TableAlias parent;
         private TableMeta tableMeta;
         private List<TableAliasBuilder> childAliases;
+        private TableAlias linkAlias;
         private boolean connectAsChild = true;
 
         TableAliasBuilder(int tupleOrdinal, Type type, QualifiedName qname, String alias)
@@ -357,12 +391,19 @@ public class TableAlias
             this.childAliases = requireNonNull(childAliases);
             return this;
         }
+
+        /** Link this alias to another alias */
+        public TableAliasBuilder linkToAlias(TableAlias linkAlias)
+        {
+            this.linkAlias = linkAlias;
+            return this;
+        }
         // CSON
 
         /** Build alias */
         public TableAlias build()
         {
-            TableAlias result = new TableAlias(tupleOrdinal, parent, connectAsChild, qname, alias, tableMeta, type);
+            TableAlias result = new TableAlias(tupleOrdinal, parent, linkAlias, connectAsChild, qname, alias, tableMeta, type);
             if (childAliases != null)
             {
                 childAliases.forEach(c ->
@@ -379,5 +420,6 @@ public class TableAlias
         {
             return new TableAliasBuilder(tupleOrdinal, type, qname, alias);
         }
+
     }
 }

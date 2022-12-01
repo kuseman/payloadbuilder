@@ -596,15 +596,27 @@ public class StatementResolver implements StatementVisitor<Statement, StatementR
              * When building sub query expression table alias hierarchy we only bind one way, the sub query knows it's parent but the parent does not know about the sub query as child
              *
              * ie.
-             *
-             * select col , (select a.col, b.col from tableB b for object) obj from tableA a where b.col > 10 <---- this should not be possible
+             * @formatter:off
+             * select col ,
+             *   (
+             *     select a.col, b.col
+             *     from
+             *     tableB b
+             *     for object
+             *   ) obj
+             * from tableA a
+             * where b.col > 10 <---- this should not be possible
              *
              * Here we will have a table alias hierarchy like this:
              *
-             * ROOT tableA <---- Should NOT know about tableB tableB <---- Should know about it's parent
+             * ROOT
+             *   tableA <---- Should NOT know about tableB
+             *     tableB <---- Should know about it's parent
              *
-             * From a sub query perspective: we should be able to access everything, ie. traverse upwards From a table source perspective: we should not be able to access sub query expressions since
+             * From a sub query perspective: we should be able to access everything, ie. traverse upwards
+             * From a table source perspective: we should not be able to access sub query expressions since
              * these are not calculated until after FROM part is complete
+             * @formatter:on
              */
 
             TableAlias subQueryAlias = TableAliasBuilder.of(context.tupleOrdinal++, TableAlias.Type.SUBQUERY, QualifiedName.of("SubQuery"), "")
@@ -883,7 +895,7 @@ public class StatementResolver implements StatementVisitor<Statement, StatementR
                             .getAlias())
                     .tableMeta(tableFunction.getFunctionInfo()
                             .getTableMeta())
-                    .parent(context.parentAlias)
+                    .parent(context.parentAlias, false) // Don't connect this alias since we will recreate it further down
                     .build();
 
             // Use the functions alias when resolving if empty
@@ -895,7 +907,24 @@ public class StatementResolver implements StatementVisitor<Statement, StatementR
             context.tableAliasByOrdinal.put(tableAlias.getTupleOrdinal(), tableAlias);
             Pair<List<Expression>, Set<TableAlias>> result = resolveFunction(context, tableAlias, tableFunction.getFunctionInfo(), tableFunction.getArguments(), tableFunction.getToken());
 
+            // The target aliases that this table function references
             context.scopeAliases = result.getValue();
+
+            if (context.scopeAliases.size() != 1)
+            {
+                throw new ParseException("TVF's pointing to multiple aliases is not supported", tableFunction.getToken());
+            }
+
+            // Recreate alias again with link to the resulting TVF alias
+            tableAlias = TableAliasBuilder.of(tableAlias.getTupleOrdinal(), TableAlias.Type.FUNCTION, QualifiedName.of(tableFunction.getFunctionInfo()
+                    .getName()), tableFunction.getTableAlias()
+                            .getAlias())
+                    .tableMeta(tableFunction.getFunctionInfo()
+                            .getTableMeta())
+                    .linkToAlias(context.scopeAliases.iterator()
+                            .next())
+                    .parent(context.parentAlias)
+                    .build();
 
             return new TableFunction(tableFunction.getCatalogAlias(), tableAlias, tableFunction.getFunctionInfo(), result.getKey(), tableFunction.getOptions()
                     .stream()
@@ -1439,23 +1468,36 @@ public class StatementResolver implements StatementVisitor<Statement, StatementR
      */
     private static Pair<List<Expression>, Set<TableAlias>> resolveFunction(Context context, TableAlias alias, FunctionInfo functionInfo, List<Expression> arguments, Token token)
     {
-        /*
+        /*@formatter:off
          * Lambda function
          *
          * Parent aliases (ROOT)
          *
-         * map(aa, x -> x.id) Lambda binding aa -> x Alias result -> arg 1
+         * map(aa, x -> x.id)
+         * Lambda binding aa -> x
+         * Alias result -> arg 1
          *
-         * 1.visit aa Result alias => aa bind x to aa 2.visit x -> x.id Result alias => ROOT 3.Alias result = arg 1 => [ROOT]
+         * 1.visit aa
+         * Result alias => aa
+         * bind x to aa
+         * 2.visit x -> x.id
+         * Result alias => ROOT
+         * 3.Alias result = arg 1 => [ROOT]
          *
          * Multi alias function
          *
          * Parent aliases (ROOT)
          *
-         * concat(aa, ap) Alias result => all args
+         * concat(aa, ap)
+         * Alias result => all args
          *
-         * 1.visit aa Result alias => aa 2.visit ap Result alias => ap 3.Alias result => [aa, ap]
+         * 1.visit aa
+         * Result alias => aa
+         * 2.visit ap
+         * Result alias => ap
+         * 3.Alias result => [aa, ap]
          *
+         *@formatter:on
          */
 
         // Store parent aliases before resolving this function call
