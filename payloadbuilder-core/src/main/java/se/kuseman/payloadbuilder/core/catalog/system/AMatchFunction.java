@@ -2,30 +2,32 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Collections.singletonList;
 
-import java.util.Iterator;
 import java.util.List;
 
-import se.kuseman.payloadbuilder.api.TableMeta;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 import se.kuseman.payloadbuilder.core.catalog.LambdaFunction;
-import se.kuseman.payloadbuilder.core.operator.StatementContext;
-import se.kuseman.payloadbuilder.core.parser.LambdaExpression;
-import se.kuseman.payloadbuilder.core.utils.CollectionUtils;
+import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.expression.LambdaExpression;
 
 /** Any function. Check if any of inputs is true */
 class AMatchFunction extends ScalarFunctionInfo implements LambdaFunction
 {
     private static final List<LambdaBinding> LAMBDA_BINDINGS = singletonList(new LambdaBinding(1, 0));
 
-    private final MatchType type;
+    private final MatchType matchType;
 
-    AMatchFunction(Catalog catalog, MatchType type)
+    AMatchFunction(Catalog catalog, MatchType matchType)
     {
-        super(catalog, type.name);
-        this.type = type;
+        super(catalog, matchType.name, FunctionType.SCALAR);
+        this.matchType = matchType;
     }
 
     @Override
@@ -35,9 +37,9 @@ class AMatchFunction extends ScalarFunctionInfo implements LambdaFunction
     }
 
     @Override
-    public TableMeta.DataType getDataType(List<? extends IExpression> arguments)
+    public ResolvedType getType(List<? extends IExpression> arguments)
     {
-        return TableMeta.DataType.BOOLEAN;
+        return ResolvedType.of(Column.Type.Boolean);
     }
 
     @Override
@@ -47,50 +49,208 @@ class AMatchFunction extends ScalarFunctionInfo implements LambdaFunction
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
     {
-        Object argResult = arguments.get(0)
-                .eval(context);
-        if (argResult == null)
-        {
-            return null;
-        }
-        StatementContext ctx = (StatementContext) context.getStatementContext();
+        ValueVector value = arguments.get(0)
+                .eval(input, context);
+
         LambdaExpression le = (LambdaExpression) arguments.get(1);
-        int lambdaId = le.getLambdaIds()[0];
 
-        Iterator<Object> it = CollectionUtils.getIterator(argResult);
-        while (it.hasNext())
+        Type type = value.type()
+                .getType();
+
+        ValueVector lambdaResult = null;
+
+        if (type == Type.ValueVector
+                || type == Type.TupleVector)
         {
-            ctx.setLambdaValue(lambdaId, it.next());
-            Object obj = le.getExpression()
-                    .eval(context);
+            lambdaResult = new ValueVector()
+            {
+                LambdaUtils.RowTupleVector inputTupleVector = new LambdaUtils.RowTupleVector(input);
 
-            if (!(obj instanceof Boolean))
-            {
-                throw new IllegalArgumentException("Expected boolean result but got: " + obj + " from " + le.getExpression());
-            }
+                @Override
+                public ResolvedType type()
+                {
+                    return ResolvedType.valueVector(ResolvedType.of(Type.Boolean));
+                }
 
-            boolean result = (boolean) obj;
-            if (type == MatchType.ALL
-                    && !result)
-            {
-                return false;
-            }
-            else if (type == MatchType.NONE
-                    && result)
-            {
-                return false;
-            }
-            else if (type == MatchType.ANY
-                    && result)
-            {
-                return true;
-            }
+                @Override
+                public int size()
+                {
+                    return value.size();
+                }
+
+                @Override
+                public boolean isNullable()
+                {
+                    return false;
+                }
+
+                @Override
+                public boolean isNull(int row)
+                {
+                    return false;
+                }
+
+                @Override
+                public Object getValue(int row)
+                {
+                    ValueVector vector;
+                    if (type == Type.ValueVector)
+                    {
+                        inputTupleVector.setRowCount(1);
+                        vector = (ValueVector) value.getValue(row);
+                    }
+                    else
+                    {
+                        TupleVector tupleVector = (TupleVector) value.getValue(row);
+                        inputTupleVector.setRowCount(tupleVector.getRowCount());
+                        vector = ValueVector.literalObject(ResolvedType.tupleVector(tupleVector.getSchema()), tupleVector, 1);
+                    }
+
+                    ((ExecutionContext) context).getStatementContext()
+                            .setLambdaValue(le.getLambdaIds()[0], vector);
+
+                    inputTupleVector.setRow(row);
+                    return le.getExpression()
+                            .eval(inputTupleVector, context);
+                }
+            };
+        }
+        else
+        {
+            ((ExecutionContext) context).getStatementContext()
+                    .setLambdaValue(le.getLambdaIds()[0], value);
+
+            lambdaResult = le.getExpression()
+                    .eval(input, context);
         }
 
-        return type.defaultResult;
+        final ValueVector result = lambdaResult;
+        Type resultType = result.type()
+                .getType();
+
+        return new ValueVector()
+        {
+            @Override
+            public ResolvedType type()
+            {
+                return ResolvedType.of(Type.Boolean);
+            }
+
+            @Override
+            public int size()
+            {
+                return input.getRowCount();
+            }
+
+            @Override
+            public boolean isNullable()
+            {
+                return false;
+            }
+
+            @Override
+            public boolean isNull(int row)
+            {
+                return false;
+            }
+
+            @Override
+            public boolean getBoolean(int row)
+            {
+                if (resultType == Type.ValueVector)
+                {
+                    ValueVector vv = (ValueVector) result.getValue(row);
+                    int size = vv.size();
+                    for (int i = 0; i < size; i++)
+                    {
+                        boolean rowResult = vv.getPredicateBoolean(i);
+
+                        if (matchType == MatchType.ALL
+                                && !rowResult)
+                        {
+                            return false;
+                        }
+                        else if (matchType == MatchType.NONE
+                                && rowResult)
+                        {
+                            return false;
+                        }
+                        else if (matchType == MatchType.ANY
+                                && rowResult)
+                        {
+                            return true;
+                        }
+                    }
+                    return matchType.defaultResult;
+                }
+                else
+                {
+                    boolean boolResult = result.getPredicateBoolean(row);
+
+                    return ((matchType == MatchType.ALL
+                            || matchType == MatchType.ANY)
+                            && boolResult)
+                            || (matchType == MatchType.NONE
+                                    && !boolResult);
+                }
+            }
+
+            @Override
+            public Object getValue(int row)
+            {
+                throw new IllegalArgumentException("getValue should not be called on typed vectors");
+            }
+        };
     }
+
+    //
+    // @Override
+    // public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    // {
+    // Object argResult = arguments.get(0)
+    // .eval(context);
+    // if (argResult == null)
+    // {
+    // return null;
+    // }
+    // StatementContext ctx = (StatementContext) context.getStatementContext();
+    // LambdaExpression le = (LambdaExpression) arguments.get(1);
+    // int lambdaId = le.getLambdaIds()[0];
+    //
+    // Iterator<Object> it = CollectionUtils.getIterator(argResult);
+    // while (it.hasNext())
+    // {
+    // ctx.setLambdaValue(lambdaId, it.next());
+    // Object obj = le.getExpression()
+    // .eval(context);
+    //
+    // if (!(obj instanceof Boolean))
+    // {
+    // throw new IllegalArgumentException("Expected boolean result but got: " + obj + " from " + le.getExpression());
+    // }
+    //
+    // boolean result = (boolean) obj;
+    // if (type == MatchType.ALL
+    // && !result)
+    // {
+    // return false;
+    // }
+    // else if (type == MatchType.NONE
+    // && result)
+    // {
+    // return false;
+    // }
+    // else if (type == MatchType.ANY
+    // && result)
+    // {
+    // return true;
+    // }
+    // }
+    //
+    // return type.defaultResult;
+    // }
 
     // @Override
     // public ExpressionCode generateCode(

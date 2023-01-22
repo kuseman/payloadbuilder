@@ -1,6 +1,7 @@
 package se.kuseman.payloadbuilder.api;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
@@ -15,6 +16,7 @@ import java.util.List;
 /** Qualified name */
 public class QualifiedName
 {
+    public static QualifiedName EMPTY = new QualifiedName(emptyList());
     private final List<String> parts;
 
     public QualifiedName(List<String> parts)
@@ -49,13 +51,21 @@ public class QualifiedName
     /** Get the last part of the qualified name */
     public String getLast()
     {
-        return parts.get(parts.size() - 1);
+        if (parts.size() > 0)
+        {
+            return parts.get(parts.size() - 1);
+        }
+        return "";
     }
 
     /** Get the first part in qualified name */
     public String getFirst()
     {
-        return parts.get(0);
+        if (parts.size() > 0)
+        {
+            return parts.get(0);
+        }
+        return "";
     }
 
     /** Extracts a new qualified name from this instance with parts defined in from to */
@@ -71,7 +81,26 @@ public class QualifiedName
         {
             return this;
         }
+        else if (parts.size() == 1
+                && from == 1)
+        {
+            return EMPTY;
+        }
+        else if (from > parts.size())
+        {
+            return EMPTY;
+        }
+
         return new QualifiedName(parts.subList(from, parts.size()));
+    }
+
+    /** Extends this qualified name with provided part */
+    public QualifiedName extend(String part)
+    {
+        List<String> parts = new ArrayList<>(this.parts.size() + 1);
+        parts.addAll(this.parts);
+        parts.add(part);
+        return new QualifiedName(parts);
     }
 
     /** Returns a dot delimited representation of this qualified name */
@@ -108,6 +137,10 @@ public class QualifiedName
     /** Construct a qualified name from provided parts */
     public static QualifiedName of(String... parts)
     {
+        if (parts.length == 0)
+        {
+            return EMPTY;
+        }
         return new QualifiedName(asList(parts));
     }
 

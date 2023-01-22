@@ -1,10 +1,10 @@
 package se.kuseman.payloadbuilder.api.expression;
 
 /** Definition of a comparison expression */
-public interface IComparisonExpression extends IExpression
+public interface IComparisonExpression extends IBinaryExpression
 {
     /** Return type of comparison */
-    Type getType();
+    Type getComparisonType();
 
     /** Type */
     public enum Type

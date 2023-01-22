@@ -6,14 +6,14 @@ import java.util.List;
 
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
-/** Definition of a function */
+/** Base class for functions */
 public abstract class FunctionInfo
 {
     private final Catalog catalog;
     private final String name;
-    private final Type type;
+    private final FunctionType type;
 
-    public FunctionInfo(Catalog catalog, String name, Type type)
+    public FunctionInfo(Catalog catalog, String name, FunctionType type)
     {
         this.catalog = requireNonNull(catalog, "catalog");
         this.name = requireNonNull(name, "name");
@@ -36,7 +36,7 @@ public abstract class FunctionInfo
         return catalog;
     }
 
-    public Type getType()
+    public FunctionType getFunctionType()
     {
         return type;
     }
@@ -87,16 +87,31 @@ public abstract class FunctionInfo
             return catalog.getName()
                     .equals(fi.getCatalog()
                             .getName())
-                    && name.equals(fi.getName())
-                    && type.equals(fi.getType());
+                    && name.equals(fi.name)
+                    && type.equals(fi.type);
         }
         return false;
     }
 
     /** Function type */
-    public enum Type
+    public enum FunctionType
     {
+        /** A scalar function used in expressions returning a scalar value. */
         SCALAR,
-        TABLE
+        /** A scalar function used in aggregations returning a scalar value from groups of values */
+        AGGREGATE,
+        /** A scalar function that act as both scalar and aggregate depending on context. */
+        SCALAR_AGGREGATE,
+        /** A table valued function used in function scans return a stream of {@link TupleVector} */
+        TABLE,
+        /** An operator function used in operators that supports transforming input stream to a scalar value. Ie. FOR clause */
+        OPERATOR;
+
+        /** Return true if this type is of aggregate type */
+        public boolean isAggregate()
+        {
+            return this == AGGREGATE
+                    || this == SCALAR_AGGREGATE;
+        }
     }
 }

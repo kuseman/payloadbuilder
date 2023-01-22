@@ -1,28 +1,30 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import java.util.List;
+import java.util.Objects;
 
-import se.kuseman.payloadbuilder.api.TableMeta;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
-import se.kuseman.payloadbuilder.api.codegen.CodeGeneratorContext;
-import se.kuseman.payloadbuilder.api.codegen.ExpressionCode;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
-import se.kuseman.payloadbuilder.core.utils.ObjectUtils;
 
 /** Function listOf. Creates a list of provided arguments */
 class ContainsFunction extends ScalarFunctionInfo
 {
     ContainsFunction(Catalog catalog)
     {
-        super(catalog, "contains");
+        super(catalog, "contains", FunctionType.SCALAR);
     }
 
     @Override
     public String getDescription()
     {
-        return "Checks if provided collection contains value argument" + System.lineSeparator() + "ie. contains(<collection expression>, <value expression>)";
+        return "Checks if provided array contains value argument" + System.lineSeparator() + "ie. contains(<array expression>, <value expression>)";
     }
 
     @Override
@@ -32,45 +34,77 @@ class ContainsFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public TableMeta.DataType getDataType(List<? extends IExpression> arguments)
+    public ResolvedType getType(List<? extends IExpression> arguments)
     {
-        return TableMeta.DataType.BOOLEAN;
+        return ResolvedType.of(Column.Type.Boolean);
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
     {
-        // Function has a declared getInputTypes method that guards against wrong argument count
-        Object arg0 = arguments.get(0)
-                .eval(context);
-        Object arg1 = arguments.get(1)
-                .eval(context);
+        final ValueVector array = arguments.get(0)
+                .eval(input, context);
+        final ValueVector findValue = arguments.get(1)
+                .eval(input, context);
 
-        return ObjectUtils.contains(arg0, arg1);
-    }
+        final Type arrayType = array.type()
+                .getType();
 
-    @Override
-    public boolean isCodeGenSupported(List<? extends IExpression> arguments)
-    {
-        return arguments.stream()
-                .allMatch(IExpression::isCodeGenSupported);
-    }
+        return new ValueVector()
+        {
+            @Override
+            public ResolvedType type()
+            {
+                return ResolvedType.of(Column.Type.Boolean);
+            }
 
-    @Override
-    public ExpressionCode generateCode(CodeGeneratorContext context, List<? extends IExpression> arguments)
-    {
-        ExpressionCode code = context.getExpressionCode();
-        context.addImport("se.kuseman.payloadbuilder.core.utils.ObjectUtils");
+            @Override
+            public int size()
+            {
+                return input.getRowCount();
+            }
 
-        ExpressionCode arg0Code = arguments.get(0)
-                .generateCode(context);
-        ExpressionCode arg1Code = arguments.get(1)
-                .generateCode(context);
+            @Override
+            public boolean isNullable()
+            {
+                return false;
+            }
 
-        String template = "%s%s" // arg0Code, arg1Code
-                          + "boolean %s = false;\n" // nullVar
-                          + "boolean %s = ObjectUtils.contains(%s, %s);\n"; // arg0 resVar, org1 resVar
-        code.setCode(String.format(template, arg0Code.getCode(), arg1Code.getCode(), code.getNullVar(), code.getResVar(), arg0Code.getResVar(), arg1Code.getResVar()));
-        return code;
+            @Override
+            public boolean isNull(int row)
+            {
+                return false;
+            }
+
+            @Override
+            public boolean getBoolean(int row)
+            {
+                Object findVal = findValue.valueAsObject(row);
+                Object arrVal = array.valueAsObject(row);
+
+                // Search vector
+                if (arrayType == Type.ValueVector)
+                {
+                    ValueVector vec = (ValueVector) arrVal;
+                    int size = vec.size();
+                    for (int i = 0; i < size; i++)
+                    {
+                        if (Objects.equals(vec.valueAsObject(i), findVal))
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+
+                return Objects.equals(arrVal, findVal);
+            }
+
+            @Override
+            public Object getValue(int row)
+            {
+                throw new IllegalArgumentException("getValue should not be called on typed vectors");
+            }
+        };
     }
 }

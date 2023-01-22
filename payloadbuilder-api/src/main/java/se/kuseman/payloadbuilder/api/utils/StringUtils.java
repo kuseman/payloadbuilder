@@ -9,6 +9,13 @@ public class StringUtils
     private static final int STRING_BUILDER_SIZE = 256;
     private static final String EMPTY = "";
 
+    /** Default string if null */
+    public static String defaultString(final String str, final String fallback)
+    {
+        return str == null ? fallback
+                : str;
+    }
+
     /** Returns true if provided sequence is blank */
     public static boolean isBlank(CharSequence seq)
     {

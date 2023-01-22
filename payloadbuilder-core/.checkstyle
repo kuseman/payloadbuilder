@@ -4,8 +4,14 @@
   <local-check-config name="java" location="/payloadbuilder/checkstyle.xml" type="project" description="">
     <additional-data name="protect-config-file" value="false"/>
   </local-check-config>
-  <fileset name="java" enabled="true" check-config-name="java" local="true">
-    <file-match-pattern match-pattern="^src/.*/java/.*\.java$" include-pattern="true"/>
+  <local-check-config name="java-test" location="/payloadbuilder/checkstyle-test.xml" type="project" description="">
+    <additional-data name="protect-config-file" value="false"/>
+  </local-check-config>
+  <fileset name="java" enabled="true" check-config-name="plb" local="false">
+    <file-match-pattern match-pattern="^src/main/java/.*\.java$" include-pattern="true"/>
+  </fileset>
+  <fileset name="java" enabled="true" check-config-name="plb-test" local="false">
+    <file-match-pattern match-pattern="^src/test/java/.*\.java$" include-pattern="true"/>
   </fileset>
   <filter name="FilesInSync" enabled="true"/>
 </fileset-config>

@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.api.operator.Tuple;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
 
 /** Cache provider for the {@link se.kuseman.payloadbuilder.core.operator.BatchCacheOperator} */
 public interface BatchCache extends Cache
@@ -22,7 +22,7 @@ public interface BatchCache extends Cache
      * NOTE! all input keys must provide a value in resulting map, NULL as indicator that value did not exist
      * </pre>
      **/
-    <TKey> Map<TKey, List<Tuple>> getAll(QualifiedName name, Iterable<TKey> keys);
+    <TKey> Map<TKey, List<TupleVector>> getAll(QualifiedName name, Iterable<TKey> keys);
 
     /**
      * Put all provided values to cache
@@ -31,5 +31,5 @@ public interface BatchCache extends Cache
      * @param values Values to put to cache
      * @param ttl TTL of the values. Null if no TTL
      */
-    <TKey> void putAll(QualifiedName name, Map<TKey, List<Tuple>> values, Duration ttl);
+    <TKey> void putAll(QualifiedName name, Map<TKey, List<TupleVector>> values, Duration ttl);
 }

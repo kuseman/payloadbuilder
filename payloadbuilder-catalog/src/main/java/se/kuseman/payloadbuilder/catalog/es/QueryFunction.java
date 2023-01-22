@@ -4,8 +4,10 @@ import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 
 /**
  * Match function that is applicable in query predicates that uses ES query_string operator on free text fields
@@ -18,7 +20,7 @@ class QueryFunction extends ScalarFunctionInfo
 {
     QueryFunction(Catalog catalog)
     {
-        super(catalog, "query");
+        super(catalog, "query", FunctionType.SCALAR);
     }
 
     @Override
@@ -31,7 +33,7 @@ class QueryFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
     {
         throw new IllegalArgumentException("'match' cannot be used in non Elastic query context.");
     }

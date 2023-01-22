@@ -22,7 +22,7 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicHeader;
 
-import se.kuseman.payloadbuilder.api.session.IQuerySession;
+import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 import se.kuseman.payloadbuilder.catalog.CredentialsException;
 
 /** Client utils */
@@ -85,7 +85,8 @@ public final class HttpClientUtils
                                 : recieveTimeout)
                         .build());
 
-        if (authType != AuthType.NONE)
+        if (authType != null
+                && authType != AuthType.NONE)
         {
             switch (authType)
             {

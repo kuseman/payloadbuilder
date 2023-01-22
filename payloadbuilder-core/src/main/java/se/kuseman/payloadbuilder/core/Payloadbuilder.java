@@ -1,6 +1,8 @@
 package se.kuseman.payloadbuilder.core;
 
 import se.kuseman.payloadbuilder.core.parser.QueryParser;
+import se.kuseman.payloadbuilder.core.planning.StatementPlanner;
+import se.kuseman.payloadbuilder.core.statement.QueryStatement;
 
 /** Main */
 public class Payloadbuilder
@@ -11,9 +13,14 @@ public class Payloadbuilder
     {
     }
 
-    /** Compile provided query qith with provided catgory registry */
-    public static CompiledQuery compile(String query)
+    /**
+     * Compile provided query qith with provided catgory registry. Produces a reusable query that can be executed. Note! The query is dependent on the catalog registry and hence cannot be executed
+     * with a different registret later on.
+     */
+    public static CompiledQuery compile(String query, QuerySession session, String defaultCatalogAlias)
     {
-        return new CompiledQuery(PARSER.parseQuery(query));
+        QueryStatement queryStatement = PARSER.parseQuery(session, query);
+        queryStatement = StatementPlanner.plan(session, defaultCatalogAlias, queryStatement);
+        return new CompiledQuery(queryStatement);
     }
 }

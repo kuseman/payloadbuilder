@@ -57,6 +57,18 @@
       ]
     },
     {
+      "name": "Select into 2",
+      "query": [
+        "select 1 + 2 \"1 + 2\" into #temp",
+        "select * from #temp"
+      ],
+      "expectedResultSets": [
+        [
+          [ { "key": "1 + 2", "value": 3 } ]
+        ]
+      ]
+    },
+    {
       "name": "Select into with cache",
       "query": [
         "select 1 col ",
@@ -134,10 +146,10 @@
       "name": "Select into table already exists",
       "query": [
         "select 1 col into #temp",
-        "select col into #temp from source"
+        "select 2 col into #temp from source"
       ],
-      "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
-      "expectedMessageContains": "Temporary table '#temp' already exists"
+      "expectedException": "se.kuseman.payloadbuilder.core.QueryException",
+      "expectedMessageContains": "Temporary table #temp already exists in session"
     },
     {
       "name": "Drop table fail",
@@ -176,8 +188,8 @@
       "query": [
         "select * from #temp"
       ],
-      "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
-      "expectedMessageContains": "No temporary table found named '#temp'"
+      "expectedException": "se.kuseman.payloadbuilder.core.QueryException",
+      "expectedMessageContains": "No temporary table found with name #temp"
     },
     {
       "name": "Select fail 2",
@@ -185,17 +197,8 @@
         "select 1 col into #temp",
         "select * from #temp2"
       ],
-      "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
-      "expectedMessageContains": "No temporary table found named '#temp2'"
-    },
-    {
-      "name": "Select fail 3",
-      "query": [
-        "select 1 + 2 into #temp",
-        "select * from #temp"
-      ],
-      "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
-      "expectedMessageContains": "All items must have an identifier when using a SELECT INTO"
+      "expectedException": "se.kuseman.payloadbuilder.core.QueryException",
+      "expectedMessageContains": "No temporary table found with name #temp2"
     },
     {
       "name": "Select fail 4",
@@ -214,7 +217,7 @@
       ],
       "expectedResultSets": [
         [
-          [{ "key": "col", "value": 1 }, { "key": "", "value": 10 } ]
+          [{ "key": "col", "value": 1 }, { "key": "col * 10", "value": 10 } ]
         ]
       ]
     },
@@ -246,7 +249,7 @@
 		"from #temp t ",
 		"inner join #temp1 t1 ",
 		"  on t1.Value = t.Value ",
-		"order by t1.newCol_temp_1 desc"      
+		"order by t1.newCol_temp_1 desc"
 	  ],
       "expectedResultSets": [
         [
@@ -258,8 +261,8 @@
     {
       "name": "Select into with asterisk and computed",
       "query": [
-        "select d.id + d.row_id col, d into #temp from data d",
-        "select d.id, d.row_id, d.data, col from #temp"
+        "select d.id + d.row_id col, d.id, d.row_id, d.data into #temp from data d",
+        "select d.id, d.row_id, d.data, col from #temp d "
       ],
       "expectedResultSets": [
         [
@@ -273,15 +276,15 @@
       ]
     },
     {
-      "name": "Traverse into temp table hierarchy",
+      "name": "Select into 3",
       "query": [
-        "select d.row_id * s.col2 calc, s, d ",
+        "select d.row_id * s.col2 calc, s.col1, d.data ",
         "into #temp ",
         "from source s ",
         "inner join data d ",
         "  on d.id = s.col1 ",
         " ",
-        "select calc, t.s.col1, t.d.data ",
+        "select calc, t.col1, t.data ",
         "from #temp t "
 	  ],
 	  "expectedResultSets": [
@@ -297,22 +300,22 @@
     {
       "name": "Complex value in temp table",
       "query": [
-        "select (select d.row_id * s.col2 calc for object) obj, s, d ",
+        "select (select d.row_id * s.col2 calc for object) obj, s.col1, d.data ",
         "into #temp ",
         "from source s ",
         "inner join data d ",
         "  on d.id = s.col1 ",
         " ",
-        "select obj, t.obj.calc, t.s.col1, t.d.data ",
+        "select obj, t.col1, t.data ",
         "from #temp t "
 	  ],
 	  "expectedResultSets": [
         [
-          [{ "key": "obj", "value": {"calc": 2 } }, { "key": "calc", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "data", "value": "1_1" }],
-          [{ "key": "obj", "value": {"calc": 4 } }, { "key": "calc", "value": 4 }, { "key": "col1", "value": 1 }, { "key": "data", "value": "1_2" }],
-          [{ "key": "obj", "value": {"calc": 4 } }, { "key": "calc", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "data", "value": "3_1" }],
-          [{ "key": "obj", "value": {"calc": 8 } }, { "key": "calc", "value": 8 }, { "key": "col1", "value": 3 }, { "key": "data", "value": "3_2" }],
-          [{ "key": "obj", "value": {"calc": 12 } },{ "key": "calc", "value": 12 }, { "key": "col1", "value": 3 }, { "key": "data", "value": "3_3" }]
+          [{ "key": "obj", "value": {"calc": 2 } },  { "key": "col1", "value": 1 }, { "key": "data", "value": "1_1" }],
+          [{ "key": "obj", "value": {"calc": 4 } },  { "key": "col1", "value": 1 }, { "key": "data", "value": "1_2" }],
+          [{ "key": "obj", "value": {"calc": 4 } },  { "key": "col1", "value": 3 }, { "key": "data", "value": "3_1" }],
+          [{ "key": "obj", "value": {"calc": 8 } },  { "key": "col1", "value": 3 }, { "key": "data", "value": "3_2" }],
+          [{ "key": "obj", "value": {"calc": 12 } }, { "key": "col1", "value": 3 }, { "key": "data", "value": "3_3" }]
         ]
 	  ]    
     },

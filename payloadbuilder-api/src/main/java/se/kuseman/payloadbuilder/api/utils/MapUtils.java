@@ -1,13 +1,9 @@
 package se.kuseman.payloadbuilder.api.utils;
 
-import static java.util.stream.Collectors.toMap;
-
 import java.util.AbstractMap.SimpleEntry;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.stream.Stream;
 
 /** Map utilities */
 public class MapUtils
@@ -27,12 +23,17 @@ public class MapUtils
     @SafeVarargs
     public static <K, V> Map<K, V> ofEntries(boolean keepInsertOrder, SimpleEntry<K, V>... values)
     {
-        return Stream.of(values)
-                .collect(toMap(Entry::getKey, Entry::getValue, (u, v) ->
-                {
-                    throw new IllegalStateException(String.format("Duplicate key %s", u));
-                }, keepInsertOrder ? LinkedHashMap::new
-                        : HashMap::new));
+        Map<K, V> result = keepInsertOrder ? new LinkedHashMap<>()
+                : new HashMap<>();
+
+        for (SimpleEntry<K, V> e : values)
+        {
+            if (result.put(e.getKey(), e.getValue()) != null)
+            {
+                throw new IllegalStateException(String.format("Duplicate key %s", e.getKey()));
+            }
+        }
+        return result;
     }
 
     /** Build entry out of provided key and value */

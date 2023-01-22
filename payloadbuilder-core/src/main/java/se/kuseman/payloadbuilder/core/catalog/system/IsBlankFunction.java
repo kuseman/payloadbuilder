@@ -1,20 +1,23 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
-import static org.apache.commons.lang3.StringUtils.isBlank;
-
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.api.catalog.UTF8String;
+import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.catalog.ValueVectorAdapter;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 
-/** Returns first item that is not a blank string */
+/** Returns first item that is not a blank string (null or empty) */
 class IsBlankFunction extends ScalarFunctionInfo
 {
     IsBlankFunction(Catalog catalog)
     {
-        super(catalog, "isblank");
+        super(catalog, "isblank", FunctionType.SCALAR);
     }
 
     @Override
@@ -35,17 +38,40 @@ class IsBlankFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public ResolvedType getType(List<? extends IExpression> arguments)
     {
-        Object obj = arguments.get(0)
-                .eval(context);
-        if (obj != null
-                && !isBlank(String.valueOf(obj)))
-        {
-            return obj;
-        }
+        ResolvedType arg0Type = arguments.get(0)
+                .getType();
+        ResolvedType arg1Type = arguments.get(1)
+                .getType();
 
-        return arguments.get(1)
-                .eval(context);
+        return arg0Type.getType()
+                .getPrecedence() >= arg1Type.getType()
+                        .getPrecedence() ? arg0Type
+                                : arg1Type;
+    }
+
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    {
+        final ValueVector value = arguments.get(0)
+                .eval(input, context);
+        final ValueVector arg1 = arguments.get(1)
+                .eval(input, context);
+
+        boolean nullable = value.isNullable()
+                || arg1.isNullable();
+        ResolvedType type = getType(arguments);
+
+        return new ValueVectorAdapter(row ->
+        {
+            if (value.isNull(row)
+                    || UTF8String.EMPTY.equals(value.getString(row)))
+            {
+                return arg1;
+            }
+
+            return value;
+        }, input.getRowCount(), nullable, type);
     }
 }

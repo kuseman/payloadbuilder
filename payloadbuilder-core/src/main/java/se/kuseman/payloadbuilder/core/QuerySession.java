@@ -6,19 +6,29 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.function.BiFunction;
 import java.util.function.BooleanSupplier;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
-import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo;
-import se.kuseman.payloadbuilder.api.session.IQuerySession;
+import se.kuseman.payloadbuilder.api.catalog.OperatorFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 import se.kuseman.payloadbuilder.core.cache.BatchCache;
 import se.kuseman.payloadbuilder.core.cache.Cache;
 import se.kuseman.payloadbuilder.core.cache.CacheType;
@@ -28,8 +38,7 @@ import se.kuseman.payloadbuilder.core.cache.SessionGenericCache;
 import se.kuseman.payloadbuilder.core.cache.SessionTempTableCache;
 import se.kuseman.payloadbuilder.core.cache.TempTableCache;
 import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
-import se.kuseman.payloadbuilder.core.operator.TemporaryTable;
-import se.kuseman.payloadbuilder.core.parser.VariableExpression;
+import se.kuseman.payloadbuilder.core.expression.VariableExpression;
 
 /**
  * A query session. Holds properties for catalog implementations etc.
@@ -63,13 +72,15 @@ public class QuerySession implements IQuerySession
     /** System properties */
     private Map<String, Object> systemProperties;
 
-    private Writer printWriter;
+    private Writer printWriter = new PrintWriter(new BufferedWriter(new OutputStreamWriter(System.out, StandardCharsets.UTF_8))); // Default to system out
     private BooleanSupplier abortSupplier;
-    private Map<QualifiedName, TemporaryTable> temporaryTables;
+    private Map<String, TupleVector> temporaryTables;
 
     private BatchCache batchCache = new SessionBatchCache();
     private TempTableCache tempTableCache = new SessionTempTableCache();
     private GenericCache genericCache = new SessionGenericCache();
+
+    private long lastQueryExecutionTime;
 
     public QuerySession(CatalogRegistry catalogRegistry)
     {
@@ -106,10 +117,42 @@ public class QuerySession implements IQuerySession
         defaultCatalogAlias = alias;
     }
 
-    /**
-     * Resolves function info from provided catalog alias and function name
-     */
-    public Pair<String, FunctionInfo> resolveFunctionInfo(String catalogAlias, String function)
+    /** Get catalog with provided alias. Uses default alias if empty */
+    public Catalog getCatalog(String catalogAlias)
+    {
+        Catalog catalog;
+        if (StringUtils.isBlank(catalogAlias))
+        {
+            catalog = getDefaultCatalog();
+        }
+        else
+        {
+            catalog = catalogRegistry.getCatalog(catalogAlias);
+        }
+
+        return requireNonNull(catalog, isBlank(catalogAlias) ? "No default catalog specified in registry"
+                : "No catalog found with alias: " + catalogAlias);
+    }
+
+    /** Resolve scalar function */
+    public Pair<String, ScalarFunctionInfo> resolveScalarFunctionInfo(String catalogAlias, String function)
+    {
+        return resolveFunctionInfo(catalogAlias, function, (c, f) -> c.getScalarFunction(f));
+    }
+
+    /** Resolve table function */
+    public Pair<String, TableFunctionInfo> resolveTableFunctionInfo(String catalogAlias, String function)
+    {
+        return resolveFunctionInfo(catalogAlias, function, (c, f) -> c.getTableFunction(f));
+    }
+
+    /** Resolve operator function */
+    public Pair<String, OperatorFunctionInfo> resolveOperatorFunctionInfo(String catalogAlias, String function)
+    {
+        return resolveFunctionInfo(catalogAlias, function, (c, f) -> c.getOperatorFunction(f));
+    }
+
+    private <T extends FunctionInfo> Pair<String, T> resolveFunctionInfo(String catalogAlias, String function, BiFunction<Catalog, String, T> functionSupplier)
     {
         Catalog catalog;
         if (isBlank(catalogAlias))
@@ -118,7 +161,7 @@ public class QuerySession implements IQuerySession
             catalog = getDefaultCatalog();
             if (catalog != null)
             {
-                FunctionInfo f = catalog.getFunction(lowerCase(function));
+                T f = functionSupplier.apply(catalog, lowerCase(function));
                 // CSOFF
                 if (f != null)
                 // CSON
@@ -139,7 +182,7 @@ public class QuerySession implements IQuerySession
             return null;
         }
 
-        FunctionInfo f = catalog.getFunction(lowerCase(function));
+        T f = functionSupplier.apply(catalog, lowerCase(function));
         if (f == null)
         {
             return null;
@@ -205,15 +248,15 @@ public class QuerySession implements IQuerySession
     }
 
     /** Get temporary table with provided qualifier */
-    public TemporaryTable getTemporaryTable(QualifiedName table)
+    public TupleVector getTemporaryTable(String table)
     {
-        TemporaryTable result;
+        TupleVector result;
         // CSOFF
         if (temporaryTables == null
                 || (result = temporaryTables.get(table)) == null)
         // CSON
         {
-            throw new QueryException("No temporary table found with name #" + table.toDotDelimited());
+            throw new QueryException("No temporary table found with name #" + table);
         }
 
         return result;
@@ -224,29 +267,30 @@ public class QuerySession implements IQuerySession
      *
      * @param table The temporary table
      */
-    public void setTemporaryTable(TemporaryTable table)
+    public void setTemporaryTable(String name, TupleVector table)
     {
         requireNonNull(table);
         if (temporaryTables == null)
         {
             temporaryTables = new HashMap<>();
         }
-        if (temporaryTables.containsKey(table.getName()))
+        name = name.toLowerCase();
+        if (temporaryTables.containsKey(name))
         {
-            throw new QueryException("Temporary table #" + table.getName()
-                    .toDotDelimited() + " already exists in session");
+            throw new QueryException("Temporary table #" + name + " already exists in session");
         }
-        temporaryTables.put(table.getName(), table);
+        temporaryTables.put(name, table);
     }
 
     /** Drop temporary table */
-    public void dropTemporaryTable(QualifiedName table, boolean lenient)
+    public void dropTemporaryTable(String table, boolean lenient)
     {
+        table = table.toLowerCase();
         if (!lenient
                 && (temporaryTables == null
                         || !temporaryTables.containsKey(table)))
         {
-            throw new QueryException("No temporary table found with name #" + table.toDotDelimited());
+            throw new QueryException("No temporary table found with name #" + table);
         }
         else if (temporaryTables != null)
         {
@@ -255,13 +299,13 @@ public class QuerySession implements IQuerySession
     }
 
     /** Return temporary table names */
-    public Collection<TemporaryTable> getTemporaryTables()
+    public Collection<Entry<String, TupleVector>> getTemporaryTables()
     {
         if (temporaryTables == null)
         {
             return emptyList();
         }
-        return temporaryTables.values();
+        return temporaryTables.entrySet();
     }
 
     /** Set catalog property */
@@ -359,5 +403,16 @@ public class QuerySession implements IQuerySession
             default:
                 throw new IllegalArgumentException("Unknown cache type " + type);
         }
+    }
+
+    @Override
+    public long getLastQueryExecutionTime()
+    {
+        return lastQueryExecutionTime;
+    }
+
+    public void setLastQueryExecutionTime(long lastQueryExecutionTime)
+    {
+        this.lastQueryExecutionTime = lastQueryExecutionTime;
     }
 }

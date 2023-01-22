@@ -1,26 +1,23 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
-import static java.util.Objects.requireNonNull;
-
-import java.io.IOException;
-import java.io.Reader;
-import java.nio.CharBuffer;
 import java.util.List;
 
-import org.apache.commons.io.IOUtils;
-
-import se.kuseman.payloadbuilder.api.TableMeta.DataType;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.api.catalog.UTF8String;
+import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 
 /** Replace */
 class ReplaceFunction extends ScalarFunctionInfo
 {
     ReplaceFunction(Catalog catalog)
     {
-        super(catalog, "replace");
+        super(catalog, "replace", FunctionType.SCALAR);
     }
 
     @Override
@@ -35,9 +32,9 @@ class ReplaceFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public DataType getDataType(List<? extends IExpression> arguments)
+    public ResolvedType getType(List<? extends IExpression> arguments)
     {
-        return DataType.ANY;
+        return ResolvedType.of(Type.String);
     }
 
     @Override
@@ -47,198 +44,63 @@ class ReplaceFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
     {
-        Object arg0 = arguments.get(0)
-                .eval(context);
-        Object arg1 = arguments.get(1)
-                .eval(context);
-        Object arg2 = arguments.get(2)
-                .eval(context);
-        if (arg0 == null
-                || arg1 == null
-                || arg2 == null)
+        final ValueVector value = arguments.get(0)
+                .eval(input, context);
+        final ValueVector search = arguments.get(1)
+                .eval(input, context);
+        final ValueVector replacement = arguments.get(2)
+                .eval(input, context);
+
+        return new ValueVector()
         {
-            return null;
-        }
-
-        String search = String.valueOf(arg1);
-        String replacement = String.valueOf(arg2);
-        if (arg0 instanceof Reader)
-        {
-            return new ReplacingReader((Reader) arg0, search, replacement);
-        }
-
-        String value = String.valueOf(arg0);
-        return value.replace(search, replacement);
-    }
-
-    /**
-     * Reader that replaces string on the while reading. This to avoid keeping whole string in memory
-     */
-    static class ReplacingReader extends Reader
-    {
-        private final Reader wrapped;
-        private final String search;
-        private final String replacement;
-        private final char firstSearchChar;
-        private final char firstReplacementChar;
-        private final int searchLength;
-
-        private StringBuilder buffer;
-        private int bufferIndex;
-
-        ReplacingReader(Reader wrapped, String search, String replacement)
-        {
-            this.wrapped = wrapped;
-            this.search = requireNonNull(search, "search");
-            this.replacement = requireNonNull(replacement, "replacement");
-            this.firstSearchChar = search.charAt(0);
-            this.firstReplacementChar = replacement.isEmpty() ? (char) 0
-                    : replacement.charAt(0);
-            this.searchLength = search.length();
-        }
-
-        @Override
-        public int read() throws IOException
-        {
-            // Stream buffer
-            if (buffer != null)
+            @Override
+            public ResolvedType type()
             {
-                if (bufferIndex < buffer.length())
-                {
-                    return buffer.charAt(bufferIndex++);
-                }
-                else
-                {
-                    buffer = null;
-                    bufferIndex = 0;
-                }
+                return ResolvedType.of(Type.String);
             }
 
-            int data = this.wrapped.read();
-            if (data != firstSearchChar)
+            @Override
+            public int size()
             {
-                return data;
+                return input.getRowCount();
             }
 
-            // First char is a match, start buffering
-            // and see if we have a full search match
-            // Since we know that we have a match on first char
-            // we can skip that one in buffer
-            buffer = new StringBuilder(searchLength - 1);
-            for (int i = 1; i < searchLength; i++)
+            @Override
+            public boolean isNullable()
             {
-                data = wrapped.read();
-                if (data == -1)
-                {
-                    return firstSearchChar;
-                }
-                buffer.append((char) data);
-                if (data != search.charAt(i))
-                {
-                    // No match, return first char in search
-                    return firstSearchChar;
-                }
+                return value.isNullable()
+                        || search.isNullable()
+                        || replacement.isNullable();
             }
 
-            if (replacement.isEmpty())
+            @Override
+            public boolean isNull(int row)
             {
-                buffer = null;
-                bufferIndex = 0;
-                return wrapped.read();
+                return value.isNull(row)
+                        || search.isNull(row)
+                        || replacement.isNull(row);
             }
 
-            // Match return replacement
-            buffer = new StringBuilder(replacement);
-            // Start at index 1 since first char is returned here
-            bufferIndex = 1;
-            return firstReplacementChar;
-        }
-
-        @Override
-        public int read(char[] cbuf) throws IOException
-        {
-            return read(cbuf, 0, cbuf.length);
-        }
-
-        @Override
-        public int read(char[] cbuf, int off, int len) throws IOException
-        {
-            int charsRead = 0;
-            for (int i = 0; i < len; i++)
+            @Override
+            public UTF8String getString(int row)
             {
-                int nextChar = read();
-                if (nextChar == -1)
-                {
-                    if (charsRead == 0)
-                    {
-                        charsRead = -1;
-                    }
-                    break;
-                }
-                charsRead = i + 1;
-                cbuf[off + i] = (char) nextChar;
+                String strValue = value.getString(row)
+                        .toString();
+                String strSearch = search.getString(row)
+                        .toString();
+                String strReplacement = replacement.getString(row)
+                        .toString();
+
+                return UTF8String.from(strValue.replace(strSearch, strReplacement));
             }
-            return charsRead;
-        }
 
-        @Override
-        public void close() throws IOException
-        {
-            wrapped.close();
-        }
-
-        @Override
-        public boolean ready() throws IOException
-        {
-            return wrapped.ready();
-        }
-
-        @Override
-        public boolean markSupported()
-        {
-            return false;
-        }
-
-        // CSOFF
-        @Override
-        // CSON
-        public int read(CharBuffer target) throws IOException
-        {
-            throw new RuntimeException("Operation Not Supported");
-        }
-
-        @Override
-        public long skip(long n) throws IOException
-        {
-            throw new RuntimeException("Operation Not Supported");
-        }
-
-        @Override
-        public void mark(int readAheadLimit) throws IOException
-        {
-            throw new RuntimeException("Operation Not Supported");
-        }
-
-        @Override
-        public void reset() throws IOException
-        {
-            throw new RuntimeException("Operation Not Supported");
-        }
-
-        @Override
-        public String toString()
-        {
-            try
+            @Override
+            public Object getValue(int row)
             {
-                return IOUtils.toString(wrapped)
-                        .replace(search, replacement);
+                throw new IllegalArgumentException("getValue should not be called on typed vectors");
             }
-            catch (IOException e)
-            {
-                throw new RuntimeException("Error replacing reader", e);
-            }
-        }
+        };
     }
 }

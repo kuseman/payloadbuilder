@@ -1,12 +1,18 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
+import se.kuseman.payloadbuilder.core.execution.StatementContext;
 
 /** Returns current date */
 class GetDateFunction extends ScalarFunctionInfo
@@ -16,7 +22,7 @@ class GetDateFunction extends ScalarFunctionInfo
     GetDateFunction(Catalog catalog, boolean utc)
     {
         super(catalog, utc ? "getutcdate"
-                : "getdate");
+                : "getdate", FunctionType.SCALAR);
         this.utc = utc;
     }
 
@@ -37,17 +43,20 @@ class GetDateFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public ResolvedType getType(List<? extends IExpression> arguments)
     {
-        if (utc)
+        return ResolvedType.of(Type.DateTime);
+    }
+
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    {
+        ZonedDateTime now = ((StatementContext) context.getStatementContext()).getNow();
+        if (!utc)
         {
-            return context.getStatementContext()
-                    .getNow();
+            now = now.withZoneSameInstant(ZoneOffset.systemDefault());
         }
 
-        return context.getStatementContext()
-                .getNow()
-                .withZoneSameInstant(ZoneOffset.systemDefault())
-                .toLocalDateTime();
+        return ValueVector.literalObject(ResolvedType.of(Type.DateTime), now, input.getRowCount());
     }
 }

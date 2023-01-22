@@ -3,16 +3,21 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.api.catalog.UTF8String;
+import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 
 /** Length of string function */
 class LengthFunction extends ScalarFunctionInfo
 {
     LengthFunction(Catalog catalog)
     {
-        super(catalog, "length");
+        super(catalog, "length", FunctionType.SCALAR);
     }
 
     @Override
@@ -22,16 +27,61 @@ class LengthFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public int arity()
     {
-        Object obj = arguments.get(0)
-                .eval(context);
-        if (obj == null)
-        {
-            return null;
-        }
+        return 1;
+    }
 
-        String value = String.valueOf(obj);
-        return value.length();
+    @Override
+    public ResolvedType getType(List<? extends IExpression> arguments)
+    {
+        return ResolvedType.of(Type.Long);
+    }
+
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    {
+        final ValueVector value = arguments.get(0)
+                .eval(input, context);
+        return new ValueVector()
+        {
+            @Override
+            public ResolvedType type()
+            {
+                return ResolvedType.of(Type.Long);
+            }
+
+            @Override
+            public int size()
+            {
+                return input.getRowCount();
+            }
+
+            @Override
+            public boolean isNullable()
+            {
+                return value.isNullable();
+            }
+
+            @Override
+            public boolean isNull(int row)
+            {
+                return value.isNull(row);
+            }
+
+            @Override
+            public long getLong(int row)
+            {
+                UTF8String string = value.getString(row);
+                return string.toString()
+                        .length();
+            }
+
+            @Override
+            public Object getValue(int row)
+            {
+                throw new IllegalArgumentException("getValue should not be called on typed vectors");
+            }
+        };
     }
 }

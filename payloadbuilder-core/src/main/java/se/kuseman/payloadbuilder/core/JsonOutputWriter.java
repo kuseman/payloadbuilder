@@ -259,6 +259,7 @@ public class JsonOutputWriter implements OutputWriter
     {
         try
         {
+            writeFieldNameInternal();
             generator.writeBoolean(value);
         }
         catch (IOException e)
@@ -272,6 +273,7 @@ public class JsonOutputWriter implements OutputWriter
     {
         try
         {
+            writeFieldNameInternal();
             generator.writeNumber(value);
         }
         catch (IOException e)
@@ -285,6 +287,7 @@ public class JsonOutputWriter implements OutputWriter
     {
         try
         {
+            writeFieldNameInternal();
             generator.writeNumber(value);
         }
         catch (IOException e)
@@ -298,6 +301,7 @@ public class JsonOutputWriter implements OutputWriter
     {
         try
         {
+            writeFieldNameInternal();
             generator.writeNumber(value);
         }
         catch (IOException e)
@@ -311,6 +315,7 @@ public class JsonOutputWriter implements OutputWriter
     {
         try
         {
+            writeFieldNameInternal();
             generator.writeNumber(value);
         }
         catch (IOException e)

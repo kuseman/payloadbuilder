@@ -14,6 +14,17 @@
           ]
         },
         {
+          "name": "source2",
+          "columns": [ "col1", "col2" ],
+          "rows": [
+            [1, 2],
+            [1, 2],
+            [5, 6],
+            [5, 6],
+            [7, 60]
+          ]
+        },
+        {
           "name": "data",
           "columns": [ "id", "row_id", "data" ],
           "rows": [
@@ -48,24 +59,205 @@
           ]
         }
       ]
+    },
+    {
+      "alias": "d",
+      "tables": [
+        {
+          "name": "source",
+          "columns": [ "col1", "col2" ],
+          "rows": [
+            [10, 20],
+            [30, 40],
+            [50, 60]
+          ]
+        }
+      ]
     }
   ],
   "cases": [
     {
-      "name": "Agg. functions",
+      "name": "Distinct",
       "query": [
-        "select id, count(1) count_const, count(value) count_col ",
-        ",          max(2)   max_const,   max(value)   max_col ",
-        ",          min(3)   min_const,   min(value)   min_col ",
-        ",          sum(4)   sum_const,   sum(value)   sum_col",
-        "from agg_data ",
-        "group by id"
+        "select distinct row_id from data"
       ],
       "expectedResultSets": [
         [
-          [{ "key": "id", "value": 1 },{ "key": "count_const", "value": 2 },{ "key": "count_col", "value": 2 },{ "key": "max_const", "value": 2 },{ "key": "max_col", "value": 20 },{ "key": "min_const", "value": 3 },{ "key": "min_col", "value": 10 },{ "key": "sum_const", "value": 8 },{ "key": "sum_col", "value": 30 }],
-          [{ "key": "id", "value": 2 },{ "key": "count_const", "value": 2 },{ "key": "count_col", "value": 1 },{ "key": "max_const", "value": 2 },{ "key": "max_col", "value": 30 },{ "key": "min_const", "value": 3 },{ "key": "min_col", "value": 30 },{ "key": "sum_const", "value": 8 },{ "key": "sum_col", "value": 30 }],
-          [{ "key": "id", "value": 3 },{ "key": "count_const", "value": 2 },{ "key": "count_col", "value": 2 },{ "key": "max_const", "value": 2 },{ "key": "max_col", "value": 60 },{ "key": "min_const", "value": 3 },{ "key": "min_col", "value": 50 },{ "key": "sum_const", "value": 8 },{ "key": "sum_col", "value": 110 }]
+          [{ "key": "row_id", "value": 1 }],
+          [{ "key": "row_id", "value": 3 }],
+          [{ "key": "row_id", "value": 2 }]
+        ]
+      ]
+    },
+    {
+      "name": "Distinct asterisk",
+      "query": [
+        "select distinct * from source2"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }],
+          [{ "key": "col1", "value": 5 }, { "key": "col2", "value": 6 }],
+          [{ "key": "col1", "value": 7 }, { "key": "col2", "value": 60 }]
+        ]
+      ]
+    },
+    {
+      "name": "Agg. functions",
+      "query": [
+        "select id, count(1)               count_const ", 
+        ",          count(value)           count_col ",
+        ",          max(2)                 max_const ",
+        ",          max(value)             max_col ",
+        ",          min(3)                 min_const ",
+        ",          min(value)             min_col ",
+        ",          sum(4)                 sum_const ",
+        ",          sum(value)             sum_col ",
+        ",          avg(5)                 avg_const ",
+        ",          avg(value)             avg_col ",
+        
+        "from agg_data ",
+        "group by id ",
+        "order by id "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 1 },{ "key": "count_const", "value": 2 },{ "key": "count_col", "value": 2 },{ "key": "max_const", "value": 2 },{ "key": "max_col", "value": 20 },{ "key": "min_const", "value": 3 },{ "key": "min_col", "value": 10 },{ "key": "sum_const", "value": 8 },{ "key": "sum_col", "value": 30  },{ "key": "avg_const", "value": 5 },{ "key": "avg_col", "value": 15 }],
+          [{ "key": "id", "value": 2 },{ "key": "count_const", "value": 2 },{ "key": "count_col", "value": 1 },{ "key": "max_const", "value": 2 },{ "key": "max_col", "value": 30 },{ "key": "min_const", "value": 3 },{ "key": "min_col", "value": 30 },{ "key": "sum_const", "value": 8 },{ "key": "sum_col", "value": 30  },{ "key": "avg_const", "value": 5 },{ "key": "avg_col", "value": 30 }],
+          [{ "key": "id", "value": 3 },{ "key": "count_const", "value": 2 },{ "key": "count_col", "value": 2 },{ "key": "max_const", "value": 2 },{ "key": "max_col", "value": 60 },{ "key": "min_const", "value": 3 },{ "key": "min_col", "value": 50 },{ "key": "sum_const", "value": 8 },{ "key": "sum_col", "value": 110 },{ "key": "avg_const", "value": 5 },{ "key": "avg_col", "value": 55 }]
+        ]
+      ]
+    },
+    {
+      "name": "Group by. Single value etc.",
+      "query": [
+        "select id * id               single   -- Only single values included in expression ",
+        ",      id * row_id           mixed    -- Mixed single value and grouped values ",
+        ",      row_id * row_id       group    -- Only group values ",
+        "from data ",
+        "group by id ",
+        "order by id "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "single", "value": 1 },{ "key": "mixed", "value": [1, 2]    },{ "key": "group", "value": [1, 4]    }],
+          [{ "key": "single", "value": 4 },{ "key": "mixed", "value": [2]       },{ "key": "group", "value": [1]       }],
+          [{ "key": "single", "value": 9 },{ "key": "mixed", "value": [3, 6, 9] },{ "key": "group", "value": [1, 4, 9] }]
+        ]
+      ]
+    },
+    {
+      "name": "Group by with mixed qualified and non qualified columns",
+      "query": [
+        "select d.id ",
+        ",      max(row_id) ",
+        "from data d",
+        "group by d.id ",
+        "order by id "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 1 },{ "key": "max(d.row_id)", "value": 2 }],
+          [{ "key": "id", "value": 2 },{ "key": "max(d.row_id)", "value": 1 }],
+          [{ "key": "id", "value": 3 },{ "key": "max(d.row_id)", "value": 3 }]
+        ]
+      ]
+    },
+    {
+      "name": "Group by with mixed qualified and non qualified columns (2)",
+      "query": [
+        "select id ",
+        ",      max(row_id) ",
+        "from data d",
+        "group by id ",
+        "order by d.id "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 1 },{ "key": "max(d.row_id)", "value": 2 }],
+          [{ "key": "id", "value": 2 },{ "key": "max(d.row_id)", "value": 1 }],
+          [{ "key": "id", "value": 3 },{ "key": "max(d.row_id)", "value": 3 }]
+        ]
+      ]
+    },
+    {
+      "name": "Group by with having",
+      "query": [
+        "select id * id               single   -- Only single values included in expression ",
+        ",      id * row_id           mixed    -- Mixed single value and grouped values ",
+        ",      row_id * row_id       group    -- Only group values ",
+        "from data ",
+        "group by id ",
+        "having count(1) = 1 "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "single", "value": 4 },{ "key": "mixed", "value": [2]       },{ "key": "group", "value": [1]       }]
+        ]
+      ]
+    },
+    {
+      "name": "Describe select, schema full",
+      "schemaLess": false,
+      "query": [
+        "describe ",
+        "select d.id ",
+        ",      max(row_id) ",
+        "from data d",
+        "group by d.id ",
+        "having count(1) = 1 ",
+        "order by id "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "Node id", "value": 3 }, { "key": "Name", "value": "+- Sort"                 }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Order By", "value": "[d.id ASC]" }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node id", "value": 2 }, { "key": "Name", "value": "|  +- Filter"            }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": "__expr0 = 1"     }],
+          [{ "key": "Node id", "value": 1 }, { "key": "Name", "value": "|     +- Hash Aggregate" }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": "__expr0: count(1)" }, { "key": "Group By", "value": "[d.id]" }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node id", "value": 0 }, { "key": "Name", "value": "|        +- Scan: data"  }, { "key": "Output", "value": "id (Any), row_id (Any), data (Any)" }, { "key": "Catalog", "value": "Test#c" }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }]
+        ]
+      ]
+    },
+    {
+      "name": "Analyze select, schema full",
+      "ignore": true,
+      "_todo": "Add support for regex assert columns, this query contains times that isn't deterministic",
+      "schemaLess": false,
+      "query": [
+        "analyze ",
+        "select d.id ",
+        ",      max(row_id) ",
+        "from data d",
+        "group by d.id ",
+        "having count(1) = 1 ",
+        "order by id "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "Node id", "value": 3 }, { "key": "Name", "value": "+- Sort"                 }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Order By", "value": "[d.id ASC]" }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node id", "value": 2 }, { "key": "Name", "value": "|  +- Filter"            }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": "__expr0 = 1"     }],
+          [{ "key": "Node id", "value": 1 }, { "key": "Name", "value": "|     +- Hash Aggregate" }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": "__expr0: count(1)" }, { "key": "Group By", "value": "[d.id]" }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node id", "value": 0 }, { "key": "Name", "value": "|        +- Scan: data"  }, { "key": "Output", "value": "id (Any), row_id (Any), data (Any)" }, { "key": "Catalog", "value": "Test#c" }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }]
+        ]
+      ]
+    },
+    {
+      "name": "Describe select, schema less",
+      "schemaLess": true,
+      "query": [
+        "describe ",
+        "select d.id ",
+        ",      max(row_id) ",
+        "from data d",
+        "group by d.id ",
+        "having count(1) = 1 ",
+        "order by id "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "Node id", "value": 3 }, { "key": "Name", "value": "+- Sort"                 }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Order By", "value": "[d.id ASC]" }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node id", "value": 2 }, { "key": "Name", "value": "|  +- Filter"            }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": "__expr0 = 1"     }],
+          [{ "key": "Node id", "value": 1 }, { "key": "Name", "value": "|     +- Hash Aggregate" }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": "__expr0: count(1)" }, { "key": "Group By", "value": "[d.id]" }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node id", "value": 0 }, { "key": "Name", "value": "|        +- Scan: data"  }, { "key": "Output", "value": "d (Any)"                            }, { "key": "Catalog", "value": "Test#c" }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }]
         ]
       ]
     },
@@ -100,7 +292,7 @@
       ]
     },
     {
-      "name": "Test variables are case in-sensetive",
+      "name": "Test variables are case in-sensitive",
       "query": [
         "set @varA = 'test' ",
         "set @VARB = 'test1' ",
@@ -114,7 +306,7 @@
       ]
     },
     {
-      "name": "Apply with subquery without table",
+      "name": "Apply with sub query without table",
       "query": [
         "select * ",
         "from source s ",
@@ -131,7 +323,7 @@
       ]
     },
     {
-      "name": "Apply with subquery with outer reference",
+      "name": "Apply with sub query with outer reference",
       "query": [
         "select * ",
         "from source s ",
@@ -148,7 +340,7 @@
       ]
     },
     {
-      "name": "Apply with subquery with outer computed reference",
+      "name": "Apply with sub query with outer computed reference",
       "query": [
         "select * ",
         "from source s ",
@@ -178,7 +370,7 @@
       ]
     },
     {
-      "name": "Subquery with a single table source",
+      "name": "Sub query with a single table source",
       "query": [
         "select x.col1, x.col2 from (select * from source) x"
       ],
@@ -199,17 +391,40 @@
         " r1.flatMap(x -> listOf(r.Value, x.Value)) flatMap, ",
         " r1.any(x -> x.Value > 0) any,",
         " r1.all(x -> r.Value - x.Value > 0) all, ",
-        " r1.none(x -> r.Value + x.Value > 10) none",
-        
+        " r1.none(x -> r.Value + x.Value > 10) none, ",
+        " r1.flatMap(x -> listOf(r.Value, x.Value)).distinct() distinct ",
+
         "from range(1, 4) r ",
-        "inner join range(1, 11) r1 with (populate=true) ",
+        "inner populate join range(1, 11) r1 ",
         "  on r1.Value % 3 + 1 = r.Value"
       ],
       "expectedResultSets": [
         [
-          [{ "key": "Value", "value": 1 },{ "key": "map", "value": [4,7,10] },	{ "key": "filter", "value": [] }, { "key": "flatMap", "value": [1, 3, 1, 6, 1, 9] },	   {"key":"any","value":true},{"key":"all","value":false},{"key":"none","value":true}],
-          [{ "key": "Value", "value": 2 },{ "key": "map", "value": [3,6,9,12] },{ "key": "filter", "value": [1] },{ "key": "flatMap", "value": [2, 1, 2, 4, 2, 7, 2, 10] },{"key":"any","value":true},{"key":"all","value":false},{"key":"none","value":false}],
-          [{ "key": "Value", "value": 3 },{ "key": "map", "value": [5,8,11] },	{ "key": "filter", "value": [2] },{ "key": "flatMap", "value": [3, 2, 3, 5, 3, 8] },	   {"key":"any","value":true},{"key":"all","value":false},{"key":"none","value":false}]
+          [{ "key": "Value", "value": 1 },{ "key": "map", "value": [4,7,10] },	{ "key": "filter", "value": [] }, { "key": "flatMap", "value": [1, 3, 1, 6, 1, 9] },	   {"key":"any","value":true},{"key":"all","value":false},{"key":"none","value":true},{"key":"distinct","value":[1, 9, 3, 6]}],
+          [{ "key": "Value", "value": 2 },{ "key": "map", "value": [3,6,9,12] },{ "key": "filter", "value": [1] },{ "key": "flatMap", "value": [2, 1, 2, 4, 2, 7, 2, 10] },{"key":"any","value":true},{"key":"all","value":false},{"key":"none","value":false},{"key":"distinct","value":[2, 10, 7, 4, 1]}],
+          [{ "key": "Value", "value": 3 },{ "key": "map", "value": [5,8,11] },	{ "key": "filter", "value": [2] },{ "key": "flatMap", "value": [3, 2, 3, 5, 3, 8] },	   {"key":"any","value":true},{"key":"all","value":false},{"key":"none","value":false},{"key":"distinct","value":[3, 8, 2, 5]}]
+        ]
+      ]
+    },
+    {
+      "name": "Aggregate functions in scalar mode",
+      "query": [
+        "select r.Value, ",
+        " r1.map(x -> r.Value + x.Value).sum()   sum, ",
+        " r1.map(x -> r.Value + x.Value).min()   min, ",
+        " r1.map(x -> r.Value + x.Value).max()   max, ",
+        " r1.map(x -> r.Value + x.Value).avg()   avg, ",
+        " r1.map(x -> r.Value + x.Value).count() count ",
+
+        "from range(1, 4) r ",
+        "inner populate join range(1, 11) r1 ",
+        "  on r1.Value % 3 + 1 = r.Value"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "Value", "value": 1 },{ "key": "sum", "value": 21 }, { "key": "min", "value": 4 }, { "key": "max", "value": 10 }, {"key":"avg", "value": 7}, {"key":"count", "value": 3} ],
+          [{ "key": "Value", "value": 2 },{ "key": "sum", "value": 30 }, { "key": "min", "value": 3 }, { "key": "max", "value": 12 }, {"key":"avg", "value": 7}, {"key":"count", "value": 4} ],
+          [{ "key": "Value", "value": 3 },{ "key": "sum", "value": 24 }, { "key": "min", "value": 5 }, { "key": "max", "value": 11 }, {"key":"avg", "value": 8}, {"key":"count", "value": 3} ]
         ]
       ]
     },
@@ -245,32 +460,49 @@
     {
       "name": "Order by expression function",
       "query": [
-        "select hash(id, row_id) newCol from data order by newcol desc"
+        "select hash(id, row_id) newCol, id from data order by newcol desc"
       ],
       "expectedResultSets": [
         [
-          [{ "key": "newCol", "value": 1057 }],
-          [{ "key": "newCol", "value": 1056 }],
-          [{ "key": "newCol", "value": 1055 }],
-          [{ "key": "newCol", "value": 1024 }],
-          [{ "key": "newCol", "value": 994 }],
-          [{ "key": "newCol", "value": 993 }]
+          [{ "key": "newCol", "value": 23387 }, { "key": "id", "value": 3 }],
+          [{ "key": "newCol", "value": 23386 }, { "key": "id", "value": 3 }],
+          [{ "key": "newCol", "value": 23385 }, { "key": "id", "value": 3 }],
+          [{ "key": "newCol", "value": 23348 }, { "key": "id", "value": 2 }],
+          [{ "key": "newCol", "value": 23312 }, { "key": "id", "value": 1 }],
+          [{ "key": "newCol", "value": 23311 }, { "key": "id", "value": 1 }]
         ]
       ]
     },
     {
-      "name": "Order by ordinal",
+      "name": "Order by expression function with asterisk",
+      "description": "Make sure that computed columns are hidden from resulting schema",
       "query": [
-        "select id - row_id newCol from data order by 1 desc"
+        "select concat(id, row_id) newCol, * from data order by newcol desc"
       ],
       "expectedResultSets": [
         [
-          [{ "key": "newCol", "value": 2 }],
-          [{ "key": "newCol", "value": 1 }],
-          [{ "key": "newCol", "value": 1 }],
-          [{ "key": "newCol", "value": 0 }],
-          [{ "key": "newCol", "value": 0 }],
-          [{ "key": "newCol", "value": -1 }]
+          [{ "key": "newCol", "value": 33 }, { "key": "id", "value": 3 }, { "key": "row_id", "value": 3 }, { "key": "data", "value": "3_3" }],
+          [{ "key": "newCol", "value": 32 }, { "key": "id", "value": 3 }, { "key": "row_id", "value": 2 }, { "key": "data", "value": "3_2" }],
+          [{ "key": "newCol", "value": 31 }, { "key": "id", "value": 3 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "3_1" }],
+          [{ "key": "newCol", "value": 21 }, { "key": "id", "value": 2 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "2_1" }],
+          [{ "key": "newCol", "value": 12 }, { "key": "id", "value": 1 }, { "key": "row_id", "value": 2 }, { "key": "data", "value": "1_2" }],
+          [{ "key": "newCol", "value": 11 }, { "key": "id", "value": 1 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "1_1" }]
+        ]
+      ]
+    },
+    {
+      "name": "Order by ordinal computed",
+      "query": [
+        "select data, id - row_id newCol from data order by 2 desc"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "data", "value": "3_1" }, { "key": "newCol", "value": 2 } ],
+          [{ "key": "data", "value": "2_1" }, { "key": "newCol", "value": 1 } ],
+          [{ "key": "data", "value": "3_2" }, { "key": "newCol", "value": 1 } ],
+          [{ "key": "data", "value": "1_1" }, { "key": "newCol", "value": 0 } ],
+          [{ "key": "data", "value": "3_3" }, { "key": "newCol", "value": 0 } ],
+          [{ "key": "data", "value": "1_2" }, { "key": "newCol", "value": -1 }]
         ]
       ]
     },
@@ -287,6 +519,22 @@
           [{ "key": "newCol", "value": 2 }],
           [{ "key": "newCol", "value": 1 }],
           [{ "key": "newCol", "value": 1 }]
+        ]
+      ]
+    },
+    {
+      "name": "Order by ordinal asterisk",
+      "query": [
+        "select * from data order by 1 desc"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 3 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "3_1" }],
+          [{ "key": "id", "value": 3 }, { "key": "row_id", "value": 2 }, { "key": "data", "value": "3_2" }],
+          [{ "key": "id", "value": 3 }, { "key": "row_id", "value": 3 }, { "key": "data", "value": "3_3" }],
+          [{ "key": "id", "value": 2 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "2_1" }],
+          [{ "key": "id", "value": 1 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "1_1" }],
+          [{ "key": "id", "value": 1 }, { "key": "row_id", "value": 2 }, { "key": "data", "value": "1_2" }]
         ]
       ]
     },
@@ -311,7 +559,7 @@
       "query": [
         "select id - row_id newCol from data order by 10 desc"
       ],
-      "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
+      "expectedException": "se.kuseman.payloadbuilder.core.QueryException",
       "expectedMessageContains": "ORDER BY position is out of range"
     },
     {
@@ -319,17 +567,32 @@
       "query": [
         "select * from data order by 1 desc"
       ],
-      "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
-      "expectedMessageContains": "ORDER BY position is not supported for non expression select items"
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 3 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "3_1" }],
+          [{ "key": "id", "value": 3 }, { "key": "row_id", "value": 2 }, { "key": "data", "value": "3_2" }],
+          [{ "key": "id", "value": 3 }, { "key": "row_id", "value": 3 }, { "key": "data", "value": "3_3" }],
+          [{ "key": "id", "value": 2 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "2_1" }],
+          [{ "key": "id", "value": 1 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "1_1" }],
+          [{ "key": "id", "value": 1 }, { "key": "row_id", "value": 2 }, { "key": "data", "value": "1_2" }]
+        ]
+      ]
     },
     {
       "name": "Order by ordinal, asterisk 2",
-      "comment": "Order by ordinal cannot be done if an asterisk select item is placed befor or on the ordinal",
       "query": [
-        "select *, col from data order by 2 desc"
+        "select *, row_id from data order by 2 desc"
       ],
-      "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
-      "expectedMessageContains": "ORDER BY position is not supported for non expression select items"
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 3 }, { "key": "row_id", "value": 3 }, { "key": "data", "value": "3_3" }, { "key": "row_id", "value": 3 }],
+          [{ "key": "id", "value": 1 }, { "key": "row_id", "value": 2 }, { "key": "data", "value": "1_2" }, { "key": "row_id", "value": 2 }],
+          [{ "key": "id", "value": 3 }, { "key": "row_id", "value": 2 }, { "key": "data", "value": "3_2" }, { "key": "row_id", "value": 2 }],
+          [{ "key": "id", "value": 1 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "1_1" }, { "key": "row_id", "value": 1 }],
+          [{ "key": "id", "value": 2 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "2_1" }, { "key": "row_id", "value": 1 }],
+          [{ "key": "id", "value": 3 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "3_1" }, { "key": "row_id", "value": 1 }]
+        ]
+      ]
     },
     {
       "name": "Where",
@@ -368,7 +631,7 @@
     {
       "name": "Group by",
       "query": [
-        "select * from source group by col1"
+        "select col1, col2 from source group by col1"
       ],
       "expectedResultSets": [
         [
@@ -383,7 +646,8 @@
       "query": [
         "select id, count(row_id) count, count(1) count1, count(case when id = 1 then null else 1 end) countExpr, sum(row_id) sum, data ",
         "from data ",
-        "group by id"
+        "group by id ",
+        "order by id "
       ],
       "expectedResultSets": [
         [
@@ -407,20 +671,6 @@
         ],
         [
           [{ "key": "col1", "value": 1 }, { "key": "col2", "value": 2 }]
-        ]
-      ]
-    },
-    {
-      "name": "Assignment select",
-      "query": [
-        "set @var3 = 0 ",
-        "select @var1 = 10 + 20 ",
-        "select @var2 = col1 + col2, @var3 = @var3 + 1 from source ",
-        "select @var1 Var1, @var2 Var2, @var3 Var3"
-      ],
-      "expectedResultSets": [
-        [
-          [{ "key": "Var1", "value": 30 }, { "key": "Var2", "value": 11 }, { "key": "Var3", "value": 3 }]
         ]
       ]
     },
@@ -495,16 +745,11 @@
     },
     {
       "name": "Calculated value in sub query with join",
-      "description": [
-        "Here we select columns from the sub query table source and hence, ",
-        "we should not get values from 'data' here for the single part columns.",
-        "However for the multipart items we should still dig down to the correct sub alias"
-      ],
       "query": [
-        "select id, col2, calc, x.d.data ",
+        "select id, col2, calc, x.data ",
         "from ",
         "( ",
-        "  select d.id, s.col2, d.id + s.col2 calc ",
+        "  select d.id, s.col2, d.id + s.col2 calc, d.data ",
         "  from data d ",
         "  inner join source s ",
         "    on s.col1 = d.row_id ",
@@ -515,7 +760,7 @@
           [{ "key": "id", "value": 1 },{ "key": "col2", "value": 2 },{ "key": "calc", "value": 3 },{ "key": "data", "value": "1_1" }],
           [{ "key": "id", "value": 2 },{ "key": "col2", "value": 2 },{ "key": "calc", "value": 4 },{ "key": "data", "value": "2_1" }],
           [{ "key": "id", "value": 3 },{ "key": "col2", "value": 2 },{ "key": "calc", "value": 5 },{ "key": "data", "value": "3_1" }],
-          [{ "key": "id", "value": 3 },{ "key": "col2", "value": 4 },{ "key": "calc", "value": 7 },{ "key": "data", "value": "3_3" }]          
+          [{ "key": "id", "value": 3 },{ "key": "col2", "value": 4 },{ "key": "calc", "value": 7 },{ "key": "data", "value": "3_3" }]
         ]
       ]
     },
@@ -553,27 +798,27 @@
         ") x"
       ],
       "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
-      "expectedMessageContains": "Unknown column: 'col' in table source: 'SubQuery (x)', expected one of: [id]"
+      "expectedMessageContains": "col cannot be bound"
     },
     {
       "name": "Selects without table source",
       "query": [
       	"select 1",
         "select 2 where false",
-        "select 3 order by 1",
+        "select 3 order by concat('val')",
         "select top 10 4"
       ],
       "expectedResultSets": [
       	[
-      	  [{"key":"","value": 1}]
+      	  [{"key":"1","value": 1}]
       	],
       	[
       	],
       	[
-      	  [{"key":"","value": 3}]
+      	  [{"key":"3","value": 3}]
       	],
       	[
-      	  [{"key":"","value": 4}]
+      	  [{"key":"4","value": 4}]
       	]
       ]
     },
@@ -588,14 +833,14 @@
       ],
       "expectedResultSets": [
       	[
-      	  [{"key":"","value": {"col1": 1, "col2": 2}},{"key":"","value": [1,2]},{"key":"","value": [{"col1": 1, "col2": 2}]},{"key":"","value": [[1,2],[3,4]]},{"key":"","value": {"ar1":[1,2],"ar2":[3,4]}}]
+      	  [{"key":"__expr0","value": {"col1": 1, "col2": 2}},{"key":"__expr1","value": [1,2]},{"key":"__expr2","value": [{"col1": 1, "col2": 2}]},{"key":"__expr3","value": [[1,2],[3,4]]},{"key":"__expr6","value": {"ar1":[1,2],"ar2":[3,4]}}]
       	]
       ]
     },
     {
       "name": "Selects with for output with table source",
       "query": [
-      	"select (select d.data row_id, col1, col2 from source for object_array) obj ",
+      	"select (select d.data row_id, s.col1, s.col2 from source s for object_array) obj ",
       	"from data d ",
       	"where id = 1"
       ],
@@ -608,17 +853,13 @@
     },
     {
       "name": "Selects with for output and subscript ",
-      "description": [
-        "Ensure that context tuples stay consistent even if they are change during a single projection evaluation.",
-        "Here the dereference expressions (d[0].data, st[0].id) changes the context tuple and the projections after should not be affected"
-      ],
       "query": [
-      	"select d[0].data ",
-      	", ( select st[0].id, row_id, data, s.col2 from open_rows(d) for object_array)  obj",
+      	"select d[0].data[0] ",
+      	", ( select st[0].id[0], d.row_id, d.data, s.col2 for object_array over d) obj",
       	"from source s ",
-      	"inner join data d with (populate = true) ",
+      	"inner populate join data d ",
       	"  on d.id = s.col1 ",
-      	"inner join strings st with (populate = true) ",
+      	"inner populate join strings st ",
       	"  on st.id = s.col1 "
       ],
       "expectedResultSets": [
@@ -629,25 +870,140 @@
       ]
     },
     {
+      "name": "Selects with for output and case ",
+      "query": [
+        "select ",
+        " case when d.row_id = 1 then (select id, data for object_array)  else null end obj",
+        "from data d ",
+        "where d.id = 1"  
+      ],
+      "expectedResultSets": [
+        [
+          [{"key": "obj", "value": [ { "id": 1, "data": "1_1" } ] } ],
+          [{"key": "obj", "value": null } ]
+        ]
+      ]
+    },
+    {
+      "name": "Selects with for output and qualified asterisk projection without over",
+      "query": [
+        "select ",
+        " (select d.* for object_array) obj",
+        "from source s ",
+        "inner populate join data d ",   
+        "  on d.id = s.col1 "  
+      ],
+      "expectedResultSets": [
+        [
+          [{"key": "obj", "value": [ { "id": [1, 1],    "row_id": [ 1, 2    ], "data": [ "1_1", "1_2"        ] } ] } ],
+          [{"key": "obj", "value": [ { "id": [3, 3, 3], "row_id": [ 1, 2, 3 ], "data": [ "3_1", "3_2", "3_3" ] } ] } ]
+        ]
+      ]
+    },
+    {
+      "name": "Selects with for output and qualified asterisk projection without over missing alias",
+      "query": [
+        "select ",
+        " (select c.* for object_array) obj",
+        "from source s ",
+        "inner populate join data d ",   
+        "  on d.id = s.col1 "  
+      ],
+      "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
+      "expectedMessageContains": "Alias c could not be bound"
+    },
+    {
+      "name": "Selects with for output and asterisk projection without over",
+      "query": [
+        "select ",
+        " (select * for object_array) obj",
+        "from source s ",
+        "inner populate join data d ",   
+        "  on d.id = s.col1 "  
+      ],
+      "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
+      "expectedMessageContains": "Must specify table source"
+    },
+    {
+      "name": "Selects with for output and asterisk projection with over clause",
+      "query": [
+        "select ",
+        " (select * for object_array over d) obj",
+        "from source s ",
+        "inner populate join data d ",   
+        "  on d.id = s.col1 "  
+      ],
+      "expectedResultSets": [
+        [
+          [{"key": "obj", "value": [ { "id": 1, "row_id": 1, "data": "1_1" }, { "id": 1, "row_id": 2, "data": "1_2" } ] } ],
+          [{"key": "obj", "value": [ { "id": 3, "row_id": 1, "data": "3_1" }, { "id": 3, "row_id": 2, "data": "3_2" }, { "id": 3, "row_id": 3, "data": "3_3" } ] } ]
+        ]
+      ]
+    },
+    {
+      "name": "Selects with for output and qualified asterisk projection with over clause",
+      "query": [
+        "select ",
+        " (select d.* for object_array over d) obj",
+        "from source s ",
+        "inner populate join data d ",   
+        "  on d.id = s.col1 "  
+      ],
+      "expectedResultSets": [
+        [
+          [{"key": "obj", "value": [ { "id": 1, "row_id": 1, "data": "1_1" }, { "id": 1, "row_id": 2, "data": "1_2" } ] } ],
+          [{"key": "obj", "value": [ { "id": 3, "row_id": 1, "data": "3_1" }, { "id": 3, "row_id": 2, "data": "3_2" }, { "id": 3, "row_id": 3, "data": "3_3" } ] } ]
+        ]
+      ]
+    },
+    {
+      "name": "Selects with for output and qualified asterisk projection with over clause missing alias",
+      "query": [
+        "select ",
+        " (select c.* for object_array over d) obj",
+        "from source s ",
+        "inner populate join data d ",   
+        "  on d.id = s.col1 "  
+      ],
+      "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
+      "expectedMessageContains": "Alias c could not be bound"
+    },
+    {
       "name": "System catalog ",
       "query": [
         "set @var = 'test' ",
         "select * from sys#catalogs ",
         "select * from sys#variables ",
+        "show variables",
         "select * from sys#c.tables ",
+        "show c#tables",
         "select * from sys#c.columns ",
         "select * from sys#c.functions ",
-        "select * from sys#c.indices "
+        "select * from sys#c.indices ",
+        "show c#functions ", 
+        "show functions"
       ],
       "expectedResultSets": [
         [
-          [{"key":"alias","value": "c"}, {"key":"name", "value": "Test#c"}]
+          [{"key":"alias","value": "c"}, {"key":"name", "value": "Test#c"}],
+          [{"key":"alias","value": "d"}, {"key":"name", "value": "Test#d"}]
+        ],
+        [
+          [{"key":"name","value": "var"}, {"key":"value", "value": "test"}]
         ],
         [
           [{"key":"name","value": "var"}, {"key":"value", "value": "test"}]
         ],
         [
           [{"key":"name","value": "source"}, {"key":"columns","value": ["col1", "col2"]}],
+          [{"key":"name","value": "source2"}, {"key":"columns","value": ["col1", "col2"]}],
+          [{"key":"name","value": "data"}, {"key":"columns","value": ["id", "row_id", "data"]}],
+          [{"key":"name","value": "strings"}, {"key":"columns","value": ["id", "string1", "string2"]}],
+          [{"key":"name","value": "agg_data"}, {"key":"columns","value": ["id", "value"]}]
+        ],
+        [
+          [{"key":"name","value": "source"}, {"key":"columns","value": ["col1", "col2"]}],
+          [{"key":"name","value": "source2"}, {"key":"columns","value": ["col1", "col2"]}],
           [{"key":"name","value": "data"}, {"key":"columns","value": ["id", "row_id", "data"]}],
           [{"key":"name","value": "strings"}, {"key":"columns","value": ["id", "string1", "string2"]}],
           [{"key":"name","value": "agg_data"}, {"key":"columns","value": ["id", "value"]}]
@@ -655,6 +1011,8 @@
         [
           [{"key":"table","value": "source"},{"key":"name","value": "col1"}, {"key":"custom","value": 4}],
           [{"key":"table","value": "source"}, {"key":"name","value": "col2"}, {"key":"custom","value": 4}],
+          [{"key":"table","value": "source2"},{"key":"name","value": "col1"}, {"key":"custom","value": 4}],
+          [{"key":"table","value": "source2"}, {"key":"name","value": "col2"}, {"key":"custom","value": 4}],
           [{"key":"table","value": "data"}, {"key":"name","value": "id"}, {"key":"custom","value": 2}],
           [{"key":"table","value": "data"},{"key":"name","value": "row_id"}, {"key":"custom","value": 6}],
           [{"key":"table","value": "data"}, {"key":"name","value": "data"}, {"key":"custom","value": 4}],
@@ -664,8 +1022,85 @@
           [{"key":"table","value": "agg_data"}, {"key":"name","value": "id"}, {"key":"custom","value": 2}],
           [{"key":"table","value": "agg_data"}, {"key":"name","value": "value"}, {"key":"custom","value": 5}]
         ],
+        [
+          [{"key":"name","value": "testFunc"},{"key":"type","value": "SCALAR"}, {"key":"description","value": ""}]
+        ],
         [],
-        []
+        [
+          [{"key":"name","value": "testFunc"},{"key":"type","value": "SCALAR"}, {"key":"description","value": ""}]
+        ],
+        [
+          [{"key":"name","value": "testFunc"},            {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "System functions"},    {"key":"type","value": ""},                 {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "array"},               {"key":"type","value": "AGGREGATE"},        {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "object"},              {"key":"type","value": "AGGREGATE"},        {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "object_array"},        {"key":"type","value": "AGGREGATE"},        {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "array"},               {"key":"type","value": "OPERATOR"},         {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "object"},              {"key":"type","value": "OPERATOR"},         {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "object_array"},        {"key":"type","value": "OPERATOR"},         {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "all"},                 {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "any"},                 {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "coalesce"},            {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "concat"},              {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "contains"},            {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "distinct"},            {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "filter"},              {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "flatmap"},             {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "format"},              {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "getdate"},             {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "getutcdate"},          {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "hash"},                {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "isblank"},             {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "isnull"},              {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "json_value"},          {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "leftpad"},             {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "length"},              {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "listOf"},              {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "lower"},               {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "ltrim"},               {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "map"},                 {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "none"},                {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "randomInt"},           {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "regexp_like"},         {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "regexp_match"},        {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "replace"},             {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "rightpad"},            {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "rtrim"},               {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "substring"},           {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "tolist"},              {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "trim"},                {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "typeof"},              {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "unix_timestamp"},      {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "upper"},               {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "avg"},                 {"key":"type","value": "SCALAR_AGGREGATE"}, {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "count"},               {"key":"type","value": "SCALAR_AGGREGATE"}, {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "max"},                 {"key":"type","value": "SCALAR_AGGREGATE"}, {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "min"},                 {"key":"type","value": "SCALAR_AGGREGATE"}, {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "sum"},                 {"key":"type","value": "SCALAR_AGGREGATE"}, {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "open_map_collection"}, {"key":"type","value": "TABLE"},            {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "range"},               {"key":"type","value": "TABLE"},            {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "string_split"},        {"key":"type","value": "TABLE"},            {"key":"description","value": "###IGNORE###"}]
+        ]
+      ]
+    },
+    {
+      "name": "Switch default catalog between two queries ",
+      "query": [
+        "select * from source ",
+        "use d ",
+        "select * from source "
+      ],
+      "expectedResultSets": [
+        [
+          [{"key":"col1","value": 1}, {"key":"col2", "value": 2}],
+          [{"key":"col1","value": 3}, {"key":"col2", "value": 4}],
+          [{"key":"col1","value": 5}, {"key":"col2", "value": 6}]
+        ],
+        [
+          [{"key":"col1","value": 10}, {"key":"col2", "value": 20}],
+          [{"key":"col1","value": 30}, {"key":"col2", "value": 40}],
+          [{"key":"col1","value": 50}, {"key":"col2", "value": 60}]
+        ]
       ]
     }
   ]

@@ -271,12 +271,28 @@
                         <phase>validate</phase>
                         <configuration>
                             <sourceDirectories>
-                                <sourceDirectory>src/</sourceDirectory>
+                                <sourceDirectory>src/main/</sourceDirectory>
                             </sourceDirectories>
                             <includeResources>true</includeResources>
                             <includeTestResources>false</includeTestResources>
                             <configLocation>checkstyle.xml</configLocation>
                             <outputFile>${project.build.directory}/checkstyle-result.xml</outputFile>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>checkstyle-test</id>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <phase>validate</phase>
+                        <configuration>
+                            <sourceDirectories>
+                                <sourceDirectory>src/test/</sourceDirectory>
+                            </sourceDirectories>
+                            <includeResources>true</includeResources>
+                            <includeTestResources>true</includeTestResources>
+                            <configLocation>checkstyle-test.xml</configLocation>
+                            <outputFile>${project.build.directory}/checkstyle-test-result.xml</outputFile>
                         </configuration>
                     </execution>
                 </executions>

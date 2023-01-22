@@ -10,9 +10,9 @@ public class SessionGenericCache extends ASessionCache<Object> implements Generi
 {
     @SuppressWarnings("unchecked")
     @Override
-    public <T> T computIfAbsent(QualifiedName name, Object key, Duration ttl, final Supplier<Object> supplier)
+    public <T> T computIfAbsent(QualifiedName name, Object key, Duration ttl, final Supplier<T> supplier)
     {
-        Cache<Object> entry = getCache(name);
-        return (T) entry.computeIfAbsent(key, ttl, supplier);
+        Cache<T> entry = (Cache<T>) getCache(name);
+        return entry.computeIfAbsent(key, ttl, supplier);
     }
 }

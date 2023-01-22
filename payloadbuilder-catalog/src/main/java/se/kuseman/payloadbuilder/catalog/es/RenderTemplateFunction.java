@@ -18,16 +18,20 @@ import org.apache.http.util.EntityUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 
 /** Render a template in ES */
 class RenderTemplateFunction extends ScalarFunctionInfo
 {
     RenderTemplateFunction(Catalog catalog)
     {
-        super(catalog, "rendertemplate");
+        super(catalog, "rendertemplate", FunctionType.SCALAR);
     }
 
     @Override
@@ -45,7 +49,7 @@ class RenderTemplateFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
     {
         Object templateObj = arguments.get(0)
                 .eval(context);
@@ -78,7 +82,7 @@ class RenderTemplateFunction extends ScalarFunctionInfo
         try (CloseableHttpResponse response = HttpClientUtils.execute(context.getSession(), catalogAlias, post))
         {
             entity = response.getEntity();
-            return IOUtils.toString(entity.getContent(), StandardCharsets.UTF_8);
+            return ValueVector.literalObject(ResolvedType.of(Type.String), IOUtils.toString(entity.getContent(), StandardCharsets.UTF_8), 1);
         }
         catch (Exception e)
         {
@@ -98,7 +102,7 @@ class RenderTemplateFunction extends ScalarFunctionInfo
     {
         try
         {
-            return ESOperator.MAPPER.writeValueAsString(value);
+            return ESDatasource.MAPPER.writeValueAsString(value);
         }
         catch (JsonProcessingException e)
         {

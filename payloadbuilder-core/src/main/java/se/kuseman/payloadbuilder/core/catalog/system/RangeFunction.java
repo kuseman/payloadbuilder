@@ -1,24 +1,25 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
-import static java.util.Arrays.asList;
-import static java.util.Objects.requireNonNull;
-
 import java.util.List;
+import java.util.NoSuchElementException;
 
-import se.kuseman.payloadbuilder.api.TableAlias;
-import se.kuseman.payloadbuilder.api.TableMeta;
-import se.kuseman.payloadbuilder.api.TableMeta.DataType;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
+import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
-import se.kuseman.payloadbuilder.api.operator.Operator.TupleIterator;
-import se.kuseman.payloadbuilder.api.operator.Tuple;
 
 /** Range table valued function that emits row in range */
 class RangeFunction extends TableFunctionInfo
 {
-    private static final TableMeta TABLE_META = new TableMeta(asList(new TableMeta.Column("Value", DataType.INT)));
+    private static final Schema SCHEMA = Schema.of(Column.of("Value", ResolvedType.of(Type.Int)));
 
     RangeFunction(Catalog catalog)
     {
@@ -26,128 +27,157 @@ class RangeFunction extends TableFunctionInfo
     }
 
     @Override
-    public TableMeta getTableMeta()
+    public Schema getSchema(List<? extends IExpression> arguments)
     {
-        return TABLE_META;
+        return SCHEMA;
     }
 
     @Override
-    public TupleIterator open(IExecutionContext context, String catalogAlias, TableAlias tableAlias, List<? extends IExpression> arguments)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments, IDatasourceOptions options)
     {
+        ValueVector vv;
+
         int from = 0;
         int to = -1;
         // to
         if (arguments.size() <= 1)
         {
-            to = ((Number) requireNonNull(arguments.get(0)
-                    .eval(context), "From argument to range cannot be null.")).intValue();
+            vv = eval(context, arguments.get(0));
+            if (vv.isNull(0))
+            {
+                throw new IllegalArgumentException("From argument to range cannot be null.");
+            }
+            to = vv.getInt(0);
         }
         // from, to
         else if (arguments.size() <= 2)
         {
-            from = ((Number) requireNonNull(arguments.get(0)
-                    .eval(context), "From argument to range cannot be null.")).intValue();
-            to = ((Number) requireNonNull(arguments.get(1)
-                    .eval(context), "To argument to range cannot be null.")).intValue();
+            vv = eval(context, arguments.get(0));
+            if (vv.isNull(0))
+            {
+                throw new IllegalArgumentException("From argument to range cannot be null.");
+            }
+            from = vv.getInt(0);
+            vv = eval(context, arguments.get(1));
+            if (vv.isNull(0))
+            {
+                throw new IllegalArgumentException("To argument to range cannot be null.");
+            }
+            to = vv.getInt(0);
         }
 
         final int start = from;
         final int stop = to;
+        final int rowCount = Math.max(stop - start, 0);
+        final int batchSize = options.getBatchSize(context);
 
-        // CSOFF
-        return new TupleIterator()
-        // CSON
+        if (rowCount <= batchSize)
         {
-            int pos = start;
+            return TupleIterator.singleton(getVector(start, stop));
+        }
+
+        final int batchCount = rowCount / batchSize;
+        return new TupleIterator()
+        {
+            int batchNumber = 0;
+            TupleVector next;
 
             @Override
-            public Tuple next()
+            public TupleVector next()
             {
-                return new RangeTuple(pos++, tableAlias.getTupleOrdinal());
+                if (next == null)
+                {
+                    throw new NoSuchElementException();
+                }
+                TupleVector result = next;
+                next = null;
+                return result;
             }
 
             @Override
             public boolean hasNext()
             {
-                return pos < stop;
+                return setNext();
+            }
+
+            private boolean setNext()
+            {
+                while (next == null)
+                {
+                    if (batchNumber > batchCount)
+                    {
+                        return false;
+                    }
+
+                    int batchStart = start + (batchSize * batchNumber);
+                    int batchStop = Math.min(batchStart + batchSize, stop);
+                    next = getVector(batchStart, batchStop);
+                    batchNumber++;
+                }
+                return true;
             }
         };
     }
 
-    /** Tuple */
-    private static class RangeTuple implements Tuple
+    private TupleVector getVector(int start, int stop)
     {
-        private final int value;
-        private final int tupleOrdinal;
-
-        private RangeTuple(int value, int tupleOrdinal)
+        int rowCount = Math.max(stop - start, 0);
+        return new TupleVector()
         {
-            this.value = value;
-            this.tupleOrdinal = tupleOrdinal;
-        }
-
-        @Override
-        public int getTupleOrdinal()
-        {
-            return tupleOrdinal;
-        }
-
-        @Override
-        public Object getValue(int columnOrdinal)
-        {
-            if (columnOrdinal == 0)
+            @Override
+            public Schema getSchema()
             {
-                return value;
+                return SCHEMA;
             }
 
-            return null;
-        }
-
-        @Override
-        public int getInt(int columnOrdinal)
-        {
-            if (columnOrdinal == 0)
+            @Override
+            public int getRowCount()
             {
-                return value;
-            }
-            return 0;
-        }
-
-        @Override
-        public boolean isNull(int columnOrdinal)
-        {
-            if (columnOrdinal == 0)
-            {
-                return false;
+                return rowCount;
             }
 
-            return true;
-        }
-
-        @Override
-        public int getColumnCount()
-        {
-            return 1;
-        }
-
-        @Override
-        public String getColumn(int columnOrdinal)
-        {
-            if (columnOrdinal == 0)
+            @Override
+            public ValueVector getColumn(final int column)
             {
-                return "Value";
-            }
-            return null;
-        }
+                return new ValueVector()
+                {
+                    @Override
+                    public ResolvedType type()
+                    {
+                        return ResolvedType.of(Type.Int);
+                    }
 
-        @Override
-        public int getColumnOrdinal(String column)
-        {
-            if ("Value".equals(column))
-            {
-                return 0;
+                    @Override
+                    public int size()
+                    {
+                        return rowCount;
+                    }
+
+                    @Override
+                    public boolean isNullable()
+                    {
+                        return false;
+                    }
+
+                    @Override
+                    public boolean isNull(int row)
+                    {
+                        return false;
+                    }
+
+                    @Override
+                    public int getInt(int row)
+                    {
+                        return start + row;
+                    }
+
+                    @Override
+                    public Object getValue(int row)
+                    {
+                        throw new IllegalArgumentException("getValue should not be called on typed vectors");
+                    }
+                };
             }
-            return -1;
-        }
+        };
     }
 }

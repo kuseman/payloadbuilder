@@ -10,7 +10,10 @@ public class ParseException extends RuntimeException
 
     public ParseException(String message, Token token)
     {
-        this(message, token.getLine(), token.getCharPositionInLine());
+        this(message, token != null ? token.getLine()
+                : -1,
+                token != null ? token.getCharPositionInLine()
+                        : -1);
     }
 
     public ParseException(String message, int line, int column)

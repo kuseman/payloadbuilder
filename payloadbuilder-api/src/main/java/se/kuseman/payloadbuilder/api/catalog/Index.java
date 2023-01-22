@@ -54,7 +54,15 @@ public class Index
     @Override
     public boolean equals(Object obj)
     {
-        if (obj instanceof Index)
+        if (obj == null)
+        {
+            return false;
+        }
+        else if (obj == this)
+        {
+            return true;
+        }
+        else if (obj instanceof Index)
         {
             Index that = (Index) obj;
             return table.equals(that.table)

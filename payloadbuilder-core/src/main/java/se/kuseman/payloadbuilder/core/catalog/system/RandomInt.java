@@ -4,9 +4,13 @@ import java.util.List;
 import java.util.Random;
 
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 
 /** Function random int, returns a random int from provided seed. */
 class RandomInt extends ScalarFunctionInfo
@@ -15,8 +19,8 @@ class RandomInt extends ScalarFunctionInfo
 
     RandomInt(Catalog catalog)
     {
-        super(catalog, "randomInt");
-        this.random = new Random();
+        super(catalog, "randomInt", FunctionType.SCALAR);
+        this.random = new Random(System.nanoTime());
     }
 
     @Override
@@ -26,17 +30,70 @@ class RandomInt extends ScalarFunctionInfo
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public ResolvedType getType(List<? extends IExpression> arguments)
     {
-        Object boundObj = arguments.get(0)
-                .eval(context);
-        if (boundObj == null)
-        {
-            return null;
-        }
-        int bound = ((Number) boundObj).intValue();
-        return random.nextInt(bound);
+        return ResolvedType.of(Type.Int);
     }
+
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    {
+        final ValueVector bound = arguments.get(0)
+                .eval(input, context);
+        return new ValueVector()
+        {
+            @Override
+            public ResolvedType type()
+            {
+                return ResolvedType.of(Type.Int);
+            }
+
+            @Override
+            public int size()
+            {
+                return input.getRowCount();
+            }
+
+            @Override
+            public boolean isNullable()
+            {
+                return bound.isNullable();
+            }
+
+            @Override
+            public boolean isNull(int row)
+            {
+                return bound.isNull(row);
+            }
+
+            @Override
+            public int getInt(int row)
+            {
+                // Might be weird to get different values on each invocation
+                // and also for each row
+                return random.nextInt(bound.getInt(row));
+            }
+
+            @Override
+            public Object getValue(int row)
+            {
+                throw new IllegalArgumentException("getValue should not be called on typed vectors");
+            }
+        };
+    }
+    //
+    // @Override
+    // public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    // {
+    // Object boundObj = arguments.get(0)
+    // .eval(context);
+    // if (boundObj == null)
+    // {
+    // return null;
+    // }
+    // int bound = ((Number) boundObj).intValue();
+    // return random.nextInt(bound);
+    // }
 
     // @Override
     // public ExpressionCode generateCode(CodeGeneratorContext context, ExpressionCode parentCode, List<Expression> arguments)

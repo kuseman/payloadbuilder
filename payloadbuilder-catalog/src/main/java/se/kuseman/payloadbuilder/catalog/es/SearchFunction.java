@@ -1,35 +1,27 @@
 package se.kuseman.payloadbuilder.catalog.es;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.isBlank;
-import static se.kuseman.payloadbuilder.catalog.es.ESUtils.getScrollUrl;
-import static se.kuseman.payloadbuilder.catalog.es.ESUtils.getSearchTemplateUrl;
-import static se.kuseman.payloadbuilder.catalog.es.ESUtils.getSearchUrl;
+import static se.kuseman.payloadbuilder.catalog.es.ESQueryUtils.getScrollUrl;
+import static se.kuseman.payloadbuilder.catalog.es.ESQueryUtils.getSearchUrl;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
 
-import org.apache.commons.lang3.mutable.MutableBoolean;
-import org.apache.http.HttpHeaders;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.StringEntity;
-
-import se.kuseman.payloadbuilder.api.TableAlias;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
+import se.kuseman.payloadbuilder.api.catalog.UTF8String;
+import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.INamedExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
-import se.kuseman.payloadbuilder.api.operator.Operator.TupleIterator;
 
 /** Search ES */
 class SearchFunction extends TableFunctionInfo
 {
-    private static final int SCROLL_SIZE = 1000;
-
     SearchFunction(Catalog catalog)
     {
         super(catalog, "search");
@@ -89,7 +81,7 @@ class SearchFunction extends TableFunctionInfo
     }
 
     @Override
-    public TupleIterator open(IExecutionContext context, String catalogAlias, TableAlias tableAlias, List<? extends IExpression> arguments)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments, IDatasourceOptions options)
     {
         String endpoint = null;
         String index = null;
@@ -105,34 +97,33 @@ class SearchFunction extends TableFunctionInfo
         {
             INamedExpression namedArg = (INamedExpression) arguments.get(i);
             String name = namedArg.getName();
-            IExpression expression = namedArg.getExpression();
             if ("endpoint".equals(name))
             {
-                endpoint = getArg(context, expression, String.class, "endpoint");
+                endpoint = getArg(context, namedArg, String.class, "endpoint");
             }
             else if ("index".equals(name))
             {
-                index = getArg(context, expression, String.class, "index");
+                index = getArg(context, namedArg, String.class, "index");
             }
             else if ("type".equals(name))
             {
-                type = getArg(context, expression, String.class, "type");
+                type = getArg(context, namedArg, String.class, "type");
             }
             else if ("body".equals(name))
             {
-                body = getArg(context, expression, String.class, "body");
+                body = getArg(context, namedArg, String.class, "body");
             }
             else if ("template".equals(name))
             {
-                template = getArg(context, expression, String.class, "template");
+                template = getArg(context, namedArg, String.class, "template");
             }
             else if ("scroll".equals(name))
             {
-                scroll = getArg(context, expression, Boolean.class, "scroll");
+                scroll = getArg(context, namedArg, Boolean.class, "scroll");
             }
             else if ("params".equals(name))
             {
-                Object obj = expression.eval(context);
+                Object obj = namedArg.eval(context);
                 if (obj instanceof String)
                 {
                     params = (String) obj;
@@ -141,7 +132,7 @@ class SearchFunction extends TableFunctionInfo
                 {
                     try
                     {
-                        params = ESOperator.MAPPER.writeValueAsString(obj);
+                        params = ESDatasource.MAPPER.writeValueAsString(obj);
                     }
                     catch (IOException e)
                     {
@@ -164,11 +155,6 @@ class SearchFunction extends TableFunctionInfo
             index = ESType.getIndex(context.getSession(), catalogAlias);
         }
 
-        if (type == null)
-        {
-            type = ESCatalog.SINGLE_TYPE_TABLE_NAME;
-        }
-
         if (template == null
                 && body == null)
         {
@@ -181,52 +167,28 @@ class SearchFunction extends TableFunctionInfo
             throw new IllegalArgumentException("'template' and 'body' arguments are mutual exclusive for function " + getName());
         }
 
-        boolean useDocType = ESUtils.getUseDocType(context.getSession(), catalogAlias);
-        final String searchUrl = !isBlank(template) ? getSearchTemplateUrl(useDocType, endpoint, index, type, scroll ? SCROLL_SIZE
-                : null,
+        int batchSize = scroll ? options.getBatchSize(context)
+                : -1;
+
+        // Turn off the options batch size if we have a size in the body
+        // else the body value will get overridden
+        if (body != null
+                && body.contains("\"size\":"))
+        {
+            batchSize = -1;
+        }
+
+        ElasticsearchMeta meta = ElasticsearchMetaUtils.getMeta(context.getSession(), catalogAlias, endpoint, index);
+        String searchUrl = getSearchUrl(endpoint, index, type, batchSize < 0 ? null
+                : batchSize,
                 scroll ? 2
-                        : null)
-                : getSearchUrl(useDocType, endpoint, index, type, scroll ? SCROLL_SIZE
                         : null,
-                        scroll ? 2
-                                : null,
-                        null);
-        final String scrollUrl = scroll ? getScrollUrl(endpoint, 2)
+                !isBlank(template));
+        String scrollUrl = scroll ? getScrollUrl(endpoint, 2)
                 : null;
 
-        AtomicLong sentBytes = new AtomicLong();
         String actualBody = getBody(body, template, defaultIfBlank(params, "{}"));
-        MutableBoolean doRequest = new MutableBoolean(true);
-        boolean isSingleType = ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(type);
-        return ESOperator.getIterator(context, catalogAlias, tableAlias, endpoint, ESCatalog.SINGLE_TYPE_TABLE_NAME.equals(type), new ESOperator.Data(), scrollId ->
-        {
-            if (doRequest.getValue())
-            {
-                sentBytes.addAndGet(searchUrl.length() + actualBody.length());
-                HttpPost post = new HttpPost(searchUrl);
-                post.setEntity(new StringEntity(actualBody, UTF_8));
-                doRequest.setFalse();
-                return post;
-            }
-            else if (scrollUrl != null)
-            {
-                String id = scrollId.getValue();
-                scrollId.setValue(null);
-                HttpPost post = new HttpPost(scrollUrl);
-                if (isSingleType)
-                {
-                    post.setEntity(new StringEntity("{\"scroll_id\":\"" + id + "\" }", UTF_8));
-                }
-                else
-                {
-                    post.removeHeaders(HttpHeaders.CONTENT_TYPE);
-                    post.setEntity(new StringEntity(id, UTF_8));
-                }
-                return post;
-            }
-
-            return null;
-        });
+        return ESDatasource.getScrollingIterator(context, meta.getStrategy(), catalogAlias, endpoint, new ESDatasource.Data(), searchUrl, scrollUrl, actualBody);
     }
 
     private String getBody(String body, String template, String params)
@@ -245,10 +207,16 @@ class SearchFunction extends TableFunctionInfo
     @SuppressWarnings("unchecked")
     private <T> T getArg(IExecutionContext context, IExpression expression, Class<? extends T> clazz, String key)
     {
-        Object obj = expression.eval(context);
-        if (obj == null)
+        ValueVector v = expression.eval(context);
+        if (v.isNull(0))
         {
             return null;
+        }
+
+        Object obj = v.valueAsObject(0);
+        if (obj instanceof UTF8String)
+        {
+            obj = ((UTF8String) obj).toString();
         }
         if (!clazz.isAssignableFrom(obj.getClass()))
         {

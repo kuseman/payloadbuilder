@@ -3,20 +3,18 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 import static java.util.Collections.singletonList;
 
 import java.util.List;
-import java.util.Set;
 
-import org.apache.commons.collections4.iterators.TransformIterator;
-
-import se.kuseman.payloadbuilder.api.TableAlias;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 import se.kuseman.payloadbuilder.core.catalog.LambdaFunction;
-import se.kuseman.payloadbuilder.core.operator.EvalUtils;
-import se.kuseman.payloadbuilder.core.operator.ExecutionContext;
-import se.kuseman.payloadbuilder.core.parser.LambdaExpression;
-import se.kuseman.payloadbuilder.core.utils.CollectionUtils;
+import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.expression.LambdaExpression;
 
 /** Map function. Maps input into another form */
 class MapFunction extends ScalarFunctionInfo implements LambdaFunction
@@ -25,15 +23,15 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
 
     MapFunction(Catalog catalog)
     {
-        super(catalog, "map");
+        super(catalog, "map", FunctionType.SCALAR);
     }
 
-    @Override
-    public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Set<TableAlias>> argumentAliases)
-    {
-        // Map function has resulting alias as the mapping lambda
-        return argumentAliases.get(1);
-    }
+    // @Override
+    // public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Set<TableAlias>> argumentAliases)
+    // {
+    // // Map function has resulting alias as the mapping lambda
+    // return argumentAliases.get(1);
+    // }
 
     @Override
     public List<LambdaBinding> getLambdaBindings()
@@ -48,24 +46,92 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
     }
 
     @Override
-    public Object eval(IExecutionContext ctx, String catalogAlias, List<? extends IExpression> arguments)
+    public ResolvedType getType(List<? extends IExpression> arguments)
     {
-        Object argResult = arguments.get(0)
-                .eval(ctx);
-        if (argResult == null)
-        {
-            return null;
-        }
-        ExecutionContext context = (ExecutionContext) ctx;
         LambdaExpression le = (LambdaExpression) arguments.get(1);
-        int lambdaId = le.getLambdaIds()[0];
-        return new TransformIterator<>(CollectionUtils.getIterator(argResult), input ->
+
+        Type inputType = arguments.get(0)
+                .getType()
+                .getType();
+
+        if (inputType == Type.ValueVector
+                || inputType == Type.TupleVector)
         {
-            context.getStatementContext()
-                    .setLambdaValue(lambdaId, input);
-            return EvalUtils.unwrap(context, le.getExpression()
-                    .eval(context));
-        });
+            return ResolvedType.valueVector(le.getExpression()
+                    .getType());
+        }
+
+        return le.getExpression()
+                .getType();
+    }
+
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    {
+        ValueVector value = arguments.get(0)
+                .eval(input, context);
+        final LambdaExpression le = (LambdaExpression) arguments.get(1);
+        final Type type = value.type()
+                .getType();
+        if (type == Type.ValueVector
+                || type == Type.TupleVector)
+        {
+            return new ValueVector()
+            {
+                LambdaUtils.RowTupleVector inputTupleVector = new LambdaUtils.RowTupleVector(input);
+
+                @Override
+                public ResolvedType type()
+                {
+                    return ResolvedType.valueVector(le.getExpression()
+                            .getType());
+                }
+
+                @Override
+                public int size()
+                {
+                    return value.size();
+                }
+
+                @Override
+                public boolean isNull(int row)
+                {
+                    // Map a null is null
+                    return value.isNull(row);
+                }
+
+                @Override
+                public Object getValue(int row)
+                {
+                    ValueVector lambdaValue;
+                    if (type == Type.TupleVector)
+                    {
+                        TupleVector vector = (TupleVector) value.getValue(row);
+                        lambdaValue = ValueVector.literalObject(ResolvedType.tupleVector(vector.getSchema()), vector, 1);
+                        inputTupleVector.setRowCount(vector.getRowCount());
+                    }
+                    else
+                    {
+                        lambdaValue = (ValueVector) value.getValue(row);
+                        inputTupleVector.setRowCount(lambdaValue.size());
+                    }
+                    ((ExecutionContext) context).getStatementContext()
+                            .setLambdaValue(le.getLambdaIds()[0], lambdaValue);
+
+                    inputTupleVector.setRow(row);
+
+                    return le.getExpression()
+                            .eval(inputTupleVector, context);
+                }
+            };
+        }
+
+        // Rest of the primitive types, just eval the lambda with inputs
+        ((ExecutionContext) context).getStatementContext()
+                .setLambdaValue(le.getLambdaIds()[0], value);
+
+        return le.getExpression()
+                .eval(input, context);
     }
 
     // @Override

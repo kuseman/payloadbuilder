@@ -5,9 +5,14 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.api.catalog.UTF8String;
+import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 
 /** Left and -right pad function */
 class PadFunction extends ScalarFunctionInfo
@@ -17,7 +22,7 @@ class PadFunction extends ScalarFunctionInfo
     PadFunction(Catalog catalog, boolean left)
     {
         super(catalog, left ? "leftpad"
-                : "rightpad");
+                : "rightpad", FunctionType.SCALAR);
         this.left = left;
     }
 
@@ -41,35 +46,72 @@ class PadFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public ResolvedType getType(List<? extends IExpression> arguments)
     {
-        Object obj = arguments.get(0)
-                .eval(context);
-        if (obj == null)
-        {
-            return null;
-        }
-        String value = String.valueOf(obj);
+        return ResolvedType.of(Type.String);
+    }
 
-        Object lengthObj = arguments.get(1)
-                .eval(context);
-        if (!(lengthObj instanceof Integer))
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, final TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    {
+        if (arguments.size() < 2)
         {
-            throw new IllegalArgumentException("Expected an integer expression for second argument of " + getName() + " but got " + lengthObj);
-        }
-        int length = ((Integer) lengthObj).intValue();
-
-        if (arguments.size() >= 3)
-        {
-            Object padString = arguments.get(2)
-                    .eval(context);
-            return left ? StringUtils.leftPad(value, length, padString != null ? String.valueOf(padString)
-                    : " ")
-                    : StringUtils.rightPad(value, length, padString != null ? String.valueOf(padString)
-                            : " ");
+            throw new IllegalArgumentException("Function " + getName() + " expects at least 2 arguments.");
         }
 
-        return left ? StringUtils.leftPad(value, length)
-                : StringUtils.rightPad(value, length);
+        final ValueVector value = arguments.get(0)
+                .eval(input, context);
+
+        final ValueVector length = arguments.get(1)
+                .eval(input, context);
+
+        final ValueVector padValue = arguments.size() > 2 ? arguments.get(2)
+                .eval(input, context)
+                : null;
+
+        return new ValueVector()
+        {
+            @Override
+            public ResolvedType type()
+            {
+                return ResolvedType.of(Type.String);
+            }
+
+            @Override
+            public int size()
+            {
+                return input.getRowCount();
+            }
+
+            @Override
+            public boolean isNull(int row)
+            {
+                return value.isNull(row)
+                        || length.isNull(row);
+            }
+
+            @Override
+            public UTF8String getString(int row)
+            {
+                // Boxing here for now
+                String strArg = String.valueOf(value.valueAsObject(row));
+                int lengthArg = length.getInt(row);
+
+                String padString = " ";
+                if (padValue != null)
+                {
+                    padString = String.valueOf(padValue.valueAsObject(row));
+                }
+
+                return UTF8String.from(left ? StringUtils.leftPad(strArg, lengthArg, padString)
+                        : StringUtils.rightPad(strArg, lengthArg, padString));
+            }
+
+            @Override
+            public Object getValue(int row)
+            {
+                throw new IllegalArgumentException("getValue should not be called on typed vectors");
+            }
+        };
     }
 }

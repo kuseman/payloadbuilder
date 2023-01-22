@@ -1,40 +1,30 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
-import static java.util.Collections.emptyIterator;
 import static java.util.Collections.singletonList;
 
-import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 
-import org.apache.commons.collections4.Transformer;
-import org.apache.commons.collections4.iterators.ObjectGraphIterator;
-
-import se.kuseman.payloadbuilder.api.TableAlias;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
+import se.kuseman.payloadbuilder.api.utils.VectorUtils;
 import se.kuseman.payloadbuilder.core.catalog.LambdaFunction;
-import se.kuseman.payloadbuilder.core.operator.StatementContext;
-import se.kuseman.payloadbuilder.core.parser.LambdaExpression;
-import se.kuseman.payloadbuilder.core.utils.CollectionUtils;
+import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.expression.LambdaExpression;
 
-/** Flat map function. Flat maps input */
+/** Flat map function. Flat maps input turning nested value vectors into flat vectors */
 class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
 {
     private static final List<LambdaBinding> LAMBDA_BINDINGS = singletonList(new LambdaBinding(1, 0));
 
     FlatMapFunction(Catalog catalog)
     {
-        super(catalog, "flatmap");
-    }
-
-    @Override
-    public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Set<TableAlias>> argumentAliases)
-    {
-        // Result of flat map is the result of the lambda
-        return argumentAliases.get(1);
+        super(catalog, "flatmap", FunctionType.SCALAR);
     }
 
     @Override
@@ -50,51 +40,117 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public ResolvedType getType(List<? extends IExpression> arguments)
     {
-        Object argResult = arguments.get(0)
-                .eval(context);
-        if (argResult == null)
-        {
-            return null;
-        }
-        StatementContext ctx = (StatementContext) context.getStatementContext();
         LambdaExpression le = (LambdaExpression) arguments.get(1);
-        int lambdaId = le.getLambdaIds()[0];
-        return new ObjectGraphIterator<>(CollectionUtils.getIterator(argResult),
-                // CSOFF
-                new Transformer<Object, Object>()
-                // CSON
-                {
-                    private Iterator<Object> it;
 
-                    @Override
-                    public Object transform(Object input)
+        ResolvedType type = le.getExpression()
+                .getType();
+
+        ResolvedType inputType = arguments.get(0)
+                .getType();
+
+        if (type.getType() == Type.ValueVector
+                && (inputType.getType() == Type.ValueVector
+                        || inputType.getType() == Type.TupleVector))
+        {
+            return ResolvedType.valueVector(type.getSubType());
+        }
+
+        return le.getExpression()
+                .getType();
+    }
+
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    {
+        ValueVector value = arguments.get(0)
+                .eval(input, context);
+
+        LambdaExpression le = (LambdaExpression) arguments.get(1);
+
+        ResolvedType type = le.getExpression()
+                .getType();
+
+        Type inputType = value.type()
+                .getType();
+
+        if (type.getType() == Type.ValueVector
+                && (inputType == Type.ValueVector
+                        || inputType == Type.TupleVector))
+        {
+            return new ValueVector()
+            {
+                LambdaUtils.RowTupleVector inputTupleVector = new LambdaUtils.RowTupleVector(input);
+
+                @Override
+                public ResolvedType type()
+                {
+                    return ResolvedType.valueVector(type.getSubType());
+                }
+
+                @Override
+                public int size()
+                {
+                    return input.getRowCount();
+                }
+
+                @Override
+                public boolean isNull(int row)
+                {
+                    // Flatmap:ing null is null
+                    return value.isNull(row);
+                }
+
+                @Override
+                public Object getValue(int row)
+                {
+                    ValueVector lambdaValue;
+                    if (inputType == Type.TupleVector)
                     {
-                        if (it == null)
-                        {
-                            ctx.setLambdaValue(lambdaId, input);
-                            Object value = le.getExpression()
-                                    .eval(context);
-                            if (value == null)
-                            {
-                                return emptyIterator();
-                            }
-                            it = CollectionUtils.getIterator(value);
-                            Object result = it;
-                            if (!it.hasNext())
-                            {
-                                it = null;
-                            }
-                            return result;
-                        }
-                        else if (!it.hasNext())
-                        {
-                            it = null;
-                        }
-                        return input;
+                        TupleVector vector = (TupleVector) value.getValue(row);
+                        lambdaValue = ValueVector.literalObject(ResolvedType.tupleVector(vector.getSchema()), vector, 1);
+                        inputTupleVector.setRowCount(vector.getRowCount());
                     }
-                });
+                    else
+                    {
+                        lambdaValue = (ValueVector) value.getValue(row);
+                        inputTupleVector.setRowCount(lambdaValue.size());
+                    }
+
+                    ((ExecutionContext) context).getStatementContext()
+                            .setLambdaValue(le.getLambdaIds()[0], lambdaValue);
+
+                    inputTupleVector.setRow(row);
+
+                    ValueVector vector = le.getExpression()
+                            .eval(inputTupleVector, context);
+
+                    // Concat all vectors into one
+                    ValueVector result = null;
+                    int size = vector.size();
+                    for (int i = 0; i < size; i++)
+                    {
+                        if (result == null)
+                        {
+                            result = (ValueVector) vector.getValue(i);
+                        }
+                        else
+                        {
+                            result = VectorUtils.concat(result, (ValueVector) vector.getValue(i));
+                        }
+                    }
+                    return result;
+                }
+            };
+        }
+
+        // Flat map flats value vectors, other values is considered flattened already so just map them with lambda expression
+        ((ExecutionContext) context).getStatementContext()
+                .setLambdaValue(le.getLambdaIds()[0], value);
+
+        return le.getExpression()
+                .eval(input, context);
     }
 
     // @Override

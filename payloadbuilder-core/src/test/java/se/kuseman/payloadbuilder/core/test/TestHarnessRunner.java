@@ -1,6 +1,7 @@
 package se.kuseman.payloadbuilder.core.test;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.containsIgnoreCase;
@@ -12,12 +13,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.TimeZone;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Assert;
 import org.junit.Assume;
@@ -28,21 +29,30 @@ import org.junit.runners.Parameterized;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import se.kuseman.payloadbuilder.api.TableAlias;
+import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
-import se.kuseman.payloadbuilder.api.operator.Operator;
-import se.kuseman.payloadbuilder.api.operator.Operator.TupleIterator;
-import se.kuseman.payloadbuilder.api.operator.Row;
-import se.kuseman.payloadbuilder.api.operator.Tuple;
+import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
+import se.kuseman.payloadbuilder.api.catalog.FunctionInfo.FunctionType;
+import se.kuseman.payloadbuilder.api.catalog.IDatasource;
+import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
+import se.kuseman.payloadbuilder.api.catalog.ObjectTupleVector;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
+import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.catalog.TableSchema;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 import se.kuseman.payloadbuilder.api.utils.ExpressionMath;
 import se.kuseman.payloadbuilder.core.CompiledQuery;
 import se.kuseman.payloadbuilder.core.Payloadbuilder;
 import se.kuseman.payloadbuilder.core.QueryResult;
 import se.kuseman.payloadbuilder.core.QuerySession;
 import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
-import se.kuseman.payloadbuilder.core.operator.AObjectOutputWriter;
-import se.kuseman.payloadbuilder.core.operator.AObjectOutputWriter.ColumnValue;
+import se.kuseman.payloadbuilder.core.test.AObjectOutputWriter.ColumnValue;
 
 /** Harness runner test */
 @RunWith(Parameterized.class)
@@ -52,6 +62,7 @@ public class TestHarnessRunner
 
     private final TestHarness harness;
     private final TestCase testCase;
+    private final boolean schemaLess;
 
     /** Test */
     @Parameterized.Parameters(
@@ -79,40 +90,51 @@ public class TestHarnessRunner
             }
         }
 
-        return harnesses.stream()
-                .flatMap(h -> h.getCases()
-                        .stream()
-                        .map(c -> Pair.of(h, c)))
-                .map(p -> new Object[] {
-                        p.getKey(), p.getValue(), p.getKey()
-                                .getName() + "#"
-                                                  + p.getValue()
-                                                          .getName() })
-                .collect(toList());
+        List<Object[]> params = new ArrayList<>();
+
+        for (TestHarness harness : harnesses)
+        {
+            for (TestCase testCase : harness.getCases())
+            {
+                for (Boolean schemaLess : asList(true, false))
+                {
+                    if (testCase.getSchemaLess() == null
+                            || testCase.getSchemaLess()
+                                    .booleanValue() == schemaLess.booleanValue())
+                    {
+                        params.add(new Object[] { harness, testCase, harness.getName() + "#" + testCase.getName() + (" schema-less: " + schemaLess + ")"), schemaLess });
+                    }
+                }
+            }
+
+        }
+
+        return params;
     }
 
-    public TestHarnessRunner(TestHarness harness, TestCase testCase, @SuppressWarnings("unused") String name)
+    public TestHarnessRunner(TestHarness harness, TestCase testCase, @SuppressWarnings("unused") String name, boolean schemaLess)
     {
         this.harness = harness;
         this.testCase = testCase;
+        this.schemaLess = schemaLess;
     }
 
     @Test
     public void test()
     {
         Assume.assumeFalse("Ignored", testCase.isIgnore());
-        testInternal(false);
-        testInternal(true);
+        testInternal();
+        // testInternal(true);
     }
 
     // CSOFF
-    private void testInternal(boolean codeGen)
+    private void testInternal()
     // CSON
     {
         CatalogRegistry registry = new CatalogRegistry();
         for (TestCatalog catalog : harness.getCatalogs())
         {
-            registry.registerCatalog(catalog.getAlias(), new TCatalog(catalog));
+            registry.registerCatalog(catalog.getAlias(), new TCatalog(catalog, schemaLess));
         }
 
         List<List<List<ColumnValue>>> actualResultSets = new ArrayList<>();
@@ -137,22 +159,18 @@ public class TestHarnessRunner
         };
 
         QuerySession session = new QuerySession(registry);
-        session.setPrintWriter(pw);
-
-        if (codeGen)
-        {
-            session.setSystemProperty(QuerySession.CODEGEN_ENABLED, true);
-        }
-
-        // Set first catalog as default
         session.setDefaultCatalogAlias(harness.getCatalogs()
                 .get(0)
                 .getAlias());
 
+        session.setPrintWriter(pw);
+
+        TimeZone defaultTimezone = TimeZone.getDefault();
         boolean fail = false;
         try
         {
-            CompiledQuery query = Payloadbuilder.compile(testCase.getQuery());
+            TimeZone.setDefault(TimeZone.getTimeZone(ZoneId.of("Europe/Berlin")));
+            CompiledQuery query = Payloadbuilder.compile(testCase.getQuery(), session, null);
             QueryResult result = query.execute(session);
             while (result.hasMoreResults())
             {
@@ -175,8 +193,11 @@ public class TestHarnessRunner
 
             if (testCase.getExpectedException() != null)
             {
-                Assert.assertTrue("Expected " + testCase.getExpectedException() + " to be thrown, but got " + e.getClass(), e.getClass()
-                        .isAssignableFrom(testCase.getExpectedException()));
+                if (!e.getClass()
+                        .isAssignableFrom(testCase.getExpectedException()))
+                {
+                    throw e;
+                }
 
                 if (!isBlank(testCase.getExpectedMessageContains()))
                 {
@@ -191,63 +212,71 @@ public class TestHarnessRunner
                 throw e;
             }
         }
+        finally
+        {
+            TimeZone.setDefault(defaultTimezone);
+        }
 
         int size = testCase.getExpectedResultSets()
                 .size();
 
-        Assert.assertEquals((codeGen ? "CodeGen: "
+        Assert.assertEquals((schemaLess ? "SchemaLess: "
                 : "") + "Expected number of result sets to be equal", size, actualResultSets.size());
 
         for (int i = 0; i < size; i++)
         {
-            assertResultSetEqual(codeGen, i, testCase.getExpectedResultSets()
+            assertResultSetEqual(schemaLess, i, testCase.getExpectedResultSets()
                     .get(i), actualResultSets.get(i));
         }
     }
 
-    private void assertResultSetEqual(boolean codeGen, int number, List<List<ColumnValue>> expected, List<List<ColumnValue>> actual)
+    private void assertResultSetEqual(boolean schemaLess, int number, List<List<ColumnValue>> expected, List<List<ColumnValue>> actual)
     {
-        int size = expected.size();
-        if (size != actual.size())
-        {
-            fail((codeGen ? "CodeGen: "
-                    : "")
-                 + "Result set number: "
-                 + (number + 1)
-                 + ", expected size "
-                 + size
-                 + " but was "
-                 + actual.size());
-        }
+        int size = Math.max(expected.size(), actual.size());
+        // if (size != actual.size())
+        // {
+        // fail((codeGen ? "CodeGen: "
+        // : "")
+        // + "Result set number: "
+        // + (number + 1)
+        // + ", expected size "
+        // + size
+        // + " but was "
+        // + actual.size());
+        // }
 
         for (int i = 0; i < size; i++)
         {
-            List<ColumnValue> expectedRow = expected.get(i);
-            List<ColumnValue> actualRow = actual.get(i);
+            List<ColumnValue> expectedRow = i < expected.size() ? expected.get(i)
+                    : emptyList();
+            List<ColumnValue> actualRow = i < actual.size() ? actual.get(i)
+                    : emptyList();
 
-            int rowSize = expectedRow.size();
-            if (rowSize != actualRow.size())
-            {
-                fail((codeGen ? "CodeGen: "
-                        : "")
-                     + "Result set number: "
-                     + (number + 1)
-                     + ", row number: "
-                     + i
-                     + ", expected size "
-                     + rowSize
-                     + " but was "
-                     + actualRow.size());
-            }
+            int rowSize = Math.max(expectedRow.size(), actualRow.size());
+            // if (rowSize != actualRow.size())
+            // {
+            // fail((codeGen ? "CodeGen: "
+            // : "")
+            // + "Result set number: "
+            // + (number + 1)
+            // + ", row number: "
+            // + i
+            // + ", expected size "
+            // + rowSize
+            // + " but was "
+            // + actualRow.size());
+            // }
 
             for (int j = 0; j < rowSize; j++)
             {
-                ColumnValue expectedColumn = expectedRow.get(j);
-                ColumnValue actualColumn = actualRow.get(j);
+                ColumnValue expectedColumn = j < expectedRow.size() ? expectedRow.get(j)
+                        : null;
+                ColumnValue actualColumn = j < actualRow.size() ? actualRow.get(j)
+                        : null;
 
                 if (!equals(expectedColumn, actualColumn))
                 {
-                    fail((codeGen ? "CodeGen: "
+                    fail((schemaLess ? "SchemaLess: "
                             : "")
                          + "Result set number: "
                          + (number + 1)
@@ -278,7 +307,17 @@ public class TestHarnessRunner
 
     private boolean equals(ColumnValue expected, ColumnValue actual)
     {
-        if (!Objects.equals(expected.getKey(), actual.getKey()))
+        if (expected == null
+                && actual != null)
+        {
+            return false;
+        }
+        else if (expected != null
+                && actual == null)
+        {
+            return false;
+        }
+        else if (!Objects.equals(expected.getKey(), actual.getKey()))
         {
             return false;
         }
@@ -290,6 +329,11 @@ public class TestHarnessRunner
         else if (actual.getValue() == null)
         {
             return false;
+        }
+
+        if ("###IGNORE###".equals(expected.getValue()))
+        {
+            return true;
         }
 
         // toString-ify the actual if we expect a string
@@ -311,126 +355,193 @@ public class TestHarnessRunner
     /** Harness catalog */
     private static class TCatalog extends Catalog
     {
+        private static final Schema SYS_TABLES_SCHEMA = Schema.of(Column.of(SYS_TABLES_NAME, Type.String), Column.of("columns", ResolvedType.valueVector(ResolvedType.of(Type.String))));
+        private static final Schema SYS_COLUMNS_SCHEMA = Schema.of(Column.of(SYS_COLUMNS_TABLE, Type.String), Column.of(SYS_COLUMNS_NAME, Type.String), Column.of("custom", Type.Int));
+        private static final Schema SYS_INDICES_SCHEMA = Schema.EMPTY;
         private final TestCatalog catalog;
+        private final boolean schemaLess;
 
-        TCatalog(TestCatalog catalog)
+        TCatalog(TestCatalog catalog, boolean schemaLess)
         {
             super("Test#" + catalog.getAlias());
             this.catalog = catalog;
+            this.schemaLess = schemaLess;
+
+            registerFunction(new ScalarFunctionInfo(this, "testFunc", FunctionType.SCALAR)
+            {
+            });
         }
 
-        @Override
-        public Operator getSystemOperator(OperatorData data)
+        private TestTable getTestTable(QualifiedName table)
         {
-            TableAlias alias = data.getTableAlias();
-            String type = alias.getTable()
-                    .getLast();
-
-            if (SYS_TABLES.equalsIgnoreCase(type))
+            String tableName = table.getLast();
+            for (TestTable testTable : catalog.getTables())
             {
-                return ctx -> getTables(alias);
-            }
-            else if (SYS_COLUMNS.equalsIgnoreCase(type))
-            {
-                return ctx -> getColumns(alias);
-            }
-            else if (SYS_FUNCTIONS.equalsIgnoreCase(type))
-            {
-                return getFunctionsOperator(data.getNodeId(), alias);
-            }
-            else if (SYS_INDICES.equalsIgnoreCase(type))
-            {
-                return Operator.EMPTY_OPERATOR;
-            }
-
-            return super.getSystemOperator(data);
-        }
-
-        @Override
-        public Operator getScanOperator(OperatorData data)
-        {
-            String operatorTable = data.getTableAlias()
-                    .getTable()
-                    .getLast();
-            for (TestTable table : catalog.getTables())
-            {
-                if (equalsIgnoreCase(table.getName(), operatorTable))
+                if (equalsIgnoreCase(testTable.getName(), tableName))
                 {
-                    return new TOperator(table, data.getTableAlias(), data.getNodeId());
+                    return testTable;
                 }
             }
 
-            throw new IllegalArgumentException("No test table setup with name: " + data.getTableAlias()
-                    .getTable());
+            throw new IllegalArgumentException("No test table setup with name: " + table.toDotDelimited());
         }
 
-        private TupleIterator getTables(TableAlias tableAlias)
+        private Schema getSchema(TestTable table)
         {
-            String[] columns = new String[] { SYS_TABLES_NAME, "columns" };
-            return TupleIterator.wrap(catalog.getTables()
+            return new Schema(table.getColumns()
                     .stream()
-                    .map(t -> (Tuple) Row.of(tableAlias, columns, new Object[] { t.getName(), t.getColumns() }))
-                    .iterator());
-        }
-
-        private TupleIterator getColumns(TableAlias tableAlias)
-        {
-            String[] columns = new String[] { SYS_COLUMNS_TABLE, SYS_COLUMNS_NAME, "custom" };
-            return TupleIterator.wrap(catalog.getTables()
-                    .stream()
-                    .flatMap(t -> t.getColumns()
-                            .stream()
-                            .map(c -> Pair.of(t, c)))
-                    .map(p -> (Tuple) Row.of(tableAlias, columns, new Object[] {
-                            p.getKey()
-                                    .getName(),
-                            p.getValue(), p.getValue()
-                                    .length() }))
-                    .iterator());
-        }
-    }
-
-    /** Harness operator */
-    private static class TOperator implements Operator
-    {
-        private final TestTable table;
-        private final TableAlias alias;
-        private final int nodeId;
-
-        TOperator(TestTable table, TableAlias alias, int nodeId)
-        {
-            this.table = table;
-            this.alias = alias;
-            this.nodeId = nodeId;
+                    .map(c -> Column.of(c, ResolvedType.of(Type.Any)))
+                    .collect(toList()));
         }
 
         @Override
-        public TupleIterator open(IExecutionContext context)
+        public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table)
         {
-            final Iterator<Object[]> it = table.getRows()
-                    .iterator();
-            final String[] columns = table.getColumns()
-                    .toArray(ArrayUtils.EMPTY_STRING_ARRAY);
-            return new TupleIterator()
+            if (schemaLess)
+            {
+                return TableSchema.EMPTY;
+            }
+
+            TestTable testTable = getTestTable(table);
+            return new TableSchema(getSchema(testTable));
+        }
+
+        @Override
+        public IDatasource getScanDataSource(IQuerySession session, String catalogAlias, QualifiedName table, DatasourceData data)
+        {
+            final TestTable testTable = getTestTable(table);
+            final Schema tableSchema = getSchema(testTable);
+            final List<Object[]> rows = testTable.getRows();
+            final int rowCount = rows.size();
+
+            return new IDatasource()
             {
                 @Override
-                public Tuple next()
+                public se.kuseman.payloadbuilder.api.catalog.TupleIterator execute(IExecutionContext context, IDatasourceOptions options)
                 {
-                    return Row.of(alias, columns, it.next());
-                }
-
-                @Override
-                public boolean hasNext()
-                {
-                    return it.hasNext();
+                    ObjectTupleVector tupleVector = new ObjectTupleVector(tableSchema, rowCount, (row, col) -> rows.get(row)[col]);
+                    return se.kuseman.payloadbuilder.api.catalog.TupleIterator.singleton(tupleVector);
                 }
             };
         }
 
         @Override
-        public int getNodeId()
+        public TableSchema getSystemTableSchema(IQuerySession session, String catalogAlias, QualifiedName table)
         {
-            return nodeId;
+            String type = table.getLast();
+            if (SYS_TABLES.equalsIgnoreCase(type))
+            {
+                return new TableSchema(SYS_TABLES_SCHEMA);
+            }
+            else if (SYS_COLUMNS.equalsIgnoreCase(type))
+            {
+                return new TableSchema(SYS_COLUMNS_SCHEMA);
+            }
+            else if (SYS_FUNCTIONS.equalsIgnoreCase(type))
+            {
+                return new TableSchema(SYS_FUNCTIONS_SCHEMA);
+            }
+            else if (SYS_INDICES.equalsIgnoreCase(type))
+            {
+                return new TableSchema(SYS_INDICES_SCHEMA);
+            }
+
+            return super.getSystemTableSchema(session, catalogAlias, table);
+        }
+
+        @Override
+        public IDatasource getSystemTableDataSource(IQuerySession session, String catalogAlias, QualifiedName table, DatasourceData data)
+        {
+            TupleVector vector = null;
+            String type = table.getLast();
+            if (SYS_TABLES.equalsIgnoreCase(type))
+            {
+                List<TestTable> tables = catalog.getTables();
+                vector = new ObjectTupleVector(SYS_TABLES_SCHEMA, tables.size(), (row, col) ->
+                {
+                    TestTable t = tables.get(row);
+                    if (col == 0)
+                    {
+                        return t.getName();
+                    }
+                    return new ValueVector()
+                    {
+                        @Override
+                        public ResolvedType type()
+                        {
+                            return ResolvedType.of(Type.String);
+                        }
+
+                        @Override
+                        public int size()
+                        {
+                            return t.getColumns()
+                                    .size();
+                        }
+
+                        @Override
+                        public boolean isNull(int row)
+                        {
+                            return t.getColumns()
+                                    .get(row) == null;
+                        }
+
+                        @Override
+                        public Object getValue(int row)
+                        {
+                            return t.getColumns()
+                                    .get(row);
+                        }
+                    };
+                });
+            }
+            else if (SYS_COLUMNS.equalsIgnoreCase(type))
+            {
+                List<Pair<TestTable, String>> columns = catalog.getTables()
+                        .stream()
+                        .flatMap(t -> t.getColumns()
+                                .stream()
+                                .map(c -> Pair.of(t, c)))
+                        .collect(toList());
+                vector = new ObjectTupleVector(SYS_COLUMNS_SCHEMA, columns.size(), (row, col) ->
+                {
+                    Pair<TestTable, String> p = columns.get(row);
+                    if (col == 0)
+                    {
+                        return p.getKey()
+                                .getName();
+                    }
+                    else if (col == 1)
+                    {
+                        return p.getValue();
+                    }
+                    return p.getValue()
+                            .length();
+                });
+            }
+            else if (SYS_FUNCTIONS.equalsIgnoreCase(type))
+            {
+                vector = getFunctionsTupleVector();
+            }
+            else if (SYS_INDICES.equalsIgnoreCase(type))
+            {
+                vector = TupleVector.EMPTY;
+            }
+
+            if (vector == null)
+            {
+                return super.getSystemTableDataSource(session, catalogAlias, table, data);
+            }
+
+            final TupleVector tupleVector = vector;
+            return new IDatasource()
+            {
+                @Override
+                public se.kuseman.payloadbuilder.api.catalog.TupleIterator execute(IExecutionContext context, IDatasourceOptions options)
+                {
+                    return se.kuseman.payloadbuilder.api.catalog.TupleIterator.singleton(tupleVector);
+                }
+            };
         }
     }
 }

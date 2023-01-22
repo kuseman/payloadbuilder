@@ -1,22 +1,26 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
-import static org.apache.commons.lang3.ArrayUtils.EMPTY_STRING_ARRAY;
+import static java.util.stream.Collectors.toList;
 
-import java.util.Iterator;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import se.kuseman.payloadbuilder.api.TableAlias;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
+import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
-import se.kuseman.payloadbuilder.api.operator.Operator.TupleIterator;
-import se.kuseman.payloadbuilder.api.operator.Row;
-import se.kuseman.payloadbuilder.api.operator.Tuple;
-import se.kuseman.payloadbuilder.core.utils.CollectionUtils;
 
 /**
  * Table value function that extracts row from a collection of maps in target expression
@@ -76,66 +80,82 @@ class OpenMapCollectionFunction extends TableFunctionInfo
     }
 
     @Override
-    public TupleIterator open(IExecutionContext context, String catalogAlias, TableAlias tableAlias, List<? extends IExpression> arguments)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments, IDatasourceOptions options)
     {
-        final Object value = arguments.get(0)
-                .eval(context);
-        final Iterator<Object> it = CollectionUtils.getIterator(value);
-        // CSOFF
-        return new TupleIterator()
-        // CSON
+        ValueVector vector = eval(context, arguments.get(0));
+
+        @SuppressWarnings("unchecked")
+        Collection<Map<String, Object>> collection = (Collection<Map<String, Object>>) vector.getValue(0);
+
+        if (collection == null)
         {
-            private Set<String> addedColumns;
-            private String[] columns;
-            private Tuple next;
+            return TupleIterator.EMPTY;
+        }
 
+        final List<Map<String, Object>> list = (collection instanceof List) ? (List<Map<String, Object>>) collection
+                : new ArrayList<>(collection);
+
+        Set<String> columns = new LinkedHashSet<>();
+
+        for (Map<String, Object> map : list)
+        {
+            columns.addAll(map.keySet());
+        }
+
+        final Schema schema = new Schema(columns.stream()
+                .map(c -> Column.of(c, ResolvedType.of(Type.Any)))
+                .collect(toList()));
+        final int rowCount = list.size();
+
+        return TupleIterator.singleton(new TupleVector()
+        {
             @Override
-            public boolean hasNext()
+            public Schema getSchema()
             {
-                return setNext();
+                return schema;
             }
 
             @Override
-            public Tuple next()
+            public int getRowCount()
             {
-                Tuple r = next;
-                next = null;
-                return r;
+                return rowCount;
             }
 
-            private boolean setNext()
+            @Override
+            public ValueVector getColumn(int column)
             {
-                while (next == null)
+                final String name = schema.getColumns()
+                        .get(column)
+                        .getName();
+
+                return new ValueVector()
                 {
-                    if (!it.hasNext())
+                    @Override
+                    public ResolvedType type()
                     {
-                        return false;
+                        return ResolvedType.of(Type.Any);
                     }
 
-                    Object value = it.next();
-
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> item = (Map<String, Object>) value;
-
-                    if (item == null)
+                    @Override
+                    public int size()
                     {
-                        continue;
+                        return rowCount;
                     }
 
-                    if (addedColumns == null)
+                    @Override
+                    public boolean isNull(int row)
                     {
-                        addedColumns = new LinkedHashSet<>(item.keySet());
-                        columns = addedColumns.toArray(EMPTY_STRING_ARRAY);
+                        return getValue(row) == null;
                     }
-                    else if (addedColumns.addAll(item.keySet()))
-                    {
-                        columns = addedColumns.toArray(EMPTY_STRING_ARRAY);
-                    }
-                    next = Row.of(tableAlias, columns, new Row.MapValues(item, columns));
-                }
 
-                return true;
+                    @Override
+                    public Object getValue(int row)
+                    {
+                        return list.get(row)
+                                .get(name);
+                    }
+                };
             }
-        };
+        });
     }
 }

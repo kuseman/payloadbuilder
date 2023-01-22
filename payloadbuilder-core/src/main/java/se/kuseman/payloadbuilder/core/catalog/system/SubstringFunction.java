@@ -3,16 +3,21 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.api.catalog.UTF8String;
+import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 
 /** Substring function */
 class SubstringFunction extends ScalarFunctionInfo
 {
     SubstringFunction(Catalog catalog)
     {
-        super(catalog, "substring");
+        super(catalog, "substring", FunctionType.SCALAR);
     }
 
     @Override
@@ -22,45 +27,73 @@ class SubstringFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public ResolvedType getType(List<? extends IExpression> arguments)
     {
-        Object obj = arguments.get(0)
-                .eval(context);
-        if (obj == null)
+        return ResolvedType.of(Type.String);
+    }
+
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    {
+        if (arguments.size() < 2)
         {
-            return null;
+            throw new IllegalArgumentException("Function " + getName() + " expects at least 2 arguments.");
         }
 
-        String value = String.valueOf(obj);
-        obj = arguments.get(1)
-                .eval(context);
-        if (obj == null)
-        {
-            return null;
-        }
-        if (!(obj instanceof Integer))
-        {
-            throw new IllegalArgumentException("Expected integer argument for start to function " + getName() + " but got: " + obj);
-        }
+        final ValueVector value = arguments.get(0)
+                .eval(input, context);
 
-        int start = (Integer) obj;
+        final ValueVector start = arguments.get(1)
+                .eval(input, context);
 
-        if (arguments.size() > 2)
+        final ValueVector length = arguments.size() > 2 ? arguments.get(2)
+                .eval(input, context)
+                : null;
+
+        return new ValueVector()
         {
-            obj = arguments.get(2)
-                    .eval(context);
-            if (obj == null)
+            @Override
+            public ResolvedType type()
             {
-                return null;
-            }
-            if (!(obj instanceof Integer))
-            {
-                throw new IllegalArgumentException("Expected integer argument for length to function " + getName() + " but got: " + obj);
+                return ResolvedType.of(Type.String);
             }
 
-            return value.substring(start, start + (int) obj);
-        }
+            @Override
+            public int size()
+            {
+                return input.getRowCount();
+            }
 
-        return value.substring(start);
+            @Override
+            public boolean isNull(int row)
+            {
+                return value.isNull(row)
+                        || start.isNull(row)
+                        || (length != null
+                                && length.isNull(row));
+            }
+
+            @Override
+            public UTF8String getString(int row)
+            {
+                String strArg = value.getString(row)
+                        .toString();
+                int startArg = start.getInt(row);
+
+                if (length != null)
+                {
+                    int lengthArg = length.getInt(row);
+                    return UTF8String.from(strArg.substring(startArg, startArg + lengthArg));
+                }
+
+                return UTF8String.from(strArg.substring(startArg));
+            }
+
+            @Override
+            public Object getValue(int row)
+            {
+                throw new IllegalArgumentException("getValue should not be called on typed vectors");
+            }
+        };
     }
 }

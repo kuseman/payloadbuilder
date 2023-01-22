@@ -6,19 +6,19 @@ import java.util.List;
 import java.util.Map;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.api.operator.Tuple;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
 
 /** Implementation of batch cache that stores values in memory in the session */
-public class SessionBatchCache extends ASessionCache<List<Tuple>> implements BatchCache
+public class SessionBatchCache extends ASessionCache<List<TupleVector>> implements BatchCache
 {
     @Override
-    public <TKey> Map<TKey, List<Tuple>> getAll(QualifiedName name, Iterable<TKey> keys)
+    public <TKey> Map<TKey, List<TupleVector>> getAll(QualifiedName name, Iterable<TKey> keys)
     {
-        Cache<List<Tuple>> cache = getCache(name);
-        Map<TKey, List<Tuple>> result = new HashMap<>();
+        Cache<List<TupleVector>> cache = getCache(name);
+        Map<TKey, List<TupleVector>> result = new HashMap<>();
         for (TKey key : keys)
         {
-            CacheEntry<List<Tuple>> entry = cache.get(key);
+            CacheEntry<List<TupleVector>> entry = cache.get(key);
             result.put(key, entry != null ? entry.value
                     : null);
         }
@@ -26,9 +26,9 @@ public class SessionBatchCache extends ASessionCache<List<Tuple>> implements Bat
     }
 
     @Override
-    public <TKey> void putAll(QualifiedName name, Map<TKey, List<Tuple>> values, Duration ttl)
+    public <TKey> void putAll(QualifiedName name, Map<TKey, List<TupleVector>> values, Duration ttl)
     {
-        Cache<List<Tuple>> cache = getCache(name);
+        Cache<List<TupleVector>> cache = getCache(name);
         cache.putAll(values, ttl);
     }
 }

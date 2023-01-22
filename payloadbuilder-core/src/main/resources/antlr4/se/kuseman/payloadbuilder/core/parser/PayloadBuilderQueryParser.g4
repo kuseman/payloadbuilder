@@ -47,11 +47,7 @@ analyzeStatement
  ;
 
 describeStatement
- : DESCRIBE
- (
-	 tableName
-   | selectStatement
- )
+ : DESCRIBE  selectStatement
  ;
 
 showStatement
@@ -108,17 +104,18 @@ topSelect
  ;
 
 selectStatement
- : SELECT (TOP topCount)? selectItem (COMMA selectItem)*
+ : SELECT (DISTINCT)? (TOP topCount)? selectItem (COMMA selectItem)*
    (INTO into=tableName intoOptions=tableSourceOptions?)?
    (FROM tableSourceJoined)?
    (WHERE where=expression)?
    (GROUPBY groupBy+=expression (COMMA groupBy+=expression)*)?
+   (HAVING having=expression)?
    (ORDERBY sortItem (COMMA sortItem)*)?
    (forClause)?
  ;
 
 forClause
- : FOR output=(OBJECT | ARRAY | OBJECT_ARRAY)
+ : FOR function=functionName (OVER alias=identifier)?
  ;
 
 dropTableStatement
@@ -160,8 +157,8 @@ tableName
  ;
 
 joinPart
- : (INNER | LEFT) JOIN tableSource ON expression
- | (CROSS | OUTER) APPLY tableSource
+ : (INNER | LEFT | RIGHT | CROSS) POPULATE? JOIN tableSource (ON expression)?
+ | (CROSS | OUTER) POPULATE? APPLY tableSource
 ;
 
 sortItem
@@ -184,6 +181,9 @@ expression
  | left=expression
    op=(ASTERISK | SLASH | PERCENT | PLUS | MINUS)
    right=expression											#arithmeticBinary
+   
+ | expression timeZone                                      #atTimeZoneExpression
+   
  | left=expression
    op=(EQUALS | NOTEQUALS| LESSTHAN | LESSTHANEQUAL | GREATERTHAN| GREATERTHANEQUAL)
    right=expression											#comparisonExpression
@@ -211,6 +211,7 @@ primary
  : literal													#literalExpression
  | left=primary DOT (identifier | functionCall)				#dereference
  | qname													#columnReference
+ | builtInFunctionCall                                      #builtInFunctionCallExpression
  | functionCall 											#functionCallExpression
  | identifier ARROW expression								#lambdaExpression
  | PARENO identifier (COMMA identifier)+ PARENC ARROW expression
@@ -230,8 +231,19 @@ when
  : WHEN condition=expression THEN result=expression
  ;
 
+builtInFunctionCall
+ : CAST PARENO input=expression (AS dataType=IDENTIFIER | COMMA arg=expression) PARENC                                  #castExpression
+ | DATEADD  PARENO (datepart=IDENTIFIER | datepartE=expression) COMMA number=expression COMMA date=expression PARENC    #dateAddExpression
+ | DATEPART PARENO (datepart=IDENTIFIER | datepartE=expression) COMMA date=expression PARENC                            #datePartExpression
+ | DATEDIFF PARENO datepart=IDENTIFIER COMMA start=expression COMMA end=expression PARENC                               #dateDiffExpression
+ ;
+ 
+ timeZone
+ : AT_WORD TIME ZONE expression
+ ;
+
 functionCall
- : functionName PARENO ( arguments+=functionArgument (COMMA arguments+=functionArgument)*)? PARENC
+ : functionName PARENO (ALL | DISTINCT)? (arguments+=functionArgument (COMMA arguments+=functionArgument)*)? PARENC
  ;
 
 functionArgument
@@ -306,9 +318,6 @@ nonReserved
  | TABLE
  | TABLES
  | LIKE
- | OBJECT
- | ARRAY
- | OBJECT_ARRAY
  | FOR
  | ALL
  | CACHE
@@ -316,4 +325,6 @@ nonReserved
  | FLUSH
  | REMOVE
  | VARIABLES
+ | POPULATE
+ | DISTINCT
  ;

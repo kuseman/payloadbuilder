@@ -1,0 +1,610 @@
+package se.kuseman.payloadbuilder.core.expression;
+
+import static java.util.Arrays.asList;
+import static se.kuseman.payloadbuilder.api.utils.MapUtils.entry;
+import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
+import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
+import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
+
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.junit.Test;
+
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.api.catalog.UTF8String;
+import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
+import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
+import se.kuseman.payloadbuilder.core.physicalplan.BitSetVector;
+
+/** Test of {@link ComparisonExpression} */
+public class ComparisonExpressionTest extends APhysicalPlanTest
+{
+    @Test
+    public void test_vector_size_1()
+    {
+        TupleVector tv = TupleVector.of(schema(new Type[] { Type.Int }, "col"), asList(ValueVector.literalInt(10, 5)));
+        ComparisonExpression e;
+        ValueVector actual;
+
+        // Construct a literal int with a fixed size 1
+        LiteralIntegerExpression litInt = new LiteralIntegerExpression(0)
+        {
+            @Override
+            public ValueVector eval(TupleVector input, IExecutionContext context)
+            {
+                return ValueVector.literalInt(5, 1);
+            }
+        };
+
+        e = new ComparisonExpression(IComparisonExpression.Type.EQUAL, litInt, ce("col"));
+        actual = e.eval(tv, context);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), false, false, false, false, false), actual);
+
+        e = new ComparisonExpression(IComparisonExpression.Type.EQUAL, ce("col"), litInt);
+        actual = e.eval(tv, context);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), false, false, false, false, false), actual);
+
+        // Test that size != 1 fails
+        LiteralIntegerExpression litInt2 = new LiteralIntegerExpression(0)
+        {
+            @Override
+            public ValueVector eval(TupleVector input, IExecutionContext context)
+            {
+                return ValueVector.literalInt(5, 2);
+            }
+        };
+        e = new ComparisonExpression(IComparisonExpression.Type.EQUAL, ce("col"), litInt2);
+
+        try
+        {
+            e.eval(tv, context);
+            fail("Should fail with different sizes");
+        }
+        catch (IllegalArgumentException ee)
+        {
+            assertTrue(ee.getMessage(), ee.getMessage()
+                    .contains("Evaluation of binary vectors requires equal size"));
+        }
+    }
+
+    @Test
+    public void test_string()
+    {
+        // EQ
+        assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.String, UTF8String.from("hello"), Type.String, UTF8String.from("hello"), true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.String, UTF8String.from("hello"), Type.Any, "hello", true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.Any, "hello", Type.String, UTF8String.from("hello"), true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.Any, "hello", Type.String, UTF8String.from("world"), false, null));
+
+        // NEQ
+        assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.String, UTF8String.from("hello"), Type.String, UTF8String.from("hello"), false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.String, UTF8String.from("hello"), Type.Any, "hello", false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.Any, "hello", Type.String, UTF8String.from("hello"), false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.Any, "hello", Type.String, UTF8String.from("world"), true, null));
+
+        // GT
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN, Type.String, UTF8String.from("hello"), Type.String, UTF8String.from("hello"), false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN, Type.String, UTF8String.from("hello"), Type.Any, "hello", false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN, Type.Any, "hello", Type.String, UTF8String.from("hello"), false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN, Type.Any, "world", Type.String, UTF8String.from("hello"), true, null));
+
+        // GTE
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN_EQUAL, Type.String, UTF8String.from("hello"), Type.String, UTF8String.from("hello"), true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN_EQUAL, Type.String, UTF8String.from("hello"), Type.Any, "hello", true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN_EQUAL, Type.Any, "hello", Type.String, UTF8String.from("hello"), true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN_EQUAL, Type.Any, "hello", Type.String, UTF8String.from("world"), false, null));
+
+        // LT
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.String, UTF8String.from("hello"), Type.String, UTF8String.from("hello"), false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.String, UTF8String.from("hello"), Type.Any, "hello", false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.Any, "hello", Type.String, UTF8String.from("hello"), false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.Any, "hello", Type.String, UTF8String.from("world"), true, null));
+
+        // LTE
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN_EQUAL, Type.String, UTF8String.from("hello"), Type.String, UTF8String.from("hello"), true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN_EQUAL, Type.String, UTF8String.from("hello"), Type.Any, "hello", true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN_EQUAL, Type.Any, "hello", Type.String, UTF8String.from("hello"), true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN_EQUAL, Type.Any, "world", Type.String, UTF8String.from("hello"), false, null));
+    }
+
+    @Test
+    public void test_boolean()
+    {
+        // EQ
+        // Bool <> Bool
+        assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.Boolean, true, Type.Boolean, true, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.Boolean, true, Type.Boolean, false, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.Boolean, false, Type.Boolean, true, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.Boolean, false, Type.Boolean, false, true, null));
+
+        // Bool <> Int
+        assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.Boolean, true, Type.Int, 1, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.Boolean, true, Type.Int, 0, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.Boolean, false, Type.Int, 1, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.Boolean, false, Type.Int, 0, true, null));
+
+        // Int <> Bool
+        assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.Int, 1, Type.Boolean, true, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.Int, 0, Type.Boolean, true, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.Int, 1, Type.Boolean, false, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.Int, 0, Type.Boolean, false, true, null));
+
+        // NEQ
+        // Bool <> Bool
+        assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.Boolean, true, Type.Boolean, true, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.Boolean, true, Type.Boolean, false, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.Boolean, false, Type.Boolean, true, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.Boolean, false, Type.Boolean, false, false, null));
+
+        // Bool <> Int
+        assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.Boolean, true, Type.Int, 1, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.Boolean, true, Type.Int, 0, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.Boolean, false, Type.Int, 1, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.Boolean, false, Type.Int, 0, false, null));
+
+        // Int <> Bool
+        assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.Int, 1, Type.Boolean, true, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.Int, 0, Type.Boolean, true, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.Int, 1, Type.Boolean, false, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.Int, 0, Type.Boolean, false, false, null));
+
+        // GT
+        // Bool <> Bool
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN, Type.Boolean, true, Type.Boolean, true, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN, Type.Boolean, true, Type.Boolean, false, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN, Type.Boolean, false, Type.Boolean, true, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN, Type.Boolean, false, Type.Boolean, false, false, null));
+
+        // Bool <> Int
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN, Type.Boolean, true, Type.Int, 1, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN, Type.Boolean, true, Type.Int, 0, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN, Type.Boolean, false, Type.Int, 1, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN, Type.Boolean, false, Type.Int, 0, false, null));
+
+        // Int <> Bool
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN, Type.Int, 1, Type.Boolean, true, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN, Type.Int, 0, Type.Boolean, true, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN, Type.Int, 1, Type.Boolean, false, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN, Type.Int, 0, Type.Boolean, false, false, null));
+
+        // GTE
+        // Bool <> Bool
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN_EQUAL, Type.Boolean, true, Type.Boolean, true, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN_EQUAL, Type.Boolean, true, Type.Boolean, false, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN_EQUAL, Type.Boolean, false, Type.Boolean, true, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN_EQUAL, Type.Boolean, false, Type.Boolean, false, true, null));
+
+        // Bool <> Int
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN_EQUAL, Type.Boolean, true, Type.Int, 1, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN_EQUAL, Type.Boolean, true, Type.Int, 0, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN_EQUAL, Type.Boolean, false, Type.Int, 1, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN_EQUAL, Type.Boolean, false, Type.Int, 0, true, null));
+
+        // Int <> Bool
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN_EQUAL, Type.Int, 1, Type.Boolean, true, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN_EQUAL, Type.Int, 0, Type.Boolean, true, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN_EQUAL, Type.Int, 1, Type.Boolean, false, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN_EQUAL, Type.Int, 0, Type.Boolean, false, true, null));
+
+        // LT
+        // Bool <> Bool
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.Boolean, true, Type.Boolean, true, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.Boolean, true, Type.Boolean, false, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.Boolean, false, Type.Boolean, true, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.Boolean, false, Type.Boolean, false, false, null));
+
+        // Bool <> Int
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.Boolean, true, Type.Int, 1, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.Boolean, true, Type.Int, 0, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.Boolean, false, Type.Int, 1, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.Boolean, false, Type.Int, 0, false, null));
+
+        // Int <> Bool
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.Int, 1, Type.Boolean, true, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.Int, 0, Type.Boolean, true, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.Int, 1, Type.Boolean, false, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.Int, 0, Type.Boolean, false, false, null));
+
+        // LTE
+        // Bool <> Bool
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN_EQUAL, Type.Boolean, true, Type.Boolean, true, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN_EQUAL, Type.Boolean, true, Type.Boolean, false, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN_EQUAL, Type.Boolean, false, Type.Boolean, true, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN_EQUAL, Type.Boolean, false, Type.Boolean, false, true, null));
+
+        // Bool <> Int
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN_EQUAL, Type.Boolean, true, Type.Int, 1, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN_EQUAL, Type.Boolean, true, Type.Int, 0, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN_EQUAL, Type.Boolean, false, Type.Int, 1, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN_EQUAL, Type.Boolean, false, Type.Int, 0, true, null));
+
+        // Int <> Bool
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN_EQUAL, Type.Int, 1, Type.Boolean, true, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN_EQUAL, Type.Int, 0, Type.Boolean, true, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN_EQUAL, Type.Int, 1, Type.Boolean, false, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN_EQUAL, Type.Int, 0, Type.Boolean, false, true, null));
+
+        // Error
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.String, "test", Type.Boolean, false, true, "Cannot cast 'test' to Boolean"));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.Boolean, true, Type.String, "test", true, "Cannot cast 'test' to Boolean"));
+    }
+
+    @Test
+    public void test_object()
+    {
+        assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.Any, 1, Type.Any, 1, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.Any, 1, Type.Any, 1F, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.Any, 1, Type.Any, 0, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN, Type.Any, 1, Type.Any, 1D, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN_EQUAL, Type.Any, 1, Type.Any, 1L, true, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.Int, 1, Type.Any, 1, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN_EQUAL, Type.Any, 1, Type.Any, 1, true, null));
+
+        // Test null
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.Any, null, Type.Any, 1, null, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.Any, 1, Type.Any, null, null, null));
+
+    }
+
+    @Test
+    public void test_numbers()
+    {
+        // 4 times 4 time 6 combinations = 96
+
+        IComparisonExpression.Type[] ops = new IComparisonExpression.Type[] {
+                IComparisonExpression.Type.EQUAL, IComparisonExpression.Type.NOT_EQUAL, IComparisonExpression.Type.GREATER_THAN, IComparisonExpression.Type.GREATER_THAN,
+                IComparisonExpression.Type.LESS_THAN, IComparisonExpression.Type.LESS_THAN };
+        Type[] types = new Type[] { Type.Int, Type.Long, Type.Float, Type.Double };
+        Object[] values = new Object[] { 1, 2L, 3F, 4D };
+
+        Map<IComparisonExpression.Type, Map<Type, boolean[]>> results = new HashMap<>();
+        //@formatter:off
+        results.put(IComparisonExpression.Type.EQUAL, ofEntries(
+                // Int = Int,Long,Float,Double
+                entry(Type.Int, new boolean[] { true, false, false, false }),
+                // Long = Int,Long,Float,Double
+                entry(Type.Long, new boolean[] { false, true, false, false }),
+                // Float = Int,Long,Float,Double
+                entry(Type.Float, new boolean[] { false, false, true, false }),
+                // Double = Int,Long,Float,Double
+                entry(Type.Double, new boolean[] { false, false, false, true })
+                ));
+        results.put(IComparisonExpression.Type.NOT_EQUAL, ofEntries(
+                // Int != Int,Long,Float,Double
+                entry(Type.Int, new boolean[] { false, true, true, true}),
+                // Long != Int,Long,Float,Double
+                entry(Type.Long, new boolean[] { true, false, true, true}),
+                // Float != Int,Long,Float,Double
+                entry(Type.Float, new boolean[] { true, true, false, true }),
+                // Double != Int,Long,Float,Double
+                entry(Type.Double, new boolean[] { true, true, true, false })
+                ));
+        results.put(IComparisonExpression.Type.GREATER_THAN, ofEntries(
+                // Int > Int,Long,Float,Double
+                entry(Type.Int, new boolean[] { false, false, false, false }),
+                // Long > Int,Long,Float,Double
+                entry(Type.Long, new boolean[] { true, false, false, false }),
+                // Float > Int,Long,Float,Double
+                entry(Type.Float, new boolean[] { true, true, false, false }),
+                // Double > Int,Long,Float,Double
+                entry(Type.Double, new boolean[] { true, true, true, false })
+                ));
+        results.put(IComparisonExpression.Type.GREATER_THAN_EQUAL, ofEntries(
+                // Int >= Int,Long,Float,Double
+                entry(Type.Int, new boolean[] { true, false, false, false }),
+                // Long >= Int,Long,Float,Double
+                entry(Type.Long, new boolean[] { true, true, false, false }),
+                // Float >= Int,Long,Float,Double
+                entry(Type.Float, new boolean[] { true, true, true, false }),
+                // Double >= Int,Long,Float,Double
+                entry(Type.Double, new boolean[] { true, true, true, true })
+                ));
+        results.put(IComparisonExpression.Type.LESS_THAN, ofEntries(
+                // Int < Int,Long,Float,Double
+                entry(Type.Int, new boolean[] { false, true, true, true }),
+                // Long < Int,Long,Float,Double
+                entry(Type.Long, new boolean[] { false, false, true, true}),
+                // Float < Int,Long,Float,Double
+                entry(Type.Float, new boolean[] { false, false, false, true }),
+                // Double < Int,Long,Float,Double
+                entry(Type.Double, new boolean[] { false, false, false, false })
+                ));
+        results.put(IComparisonExpression.Type.LESS_THAN_EQUAL, ofEntries(
+                // Int <= Int,Long,Float,Double
+                entry(Type.Int, new boolean[] { true, true, true, true }),
+                // Long <= Int,Long,Float,Double
+                entry(Type.Long, new boolean[] { false, true, true, true}),
+                // Float <= Int,Long,Float,Double
+                entry(Type.Float, new boolean[] { false, false, true, true }),
+                // Double <= Int,Long,Float,Double
+                entry(Type.Double, new boolean[] { false, false, false, true })
+                ));
+        //@formatter:on
+
+        // Operations
+        for (int i = 0; i < results.size(); i++)
+        {
+            Map<Type, boolean[]> opResults = results.get(ops[i]);
+            for (int left = 0; left < 4; left++)
+            {
+                Type leftType = types[left];
+                boolean[] typeResults = opResults.get(leftType);
+                for (int right = 0; right < 4; right++)
+                {
+                    Type rightType = types[right];
+                    TestCase test = new TestCase(ops[i], leftType, values[left], rightType, values[right], typeResults[right], null);
+                    assertCase(test);
+                }
+            }
+        }
+    }
+
+    @Test
+    public void test_numbers_int_false()
+    {
+        assertCase(new TestCase(IComparisonExpression.Type.EQUAL, Type.Int, 1, Type.Int, 0, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.NOT_EQUAL, Type.Int, 1, Type.Int, 1, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN, Type.Int, 1, Type.Int, 1, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.GREATER_THAN, Type.Int, 1, Type.Int, 10, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.Int, 1, Type.Int, 1, false, null));
+        assertCase(new TestCase(IComparisonExpression.Type.LESS_THAN, Type.Int, 1, Type.Int, 0, false, null));
+    }
+
+    @Test
+    public void test_eq()
+    {
+        TupleVector tv = TupleVector.of(schema("col"), asList(vv(ResolvedType.of(Type.Any), 1, 2, 3, 4, 5)));
+
+        ComparisonExpression e;
+        ValueVector actual;
+
+        // a = b
+        e = new ComparisonExpression(IComparisonExpression.Type.EQUAL, new LiteralIntegerExpression(5), new LiteralIntegerExpression(5));
+        actual = e.eval(tv, null);
+        assertTrue(actual instanceof BitSetVector);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), true, true, true, true, true), actual);
+        assertFalse(actual.isNullable());
+
+        // a = null
+        e = new ComparisonExpression(IComparisonExpression.Type.EQUAL, new LiteralIntegerExpression(5), new LiteralNullExpression(Type.Int));
+        actual = e.eval(tv, null);
+        assertTrue(actual instanceof BitSetVector);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
+        assertTrue(actual.isNullable());
+
+        // null = a
+        e = new ComparisonExpression(IComparisonExpression.Type.EQUAL, new LiteralNullExpression(Type.Int), new LiteralIntegerExpression(5));
+        actual = e.eval(tv, null);
+        assertTrue(actual instanceof BitSetVector);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
+        assertTrue(actual.isNullable());
+    }
+
+    @Test
+    public void test_neq()
+    {
+        TupleVector tv = TupleVector.of(schema("col"), asList(vv(ResolvedType.of(Type.Any), 1, 2, 3, 4, 5)));
+
+        ComparisonExpression e;
+        ValueVector actual;
+
+        // a != b
+        e = new ComparisonExpression(IComparisonExpression.Type.NOT_EQUAL, new LiteralIntegerExpression(5), new LiteralIntegerExpression(5));
+        actual = e.eval(tv, null);
+        assertTrue(actual instanceof BitSetVector);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), false, false, false, false, false), actual);
+        assertFalse(actual.isNullable());
+
+        // a != null
+        e = new ComparisonExpression(IComparisonExpression.Type.NOT_EQUAL, new LiteralIntegerExpression(5), new LiteralNullExpression(Type.Int));
+        actual = e.eval(tv, null);
+        assertTrue(actual instanceof BitSetVector);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
+        assertTrue(actual.isNullable());
+
+        // null != a
+        e = new ComparisonExpression(IComparisonExpression.Type.NOT_EQUAL, new LiteralNullExpression(Type.Int), new LiteralIntegerExpression(5));
+        actual = e.eval(tv, null);
+        assertTrue(actual instanceof BitSetVector);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
+        assertTrue(actual.isNullable());
+    }
+
+    @Test
+    public void test_gt()
+    {
+        TupleVector tv = TupleVector.of(schema("col"), asList(vv(ResolvedType.of(Type.Any), 1, 2, 3, 4, 5)));
+
+        ComparisonExpression e;
+        ValueVector actual;
+
+        // a > b
+        e = new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN, new LiteralIntegerExpression(5), new LiteralIntegerExpression(5));
+        actual = e.eval(tv, null);
+        assertTrue(actual instanceof BitSetVector);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), false, false, false, false, false), actual);
+        assertFalse(actual.isNullable());
+
+        // a > null
+        e = new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN, new LiteralIntegerExpression(5), new LiteralNullExpression(Type.Int));
+        actual = e.eval(tv, null);
+        assertTrue(actual instanceof BitSetVector);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
+        assertTrue(actual.isNullable());
+
+        // null > a
+        e = new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN, new LiteralNullExpression(Type.Int), new LiteralIntegerExpression(5));
+        actual = e.eval(tv, null);
+        assertTrue(actual instanceof BitSetVector);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
+        assertTrue(actual.isNullable());
+    }
+
+    @Test
+    public void test_gte()
+    {
+        TupleVector tv = TupleVector.of(schema("col"), asList(vv(ResolvedType.of(Type.Any), 1, 2, 3, 4, 5)));
+
+        ComparisonExpression e;
+        ValueVector actual;
+
+        // a >= b
+        e = new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN_EQUAL, new LiteralIntegerExpression(5), new LiteralIntegerExpression(5));
+        actual = e.eval(tv, null);
+        assertTrue(actual instanceof BitSetVector);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), true, true, true, true, true), actual);
+        assertFalse(actual.isNullable());
+
+        // a >= null
+        e = new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN_EQUAL, new LiteralIntegerExpression(5), new LiteralNullExpression(Type.Int));
+        actual = e.eval(tv, null);
+        assertTrue(actual instanceof BitSetVector);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
+        assertTrue(actual.isNullable());
+
+        // null >= a
+        e = new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN_EQUAL, new LiteralNullExpression(Type.Int), new LiteralIntegerExpression(5));
+        actual = e.eval(tv, null);
+        assertTrue(actual instanceof BitSetVector);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
+        assertTrue(actual.isNullable());
+    }
+
+    @Test
+    public void test_lt()
+    {
+        TupleVector tv = TupleVector.of(schema("col"), asList(vv(ResolvedType.of(Type.Any), 1, 2, 3, 4, 5)));
+
+        ComparisonExpression e;
+        ValueVector actual;
+
+        // a < b
+        e = new ComparisonExpression(IComparisonExpression.Type.LESS_THAN, new LiteralIntegerExpression(5), new LiteralIntegerExpression(5));
+        actual = e.eval(tv, null);
+        assertTrue(actual instanceof BitSetVector);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), false, false, false, false, false), actual);
+        assertFalse(actual.isNullable());
+
+        // a < null
+        e = new ComparisonExpression(IComparisonExpression.Type.LESS_THAN, new LiteralIntegerExpression(5), new LiteralNullExpression(Type.Int));
+        actual = e.eval(tv, null);
+        assertTrue(actual instanceof BitSetVector);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
+        assertTrue(actual.isNullable());
+
+        // null < a
+        e = new ComparisonExpression(IComparisonExpression.Type.LESS_THAN, new LiteralNullExpression(Type.Int), new LiteralIntegerExpression(5));
+        actual = e.eval(tv, null);
+        assertTrue(actual instanceof BitSetVector);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
+        assertTrue(actual.isNullable());
+    }
+
+    @Test
+    public void test_lte()
+    {
+        TupleVector tv = TupleVector.of(schema("col"), asList(vv(ResolvedType.of(Type.Any), 1, 2, 3, 4, 5)));
+
+        ComparisonExpression e;
+        ValueVector actual;
+
+        // a <= b
+        e = new ComparisonExpression(IComparisonExpression.Type.LESS_THAN_EQUAL, new LiteralIntegerExpression(5), new LiteralIntegerExpression(5));
+        actual = e.eval(tv, null);
+        assertTrue(actual instanceof BitSetVector);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), true, true, true, true, true), actual);
+        assertFalse(actual.isNullable());
+
+        // a <= null
+        e = new ComparisonExpression(IComparisonExpression.Type.LESS_THAN_EQUAL, new LiteralIntegerExpression(5), new LiteralNullExpression(Type.Int));
+        actual = e.eval(tv, null);
+        assertTrue(actual instanceof BitSetVector);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
+        assertTrue(actual.isNullable());
+
+        // null <= a
+        e = new ComparisonExpression(IComparisonExpression.Type.LESS_THAN_EQUAL, new LiteralNullExpression(Type.Int), new LiteralIntegerExpression(5));
+        actual = e.eval(tv, null);
+        assertTrue(actual instanceof BitSetVector);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
+        assertTrue(actual.isNullable());
+    }
+
+    private void assertCase(TestCase test)
+    {
+        TupleVector input = TupleVector.of(schema(new Type[] { test.left, test.right }, "col1", "col2"),
+                asList(vv(ResolvedType.of(test.left), test.leftValue), vv(ResolvedType.of(test.right), test.rightValue)));
+        ComparisonExpression e = new ComparisonExpression(test.type, ce("col1"), ce("col2"));
+        assertEquals(Type.Boolean, e.getType()
+                .getType());
+        try
+        {
+            ValueVector result = e.eval(input, context);
+            assertEquals(Type.Boolean, result.type()
+                    .getType());
+            assertEquals(1, result.size());
+            if (test.result == null)
+            {
+                assertTrue(test.toString(), result.isNull(0));
+            }
+            else
+            {
+                assertEquals(test.toString(), test.result, result.getBoolean(0));
+            }
+
+            if (test.assertExceptionMessage != null)
+            {
+                fail("Evaluation should fail with: " + test.assertExceptionMessage);
+            }
+        }
+        catch (Exception ee)
+        {
+            if (test.assertExceptionMessage == null)
+            {
+                fail("Should not fail. " + ee.getMessage());
+            }
+
+            StringWriter sw = new StringWriter();
+            ee.printStackTrace(new PrintWriter(sw));
+
+            assertTrue("Should fail with message: " + test.assertExceptionMessage + " but was: " + sw.toString(), ee.getMessage()
+                    .contains(test.assertExceptionMessage));
+        }
+    }
+
+    /** Test case */
+    public static class TestCase
+    {
+        private IComparisonExpression.Type type;
+        private Type left;
+        private Object leftValue;
+        private Type right;
+        private Object rightValue;
+        private Object result;
+        private String assertExceptionMessage;
+
+        TestCase(IComparisonExpression.Type type, Type left, Object leftValue, Type right, Object rightValue, Object result, String assertExceptionMessage)
+        {
+            this.type = type;
+            this.left = left;
+            this.leftValue = leftValue;
+            this.right = right;
+            this.rightValue = rightValue;
+            this.result = result;
+            this.assertExceptionMessage = assertExceptionMessage;
+        }
+
+        @Override
+        public String toString()
+        {
+            return String.format("%s [%s] %s %s [%s]", leftValue, left, type, rightValue, right);
+        }
+    }
+}

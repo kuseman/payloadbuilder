@@ -5,9 +5,14 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.api.catalog.UTF8String;
+import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 
 /** Lower and upper function */
 class TrimFunction extends ScalarFunctionInfo
@@ -16,7 +21,7 @@ class TrimFunction extends ScalarFunctionInfo
 
     TrimFunction(Catalog catalog, Type type)
     {
-        super(catalog, type.name);
+        super(catalog, type.name, FunctionType.SCALAR);
         this.type = type;
     }
 
@@ -33,29 +38,62 @@ class TrimFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public ResolvedType getType(List<? extends IExpression> arguments)
     {
-        Object obj = arguments.get(0)
-                .eval(context);
-        if (obj == null)
-        {
-            return null;
-        }
+        return ResolvedType.of(Column.Type.String);
+    }
 
-        String value = String.valueOf(obj);
-        // CSOFF
-        switch (type)
-        // CSON
-        {
-            case BOTH:
-                return StringUtils.trim(value);
-            case LEFT:
-                return StringUtils.stripStart(value, null);
-            case RIGHT:
-                return StringUtils.stripEnd(value, null);
-        }
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, final TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    {
+        final ValueVector value = arguments.get(0)
+                .eval(input, context);
 
-        return null;
+        return new ValueVector()
+        {
+            @Override
+            public ResolvedType type()
+            {
+                return ResolvedType.of(Column.Type.String);
+            }
+
+            @Override
+            public int size()
+            {
+                return input.getRowCount();
+            }
+
+            @Override
+            public boolean isNull(int row)
+            {
+                return value.isNull(row);
+            }
+
+            @Override
+            public UTF8String getString(int row)
+            {
+                // Boxing here for now
+                Object arg = value.valueAsObject(row);
+                String strArg = String.valueOf(arg);
+                switch (type)
+                {
+                    case BOTH:
+                        return UTF8String.from(StringUtils.trim(strArg));
+                    case LEFT:
+                        return UTF8String.from(StringUtils.stripStart(strArg, null));
+                    case RIGHT:
+                        return UTF8String.from(StringUtils.stripEnd(strArg, null));
+                    default:
+                        throw new IllegalArgumentException("Unsupported trim type: " + type);
+                }
+            }
+
+            @Override
+            public Object getValue(int row)
+            {
+                throw new IllegalArgumentException("getValue should not be called on typed vectors");
+            }
+        };
     }
 
     /** Type */

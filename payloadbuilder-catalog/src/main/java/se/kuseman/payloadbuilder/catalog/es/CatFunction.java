@@ -1,14 +1,13 @@
 package se.kuseman.payloadbuilder.catalog.es;
 
+import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.defaultString;
-import static se.kuseman.payloadbuilder.catalog.es.HttpClientUtils.execute;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpStatus;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -18,14 +17,17 @@ import org.apache.http.util.EntityUtils;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 
-import se.kuseman.payloadbuilder.api.TableAlias;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
+import se.kuseman.payloadbuilder.api.catalog.ObjectTupleVector;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
+import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
-import se.kuseman.payloadbuilder.api.operator.Operator.TupleIterator;
-import se.kuseman.payloadbuilder.api.operator.Row;
-import se.kuseman.payloadbuilder.api.operator.Tuple;
 
 /** TVF that exposes ES cat api */
 class CatFunction extends TableFunctionInfo
@@ -53,7 +55,7 @@ class CatFunction extends TableFunctionInfo
     }
 
     @Override
-    public TupleIterator open(IExecutionContext context, String catalogAlias, TableAlias tableAlias, List<? extends IExpression> arguments)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments, IDatasourceOptions options)
     {
         String catspec;
         String endpoint;
@@ -63,14 +65,17 @@ class CatFunction extends TableFunctionInfo
             endpoint = context.getSession()
                     .getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY);
             catspec = String.valueOf(arguments.get(0)
-                    .eval(context));
+                    .eval(context)
+                    .valueAsObject(0));
         }
         else if (arguments.size() == 2)
         {
             endpoint = String.valueOf(arguments.get(0)
-                    .eval(context));
+                    .eval(context)
+                    .valueAsObject(0));
             catspec = String.valueOf(arguments.get(1)
-                    .eval(context));
+                    .eval(context)
+                    .valueAsObject(0));
         }
         else
         {
@@ -92,7 +97,7 @@ class CatFunction extends TableFunctionInfo
         List<Map<String, Object>> result;
         HttpEntity entity = null;
         HttpGet get = new HttpGet(getCatUrl(endpoint, catspec));
-        try (CloseableHttpResponse response = execute(context.getSession(), catalogAlias, get))
+        try (CloseableHttpResponse response = HttpClientUtils.execute(context.getSession(), catalogAlias, get))
         {
             entity = response.getEntity();
             if (response.getStatusLine()
@@ -103,7 +108,7 @@ class CatFunction extends TableFunctionInfo
                 throw new RuntimeException("Error querying ES cat-api: " + body);
             }
 
-            result = ESOperator.MAPPER.readValue(entity.getContent(), LIST_OF_OBJ);
+            result = ESDatasource.MAPPER.readValue(entity.getContent(), LIST_OF_OBJ);
         }
         catch (Exception e)
         {
@@ -123,17 +128,30 @@ class CatFunction extends TableFunctionInfo
             return TupleIterator.EMPTY;
         }
 
-        String[] columns = result.get(0)
+        Schema schema = new Schema(result.get(0)
                 .keySet()
-                .toArray(ArrayUtils.EMPTY_STRING_ARRAY);
-        return TupleIterator.wrap(result.stream()
-                .map(map -> (Tuple) Row.of(tableAlias, columns, new Row.MapValues(map, columns)))
-                .iterator());
+                .stream()
+                .map(c -> Column.of(c, ResolvedType.of(Type.Any)))
+                .collect(toList()));
+
+        return TupleIterator.singleton(new ObjectTupleVector(schema, result.size(), (row, col) ->
+        {
+            Map<String, Object> map = result.get(row);
+            Column column = schema.getColumns()
+                    .get(col);
+            return map.get(column.getName());
+        }));
+        // String[] columns = result.get(0)
+        // .keySet()
+        // .toArray(ArrayUtils.EMPTY_STRING_ARRAY);
+        // return TupleIterator.wrap(result.stream()
+        // .map(map -> (Tuple) Row.of(tableAlias, columns, new Row.MapValues(map, columns)))
+        // .iterator());
     }
 
     static String getCatUrl(String endpoint, String catspec)
     {
-        URIBuilder builder = ESUtils.uriBuilder(endpoint);
+        URIBuilder builder = ESQueryUtils.uriBuilder(endpoint);
         String existingPath = defaultString(builder.getPath(), "");
         if (!existingPath.endsWith("/"))
         {
@@ -158,6 +176,6 @@ class CatFunction extends TableFunctionInfo
             builder.setPath(existingPath + "_cat/" + catspec);
         }
         builder.addParameter("format", "json");
-        return ESUtils.toUrl(builder);
+        return ESQueryUtils.toUrl(builder);
     }
 }

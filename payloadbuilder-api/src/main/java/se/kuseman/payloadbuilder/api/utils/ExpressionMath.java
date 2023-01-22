@@ -352,6 +352,7 @@ public final class ExpressionMath
     /** Arithmetic operation */
     private static Number arithmetic(Number left, Number right, DoubleOp doubleOp, FloatOp floatOp, LongOp longOp, IntOp intOp)
     {
+        // TODO: need to maintain bigdecimals else we lose precision when going to doubles
         if (left instanceof BigDecimal
                 || right instanceof BigDecimal
                 || left instanceof Double

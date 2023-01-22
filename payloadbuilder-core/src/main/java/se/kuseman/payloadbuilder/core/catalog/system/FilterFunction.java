@@ -3,19 +3,21 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 import static java.util.Collections.singletonList;
 
 import java.util.List;
-import java.util.Set;
+import java.util.NoSuchElementException;
 
-import org.apache.commons.collections4.iterators.FilterIterator;
-
-import se.kuseman.payloadbuilder.api.TableAlias;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.catalog.ValueVectorAdapter;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 import se.kuseman.payloadbuilder.core.catalog.LambdaFunction;
-import se.kuseman.payloadbuilder.core.operator.StatementContext;
-import se.kuseman.payloadbuilder.core.parser.LambdaExpression;
-import se.kuseman.payloadbuilder.core.utils.CollectionUtils;
+import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.expression.LambdaExpression;
+import se.kuseman.payloadbuilder.core.physicalplan.PredicatedTupleVector;
 
 /** Filter input argument with a lambda */
 class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
@@ -24,15 +26,15 @@ class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
 
     FilterFunction(Catalog catalog)
     {
-        super(catalog, "filter");
+        super(catalog, "filter", FunctionType.SCALAR);
     }
 
-    @Override
-    public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Set<TableAlias>> argumentAliases)
-    {
-        // Resulting alias is the result of argument 0
-        return argumentAliases.get(0);
-    }
+    // @Override
+    // public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Set<TableAlias>> argumentAliases)
+    // {
+    // // Resulting alias is the result of argument 0
+    // return argumentAliases.get(0);
+    // }
 
     @Override
     public List<LambdaBinding> getLambdaBindings()
@@ -47,25 +49,124 @@ class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public ResolvedType getType(List<? extends IExpression> arguments)
     {
-        Object argResult = arguments.get(0)
-                .eval(context);
-        if (argResult == null)
-        {
-            return null;
-        }
-        StatementContext ctx = (StatementContext) context.getStatementContext();
+        // Result type of filter is the same as input ie. argument 0
+        return arguments.get(0)
+                .getType();
+    }
+
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    {
+        ValueVector value = arguments.get(0)
+                .eval(input, context);
+
         LambdaExpression le = (LambdaExpression) arguments.get(1);
-        int lambdaId = le.getLambdaIds()[0];
-        return new FilterIterator<>(CollectionUtils.getIterator(argResult), input ->
+
+        Type type = value.type()
+                .getType();
+
+        // Filter each individual vector
+        if (type == Type.ValueVector
+                || type == Type.TupleVector)
         {
-            ctx.setLambdaValue(lambdaId, input);
-            Boolean result = (Boolean) le.getExpression()
-                    .eval(context);
-            return result != null
-                    && result.booleanValue();
-        });
+            return new ValueVector()
+            {
+                LambdaUtils.RowTupleVector inputTupleVector = new LambdaUtils.RowTupleVector(input);
+
+                @Override
+                public ResolvedType type()
+                {
+                    return value.type();
+                }
+
+                @Override
+                public int size()
+                {
+                    return value.size();
+                }
+
+                @Override
+                public boolean isNull(int row)
+                {
+                    // Filter a null is null
+                    return value.isNull(row);
+                }
+
+                @Override
+                public Object getValue(int row)
+                {
+                    inputTupleVector.setRow(row);
+                    if (type == Type.ValueVector)
+                    {
+                        ValueVector lambdaValue = (ValueVector) value.getValue(row);
+                        inputTupleVector.setRowCount(lambdaValue.size());
+                        return createFilteredVector(context, inputTupleVector, le, lambdaValue);
+                    }
+
+                    TupleVector vector = (TupleVector) value.getValue(row);
+                    inputTupleVector.setRowCount(vector.getRowCount());
+
+                    ((ExecutionContext) context).getStatementContext()
+                            .setLambdaValue(le.getLambdaIds()[0], ValueVector.literalObject(ResolvedType.tupleVector(vector.getSchema()), vector, 1));
+
+                    ValueVector filter = le.getExpression()
+                            .eval(inputTupleVector, context);
+
+                    return new PredicatedTupleVector(vector, filter);
+
+                }
+            };
+        }
+
+        // Filter the whole input
+        return createFilteredVector(context, input, le, value);
+    }
+
+    private ValueVector createFilteredVector(IExecutionContext context, TupleVector input, LambdaExpression lambdaExpression, ValueVector value)
+    {
+        // First evaluate the input value to create a filter vector
+        ((ExecutionContext) context).getStatementContext()
+                .setLambdaValue(lambdaExpression.getLambdaIds()[0], value);
+
+        final ValueVector predicate = lambdaExpression.getExpression()
+                .eval(input, context);
+
+        final int predicateSize = predicate.size();
+        final int resultSize = predicate.getCardinality();
+
+        // Then return a filtered value vector
+        return new ValueVectorAdapter(value)
+        {
+            @Override
+            public int size()
+            {
+                return resultSize;
+            }
+
+            @Override
+            protected int getRow(int row)
+            {
+                // Find match from input row
+                int match = -1;
+                for (int i = 0; i < predicateSize; i++)
+                {
+                    if (predicate.getPredicateBoolean(i))
+                    {
+                        match++;
+                        if (match == row)
+                        {
+                            return i;
+                        }
+                    }
+                }
+
+                throw new NoSuchElementException();
+            }
+
+        };
+
     }
 
     // @Override

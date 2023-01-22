@@ -8,7 +8,7 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.api.operator.Tuple;
+import se.kuseman.payloadbuilder.api.catalog.TupleVector;
 
 /** Test of {@link SessionBatchCache} */
 public class SessionBatchCacheTest extends Assert
@@ -18,7 +18,7 @@ public class SessionBatchCacheTest extends Assert
     {
         SessionBatchCache c = new SessionBatchCache();
 
-        Map<Integer, List<Tuple>> map = c.getAll(QualifiedName.of("cache"), Arrays.asList(1, 2, 3));
+        Map<Integer, List<TupleVector>> map = c.getAll(QualifiedName.of("cache"), Arrays.asList(1, 2, 3));
         assertEquals(3, map.size());
         assertNull(map.get(1));
         assertNull(map.get(2));
