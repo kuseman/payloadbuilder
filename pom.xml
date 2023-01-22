@@ -2,7 +2,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>se.kuseman</groupId>
     <artifactId>payloadbuilder</artifactId>
-    <version>0.8.7-SNAPSHOT</version>
+    <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Payloadbuilder</name>
     <description>SQL Query engine</description>
@@ -10,19 +10,20 @@
 
     <properties>
         <!-- Build -->
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <main.basedir>${project.basedir}</main.basedir>
 
         <!-- Versions -->
         <junit.version>4.13.1</junit.version>
         <mockito-core.version>4.3.1</mockito-core.version>
-        <spotless.version>2.22.0</spotless.version>
-        <jackson.version>2.13.4.2</jackson.version>
-        <commons-io.version>2.11.0</commons-io.version>
+        <spotless.version>2.39.0</spotless.version>
+        <jackson.version>2.15.2</jackson.version>
+        <commons-io.version>2.13.0</commons-io.version>
         <commons-lang3.version>3.12.0</commons-lang3.version>
         <commons-collections4.version>4.4</commons-collections4.version>
+        <slf4j.version>1.7.36</slf4j.version>
     </properties>
 
     <issueManagement>
@@ -67,6 +68,7 @@
         <module>payloadbuilder-api</module>
         <module>payloadbuilder-core</module>
         <module>payloadbuilder-catalog</module>
+        <module>payloadbuilder-bytes</module>
     </modules>
 
     <dependencyManagement>
@@ -103,6 +105,17 @@
                 <artifactId>jackson-databind</artifactId>
                 <version>${jackson.version}</version>
             </dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-api</artifactId>
+                <version>${slf4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>slf4j-reload4j</artifactId>
+                <version>${slf4j.version}</version>
+                <scope>test</scope>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -117,20 +130,6 @@
             </activation>
             <build>
                 <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-source-plugin</artifactId>
-                        <version>3.2.1</version>
-                        <executions>
-                            <execution>
-                                <id>attach-sources</id>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>jar-no-fork</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-javadoc-plugin</artifactId>
@@ -211,10 +210,10 @@
                         <java>
                             <removeUnusedImports />
                             <importOrder>
-                                <file>${maven.multiModuleProjectDirectory}/eclipse-importorder.cfg</file>
+                                <file>${main.basedir}/eclipse-importorder.cfg</file>
                             </importOrder>
                             <eclipse>
-                                <file>${maven.multiModuleProjectDirectory}/eclipse-code-formatter.xml</file>
+                                <file>${main.basedir}/eclipse-code-formatter.xml</file>
                             </eclipse>
                         </java>
                     </configuration>
@@ -222,6 +221,20 @@
             </plugins>
         </pluginManagement>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.2.1</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -271,12 +284,28 @@
                         <phase>validate</phase>
                         <configuration>
                             <sourceDirectories>
-                                <sourceDirectory>src/</sourceDirectory>
+                                <sourceDirectory>src/main/</sourceDirectory>
                             </sourceDirectories>
                             <includeResources>true</includeResources>
                             <includeTestResources>false</includeTestResources>
                             <configLocation>checkstyle.xml</configLocation>
                             <outputFile>${project.build.directory}/checkstyle-result.xml</outputFile>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>checkstyle-test</id>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <phase>validate</phase>
+                        <configuration>
+                            <sourceDirectories>
+                                <sourceDirectory>src/test/</sourceDirectory>
+                            </sourceDirectories>
+                            <includeResources>true</includeResources>
+                            <includeTestResources>true</includeTestResources>
+                            <configLocation>checkstyle-test.xml</configLocation>
+                            <outputFile>${project.build.directory}/checkstyle-test-result.xml</outputFile>
                         </configuration>
                     </execution>
                 </executions>

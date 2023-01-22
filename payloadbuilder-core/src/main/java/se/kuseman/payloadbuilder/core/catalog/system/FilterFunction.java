@@ -1,37 +1,34 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
 import java.util.List;
-import java.util.Set;
 
-import org.apache.commons.collections4.iterators.FilterIterator;
-
-import se.kuseman.payloadbuilder.api.TableAlias;
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 import se.kuseman.payloadbuilder.core.catalog.LambdaFunction;
-import se.kuseman.payloadbuilder.core.operator.StatementContext;
-import se.kuseman.payloadbuilder.core.parser.LambdaExpression;
-import se.kuseman.payloadbuilder.core.utils.CollectionUtils;
+import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.execution.LambdaUtils;
+import se.kuseman.payloadbuilder.core.execution.LambdaUtils.LambdaResultConsumer;
+import se.kuseman.payloadbuilder.core.execution.vector.TupleVectorBuilder;
+import se.kuseman.payloadbuilder.core.expression.LambdaExpression;
 
 /** Filter input argument with a lambda */
 class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
 {
     private static final List<LambdaBinding> LAMBDA_BINDINGS = singletonList(new LambdaBinding(1, 0));
 
-    FilterFunction(Catalog catalog)
+    FilterFunction()
     {
-        super(catalog, "filter");
-    }
-
-    @Override
-    public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Set<TableAlias>> argumentAliases)
-    {
-        // Resulting alias is the result of argument 0
-        return argumentAliases.get(0);
+        super("filter", FunctionType.SCALAR);
     }
 
     @Override
@@ -41,80 +38,121 @@ class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
     }
 
     @Override
-    public int arity()
+    public Arity arity()
     {
-        return 2;
+        return Arity.TWO;
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
-        Object argResult = arguments.get(0)
-                .eval(context);
-        if (argResult == null)
-        {
-            return null;
-        }
-        StatementContext ctx = (StatementContext) context.getStatementContext();
-        LambdaExpression le = (LambdaExpression) arguments.get(1);
-        int lambdaId = le.getLambdaIds()[0];
-        return new FilterIterator<>(CollectionUtils.getIterator(argResult), input ->
-        {
-            ctx.setLambdaValue(lambdaId, input);
-            Boolean result = (Boolean) le.getExpression()
-                    .eval(context);
-            return result != null
-                    && result.booleanValue();
-        });
+        // Result type of filter is the same as input ie. argument 0
+        return arguments.get(0)
+                .getType();
     }
 
-    // @Override
-    // public ExpressionCode generateCode(
-    // CodeGeneratorContext context,
-    // ExpressionCode parentCode,
-    // List<Expression> arguments)
-    // {
-    // ExpressionCode inputCode = arguments.get(0).generateCode(context, parentCode);
-    // ExpressionCode code = ExpressionCode.code(context, inputCode);
-    // code.addImport("se.kuseman.payloadbuilder.core.utils.CollectionUtils");
-    // code.addImport("java.util.Iterator");
-    // code.addImport("org.apache.commons.collections.iterators.FilterIterator");
-    // code.addImport("org.apache.commons.collections.Predicate");
-    //
-    // LambdaExpression le = (LambdaExpression) arguments.get(1);
-    //
-    // context.addLambdaParameters(le.getIdentifiers());
-    // ExpressionCode lambdaCode = le.getExpression().generateCode(context, parentCode);
-    // context.removeLambdaParameters(le.getIdentifiers());
-    //
-    // String template = "%s"
-    // + "boolean %s = true;\n"
-    // + "Iterator %s = null;\n"
-    // + "if (!%s)\n"
-    // + "{\n"
-    // + " %s = new FilterIterator(IteratorUtils.getIterator(%s), new Predicate()\n"
-    // + " {\n"
-    // + " public boolean evaluate(Object object)\n"
-    // + " {\n"
-    // + " Object %s = object;\n"
-    // + " %s"
-    // + " return %s;\n"
-    // + " }\n"
-    // + " });\n"
-    // + " %s = false;\n"
-    // + "}\n";
-    //
-    // code.setCode(String.format(template,
-    // inputCode.getCode(),
-    // code.getIsNull(),
-    // code.getResVar(),
-    // inputCode.getIsNull(),
-    // code.getResVar(), inputCode.getResVar(),
-    // le.getIdentifiers().get(0),
-    // lambdaCode.getCode(),
-    // lambdaCode.getResVar(),
-    // code.getIsNull()));
-    //
-    // return code;
-    // }
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
+    {
+        final ValueVector value = arguments.get(0)
+                .eval(input, context);
+
+        LambdaExpression le = (LambdaExpression) arguments.get(1);
+
+        final Type type = value.type()
+                .getType();
+
+        // Filter each individual vector
+        if (LambdaUtils.supportsForEachLambdaResult(type))
+        {
+            IObjectVectorBuilder builder = context.getVectorBuilderFactory()
+                    .getObjectVectorBuilder(value.type(), input.getRowCount());
+
+            LambdaResultConsumer consumer = (inputResult, lambdaResult, inputWasListType) ->
+            {
+                if (lambdaResult == null)
+                {
+                    builder.put(null);
+                    return;
+                }
+                else if (!inputWasListType)
+                {
+                    if (lambdaResult.getPredicateBoolean(0))
+                    {
+                        builder.put(inputResult);
+                    }
+                    return;
+                }
+
+                if (inputResult instanceof ValueVector)
+                {
+                    builder.put(createFilteredVector(context, (ValueVector) inputResult, lambdaResult));
+                    return;
+                }
+                else if (inputResult instanceof TupleVector)
+                {
+                    TupleVector table = (TupleVector) inputResult;
+
+                    int cardinality = lambdaResult.getCardinality();
+                    if (cardinality == 0)
+                    {
+                        builder.put(TupleVector.of(table.getSchema(), emptyList()));
+                        return;
+                    }
+
+                    TupleVectorBuilder b = new TupleVectorBuilder(((ExecutionContext) context).getBufferAllocator(), cardinality);
+                    b.append(table, lambdaResult);
+                    builder.put(b.build());
+                }
+                else
+                {
+                    if (lambdaResult.getPredicateBoolean(0))
+                    {
+                        builder.put(inputResult);
+                    }
+                }
+            };
+
+            LambdaUtils.forEachLambdaResult(context, input, value, le, consumer);
+            return builder.build();
+        }
+
+        // Filter the whole input
+        return createFilteredVector(context, input, le, value);
+    }
+
+    private ValueVector createFilteredVector(IExecutionContext context, TupleVector input, LambdaExpression lambdaExpression, ValueVector value)
+    {
+        // First evaluate the input value to create a filter vector
+        ((ExecutionContext) context).getStatementContext()
+                .setLambdaValue(lambdaExpression.getLambdaIds()[0], value);
+
+        ValueVector filter = lambdaExpression.getExpression()
+                .eval(input, context);
+
+        return createFilteredVector(context, value, filter);
+    }
+
+    private ValueVector createFilteredVector(IExecutionContext context, ValueVector value, ValueVector filter)
+    {
+        int rowCount = value.size();
+        int resultSize = filter.getCardinality();
+
+        if (resultSize == 0)
+        {
+            return ValueVector.empty(value.type());
+        }
+
+        IValueVectorBuilder builder = context.getVectorBuilderFactory()
+                .getValueVectorBuilder(value.type(), resultSize);
+
+        for (int i = 0; i < rowCount; i++)
+        {
+            if (filter.getPredicateBoolean(i))
+            {
+                builder.put(value, i);
+            }
+        }
+        return builder.build();
+    }
 }

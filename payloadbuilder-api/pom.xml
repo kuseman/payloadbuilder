@@ -3,13 +3,17 @@
     <parent>
         <groupId>se.kuseman</groupId>
         <artifactId>payloadbuilder</artifactId>
-        <version>0.8.7-SNAPSHOT</version>
+        <version>1.0.0-SNAPSHOT</version>
     </parent>
     <groupId>se.kuseman.payloadbuilder</groupId>
     <artifactId>payloadbuilder-api</artifactId>
     <name>Payloadbuilder :: API</name>
     <description>Payloadbuilder API Module</description>
     <url>https://github.com/kuseman/payloadbuilder</url>
+
+    <properties>
+        <main.basedir>${project.parent.basedir}</main.basedir>
+    </properties>
 
     <dependencies>
         <dependency>

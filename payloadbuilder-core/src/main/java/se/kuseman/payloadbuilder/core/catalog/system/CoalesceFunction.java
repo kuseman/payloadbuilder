@@ -2,17 +2,20 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 
 import java.util.List;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 
 /** Returns first non null argument */
 class CoalesceFunction extends ScalarFunctionInfo
 {
-    CoalesceFunction(Catalog catalog)
+    CoalesceFunction()
     {
-        super(catalog, "coalesce");
+        super("coalesce", FunctionType.SCALAR);
     }
 
     @Override
@@ -25,17 +28,58 @@ class CoalesceFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
-        for (IExpression arg : arguments)
+        // Find the highest precedence return type
+        ResolvedType type = arguments.get(0)
+                .getType();
+        int size = arguments.size();
+        for (int i = 1; i < size; i++)
         {
-            Object obj = arg.eval(context);
-            if (obj != null)
+            ResolvedType t = arguments.get(i)
+                    .getType();
+            if (t.getType()
+                    .getPrecedence() > type.getType()
+                            .getPrecedence())
             {
-                return obj;
+                type = t;
             }
         }
+        return type;
+    }
 
-        return null;
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
+    {
+        ResolvedType type = getType(arguments);
+        int size = arguments.size();
+        ValueVector[] values = new ValueVector[size];
+        int rowCount = input.getRowCount();
+        IValueVectorBuilder builder = context.getVectorBuilderFactory()
+                .getValueVectorBuilder(type, rowCount);
+
+        for (int i = 0; i < rowCount; i++)
+        {
+            boolean allNull = true;
+            for (int j = 0; j < size; j++)
+            {
+                if (values[j] == null)
+                {
+                    values[j] = arguments.get(j)
+                            .eval(input, context);
+                }
+                if (!values[j].isNull(i))
+                {
+                    allNull = false;
+                    builder.put(values[j], i);
+                    break;
+                }
+            }
+            if (allNull)
+            {
+                builder.putNull();
+            }
+        }
+        return builder.build();
     }
 }

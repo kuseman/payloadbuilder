@@ -3,24 +3,26 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import se.kuseman.payloadbuilder.api.TableMeta.DataType;
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 
 /** Regexp like. Matches input with a regular expression */
 class RegexpLikeFunction extends ScalarFunctionInfo
 {
-    RegexpLikeFunction(Catalog catalog)
+    RegexpLikeFunction()
     {
-        super(catalog, "regexp_like");
+        super("regexp_like", FunctionType.SCALAR);
     }
 
     @Override
-    public DataType getDataType(List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
-        return DataType.BOOLEAN;
+        return ResolvedType.of(Type.Boolean);
     }
 
     @Override
@@ -33,27 +35,63 @@ class RegexpLikeFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public Arity arity()
     {
-        Object obj = arguments.get(0)
-                .eval(context);
+        return Arity.TWO;
+    }
 
-        if (obj == null)
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
+    {
+        final ValueVector value = arguments.get(0)
+                .eval(input, context);
+        final ValueVector pattern = arguments.get(1)
+                .eval(input, context);
+        final Pattern constantPattern = arguments.get(1)
+                .isConstant()
+                        ? Pattern.compile(pattern.getString(0)
+                                .toString())
+                        : null;
+        return new ValueVector()
         {
-            return null;
-        }
+            @Override
+            public ResolvedType type()
+            {
+                return ResolvedType.of(Type.Boolean);
+            }
 
-        Object patternObj = arguments.get(1)
-                .eval(context);
-        if (!(patternObj instanceof String))
-        {
-            throw new IllegalArgumentException("Expected a String pattern for function " + getName() + " but got " + patternObj);
-        }
+            @Override
+            public int size()
+            {
+                return input.getRowCount();
+            }
 
-        String value = String.valueOf(obj);
-        Pattern pattern = Pattern.compile((String) patternObj);
+            @Override
+            public boolean isNull(int row)
+            {
+                return value.isNull(row)
+                        || pattern.isNull(row);
+            }
 
-        return pattern.matcher(value)
-                .find();
+            @Override
+            public boolean getBoolean(int row)
+            {
+                String strValue = value.getString(row)
+                        .toString();
+                Pattern regexPattern;
+                if (constantPattern != null)
+                {
+                    regexPattern = constantPattern;
+                }
+                else
+                {
+                    regexPattern = Pattern.compile(pattern.getString(row)
+                            .toString());
+                }
+
+                return regexPattern.matcher(strValue)
+                        .find();
+            }
+        };
     }
 }

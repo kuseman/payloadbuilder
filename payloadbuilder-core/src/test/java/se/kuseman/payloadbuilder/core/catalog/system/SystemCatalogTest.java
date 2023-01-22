@@ -4,45 +4,276 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 
-import java.io.StringReader;
-import java.time.LocalDate;
+import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeParseException;
-import java.time.zone.ZoneRulesException;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.TimeZone;
 
 import org.junit.Test;
-import org.mockito.Mockito;
 
-import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
-import se.kuseman.payloadbuilder.api.operator.Operator.TupleIterator;
-import se.kuseman.payloadbuilder.api.operator.Operator.TupleList;
-import se.kuseman.payloadbuilder.api.operator.Tuple;
+import se.kuseman.payloadbuilder.api.execution.Decimal;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
 import se.kuseman.payloadbuilder.api.utils.MapUtils;
-import se.kuseman.payloadbuilder.core.parser.AParserTest;
+import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
+import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.execution.QuerySession;
+import se.kuseman.payloadbuilder.core.expression.AExpressionTest;
 
 /** Tests functions etc. in built in catalog */
-public class SystemCatalogTest extends AParserTest
+public class SystemCatalogTest extends AExpressionTest
 {
     @Test
     public void test_function_hash() throws Exception
     {
         assertExpression(null, null, "hash(null)");
         assertExpression(null, null, "hash(null,true)");
-        assertExpression(1262, null, "hash(true)");
-        assertExpression(1115, null, "hash(1,123)");
+        assertExpression(629, null, "hash(true)");
+        assertExpression(23433, null, "hash(1,123)");
+    }
+
+    @Test
+    public void test_reverse() throws Exception
+    {
+        assertExpression(null, null, "reverse(null)");
+        assertExpression("olleh", null, "reverse('hello')");
+    }
+
+    @Test
+    public void test_current_timezone() throws Exception
+    {
+        TimeZone timeZone = TimeZone.getDefault();
+        try
+        {
+            TimeZone.setDefault(TimeZone.getTimeZone("America/Los_Angeles"));
+            assertExpression("America/Los_Angeles", null, "current_timezone()");
+            assertExpression("2020-10-10T07:10:10-07:00", null, "cast('2020-10-10T10:10:10-04:00' as datetimeoffset) at time zone current_timezone()");
+        }
+        finally
+        {
+            TimeZone.setDefault(timeZone);
+        }
+    }
+
+    @Test
+    public void test_abs() throws Exception
+    {
+
+        assertExpression(null, null, "abs(null)");
+        assertExpression(1, null, "abs(-1)");
+        assertExpression(1L, null, "abs(-1L)");
+        assertExpression(1F, null, "abs(-1F)");
+        assertExpression(1D, null, "abs(-1D)");
+        assertExpression(Decimal.from(1D), null, "abs(cast(-1D as decimal))");
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("a", -123);
+        assertExpression(123, params, "abs(@a)");
+
+        try
+        {
+            assertExpression(null, null, "abs(true)", true);
+            fail("Should fail because of invalid data type");
+        }
+        catch (IllegalArgumentException e)
+        {
+            assertTrue(e.getMessage(), e.getMessage()
+                    .contains("Function abs does not support type: Boolean"));
+        }
+    }
+
+    @Test
+    public void test_ceiling() throws Exception
+    {
+
+        assertExpression(null, null, "ceiling(null)");
+        assertExpression(1, null, "ceiling(1)");
+        assertExpression(1L, null, "ceiling(1L)");
+        assertExpression(2F, null, "ceiling(1.5F)");
+        assertExpression(3D, null, "ceiling(2.5D)");
+        assertExpression(Decimal.from("4"), null, "ceiling(cast(3.5D as decimal))");
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("a", 123.5);
+        assertExpression(124.0, params, "ceiling(@a)");
+
+        try
+        {
+            assertExpression(null, null, "ceiling(true)", true);
+            fail("Should fail because of invalid data type");
+        }
+        catch (IllegalArgumentException e)
+        {
+            assertTrue(e.getMessage(), e.getMessage()
+                    .contains("Function ceiling does not support type: Boolean"));
+        }
+    }
+
+    @Test
+    public void test_floor() throws Exception
+    {
+
+        assertExpression(null, null, "floor(null)");
+        assertExpression(1, null, "floor(1)");
+        assertExpression(1L, null, "floor(1L)");
+        assertExpression(1F, null, "floor(1.5F)");
+        assertExpression(2D, null, "floor(2.5D)");
+        assertExpression(Decimal.from("3"), null, "floor(cast(3.5D as decimal))");
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("a", 123.5);
+        assertExpression(123.0, params, "floor(@a)");
+
+        try
+        {
+            assertExpression(null, null, "floor(true)", true);
+            fail("Should fail because of invalid data type");
+        }
+        catch (IllegalArgumentException e)
+        {
+            assertTrue(e.getMessage(), e.getMessage()
+                    .contains("Function floor does not support type: Boolean"));
+        }
+    }
+
+    @Test
+    public void test_charindex() throws Exception
+    {
+        assertExpression(null, null, "charindex(null, null)");
+        assertExpression(null, null, "charindex('hello', null)");
+        assertExpression(null, null, "charindex(null, 'hello')");
+        assertExpression(1L, null, "charindex('ell', 'hello')");
+        assertExpression(2L, null, "charindex('l', 'hello')");
+        assertExpression(3L, null, "charindex('l','hello', 3)");
+        assertExpression(-1L, null, "charindex('l', 'hello', 4)");
+    }
+
+    @Test
+    public void test_left_right() throws Exception
+    {
+        assertExpression(null, null, "right(null, null)");
+        assertExpression(null, null, "right(null, 12)");
+        assertExpression(null, null, "right('hello', null)");
+        assertExpression("llo", null, "right('hello', 3)");
+
+        assertExpression(null, null, "left(null, null)");
+        assertExpression(null, null, "left(null, 12)");
+        assertExpression(null, null, "left('hello', null)");
+        assertExpression("hel", null, "left('hello', 3)");
+
+        try
+        {
+            assertExpression("hel", null, "left('hello', -3)", true);
+            fail("Expression should fail because of negative size");
+        }
+        catch (IllegalArgumentException e)
+        {
+            assertTrue(e.getMessage(), e.getMessage()
+                    .contains("Function left expects a positive integer value for argument 2"));
+        }
+    }
+
+    @Test
+    public void test_format() throws Exception
+    {
+        Locale current = Locale.getDefault();
+        try
+        {
+            Locale.setDefault(Locale.US);
+            assertExpression(null, null, "format(null, '###.##E0')");
+            assertExpression(null, null, "format(100000000, null)");
+            assertExpression(null, null, "format(100000000, null, null)");
+            assertExpression(null, null, "format(null, null, 'de')");
+            assertExpression(null, null, "format(null, null, null)");
+            assertExpression(null, null, "format(100000000, '###.##E0', null)");
+
+            Map<String, Object> params = new HashMap<>();
+            params.put("a", 100000000);
+            params.put("fmt", "###.###");
+            params.put("loc", "se");
+
+            // Decimal format
+            assertExpression("100E6", params, "format(@a, '###.##E0')");
+            assertExpression("100E6", null, "format(100000000, '###.##E0')");
+            assertExpression("100E6", null, "format(100000000L, '###.##E0')");
+            assertExpression("100E6", null, "format(100000000F, '###.##E0')");
+            assertExpression("100E6", null, "format(100000000D, '###.##E0')");
+            assertExpression("123.123", null, "format(cast('123.123456' as Decimal), '###.###')");
+            assertExpression("123.123", params, "format(cast('123.123456' as Decimal), @fmt)");
+
+            // Decimal format locale
+            assertExpression("123,123", null, "format(cast('123.123456' as Decimal), '###.###', 'se')");
+            assertExpression("123,123", params, "format(cast('123.123456' as Decimal), '###.###', @loc)");
+
+            params = new HashMap<>();
+            params.put("a", "2020-10-10 10:11:12");
+            params.put("fmt", "YYYY-MM");
+            params.put("loc", "us");
+            params.put("b", EpochDateTime.from("2020-10-10 10:11:12"));
+            params.put("c", EpochDateTimeOffset.from("2020-10-10 10:11:12"));
+            params.put("d", LocalDateTime.parse("2020-10-10T10:11:12"));
+
+            // DateTime format
+            assertExpression("2020-10-10", params, "format(cast('2020-10-10 10:11:12' as datetime), 'YYYY-MM-dd')");
+            assertExpression("2020-10-10", params, "format(cast('2020-10-10 10:11:12' as datetime), 'YYYY-MM-dd', 'se')");
+            assertExpression("2020-10-10", params, "format(cast(@a as datetime), 'YYYY-MM-dd')");
+            assertExpression("2020-10-10", params, "format(cast(@a as datetime), 'YYYY-MM-dd', 'se')");
+            assertExpression("2020-10-10", params, "format(cast(@a as datetime), 'YYYY-MM-dd', @loc)");
+            assertExpression("2020-10", params, "format(cast(@a as datetime), @fmt, @loc)");
+            assertExpression("2020-10", params, "format(cast(@a as datetime), @fmt)");
+
+            // DateTimeOffset format
+            assertExpression("2020-10-10", params, "format(cast('2020-10-10 10:11:12' as DateTimeOffset), 'YYYY-MM-dd')");
+            assertExpression("2020-10-10", params, "format(cast('2020-10-10 10:11:12' as DateTimeOffset), 'YYYY-MM-dd', 'se')");
+            assertExpression("2020-10-10+0000", params, "format(cast(@a as DateTimeOffset), 'YYYY-MM-ddZ')");
+            assertExpression("2020-10-10+0000", params, "format(cast(@a as DateTimeOffset), 'YYYY-MM-ddZ', 'se')");
+            assertExpression("2020-10-10+0000", params, "format(cast(@a as DateTimeOffset), 'YYYY-MM-ddZ', @loc)");
+            assertExpression("2020-10", params, "format(cast(@a as DateTimeOffset), @fmt, @loc)");
+            assertExpression("2020-10", params, "format(cast(@a as DateTimeOffset), @fmt)");
+
+            // DateTime/Offset with any
+            assertExpression("2020-10-10", params, "format(@b, 'YYYY-MM-dd')");
+            assertExpression("2020-10-10", params, "format(@c, 'YYYY-MM-dd', 'se')");
+            assertExpression("2020-10-10", params, "format(@d, 'YYYY-MM-dd', 'se')");
+
+            // Misc
+            assertExpression("Some true value", params, "format(true, 'Some %s value')");
+            assertExpression("Some true value", params, "format(true, 'Some %s value', 'se')");
+        }
+        finally
+        {
+            Locale.setDefault(current);
+        }
+    }
+
+    @Test
+    public void test_dereference() throws Exception
+    {
+        assertExpression(null, null, "(null).key");
     }
 
     @Test
     public void test_function_coalesce() throws Exception
     {
         assertExpression(10, null, "coalesce(null, null, 10)");
-        assertExpression("str", null, "coalesce('str', null, 10)");
+        assertExpression(20, null, "coalesce('20', null, 10)");
+    }
+
+    @Test
+    public void test_function_trim() throws Exception
+    {
+        assertExpression("hello", null, "trim('  hello  ')");
+        assertExpression("hello  ", null, "ltrim('  hello  ')");
+        assertExpression("  hello", null, "rtrim('  hello  ')");
+
+        assertExpression("ell", null, "trim('  hello  ', ' ho')");
+        assertExpression("ello  ", null, "ltrim('  hello  ', ' ho')");
+        assertExpression("  hell", null, "rtrim('  hello  ', ' ho')");
+
+        assertExpression("hello", null, "trim('  hello\n\r  ', ' ' + char(10) + char(13))");
     }
 
     @Test
@@ -53,94 +284,20 @@ public class SystemCatalogTest extends AParserTest
     }
 
     @Test
-    public void test_function_filter() throws Exception
-    {
-        Map<String, Object> values = new HashMap<>();
-        values.put("a", asList(-1, -2, -3, 0, 1, 2, 3));
-        values.put("b", null);
-
-        assertExpression(asList(1, 2, 3), values, "a.filter(a -> a > 0)");
-        assertExpression(null, values, "b.filter(a -> a > 0)");
-        assertExpression(asList(2), values, "filter(a.filter(a -> a > 0), a -> a = 2)");
-        assertExpression(asList("1s", "2s", "3s"), values, "map(a.filter(a -> a > 0), a -> a + 's')");
-    }
-
-    @Test
     public void test_function_concat() throws Exception
     {
         assertExpression("110.1", null, "concat(null,1,10.1)");
         assertExpression("", null, "concat(null,null)");
+        assertExpression("123", null, "concat(null,123)");
     }
 
     @Test
-    public void test_function_count() throws Exception
+    public void test_function_array() throws Exception
     {
-        Map<String, Object> values = new HashMap<>();
-        values.put("a", asList(-1, -2, -3, 0, 1, 2, 3));
-        values.put("b", asList(-1, -2, -3, 0, 1, 2, 3).iterator());
-        values.put("c", MapUtils.ofEntries(MapUtils.entry("key", "value"), MapUtils.entry("key1", "value1")));
-        values.put("d", new TupleList()
-        {
-            @Override
-            public int size()
-            {
-                return 3;
-            }
-
-            @Override
-            public Tuple get(int index)
-            {
-                return Mockito.mock(Tuple.class);
-            }
-        });
-        values.put("e", new TupleIterator()
-        {
-            int index;
-
-            @Override
-            public boolean hasNext()
-            {
-                return index < 5;
-            }
-
-            @Override
-            public Tuple next()
-            {
-                index++;
-                return Mockito.mock(Tuple.class);
-            }
-        });
-
-        assertExpression(7, values, "count(a)");
-        assertExpression(7, values, "count(b)");
-        assertExpression(2, values, "count(c)");
-        assertExpression(1, values, "count(1)");
-        assertExpression(0, values, "count(null)");
-        assertExpression(3, values, "count(d)");
-        assertExpression(5, values, "count(e)");
-    }
-
-    @Test
-    public void test_function_unionall() throws Exception
-    {
-        Map<String, Object> values = new HashMap<>();
-        values.put("a", asList(-1, -2, -3, 0, 1, 2, 3));
-        values.put("b", null);
-
-        assertExpression(asList(-1, -2, -3, 0, 1, 2, 3, 1, 2, 3), values, "a.unionall(a.filter(x -> x > 0))");
-        assertExpression(asList(-1, -2, -3, 1, 2, 3), values, "unionall(a.filter(x -> x < 0), a.filter(x -> x > 0))");
-    }
-
-    @Test
-    public void test_function_map() throws Exception
-    {
-        Map<String, Object> values = new HashMap<>();
-        values.put("a", asList(-1, -2, -3, 0, 1, 2, 3));
-        values.put("b", null);
-
-        assertExpression(null, values, "b.map(a -> a * 2)");
-        assertExpression(asList(-2, -4, -6, 0, 2, 4, 6), values, "a.map(a -> a * 2)");
-        assertExpression(asList(-1, -2, -3, 0, 1, 2, 3), values, "map(a.map(a -> a * 2), a -> a / 2)");
+        assertExpression(asList(1, 2, 3), null, "array(1,2,3)");
+        assertExpression(emptyList(), null, "array()");
+        assertExpression(emptyList(), null, "array()");
+        assertExpression(asList(123), MapUtils.ofEntries(MapUtils.entry("col", 123)), "array(@col)");
     }
 
     @Test
@@ -149,68 +306,43 @@ public class SystemCatalogTest extends AParserTest
         Map<String, Object> values = new HashMap<>();
         values.put("a", asList(-1, -2, -3, 0, 1, 2, 3));
         values.put("b", null);
-        values.put("c", asList(-1, -2, -3, 0, 1, 2, 3).iterator());
+        values.put("c", asList(-1, -2, -3, 0, 1, 2, 3));
+        values.put("d", 10);
 
         assertExpression(false, values, "contains(null, 1)");
-        assertExpression(false, values, "contains(a, 10)");
-        assertExpression(true, values, "contains(a, -2)");
-        assertExpression(false, values, "contains(c, 10)");
+        assertExpression(false, values, "contains(cast(@a as array), 10)");
+        assertExpression(true, values, "contains(cast(@a as array), -2)");
+        assertExpression(false, values, "contains(cast(@c as array), 10)");
+        assertExpression(true, values, "contains(cast(@d as int), 10)");
+        assertExpression(false, values, "contains(cast(@d as int), 20)");
+        assertExpression(false, values, "contains(@d, 20)");
+        assertExpression(true, values, "contains(@d, 10)");
+        assertExpression(true, values, "contains(array(null), null)");
+        // Reflective array
+        assertExpression(true, values, "contains(@a, 3)");
 
-        values.put("c", asList(-1, -2, -3, 0, 1, 2, 3).iterator());
+        values.put("c", asList(-1, -2, -3, 0, 1, 2, 3));
 
-        assertExpression(true, values, "contains(c, -2)");
+        assertExpression(true, values, "contains(cast(@c as array), -2)");
     }
 
     @Test
-    public void test_isCodegenSupported()
-    {
-        assertTrue(((ScalarFunctionInfo) session.getCatalogRegistry()
-                .getSystemCatalog()
-                .getFunction("contains")).isCodeGenSupported(asList(e("10"), e("20"))));
-    }
-
-    @Test
-    public void test_function_match() throws Exception
-    {
-        Map<String, Object> values = new HashMap<>();
-        values.put("a", asList());
-        values.put("b", null);
-        values.put("c", asList(1, 2));
-
-        // Empty
-        assertExpression(false, values, "a.any(x -> x > 0)");
-        assertExpression(true, values, "a.all(x -> x > 0)");
-        assertExpression(true, values, "a.none(x -> x > 0)");
-
-        // Null
-        assertExpression(null, values, "b.any(x -> x > 0)");
-        assertExpression(null, values, "b.all(x -> x > 0)");
-        assertExpression(null, values, "b.none(x -> x > 0)");
-
-        // Values
-        assertExpression(true, values, "c.any(x -> x > 0)");
-        assertExpression(true, values, "c.all(x -> x > 0)");
-        assertExpression(false, values, "c.none(x -> x > 0)");
-
-        assertExpression(false, values, "c.any(x -> x < 0)");
-        assertExpression(false, values, "c.all(x -> x < 0)");
-        assertExpression(true, values, "c.none(x -> x < 0)");
-
-        assertExpressionFail(IllegalArgumentException.class, "Expected boolean result but got: 2", values, "c.any(x -> x+1)");
-    }
-
-    @Test
-    public void test_function_flatMap() throws Exception
+    public void test_function_distinct() throws Exception
     {
         Map<String, Object> values = new HashMap<>();
-        values.put("a", asList(-1, -2, 3, null));
+        values.put("a", asList(-1, -1, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4));
         values.put("b", null);
+        values.put("c", asList("a", "A", "A", "hello", "hello", "world"));
 
-        assertExpression(asList(-1, -2, 3), values, "a.flatMap(a -> a)");
-        assertExpression(null, values, "b.flatMap(a -> a)");
-        assertExpression(asList(-1, -2, 3, null, -1, -2, 3, null, -1, -2, 3, null, -1, -2, 3, null), values, "a.flatMap(l -> a)");
-        assertExpression(asList(-1, -2, 3, -1, -2, 3, -1, -2, 3, -1, -2, 3), values, "a.flatMap(l -> a).filter(a -> a IS NOT NULL)");
-        assertExpression(asList(null, null, null, null), values, "a.flatMap(l -> a).filter(a -> a IS NULL)");
+        assertExpression(13, values, "distinct(13)");
+        assertExpression(null, values, "distinct(null)");
+        assertExpression(null, values, "distinct(@b)");
+        assertExpression(asList(-1, 3, 4, 1, 0, 2), values, "distinct(cast(@a as array))");
+        assertExpression(asList("a", "world", "hello", "A"), values, "distinct(cast(@c as array))");
+
+        values.put("c", asList(-1.0f, -1.0f, -3, 0, 1, 1, 3));
+
+        assertExpression(asList(-1.0f, 3, -3, 1, 0), values, "distinct(cast(@c as array))");
     }
 
     @Test
@@ -232,95 +364,40 @@ public class SystemCatalogTest extends AParserTest
     @Test
     public void test_function_isblank() throws Exception
     {
-        assertExpression(1, null, "isblank(null, 1)");
-        assertExpression(1, null, "isblank('', 1)");
+        assertExpression("1", null, "isblank(null, 1)");
+        assertExpression(null, null, "isblank(null, null)");
+        assertExpression("1", null, "isblank('', 1)");
         assertExpression("str", null, "isblank('str', null)");
+        assertExpression("20", null, "isblank('20', 10)");
+    }
+
+    @Test
+    public void test_template_string() throws Exception
+    {
+        Map<String, Object> values = new HashMap<>();
+        values.put("a", "hello world");
+        assertExpression("hello world", values, "`${@a}`");
     }
 
     @Test
     public void test_getdate() throws Exception
     {
-        ZonedDateTime now = context.getStatementContext()
-                .getNow()
-                .withZoneSameInstant(ZoneOffset.UTC);
+        ExecutionContext context = new ExecutionContext(new QuerySession(new CatalogRegistry()));
 
-        LocalDateTime nowLocal = now.withZoneSameInstant(ZoneOffset.systemDefault())
+        long now = context.getStatementContext()
+                .getNow();
+        long nowUtc = context.getStatementContext()
+                .getNowUtc();
+
+        LocalDateTime expectedNow = Instant.ofEpochMilli(now)
+                .atZone(ZoneId.of("UTC"))
+                .toLocalDateTime();
+        LocalDateTime expectedNowUtc = Instant.ofEpochMilli(nowUtc)
+                .atZone(ZoneId.of("UTC"))
                 .toLocalDateTime();
 
-        assertExpression(now, null, "getutcdate()");
-        assertExpression(nowLocal, null, "getdate()");
-    }
-
-    @Test
-    public void test_attimezone() throws Exception
-    {
-        assertExpression(null, null, "attimezone(null, null)");
-        assertExpression(null, null, "attimezone(getdate(), null)");
-        assertExpressionFail(ZoneRulesException.class, "Unknown time-zone ID: dummy", null, "attimezone(getdate(), 'dummy')");
-        assertExpressionFail(IllegalArgumentException.class, "Cannot change time zone of value: hello", null, "attimezone('hello', 'Z')");
-
-        Map<String, Object> values = new HashMap<>();
-        values.put("a", LocalDate.parse("2000-10-10"));
-        values.put("b", LocalDateTime.parse("2000-10-10T10:10:10"));
-        values.put("c", ZonedDateTime.parse("2000-10-10T12:10:10+02:00"));
-
-        Object expected = ZonedDateTime.of(LocalDate.parse("2000-10-10"), LocalTime.parse("00:00:00"), ZoneId.systemDefault())
-                .withZoneSameInstant(ZoneId.of("Z"));
-
-        assertExpression(expected, values, "attimezone(a, 'Z')");
-
-        expected = ZonedDateTime.of(LocalDateTime.parse("2000-10-10T10:10:10"), ZoneId.systemDefault())
-                .withZoneSameInstant(ZoneId.of("Z"));
-
-        assertExpression(expected, values, "attimezone(b, 'Z')");
-
-        assertExpression(ZonedDateTime.parse("2000-10-10T10:10:10Z"), values, "attimezone(c, 'Z')");
-    }
-
-    @Test
-    public void test_function_cast() throws Exception
-    {
-        assertExpression(null, null, "cast(null, integer)");
-        assertExpression(null, null, "cast(1, null)");
-
-        assertExpression(1, null, "cast(1, 'integer')");
-        assertExpression(1L, null, "cast(1, 'long')");
-        assertExpression(1.0f, null, "cast(1, 'float')");
-        assertExpression(1.0d, null, "cast(1, 'double')");
-
-        assertExpression(1, null, "cast('1', 'integer')");
-        assertExpression(1L, null, "cast('1', 'long')");
-        assertExpression(1.0f, null, "cast('1', 'float')");
-        assertExpression(1.0d, null, "cast('1', 'double')");
-
-        assertExpression("1.0", null, "cast(1.0, 'string')");
-
-        assertExpression(true, null, "cast(1, 'boolean')");
-        assertExpression(true, null, "cast(1.20, 'boolean')");
-        assertExpression(false, null, "cast(0, 'boolean')");
-        assertExpression(true, null, "cast('TRUE', 'boolean')");
-        assertExpression(false, null, "cast('false', 'boolean')");
-        assertExpression(false, null, "cast('hello', 'boolean')");
-
-        assertExpression(LocalDateTime.parse("2000-10-10T00:00:00"), null, "cast('2000-10-10', 'datetime')");
-        assertExpression(LocalDateTime.parse("2000-10-10T10:10:00"), null, "cast('2000-10-10 10:10', 'datetime')");
-        assertExpression(ZonedDateTime.parse("2000-10-10T10:10Z")
-                .withZoneSameInstant(ZoneId.systemDefault())
-                .toLocalDateTime(), null, "cast('2000-10-10 10:10Z', 'datetime')");
-        assertExpression(ZonedDateTime.parse("2000-10-10T10:10:10.123Z")
-                .withZoneSameInstant(ZoneId.systemDefault())
-                .toLocalDateTime(), null, "cast('2000-10-10 10:10:10.123Z', 'datetime')");
-
-        // 2022-04-20T08:42:58.803381412+00:00
-        assertExpression(ZonedDateTime.parse("2022-04-20T08:42:58.803381412+00:00")
-                .withZoneSameInstant(ZoneId.systemDefault())
-                .toLocalDateTime(), null, "cast('2022-04-20T08:42:58.803381412+00:00', 'datetime')");
-
-        assertExpressionFail(DateTimeParseException.class, "Text 'jibberish' could not", null, "cast('jibberish', 'datetime')");
-        assertExpressionFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, 'integer')");
-        assertExpressionFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, 'long')");
-        assertExpressionFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, 'float')");
-        assertExpressionFail(IllegalArgumentException.class, "Cannot cast", null, "cast(true, 'double')");
+        assertExpression(context, expectedNow, null, "getdate()");
+        assertExpression(context, expectedNowUtc, null, "getutcdate()");
     }
 
     @Test
@@ -332,46 +409,5 @@ public class SystemCatalogTest extends AParserTest
         assertExpression(null, null, "replace(null, 'xxx', 'world')");
         assertExpression("hello world", null, "replace('hello xxx', 'xxx', 'world')");
         assertExpression("hello xxx", null, "replace('hello xxx', 'yyy', 'world')");
-
-        // Test reader replacement
-
-        Map<String, Object> values = new HashMap<>();
-        values.put("a", new StringReader("hello xxx"));
-
-        assertExpression("hello world", values, "replace(a, 'xxx', 'world')");
-        values.put("a", new StringReader("hello xxx"));
-        assertExpression("hello ", values, "replace(a, 'xxx', '')");
-        values.put("a", new StringReader("hello xxx"));
-        assertExpression("hello xxx", values, "replace(a, 'yyy', '')");
-        values.put("a", new StringReader("hello xxx"));
-        assertExpression("hello xxx", values, "replace(a, 'xyy', '')");
-        values.put("a", new StringReader("hello xxx"));
-        assertExpression("åäöello xxx", values, "replace(a, 'h', 'åäö')");
-        values.put("a", new StringReader("hello xyz"));
-        assertExpression("hello xyåäö", values, "replace(a, 'z', 'åäö')");
-    }
-
-    @Test
-    public void test_function_regexp_like() throws Exception
-    {
-        assertExpression(null, null, "regexp_like(null, '')");
-        assertExpression(true, null, "regexp_like('text', '')");
-        assertExpression(false, null, "regexp_like('text', 'nono')");
-        assertExpressionFail(IllegalArgumentException.class, "Expected a String pattern for function", null, "regexp_like('text', 1234)");
-    }
-
-    @Test
-    public void test_function_regexp_match() throws Exception
-    {
-        assertExpression(null, null, "regexp_match(null, '')");
-        assertExpression(emptyList(), null, "regexp_match('text', '')");
-        assertExpressionFail(IllegalArgumentException.class, "Expected a String pattern for function", null, "regexp_match('text', 1234)");
-        assertExpression(emptyList(), null, "regexp_match('text', 'nono')");
-        assertExpression(asList("123", "456"), null, "regexp_match('123-456-abc', '([0-9][0-9][0-9])')");
-        assertExpression(asList("123", "abc", "798", "def"), null, "regexp_match('123-456-abc 798-103-def', '([0-9]{3})-[0-9]{3}-([a-z]{3})')");
-        assertExpression(asList("123"), null, "regexp_match('123-456-abc 798-103-def', '^([0-9]{3})-[0-9]{3}.*$')");
-        assertExpression(asList("456", "103"), null, "regexp_match('123-456-abc 798-103-def', '[0-9]{3}-([0-9]{3})')");
-        assertExpression(emptyList(), null, "regexp_match('123-456-abc 798-103-def', '[i-k]{3}-([i-k]{3})')");
-        assertExpression("abc", null, "regexp_match('123-456-abc 798-103-def', '([a-z]{3})')[0]");
     }
 }

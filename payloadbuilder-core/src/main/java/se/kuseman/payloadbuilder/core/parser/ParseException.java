@@ -1,32 +1,27 @@
 package se.kuseman.payloadbuilder.core.parser;
 
-import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.ParserRuleContext;
+import org.apache.commons.lang3.ObjectUtils;
 
 /** Parse exception */
 public class ParseException extends RuntimeException
 {
-    private final int line;
-    private final int column;
+    private final Location location;
 
-    public ParseException(String message, Token token)
-    {
-        this(message, token.getLine(), token.getCharPositionInLine());
-    }
-
-    public ParseException(String message, int line, int column)
+    public ParseException(String message, ParserRuleContext ctx)
     {
         super(message);
-        this.line = line;
-        this.column = column;
+        this.location = Location.from(ctx);
     }
 
-    public int getLine()
+    public ParseException(String message, Location location)
     {
-        return line;
+        super(message);
+        this.location = ObjectUtils.defaultIfNull(location, Location.EMPTY);
     }
 
-    public int getColumn()
+    public Location getLocation()
     {
-        return column;
+        return location;
     }
 }

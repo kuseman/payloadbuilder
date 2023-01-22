@@ -16,12 +16,12 @@ jobs:
           echo "VERSION=${TAG/v/}" >> $GITHUB_ENV
       - run: echo "Will start a Maven Central upload with tag ${VERSION}"
 
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Set up Maven Central Repository
         uses: actions/setup-java@v3.6.0
         with:
-          java-version: 11
+          java-version: 17
           distribution: 'zulu'
           server-id: ossrh
           server-username: MAVEN_USERNAME

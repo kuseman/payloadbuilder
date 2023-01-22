@@ -2,28 +2,39 @@ package se.kuseman.payloadbuilder.core;
 
 import static java.util.Objects.requireNonNull;
 
-import se.kuseman.payloadbuilder.core.parser.QueryStatement;
+import java.util.List;
+
+import se.kuseman.payloadbuilder.core.execution.QuerySession;
+import se.kuseman.payloadbuilder.core.parser.Location;
+import se.kuseman.payloadbuilder.core.statement.QueryStatement;
 
 /**
  * Result of a query compilation. This class can be reused between executions
- *
- * <pre>
- * NOTE! The built query is compiled against a catalog registry that is assumed to
- * be the same during execution, else unexpected results will occur
- * </pre>
  */
 public class CompiledQuery
 {
     private final QueryStatement query;
+    private final List<Warning> warnings;
 
-    CompiledQuery(QueryStatement query)
+    CompiledQuery(QueryStatement query, List<Warning> warnings)
     {
         this.query = requireNonNull(query);
+        this.warnings = warnings;
     }
 
     /** Execute this query with provided session */
     public QueryResult execute(QuerySession session)
     {
         return new QueryResultImpl(session, query);
+    }
+
+    public List<Warning> getWarnings()
+    {
+        return warnings;
+    }
+
+    /** A compiler warning */
+    public static record Warning(String message, Location location)
+    {
     }
 }

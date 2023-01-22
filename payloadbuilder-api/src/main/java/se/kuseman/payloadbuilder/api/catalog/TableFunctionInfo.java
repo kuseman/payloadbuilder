@@ -1,16 +1,12 @@
 package se.kuseman.payloadbuilder.api.catalog;
 
-import static java.util.Collections.singleton;
-
 import java.util.List;
-import java.util.Set;
+import java.util.Optional;
 
-import se.kuseman.payloadbuilder.api.TableAlias;
-import se.kuseman.payloadbuilder.api.TableMeta;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
-import se.kuseman.payloadbuilder.api.operator.Operator.TupleIterator;
-import se.kuseman.payloadbuilder.api.session.IQuerySession;
 
 /**
  * Definition of a table valued function. These functions are applied row by row.
@@ -19,53 +15,40 @@ import se.kuseman.payloadbuilder.api.session.IQuerySession;
 public abstract class TableFunctionInfo extends FunctionInfo
 // CSON
 {
-    public TableFunctionInfo(Catalog catalog, String name)
+    public TableFunctionInfo(String name)
     {
-        super(catalog, name, Type.TABLE);
+        super(name, FunctionType.TABLE);
     }
 
     /**
-     * Resolves resulting aliases for this function
-     *
-     * <pre>
-     *
-     * Example:
-     * Range function
-     * <b>range(1, 10)</b>
-     * Resulting alias will the table alias for the function itself
-    
-     * Example:
-     * Table valued function that opens an alias for row traversal in a sub query expression
-     * <b>open_rows(aa)</b>
-     * Resulting alias will the argument result ie. [aa]
-     * </pre>
-     *
-     * @param alias The table alias belonging to the table function
-     * @param parentAliases Parent aliases in context to this function
-     * @param argumentAliases Resulting aliases for earch function argument
-     **/
-    public Set<TableAlias> resolveAlias(TableAlias alias, Set<TableAlias> parentAliases, List<Set<TableAlias>> argumentAliases)
+     * Return the schema for this function. NOTE! If schema cannot be resolved throw a {@link SchemaResolveException}
+     */
+    public Schema getSchema(List<IExpression> arguments)
     {
-        return singleton(alias);
-    }
-
-    /** Return table meta for this function */
-    public TableMeta getTableMeta()
-    {
-        return null;
+        return Schema.EMPTY;
     }
 
     /**
-     * Open iterator for this function
+     * Execute table function.
      *
-     * <pre>
-     * NOTE! In main loop of operator add check of {@link IQuerySession#abortQuery()} to not hang a
-     * thread in execution state.
-     * </pre>
-     *
-     * @param context Context
-     * @param tableAlias Table alias used for this function
-     * @param arguments Arguments to function
-     **/
-    public abstract TupleIterator open(IExecutionContext context, String catalogAlias, TableAlias tableAlias, List<? extends IExpression> arguments);
+     * @param context Execution context
+     * @param catalogAlias The query specific catalog alias used in this invocation
+     * @param schema Planned schema for this table function. If this has a value then the schema should be used when returning {@link TupleVector}' from {@link TupleIterator}. Else value will be
+     * {@link Optional#empty()} and the actual runtime schema should be return for vectors.
+     * @param arguments Function arguments
+     * @param options Options for this table source such as batch size etc.
+     */
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, IDatasourceOptions options)
+    {
+        return TupleIterator.EMPTY;
+    }
+
+    /** Exception that can be thrown during schema resolving for TVS to properly trigg compile exception. */
+    public static class SchemaResolveException extends RuntimeException
+    {
+        public SchemaResolveException(String message)
+        {
+            super(message);
+        }
+    }
 }

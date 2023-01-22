@@ -1,26 +1,23 @@
 package se.kuseman.payloadbuilder.core.cache;
 
+import se.kuseman.payloadbuilder.api.execution.GenericCache;
+
 /** Cache type */
 public enum CacheType
 {
-    BATCH,
     TEMPTABLE,
-    CUSTOM;
+    GENERIC;
 
     /**
      * Return cache type from provided provider.
      *
      * @return Type or null if no matching type could be found
      */
-    public static CacheType from(Cache provider)
+    public static CacheType from(CacheProvider provider)
     {
         if (provider instanceof GenericCache)
         {
-            return CacheType.CUSTOM;
-        }
-        else if (provider instanceof BatchCache)
-        {
-            return CacheType.BATCH;
+            return CacheType.GENERIC;
         }
         else if (provider instanceof TempTableCache)
         {

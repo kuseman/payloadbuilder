@@ -1,72 +1,136 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
+import java.util.ArrayList;
 import java.util.List;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
-import se.kuseman.payloadbuilder.core.operator.EvalUtils;
-import se.kuseman.payloadbuilder.core.operator.ExecutionContext;
 
 /** Concat function. Concatenates all arguments into a string */
 class ConcatFunction extends ScalarFunctionInfo
 {
-    ConcatFunction(Catalog catalog)
+    ConcatFunction()
     {
-        super(catalog, "concat");
+        super("concat", FunctionType.SCALAR);
     }
 
     @Override
-    public Object eval(IExecutionContext ctx, String catalogAlias, List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
-        int size = arguments.size();
-        if (size <= 0)
-        {
-            return null;
-        }
-
-        ExecutionContext context = (ExecutionContext) ctx;
-        StringBuilder sb = new StringBuilder();
-        for (IExpression arg : arguments)
-        {
-            Object object = arg.eval(context);
-            if (object != null)
-            {
-                sb.append(EvalUtils.unwrap(context, object));
-            }
-        }
-        return sb.toString();
+        return ResolvedType.of(Type.String);
     }
 
-    // @Override
-    // public ExpressionCode generateCode(
-    // CodeGeneratorContext context,
-    // ExpressionCode parentCode,
-    // List<Expression> arguments)
-    // {
-    // ExpressionCode code = ExpressionCode.code(context, parentCode);
-    // context.addImport("se.kuseman.payloadbuilder.core.utils.ObjectUtils");
-    //
-    // List<String> argsResVars = new ArrayList<>(arguments.size());
-    // StringBuilder sb = new StringBuilder();
-    // for (Expression arg : arguments)
-    // {
-    // ExpressionCode argCode = arg.generateCode(context, parentCode);
-    // argsResVars.add(argCode.getResVar());
-    // sb.append(argCode.getCode());
-    // }
-    //
-    // // TODO: Fix iterator concating even if arguments are object
-    //
-    // String template = "%s"
-    // + "Object %s = ObjectUtils.concat(%s);\n";
-    //
-    // code.setCode(String.format(template,
-    // sb.toString(),
-    // code.getIsNull(),
-    // code.getResVar(),
-    // argsResVars.stream().collect(joining(","))));
-    // return code;
-    // }
+    @Override
+    public IExpression fold(IExecutionContext context, List<IExpression> arguments)
+    {
+        if (arguments.stream()
+                .allMatch(IExpression::isConstant))
+        {
+            final int expressionSize = arguments.size();
+            final ValueVector[] vectors = new ValueVector[expressionSize];
+            for (int i = 0; i < expressionSize; i++)
+            {
+                vectors[i] = arguments.get(i)
+                        .eval(null);
+            }
+            UTF8String string = concat(vectors, 0);
+            return context.getExpressionFactory()
+                    .createStringExpression(string);
+        }
+        return null;
+    }
+
+    @Override
+    public Arity arity()
+    {
+        return Arity.AT_LEAST_TWO;
+    }
+
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
+    {
+        final int expressionSize = arguments.size();
+        // Folded arguments, return the argument
+        if (expressionSize == 1)
+        {
+            return arguments.get(0)
+                    .eval(input, context);
+        }
+
+        final ValueVector[] vectors = new ValueVector[expressionSize];
+        for (int i = 0; i < expressionSize; i++)
+        {
+            vectors[i] = arguments.get(i)
+                    .eval(input, context);
+        }
+        return new ValueVector()
+        {
+            @Override
+            public ResolvedType type()
+            {
+                return ResolvedType.of(Type.String);
+            }
+
+            @Override
+            public int size()
+            {
+                return input.getRowCount();
+            }
+
+            @Override
+            public boolean isNull(int row)
+            {
+                return false;
+            }
+
+            @Override
+            public UTF8String getString(int row)
+            {
+                return concat(vectors, row);
+            }
+        };
+    }
+
+    private static UTF8String concat(ValueVector[] vectors, int row)
+    {
+        int size = vectors.length;
+
+        UTF8String string = null;
+        List<UTF8String> strings = null;
+        for (int i = 0; i < size; i++)
+        {
+            // Null values are ignored
+            if (vectors[i].isNull(row))
+            {
+                continue;
+            }
+            else if (string == null)
+            {
+                string = vectors[i].getString(row);
+                continue;
+            }
+
+            if (strings == null)
+            {
+                strings = new ArrayList<>(size);
+                strings.add(string);
+            }
+
+            strings.add(vectors[i].getString(row));
+        }
+
+        if (strings == null)
+        {
+            return string != null ? string
+                    : UTF8String.EMPTY;
+        }
+
+        return UTF8String.concat(UTF8String.EMPTY, strings);
+    }
 }

@@ -5,7 +5,7 @@ import static java.util.stream.Collectors.joining;
 import java.util.Collection;
 import java.util.List;
 
-import se.kuseman.payloadbuilder.core.operator.AObjectOutputWriter.ColumnValue;
+import se.kuseman.payloadbuilder.core.test.AObjectOutputWriter.ColumnValue;
 
 /** Domain of a test case inside a {@link TestHarness} */
 class TestCase
@@ -13,6 +13,11 @@ class TestCase
     private String name;
     private String query;
     private boolean ignore;
+    /** Filter for only run on schema or shema less */
+    private Boolean schemaLess;
+
+    private boolean onlyAssertExpectedColumns;
+
     private List<List<List<ColumnValue>>> expectedResultSets;
     private Class<? extends Exception> expectedException;
     private String expectedMessageContains;
@@ -55,6 +60,26 @@ class TestCase
     void setIgnore(boolean ignore)
     {
         this.ignore = ignore;
+    }
+
+    Boolean getSchemaLess()
+    {
+        return schemaLess;
+    }
+
+    void setSchemaLess(Boolean schemaLess)
+    {
+        this.schemaLess = schemaLess;
+    }
+
+    boolean isOnlyAssertExpectedColumns()
+    {
+        return onlyAssertExpectedColumns;
+    }
+
+    void setOnlyAssertExpectedColumns(boolean onlyAssertExpectedColumns)
+    {
+        this.onlyAssertExpectedColumns = onlyAssertExpectedColumns;
     }
 
     List<List<List<ColumnValue>>> getExpectedResultSets()

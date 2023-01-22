@@ -30,7 +30,7 @@ public class CatalogRegistry
     /** Register catalog */
     public void registerCatalog(String alias, Catalog catalog)
     {
-        if (SystemCatalog.ALIAS.equals(lowerCase(alias)))
+        if (Catalog.SYSTEM_CATALOG_ALIAS.equals(lowerCase(alias)))
         {
             throw new IllegalArgumentException("Cannot register a catalog with reserved alias 'sys'");
         }
@@ -46,7 +46,7 @@ public class CatalogRegistry
     /** Get catalog */
     public Catalog getCatalog(String alias)
     {
-        if (SystemCatalog.ALIAS.equals(lowerCase(alias)))
+        if (Catalog.SYSTEM_CATALOG_ALIAS.equals(lowerCase(alias)))
         {
             return systemCatalog;
         }
