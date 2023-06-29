@@ -5,12 +5,11 @@ import static java.util.Collections.emptyList;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 
 /** Definition of an expression */
 public interface IExpression
@@ -60,12 +59,6 @@ public interface IExpression
     default boolean isInternal()
     {
         return false;
-    }
-
-    /** Return a column reference for this expression if any */
-    default ColumnReference getColumnReference()
-    {
-        return null;
     }
 
     /** Return a qualified column name for this expression if any exists otherwise null */

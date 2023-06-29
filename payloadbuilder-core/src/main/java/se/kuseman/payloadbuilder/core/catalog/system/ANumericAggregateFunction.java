@@ -4,75 +4,83 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.Decimal;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
-/** Base class for numeric aggregate functions. SUM/MIN/MAX/AVG etc. */
+/** Base class for numeric aggregate functions. SUM/AVG */
 abstract class ANumericAggregateFunction extends ScalarFunctionInfo
 {
-    ANumericAggregateFunction(Catalog catalog, String name)
+    ANumericAggregateFunction(String name)
     {
-        super(catalog, name, FunctionType.SCALAR_AGGREGATE);
+        super(name, FunctionType.SCALAR_AGGREGATE);
     }
 
     @Override
-    public int arity()
+    public Arity arity()
     {
-        return 1;
+        return Arity.ONE;
     }
 
     @Override
-    public ResolvedType getType(List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
-        ResolvedType resolvedArgType = arguments.get(0)
+        ResolvedType result = arguments.get(0)
                 .getType();
-        Type argType = resolvedArgType.getType();
 
-        if (argType == Type.ValueVector)
+        // In scalar mode and we have an array input type the result is the sub type
+        if (result.getType() == Column.Type.Array)
         {
-            argType = resolvedArgType.getSubType()
-                    .getType();
+            result = result.getSubType();
         }
 
-        return ResolvedType.of(argType);
+        return result;
     }
 
     @Override
-    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    public ResolvedType getAggregateType(List<IExpression> arguments)
+    {
+        // Aggregated result type is the same as argument
+        return arguments.get(0)
+                .getType();
+    }
+
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
     {
         ValueVector vv = arguments.get(0)
                 .eval(input, context);
         Type resultType = vv.type()
                 .getType();
-        if (resultType == Type.ValueVector)
+        if (resultType == Column.Type.Array)
         {
             resultType = vv.type()
                     .getSubType()
                     .getType();
         }
 
-        if (resultType == Type.Int
-                || resultType == Type.Long)
+        if (resultType == Column.Type.Int
+                || resultType == Column.Type.Long)
         {
             return aggregateInteger(resultType, vv);
         }
-        else if (resultType == Type.Float
-                || resultType == Type.Double)
+        else if (resultType == Column.Type.Float
+                || resultType == Column.Type.Double)
         {
-            return aggregateDecimal(resultType, vv);
+            return aggregateDecimalPrimitive(resultType, vv);
         }
 
         return aggregateObjects(vv);
     }
 
     @Override
-    public ValueVector evalAggregate(IExecutionContext context, AggregateMode mode, ValueVector groups, String catalogAlias, List<? extends IExpression> arguments)
+    public ValueVector evalAggregate(IExecutionContext context, AggregateMode mode, ValueVector groups, String catalogAlias, List<IExpression> arguments)
     {
         if (mode == AggregateMode.DISTINCT)
         {
@@ -80,7 +88,7 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
         }
 
         if (groups.type()
-                .getType() != Type.TupleVector)
+                .getType() != Column.Type.Table)
         {
             throw new IllegalArgumentException("Wrong type of input vector, expected tuple vector but got: " + groups.type());
         }
@@ -93,7 +101,7 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
         List<ValueVector> vectors = new ArrayList<>(groups.size());
         for (int i = 0; i < size; i++)
         {
-            ValueVector vv = expression.eval((TupleVector) groups.getValue(i), context);
+            ValueVector vv = expression.eval(groups.getTable(i), context);
             if (resultType == null)
             {
                 resultType = vv.type()
@@ -105,15 +113,19 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
             }
             vectors.add(vv);
         }
-        if (resultType == Type.Int
-                || resultType == Type.Long)
+        if (resultType == Column.Type.Int
+                || resultType == Column.Type.Long)
         {
             return aggregateInteger(resultType, of(vectors, resultType));
         }
-        else if (resultType == Type.Float
-                || resultType == Type.Double)
+        else if (resultType == Column.Type.Float
+                || resultType == Column.Type.Double)
         {
-            return aggregateDecimal(resultType, of(vectors, resultType));
+            return aggregateDecimalPrimitive(resultType, of(vectors, resultType));
+        }
+        else if (resultType == Column.Type.Decimal)
+        {
+            return aggregateDecimal(of(vectors, resultType));
         }
 
         return aggregateObjects(of(vectors, resultType));
@@ -123,14 +135,14 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
     {
         Type type = next.getType();
 
-        if (next.getType() == Type.ValueVector)
+        if (next.getType() == Column.Type.Array)
         {
             type = next.getSubType()
                     .getType();
         }
         // Type object then we need to use reflective SUM. Ie BigDecimal etc.
         if (!(type.isNumber()
-                || type == Type.Any))
+                || type == Column.Type.Any))
         {
             throw new IllegalArgumentException(getName() + " doesn't support type " + type);
         }
@@ -150,7 +162,7 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
             @Override
             public ResolvedType type()
             {
-                return ResolvedType.valueVector(ResolvedType.of(resultType));
+                return ResolvedType.array(ResolvedType.of(resultType));
             }
 
             @Override
@@ -166,7 +178,7 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
             }
 
             @Override
-            public Object getValue(int row)
+            public ValueVector getArray(int row)
             {
                 return vectors.get(row);
             }
@@ -184,6 +196,9 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
 
     /** Creates a {@link DoubleAggregator} */
     protected abstract DoubleAggregator createDoubleAggregator();
+
+    /** Creates a {@link DecimalAggregator} */
+    protected abstract DecimalAggregator createDecimalAggregator();
 
     /** Creates a {@link ObjectAggregator} */
     protected abstract ObjectAggregator createObjectAggregator();
@@ -245,7 +260,7 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
         }
     }
 
-    /** Aggregates floats */
+    /** Aggregates doubles */
     protected interface DoubleAggregator
     {
         /** Return the identity */
@@ -259,6 +274,25 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
 
         /** Combine the result */
         default double combine(double result)
+        {
+            return result;
+        }
+    }
+
+    /** Aggregates doubles */
+    protected interface DecimalAggregator
+    {
+        /** Return the identity */
+        default Decimal getIdentity()
+        {
+            return null;
+        }
+
+        /** Aggregate current and next value */
+        Decimal aggregate(Decimal current, Decimal next);
+
+        /** Combine the result */
+        default Decimal combine(Decimal result)
         {
             return result;
         }
@@ -289,7 +323,6 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
                 .getType();
         final int size = values.size();
         final Object[] results = new Object[size];
-        boolean anyAllNulls = false;
         for (int i = 0; i < size; i++)
         {
             ObjectAggregator aggregator = createObjectAggregator();
@@ -299,9 +332,9 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
             int end;
 
             // The value should be a ValueVector that should be aggregated
-            if (type == Type.ValueVector)
+            if (type == Column.Type.Array)
             {
-                v = (ValueVector) values.getValue(i);
+                v = values.getArray(i);
                 end = v.size();
             }
             // Scalar mode then we aggregate the whole input vector
@@ -313,42 +346,28 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
                 end = i + 1;
             }
 
-            boolean nullable = v.isNullable();
-
             Object result = aggregator.getIdentity();
             for (int r = start; r < end; r++)
             {
-                if (nullable
-                        && v.isNull(r))
+                if (v.isNull(r))
                 {
                     continue;
                 }
-                result = aggregator.aggregate(result, v.getValue(r));
+                result = aggregator.aggregate(result, v.valueAsObject(r));
             }
-            if (result == null)
-            {
-                anyAllNulls = true;
-            }
-            else
+            if (result != null)
             {
                 results[i] = aggregator.combine(result);
             }
         }
 
-        final boolean nullable = anyAllNulls;
         return new ValueVector()
         {
             @Override
             public ResolvedType type()
             {
                 // TODO: could be converted to a primitive type by checking all values in array
-                return ResolvedType.of(Type.Any);
-            }
-
-            @Override
-            public boolean isNullable()
-            {
-                return nullable;
+                return ResolvedType.of(Column.Type.Any);
             }
 
             @Override
@@ -364,7 +383,7 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
             }
 
             @Override
-            public Object getValue(int row)
+            public Object getAny(int row)
             {
                 return results[row];
             }
@@ -379,7 +398,7 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
         Type type = values.type()
                 .getType();
         final int size = values.size();
-        boolean isLong = resultType == Type.Long;
+        boolean isLong = resultType == Column.Type.Long;
         int[] intArr = isLong ? null
                 : new int[size];
         long[] longArr = isLong ? new long[size]
@@ -398,9 +417,9 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
             int end;
 
             // The value should be a ValueVector that should be aggregated
-            if (type == Type.ValueVector)
+            if (type == Column.Type.Array)
             {
-                v = (ValueVector) values.getValue(i);
+                v = values.getArray(i);
                 end = v.size();
             }
             // Scalar mode then we aggregate the whole input vector
@@ -411,8 +430,6 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
                 start = i;
                 end = i + 1;
             }
-
-            boolean nullable = v.isNullable();
             // CSOFF
             int iR = isLong ? 0
                     : intAggregator.getIdentity();
@@ -422,8 +439,7 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
             boolean allNulls = true;
             for (int r = start; r < end; r++)
             {
-                if (nullable
-                        && v.isNull(r))
+                if (v.isNull(r))
                 {
                     continue;
                 }
@@ -466,14 +482,12 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
         return new ValueVector()
         {
             @Override
-            public boolean isNullable()
-            {
-                return nullBitSet != null;
-            }
-
-            @Override
             public boolean isNull(int row)
             {
+                if (nullBitSet == null)
+                {
+                    return false;
+                }
                 return nullBitSet.get(row);
             }
 
@@ -492,7 +506,7 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
             @Override
             public int getInt(int row)
             {
-                if (resultType == Type.Long)
+                if (resultType == Column.Type.Long)
                 {
                     return (int) longResult[row];
                 }
@@ -503,31 +517,114 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
             @Override
             public long getLong(int row)
             {
-                if (resultType == Type.Int)
+                if (resultType == Column.Type.Int)
                 {
                     return intResult[row];
                 }
 
                 return longResult[row];
             }
+        };
+    }
+
+    private ValueVector aggregateDecimal(ValueVector values)
+    {
+        Column.Type type = values.type()
+                .getType();
+        final int size = values.size();
+        final Decimal[] result = new Decimal[size];
+        BitSet nulls = null;
+
+        for (int i = 0; i < size; i++)
+        {
+            DecimalAggregator aggregator = createDecimalAggregator();
+
+            ValueVector v;
+            int start = 0;
+            int end;
+
+            // The value should be a ValueVector that should be aggregated
+            if (type == Column.Type.Array)
+            {
+                v = values.getArray(i);
+                end = v.size();
+            }
+            // Scalar mode then we aggregate the whole input vector
+            else
+            {
+                // Only one value should be aggregated
+                v = values;
+                start = i;
+                end = i + 1;
+            }
+
+            Decimal d = aggregator.getIdentity();
+            boolean allNulls = true;
+            for (int r = start; r < end; r++)
+            {
+                if (v.isNull(r))
+                {
+                    continue;
+                }
+
+                allNulls = false;
+                d = aggregator.aggregate(d, v.getDecimal(r));
+            }
+            if (allNulls)
+            {
+                if (nulls == null)
+                {
+                    nulls = new BitSet(size);
+                }
+                nulls.set(i);
+            }
+            else
+            {
+                result[i] = aggregator.combine(d);
+            }
+        }
+        final BitSet nullBitSet = nulls;
+        return new ValueVector()
+        {
+            @Override
+            public ResolvedType type()
+            {
+                return ResolvedType.of(Column.Type.Decimal);
+            }
 
             @Override
-            public Object getValue(int row)
+            public int size()
             {
-                throw new IllegalArgumentException("Cannot call getValue on a typed vector");
+                return size;
+            }
+
+            @Override
+            public boolean isNull(int row)
+            {
+                if (nullBitSet == null)
+                {
+                    return false;
+                }
+                return nullBitSet.get(row);
+            }
+
+            @Override
+            public Decimal getDecimal(int row)
+            {
+                return result[row];
             }
         };
     }
 
     /**
-     * Aggregate decimal values
+     * Aggregate decimal primitive values
      */
-    private ValueVector aggregateDecimal(final Type resultType, ValueVector values)
+    private ValueVector aggregateDecimalPrimitive(final Column.Type resultType, ValueVector values)
     {
-        Type type = values.type()
+        Column.Type type = values.type()
                 .getType();
         final int size = values.size();
-        boolean isDouble = resultType == Type.Double;
+        boolean isDouble = resultType == Column.Type.Double;
         float[] floatArr = isDouble ? null
                 : new float[size];
         double[] doubleArr = isDouble ? new double[size]
@@ -540,16 +637,15 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
                     : createFloatAggregator();
             DoubleAggregator doubleAggregator = isDouble ? createDoubleAggregator()
                     : null;
-            // ValueVector v = vectors.get(i);
 
             ValueVector v;
             int start = 0;
             int end;
 
             // The value should be a ValueVector that should be aggregated
-            if (type == Type.ValueVector)
+            if (type == Column.Type.Array)
             {
-                v = (ValueVector) values.getValue(i);
+                v = values.getArray(i);
                 end = v.size();
             }
             // Scalar mode then we aggregate the whole input vector
@@ -561,7 +657,6 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
                 end = i + 1;
             }
 
-            boolean nullable = v.isNullable();
             // CSOFF
             float fR = isDouble ? 0
                     : floatAggregator.getIdentity();
@@ -571,8 +666,7 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
             boolean allNulls = true;
             for (int r = start; r < end; r++)
             {
-                if (nullable
-                        && v.isNull(r))
+                if (v.isNull(r))
                 {
                     continue;
                 }
@@ -581,7 +675,7 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
                 if (isDouble)
                 {
                     dR = doubleAggregator.aggregate(dR, (v.type()
-                            .getType() == Type.Float ? v.getFloat(r)
+                            .getType() == Column.Type.Float ? v.getFloat(r)
                                     : v.getDouble(r)));
                 }
                 else
@@ -617,14 +711,12 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
         return new ValueVector()
         {
             @Override
-            public boolean isNullable()
-            {
-                return nullBitSet != null;
-            }
-
-            @Override
             public boolean isNull(int row)
             {
+                if (nullBitSet == null)
+                {
+                    return false;
+                }
                 return nullBitSet.get(row);
             }
 
@@ -643,7 +735,7 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
             @Override
             public float getFloat(int row)
             {
-                if (resultType == Type.Double)
+                if (resultType == Column.Type.Double)
                 {
                     return (float) doubleResult[row];
                 }
@@ -654,18 +746,12 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
             @Override
             public double getDouble(int row)
             {
-                if (resultType == Type.Float)
+                if (resultType == Column.Type.Float)
                 {
                     return floatResult[row];
                 }
 
                 return doubleResult[row];
-            }
-
-            @Override
-            public Object getValue(int row)
-            {
-                throw new IllegalArgumentException("Cannot call getValue on a typed vector");
             }
         };
     }

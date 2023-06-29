@@ -7,12 +7,13 @@ import java.time.DateTimeException;
 import java.time.ZoneId;
 import java.util.List;
 
+import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.EpochDateTime;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IAtTimeZoneExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
@@ -52,29 +53,24 @@ public class AtTimeZoneExpression implements IAtTimeZoneExpression
     {
         final ValueVector value = expression.eval(input, context);
         final ValueVector timeZone = this.timeZone.eval(input, context);
-        final String constantTimeZone = this.timeZone.isConstant() ? timeZone.getString(0)
-                .toString()
-                : null;
+        final String constantTimeZone = this.timeZone.isConstant()
+                && !timeZone.isNull(0)
+                        ? timeZone.getString(0)
+                                .toString()
+                        : null;
 
         return new ValueVector()
         {
             @Override
             public ResolvedType type()
             {
-                return ResolvedType.of(Type.DateTime);
+                return ResolvedType.of(Type.DateTimeOffset);
             }
 
             @Override
             public int size()
             {
                 return input.getRowCount();
-            }
-
-            @Override
-            public boolean isNullable()
-            {
-                return value.isNullable()
-                        || timeZone.isNullable();
             }
 
             @Override
@@ -85,7 +81,7 @@ public class AtTimeZoneExpression implements IAtTimeZoneExpression
             }
 
             @Override
-            public EpochDateTime getDateTime(int row)
+            public EpochDateTimeOffset getDateTimeOffset(int row)
             {
                 String timeZoneString = constantTimeZone;
                 if (timeZoneString == null)
@@ -103,14 +99,16 @@ public class AtTimeZoneExpression implements IAtTimeZoneExpression
                 {
                     throw new IllegalArgumentException("Time zone '" + timeZoneString + "' could not be found.");
                 }
-                return value.getDateTime(row)
-                        .atZone(zone);
-            }
 
-            @Override
-            public Object getValue(int row)
-            {
-                throw new IllegalArgumentException("getValue should not be called on typed vectors");
+                if (value.type()
+                        .getType() == Column.Type.DateTime)
+                {
+                    return value.getDateTime(row)
+                            .toOffset(zone);
+                }
+
+                return value.getDateTimeOffset(row)
+                        .atZone(zone);
             }
         };
     }

@@ -36,16 +36,13 @@ import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.lang3.time.StopWatch;
-import org.apache.http.Header;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpStatus;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpRequestBase;
-import org.apache.http.entity.AbstractHttpEntity;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.message.BasicHeader;
-import org.apache.http.util.EntityUtils;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.HttpStatus;
+import org.apache.hc.core5.http.io.entity.AbstractHttpEntity;
+import org.apache.hc.core5.http.io.entity.StringEntity;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JacksonException;
@@ -61,19 +58,20 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.CatalogException;
 import se.kuseman.payloadbuilder.api.catalog.Column;
-import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
+import se.kuseman.payloadbuilder.api.catalog.IPredicate.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.ISeekKey;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.SeekType;
 import se.kuseman.payloadbuilder.api.execution.NodeData;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.catalog.es.ESQueryUtils.SortItemMeta;
 import se.kuseman.payloadbuilder.catalog.es.ElasticsearchMetaUtils.MappedProperty;
 
@@ -125,18 +123,14 @@ class ESDatasource implements IDatasource
                         sortItems.stream()
                                 .map(Object::toString)
                                 .collect(joining(", "))),
-                entry("Query", ESQueryUtils.getSearchBody(strategy, sortItems, propertyPredicates, null, indexField, quoteValues, context)));
-
-        if (indexPredicate != null)
-        {
-            result.put(INDEX, indexPredicate.getIndex());
-        }
+                entry("Query", ESQueryUtils.getSearchBody(true, strategy, sortItems, propertyPredicates, null, indexField, quoteValues, context)));
 
         Data data = context.getStatementContext()
                 .getNodeData(nodeId);
         if (data != null)
         {
             result.put("Request count", data.requestCount);
+            result.put("Scroll count", data.scrollCount);
             result.put("Bytes sent", FileUtils.byteCountToDisplaySize(data.bytesSent));
             result.put("Bytes received", FileUtils.byteCountToDisplaySize(data.bytesReceived));
             result.put("Request and deserialization time", DurationFormatUtils.formatDurationHMS(data.requestTime.getTime(TimeUnit.MILLISECONDS)));
@@ -149,10 +143,10 @@ class ESDatasource implements IDatasource
     public TupleIterator execute(IExecutionContext context, IDatasourceOptions options)
     {
         ValueVector indexSeekValues = getIndexSeekValues(context);
-        int batchSize = getBatchSize(context, options, indexSeekValues);
+        String indexField = getIndexField();
+        int batchSize = getBatchSize(context, options, indexField, indexSeekValues);
 
         ESType esType = ESType.of(context.getSession(), catalogAlias, table);
-        String indexField = getIndexField();
         Data data = context.getStatementContext()
                 .getOrCreateNodeData(nodeId, Data::new);
 
@@ -175,25 +169,55 @@ class ESDatasource implements IDatasource
 
         boolean quoteValues = indexProperty == null
                 || indexProperty.shouldQuoteValues();
-        String body = ESQueryUtils.getSearchBody(strategy, sortItems, propertyPredicates, indexSeekValues, indexField, quoteValues, context);
+        String body = ESQueryUtils.getSearchBody(false, strategy, sortItems, propertyPredicates, indexSeekValues, indexField, quoteValues, context);
 
         return getScrollingIterator(context, strategy, catalogAlias, esType.endpoint, data, searchUrl, scrollUrl, body);
     }
 
-    private int getBatchSize(IExecutionContext context, IDatasourceOptions options, ValueVector indexSeekKeys)
+    private int getBatchSize(IExecutionContext context, IDatasourceOptions options, String indexField, ValueVector indexSeekKeys)
     {
         // Fetch batch size from options
         int batchSize = options.getBatchSize(context);
 
         // If this is an index request, see if the index size is lower or equal to the batch
         // size option then we can skip scrolling
-        if (indexSeekKeys != null)
+        int min = -1;
+        if (ID.equalsIgnoreCase(indexField))
         {
-            if (indexSeekKeys.size() <= batchSize)
+            min = indexSeekKeys.size();
+        }
+
+        // Filter on id, see if we can skip scroll
+        for (PropertyPredicate predicate : propertyPredicates)
+        {
+            if (ID.equalsIgnoreCase(predicate.property))
             {
-                return -1;
+                if (predicate.predicate.getType() == Type.COMPARISION
+                        && predicate.predicate.getComparisonType() == IComparisonExpression.Type.EQUAL)
+                {
+                    min = min < 0 ? 1
+                            : Math.min(min, 1);
+                }
+                else if (predicate.predicate.getType() == Type.IN
+                        && !predicate.predicate.getInExpression()
+                                .isNot())
+                {
+                    int argSize = predicate.predicate.getInExpression()
+                            .getArguments()
+                            .size();
+                    min = min < 0 ? argSize
+                            : Math.min(min, argSize);
+                }
             }
         }
+
+        // We have a filter on Id that is less than batch size => don't use scroll
+        if (min >= 0
+                && min <= batchSize)
+        {
+            return -1;
+        }
+
         return batchSize;
     }
 
@@ -312,6 +336,7 @@ class ESDatasource implements IDatasource
             }
             else if (scrollId.getValue() != null)
             {
+                data.scrollCount++;
                 String id = scrollId.getValue();
                 data.bytesSent += scrollUrl.length() + body.length();
                 scrollId.setValue(null);
@@ -323,7 +348,7 @@ class ESDatasource implements IDatasource
     }
 
     static TupleIterator getIterator(IExecutionContext context, ElasticStrategy strategy, String catalogAlias, String endpoint, Data data,
-            Function<MutableObject<String>, HttpRequestBase> requestSupplier)
+            Function<MutableObject<String>, ClassicHttpRequest> requestSupplier)
     {
         // CSOFF
         return new TupleIterator()
@@ -361,19 +386,21 @@ class ESDatasource implements IDatasource
                 {
                     data.requestCount++;
 
-                    HttpRequestBase delete = strategy.getDeleteScrollRequest(endpoint, scrollId.getValue());
-                    HttpEntity entity = null;
-                    try (CloseableHttpResponse response = HttpClientUtils.execute(context.getSession(), catalogAlias, delete))
+                    ClassicHttpRequest delete = strategy.getDeleteScrollRequest(endpoint, scrollId.getValue());
+                    try
                     {
-                        entity = response.getEntity();
-                        int status = response.getStatusLine()
-                                .getStatusCode();
-                        if (!(status == HttpStatus.SC_OK
-                                || status == HttpStatus.SC_NOT_FOUND))
+                        HttpClientUtils.execute(context.getSession(), catalogAlias, delete, response ->
                         {
-                            String body = IOUtils.toString(entity.getContent(), StandardCharsets.UTF_8);
-                            throw new RuntimeException("Error clearing scroll: " + body);
-                        }
+                            HttpEntity entity = response.getEntity();
+                            int status = response.getCode();
+                            if (!(status == HttpStatus.SC_OK
+                                    || status == HttpStatus.SC_NOT_FOUND))
+                            {
+                                String body = IOUtils.toString(entity.getContent(), StandardCharsets.UTF_8);
+                                throw new RuntimeException("Error clearing scroll: " + body);
+                            }
+                            return null;
+                        });
                     }
                     catch (Exception e)
                     {
@@ -382,10 +409,6 @@ class ESDatasource implements IDatasource
                             throw (RuntimeException) e;
                         }
                         throw new RuntimeException("Error deleting scroll", e);
-                    }
-                    finally
-                    {
-                        EntityUtils.consumeQuietly(entity);
                     }
                 }
                 closed = true;
@@ -403,7 +426,7 @@ class ESDatasource implements IDatasource
                         return false;
                     }
 
-                    HttpRequestBase request = requestSupplier.apply(scrollId);
+                    ClassicHttpRequest request = requestSupplier.apply(scrollId);
                     if (request == null)
                     {
                         return false;
@@ -412,33 +435,35 @@ class ESDatasource implements IDatasource
                     ESResponse esReponse;
                     data.requestCount++;
                     data.requestTime.resume();
-                    HttpEntity entity = null;
-                    try (CloseableHttpResponse response = HttpClientUtils.execute(context.getSession(), catalogAlias, request))
+
+                    try
                     {
-                        entity = response.getEntity();
-                        if (response.getStatusLine()
-                                .getStatusCode() != HttpStatus.SC_OK)
+                        esReponse = HttpClientUtils.execute(context.getSession(), catalogAlias, request, response ->
                         {
-                            String body = IOUtils.toString(response.getEntity()
-                                    .getContent(), StandardCharsets.UTF_8);
-
-                            try
+                            HttpEntity entity = response.getEntity();
+                            if (response.getCode() != HttpStatus.SC_OK)
                             {
-                                // Try to parse and format json error
-                                Object parsedBody = MAPPER.readValue(body, Object.class);
-                                body = MAPPER.writerWithDefaultPrettyPrinter()
-                                        .writeValueAsString(parsedBody);
-                            }
-                            catch (IOException e)
-                            {
-                                // SWALLOW
-                            }
+                                String body = IOUtils.toString(response.getEntity()
+                                        .getContent(), StandardCharsets.UTF_8);
+                                try
+                                {
+                                    // Try to parse and format json error
+                                    Object parsedBody = MAPPER.readValue(body, Object.class);
+                                    body = MAPPER.writerWithDefaultPrettyPrinter()
+                                            .writeValueAsString(parsedBody);
+                                }
+                                catch (IOException e)
+                                {
+                                    // SWALLOW
+                                }
 
-                            throw new RuntimeException("Error query Elastic. Status: " + response.getStatusLine() + "." + System.lineSeparator() + body);
-                        }
-                        CountingInputStream cis = new CountingInputStream(entity.getContent());
-                        esReponse = READER.readValue(cis);
-                        data.bytesReceived += cis.getByteCount();
+                                throw new RuntimeException("Error query Elastic. Status: " + response.getCode() + "." + System.lineSeparator() + body);
+                            }
+                            CountingInputStream cis = new CountingInputStream(entity.getContent());
+                            ESResponse result = READER.readValue(cis);
+                            data.bytesReceived += cis.getByteCount();
+                            return result;
+                        });
                     }
                     catch (CatalogException e)
                     {
@@ -450,7 +475,6 @@ class ESDatasource implements IDatasource
                     }
                     finally
                     {
-                        EntityUtils.consumeQuietly(entity);
                         data.requestTime.suspend();
                     }
 
@@ -531,7 +555,7 @@ class ESDatasource implements IDatasource
                 @Override
                 public ResolvedType type()
                 {
-                    return ResolvedType.of(Type.Any);
+                    return ResolvedType.of(Column.Type.Any);
                 }
 
                 @Override
@@ -543,11 +567,11 @@ class ESDatasource implements IDatasource
                 @Override
                 public boolean isNull(int row)
                 {
-                    return getValue(row) == null;
+                    return getAny(row) == null;
                 }
 
                 @Override
-                public Object getValue(int row)
+                public Object getAny(int row)
                 {
                     Doc doc = docs.get(row);
 
@@ -693,6 +717,7 @@ class ESDatasource implements IDatasource
         int requestCount;
         long bytesSent;
         long bytesReceived;
+        int scrollCount;
 
         Data()
         {
@@ -708,7 +733,6 @@ class ESDatasource implements IDatasource
         private static final byte[] FOOTER_BYTES = "]}".getBytes(StandardCharsets.UTF_8);
         private static final byte[] QUOTE_BYTES = "\"".getBytes(StandardCharsets.UTF_8);
         private static final byte[] COMMA_BYTES = ",".getBytes(StandardCharsets.UTF_8);
-        private static final Header APPLICATION_JSON = new BasicHeader("Content-Type", "application/json");
 
         private final ValueVector values;
         private final Data data;
@@ -717,6 +741,7 @@ class ESDatasource implements IDatasource
 
         private DocIdStreamingEntity(ValueVector values, Data data, int from, int to)
         {
+            super(ContentType.APPLICATION_JSON, null);
             this.values = values;
             this.data = data;
             this.from = from;
@@ -730,27 +755,9 @@ class ESDatasource implements IDatasource
         }
 
         @Override
-        public boolean isChunked()
-        {
-            return false;
-        }
-
-        @Override
         public long getContentLength()
         {
             return -1;
-        }
-
-        @Override
-        public Header getContentType()
-        {
-            return APPLICATION_JSON;
-        }
-
-        @Override
-        public Header getContentEncoding()
-        {
-            return null;
         }
 
         @Override
@@ -794,6 +801,11 @@ class ESDatasource implements IDatasource
         public boolean isStreaming()
         {
             return false;
+        }
+
+        @Override
+        public void close() throws IOException
+        {
         }
     }
 }

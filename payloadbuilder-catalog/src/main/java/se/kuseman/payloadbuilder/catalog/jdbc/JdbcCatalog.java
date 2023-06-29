@@ -28,19 +28,18 @@ import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.Index;
-import se.kuseman.payloadbuilder.api.catalog.ObjectTupleVector;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
+import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.catalog.CredentialsException;
 
 /** Jdbc catalog */
 public class JdbcCatalog extends Catalog
 {
-    private static final int BATCH_SIZE = 500;
     public static final String NAME = "JdbcCatalog";
     public static final String DRIVER_CLASSNAME = "driverclassname";
     public static final String URL = "url";
@@ -59,7 +58,7 @@ public class JdbcCatalog extends Catalog
     @Override
     public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table)
     {
-        return new TableSchema(Schema.EMPTY, singletonList(new Index(table, emptyList(), Index.ColumnsType.WILDCARD, BATCH_SIZE)));
+        return new TableSchema(Schema.EMPTY, singletonList(new Index(table, emptyList(), Index.ColumnsType.WILDCARD)));
     }
 
     @Override
@@ -84,7 +83,8 @@ public class JdbcCatalog extends Catalog
         }
         else if (SYS_FUNCTIONS.equalsIgnoreCase(type))
         {
-            return (ctx, opt) -> TupleIterator.singleton(getFunctionsTupleVector());
+            return (ctx, opt) -> TupleIterator.singleton(getFunctionsTupleVector(data.getSchema()
+                    .get()));
         }
 
         throw new RuntimeException(type + " is not supported");
@@ -109,51 +109,6 @@ public class JdbcCatalog extends Catalog
         List<ISortItem> sortItems = getSortItems(data);
         return new JdbcDatasource(this, catalogAlias, table, seekPredicate, data.getProjection(), predicates, sortItems);
     }
-    //
-    // @Override
-    // public Operator getSystemOperator(OperatorData data)
-    // {
-    // final IQuerySession session = data.getSession();
-    // final String catalogAlias = data.getCatalogAlias();
-    // final TableAlias alias = data.getTableAlias();
-    // String type = alias.getTable()
-    // .getLast();
-    //
-    // if (SYS_TABLES.equalsIgnoreCase(type))
-    // {
-    // return systemOperator(data.getNodeId(), type, ctx -> getTupleIterator(session, catalogAlias, alias, null, true));
-    // }
-    // else if (SYS_COLUMNS.equalsIgnoreCase(type))
-    // {
-    // IExpression tableFilter = data.extractPredicate(SYS_COLUMNS_TABLE);
-    // return systemOperator(data.getNodeId(), type, ctx ->
-    // {
-    // String table = tableFilter != null ? String.valueOf(tableFilter.eval(ctx))
-    // : null;
-    // return getTupleIterator(session, catalogAlias, alias, table, false);
-    // });
-    // }
-    // else if (SYS_FUNCTIONS.equalsIgnoreCase(type))
-    // {
-    // return getFunctionsOperator(data.getNodeId(), alias);
-    // }
-    //
-    // throw new RuntimeException(type + " is not supported");
-    // }
-    //
-    // @Override
-    // public Operator getScanOperator(OperatorData data)
-    // {
-    // return getIndexOperator(data, null);
-    // }
-    //
-    // @Override
-    // public Operator getIndexOperator(OperatorData data, IIndexPredicate indexPredicate)
-    // {
-    // List<IAnalyzePair> pairs = getPredicatePairs(data);
-    // List<ISortItem> sortItems = getSortItems(data);
-    // return new JdbcOperator(this, data.getNodeId(), data.getCatalogAlias(), data.getTableAlias(), pairs, sortItems, indexPredicate);
-    // }
 
     private List<IPredicate> getPredicates(DatasourceData data)
     {
@@ -224,14 +179,17 @@ public class JdbcCatalog extends Catalog
     /** Get connection for provided session/catalog alias */
     Connection getConnection(IQuerySession session, String catalogAlias)
     {
-        final String driverClassName = session.getCatalogProperty(catalogAlias, JdbcCatalog.DRIVER_CLASSNAME);
-        final String url = session.getCatalogProperty(catalogAlias, JdbcCatalog.URL);
+        final String driverClassName = session.getCatalogProperty(catalogAlias, JdbcCatalog.DRIVER_CLASSNAME)
+                .valueAsString(0);
+        final String url = session.getCatalogProperty(catalogAlias, JdbcCatalog.URL)
+                .valueAsString(0);
         if (isBlank(url))
         {
             throw new IllegalArgumentException("Missing URL in catalog properties for " + catalogAlias);
         }
 
-        final String username = session.getCatalogProperty(catalogAlias, JdbcCatalog.USERNAME);
+        final String username = session.getCatalogProperty(catalogAlias, JdbcCatalog.USERNAME)
+                .valueAsString(0);
         final String password = getPassword(session, catalogAlias);
         if (isBlank(username)
                 || isBlank(password))
@@ -283,7 +241,8 @@ public class JdbcCatalog extends Catalog
 
     private String getPassword(IQuerySession session, String catalogAlias)
     {
-        Object obj = session.getCatalogProperty(catalogAlias, JdbcCatalog.PASSWORD);
+        Object obj = session.getCatalogProperty(catalogAlias, JdbcCatalog.PASSWORD)
+                .valueAsObject(0);
         if (obj instanceof String)
         {
             return (String) obj;
@@ -297,7 +256,8 @@ public class JdbcCatalog extends Catalog
 
     private TupleIterator getSystemIterator(IQuerySession session, String catalogAlias, String tableFilter, boolean tables)
     {
-        String database = session.getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE);
+        String database = session.getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE)
+                .valueAsString(0);
         Connection connection = null;
         ResultSet rs = null;
         try

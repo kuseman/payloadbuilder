@@ -17,30 +17,49 @@ import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.api.execution.Decimal;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IArithmeticBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.IDatePartExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.QuerySession;
-import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.expression.ArithmeticBinaryExpression;
+import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.AtTimeZoneExpression;
 import se.kuseman.payloadbuilder.core.expression.CastExpression;
 import se.kuseman.payloadbuilder.core.expression.DateAddExpression;
 import se.kuseman.payloadbuilder.core.expression.DatePartExpression;
 import se.kuseman.payloadbuilder.core.expression.LambdaExpression;
+import se.kuseman.payloadbuilder.core.expression.LiteralArrayExpression;
+import se.kuseman.payloadbuilder.core.expression.LiteralBooleanExpression;
+import se.kuseman.payloadbuilder.core.expression.LiteralDateTimeExpression;
+import se.kuseman.payloadbuilder.core.expression.LiteralDateTimeOffsetExpression;
+import se.kuseman.payloadbuilder.core.expression.LiteralDecimalExpression;
+import se.kuseman.payloadbuilder.core.expression.LiteralDoubleExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralExpression;
+import se.kuseman.payloadbuilder.core.expression.LiteralFloatExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression;
+import se.kuseman.payloadbuilder.core.expression.LiteralLongExpression;
+import se.kuseman.payloadbuilder.core.expression.LiteralNullExpression;
+import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedFunctionCallExpression;
+import se.kuseman.payloadbuilder.core.expression.UnresolvedSubQueryExpression;
 import se.kuseman.payloadbuilder.core.expression.VariableExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
+import se.kuseman.payloadbuilder.core.logicalplan.ExpressionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
+import se.kuseman.payloadbuilder.core.logicalplan.Join;
 import se.kuseman.payloadbuilder.core.logicalplan.OperatorFunctionScan;
-import se.kuseman.payloadbuilder.core.logicalplan.OverScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Projection;
+import se.kuseman.payloadbuilder.core.logicalplan.TableFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
 import se.kuseman.payloadbuilder.core.statement.LogicalSelectStatement;
+import se.kuseman.payloadbuilder.core.statement.QueryStatement;
+import se.kuseman.payloadbuilder.core.statement.Statement;
+import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link QueryParser} */
 public class QueryParserTest extends Assert
@@ -65,6 +84,17 @@ public class QueryParserTest extends Assert
     private IExpression ce(String column)
     {
         return new se.kuseman.payloadbuilder.core.expression.UnresolvedColumnExpression(QualifiedName.of(column), -1, null);
+    }
+
+    @Test
+    public void test_count()
+    {
+        assertExpressionFail(ParseException.class, "COUNT asterisk doesn't support ALL/DISTINCT", "count(ALL *)");
+        assertExpressionFail(ParseException.class, "COUNT asterisk doesn't support ALL/DISTINCT", "count(DISTINCT *)");
+        // This is valid at parse stage but will throw later on when resolving function with it's arity
+        assertExpression("x.map(y -> y).count(*)");
+        assertExpression("count(*)", new UnresolvedFunctionCallExpression("sys", "count", null, asList(new AsteriskExpression(null)), null));
+        assertExpression("count(1)", new UnresolvedFunctionCallExpression("sys", "count", null, asList(new LiteralIntegerExpression(1)), null));
     }
 
     @Test
@@ -95,6 +125,8 @@ public class QueryParserTest extends Assert
         assertExpression("`hello`", litString("hello"));
         assertExpression("`${'hello'}`", litString("hello"));
         assertExpression("`hello${' world'}`", litString("hello world"));
+
+        assertExpression("`hello${null}`", litString("hello"));
     }
 
     @Test
@@ -125,13 +157,16 @@ public class QueryParserTest extends Assert
         assertExpression("datepart(day, col)", expected);
         assertExpression("datepart('day', col)", expected);
 
+        // Assert that builtin expression functions cannot be dereferenced
+        assertExpressionFail(ParseException.class, "DateAddExpression cannot be used as a dereference", "x.map(y -> y).dateadd(day, 10, col)");
+
     }
 
     @Test
     public void test_set()
     {
         assertQuery("set @var = 10");
-        assertQuery("set system.prop = false");
+        assertQuery("set @@system.prop = false");
     }
 
     @Test
@@ -154,18 +189,65 @@ public class QueryParserTest extends Assert
         assertQuery("select top 10 1");
         assertQuery("select top (@a) 1");
 
-        assertQuery("cache flush batch/cache.name");
+        assertQuery("cache flush GENERIC/cache.name");
+    }
+
+    @Test
+    public void test_not()
+    {
+        assertEquals(e("a + 2 = 10"), assertExpression("NOT NOT (a + 2 = 10)"));
+        assertEquals(e("a"), assertExpression("NOT NOT a"));
+        assertEquals(e("NOT a"), assertExpression("NOT NOT NOT a"));
+
+        assertEquals(e("a = 10"), assertExpression("NOT NOT (a = 10)"));
+        assertEquals(e("a != 10"), assertExpression("NOT NOT (a != 10)"));
+        assertEquals(e("a > 10"), assertExpression("NOT NOT (a > 10)"));
+        assertEquals(e("a >= 10"), assertExpression("NOT NOT (a >= 10)"));
+        assertEquals(e("a < 10"), assertExpression("NOT NOT (a < 10)"));
+        assertEquals(e("a <= 10"), assertExpression("NOT NOT (a <= 10)"));
+
+        assertEquals(e("a NOT LIKE 'hello'"), assertExpression("NOT (a LIKE 'hello')"));
+        assertEquals(e("a IS NULL"), assertExpression("NOT (a IS NOT NULL)"));
+
+        assertEquals(e("null"), assertExpression("NOT (null)"));
+        assertEquals(e("false"), assertExpression("NOT true"));
+        assertEquals(e("true"), assertExpression("NOT false"));
     }
 
     @Test
     public void test_cast()
     {
-        assertExpression("cast(123 AS ValueVector)", new CastExpression(new se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression(123), ResolvedType.valueVector(Type.Any)));
-        assertExpression("cast(123 AS int)", new CastExpression(new se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression(123), ResolvedType.of(Type.Int)));
-        assertExpression("cast(123 AS long)", new CastExpression(new se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression(123), ResolvedType.of(Type.Long)));
-        assertExpression("cast(123 AS float)", new CastExpression(new se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression(123), ResolvedType.of(Type.Float)));
-        assertExpression("cast(123 AS double)", new CastExpression(new se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression(123), ResolvedType.of(Type.Double)));
-        assertExpression("cast(123 AS boolean)", new CastExpression(new se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression(123), ResolvedType.of(Type.Boolean)));
+        assertExpression("cast(@var AS array)", new CastExpression(new VariableExpression(QualifiedName.of("var")), ResolvedType.array(Type.Any)));
+        assertExpression("cast(@var AS int)", new CastExpression(new VariableExpression(QualifiedName.of("var")), ResolvedType.of(Type.Int)));
+        assertExpression("cast(@var AS long)", new CastExpression(new VariableExpression(QualifiedName.of("var")), ResolvedType.of(Type.Long)));
+        assertExpression("cast(@var AS float)", new CastExpression(new VariableExpression(QualifiedName.of("var")), ResolvedType.of(Type.Float)));
+        assertExpression("cast(@var AS double)", new CastExpression(new VariableExpression(QualifiedName.of("var")), ResolvedType.of(Type.Double)));
+        assertExpression("cast(@var AS boolean)", new CastExpression(new VariableExpression(QualifiedName.of("var")), ResolvedType.of(Type.Boolean)));
+
+        // Test folding
+        assertExpression("cast(null AS int)", new LiteralNullExpression(ResolvedType.of(Type.Int)));
+        assertExpression("cast('123' AS int)", new LiteralIntegerExpression(123));
+        assertExpression("cast('123' AS long)", new LiteralLongExpression(123L));
+        assertExpression("cast('123.0' AS float)", new LiteralFloatExpression(123.0F));
+        assertExpression("cast('123.0' AS double)", new LiteralDoubleExpression(123.0D));
+        assertExpression("cast(123.0D AS decimal)", new LiteralDecimalExpression(Decimal.from(123.0D)));
+        assertExpression("cast(123 AS boolean)", LiteralBooleanExpression.TRUE);
+        assertExpression("cast(0 AS boolean)", LiteralBooleanExpression.FALSE);
+        assertExpression("cast(123 AS string)", new LiteralStringExpression("123"));
+        assertExpression("cast('2020-10-10' AS datetime)", new LiteralDateTimeExpression(EpochDateTime.from("2020-10-10")));
+        assertExpression("cast('2020-10-10' AS datetimeoffset)", new LiteralDateTimeOffsetExpression(EpochDateTimeOffset.from("2020-10-10")));
+        assertExpression("cast(123 AS string)", new LiteralStringExpression("123"));
+
+        ValueVector expected = new LiteralArrayExpression(ValueVector.literalAny(123)).getValue();
+        ValueVector actual = ((LiteralArrayExpression) assertExpression("cast(123 AS array)", null)).getValue();
+        VectorTestUtils.assertVectorsEquals(expected, actual);
+
+    }
+
+    @Test
+    public void test_that_we_cannot_insert_into_a_non_temp_table()
+    {
+        assertQueryFail(ParseException.class, "Can only insert into temp tables", "select * into table from tableA");
     }
 
     @Test
@@ -186,7 +268,7 @@ public class QueryParserTest extends Assert
     public void test_subquery_expression()
     {
         //@formatter:off
-        se.kuseman.payloadbuilder.core.statement.Statement expected =
+        Statement expected =
                 new LogicalSelectStatement(
                     new Projection(
                         new Filter(
@@ -201,10 +283,18 @@ public class QueryParserTest extends Assert
                             e("a.col > 10")),
                         asList(
                             e("a.col"),
-                            new se.kuseman.payloadbuilder.core.expression.SubQueryExpression(
+                            new UnresolvedSubQueryExpression(
                                 new OperatorFunctionScan(
                                     Schema.of(Column.of("output", Type.Any)),
-                                    new OverScan(Schema.EMPTY, "a", -1, null),
+                                    new Projection(
+                                        new TableFunctionScan(
+                                            new TableSourceReference("", QualifiedName.of("open_table"), "a"),
+                                            Schema.EMPTY,
+                                            asList(e("a")),
+                                            emptyList(),
+                                            null),
+                                        asList(new AsteriskExpression(QualifiedName.of("a"), null)),
+                                        false),
                                     "",
                                     "objectarray",
                                     null),
@@ -212,7 +302,7 @@ public class QueryParserTest extends Assert
                         false),
                     false);
         //@formatter:on
-        se.kuseman.payloadbuilder.core.statement.Statement actual = s("select a.col, (select * for objectarray over a) from table a where a.col > 10");
+        Statement actual = s("select a.col, (select a.* from open_table(a) a for objectarray) from table a where a.col > 10");
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
@@ -250,6 +340,10 @@ public class QueryParserTest extends Assert
     {
         assertQuery("describe select * from table");
         assertQuery("analyze select * from table");
+
+        // Analyze insert into
+        assertQuery("analyze select * into #temp from table");
+
     }
 
     @Test
@@ -322,6 +416,20 @@ public class QueryParserTest extends Assert
         assertSelectFail(ParseException.class, "Assignment selects are not allowed in sub query context", "select * from (select @a=1 from tableA) x");
         assertSelectFail(ParseException.class, "SELECT INTO are not allowed in sub query context", "select * from (select 1,2 into #temp from tableA) x");
         assertSelectFail(ParseException.class, "Sub query must have an alias", "select * from (select 1 col1 ,2 col2 from tableA for object)");
+
+        // Verify that sub queries are allowed inside projections
+        //@formatter:off
+        assertQuery(""
+                + "select ("
+                + "  select col "
+                + "  from tableA a"
+                + "  cross apply ( "
+                + "    select * "
+                + "    from open_table(a.table) "
+                + "  ) x"
+                + ") "
+                + "from tableB ");
+        //@formatter:on
     }
 
     @Test
@@ -356,12 +464,21 @@ public class QueryParserTest extends Assert
         assertSelect("select a.art_id from article a left populate join articleAttribute aa on aa.art_id = a.art_id ");
 
         // Nested
-        assertSelect(
+        LogicalSelectStatement s = (LogicalSelectStatement) assertSelect(
                 "select a.art_id from article a inner join (select * from articleAttribute aa  inner join articlePrice ap on ap.sku_id = aa.sku_id) aa with (populate=true) on aa.art_id = a.art_id ");
+
+        // Verify backwards compatibility for populate
+        assertEquals("aa", ((Join) s.getSelect()
+                .getChildren()
+                .get(0)).getPopulateAlias());
+
         assertSelect(
                 // CSOFF
                 "select a.art_id from article a inner join (select * from articleAttribute aa  left join articlePrice ap with (populate=true) on ap.sku_id = aa.sku_id) aa with (populate=true) on aa.art_id = a.art_id ");
         // CSON
+
+        assertQueryFail(ParseException.class, "Alias is mandatory on table sources when having joins", "select * from table inner join tableA a on a.col = col");
+        assertQueryFail(ParseException.class, "Alias is mandatory on joined table sources", "select * from table t inner join tableA on col = t.col");
 
         // TODO: more parser tests, where, orderby, group by
     }
@@ -374,6 +491,11 @@ public class QueryParserTest extends Assert
         assertSelect("select 1 where false");
         assertSelect("select 1 order by 1");
         assertSelect("select top 10 1");
+
+        assertEquals(new LogicalSelectStatement(new ExpressionScan(new TableSourceReference("", QualifiedName.of("a.b"), ""), Schema.EMPTY, e("a.b"), null), false),
+                assertSelect("select * from (a.b)"));
+
+        assertSelectFail(ParseException.class, "Expression scans cannot have options", "select * from (a.b) with (a=123)");
 
         assertQuery("select ( select 'value' key for object) select ( select 'value2' key for object)");
 
@@ -504,14 +626,14 @@ public class QueryParserTest extends Assert
         return e;
     }
 
-    private se.kuseman.payloadbuilder.core.statement.Statement assertSelect(String select)
+    private Statement assertSelect(String select)
     {
         return s(select);
     }
 
-    private se.kuseman.payloadbuilder.core.statement.QueryStatement assertQuery(String query)
+    private QueryStatement assertQuery(String query)
     {
-        return PARSER.parseQuery(new QuerySession(new CatalogRegistry()), query);
+        return PARSER.parseQuery(query, null);
     }
 
     private void assertExpressionFail(Class<? extends Exception> expected, String messageContains, String expression)

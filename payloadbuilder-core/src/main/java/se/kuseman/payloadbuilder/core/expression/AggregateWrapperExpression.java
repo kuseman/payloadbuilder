@@ -6,17 +6,17 @@ import static java.util.Objects.requireNonNull;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVectorAdapter;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 
 /** An aggregate expression that wrapps a ordinary expression and turns it into an aggregate result */
-public class AggregateWrapperExpression implements IAggregateExpression, HasAlias
+public class AggregateWrapperExpression implements IAggregateExpression, HasAlias, HasColumnReference
 {
     private final IExpression expression;
 
@@ -62,7 +62,11 @@ public class AggregateWrapperExpression implements IAggregateExpression, HasAlia
     @Override
     public ColumnReference getColumnReference()
     {
-        return expression.getColumnReference();
+        if (expression instanceof HasColumnReference)
+        {
+            return ((HasColumnReference) expression).getColumnReference();
+        }
+        return null;
     }
 
     @Override
@@ -96,7 +100,13 @@ public class AggregateWrapperExpression implements IAggregateExpression, HasAlia
 
         // We return a value vector if it's not a single value
         return singleValue ? expression.getType()
-                : ResolvedType.valueVector(expression.getType());
+                : ResolvedType.array(expression.getType());
+    }
+
+    @Override
+    public ResolvedType getAggregateType()
+    {
+        return getType();
     }
 
     @Override
@@ -124,7 +134,7 @@ public class AggregateWrapperExpression implements IAggregateExpression, HasAlia
         }
 
         if (groups.type()
-                .getType() != Type.TupleVector)
+                .getType() != Type.Table)
         {
             throw new IllegalArgumentException("Wrong type of input vector, expected tuple vector but got: " + groups.type());
         }
@@ -134,21 +144,20 @@ public class AggregateWrapperExpression implements IAggregateExpression, HasAlia
 
         for (int i = 0; i < size; i++)
         {
-            TupleVector vector = (TupleVector) groups.getValue(i);
+            TupleVector vector = groups.getTable(i);
             result[i] = expression.eval(vector, context);
         }
 
         if (singleValue)
         {
-            return new ValueVectorAdapter(row -> result[row], size, result[0].isNullable(), result[0].type())
+            // Pick first row from all groups
+            IValueVectorBuilder builder = context.getVectorBuilderFactory()
+                    .getValueVectorBuilder(result[0].type(), size);
+            for (int i = 0; i < size; i++)
             {
-                @Override
-                protected int getRow(int row)
-                {
-                    // Return the first row from each group since they are all the same
-                    return 0;
-                }
-            };
+                builder.put(result[i], 0);
+            }
+            return builder.build();
         }
 
         return new ValueVector()
@@ -156,7 +165,7 @@ public class AggregateWrapperExpression implements IAggregateExpression, HasAlia
             @Override
             public ResolvedType type()
             {
-                return ResolvedType.valueVector(expression.getType());
+                return ResolvedType.array(expression.getType());
             }
 
             @Override
@@ -172,7 +181,7 @@ public class AggregateWrapperExpression implements IAggregateExpression, HasAlia
             }
 
             @Override
-            public Object getValue(int row)
+            public ValueVector getArray(int row)
             {
                 return result[row];
             }

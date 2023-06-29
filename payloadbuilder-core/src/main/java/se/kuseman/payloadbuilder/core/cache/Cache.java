@@ -1,69 +1,58 @@
 package se.kuseman.payloadbuilder.core.cache;
 
-import static java.util.Collections.emptyList;
-
 import java.time.ZonedDateTime;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 
-/** Base definition of a cache */
+/** Definition of a cache produced by a {@link CacheProvider} */
 public interface Cache
 {
-    /** Name of the provider */
-    String getName();
+    /** Return name of cache */
+    QualifiedName getName();
 
-    /** Return cache infos for this cache provider */
-    default List<CacheInfo> getCaches()
+    /** Return size of cache */
+    int getSize();
+
+    /** Return cache hits */
+    int getCacheHits();
+
+    /** Return cache stale hits */
+    int getCacheStaleHits();
+
+    /** Return cache misses */
+    int getCacheMisses();
+
+    /** Flush cache */
+    void flush();
+
+    /** Flush key from cache */
+    void flush(Object key);
+
+    /** Return the cache hit ratio */
+    default float getCacheHitRatio()
     {
-        return emptyList();
+        return (float) getCacheHits() / (getCacheHits() + getCacheMisses());
+    }
+
+    /** Return the cache miss ratio */
+    default float getCacheMissRatio()
+    {
+        return (float) getCacheMisses() / (getCacheHits() + getCacheMisses());
     }
 
     /**
-     * Return cache entry infos for this cache provider
-     *
-     * @param cacheName Name of cache to return entry infos for
+     * Return cache entry infos for this cache
      */
-    default List<CacheEntryInfo> getCacheEntries(QualifiedName cacheName)
-    {
-        return emptyList();
-    }
-
-    /** Flush all caches in this provider */
-    void flushAll();
-
-    /** Flush cache with provided name */
-    void flush(QualifiedName name);
-
-    /** Flush key from cache with provided name */
-    void flush(QualifiedName name, Object key);
-
-    /** Remove all caches from this provider */
-    void removeAll();
-
-    /** Remove cache with provided name from this provider */
-    void remove(QualifiedName name);
+    List<CacheEntry> getCacheEntries();
 
     /** Info about a cache entry */
-    class CacheEntryInfo
+    interface CacheEntry
     {
-        private final Object key;
-        private final ZonedDateTime expireTime;
+        /** Return the cache key */
+        Object getKey();
 
-        public CacheEntryInfo(Object key, ZonedDateTime expireTime)
-        {
-            this.key = key;
-            this.expireTime = expireTime;
-        }
-
-        public Object getKey()
-        {
-            return key;
-        }
-
-        public ZonedDateTime getExpireTime()
-        {
-            return expireTime;
-        }
+        /** Return the expire time */
+        ZonedDateTime getExpireTime();
     }
 }

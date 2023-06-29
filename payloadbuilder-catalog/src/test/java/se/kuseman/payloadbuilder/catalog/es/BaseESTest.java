@@ -2,7 +2,6 @@ package se.kuseman.payloadbuilder.catalog.es;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
-import static java.util.Collections.emptySet;
 import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -13,24 +12,24 @@ import static se.kuseman.payloadbuilder.catalog.TestUtils.mockExecutionContext;
 import static se.kuseman.payloadbuilder.catalog.TestUtils.mockOptions;
 import static se.kuseman.payloadbuilder.catalog.TestUtils.mockSortItem;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
-import static se.kuseman.payloadbuilder.test.VectorTestUtils.nvv;
+import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpDelete;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpPut;
-import org.apache.http.client.methods.HttpRequestBase;
-import org.apache.http.entity.StringEntity;
+import org.apache.hc.client5.http.classic.methods.HttpDelete;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.classic.methods.HttpPut;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -50,16 +49,15 @@ import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.SeekType;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.INamedExpression;
-import se.kuseman.payloadbuilder.api.utils.VectorUtils;
 import se.kuseman.payloadbuilder.catalog.TestUtils;
 import se.kuseman.payloadbuilder.catalog.es.ElasticsearchMeta.Version;
 import se.kuseman.payloadbuilder.test.IPredicateMock;
@@ -102,14 +100,17 @@ abstract class BaseESTest extends Assert
     public void setup() throws IOException
     {
         HttpGet mappings = new HttpGet(endpoint + "/_mappings");
-        Set<String> indices = emptySet();
-        try (CloseableHttpResponse response = HttpClientUtils.execute("", mappings, null, null, null, null, null, null))
+        // Set<String> indices = emptySet();
+
+        Set<String> indices = HttpClientUtils.execute("", mappings, null, null, null, null, null, null, response ->
         {
             @SuppressWarnings("unchecked")
             Map<String, Object> m = MAPPER.readValue(response.getEntity()
                     .getContent(), Map.class);
-            indices = m.keySet();
-        }
+            return m.keySet();
+        });
+
+        System.out.println(getClass().getSimpleName() + " deleting indices: " + indices);
 
         for (String index : indices)
         {
@@ -119,18 +120,18 @@ abstract class BaseESTest extends Assert
             }
 
             HttpDelete delete = new HttpDelete(endpoint + "/" + index);
-            try (CloseableHttpResponse response = HttpClientUtils.execute("", delete, null, null, null, null, null, null))
+
+            HttpClientUtils.execute("", delete, null, null, null, null, null, null, response ->
             {
-                if (!(response.getStatusLine()
-                        .getStatusCode() >= 200
-                        && response.getStatusLine()
-                                .getStatusCode() < 299))
+                if (!(response.getCode() >= 200
+                        && response.getCode() < 299))
                 {
                     String error = IOUtils.toString(response.getEntity()
                             .getContent(), StandardCharsets.UTF_8);
                     throw new RuntimeException("Error index document: " + error);
                 }
-            }
+                return null;
+            });
         }
     }
 
@@ -149,7 +150,7 @@ abstract class BaseESTest extends Assert
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, data);
 
         List<ISortItem> sortItems = new ArrayList<>(asList(mockSortItem(QualifiedName.of("key"))));
-        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("_doc"), new DatasourceData(0, emptyList(), sortItems, emptyList()));
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("_doc"), new DatasourceData(0, Optional.empty(), emptyList(), sortItems, emptyList()));
         IDatasourceOptions options = mockOptions(500);
 
         // Verify that sort items are consumed
@@ -172,11 +173,11 @@ abstract class BaseESTest extends Assert
                     ), v.getSchema());
             //@formatter:on
 
-            assertVectorsEquals(nvv(Type.Any, INDEX, INDEX), v.getColumn(0));
-            assertVectorsEquals(nvv(Type.Any, "type1", "type2"), v.getColumn(1));
-            assertVectorsEquals(nvv(Type.Any, "001", "002"), v.getColumn(2));
+            assertVectorsEquals(vv(Type.Any, INDEX, INDEX), v.getColumn(0));
+            assertVectorsEquals(vv(Type.Any, "type1", "type2"), v.getColumn(1));
+            assertVectorsEquals(vv(Type.Any, "001", "002"), v.getColumn(2));
             assertVectorIsMap(v.getColumn(3), 2);
-            assertVectorsEquals(nvv(Type.Any, 123, 456), v.getColumn(4));
+            assertVectorsEquals(vv(Type.Any, 123, 456), v.getColumn(4));
         }
         it.close();
 
@@ -194,7 +195,8 @@ abstract class BaseESTest extends Assert
         }
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, new ESDatasource.Data());
 
-        IDatasource ds = catalog.getSystemTableDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("tables"), new DatasourceData(0, emptyList(), emptyList(), emptyList()));
+        IDatasource ds = catalog.getSystemTableDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("tables"),
+                new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList()));
         IDatasourceOptions options = mockOptions(500);
 
         TupleIterator it = ds.execute(context, options);
@@ -214,12 +216,12 @@ abstract class BaseESTest extends Assert
             if (version.getStrategy()
                     .supportsTypes())
             {
-                assertVectorsEquals(nvv(Type.String, ESCatalog.SINGLE_TYPE_TABLE_NAME, type), v.getColumn(0));
+                assertVectorsEquals(vv(Type.String, ESCatalog.SINGLE_TYPE_TABLE_NAME, type), v.getColumn(0));
                 assertVectorIsMap(v.getColumn(1), 2);
             }
             else
             {
-                assertVectorsEquals(nvv(Type.String, ESCatalog.SINGLE_TYPE_TABLE_NAME), v.getColumn(0));
+                assertVectorsEquals(vv(Type.String, ESCatalog.SINGLE_TYPE_TABLE_NAME), v.getColumn(0));
                 assertVectorIsMap(v.getColumn(1), 1);
             }
         }
@@ -239,7 +241,8 @@ abstract class BaseESTest extends Assert
         }
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, new ESDatasource.Data());
 
-        IDatasource ds = catalog.getSystemTableDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("indices"), new DatasourceData(0, emptyList(), emptyList(), emptyList()));
+        IDatasource ds = catalog.getSystemTableDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("indices"),
+                new DatasourceData(0, Optional.of(ESCatalog.INDICES_SCHEMA.getSchema()), emptyList(), emptyList(), emptyList()));
         IDatasourceOptions options = mockOptions(500);
 
         TupleIterator it = ds.execute(context, options);
@@ -249,12 +252,7 @@ abstract class BaseESTest extends Assert
             TupleVector v = it.next();
             rowCount += v.getRowCount();
 
-            //@formatter:off
-            assertEquals(Schema.of(
-                    Column.of("table", Type.String),
-                    Column.of("columns", Type.Any)
-                    ), v.getSchema());
-            //@formatter:on
+            assertEquals(ESCatalog.INDICES_SCHEMA.getSchema(), v.getSchema());
 
             // Special case for 1.x and 2.x since those doesn't auto create
             // fields to string values that is not analyzed and hence
@@ -262,19 +260,19 @@ abstract class BaseESTest extends Assert
             if (version == Version._1X
                     || version == Version._2X)
             {
-                assertVectorsEquals(nvv(Type.String, ESCatalog.SINGLE_TYPE_TABLE_NAME, ESCatalog.SINGLE_TYPE_TABLE_NAME, type, type), v.getColumn(0));
-                assertVectorsEquals(nvv(Type.Any, asList("__id"), asList("key"), asList("__id"), asList("key")), v.getColumn(1));
+                assertVectorsEquals(vv(Type.String, ESCatalog.SINGLE_TYPE_TABLE_NAME, ESCatalog.SINGLE_TYPE_TABLE_NAME, type, type), v.getColumn(0));
+                assertVectorsEquals(vv(Type.Any, asList("__id"), asList("key"), asList("__id"), asList("key")), v.getColumn(1));
             }
             else if (version.getStrategy()
                     .supportsTypes())
             {
-                assertVectorsEquals(nvv(Type.String, ESCatalog.SINGLE_TYPE_TABLE_NAME, ESCatalog.SINGLE_TYPE_TABLE_NAME, ESCatalog.SINGLE_TYPE_TABLE_NAME, type, type, type), v.getColumn(0));
-                assertVectorsEquals(nvv(Type.Any, asList("__id"), asList("key2"), asList("key"), asList("__id"), asList("key2"), asList("key")), v.getColumn(1));
+                assertVectorsEquals(vv(Type.String, ESCatalog.SINGLE_TYPE_TABLE_NAME, ESCatalog.SINGLE_TYPE_TABLE_NAME, ESCatalog.SINGLE_TYPE_TABLE_NAME, type, type, type), v.getColumn(0));
+                assertVectorsEquals(vv(Type.Any, asList("__id"), asList("key2"), asList("key"), asList("__id"), asList("key2"), asList("key")), v.getColumn(1));
             }
             else
             {
-                assertVectorsEquals(nvv(Type.String, ESCatalog.SINGLE_TYPE_TABLE_NAME, ESCatalog.SINGLE_TYPE_TABLE_NAME, ESCatalog.SINGLE_TYPE_TABLE_NAME), v.getColumn(0));
-                assertVectorsEquals(nvv(Type.Any, asList("__id"), asList("key2"), asList("key")), v.getColumn(1));
+                assertVectorsEquals(vv(Type.String, ESCatalog.SINGLE_TYPE_TABLE_NAME, ESCatalog.SINGLE_TYPE_TABLE_NAME, ESCatalog.SINGLE_TYPE_TABLE_NAME), v.getColumn(0));
+                assertVectorsEquals(vv(Type.Any, asList("__id"), asList("key2"), asList("key")), v.getColumn(1));
             }
         }
 
@@ -304,7 +302,8 @@ abstract class BaseESTest extends Assert
         }
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, new ESDatasource.Data());
 
-        IDatasource ds = catalog.getSystemTableDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("columns"), new DatasourceData(0, emptyList(), emptyList(), emptyList()));
+        IDatasource ds = catalog.getSystemTableDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("columns"),
+                new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList()));
         IDatasourceOptions options = mockOptions(500);
 
         TupleIterator it = ds.execute(context, options);
@@ -326,13 +325,13 @@ abstract class BaseESTest extends Assert
             if (version.getStrategy()
                     .supportsTypes())
             {
-                assertVectorsEquals(nvv(Type.String, ESCatalog.SINGLE_TYPE_TABLE_NAME, ESCatalog.SINGLE_TYPE_TABLE_NAME, type, type), v.getColumn(0));
-                assertVectorsEquals(nvv(Type.String, "key", "key2", "key", "key2"), v.getColumn(1));
+                assertVectorsEquals(vv(Type.String, ESCatalog.SINGLE_TYPE_TABLE_NAME, ESCatalog.SINGLE_TYPE_TABLE_NAME, type, type), v.getColumn(0));
+                assertVectorsEquals(vv(Type.String, "key", "key2", "key", "key2"), v.getColumn(1));
             }
             else
             {
-                assertVectorsEquals(nvv(Type.String, ESCatalog.SINGLE_TYPE_TABLE_NAME, ESCatalog.SINGLE_TYPE_TABLE_NAME), v.getColumn(0));
-                assertVectorsEquals(nvv(Type.String, "key", "key2"), v.getColumn(1));
+                assertVectorsEquals(vv(Type.String, ESCatalog.SINGLE_TYPE_TABLE_NAME, ESCatalog.SINGLE_TYPE_TABLE_NAME), v.getColumn(0));
+                assertVectorsEquals(vv(Type.String, "key", "key2"), v.getColumn(1));
             }
         }
         assertEquals(version.getStrategy()
@@ -351,16 +350,16 @@ abstract class BaseESTest extends Assert
             index(endpoint, INDEX, type, MAPPER.writeValueAsString(p.getValue()), p.getKey());
         }
 
-        SearchFunction f = new SearchFunction(catalog);
+        SearchFunction f = new SearchFunction();
 
         INamedExpression body = mock(INamedExpression.class);
         when(body.getName()).thenReturn("body");
-        when(body.eval(any())).thenReturn(ValueVector.literalObject(ResolvedType.of(Type.String), "{ \"sort\": \"key\" }"));
-        when(body.eval(any(), any())).thenReturn(ValueVector.literalObject(ResolvedType.of(Type.String), "{ \"sort\": \"key\" }"));
+        when(body.eval(any())).thenReturn(ValueVector.literalString("{ \"sort\": \"key\" }", 1));
+        when(body.eval(any(), any())).thenReturn(ValueVector.literalString("{ \"sort\": \"key\" }", 1));
 
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, new ESDatasource.Data());
 
-        TupleIterator it = f.execute(context, CATALOG_ALIAS, asList(body), mockOptions(500));
+        TupleIterator it = f.execute(context, CATALOG_ALIAS, Optional.empty(), asList(body), mockOptions(500));
 
         int rowCount = 0;
         while (it.hasNext())
@@ -382,33 +381,70 @@ abstract class BaseESTest extends Assert
             index(endpoint, INDEX, type, MAPPER.writeValueAsString(p.getValue()), p.getKey());
         }
 
-        SearchFunction f = new SearchFunction(catalog);
+        SearchFunction f = new SearchFunction();
 
         INamedExpression body = mock(INamedExpression.class);
         when(body.getName()).thenReturn("body");
-        when(body.eval(any())).thenReturn(ValueVector.literalObject(ResolvedType.of(Type.String), "{ \"sort\": \"key\" }"));
-        when(body.eval(any(), any())).thenReturn(ValueVector.literalObject(ResolvedType.of(Type.String), "{ \"sort\": \"key\" }"));
+        when(body.eval(any())).thenReturn(ValueVector.literalString("{ \"sort\": \"key\" }", 1));
+        when(body.eval(any(), any())).thenReturn(ValueVector.literalString("{ \"sort\": \"key\" }", 1));
         INamedExpression scroll = mock(INamedExpression.class);
         when(scroll.getName()).thenReturn("scroll");
-        when(scroll.eval(any())).thenReturn(ValueVector.literalObject(ResolvedType.of(Type.Boolean), true));
-        when(scroll.eval(any(), any())).thenReturn(ValueVector.literalObject(ResolvedType.of(Type.Boolean), true));
+        when(scroll.eval(any())).thenReturn(ValueVector.literalBoolean(true, 1));
+        when(scroll.eval(any(), any())).thenReturn(ValueVector.literalBoolean(true, 1));
 
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, new ESDatasource.Data());
 
-        TupleIterator it = f.execute(context, CATALOG_ALIAS, asList(body, scroll), mockOptions(2));
-
-        List<TupleVector> vectors = new ArrayList<>();
+        TupleIterator it = f.execute(context, CATALOG_ALIAS, Optional.empty(), asList(body, scroll), mockOptions(2));
 
         int batchCount = 0;
         int rowCount = 0;
         while (it.hasNext())
         {
             TupleVector v = it.next();
+
+            if (batchCount == 0)
+            {
+                // First batch should not contain key2
+                //@formatter:off
+                assertEquals(Schema.of(
+                        Column.of("__index", Type.Any),
+                        Column.of("__type", Type.Any),
+                        Column.of("__id", Type.Any),
+                        Column.of("__meta", Type.Any),
+                        Column.of("key", Type.Any)
+                        ), v.getSchema());
+                //@formatter:on
+
+                assertVectorsEquals(vv(Type.Any, INDEX, INDEX), v.getColumn(0));
+                assertVectorsEquals(getTypeColumnExpected(2), v.getColumn(1));
+                assertVectorsEquals(vv(Type.Any, "001", "002"), v.getColumn(2));
+                assertVectorIsMap(v.getColumn(3), 2);
+                assertVectorsEquals(vv(Type.Any, 123, 456), v.getColumn(4));
+            }
+            else
+            {
+                // Second batch have both key and key2
+                //@formatter:off
+                assertEquals(Schema.of(
+                        Column.of("__index", Type.Any),
+                        Column.of("__type", Type.Any),
+                        Column.of("__id", Type.Any),
+                        Column.of("__meta", Type.Any),
+                        Column.of("key", Type.Any),
+                        Column.of("key2", Type.Any)
+                        ), v.getSchema());
+                //@formatter:on
+
+                assertVectorsEquals(vv(Type.Any, INDEX), v.getColumn(0));
+                assertVectorsEquals(getTypeColumnExpected(1), v.getColumn(1));
+                assertVectorsEquals(vv(Type.Any, "003"), v.getColumn(2));
+                assertVectorIsMap(v.getColumn(3), 1);
+                assertVectorsEquals(vv(Type.Any, 789), v.getColumn(4));
+                assertVectorsEquals(vv(Type.Any, "some string"), v.getColumn(5));
+            }
             batchCount++;
             rowCount += v.getRowCount();
-            vectors.add(v);
         }
-        assertScan(VectorUtils.merge(vectors));
         assertEquals(2, batchCount);
         assertEquals(3, rowCount);
     }
@@ -423,33 +459,71 @@ abstract class BaseESTest extends Assert
             index(endpoint, INDEX, type, MAPPER.writeValueAsString(p.getValue()), p.getKey());
         }
 
-        SearchFunction f = new SearchFunction(catalog);
+        SearchFunction f = new SearchFunction();
 
         INamedExpression body = mock(INamedExpression.class);
         when(body.getName()).thenReturn("body");
-        when(body.eval(any())).thenReturn(ValueVector.literalObject(ResolvedType.of(Type.String), "{ \"sort\": \"key\", \"size\": 2 }"));
-        when(body.eval(any(), any())).thenReturn(ValueVector.literalObject(ResolvedType.of(Type.String), "{ \"sort\": \"key\", \"size\": 2 }"));
+        when(body.eval(any())).thenReturn(ValueVector.literalString("{ \"sort\": \"key\", \"size\": 2 }", 1));
+        when(body.eval(any(), any())).thenReturn(ValueVector.literalString("{ \"sort\": \"key\", \"size\": 2 }", 1));
         INamedExpression scroll = mock(INamedExpression.class);
         when(scroll.getName()).thenReturn("scroll");
-        when(scroll.eval(any())).thenReturn(ValueVector.literalObject(ResolvedType.of(Type.Boolean), true));
-        when(scroll.eval(any(), any())).thenReturn(ValueVector.literalObject(ResolvedType.of(Type.Boolean), true));
+        when(scroll.eval(any())).thenReturn(ValueVector.literalBoolean(true, 1));
+        when(scroll.eval(any(), any())).thenReturn(ValueVector.literalBoolean(true, 1));
 
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, new ESDatasource.Data());
 
-        TupleIterator it = f.execute(context, CATALOG_ALIAS, asList(body, scroll), mockOptions(500));
-
-        List<TupleVector> vectors = new ArrayList<>();
+        TupleIterator it = f.execute(context, CATALOG_ALIAS, Optional.empty(), asList(body, scroll), mockOptions(500));
 
         int batchCount = 0;
         int rowCount = 0;
         while (it.hasNext())
         {
             TupleVector v = it.next();
+
+            if (batchCount == 0)
+            {
+                // First batch should not contain key2
+                //@formatter:off
+                assertEquals(Schema.of(
+                        Column.of("__index", Type.Any),
+                        Column.of("__type", Type.Any),
+                        Column.of("__id", Type.Any),
+                        Column.of("__meta", Type.Any),
+                        Column.of("key", Type.Any)
+                        ), v.getSchema());
+                //@formatter:on
+
+                assertVectorsEquals(vv(Type.Any, INDEX, INDEX), v.getColumn(0));
+                assertVectorsEquals(getTypeColumnExpected(2), v.getColumn(1));
+                assertVectorsEquals(vv(Type.Any, "001", "002"), v.getColumn(2));
+                assertVectorIsMap(v.getColumn(3), 2);
+                assertVectorsEquals(vv(Type.Any, 123, 456), v.getColumn(4));
+            }
+            else
+            {
+                // Second batch have both key and key2
+                //@formatter:off
+                assertEquals(Schema.of(
+                        Column.of("__index", Type.Any),
+                        Column.of("__type", Type.Any),
+                        Column.of("__id", Type.Any),
+                        Column.of("__meta", Type.Any),
+                        Column.of("key", Type.Any),
+                        Column.of("key2", Type.Any)
+                        ), v.getSchema());
+                //@formatter:on
+
+                assertVectorsEquals(vv(Type.Any, INDEX), v.getColumn(0));
+                assertVectorsEquals(getTypeColumnExpected(1), v.getColumn(1));
+                assertVectorsEquals(vv(Type.Any, "003"), v.getColumn(2));
+                assertVectorIsMap(v.getColumn(3), 1);
+                assertVectorsEquals(vv(Type.Any, 789), v.getColumn(4));
+                assertVectorsEquals(vv(Type.Any, "some string"), v.getColumn(5));
+            }
+
             batchCount++;
             rowCount += v.getRowCount();
-            vectors.add(v);
         }
-        assertScan(VectorUtils.merge(vectors));
         assertEquals(2, batchCount);
         assertEquals(3, rowCount);
     }
@@ -457,12 +531,12 @@ abstract class BaseESTest extends Assert
     @Test
     public void test_cat()
     {
-        CatFunction f = new CatFunction(catalog);
+        CatFunction f = new CatFunction();
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", "")), 0, new ESDatasource.Data());
         IExpression catSpecArg = mock(IExpression.class);
         when(catSpecArg.eval(context)).thenReturn(VectorTestUtils.vv(Type.String, "/nodes"));
 
-        TupleIterator it = f.execute(context, CATALOG_ALIAS, asList(catSpecArg), mockOptions(500));
+        TupleIterator it = f.execute(context, CATALOG_ALIAS, Optional.empty(), asList(catSpecArg), mockOptions(500));
         int count = 0;
         while (it.hasNext())
         {
@@ -554,7 +628,7 @@ abstract class BaseESTest extends Assert
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(version.getStrategy()
                 .supportsTypes() ? type
                         : ESCatalog.SINGLE_TYPE_TABLE_NAME),
-                new DatasourceData(0, predicates, sortItems, emptyList()));
+                new DatasourceData(0, Optional.empty(), predicates, sortItems, emptyList()));
         IDatasourceOptions options = mockOptions(500);
 
         assertTrue(sortItems.isEmpty());
@@ -565,7 +639,7 @@ abstract class BaseESTest extends Assert
         {
             TupleVector v = it.next();
             rowCount += v.getRowCount();
-            assertVectorsEquals(nvv(Type.Any, "003", "002", "001"), v.getColumn(2));
+            assertVectorsEquals(vv(Type.Any, "003", "002", "001"), v.getColumn(2));
         }
         it.close();
 
@@ -586,7 +660,7 @@ abstract class BaseESTest extends Assert
         ESDatasource.Data data = new ESDatasource.Data();
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, data);
         ISeekPredicate seekPredicate = mockSeekPrecidate(context, "key", 123, null); // Null values should be excluded
-        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, emptyList(), emptyList(), emptyList()));
+        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList()));
         IDatasourceOptions options = mockOptions(500);
 
         TupleIterator it = ds.execute(context, options);
@@ -606,15 +680,15 @@ abstract class BaseESTest extends Assert
                     ), v.getSchema());
             //@formatter:on
 
-            assertVectorsEquals(nvv(Type.Any, INDEX), v.getColumn(0));
+            assertVectorsEquals(vv(Type.Any, INDEX), v.getColumn(0));
             assertVectorsEquals(getTypeColumnExpected(1), v.getColumn(1));
-            assertVectorsEquals(nvv(Type.Any, "001"), v.getColumn(2));
+            assertVectorsEquals(vv(Type.Any, "001"), v.getColumn(2));
             assertVectorIsMap(v.getColumn(3), 1);
-            assertVectorsEquals(nvv(Type.Any, 123), v.getColumn(4));
+            assertVectorsEquals(vv(Type.Any, 123), v.getColumn(4));
         }
         it.close();
 
-        assertEquals(data.requestCount, 1);
+        assertEquals(data.requestCount, 3);
         assertEquals(1, rowCount);
     }
 
@@ -631,7 +705,7 @@ abstract class BaseESTest extends Assert
         ESDatasource.Data data = new ESDatasource.Data();
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, data);
         ISeekPredicate seekPredicate = mockSeekPrecidate(context, "__id", "001", null); // Null values should be excluded
-        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, emptyList(), emptyList(), emptyList()));
+        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList()));
         IDatasourceOptions options = mockOptions(500);
 
         TupleIterator it = ds.execute(context, options);
@@ -651,11 +725,11 @@ abstract class BaseESTest extends Assert
                     ), v.getSchema());
             //@formatter:on
 
-            assertVectorsEquals(nvv(Type.Any, INDEX), v.getColumn(0));
+            assertVectorsEquals(vv(Type.Any, INDEX), v.getColumn(0));
             assertVectorsEquals(getTypeColumnExpected(1), v.getColumn(1));
-            assertVectorsEquals(nvv(Type.Any, "001"), v.getColumn(2));
+            assertVectorsEquals(vv(Type.Any, "001"), v.getColumn(2));
             assertVectorIsMap(v.getColumn(3), 1);
-            assertVectorsEquals(nvv(Type.Any, 123), v.getColumn(4));
+            assertVectorsEquals(vv(Type.Any, 123), v.getColumn(4));
         }
         it.close();
 
@@ -676,7 +750,7 @@ abstract class BaseESTest extends Assert
         ESDatasource.Data data = new ESDatasource.Data();
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, data);
         ISeekPredicate seekPredicate = mockSeekPrecidate(context, "key", 123, 456);
-        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, emptyList(), emptyList(), emptyList()));
+        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList()));
         // Size 1 => 2 batches
         IDatasourceOptions options = mockOptions(1);
 
@@ -701,19 +775,19 @@ abstract class BaseESTest extends Assert
 
             if (batchCount == 1)
             {
-                assertVectorsEquals(nvv(Type.Any, INDEX), v.getColumn(0));
+                assertVectorsEquals(vv(Type.Any, INDEX), v.getColumn(0));
                 assertVectorsEquals(getTypeColumnExpected(1), v.getColumn(1));
-                assertVectorsEquals(nvv(Type.Any, "001"), v.getColumn(2));
+                assertVectorsEquals(vv(Type.Any, "001"), v.getColumn(2));
                 assertVectorIsMap(v.getColumn(3), 1);
-                assertVectorsEquals(nvv(Type.Any, 123), v.getColumn(4));
+                assertVectorsEquals(vv(Type.Any, 123), v.getColumn(4));
             }
             else
             {
-                assertVectorsEquals(nvv(Type.Any, INDEX), v.getColumn(0));
+                assertVectorsEquals(vv(Type.Any, INDEX), v.getColumn(0));
                 assertVectorsEquals(getTypeColumnExpected(1), v.getColumn(1));
-                assertVectorsEquals(nvv(Type.Any, "002"), v.getColumn(2));
+                assertVectorsEquals(vv(Type.Any, "002"), v.getColumn(2));
                 assertVectorIsMap(v.getColumn(3), 1);
-                assertVectorsEquals(nvv(Type.Any, 456), v.getColumn(4));
+                assertVectorsEquals(vv(Type.Any, 456), v.getColumn(4));
             }
         }
         it.close();
@@ -738,7 +812,8 @@ abstract class BaseESTest extends Assert
         ESDatasource.Data data = new ESDatasource.Data();
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", "*")), 0, data);
         List<ISortItem> sortItems = new ArrayList<>(asList(mockSortItem(QualifiedName.of("__index"), Order.DESC)));
-        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(ESCatalog.SINGLE_TYPE_TABLE_NAME), new DatasourceData(0, emptyList(), sortItems, emptyList()));
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(ESCatalog.SINGLE_TYPE_TABLE_NAME),
+                new DatasourceData(0, Optional.empty(), emptyList(), sortItems, emptyList()));
         IDatasourceOptions options = mockOptions(500);
 
         // Verify that sort items are consumed
@@ -749,10 +824,11 @@ abstract class BaseESTest extends Assert
         while (it.hasNext())
         {
             TupleVector v = it.next();
+
             rowCount += v.getRowCount();
-            assertVectorsEquals(nvv(Type.Any, "test_003", "test_002", "test_001"), v.getColumn(0));
+            assertVectorsEquals(vv(Type.Any, "test_003", "test_002", "test_001"), v.getColumn(0));
             assertVectorsEquals(getTypeColumnExpected(3), v.getColumn(1));
-            assertVectorsEquals(nvv(Type.Any, "003", "002", "001"), v.getColumn(2));
+            assertVectorsEquals(vv(Type.Any, "003", "002", "001"), v.getColumn(2));
             assertVectorIsMap(v.getColumn(3), 3);
         }
         it.close();
@@ -780,7 +856,7 @@ abstract class BaseESTest extends Assert
 
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", "*")), 0, data);
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(ESCatalog.SINGLE_TYPE_TABLE_NAME),
-                new DatasourceData(0, predicates, emptyList(), emptyList()));
+                new DatasourceData(0, Optional.empty(), predicates, emptyList(), emptyList()));
         IDatasourceOptions options = mockOptions(500);
 
         // Verify that predicates are consumed
@@ -793,9 +869,9 @@ abstract class BaseESTest extends Assert
             TupleVector v = it.next();
 
             rowCount += v.getRowCount();
-            assertVectorsEquals(nvv(Type.Any, "test_002"), v.getColumn(0));
+            assertVectorsEquals(vv(Type.Any, "test_002"), v.getColumn(0));
             assertVectorsEquals(getTypeColumnExpected(1), v.getColumn(1));
-            assertVectorsEquals(nvv(Type.Any, "002"), v.getColumn(2));
+            assertVectorsEquals(vv(Type.Any, "002"), v.getColumn(2));
             assertVectorIsMap(v.getColumn(3), 1);
         }
         it.close();
@@ -819,7 +895,7 @@ abstract class BaseESTest extends Assert
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, data);
 
         List<IPredicate> predicates = new ArrayList<>(asList(IPredicateMock.eq("__type", "type2")));
-        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("_doc"), new DatasourceData(0, predicates, emptyList(), emptyList()));
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("_doc"), new DatasourceData(0, Optional.empty(), predicates, emptyList(), emptyList()));
         IDatasourceOptions options = mockOptions(500);
 
         // Verify that predicates are consumed
@@ -842,11 +918,11 @@ abstract class BaseESTest extends Assert
                     ), v.getSchema());
             //@formatter:on
 
-            assertVectorsEquals(nvv(Type.Any, INDEX), v.getColumn(0));
-            assertVectorsEquals(nvv(Type.Any, "type2"), v.getColumn(1));
-            assertVectorsEquals(nvv(Type.Any, "002"), v.getColumn(2));
+            assertVectorsEquals(vv(Type.Any, INDEX), v.getColumn(0));
+            assertVectorsEquals(vv(Type.Any, "type2"), v.getColumn(1));
+            assertVectorsEquals(vv(Type.Any, "002"), v.getColumn(2));
             assertVectorIsMap(v.getColumn(3), 1);
-            assertVectorsEquals(nvv(Type.Any, 456), v.getColumn(4));
+            assertVectorsEquals(vv(Type.Any, 456), v.getColumn(4));
         }
         it.close();
 
@@ -866,7 +942,7 @@ abstract class BaseESTest extends Assert
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, data);
 
         List<IPredicate> predicates = new ArrayList<>(asList(IPredicateMock.eq("__id", "002")));
-        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("_doc"), new DatasourceData(0, predicates, emptyList(), emptyList()));
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("_doc"), new DatasourceData(0, Optional.empty(), predicates, emptyList(), emptyList()));
         IDatasourceOptions options = mockOptions(500);
 
         // Verify that predicates are consumed
@@ -889,15 +965,15 @@ abstract class BaseESTest extends Assert
                     ), v.getSchema());
             //@formatter:on
 
-            assertVectorsEquals(nvv(Type.Any, INDEX), v.getColumn(0));
+            assertVectorsEquals(vv(Type.Any, INDEX), v.getColumn(0));
             assertVectorsEquals(getTypeColumnExpected(1), v.getColumn(1));
-            assertVectorsEquals(nvv(Type.Any, "002"), v.getColumn(2));
+            assertVectorsEquals(vv(Type.Any, "002"), v.getColumn(2));
             assertVectorIsMap(v.getColumn(3), 1);
-            assertVectorsEquals(nvv(Type.Any, 456), v.getColumn(4));
+            assertVectorsEquals(vv(Type.Any, 456), v.getColumn(4));
         }
         it.close();
 
-        assertEquals(3, data.requestCount);
+        assertEquals(1, data.requestCount);
         assertEquals(1, rowCount);
     }
 
@@ -916,7 +992,7 @@ abstract class BaseESTest extends Assert
 
         List<ISortItem> sortItems = new ArrayList<>(asList(mockSortItem(QualifiedName.of("key"))));
         List<IPredicate> predicates = new ArrayList<>(asList(IPredicateMock.in("__id", asList("002", "004"))));
-        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("_doc"), new DatasourceData(0, predicates, sortItems, emptyList()));
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("_doc"), new DatasourceData(0, Optional.empty(), predicates, sortItems, emptyList()));
         IDatasourceOptions options = mockOptions(500);
 
         // Verify that predicates/sort items are consumed
@@ -940,15 +1016,15 @@ abstract class BaseESTest extends Assert
                     ), v.getSchema());
             //@formatter:on
 
-            assertVectorsEquals(nvv(Type.Any, INDEX, INDEX), v.getColumn(0));
+            assertVectorsEquals(vv(Type.Any, INDEX, INDEX), v.getColumn(0));
             assertVectorsEquals(getTypeColumnExpected(2), v.getColumn(1));
-            assertVectorsEquals(nvv(Type.Any, "002", "004"), v.getColumn(2));
+            assertVectorsEquals(vv(Type.Any, "002", "004"), v.getColumn(2));
             assertVectorIsMap(v.getColumn(3), 2);
-            assertVectorsEquals(nvv(Type.Any, 456, 101112), v.getColumn(4));
+            assertVectorsEquals(vv(Type.Any, 456, 101112), v.getColumn(4));
         }
         it.close();
 
-        assertEquals(3, data.requestCount);
+        assertEquals(1, data.requestCount);
         assertEquals(2, rowCount);
     }
 
@@ -967,7 +1043,7 @@ abstract class BaseESTest extends Assert
 
         List<ISortItem> sortItems = new ArrayList<>(asList(mockSortItem(QualifiedName.of("key"))));
         List<IPredicate> predicates = new ArrayList<>(asList(IPredicateMock.notIn("__id", asList("001", "003"))));
-        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("_doc"), new DatasourceData(0, predicates, sortItems, emptyList()));
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of("_doc"), new DatasourceData(0, Optional.empty(), predicates, sortItems, emptyList()));
         IDatasourceOptions options = mockOptions(500);
 
         // Verify that predicates/sort items are consumed
@@ -991,11 +1067,11 @@ abstract class BaseESTest extends Assert
                     ), v.getSchema());
             //@formatter:on
 
-            assertVectorsEquals(nvv(Type.Any, INDEX, INDEX), v.getColumn(0));
+            assertVectorsEquals(vv(Type.Any, INDEX, INDEX), v.getColumn(0));
             assertVectorsEquals(getTypeColumnExpected(2), v.getColumn(1));
-            assertVectorsEquals(nvv(Type.Any, "002", "004"), v.getColumn(2));
+            assertVectorsEquals(vv(Type.Any, "002", "004"), v.getColumn(2));
             assertVectorIsMap(v.getColumn(3), 2);
-            assertVectorsEquals(nvv(Type.Any, 456, 101112), v.getColumn(4));
+            assertVectorsEquals(vv(Type.Any, 456, 101112), v.getColumn(4));
         }
         it.close();
 
@@ -1016,7 +1092,7 @@ abstract class BaseESTest extends Assert
         ESDatasource.Data data = new ESDatasource.Data();
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, data);
         ISeekPredicate seekPredicate = mockSeekPrecidate(context, "__id", "001", "002", "003");
-        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, emptyList(), emptyList(), emptyList()));
+        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList()));
         // Size 2 => 2 batches
         IDatasourceOptions options = mockOptions(2);
 
@@ -1042,11 +1118,11 @@ abstract class BaseESTest extends Assert
                         ), v.getSchema());
                 //@formatter:on
 
-                assertVectorsEquals(nvv(Type.Any, INDEX, INDEX), v.getColumn(0));
+                assertVectorsEquals(vv(Type.Any, INDEX, INDEX), v.getColumn(0));
                 assertVectorsEquals(getTypeColumnExpected(2), v.getColumn(1));
-                assertVectorsEquals(nvv(Type.Any, "001", "002"), v.getColumn(2));
+                assertVectorsEquals(vv(Type.Any, "001", "002"), v.getColumn(2));
                 assertVectorIsMap(v.getColumn(3), 2);
-                assertVectorsEquals(nvv(Type.Any, 123, 456), v.getColumn(4));
+                assertVectorsEquals(vv(Type.Any, 123, 456), v.getColumn(4));
             }
             else
             {
@@ -1061,12 +1137,12 @@ abstract class BaseESTest extends Assert
                         ), v.getSchema());
                 //@formatter:on
 
-                assertVectorsEquals(nvv(Type.Any, INDEX), v.getColumn(0));
+                assertVectorsEquals(vv(Type.Any, INDEX), v.getColumn(0));
                 assertVectorsEquals(getTypeColumnExpected(1), v.getColumn(1));
-                assertVectorsEquals(nvv(Type.Any, "003"), v.getColumn(2));
+                assertVectorsEquals(vv(Type.Any, "003"), v.getColumn(2));
                 assertVectorIsMap(v.getColumn(3), 1);
-                assertVectorsEquals(nvv(Type.Any, 789), v.getColumn(4));
-                assertVectorsEquals(nvv(Type.Any, "some string"), v.getColumn(5));
+                assertVectorsEquals(vv(Type.Any, 789), v.getColumn(4));
+                assertVectorsEquals(vv(Type.Any, "some string"), v.getColumn(5));
             }
         }
         it.close();
@@ -1093,7 +1169,7 @@ abstract class BaseESTest extends Assert
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(version.getStrategy()
                 .supportsTypes() ? type
                         : ESCatalog.SINGLE_TYPE_TABLE_NAME),
-                new DatasourceData(0, emptyList(), sortItems, emptyList()));
+                new DatasourceData(0, Optional.empty(), emptyList(), sortItems, emptyList()));
         IDatasourceOptions options = TestUtils.mockOptions(500);
 
         // Verify that sort items are consumed
@@ -1132,7 +1208,7 @@ abstract class BaseESTest extends Assert
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(version.getStrategy()
                 .supportsTypes() ? type
                         : ESCatalog.SINGLE_TYPE_TABLE_NAME),
-                new DatasourceData(0, emptyList(), sortItems, emptyList()));
+                new DatasourceData(0, Optional.empty(), emptyList(), sortItems, emptyList()));
         // Size 2 => 2 batches
         IDatasourceOptions options = mockOptions(2);
 
@@ -1161,11 +1237,11 @@ abstract class BaseESTest extends Assert
                         ), v.getSchema());
                 //@formatter:on
 
-                assertVectorsEquals(nvv(Type.Any, INDEX, INDEX), v.getColumn(0));
+                assertVectorsEquals(vv(Type.Any, INDEX, INDEX), v.getColumn(0));
                 assertVectorsEquals(getTypeColumnExpected(2), v.getColumn(1));
-                assertVectorsEquals(nvv(Type.Any, "001", "002"), v.getColumn(2));
+                assertVectorsEquals(vv(Type.Any, "001", "002"), v.getColumn(2));
                 assertVectorIsMap(v.getColumn(3), 2);
-                assertVectorsEquals(nvv(Type.Any, 123, 456), v.getColumn(4));
+                assertVectorsEquals(vv(Type.Any, 123, 456), v.getColumn(4));
             }
             else
             {
@@ -1180,12 +1256,12 @@ abstract class BaseESTest extends Assert
                         ), v.getSchema());
                 //@formatter:on
 
-                assertVectorsEquals(nvv(Type.Any, INDEX), v.getColumn(0));
+                assertVectorsEquals(vv(Type.Any, INDEX), v.getColumn(0));
                 assertVectorsEquals(getTypeColumnExpected(1), v.getColumn(1));
-                assertVectorsEquals(nvv(Type.Any, "003"), v.getColumn(2));
+                assertVectorsEquals(vv(Type.Any, "003"), v.getColumn(2));
                 assertVectorIsMap(v.getColumn(3), 1);
-                assertVectorsEquals(nvv(Type.Any, 789), v.getColumn(4));
-                assertVectorsEquals(nvv(Type.Any, "some string"), v.getColumn(5));
+                assertVectorsEquals(vv(Type.Any, 789), v.getColumn(4));
+                assertVectorsEquals(vv(Type.Any, "some string"), v.getColumn(5));
             }
         }
         it.close();
@@ -1214,12 +1290,12 @@ abstract class BaseESTest extends Assert
                 ), v.getSchema());
         //@formatter:on
 
-        assertVectorsEquals(nvv(Type.Any, INDEX, INDEX, INDEX), v.getColumn(0));
+        assertVectorsEquals(vv(Type.Any, INDEX, INDEX, INDEX), v.getColumn(0));
         assertVectorsEquals(getTypeColumnExpected(3), v.getColumn(1));
-        assertVectorsEquals(nvv(Type.Any, "001", "002", "003"), v.getColumn(2));
+        assertVectorsEquals(vv(Type.Any, "001", "002", "003"), v.getColumn(2));
         assertVectorIsMap(v.getColumn(3), 3);
-        assertVectorsEquals(nvv(Type.Any, 123, 456, 789), v.getColumn(4));
-        assertVectorsEquals(nvv(Type.Any, null, null, "some string"), v.getColumn(5));
+        assertVectorsEquals(vv(Type.Any, 123, 456, 789), v.getColumn(4));
+        assertVectorsEquals(vv(Type.Any, null, null, "some string"), v.getColumn(5));
     }
 
     private void assertVectorIsMap(ValueVector v, int expectedSize)
@@ -1260,7 +1336,7 @@ abstract class BaseESTest extends Assert
             }
 
             @Override
-            public Object getValue(int row)
+            public Object getAny(int row)
             {
                 return type;
             }
@@ -1279,23 +1355,23 @@ abstract class BaseESTest extends Assert
         {
             put.setEntity(new StringEntity(MAPPER.writeValueAsString(body), StandardCharsets.UTF_8));
         }
-        try (CloseableHttpResponse response = HttpClientUtils.execute("", put, null, null, null, null, null, null))
+
+        HttpClientUtils.execute("", put, null, null, null, null, null, null, response ->
         {
-            if (!(response.getStatusLine()
-                    .getStatusCode() >= 200
-                    && response.getStatusLine()
-                            .getStatusCode() < 299))
+            if (!(response.getCode() >= 200
+                    && response.getCode() < 299))
             {
                 String error = IOUtils.toString(response.getEntity()
                         .getContent(), StandardCharsets.UTF_8);
                 throw new RuntimeException("Error creating index: " + error);
             }
-        }
+            return null;
+        });
     }
 
     protected void index(String endpoint, String index, String type, String source, String id) throws IOException
     {
-        HttpRequestBase req;
+        ClassicHttpRequest req;
         if (id == null)
         {
             HttpPost post = new HttpPost(endpoint + "/" + index + "/" + type + "?refresh=true");
@@ -1306,22 +1382,22 @@ abstract class BaseESTest extends Assert
         {
             req = createIndexRequest(endpoint, index, type, id, source);
         }
-        try (CloseableHttpResponse response = HttpClientUtils.execute("", req, null, null, null, null, null, null))
+
+        HttpClientUtils.execute("", req, null, null, null, null, null, null, response ->
         {
-            if (!(response.getStatusLine()
-                    .getStatusCode() >= 200
-                    && response.getStatusLine()
-                            .getStatusCode() < 299))
+            if (!(response.getCode() >= 200
+                    && response.getCode() < 299))
             {
                 String error = IOUtils.toString(response.getEntity()
                         .getContent(), StandardCharsets.UTF_8);
                 throw new RuntimeException("Error index document: " + error);
             }
-        }
+            return null;
+        });
     }
 
     /** Return index url */
-    protected HttpRequestBase createIndexRequest(String endpoint, String index, String type, String id, String source)
+    protected ClassicHttpRequest createIndexRequest(String endpoint, String index, String type, String id, String source)
     {
         HttpPut put = new HttpPut(endpoint + "/" + index + "/" + type + "/" + id + "?refresh=true");
         put.setEntity(new StringEntity(source, StandardCharsets.UTF_8));
@@ -1348,7 +1424,7 @@ abstract class BaseESTest extends Assert
         ISeekPredicate.ISeekKey seekKey = mock(ISeekPredicate.ISeekKey.class);
         when(seekPredicate.getSeekKeys(any(IExecutionContext.class))).thenReturn(asList(seekKey));
         when(seekKey.getType()).thenReturn(SeekType.EQ);
-        when(seekKey.getValue()).thenReturn(ValueVector.literalObject(ResolvedType.of(Type.String), values));
+        when(seekKey.getValue()).thenReturn(ValueVector.literalAny(values));
 
         return seekPredicate;
     }

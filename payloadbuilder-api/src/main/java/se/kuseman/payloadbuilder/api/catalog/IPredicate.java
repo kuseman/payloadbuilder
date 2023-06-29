@@ -54,7 +54,7 @@ public interface IPredicate
     /** Return the type of this pair */
     Type getType();
 
-    /** Return the qualified column name of this pair (if any exists). If no column is present null is returned */
+    /** Return the qualified column name of this predicate (if any exists). If no column is present null is returned */
     QualifiedName getQualifiedColumn();
 
     /**
@@ -96,17 +96,17 @@ public interface IPredicate
     enum Type
     {
         /**
-         * Comparison pair. One of {@link IComparisonExpression.Type} is used. Will be used if the predicate pair has a column expression on either side of the comparison operator
+         * Comparison predicate. One of {@link IComparisonExpression.Type} is used. Will be used if the predicate pair has a column expression on either side of the comparison operator
          */
         COMPARISION,
 
         /**
-         * In pair. {@link IInExpression} is used. Will be used if the IN operand is a column expression. Ie. t.col IN (1,2,3,4)
+         * In predicate. {@link IInExpression} is used. Will be used if the IN operand is a column expression. Ie. t.col IN (1,2,3,4)
          */
         IN,
 
         /**
-         * Like pair. {@link ILikeExpression} is used Will be used if the LIKE operand is a column expression. Ie. t.col LIKE 'some string'
+         * Like predicate. {@link ILikeExpression} is used Will be used if the LIKE operand is a column expression. Ie. t.col LIKE 'some string'
          */
         LIKE,
 

@@ -1,17 +1,18 @@
 package se.kuseman.payloadbuilder.core.expression;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Definition of an aggregate expression */
 public interface IAggregateExpression extends IExpression
 {
     /**
-     * Aggregate input groups. Input value vector is of type {@link Type#TupleVector} one for each group. Returning value should have the size equal to the input size with each ordinal as the
-     * resulting aggregated value.
+     * Aggregate input groups. Input value vector is of type {@link Type#Table} one for each group. Returning value should have the size equal to the input size with each ordinal as the resulting
+     * aggregated value.
      * 
      * <pre>
      * Ie. For a sum aggregation with expression "sum(col1)"
@@ -34,6 +35,9 @@ public interface IAggregateExpression extends IExpression
     @Override
     default ValueVector eval(TupleVector input, IExecutionContext context)
     {
-        throw new IllegalArgumentException("Scalar eval should NOT be called on an aggregate expression");
+        throw new IllegalArgumentException("Scalar eval not implementd on " + getClass());
     }
+
+    /** Return the aggregate result type for this expression */
+    ResolvedType getAggregateType();
 }

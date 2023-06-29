@@ -1,6 +1,7 @@
 package se.kuseman.payloadbuilder.api.catalog;
 
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 
 /**
  * Definition of options provided to data sources. These are options within a WITH statement in table sources

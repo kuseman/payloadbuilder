@@ -7,13 +7,14 @@ import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.Decimal;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IArithmeticUnaryExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
-import se.kuseman.payloadbuilder.api.utils.ExpressionMath;
+import se.kuseman.payloadbuilder.core.execution.ExpressionMath;
 
 /** Arithmetic unary expression */
 public class ArithmeticUnaryExpression implements IArithmeticUnaryExpression
@@ -53,15 +54,55 @@ public class ArithmeticUnaryExpression implements IArithmeticUnaryExpression
     }
 
     @Override
+    public IExpression fold()
+    {
+        if (expression instanceof LiteralNullExpression)
+        {
+            return new LiteralNullExpression(getType());
+        }
+
+        if (expression.isConstant())
+        {
+            ValueVector v = eval(TupleVector.CONSTANT, null);
+
+            if (v.isNull(0))
+            {
+                return new LiteralNullExpression(getType());
+            }
+
+            Column.Type resultType = v.type()
+                    .getType();
+
+            switch (resultType)
+            {
+                case Double:
+                    return new LiteralDoubleExpression(v.getDouble(0));
+                case Float:
+                    return new LiteralFloatExpression(v.getFloat(0));
+                case Int:
+                    return new LiteralIntegerExpression(v.getInt(0));
+                case Long:
+                    return new LiteralLongExpression(v.getLong(0));
+                case Decimal:
+                    return new LiteralDecimalExpression(v.getDecimal(0));
+                default:
+                    throw new IllegalArgumentException("Unsupported result type: " + resultType);
+            }
+        }
+
+        return this;
+    }
+
+    @Override
     public ValueVector eval(TupleVector input, IExecutionContext context)
     {
         final ValueVector value = expression.eval(input, context);
 
-        if (!(value.type()
-                .getType()
-                .isNumber()
-                || value.type()
-                        .getType() == Column.Type.Any))
+        final Column.Type type = value.type()
+                .getType();
+
+        if (!(type.isNumber()
+                || type == Column.Type.Any))
         {
             throw new IllegalArgumentException("Cannot negate '" + value.type() + "'");
         }
@@ -78,12 +119,6 @@ public class ArithmeticUnaryExpression implements IArithmeticUnaryExpression
             public int size()
             {
                 return input.getRowCount();
-            }
-
-            @Override
-            public boolean isNullable()
-            {
-                return value.isNullable();
             }
 
             @Override
@@ -117,9 +152,16 @@ public class ArithmeticUnaryExpression implements IArithmeticUnaryExpression
             }
 
             @Override
-            public Object getValue(int row)
+            public Decimal getDecimal(int row)
             {
-                return ExpressionMath.negate(value.getValue(row));
+                return value.getDecimal(row)
+                        .negate();
+            }
+
+            @Override
+            public Object getAny(int row)
+            {
+                return ExpressionMath.negate(value.getAny(row));
             }
         };
     }

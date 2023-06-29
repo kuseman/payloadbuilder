@@ -12,10 +12,12 @@ import java.util.Set;
 import org.apache.commons.lang3.ObjectUtils;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 
 /** Logical definition of a join */
 public class Join implements ILogicalPlan
@@ -27,11 +29,6 @@ public class Join implements ILogicalPlan
     private final String populateAlias;
     private final IExpression condition;
     private final Set<Column> outerReferences;
-
-    // /**
-    // * Field that is set after optimization of predicate push down. This will be later on used to ask catalogs to handle predicates to push down the filters even further.
-    // */
-    // private final List<AnalyzePair> predicatePairs;
 
     /** Flag that indicates that inner and outer has switched places so we need to take that into consideration when generating schema */
     private final boolean switchedInputs;
@@ -45,22 +42,8 @@ public class Join implements ILogicalPlan
         this.populateAlias = populateAlias;
         this.condition = condition;
         this.outerReferences = ObjectUtils.defaultIfNull(outerReferences, emptySet());
-        // this.predicatePairs = null;
         this.switchedInputs = switchedInputs;
     }
-
-    // /** Constructor used during predicate push down */
-    // public Join(ILogicalPlan left, ILogicalPlan right, Type type, String populateAlias, List<AnalyzePair> predicatePairs, Set<Column> outerReferences, boolean switchedInputs)
-    // {
-    // this.outer = requireNonNull(left, "left");
-    // this.inner = requireNonNull(right, "right");
-    // this.type = requireNonNull(type, "type");
-    // this.populateAlias = populateAlias;
-    // this.predicatePairs = requireNonNull(predicatePairs, "predicatePairs");
-    // this.condition = AnalyzeResult.getPredicate(predicatePairs);
-    // this.outerReferences = ObjectUtils.defaultIfNull(outerReferences, emptySet());
-    // this.switchedInputs = switchedInputs;
-    // }
 
     public ILogicalPlan getOuter()
     {
@@ -87,11 +70,6 @@ public class Join implements ILogicalPlan
         return condition;
     }
 
-    // public List<AnalyzePair> getPredicatePairs()
-    // {
-    // return predicatePairs;
-    // }
-
     public Set<Column> getOuterReferences()
     {
         return outerReferences;
@@ -115,14 +93,14 @@ public class Join implements ILogicalPlan
 
         if (populateAlias != null)
         {
+            Column column = innerSchema.getColumns()
+                    .get(0);
             // Copy table source from inner schema if any exists
-            ColumnReference colRef = innerSchema.getColumns()
-                    .get(0)
-                    .getColumnReference();
+            ColumnReference colRef = SchemaUtils.getColumnReference(column);
             colRef = colRef != null ? colRef.rename(populateAlias)
                     : null;
 
-            columns.add(new Column(populateAlias, ResolvedType.tupleVector(innerSchema), colRef));
+            columns.add(CoreColumn.of(populateAlias, ResolvedType.table(innerSchema), colRef));
         }
         else
         {
@@ -185,11 +163,9 @@ public class Join implements ILogicalPlan
     /** Type of join */
     public enum Type
     {
+        CROSS,
         INNER,
         LEFT,
         RIGHT
-        // CROSS,
-        // CROSS_APPLY,
-        // OUTER_APPLY
     }
 }

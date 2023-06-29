@@ -3,19 +3,17 @@ package se.kuseman.payloadbuilder.core.planning;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
-import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
-import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
-import se.kuseman.payloadbuilder.core.QuerySession;
-import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzePair;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.statement.QueryStatement;
@@ -35,7 +33,7 @@ public class StatementPlanner
         boolean joinPreserveOuterOrder;
         boolean topTableScanVisited;
 
-        Map<String, Schema> schemaByTempTable = new HashMap<>();
+        Map<String, TableSchema> schemaByTempTable = new HashMap<>();
 
         /** Flag indicating that next plan to be generated is an analzye */
         boolean analyze;
@@ -74,28 +72,8 @@ public class StatementPlanner
     }
 
     /** Plans provided query. Produces a runnable query that can be cached */
-    public static QueryStatement plan(QuerySession session, String defaultCatalogAlias, QueryStatement query)
+    public static QueryStatement plan(QuerySession session, QueryStatement query)
     {
-        // Create a temporary session during planning
-        // TODO: need stuff from a real session here else cache entries etc. will be empty
-        // QuerySession session = new QuerySession(registry);
-
-        CatalogRegistry registry = session.getCatalogRegistry();
-
-        // Set default category to the first catalog
-        if (isBlank(defaultCatalogAlias)
-                && registry.getCatalogs()
-                        .size() > 0)
-        {
-            session.setDefaultCatalogAlias(registry.getCatalogs()
-                    .iterator()
-                    .next()
-                    .getKey());
-        }
-        else
-        {
-            session.setDefaultCatalogAlias(defaultCatalogAlias);
-        }
         ExecutionContext context = new ExecutionContext(session);
         Context ctx = new Context(context);
         return new QueryStatement(query.getStatements()

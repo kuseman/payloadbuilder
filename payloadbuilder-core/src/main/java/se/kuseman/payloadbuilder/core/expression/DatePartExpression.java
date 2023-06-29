@@ -5,12 +5,12 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 
+import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.EpochDateTime;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IDatePartExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
@@ -61,7 +61,7 @@ public class DatePartExpression implements IDatePartExpression
             @Override
             public ResolvedType type()
             {
-                return ResolvedType.of(Type.Int);
+                return ResolvedType.of(Type.Long);
             }
 
             @Override
@@ -71,29 +71,26 @@ public class DatePartExpression implements IDatePartExpression
             }
 
             @Override
-            public boolean isNullable()
-            {
-                return value.isNullable();
-            }
-
-            @Override
             public boolean isNull(int row)
             {
                 return value.isNull(row);
             }
 
             @Override
-            public int getInt(int row)
+            public long getLong(int row)
             {
-                EpochDateTime dateTime = value.getDateTime(row);
-                return dateTime.toZonedDateTime()
-                        .get(part.getChronoField());
-            }
+                Type type = value.type()
+                        .getType();
 
-            @Override
-            public Object getValue(int row)
-            {
-                throw new IllegalArgumentException("getValue should not be called on typed vectors");
+                if (type == Column.Type.DateTimeOffset)
+                {
+                    return value.getDateTimeOffset(row)
+                            .getPart(part.getChronoField());
+                }
+
+                // Implicitly cast to datetime
+                return value.getDateTime(row)
+                        .getPart(part.getChronoField());
             }
         };
     }
@@ -101,7 +98,7 @@ public class DatePartExpression implements IDatePartExpression
     @Override
     public ResolvedType getType()
     {
-        return ResolvedType.of(Type.Int);
+        return ResolvedType.of(Type.Long);
     }
 
     @Override

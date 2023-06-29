@@ -35,7 +35,7 @@ miscStatement
  ;
 
 setStatement
- : SET AT? qname EQUALS expression
+ : SET AT? AT? qname EQUALS expression
  ;
 
 useStatement
@@ -53,16 +53,16 @@ describeStatement
 showStatement
  : SHOW
  (
-	  VARIABLES
-	| (catalog=identifier HASH)? TABLES
-	| (catalog=identifier HASH)? FUNCTIONS
-	| CACHES
+      VARIABLES
+    | (catalog=identifier HASH)? TABLES
+    | (catalog=identifier HASH)? FUNCTIONS
+    | CACHES
  )
  ;
 
 cacheFlushStatement
-  : CACHE FLUSH cache=fullCacheQualifier key=expression?  #cacheFlush
-  | CACHE REMOVE cache=fullCacheQualifier  				  #cacheRemove
+  : CACHE FLUSH cache=fullCacheQualifier key=expression?     #cacheFlush
+  | CACHE REMOVE cache=fullCacheQualifier                    #cacheRemove
   ;
 
 fullCacheQualifier
@@ -115,7 +115,7 @@ selectStatement
  ;
 
 forClause
- : FOR function=functionName (OVER alias=identifier)?
+ : FOR function=functionName
  ;
 
 dropTableStatement
@@ -124,12 +124,12 @@ dropTableStatement
 
 topCount
  : NUMERIC_LITERAL
- | '(' expression ')'
+ | PARENO expression PARENC
  ;
 
 selectItem
  :
-	(alias=identifier DOT)? ASTERISK
+    (alias=identifier DOT)? ASTERISK
  |  (variable EQUALS)? expression (AS? identifier)?
  ;
 
@@ -138,13 +138,13 @@ tableSourceJoined
  ;
 
 tableSource
- : tableName						identifier? tableSourceOptions?
- | functionCall						identifier? tableSourceOptions?
- | PARENO selectStatement PARENC	identifier? tableSourceOptions?
+ : tableName                                    identifier? tableSourceOptions?
+ | functionCall                                 identifier? tableSourceOptions?
+ | PARENO (selectStatement | expression) PARENC identifier? tableSourceOptions?
  ;
 
 tableSourceOptions
- : WITH '(' options+=tableSourceOption (COMMA options+=tableSourceOption)* ')'
+ : WITH PARENO options+=tableSourceOption (COMMA options+=tableSourceOption)* PARENC
  ;
 
 tableSourceOption
@@ -173,53 +173,52 @@ topExpression
  ;
 
 expression
- : primary													#primaryExpression
+ : primary                                                     #primaryExpression
 
  //
 
- | op=(MINUS | PLUS) expression								#arithmeticUnary
+ | op=(MINUS | PLUS) expression                                #arithmeticUnary
  | left=expression
    op=(ASTERISK | SLASH | PERCENT | PLUS | MINUS)
-   right=expression											#arithmeticBinary
+   right=expression                                            #arithmeticBinary
    
- | expression timeZone                                      #atTimeZoneExpression
+ | expression timeZone                                         #atTimeZoneExpression
    
  | left=expression
    op=(EQUALS | NOTEQUALS| LESSTHAN | LESSTHANEQUAL | GREATERTHAN| GREATERTHANEQUAL)
-   right=expression											#comparisonExpression
+   right=expression                                            #comparisonExpression
 
  //
 
  | left=expression
    NOT? IN
-   '(' expression (COMMA expression)* ')'					#inExpression
+   PARENO expression (COMMA expression)* PARENC                #inExpression
  | left=expression
    // Have to use primary here to solve ambiguity when ie. nesting AND's
    NOT? LIKE right=primary
-   (ESCAPE escape=expression)?								#likeExpression
- | expression IS NOT? NULL  								#nullPredicate
+   (ESCAPE escape=expression)?                                 #likeExpression
+ | expression IS NOT? NULL                                     #nullPredicate
 
  //
 
- | NOT expression											#logicalNot
+ | NOT expression                                              #logicalNot
  | left=expression
    op=(AND | OR)
-   right=expression											#logicalBinary
+   right=expression                                            #logicalBinary
  ;
 
 primary
- : literal													#literalExpression
- | left=primary DOT (identifier | functionCall)				#dereference
- | qname													#columnReference
- | builtInFunctionCall                                      #builtInFunctionCallExpression
- | functionCall 											#functionCallExpression
- | identifier ARROW expression								#lambdaExpression
+ : literal                                                     #literalExpression
+ | left=primary DOT (identifier | scalarFunctionCall)          #dereference
+ | qname                                                       #columnReference
+ | scalarFunctionCall                                          #functionCallExpression
+ | identifier ARROW expression                                 #lambdaExpression
  | PARENO identifier (COMMA identifier)+ PARENC ARROW expression
-                                                            #lambdaExpression
- | value=primary BRACKETO subscript=expression BRACKETC		#subscript
- | variable													#variableExpression
- | bracket_expression 										#bracketExpression
- | CASE when+ (ELSE elseExpr=expression)? END               #caseExpression
+                                                               #lambdaExpression
+ | value=primary BRACKETO subscript=expression BRACKETC        #subscript
+ | variable                                                    #variableExpression
+ | bracket_expression                                          #bracketExpression
+ | CASE when+ (ELSE elseExpr=expression)? END                  #caseExpression
  ;
 
 bracket_expression
@@ -231,11 +230,13 @@ when
  : WHEN condition=expression THEN result=expression
  ;
 
-builtInFunctionCall
- : CAST PARENO input=expression (AS dataType=IDENTIFIER | COMMA arg=expression) PARENC                                  #castExpression
+scalarFunctionCall
+ : COUNT PARENO (ALL | DISTINCT)? (ASTERISK | arg=expression) PARENC                                                    #countExpression
+ | CAST PARENO input=expression (AS dataType=IDENTIFIER | COMMA arg=expression) PARENC                                  #castExpression
  | DATEADD  PARENO (datepart=IDENTIFIER | datepartE=expression) COMMA number=expression COMMA date=expression PARENC    #dateAddExpression
  | DATEPART PARENO (datepart=IDENTIFIER | datepartE=expression) COMMA date=expression PARENC                            #datePartExpression
  | DATEDIFF PARENO datepart=IDENTIFIER COMMA start=expression COMMA end=expression PARENC                               #dateDiffExpression
+ | functionCall                                                                                                         #genericFunctionCallExpression
  ;
  
  timeZone
@@ -312,19 +313,22 @@ booleanLiteral
  ;
 
 nonReserved
- : FROM
- | FIRST
- | FUNCTIONS
- | TABLE
- | TABLES
- | LIKE
- | FOR
- | ALL
+ : ALL
  | CACHE
  | CACHES
- | FLUSH
- | REMOVE
- | VARIABLES
- | POPULATE
+ | COUNT
  | DISTINCT
+ | FIRST
+ | FLUSH
+ | FOR
+ | FROM
+ | FUNCTIONS
+ | LEFT
+ | LIKE
+ | POPULATE
+ | REMOVE
+ | RIGHT
+ | TABLE
+ | TABLES
+ | VARIABLES
  ;

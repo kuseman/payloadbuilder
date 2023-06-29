@@ -2,22 +2,21 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 
 import java.util.List;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.UTF8String;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Substring function */
 class SubstringFunction extends ScalarFunctionInfo
 {
-    SubstringFunction(Catalog catalog)
+    SubstringFunction()
     {
-        super(catalog, "substring", FunctionType.SCALAR);
+        super("substring", FunctionType.SCALAR);
     }
 
     @Override
@@ -27,19 +26,20 @@ class SubstringFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public ResolvedType getType(List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
         return ResolvedType.of(Type.String);
     }
 
     @Override
-    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    public Arity arity()
     {
-        if (arguments.size() < 2)
-        {
-            throw new IllegalArgumentException("Function " + getName() + " expects at least 2 arguments.");
-        }
+        return new Arity(2, 3);
+    }
 
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
+    {
         final ValueVector value = arguments.get(0)
                 .eval(input, context);
 
@@ -87,12 +87,6 @@ class SubstringFunction extends ScalarFunctionInfo
                 }
 
                 return UTF8String.from(strArg.substring(startArg));
-            }
-
-            @Override
-            public Object getValue(int row)
-            {
-                throw new IllegalArgumentException("getValue should not be called on typed vectors");
             }
         };
     }

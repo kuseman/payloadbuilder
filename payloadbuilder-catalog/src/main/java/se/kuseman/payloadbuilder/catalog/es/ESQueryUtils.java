@@ -8,15 +8,12 @@ import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.util.List;
 
-import org.apache.http.client.utils.URIBuilder;
+import org.apache.hc.core5.net.URIBuilder;
 
-import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
-import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
-import se.kuseman.payloadbuilder.api.utils.StringUtils;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.catalog.es.ElasticsearchMetaUtils.MappedProperty;
 
 /** Utils for ESCatalog */
@@ -55,7 +52,7 @@ final class ESQueryUtils
     /** Construct a search url */
     static String getSearchUrl(String endpoint, String index, String type, Integer size, Integer scrollMinutes, boolean isTemplate)
     {
-        StringUtils.requireNonBlank(endpoint, "endpoint is required");
+        requireNonBlank(endpoint, "endpoint is required");
 
         String indexPart = isBlank(index) ? "*"
                 : index;
@@ -79,15 +76,15 @@ final class ESQueryUtils
     /** Build scroll url */
     static String getScrollUrl(String endpoint, int scrollMinutes)
     {
-        StringUtils.requireNonBlank(endpoint, "endpoint is required");
+        requireNonBlank(endpoint, "endpoint is required");
         return String.format("%s/_search/scroll?scroll=%dm&filter_path=_scroll_id,hits.hits", endpoint, scrollMinutes);
     }
 
     /** Build mget url */
     static String getMgetUrl(String endpoint, String index, String type)
     {
-        StringUtils.requireNonBlank(endpoint, "endpoint is required");
-        StringUtils.requireNonBlank(index, "index is required");
+        requireNonBlank(endpoint, "endpoint is required");
+        requireNonBlank(index, "index is required");
 
         String typePart = useType(type) ? (type + "/")
                 : "";
@@ -96,18 +93,18 @@ final class ESQueryUtils
     }
 
     /** Build search body **/
-    static String getSearchBody(ElasticStrategy strategy, List<SortItemMeta> sortItems, List<PropertyPredicate> propertyPredicates, ValueVector indexSeekValues, String indexField,
+    static String getSearchBody(boolean describe, ElasticStrategy strategy, List<SortItemMeta> sortItems, List<PropertyPredicate> propertyPredicates, ValueVector indexSeekValues, String indexField,
             boolean quoteIndexFieldValues, IExecutionContext context)
     {
         StringBuilder sb = new StringBuilder("{");
         appendSortItems(strategy, sortItems, sb);
-        appendPropertyPredicates(strategy, propertyPredicates, indexSeekValues, indexField, quoteIndexFieldValues, sb, context);
+        appendPropertyPredicates(describe, strategy, propertyPredicates, indexSeekValues, indexField, quoteIndexFieldValues, sb, context);
         sb.append("}");
         return sb.toString();
     }
 
-    private static void appendPropertyPredicates(ElasticStrategy strategy, List<PropertyPredicate> propertyPredicates, ValueVector indexSeekValues, String indexField, boolean quoteIndexFieldValues,
-            StringBuilder sb, IExecutionContext context)
+    private static void appendPropertyPredicates(boolean describe, ElasticStrategy strategy, List<PropertyPredicate> propertyPredicates, ValueVector indexSeekValues, String indexField,
+            boolean quoteIndexFieldValues, StringBuilder sb, IExecutionContext context)
     {
         StringBuilder filterMust = new StringBuilder();
         StringBuilder filterMustNot = new StringBuilder();
@@ -124,7 +121,7 @@ final class ESQueryUtils
             int length = sbs.size();
             for (PropertyPredicate predicate : propertyPredicates)
             {
-                predicate.appendBooleanClause(filterMust, filterMustNot, context);
+                predicate.appendBooleanClause(describe, filterMust, filterMustNot, context);
 
                 for (int i = 0; i < length; i++)
                 {
@@ -168,7 +165,7 @@ final class ESQueryUtils
         {
             // No iterator here, that means we have a describe/analyze-call
             // so add a dummy value
-            value = ValueVector.literalObject(ResolvedType.of(Type.String), "<index values>", 1);
+            value = ValueVector.literalString("<index values>", 1);
         }
 
         sb.append("{\"terms\":{\"")
@@ -314,6 +311,16 @@ final class ESQueryUtils
         {
             sb.deleteCharAt(sb.length() - 1);
         }
+    }
+
+    /** Checks that provided string is not blank, throws exception otherwise */
+    private static String requireNonBlank(String string, String message)
+    {
+        if (isBlank(string))
+        {
+            throw new IllegalArgumentException(message);
+        }
+        return string;
     }
 
     /** Meta sort items, used to build a sort query to ES */

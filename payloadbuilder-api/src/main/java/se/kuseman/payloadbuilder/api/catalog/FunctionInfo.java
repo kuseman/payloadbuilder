@@ -2,20 +2,16 @@ package se.kuseman.payloadbuilder.api.catalog;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.List;
-
-import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
 
 /** Base class for functions */
 public abstract class FunctionInfo
 {
-    private final Catalog catalog;
     private final String name;
     private final FunctionType type;
 
-    public FunctionInfo(Catalog catalog, String name, FunctionType type)
+    public FunctionInfo(String name, FunctionType type)
     {
-        this.catalog = requireNonNull(catalog, "catalog");
         this.name = requireNonNull(name, "name");
         this.type = requireNonNull(type, "type");
     }
@@ -31,11 +27,6 @@ public abstract class FunctionInfo
         return "";
     }
 
-    public Catalog getCatalog()
-    {
-        return catalog;
-    }
-
     public FunctionType getFunctionType()
     {
         return type;
@@ -47,29 +38,16 @@ public abstract class FunctionInfo
         return false;
     }
 
-    /** Return this functions arity. -1 if unknown */
-    public int arity()
+    /** Return this functions arity. */
+    public Arity arity()
     {
-        return -1;
-    }
-
-    /**
-     * Fold arguments. Is called upon parsing to let functions fold it's arguments. Ie. Replace arguments with other values etc.
-     * 
-     * <pre>
-     * NOTE! Arguments are unresolved so for example transforming a
-     * QualifiedRefernece then argument will be UnresolvedQualifiedReferenceExpression
-     * </pre>
-     */
-    public List<? extends IExpression> foldArguments(List<? extends IExpression> arguments)
-    {
-        return arguments;
+        return Arity.NO_LIMIT;
     }
 
     @Override
     public String toString()
     {
-        return catalog.getName() + "." + name;
+        return name;
     }
 
     @Override
@@ -83,12 +61,9 @@ public abstract class FunctionInfo
     {
         if (obj instanceof FunctionInfo)
         {
-            FunctionInfo fi = (FunctionInfo) obj;
-            return catalog.getName()
-                    .equals(fi.getCatalog()
-                            .getName())
-                    && name.equals(fi.name)
-                    && type.equals(fi.type);
+            FunctionInfo that = (FunctionInfo) obj;
+            return name.equals(that.name)
+                    && type.equals(that.type);
         }
         return false;
     }
@@ -112,6 +87,90 @@ public abstract class FunctionInfo
         {
             return this == AGGREGATE
                     || this == SCALAR_AGGREGATE;
+        }
+    }
+
+    /** Arity definition for functions */
+    public static class Arity
+    {
+        /** Arity where the arguments have no limits */
+        public static final Arity NO_LIMIT = new Arity(-1, -1);
+        /** Arity for functions with no arguments */
+        public static final Arity ZERO = new Arity(0, 0);
+        /** Arity for functions with one argument */
+        public static final Arity ONE = new Arity(1, 1);
+        /** Arity for functions with at least one argument */
+        public static final Arity AT_LEAST_ONE = new Arity(1, -1);
+        /** Arity for functions with two arguments */
+        public static final Arity TWO = new Arity(2, 2);
+        /** Arity for functions with at least two arguments */
+        public static final Arity AT_LEAST_TWO = new Arity(2, -1);
+
+        /** Mininum arguments */
+        private final int min;
+        /** Mininum arguments */
+        private final int max;
+
+        public Arity(int min, int max)
+        {
+            this.min = min;
+            this.max = max;
+
+            if (min >= 0
+                    && max >= 0
+                    && max < min)
+            {
+                throw new IllegalArgumentException("Invalid arity definition. max must be greater of equal to min");
+            }
+        }
+
+        public int getMin()
+        {
+            return min;
+        }
+
+        public int getMax()
+        {
+            return max;
+        }
+
+        /** Returns true if this arity satisfies provided argument count */
+        public boolean satisfies(int argumentCount)
+        {
+            if (min < 0)
+            {
+                return true;
+            }
+            return argumentCount >= min
+                    && (max < 0
+                            || argumentCount <= max);
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return min;
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (obj == null)
+            {
+                return false;
+            }
+            else if (obj == this)
+            {
+                return true;
+            }
+            else if (obj instanceof Arity)
+            {
+                Arity that = (Arity) obj;
+                return min == that.min
+                        && max == that.max;
+            }
+
+            return false;
         }
     }
 }

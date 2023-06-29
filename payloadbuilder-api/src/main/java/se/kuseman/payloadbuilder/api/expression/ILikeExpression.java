@@ -11,4 +11,7 @@ public interface ILikeExpression extends IExpression
 
     /** Return pattern expression for this LIKE expression */
     IExpression getPatternExpression();
+
+    /** Return the escape character expression for this LIKE expression */
+    IExpression getEscapeCharacterExpression();
 }

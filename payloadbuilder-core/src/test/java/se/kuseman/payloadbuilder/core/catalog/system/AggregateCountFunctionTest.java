@@ -14,8 +14,8 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo.AggregateMode;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
@@ -35,16 +35,16 @@ public class AggregateCountFunctionTest extends APhysicalPlanTest
     @Test
     public void test_aggregate()
     {
-        ValueVector one = ValueVector.literalObject(ResolvedType.of(Type.Any), 10, 20, -20F, -200D);
-        ValueVector two = ValueVector.literalObject(ResolvedType.of(Type.Any), 10_000_000, 4);
+        ValueVector one = ValueVector.literalAny(10, 20, -20F, -200D);
+        ValueVector two = ValueVector.literalAny(4, 10_000_000);
         ValueVector three = ValueVector.literalNull(ResolvedType.of(Type.Any), 4);
-        ValueVector four = ValueVector.literalObject(ResolvedType.of(Type.Any), "one", "two", "three");
-        ValueVector five = ValueVector.literalObject(ResolvedType.of(Type.Any), new BigDecimal("100.10"), new BigDecimal("-200.10"), new BigDecimal("2000.10"));
+        ValueVector four = ValueVector.literalAny("one", "two", "three");
+        ValueVector five = ValueVector.literalAny(new BigDecimal("100.10"), new BigDecimal("-200.10"), new BigDecimal("2000.10"));
 
         Schema schema = schema(new Type[] { Type.Any }, "col1");
 
         //@formatter:off
-        ValueVector v = ValueVector.literalObject(ResolvedType.tupleVector(schema),
+        ValueVector v = ValueVector.literalTable(
                 TupleVector.of(schema, asList(one)),
                 TupleVector.of(schema, asList(two)),
                 TupleVector.of(schema, asList(three)),
@@ -62,7 +62,7 @@ public class AggregateCountFunctionTest extends APhysicalPlanTest
     @Test
     public void test_scalar()
     {
-        ValueVector one = ValueVector.literalObject(ResolvedType.of(Type.Any), 10, 20, null, -200D);
+        ValueVector one = ValueVector.literalAny(10, 20, null, -200D);
 
         Schema schema = schema(new Type[] { Type.Any }, "col1");
 
@@ -78,15 +78,15 @@ public class AggregateCountFunctionTest extends APhysicalPlanTest
     @Test
     public void test_scalar_value_vector()
     {
-        ValueVector one = ValueVector.literalObject(ResolvedType.of(Type.Any), 10, 20, -20F, -200D);
-        ValueVector two = ValueVector.literalObject(ResolvedType.of(Type.Any), 10_000_000, 4);
+        ValueVector one = ValueVector.literalAny(10, 20, -20F, -200D);
+        ValueVector two = ValueVector.literalAny(4, 10_000_000);
         ValueVector three = ValueVector.literalNull(ResolvedType.of(Type.Any), 4);
-        ValueVector four = ValueVector.literalObject(ResolvedType.of(Type.Any), "one", "two", "three");
-        ValueVector five = ValueVector.literalObject(ResolvedType.of(Type.Any), new BigDecimal("100.10"), new BigDecimal("-200.10"), new BigDecimal("2000.10"));
+        ValueVector four = ValueVector.literalAny("one", "two", "three");
+        ValueVector five = ValueVector.literalAny(new BigDecimal("100.10"), new BigDecimal("-200.10"), new BigDecimal("2000.10"));
 
-        Schema schema = Schema.of(Column.of("col1", ResolvedType.valueVector(ResolvedType.of(Type.Any))));
+        Schema schema = Schema.of(Column.of("col1", ResolvedType.array(ResolvedType.of(Type.Any))));
 
-        TupleVector input = TupleVector.of(schema, asList(vv(ResolvedType.valueVector(ResolvedType.of(Type.Any)), one, two, three, four, five)));
+        TupleVector input = TupleVector.of(schema, asList(vv(ResolvedType.array(ResolvedType.of(Type.Any)), one, two, three, four, five)));
 
         ValueVector actual = function.evalScalar(context, input, "", asList(col1));
 

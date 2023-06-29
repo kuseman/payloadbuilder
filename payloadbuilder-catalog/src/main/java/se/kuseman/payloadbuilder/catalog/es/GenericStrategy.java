@@ -1,18 +1,17 @@
 package se.kuseman.payloadbuilder.catalog.es;
 
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 
-import org.apache.http.client.methods.HttpEntityEnclosingRequestBase;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpRequestBase;
-import org.apache.http.entity.StringEntity;
+import org.apache.hc.client5.http.classic.methods.HttpDelete;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.core5.http.io.entity.StringEntity;
 
 /** Strategy with basic common functionality cross versions */
 class GenericStrategy implements ElasticStrategy
 {
     @Override
-    public HttpRequestBase getScrollRequest(String scrollUrl, String scrollId)
+    public ClassicHttpRequest getScrollRequest(String scrollUrl, String scrollId)
     {
         HttpPost post = new HttpPost(scrollUrl);
         post.setEntity(new StringEntity("{\"scroll_id\":\"" + scrollId + "\" }", StandardCharsets.UTF_8));
@@ -20,9 +19,9 @@ class GenericStrategy implements ElasticStrategy
     }
 
     @Override
-    public HttpRequestBase getDeleteScrollRequest(String endpoint, String scrollId)
+    public ClassicHttpRequest getDeleteScrollRequest(String endpoint, String scrollId)
     {
-        HttpDeleteWithBody delete = new HttpDeleteWithBody(endpoint + "/_search/scroll");
+        HttpDelete delete = new HttpDelete(endpoint + "/_search/scroll");
         delete.setEntity(new StringEntity("{\"scroll_id\":\"" + scrollId + "\"}", StandardCharsets.UTF_8));
         return delete;
     }
@@ -44,23 +43,4 @@ class GenericStrategy implements ElasticStrategy
     {
         return true;
     }
-
-    /** Entity support for DELETE */
-    static class HttpDeleteWithBody extends HttpEntityEnclosingRequestBase
-    {
-        public static final String METHOD_NAME = "DELETE";
-
-        @Override
-        public String getMethod()
-        {
-            return METHOD_NAME;
-        }
-
-        HttpDeleteWithBody(final String uri)
-        {
-            super();
-            setURI(URI.create(uri));
-        }
-    }
-
 }

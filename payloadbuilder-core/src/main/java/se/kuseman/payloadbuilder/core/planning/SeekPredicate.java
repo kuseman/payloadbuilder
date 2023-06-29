@@ -9,12 +9,17 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 import se.kuseman.payloadbuilder.api.catalog.Index;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.execution.StatementContext;
+import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
+import se.kuseman.payloadbuilder.core.execution.VectorUtils;
+
+import it.unimi.dsi.fastutil.ints.IntHash.Strategy;
+import it.unimi.dsi.fastutil.ints.IntLinkedOpenCustomHashSet;
 
 /** Index predicate used when creating index operators from catalogs */
 class SeekPredicate implements ISeekPredicate
@@ -26,7 +31,6 @@ class SeekPredicate implements ISeekPredicate
      */
     private final List<String> indexColumns;
     private final List<IExpression> expressions;
-    // private final Type type = Type.KEY_LOOKUP;
 
     SeekPredicate(Index index, List<String> indexColumns, List<IExpression> expressions)
     {
@@ -39,12 +43,6 @@ class SeekPredicate implements ISeekPredicate
             throw new IllegalArgumentException("Index columns and expressions must equal in size");
         }
     }
-
-    // @Override
-    // public Type getType()
-    // {
-    // return type;
-    // }
 
     @Override
     public Index getIndex()
@@ -61,37 +59,97 @@ class SeekPredicate implements ISeekPredicate
     @Override
     public List<ISeekKey> getSeekKeys(IExecutionContext context)
     {
-        TupleVector tupleVector = ((StatementContext) context.getStatementContext()).getOuterTupleVector();
+        TupleVector tupleVector = ((StatementContext) context.getStatementContext()).getIndexSeekTupleVector();
 
         if (tupleVector == null)
         {
-            throw new IllegalArgumentException("Expected a tuple vector in context");
+            throw new IllegalArgumentException("Expected an index seek tuple vector in context");
         }
 
-        List<ISeekKey> keys = new ArrayList<>(expressions.size());
+        int size = expressions.size();
+        final ValueVector[] vectors = new ValueVector[size];
 
-        for (final IExpression expression : expressions)
+        for (int i = 0; i < size; i++)
         {
-            keys.add(new ISeekKey()
-            {
-                final ValueVector value = expression.eval(tupleVector, context);
+            vectors[i] = expressions.get(i)
+                    .eval(tupleVector, context);
+        }
 
+        int rowCount = tupleVector.getRowCount();
+        // We use a linked hash set here to keep the order from input
+        IntLinkedOpenCustomHashSet set = new IntLinkedOpenCustomHashSet(rowCount, new Strategy()
+        {
+            @Override
+            public int hashCode(int e)
+            {
+                return VectorUtils.hash(vectors, e);
+            }
+
+            @Override
+            public boolean equals(int a, int b)
+            {
+                return VectorUtils.equals(vectors, a, b);
+            }
+        });
+
+        for (int i = 0; i < rowCount; i++)
+        {
+            // If any of the vectors has a null value it should be ignored since
+            // seek predicates usage at the time of writing should not be used with nulls.
+            // Ie. predicate: 'on a.col = b.col' where b.col has a seek predicate
+            // a null value can never yield a match
+            boolean hasNull = false;
+            for (int j = 0; j < size; j++)
+            {
+                if (vectors[j].isNull(i))
+                {
+                    hasNull = true;
+                    break;
+                }
+            }
+            if (hasNull)
+            {
+                continue;
+            }
+            set.add(i);
+        }
+
+        final int[] ordinals = set.toIntArray();
+        final int resultSize = ordinals.length;
+        List<ISeekKey> seekKeys = new ArrayList<>(size);
+        for (int i = 0; i < size; i++)
+        {
+            final ValueVector keyVector = new ValueVectorAdapter(vectors[i])
+            {
+                @Override
+                public int size()
+                {
+                    return resultSize;
+                }
+
+                @Override
+                protected int getRow(int row)
+                {
+                    return ordinals[row];
+                }
+            };
+            seekKeys.add(new ISeekKey()
+            {
                 @Override
                 public ValueVector getValue()
                 {
-                    return value;
+                    return keyVector;
                 }
 
                 @Override
                 public SeekType getType()
                 {
-                    // Only supports EQ at this time
+                    // Only EQ supported for now
                     return SeekType.EQ;
                 }
             });
         }
-
-        return keys;
+        return seekKeys;
     }
 
     @Override
@@ -128,18 +186,4 @@ class SeekPredicate implements ISeekPredicate
                 .mapToObj(i -> indexColumns.get(i) + " = " + expressions.get(i))
                 .collect(joining(", "));
     }
-
-    // /**
-    // * Return outervalues used by this index predicate. Only applicable when have a KEY_LOOKUP index predicate
-    // */
-    // @Override
-    // public Iterator<IOrdinalValues> getOuterValuesIterator(IExecutionContext context)
-    // {
-    // if (type != Type.KEY_LOOKUP)
-    // {
-    // throw new IllegalArgumentException("This index predicate is not of " + Type.KEY_LOOKUP + " type");
-    // }
-    //
-    // return ((StatementContext) context.getStatementContext()).getOuterOrdinalValues();
-    // }
 }

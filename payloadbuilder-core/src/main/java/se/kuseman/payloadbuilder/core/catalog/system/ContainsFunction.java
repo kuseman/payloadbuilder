@@ -1,24 +1,23 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import java.util.List;
-import java.util.Objects;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 
 /** Function listOf. Creates a list of provided arguments */
 class ContainsFunction extends ScalarFunctionInfo
 {
-    ContainsFunction(Catalog catalog)
+    ContainsFunction()
     {
-        super(catalog, "contains", FunctionType.SCALAR);
+        super("contains", FunctionType.SCALAR);
     }
 
     @Override
@@ -28,19 +27,19 @@ class ContainsFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public int arity()
+    public Arity arity()
     {
-        return 2;
+        return Arity.TWO;
     }
 
     @Override
-    public ResolvedType getType(List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
         return ResolvedType.of(Column.Type.Boolean);
     }
 
     @Override
-    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
     {
         final ValueVector array = arguments.get(0)
                 .eval(input, context);
@@ -49,6 +48,7 @@ class ContainsFunction extends ScalarFunctionInfo
 
         final Type arrayType = array.type()
                 .getType();
+        final Type equalsType = getEqualsType(array, findValue);
 
         return new ValueVector()
         {
@@ -65,12 +65,6 @@ class ContainsFunction extends ScalarFunctionInfo
             }
 
             @Override
-            public boolean isNullable()
-            {
-                return false;
-            }
-
-            @Override
             public boolean isNull(int row)
             {
                 return false;
@@ -79,17 +73,33 @@ class ContainsFunction extends ScalarFunctionInfo
             @Override
             public boolean getBoolean(int row)
             {
-                Object findVal = findValue.valueAsObject(row);
-                Object arrVal = array.valueAsObject(row);
-
-                // Search vector
-                if (arrayType == Type.ValueVector)
+                // A null array cannot be searched and hence => false
+                if (array.isNull(row))
                 {
-                    ValueVector vec = (ValueVector) arrVal;
-                    int size = vec.size();
+                    return false;
+                }
+
+                ValueVector currentArray = null;
+                if (arrayType == Type.Any)
+                {
+                    Object arrayValue = VectorUtils.convertToValueVector(array.valueAsObject(row), false);
+                    if (arrayValue instanceof ValueVector)
+                    {
+                        currentArray = (ValueVector) arrayValue;
+                    }
+                }
+                else if (arrayType == Type.Array)
+                {
+                    currentArray = array.getArray(row);
+                }
+
+                if (currentArray != null)
+                {
+                    int size = currentArray.size();
                     for (int i = 0; i < size; i++)
                     {
-                        if (Objects.equals(vec.valueAsObject(i), findVal))
+                        // NOTE! When searching arrays we compare nulls so it's possible to perform a "arr.contains(null)"
+                        if (VectorUtils.equals(currentArray, findValue, equalsType, i, row, true))
                         {
                             return true;
                         }
@@ -97,14 +107,25 @@ class ContainsFunction extends ScalarFunctionInfo
                     return false;
                 }
 
-                return Objects.equals(arrVal, findVal);
-            }
-
-            @Override
-            public Object getValue(int row)
-            {
-                throw new IllegalArgumentException("getValue should not be called on typed vectors");
+                return VectorUtils.equals(array, findValue, equalsType, row, row, false);
             }
         };
+    }
+
+    private Type getEqualsType(ValueVector array, ValueVector findValue)
+    {
+        Type arrayType = array.type()
+                .getType();
+        if (arrayType == Type.Array)
+        {
+            arrayType = array.type()
+                    .getSubType()
+                    .getType();
+        }
+        Type findValueType = findValue.type()
+                .getType();
+
+        return arrayType.getPrecedence() > findValueType.getPrecedence() ? arrayType
+                : findValueType;
     }
 }

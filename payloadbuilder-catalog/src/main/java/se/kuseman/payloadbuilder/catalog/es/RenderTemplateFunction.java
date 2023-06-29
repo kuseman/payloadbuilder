@@ -9,29 +9,26 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.http.HttpEntity;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.util.EntityUtils;
+import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.io.entity.StringEntity;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Render a template in ES */
 class RenderTemplateFunction extends ScalarFunctionInfo
 {
-    RenderTemplateFunction(Catalog catalog)
+    RenderTemplateFunction()
     {
-        super(catalog, "rendertemplate", FunctionType.SCALAR);
+        super("rendertemplate", FunctionType.SCALAR);
     }
 
     @Override
@@ -43,13 +40,19 @@ class RenderTemplateFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public int arity()
+    public ResolvedType getType(List<IExpression> arguments)
     {
-        return 2;
+        return ResolvedType.of(Type.String);
     }
 
     @Override
-    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    public Arity arity()
+    {
+        return Arity.TWO;
+    }
+
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
     {
         Object templateObj = arguments.get(0)
                 .eval(context);
@@ -65,7 +68,8 @@ class RenderTemplateFunction extends ScalarFunctionInfo
         }
 
         String endpoint = context.getSession()
-                .getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY);
+                .getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY)
+                .valueAsString(0);
 
         if (isBlank(endpoint))
         {
@@ -78,11 +82,14 @@ class RenderTemplateFunction extends ScalarFunctionInfo
 
         HttpPost post = new HttpPost(endpoint + "/_render/template/");
         post.setEntity(new StringEntity(serialize(ofEntries(entry("id", template), entry("params", params))), StandardCharsets.UTF_8));
-        HttpEntity entity = null;
-        try (CloseableHttpResponse response = HttpClientUtils.execute(context.getSession(), catalogAlias, post))
+
+        try
         {
-            entity = response.getEntity();
-            return ValueVector.literalObject(ResolvedType.of(Type.String), IOUtils.toString(entity.getContent(), StandardCharsets.UTF_8), 1);
+            return HttpClientUtils.execute(context.getSession(), catalogAlias, post, response ->
+            {
+                HttpEntity entity = response.getEntity();
+                return ValueVector.literalString(IOUtils.toString(entity.getContent(), StandardCharsets.UTF_8), 1);
+            });
         }
         catch (Exception e)
         {
@@ -91,10 +98,6 @@ class RenderTemplateFunction extends ScalarFunctionInfo
                 throw (RuntimeException) e;
             }
             throw new RuntimeException("Error rendering template", e);
-        }
-        finally
-        {
-            EntityUtils.consumeQuietly(entity);
         }
     }
 

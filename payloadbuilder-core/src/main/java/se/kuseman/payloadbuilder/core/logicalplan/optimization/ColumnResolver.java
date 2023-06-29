@@ -3,36 +3,40 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.defaultString;
-import static org.apache.commons.lang3.StringUtils.equalsIgnoreCase;
+import static org.apache.commons.lang3.StringUtils.equalsAnyIgnoreCase;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.antlr.v4.runtime.Token;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.mutable.MutableBoolean;
+import org.apache.commons.lang3.tuple.Pair;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.api.catalog.OperatorFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo.SchemaResolveException;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IDereferenceExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IFunctionCallExpression;
 import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.LambdaFunction;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.Option;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.common.SortItem;
 import se.kuseman.payloadbuilder.core.expression.AExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.ARewriteExpressionVisitor;
@@ -41,23 +45,28 @@ import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.DereferenceExpression;
 import se.kuseman.payloadbuilder.core.expression.FunctionCallExpression;
+import se.kuseman.payloadbuilder.core.expression.HasColumnReference;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 import se.kuseman.payloadbuilder.core.expression.LambdaExpression;
 import se.kuseman.payloadbuilder.core.expression.LogicalBinaryExpression;
-import se.kuseman.payloadbuilder.core.expression.SubQueryExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedFunctionCallExpression;
+import se.kuseman.payloadbuilder.core.expression.UnresolvedSubQueryExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.Aggregate;
+import se.kuseman.payloadbuilder.core.logicalplan.ExpressionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.Join;
-import se.kuseman.payloadbuilder.core.logicalplan.OverScan;
+import se.kuseman.payloadbuilder.core.logicalplan.OperatorFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Projection;
 import se.kuseman.payloadbuilder.core.logicalplan.Sort;
 import se.kuseman.payloadbuilder.core.logicalplan.SubQuery;
 import se.kuseman.payloadbuilder.core.logicalplan.TableFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
 import se.kuseman.payloadbuilder.core.parser.ParseException;
+
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 
 /**
  * Rule to optimize columns and eliminate sub queries.
@@ -82,75 +91,45 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         final ColumnResolver columnResvoler;
 
         /** Schema used when resolving expressions in {@link ColumnResolverVisitor} */
-        Schema schema;
+        ResolveSchema schema;
 
         /** Concated outer schema used by joins/sub query expressions to detect outer column references in {@link ColumnResolverVisitor} */
-        Schema outerSchema;
+        ResolveSchema outerSchema;
 
         /** Outer references found during traversal. Used to detect correlated sub queries. Added in {@link ColumnResolverVisitor} */
         Set<Column> outerReferences;
 
-        /** Schemas produced */
-        Deque<Schema> schemas = new ArrayDeque<>();
+        /** Stack with the last visited plans resulting schema */
+        Deque<ResolveSchema> planSchema = new ArrayDeque<>();
+
+        /** Map with type for each lambda id */
+        Int2ObjectMap<ResolvedType> lambdaTypes = new Int2ObjectOpenHashMap<>();
+
+        /** Flag to indicate when we are resolving inside a sub query */
+        boolean insideSubQuery = false;
 
         /**
          * Set with column references used when resolving aggregate projection to detect if an expression should be single value or grouped
          */
         Set<ColumnReference> aggregateColumnReferences;
 
-        /**
-         * Map of the schema for each alias for a single query level. Used when exploding asterisk expressions and column resolving etc.
-         */
-        Deque<Map<String, SchemaMapping>> schemaByAlias = new ArrayDeque<>();
-
         Ctx(IExecutionContext context, ColumnResolver columnResolver)
         {
             super(context);
-            this.schemaByAlias.push(new HashMap<>());
             this.columnResvoler = columnResolver;
         }
 
-        /** Pushes an alias mapping to the top of the alias mappings stack */
-        void pushAliasSchema(String alias, Schema schema, boolean populated, Token token)
+        /**
+         * Return the schema for provided plan, either the top of the plan schema stack or the input plan if column resolver doesn't process the logical plan type
+         */
+        ResolveSchema getSchema(ILogicalPlan plan)
         {
-            if (schemaByAlias.peek()
-                    .put(alias.toLowerCase(), new SchemaMapping(schema, populated)) != null)
+            if (planSchema.size() > 0)
             {
-                throw new ParseException("Alias '" + alias + "' is specified multiple times.", token);
+                return planSchema.pop();
             }
-        }
 
-        /** Pushes an alias mapping to the top of the alias mappings stack */
-        void pushLambdaType(String alias, ResolvedType type, Token token)
-        {
-            SchemaMapping mapping = new SchemaMapping(Schema.EMPTY, false);
-            mapping.lambdaType = type;
-            if (schemaByAlias.peek()
-                    .put(alias.toLowerCase(), mapping) != null)
-            {
-                throw new ParseException("Alias '" + alias + "' is specified multiple times.", token);
-            }
-        }
-    }
-
-    static class SchemaMapping
-    {
-        final Schema schema;
-        final boolean populated;
-        /** Type used for lambda aliases */
-        ResolvedType lambdaType;
-
-        SchemaMapping(Schema schema, boolean populated)
-        {
-            this.schema = schema;
-            this.populated = populated;
-        }
-
-        @Override
-        public String toString()
-        {
-            return schema.toString() + (populated ? " populated"
-                    : "");
+            return new ResolveSchema(plan.getSchema());
         }
     }
 
@@ -173,28 +152,28 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         ILogicalPlan input = plan.getInput()
                 .accept(this, context);
 
-        Schema schema = input.getSchema();
+        ResolveSchema schema = context.getSchema(input);
 
         // Concat the schemas here, if we visit sub query expression further down
         // this will be the actual outer schema for that sub plan
         // This is a preparation for detecting a correlated sub query expression that will
         // be optimized later on in SubQueryExpressionPushDown rule
         // CSOFF
-        Schema prevOuterSchema = context.outerSchema;
+        ResolveSchema prevOuterSchema = context.outerSchema;
         // CSON
         MutableBoolean hasSubQueries = new MutableBoolean(false);
         plan.getExpressions()
                 .forEach(e -> e.accept(SubQueryExpressionDetector.INSTANCE, hasSubQueries));
         if (hasSubQueries.booleanValue())
         {
-            context.outerSchema = Schema.concat(context.outerSchema, schema);
+            context.outerSchema = ResolveSchema.concat(context.outerSchema, schema);
         }
         // Rewrite expressions according to input plan schema
         context.schema = schema;
         List<IExpression> expressions = ColumnResolverVisitor.rewrite(context, plan.getExpressions());
 
         // Expand all asterisks, they should not be left for execution
-        expressions = expandAsterisks(expressions, context.outerReferences, context.outerSchema, schema, context.schemaByAlias.peek());
+        expressions = expandAsterisks(expressions, context.outerReferences, context.outerSchema, schema);
 
         if (input instanceof Projection)
         {
@@ -205,7 +184,9 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         context.outerSchema = prevOuterSchema;
 
         // Might create the resulting schema from the expressions here and not do that on demand
-        return new Projection(input, expressions, plan.isAppendInputColumns());
+        ILogicalPlan result = new Projection(input, expressions, plan.isAppendInputColumns());
+        context.planSchema.push(new ResolveSchema(result.getSchema()));
+        return result;
     }
 
     @Override
@@ -214,13 +195,13 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         // Re-write input
         ILogicalPlan input = plan.getInput()
                 .accept(this, context);
-        Schema schema = input.getSchema();
+        ResolveSchema schema = context.getSchema(input);
 
         // Rewrite predicate according to input plan schema
         context.schema = schema;
         IExpression predicate = ColumnResolverVisitor.rewrite(context, plan.getPredicate());
 
-        // Nested filters => AND predicates and return plans input
+        // Nested filters => AND the predicates and return plans input
         if (input instanceof Filter)
         {
             IExpression inputPredicate = ((Filter) input).getPredicate();
@@ -228,7 +209,10 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             input = ((Filter) input).getInput();
         }
 
-        return new Filter(input, plan.getTableSource(), predicate);
+        ILogicalPlan result = new Filter(input, plan.getTableSource(), predicate);
+
+        context.planSchema.push(schema);
+        return result;
     }
 
     @Override
@@ -237,7 +221,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         // Re-write input
         ILogicalPlan input = plan.getInput()
                 .accept(this, context);
-        Schema schema = input.getSchema();
+        ResolveSchema schema = context.getSchema(input);
 
         if (input instanceof Sort)
         {
@@ -252,7 +236,9 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 .map(si -> new SortItem(ColumnResolverVisitor.rewrite(context, si.getExpression()), si.getOrder(), si.getNullOrder(), si.getToken()))
                 .collect(toList());
 
-        return new Sort(input, sortItems);
+        ILogicalPlan result = new Sort(input, sortItems);
+        context.planSchema.push(schema);
+        return result;
     }
 
     @Override
@@ -264,18 +250,19 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
 
         // CSOFF
         // Concat outer and left schema to detect outer references
-        Schema prevOuterSchema = context.outerSchema;
+        ResolveSchema prevOuterSchema = context.outerSchema;
         // Reset the outer reference list before visiting left to distinctly
         // know what references this join has
         Set<Column> prevOuterReferences = context.outerReferences;
         // CSON
 
-        Schema leftSchema = left.getSchema();
+        ResolveSchema leftSchema = context.getSchema(left);
 
-        // Outer reference are only supported in outer/cross apply's/cross joins (ie. there is no condition)
-        if (plan.getCondition() == null)
+        // Outer reference are only supported in outer/cross apply's
+        if (plan.getCondition() == null
+                && plan.getType() != Join.Type.CROSS)
         {
-            context.outerSchema = Schema.concat(context.outerSchema, leftSchema);
+            context.outerSchema = ResolveSchema.concat(context.outerSchema, leftSchema);
             context.outerReferences = new HashSet<>();
         }
         else
@@ -287,34 +274,35 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         ILogicalPlan right = plan.getInner()
                 .accept(this, context);
 
+        ResolveSchema rightSchema = context.getSchema(right);
+
+        // Construct a resulting join schema
+        ResolveSchema resultSchema = new ResolveSchema();
+        resultSchema.schemas.addAll(leftSchema.schemas);
+        if (plan.getPopulateAlias() != null)
+        {
+            Schema populateSchema = rightSchema.getSchema();
+            ColumnReference colRef = SchemaUtils.getColumnReference(populateSchema.getColumns()
+                    .get(0));
+            if (colRef != null)
+            {
+                colRef = colRef.rename(plan.getPopulateAlias());
+            }
+
+            resultSchema.add(new AliasSchema(Schema.of(CoreColumn.of(plan.getPopulateAlias(), ResolvedType.table(populateSchema), colRef)), plan.getPopulateAlias()), null);
+        }
+        else
+        {
+            resultSchema.addAll(rightSchema.schemas, null);
+        }
+
         IExpression condition = plan.getCondition();
 
         // Rewrite condition if present. Cross/outer joins doesn't have conditions
         if (condition != null)
         {
-            context.schema = Schema.concat(leftSchema, right.getSchema());
+            context.schema = ResolveSchema.concat(leftSchema, rightSchema);
             condition = ColumnResolverVisitor.rewrite(context, condition);
-        }
-
-        // Correct the inner schema mappings if we have a populate join
-        // Note! The join condition is performed against a non populated schema, it's not until
-        // after the join we have a populated schema, that is why we adjust after we resolved the condition columns
-        String populateAlias = plan.getPopulateAlias();
-        if (populateAlias != null)
-        {
-            SchemaMapping populateSchema = context.schemaByAlias.peek()
-                    .remove(populateAlias.toLowerCase());
-
-            // Create a column reference (named from the populate alias) from the inner table source, if any exists
-            ColumnReference colRef = populateSchema.schema.getColumns()
-                    .get(0)
-                    .getColumnReference();
-            if (colRef != null)
-            {
-                colRef = colRef.rename(populateAlias);
-            }
-
-            context.pushAliasSchema(populateAlias, Schema.of(new Column(populateAlias, ResolvedType.tupleVector(populateSchema.schema), colRef)), true, null);
         }
 
         // CSOFF
@@ -330,6 +318,8 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         }
         context.outerReferences = prevOuterReferences;
 
+        context.planSchema.push(resultSchema);
+
         return result;
     }
 
@@ -340,23 +330,20 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         ILogicalPlan input = plan.getInput()
                 .accept(this, context);
 
-        Schema schema = input.getSchema();
+        ResolveSchema schema = context.getSchema(input);
         // Resolve expressions against input schema
         context.schema = schema;
 
         List<IExpression> aggregateExpressions = ColumnResolverVisitor.rewrite(context, plan.getAggregateExpressions());
-        // Expand asterisks, this only happens when aggregate is used for DISTINCT since GROUP BY * is invalid
-        aggregateExpressions = expandAsterisks(aggregateExpressions, context.outerReferences, context.outerSchema, schema, context.schemaByAlias.peek());
-
         context.aggregateColumnReferences = new HashSet<>();
         for (IExpression e : aggregateExpressions)
         {
-            if (e instanceof ColumnExpression)
+            if (e instanceof HasColumnReference)
             {
-                ColumnExpression ce = (ColumnExpression) e;
-                if (ce.getColumnReference() != null)
+                ColumnReference colRef = ((HasColumnReference) e).getColumnReference();
+                if (colRef != null)
                 {
-                    context.aggregateColumnReferences.add(ce.getColumnReference());
+                    context.aggregateColumnReferences.add(colRef);
                 }
             }
         }
@@ -372,11 +359,12 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             if (exp instanceof AggregateWrapperExpression
                     && ((AggregateWrapperExpression) exp).getExpression() instanceof AsteriskExpression)
             {
-                List<IExpression> expandAsterisks = expandAsterisks(singletonList(((AggregateWrapperExpression) exp).getExpression()), context.outerReferences, context.outerSchema, schema,
-                        context.schemaByAlias.peek());
+                AggregateWrapperExpression awe = (AggregateWrapperExpression) exp;
+
+                List<IExpression> expandAsterisks = expandAsterisks(singletonList(awe.getExpression()), context.outerReferences, context.outerSchema, schema);
                 for (IExpression ea : expandAsterisks)
                 {
-                    projectionExpressions.add(new AggregateWrapperExpression(ea, true, false));
+                    projectionExpressions.add(new AggregateWrapperExpression(ea, awe.isSingleValue(), false));
                 }
             }
             else
@@ -385,40 +373,40 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             }
         }
 
-        return new Aggregate(input, aggregateExpressions, projectionExpressions);
+        ILogicalPlan result = new Aggregate(input, aggregateExpressions, projectionExpressions);
+        context.planSchema.push(new ResolveSchema(result.getSchema()));
+        return result;
     }
 
     @Override
     public ILogicalPlan visit(SubQuery plan, Ctx context)
     {
-        // Prepare to store all child schemas
-        context.schemaByAlias.push(new HashMap<>());
+        // CSOFF
+        boolean prevInsideSubQuery = context.insideSubQuery;
+        // CSON
+        context.insideSubQuery = true;
 
         // Eliminate sub query, no sub queries should be left
         ILogicalPlan result = plan.getInput()
                 .accept(this, context);
 
-        Schema schema = result.getSchema();
+        ResolveSchema schema = context.getSchema(result);
 
         // Validate sub query schema, all columns must have a specified alias
         int size = schema.getSize();
         for (int i = 0; i < size; i++)
         {
-            Column column = schema.getColumns()
-                    .get(i);
-
+            Column column = schema.getColumn(i)
+                    .getValue();
+            boolean isAsterisk = SchemaUtils.isAsterisk(column);
             if ("".equals(column.getName())
-                    && (column.getColumnReference() == null
-                            || !column.getColumnReference()
-                                    .isAsterisk()))
+                    && !isAsterisk)
             {
                 throw new ParseException("Missing column name for ordinal " + i + " of " + plan.getAlias(), plan.getToken());
             }
         }
-
-        // Pop the map we put all child schemas in since those are not needed anymore when we leave the subquery
-        context.schemaByAlias.pop();
-        context.pushAliasSchema(plan.getAlias(), schema, false, plan.getToken());
+        context.planSchema.push(new ResolveSchema(schema, plan.getAlias()));
+        context.insideSubQuery = prevInsideSubQuery;
         return result;
     }
 
@@ -426,18 +414,13 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
     public ILogicalPlan visit(TableFunctionScan plan, Ctx context)
     {
         // CSOFF
-        Schema prevSchema = context.schema;
-        // Table function only have outer schema to search values from
-        Deque<Map<String, SchemaMapping>> prevSchemaByAlias = context.schemaByAlias;
+        ResolveSchema prevSchema = context.schema;
         context.schema = null;
-        context.schemaByAlias = new ArrayDeque<>();
+        // Table function only have outer schema to search values from
         List<IExpression> expressions = ColumnResolverVisitor.rewrite(context, plan.getArguments());
-        context.schemaByAlias = prevSchemaByAlias;
         // CSON
 
-        context.pushAliasSchema(plan.getAlias(), plan.getSchema(), false, plan.getToken());
-
-        Schema prevOuterSchema = context.outerSchema;
+        ResolveSchema prevOuterSchema = context.outerSchema;
         context.outerSchema = null;
 
         // Options cannot reference columns
@@ -451,82 +434,113 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         context.schema = prevSchema;
         context.outerSchema = prevOuterSchema;
 
-        return new TableFunctionScan(plan.getTableSource(), plan.getSchema(), expressions, options, plan.getToken());
+        TableFunctionInfo function = context.getSession()
+                .resolveTableFunctionInfo(plan.getCatalogAlias(), plan.getTableSource()
+                        .getName()
+                        .getFirst())
+                .getValue();
+
+        // Resolve the table function schema from it's resolved arguments
+        Schema schema = Schema.EMPTY;
+        try
+        {
+            schema = function.getSchema(expressions);
+        }
+        catch (SchemaResolveException e)
+        {
+            throw new ParseException(e.getMessage(), plan.getToken());
+        }
+        if (schema.getColumns()
+                .isEmpty())
+        {
+            ColumnReference ast = new ColumnReference(plan.getTableSource(), plan.getAlias(), ColumnReference.Type.ASTERISK);
+            schema = Schema.of(CoreColumn.of(ast, ResolvedType.of(Type.Any)));
+        }
+        else
+        {
+            // .. force all columns to have a proper column reference
+            schema = SchemaResolver.recreate(plan.getTableSource(), schema);
+        }
+
+        context.planSchema.push(new ResolveSchema(schema, plan.getTableSource()
+                .getAlias()));
+
+        return new TableFunctionScan(plan.getTableSource(), schema, expressions, options, plan.getToken());
     }
 
     @Override
     public ILogicalPlan visit(TableScan plan, Ctx context)
     {
-        context.pushAliasSchema(plan.getAlias(), plan.getSchema(), false, plan.getToken());
+        context.planSchema.push(new ResolveSchema(plan.getSchema(), plan.getTableSource()
+                .getAlias()));
         return super.visit(plan, context);
     }
 
     @Override
-    public ILogicalPlan visit(OverScan plan, Ctx context)
+    public ILogicalPlan visit(ExpressionScan plan, Ctx context)
     {
-        String alias = plan.getOverAlias();
-        if (context.outerSchema == null)
+        // CSOFF
+        ResolveSchema prevSchema = context.schema;
+        context.schema = null;
+        // Expression scans only have outer schema to search values from
+        IExpression expression = ColumnResolverVisitor.rewrite(context, plan.getExpression());
+        // CSON
+
+        ResolvedType type = expression.getType();
+        // Parse error, expression has invalid type
+        if (!(type.getType() == Type.Any
+                || type.getType() == Type.Table))
         {
-            throw new IllegalArgumentException("An over scan requires an outer schema");
+            throw new ParseException("Expression scans must reference either " + Type.Any + " or " + Type.Table + " types.", plan.getToken());
         }
 
-        int size = context.outerSchema.getSize();
-        int matchOrdinal = -1;
-        boolean containsAsterisks = false;
-        for (int i = 0; i < size; i++)
+        Schema schema = type.getSchema();
+        if (schema == null)
         {
-            Column column = context.outerSchema.getColumns()
-                    .get(i);
-            if (column.getType()
-                    .getType() == Column.Type.TupleVector
-                    && equalsIgnoreCase(alias, column.getName()))
-            {
-                if (matchOrdinal != -1)
-                {
-                    throw new ParseException("Ambiguous alias: " + alias, plan.getToken());
-                }
-                matchOrdinal = i;
-            }
-
-            containsAsterisks = containsAsterisks
-                    || (column.getColumnReference() != null
-                            && column.getColumnReference()
-                                    .isAsterisk());
+            schema = Schema.EMPTY;
         }
 
-        if (matchOrdinal == -1)
+        if (SchemaUtils.isAsterisk(schema))
         {
-            throw new ParseException("Alias " + alias + " cannot be bound", plan.getToken());
+            // Set an asterisk schema with expression scans table source
+            ColumnReference ast = new ColumnReference(plan.getTableSource(), plan.getAlias(), ColumnReference.Type.ASTERISK);
+            schema = Schema.of(CoreColumn.of(ast, ResolvedType.of(Type.Any)));
+        }
+        else
+        {
+            // .. else force all columns to have a proper column reference
+            schema = SchemaResolver.recreate(plan.getTableSource(), schema);
         }
 
-        Column column = context.outerSchema.getColumns()
-                .get(matchOrdinal);
-        Schema schema = column.getType()
-                .getSchema();
+        context.schema = prevSchema;
 
-        // Cannot use ordinal when having asterisks
-        if (containsAsterisks)
-        {
-            matchOrdinal = -1;
-        }
+        context.planSchema.push(new ResolveSchema(schema, plan.getTableSource()
+                .getAlias()));
 
-        // We push the over alias to context schemas to override the outerschema that would otherwise
-        // create an ambiguity due to the over scan will have a schema that is also present in the outer schema
-        context.pushAliasSchema(alias, schema, false, plan.getToken());
-
-        // An overscan is by definition outer reference so add the column to context
-        context.outerReferences.add(column);
-
-        return new OverScan(schema, alias, matchOrdinal, plan.getToken());
+        return new ExpressionScan(plan.getTableSource(), schema, expression, plan.getToken());
     }
 
-    private List<IExpression> expandAsterisks(List<IExpression> expressions, Set<Column> outerReferences, Schema outerSchema, Schema inputSchema, Map<String, SchemaMapping> aliasSchema)
+    @Override
+    public ILogicalPlan visit(OperatorFunctionScan plan, Ctx context)
     {
-        boolean inputSchemaHasAsterisks = inputSchema.getColumns()
-                .stream()
-                .anyMatch(c -> c.getColumnReference() != null
-                        && c.getColumnReference()
-                                .isAsterisk());
+        Pair<String, OperatorFunctionInfo> pair = context.getSession()
+                .resolveOperatorFunctionInfo(plan.getCatalogAlias(), plan.getFunction());
+        if (pair == null)
+        {
+            throw new ParseException("No operator function found named: " + plan.getFunction(), plan.getToken());
+        }
+        ILogicalPlan input = plan.getInput()
+                .accept(this, context);
+
+        // Create a temporary column name, this will be corrected in SubQueryExpressionPushDown later on
+        Schema schema = Schema.of(Column.of("output", pair.getValue()
+                .getType(input.getSchema())));
+        return new OperatorFunctionScan(schema, input, plan.getCatalogAlias(), plan.getFunction(), plan.getToken());
+    }
+
+    private List<IExpression> expandAsterisks(List<IExpression> expressions, Set<Column> outerReferences, ResolveSchema outerSchema, ResolveSchema inputSchema)
+    {
+        boolean schemaHasAsterisks = inputSchema.hasAsteriskColumns();
 
         List<IExpression> result = new ArrayList<>();
         for (IExpression expression : expressions)
@@ -536,9 +550,10 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 AsteriskExpression ae = (AsteriskExpression) expression;
                 QualifiedName qname = ae.getQname();
 
+                int startIndex = 0;
                 int populateIndex = -1;
                 String populateAlias = null;
-                Schema schema = null;
+                ResolveSchema schema = null;
                 boolean outerReference = false;
 
                 // Full schema
@@ -549,62 +564,30 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 // Qualified schema
                 else if (qname.size() == 1)
                 {
-                    SchemaMapping mapping = aliasSchema.get(qname.getFirst()
-                            .toLowerCase());
-                    if (mapping == null)
+                    String alias = qname.getFirst()
+                            .toLowerCase();
+
+                    Pair<Integer, ResolveSchema> pair = inputSchema.getResolveSchema(alias);
+
+                    if (pair == null)
                     {
-                        // Try outer schema
-                        if (outerSchema != null)
-                        {
-                            for (Column outerCol : outerSchema.getColumns())
-                            {
-                                if (outerCol.getType()
-                                        .getType() == Type.TupleVector
-                                        && qname.getFirst()
-                                                .equalsIgnoreCase(outerCol.getName()))
-                                {
-                                    outerReference = true;
-                                    populateAlias = qname.getFirst()
-                                            .toLowerCase();
-                                    schema = outerCol.getType()
-                                            .getSchema();
-                                    populateIndex = outerSchema.getColumns()
-                                            .indexOf(outerCol);
-
-                                    inputSchemaHasAsterisks = outerSchema.getColumns()
-                                            .stream()
-                                            .anyMatch(c -> c.getColumnReference() != null
-                                                    && c.getColumnReference()
-                                                            .isAsterisk());
-
-                                    outerReferences.add(outerCol);
-
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (schema == null)
+                        // Try outer
+                        pair = outerSchema != null ? outerSchema.getResolveSchema(alias)
+                                : null;
+                        if (pair == null)
                         {
                             throw new ParseException("Alias " + qname.toDotDelimited() + " could not be bound", ae.getToken());
                         }
+
+                        schemaHasAsterisks = outerSchema.hasAsteriskColumns();
+                        outerReference = true;
+                        startIndex = pair.getKey();
+                        schema = pair.getValue();
                     }
                     else
                     {
-                        schema = mapping.schema;
-                        if (mapping.populated)
-                        {
-                            populateAlias = qname.getFirst()
-                                    .toLowerCase();
-                            // Expand the schema
-                            populateIndex = inputSchema.getColumns()
-                                    .indexOf(schema.getColumns()
-                                            .get(0));
-                            schema = schema.getColumns()
-                                    .get(0)
-                                    .getType()
-                                    .getSchema();
-                        }
+                        startIndex = pair.getKey();
+                        schema = pair.getValue();
                     }
                 }
                 // Expand nested value like map, tuple vector etc.
@@ -614,37 +597,55 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 }
 
                 int size = schema.getSize();
+                // Populated, dig into populate schema
+                if (schema.isPopulated())
+                {
+                    if (outerReference)
+                    {
+                        outerReferences.add(schema.getColumn(0)
+                                .getValue());
+                    }
+                    populateIndex = startIndex;
+                    populateAlias = qname.getFirst()
+                            .toLowerCase();
+                    schema = new ResolveSchema(schema.getColumn(0)
+                            .getValue()
+                            .getType()
+                            .getSchema());
+                    size = schema.getSize();
+                }
+
                 for (int i = 0; i < size; i++)
                 {
-                    Column column = schema.getColumns()
-                            .get(i);
+                    Pair<String, Column> pair = schema.getColumn(i);
+
+                    Column column = pair.getValue();
 
                     // Internal columns should not be expanded
-                    if (column.isInternal())
+                    if (column instanceof CoreColumn
+                            && ((CoreColumn) column).isInternal())
                     {
                         continue;
                     }
 
-                    ColumnReference colRef = column.getColumnReference();
+                    ColumnReference colRef = SchemaUtils.getColumnReference(column);
 
                     int index;
                     QualifiedName path;
 
                     if (populateAlias != null)
                     {
-                        index = inputSchemaHasAsterisks ? -1
+                        index = schemaHasAsterisks ? -1
                                 : populateIndex;
 
                         path = QualifiedName.of(populateAlias, column.getName());
                     }
                     else
                     {
-                        index = inputSchemaHasAsterisks ? -1
-                                : inputSchema.getColumns()
-                                        .indexOf(column);
+                        index = schemaHasAsterisks ? -1
+                                : startIndex + i;
 
                         path = QualifiedName.of(column.getName());
-
                     }
 
                     // A asterisk column (a.*) then we don't have a path but only a column reference
@@ -663,7 +664,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                     if (populateAlias != null)
                     {
                         expressionAlias = populateAlias;
-                        expressionType = ResolvedType.tupleVector(schema);
+                        expressionType = ResolvedType.table(schema.getSchema());
                     }
 
                     ColumnExpression.Builder builder = ColumnExpression.Builder.of(expressionAlias, expressionType)
@@ -683,7 +684,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
 
                     if (path.size() > 0)
                     {
-                        result.add(DereferenceExpression.create(builder.build(), path));
+                        result.add(DereferenceExpression.create(builder.build(), path, ae.getToken()));
                     }
                     else
                     {
@@ -704,7 +705,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         private static final SubQueryExpressionDetector INSTANCE = new SubQueryExpressionDetector();
 
         @Override
-        public Void visit(SubQueryExpression expression, MutableBoolean context)
+        public Void visit(UnresolvedSubQueryExpression expression, MutableBoolean context)
         {
             context.setTrue();
             // No need to visit the subquery nestedly since we found one already
@@ -725,10 +726,17 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         /** Rewrite provided expressions according to provided schema */
         static List<IExpression> rewrite(ColumnResolver.Ctx context, List<IExpression> expressions)
         {
+            ResolveSchema schema = context.schema;
+            ResolveSchema outerSchema = context.outerSchema;
+
             List<IExpression> result = new ArrayList<>(expressions.size());
             for (IExpression expression : expressions)
             {
                 result.add(expression.accept(INSTANCE, context));
+
+                // Restore context between resolves since there could be sub query expressions that sets these
+                context.schema = schema;
+                context.outerSchema = outerSchema;
             }
             return result;
         }
@@ -736,8 +744,18 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         @Override
         public IExpression visit(AggregateWrapperExpression expression, Ctx context)
         {
+            /*
+             * If this is a wrapper around an asterisk expression then simply return the input. This will be expanded into column expressions later on and the singleValue property on the wrapper
+             * should be not be altered with because it's used when creating the expanded expressions
+             */
+            if (expression.getExpression() instanceof AsteriskExpression)
+            {
+                return expression;
+            }
+
             IExpression result = expression.getExpression()
                     .accept(this, context);
+
             Set<ColumnReference> columnReferences = ColumnResolver.collectColumns(singletonList(result));
 
             boolean singleValue = columnReferences.isEmpty()
@@ -750,7 +768,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         public IExpression visit(IDereferenceExpression expression, Ctx context)
         {
             return DereferenceExpression.create(expression.getExpression()
-                    .accept(this, context), QualifiedName.of(expression.getRight()));
+                    .accept(this, context), QualifiedName.of(expression.getRight()), null);
         };
 
         @Override
@@ -786,22 +804,20 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                     LambdaExpression le = (LambdaExpression) expression.getArguments()
                             .get(lambdaArg);
 
-                    // Set schema mappings for all lambda identifiers
-                    for (String lambdaIdentifier : le.getIdentifiers())
+                    // Set lambda types for all lambda ids
+                    for (int lambdaId : le.getLambdaIds())
                     {
-                        context.pushLambdaType(lambdaIdentifier, toArgType, null);
+                        context.lambdaTypes.put(lambdaId, toArgType);
                     }
 
                     // Resolve the lambda's expression
                     arguments.set(lambdaArg, new LambdaExpression(le.getIdentifiers(), le.getExpression()
                             .accept(this, context), le.getLambdaIds()));
 
-                    Map<String, SchemaMapping> schemaByAlias = context.schemaByAlias.peek();
-
-                    // Remove all the lambda identifiers that we added before resolving
-                    for (String lambdaIdentifier : le.getIdentifiers())
+                    // Clean up
+                    for (int lambdaId : le.getLambdaIds())
                     {
-                        schemaByAlias.remove(lambdaIdentifier);
+                        context.lambdaTypes.remove(lambdaId);
                     }
                 }
 
@@ -839,15 +855,13 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
          * Dig down into sub query and resolve Since this will be a nested loop further down we collect outer references
          */
         @Override
-        public IExpression visit(SubQueryExpression expression, ColumnResolver.Ctx context)
+        public IExpression visit(UnresolvedSubQueryExpression expression, ColumnResolver.Ctx context)
         {
-            // Push a new map for aliases. A sub query expression doesn't it self
-            // have an alias but we are entering a new scope and we need a new clean map because of that
-            context.schemaByAlias.push(new HashMap<>());
-
             // Reset the outer reference list before visiting the sub query expression plan
             // to distinctly gather outer references for this sub query
+            // CSOFF
             Set<Column> prevOuterReferences = context.outerReferences;
+            // CSON
             context.outerReferences = new HashSet<>();
 
             // Resolve the sub query plan
@@ -855,11 +869,11 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                     .accept(context.columnResvoler, context);
 
             // CSOFF
-            IExpression result = new SubQueryExpression(input, context.outerReferences, expression.getToken());
+            IExpression result = new UnresolvedSubQueryExpression(input, context.outerReferences, expression.getToken());
             // CSON
 
-            // Pop the map we put all child schemas in since those are not needed anymore when we leave the subquery
-            context.schemaByAlias.pop();
+            // Pop the top schema after we visit the logical plan to keep a clean state
+            context.planSchema.pop();
 
             // Restore context values
             // Add all new outer references to previous list to cascade the list upwards
@@ -886,6 +900,17 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         @Override
         public IExpression visit(UnresolvedColumnExpression expression, ColumnResolver.Ctx context)
         {
+            IExpression result = visitInternal(expression, context);
+            return result;
+        }
+
+        private IExpression visitInternal(UnresolvedColumnExpression expression, ColumnResolver.Ctx context)
+        {
+            // CSOFF
+            ResolveSchema schema = context.schema;
+            ResolveSchema outerSchema = context.outerSchema;
+            // CSON
+
             Token token = expression.getToken();
 
             QualifiedName path = expression.getColumn();
@@ -894,102 +919,62 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             int lambdaId = expression.getLambdaId();
             if (lambdaId >= 0)
             {
-                alias = path.getParts()
-                        .get(0);
+                alias = path.getFirst();
                 path = path.extract(1);
 
-                SchemaMapping schemaMapping = context.schemaByAlias.peek()
-                        .get(alias);
+                ResolvedType lambdaType = context.lambdaTypes.get(lambdaId);
 
-                Column.Type type = schemaMapping.lambdaType.getType();
-                // Non tuple vector type for the lambda then simply create a de-referenced column expression
-                // else we need to resolve the expression against the schema
-                if (type != Column.Type.TupleVector)
+                Column.Type type = lambdaType.getType();
+
+                // Applying lambda to a table yields an object with the same schema
+                if (type == Column.Type.Table)
                 {
-                    return DereferenceExpression.create(ColumnExpression.Builder.of(alias, schemaMapping.lambdaType)
+                    return DereferenceExpression.create(ColumnExpression.Builder.of(alias, ResolvedType.object(lambdaType.getSchema()))
                             .withLambdaId(lambdaId)
-                            .build(), path);
+                            .build(), path, expression.getToken());
                 }
+                // Applying a lambda to an array then we will get the sub type
+                else if (type == Column.Type.Array)
+                {
+                    return DereferenceExpression.create(ColumnExpression.Builder.of(alias, lambdaType.getSubType())
+                            .withLambdaId(lambdaId)
+                            .build(), path, expression.getToken());
+                }
+
+                // All other types is resolved to that type
+                return DereferenceExpression.create(ColumnExpression.Builder.of(alias, lambdaType)
+                        .withLambdaId(lambdaId)
+                        .build(), path, expression.getToken());
             }
-            else
-            {
-                alias = defaultString(path.getAlias(), "").toLowerCase();
-                path = "".equals(alias) ? path
-                        : path.extract(1);
-            }
+
+            alias = defaultString(path.getAlias(), "").toLowerCase();
+            path = "".equals(alias) ? path
+                    : path.extract(1);
 
             String column = path.getFirst();
             path = path.extract(1);
 
-            Schema schema;
             IExpression result = null;
-            boolean populateAlias = false;
-            boolean aliasMatch = false;
-            // No alias, search in current and outer schema
-            if ("".equals(alias))
-            {
-                schema = context.schema;
-            }
-            // Fetch schema from alias mapping
-            else
-            {
-                Map<String, SchemaMapping> aliasMapping = context.schemaByAlias.peek();
-
-                SchemaMapping mapping = aliasMapping != null ? aliasMapping.get(alias)
-                        : null;
-
-                aliasMatch = aliasMapping != null;
-
-                // Extract the schema from the mapping
-                schema = mapping != null ? mapping.schema
-                        : null;
-                populateAlias = mapping != null ? mapping.populated
-                        : false;
-
-                // Lambda expression with a schema ie. a TupleVector is accessed
-                // resolve according to that schema
-                if (mapping != null
-                        && mapping.lambdaType != null)
-                {
-                    schema = mapping.lambdaType.getSchema();
-                    // Special case where we don't access any columns but the whole lambda
-                    // ie. map(x -> x) then we simply return the value as is
-                    if ("".equals(column))
-                    {
-                        return ColumnExpression.Builder.of(alias, ResolvedType.tupleVector(schema))
-                                .withLambdaId(lambdaId)
-                                .build();
-                    }
-
-                    result = resolve(expression.getColumn(), schema, schema, false, null, column, null, lambdaId, token);
-
-                    if (result == null)
-                    {
-                        throw new ParseException(expression.getColumn()
-                                .toDotDelimited() + " cannot be bound", token);
-                    }
-
-                    return result;
-                }
-            }
-
             if (schema != null)
             {
-                result = resolve(expression.getColumn(), context.schema, schema, false, populateAlias ? alias
-                        : null, column, null, lambdaId, token);
+                result = resolve(expression.getColumn(), schema, alias, column, null, lambdaId, token);
             }
 
             // Search in outer scope
-            // NOTE! Schema is the same as the outer schema when resolving a projection with subexpressions¨
-            if (context.outerSchema != null
-                    && schema != context.outerSchema)
+            // NOTE! Schema is the same as the outer schema when resolving a projection with subexpressions
+            if (outerSchema != null
+                    && schema != outerSchema)
             {
                 IExpression maybeResult = result;
+                ColumnReference colRef = null;
+                if (maybeResult instanceof HasColumnReference)
+                {
+                    colRef = ((HasColumnReference) maybeResult).getColumnReference();
+                }
 
                 boolean asteriskMatch = result != null
-                        && result.getColumnReference() != null
-                        && result.getColumnReference()
-                                .getType() == ColumnReference.Type.NAMED_ASTERISK;
+                        && colRef != null
+                        && colRef.getType() == ColumnReference.Type.NAMED_ASTERISK;
 
                 Set<Column> outerReferences = context.outerReferences;
                 context.outerReferences = new HashSet<>();
@@ -997,12 +982,10 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 // Result is still null or
                 // we found an asterisk match and we have an outer schema then we must search in outer too
                 // since there could be a non asterisk match there which have higher precedence
-                // Only do search if we not explicitly found an alias match
                 if (result == null
-                        || (asteriskMatch
-                                && !aliasMatch))
+                        || asteriskMatch)
                 {
-                    result = resolve(expression.getColumn(), context.outerSchema, context.outerSchema, true, alias, column, context.outerReferences, -1, token);
+                    result = resolve(expression.getColumn(), outerSchema, alias, column, context.outerReferences, -1, token);
                 }
 
                 // Swap back to the first hit if outer did not yield a match
@@ -1026,16 +1009,48 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 context.outerReferences = outerReferences;
             }
 
-            // No expression => cannot be bound
             if (result == null)
             {
-                throw new ParseException(expression.getColumn()
-                        .toDotDelimited() + " cannot be bound", token);
+                // If we are on top we can bind non matching expressions to a single available schema
+                if (!context.insideSubQuery)
+                {
+                    path = expression.getColumn();
+                    column = path.getFirst();
+                    path = path.extract(1);
+
+                    // If we only have a single schema to choose from and no hit's
+                    // bind the expression to that schema
+                    if (schema != null
+                            && (outerSchema == null
+                                    || outerSchema.isEmpty())
+                            && schema.schemas.size() == 1)
+                    {
+                        result = resolve(expression.getColumn(), schema, schema.schemas.get(0).alias, column, null, -1, token);
+                    }
+                    else if ((schema == null
+                            || schema.isEmpty())
+                            && outerSchema != null
+                            && outerSchema.schemas.size() == 1)
+                    {
+                        result = resolve(expression.getColumn(), outerSchema, outerSchema.schemas.get(0).alias, column, context.outerReferences, -1, token);
+                    }
+                }
+
+                if (result != null)
+                {
+                    return DereferenceExpression.create(result, path, token);
+                }
+                else
+                {
+                    // No expression => cannot be bound
+                    throw new ParseException(expression.getColumn()
+                            .toDotDelimited() + " cannot be bound", token);
+                }
             }
 
             if (path.size() > 0)
             {
-                return DereferenceExpression.create(result, path);
+                return DereferenceExpression.create(result, path, expression.getToken());
             }
 
             return result;
@@ -1049,10 +1064,15 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 return current;
             }
 
+            ColumnReference colRef = null;
+            if (outer instanceof HasColumnReference)
+            {
+                colRef = ((HasColumnReference) outer).getColumnReference();
+            }
+
             boolean outerAsteriskMatch = outer != null
-                    && outer.getColumnReference() != null
-                    && outer.getColumnReference()
-                            .getType() == ColumnReference.Type.NAMED_ASTERISK;
+                    && colRef != null
+                    && colRef.getType() == ColumnReference.Type.NAMED_ASTERISK;
 
             // Current is asterisk here
             // Non asterisk outer has higher precedence than asterisk
@@ -1065,7 +1085,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             if (outer instanceof ColumnExpression)
             {
                 ColumnExpression ce = (ColumnExpression) outer;
-                ColumnReference colRef = ce.getColumnReference();
+                colRef = ce.getColumnReference();
                 if (colRef != null)
                 {
                     TableSourceReference tableSource = colRef.getTableSource();
@@ -1082,33 +1102,48 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             return current;
         }
 
-        private IExpression resolve(QualifiedName originalQname, Schema inputSchema, Schema schema, boolean compareAlias, String alias, String column, Set<Column> outerReferences, int lambdaId,
-                Token token)
+        private IExpression resolve(QualifiedName originalQname, ResolveSchema schema, String alias, String column, Set<Column> outerReferences, int lambdaId, Token token)
         {
             int asteriskIndexMatch = -1;
             int nonAsteriskIndexMatch = -1;
             boolean multipleAsterisk = false;
             boolean populatedColumnMatch = false;
+            boolean canUseOrdinal = true;
 
             int size = schema.getSize();
             for (int i = 0; i < size; i++)
             {
-                Column schemaColumn = schema.getColumns()
-                        .get(i);
-                ColumnReference colRef = schemaColumn.getColumnReference();
-                boolean isAsterisk = colRef != null
-                        && colRef.isAsterisk();
-                String schemaAlias = colRef != null ? colRef.getTableSource()
+                Pair<String, Column> p = schema.getColumn(i);
+
+                Column schemaColumn = p.getValue();
+                String schemaAlias = p.getKey();
+                ColumnReference schemaColRef = SchemaUtils.getColumnReference(schemaColumn);
+
+                String columnAlias = schemaColRef != null ? schemaColRef.getTableSource()
                         .getAlias()
                         : "";
+                boolean isAsterisk = SchemaUtils.isAsterisk(schemaColumn);
 
-                if (compareAlias
-                        && alias != null
-                        && !"".equals(alias)
-                        && !"".equals(schemaAlias)
-                        && !alias.equalsIgnoreCase(schemaAlias))
+                // Ordinals can be used if there are no asterisk in the schema
+                canUseOrdinal = canUseOrdinal
+                        && (schemaColRef == null
+                                || schemaColRef.getType() == ColumnReference.Type.REGULAR);
+
+                // Match alias
+                if (!"".equals(alias))
                 {
-                    continue;
+                    // Non empty schema alias and the qualifier alias doesn't match => column not eligible
+                    if (!"".equalsIgnoreCase(schemaAlias)
+                            && !alias.equalsIgnoreCase(schemaAlias))
+                    {
+                        continue;
+                    }
+                    // Empty schema alias and the qualifier alias doesn't match column alias => column not eligible
+                    else if ("".equalsIgnoreCase(schemaAlias)
+                            && !alias.equalsIgnoreCase(columnAlias))
+                    {
+                        continue;
+                    }
                 }
 
                 if (isAsterisk)
@@ -1120,7 +1155,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 }
                 else if (column.equalsIgnoreCase(schemaColumn.getName())
                         || (schemaColumn.getType()
-                                .getType() == Column.Type.TupleVector
+                                .getType() == Column.Type.Table
                                 && schemaColumn.getName()
                                         .equalsIgnoreCase(alias)))
                 {
@@ -1150,19 +1185,10 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             int index = nonAsteriskIndexMatch >= 0 ? nonAsteriskIndexMatch
                     : asteriskIndexMatch;
 
-            Column match = schema.getColumns()
-                    .get(index);
+            Column match = schema.getColumn(index)
+                    .getRight();
 
-            // Calculate ordinal of column in input schema
-            // Ordinal can only be used if the whole schema consist of regular columns
-            boolean canUseOrdinal = inputSchema.getColumns()
-                    .stream()
-                    .allMatch(c -> c.getColumnReference() == null
-                            || c.getColumnReference()
-                                    .getType() == ColumnReference.Type.REGULAR);
-
-            int ordinal = canUseOrdinal ? inputSchema.getColumns()
-                    .indexOf(match)
+            int ordinal = canUseOrdinal ? index
                     : -1;
 
             ColumnExpression.Builder builder = ColumnExpression.Builder.of(populatedColumnMatch ? alias
@@ -1177,7 +1203,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                         : column);
             }
 
-            ColumnReference colRef = match.getColumnReference();
+            ColumnReference colRef = SchemaUtils.getColumnReference(match);
 
             if (colRef != null)
             {
@@ -1189,7 +1215,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 {
                     colRef = colRef.rename(column);
                 }
-                match = new Column(colRef.getName(), match.getType(), colRef);
+                match = CoreColumn.of(colRef.getName(), match.getType(), colRef);
                 builder.withColumnReference(colRef);
             }
 
@@ -1203,10 +1229,191 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             // If we had a match on the alias we need to wrap the column expression with a dereference of the column
             if (populatedColumnMatch)
             {
-                return DereferenceExpression.create(builder.build(), QualifiedName.of(column));
+                return DereferenceExpression.create(builder.build(), QualifiedName.of(column), token);
             }
 
             return builder.build();
+        }
+    }
+
+    /** Wrapper around a list of schemas used during resolving */
+    static class ResolveSchema
+    {
+        final List<AliasSchema> schemas = new ArrayList<>();
+
+        ResolveSchema()
+        {
+        }
+
+        /** Construct a resolve schema from a single regular schema */
+        ResolveSchema(Schema schema)
+        {
+            this(schema, "");
+        }
+
+        /** Construct a resolve schema from a single regular schema */
+        ResolveSchema(Schema schema, String alias)
+        {
+            schemas.add(new AliasSchema(schema, alias));
+        }
+
+        /** Copy a resolve schema but change it's alias */
+        ResolveSchema(ResolveSchema schema, String alias)
+        {
+            // Concat all the actual schemas into one alias schema
+            Schema result = null;
+
+            for (AliasSchema s : schema.schemas)
+            {
+                if (result == null)
+                {
+                    result = s.schema;
+                }
+                else
+                {
+                    result = SchemaUtils.concat(result, s.schema);
+                }
+            }
+
+            schemas.add(new AliasSchema(result, alias));
+        }
+
+        boolean isEmpty()
+        {
+            return schemas.isEmpty()
+                    || (schemas.size() == 1
+                            && schemas.get(0).schema.getSize() == 0);
+        }
+
+        /** Create a regular schema from this instance */
+        Schema getSchema()
+        {
+            List<Column> columns = new ArrayList<>(getSize());
+
+            for (AliasSchema s : schemas)
+            {
+                for (Column column : s.schema.getColumns())
+                {
+                    columns.add(column);
+                }
+            }
+
+            return new Schema(columns);
+        }
+
+        /** Get sub schema with provided alias */
+        Pair<Integer, ResolveSchema> getResolveSchema(String alias)
+        {
+            int index = 0;
+            for (AliasSchema s : schemas)
+            {
+                if (alias.equalsIgnoreCase(s.alias))
+                {
+                    return Pair.of(index, new ResolveSchema(s.schema));
+                }
+                index += s.schema.getSize();
+            }
+            return null;
+        }
+
+        int getSize()
+        {
+            int size = 0;
+            for (AliasSchema s : schemas)
+            {
+                size += s.schema.getSize();
+            }
+            return size;
+        }
+
+        Pair<String, Column> getColumn(int index)
+        {
+            int count = 0;
+            for (AliasSchema s : schemas)
+            {
+                int size = s.schema.getSize();
+                for (int i = 0; i < size; i++)
+                {
+                    Column column = s.schema.getColumns()
+                            .get(i);
+                    if (count == index)
+                    {
+                        return Pair.of(s.alias, column);
+                    }
+                    count++;
+                }
+            }
+            return null;
+        }
+
+        boolean isPopulated()
+        {
+            return getSize() == 1
+                    && getColumn(0).getValue()
+                            .getType()
+                            .getType() == Type.Table;
+        }
+
+        boolean hasAsteriskColumns()
+        {
+            for (AliasSchema s : schemas)
+            {
+                for (Column column : s.schema.getColumns())
+                {
+                    ColumnReference colRef = SchemaUtils.getColumnReference(column);
+                    if (colRef != null
+                            && colRef.isAsterisk())
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        /** Append alias schema */
+        void add(AliasSchema aliasSchema, Token token)
+        {
+            if (schemas.stream()
+                    .anyMatch(s -> equalsAnyIgnoreCase(s.alias, aliasSchema.alias)))
+            {
+                throw new ParseException("Alias '" + aliasSchema.alias + "' is specified multiple times.", token);
+            }
+            schemas.add(aliasSchema);
+        }
+
+        void addAll(List<AliasSchema> schemas, Token token)
+        {
+            for (AliasSchema schema : schemas)
+            {
+                add(schema, token);
+            }
+        }
+
+        static ResolveSchema concat(ResolveSchema schema1, ResolveSchema schema2)
+        {
+            if (schema1 == null)
+            {
+                return schema2;
+            }
+
+            ResolveSchema result = new ResolveSchema();
+            result.schemas.addAll(schema1.schemas);
+            result.schemas.addAll(schema2.schemas);
+            return result;
+        }
+    }
+
+    /** Wrapper around a schema with an attached alias to property resolve qualifiers */
+    static class AliasSchema
+    {
+        final Schema schema;
+        final String alias;
+
+        AliasSchema(Schema schema, String alias)
+        {
+            this.schema = schema;
+            this.alias = alias;
         }
     }
 }

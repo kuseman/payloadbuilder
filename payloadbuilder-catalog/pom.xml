@@ -3,11 +3,11 @@
     <parent>
         <groupId>se.kuseman</groupId>
         <artifactId>payloadbuilder</artifactId>
-        <version>0.8.7-SNAPSHOT</version>
+        <version>1.0.0-SNAPSHOT</version>
     </parent>
     <groupId>se.kuseman.payloadbuilder</groupId>
     <artifactId>payloadbuilder-catalog</artifactId>
-    <name>Payloadbuilder :: Catalogs</name>
+    <name>Payloadbuilder :: Catalog</name>
     <description>Payloadbuilder Catalogs</description>
     <url>https://github.com/kuseman/payloadbuilder</url>
 
@@ -42,16 +42,17 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpclient</artifactId>
-            <version>4.5.13</version>
+            <groupId>org.apache.httpcomponents.client5</groupId>
+            <artifactId>httpclient5</artifactId>
+            <version>5.2.1</version>
         </dependency>
-        <!-- Overwrite httpclients vurn. dep. -->
+        <!-- Overwrite httpclients vurn. dep. 
         <dependency>
             <groupId>commons-codec</groupId>
             <artifactId>commons-codec</artifactId>
-            <version>1.15</version>
+            <version>1.16.0</version>
         </dependency>
+        -->
         <dependency>
             <groupId>com.github.spullara.mustache.java</groupId>
             <artifactId>compiler</artifactId>
@@ -62,11 +63,16 @@
             <artifactId>HikariCP</artifactId>
             <version>4.0.3</version>
             <exclusions>
-            	<exclusion>
-            		<groupId>org.slf4j</groupId>
-            		<artifactId>slf4j-api</artifactId>
-            	</exclusion>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
             </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>1.7.36</version>
         </dependency>
 
         <!-- Test -->
@@ -99,7 +105,7 @@
             <version>1.16.3</version>
             <scope>test</scope>
         </dependency>
-        
+
         <!-- JDBC drivers -->
         <dependency>
             <groupId>com.microsoft.sqlserver</groupId>

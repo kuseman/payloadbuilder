@@ -11,10 +11,10 @@ import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.NodeData;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
 
 /** Analyze interceptor that measures things like time spent, execution count. etc. */
@@ -76,42 +76,9 @@ public class AnalyzeInterceptor implements IPhysicalPlan
             properties = new LinkedHashMap<>();
         }
 
-        long totalAcc = 0;
-        long total = 0;
-        float percentageTime = 0;
-        int executionCount = 0;
-        long rowCount = 0;
-
         NodeData data = context.getStatementContext()
                 .getNodeData(nodeId);
-        if (data != null)
-        {
-            executionCount = data.getExecutionCount();
-            rowCount = data.getRowCount();
-            total = data.getNodeTime(TimeUnit.MILLISECONDS);
-            totalAcc = total;
-            // Remove the children times to get the actual time spent in this node
-            List<IPhysicalPlan> children = getChildren();
-            for (IPhysicalPlan child : children)
-            {
-                NodeData childData = context.getStatementContext()
-                        .getNodeData(child.getActualNodeId());
-                if (childData != null)
-                {
-                    total -= childData.getNodeTime(TimeUnit.MILLISECONDS);
-                }
-            }
-
-            percentageTime = 100 * ((float) total / data.getTotalQueryTime());
-        }
-
-        // Append statistics to target nodes properties
-        String timeSpent = String.format("%s (%.2f %%)", DurationFormatUtils.formatDurationHMS(Math.max(0, total)), percentageTime);
-        properties.put(DescribeUtils.TIME_SPENT_ACC, DurationFormatUtils.formatDurationHMS(totalAcc));
-        properties.put(DescribeUtils.TIME_SPENT, timeSpent);
-        properties.put(DescribeUtils.EXECUTION_COUNT, executionCount);
-        properties.put(DescribeUtils.PROCESSED_ROWS, rowCount);
-
+        populateTimings(context, data, input, properties);
         return properties;
     }
 
@@ -165,7 +132,51 @@ public class AnalyzeInterceptor implements IPhysicalPlan
     @Override
     public String toString()
     {
-        return "Analyze Intercep " + "(" + nodeId + ")";
+        return "Analyze Interceptor " + "(" + nodeId + ")";
+    }
+
+    /** Skip interceptors in the tree to avoid verbosity */
+    @Override
+    public String print(int indent)
+    {
+        return input.print(indent);
+    }
+
+    static void populateTimings(IExecutionContext context, NodeData data, IPhysicalPlan input, Map<String, Object> properties)
+    {
+        long totalAcc = 0;
+        long total = 0;
+        float percentageTime = 0;
+        int executionCount = 0;
+        long rowCount = 0;
+
+        if (data != null)
+        {
+            executionCount = data.getExecutionCount();
+            rowCount = data.getRowCount();
+            total = data.getNodeTime(TimeUnit.MILLISECONDS);
+            totalAcc = total;
+            // Remove the child times to get the actual time spent in this node
+            List<IPhysicalPlan> children = input.getChildren();
+            for (IPhysicalPlan child : children)
+            {
+                NodeData childData = context.getStatementContext()
+                        .getNodeData(child.getActualNodeId());
+                if (childData != null)
+                {
+                    total -= childData.getNodeTime(TimeUnit.MILLISECONDS);
+                }
+            }
+
+            percentageTime = 100 * ((float) total / data.getTotalQueryTime());
+        }
+
+        // Append statistics to target nodes properties
+        String timeSpent = String.format("%s (%.2f %%)", DurationFormatUtils.formatDurationHMS(Math.max(0, total)), percentageTime);
+        properties.put(DescribeUtils.TIME_SPENT_ACC, DurationFormatUtils.formatDurationHMS(totalAcc));
+        properties.put(DescribeUtils.TIME_SPENT, timeSpent);
+        properties.put(DescribeUtils.EXECUTION_COUNT, executionCount);
+        properties.put(DescribeUtils.PROCESSED_ROWS, rowCount);
     }
 
     /** Analyze iterator */
@@ -201,7 +212,9 @@ public class AnalyzeInterceptor implements IPhysicalPlan
         @Override
         public void close()
         {
+            data.resumeNodeTime();
             it.close();
+            data.suspenNodeTime();
         }
     }
 

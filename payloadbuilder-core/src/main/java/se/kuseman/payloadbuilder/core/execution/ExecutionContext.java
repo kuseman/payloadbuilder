@@ -8,7 +8,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
-import se.kuseman.payloadbuilder.core.QuerySession;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IVectorBuilderFactory;
+import se.kuseman.payloadbuilder.api.expression.IExpressionFactory;
+import se.kuseman.payloadbuilder.core.execution.vector.BufferAllocator;
+import se.kuseman.payloadbuilder.core.execution.vector.VectorBuilderFactory;
 
 /**
  * Context used during execution of a query
@@ -21,9 +25,12 @@ public class ExecutionContext implements IExecutionContext
 {
     private final QuerySession session;
     private final StatementContext statementContext;
+    private final BufferAllocator bufferAllocator;
+    private final VectorBuilderFactory vectorBuilderFactory;
+    private final ExpressionFactory expressionFactory;
 
     /** Variables in context */
-    private Map<String, Object> variables;
+    private Map<String, ValueVector> variables;
 
     public ExecutionContext(QuerySession session)
     {
@@ -32,6 +39,9 @@ public class ExecutionContext implements IExecutionContext
         this.variables = session.getVariables() != null ? new HashMap<>(session.getVariables())
                 : null;
         this.statementContext = new StatementContext();
+        this.bufferAllocator = new BufferAllocator();
+        this.vectorBuilderFactory = new VectorBuilderFactory(bufferAllocator);
+        this.expressionFactory = new ExpressionFactory();
     }
 
     private ExecutionContext(ExecutionContext source)
@@ -39,6 +49,9 @@ public class ExecutionContext implements IExecutionContext
         this.session = source.session;
         this.variables = source.variables;
         this.statementContext = new StatementContext(source.statementContext);
+        this.bufferAllocator = source.bufferAllocator;
+        this.vectorBuilderFactory = source.vectorBuilderFactory;
+        this.expressionFactory = new ExpressionFactory();
     }
 
     /** Return session */
@@ -48,14 +61,31 @@ public class ExecutionContext implements IExecutionContext
         return session;
     }
 
+    @Override
+    public IVectorBuilderFactory getVectorBuilderFactory()
+    {
+        return vectorBuilderFactory;
+    }
+
+    @Override
+    public IExpressionFactory getExpressionFactory()
+    {
+        return expressionFactory;
+    }
+
+    public BufferAllocator getBufferAllocator()
+    {
+        return bufferAllocator;
+    }
+
     /** Get variables map */
-    public Map<String, Object> getVariables()
+    public Map<String, ValueVector> getVariables()
     {
         return defaultIfNull(variables, emptyMap());
     }
 
     /** Set variable to context */
-    public void setVariable(String name, Object value)
+    public void setVariable(String name, ValueVector value)
     {
         if (variables == null)
         {
@@ -65,7 +95,7 @@ public class ExecutionContext implements IExecutionContext
     }
 
     /** Get variable from context */
-    public Object getVariableValue(String name)
+    public ValueVector getVariableValue(String name)
     {
         return variables != null ? variables.get(name)
                 : null;

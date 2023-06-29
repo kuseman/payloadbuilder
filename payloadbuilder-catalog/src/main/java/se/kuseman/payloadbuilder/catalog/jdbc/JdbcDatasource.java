@@ -1,6 +1,5 @@
 package se.kuseman.payloadbuilder.catalog.jdbc;
 
-import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
@@ -26,17 +25,16 @@ import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
-import se.kuseman.payloadbuilder.api.catalog.ObjectTupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.UTF8String;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.ISeekKey;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.SeekType;
+import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IInExpression;
 import se.kuseman.payloadbuilder.api.expression.ILikeExpression;
@@ -131,36 +129,23 @@ class JdbcDatasource implements IDatasource
             if (describe)
             {
                 // Create dummy values
-                final ValueVector key1 = ValueVector.literalObject(ResolvedType.of(Type.String), "<index values colN>");
-                final ValueVector key2 = ValueVector.literalObject(ResolvedType.of(Type.String), "<index values colM>");
+                seekKeys = indexPredicate.getIndexColumns()
+                        .stream()
+                        .map(c -> new ISeekKey()
+                        {
+                            @Override
+                            public ValueVector getValue()
+                            {
+                                return ValueVector.literalString("<index values " + c + ">", 1);
+                            }
 
-                seekKeys = asList(new ISeekKey()
-                {
-                    @Override
-                    public ValueVector getValue()
-                    {
-                        return key1;
-                    }
-
-                    @Override
-                    public SeekType getType()
-                    {
-                        return SeekType.EQ;
-                    }
-                }, new ISeekKey()
-                {
-                    @Override
-                    public ValueVector getValue()
-                    {
-                        return key2;
-                    }
-
-                    @Override
-                    public SeekType getType()
-                    {
-                        return SeekType.EQ;
-                    }
-                });
+                            @Override
+                            public SeekType getType()
+                            {
+                                return SeekType.EQ;
+                            }
+                        })
+                        .collect(toList());
             }
             else
             {
@@ -368,7 +353,8 @@ class JdbcDatasource implements IDatasource
     static TupleIterator getIterator(JdbcCatalog catalog, IExecutionContext context, String catalogAlias, String query, List<Object> parameters, int batchSize)
     {
         final String database = context.getSession()
-                .getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE);
+                .getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE)
+                .valueAsString(0);
 
         // CSOFF
         return new TupleIterator()

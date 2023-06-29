@@ -2,7 +2,6 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Arrays.asList;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
-import static se.kuseman.payloadbuilder.test.VectorTestUtils.nvv;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import org.junit.Test;
@@ -12,8 +11,8 @@ import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralFloatExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
@@ -62,10 +61,10 @@ public class CoalesceFunctionTest extends APhysicalPlanTest
 
         assertEquals(ResolvedType.of(Type.Float), f.getType(asList(col1, col2)));
         actual = f.evalScalar(context, input, "", asList(col1, col2));
-        assertVectorsEquals(nvv(ResolvedType.of(Type.Float), 1F, 2F, 4F, 5F), actual);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Float), 1F, 2F, 4F, 5F), actual);
 
         assertEquals(ResolvedType.of(Type.Float), f.getType(asList(col6, col2)));
         actual = f.evalScalar(context, input, "", asList(col6, col2));
-        assertVectorsEquals(nvv(ResolvedType.of(Type.Float), 1F, null, 4F, 5F), actual);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Float), 1F, null, 4F, 5F), actual);
     }
 }

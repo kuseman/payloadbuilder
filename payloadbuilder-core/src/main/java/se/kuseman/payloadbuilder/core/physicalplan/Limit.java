@@ -10,14 +10,14 @@ import java.util.NoSuchElementException;
 
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVectorAdapter;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.QueryException;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
+import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
 
 /** Limit plan that returns x rows from input */
 public class Limit implements IPhysicalPlan

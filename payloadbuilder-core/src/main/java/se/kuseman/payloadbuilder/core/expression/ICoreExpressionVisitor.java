@@ -20,7 +20,7 @@ public interface ICoreExpressionVisitor<T, C> extends IExpressionVisitor<T, C>
         return visitChildren(context, expression);
     };
 
-    default T visit(SubQueryExpression expression, C context)
+    default T visit(UnresolvedSubQueryExpression expression, C context)
     {
         return visitChildren(context, expression);
     }

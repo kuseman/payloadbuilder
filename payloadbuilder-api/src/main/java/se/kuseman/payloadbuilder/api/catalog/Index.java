@@ -14,15 +14,13 @@ public class Index
 {
     private final QualifiedName table;
     private final List<String> columns;
-    private final int batchSize;
     private final ColumnsType columnsType;
 
-    public Index(QualifiedName table, List<String> columns, ColumnsType columnsType, int batchSize)
+    public Index(QualifiedName table, List<String> columns, ColumnsType columnsType)
     {
         this.table = requireNonNull(table, "table");
         this.columns = unmodifiableList(requireNonNull(columns, "columns"));
         this.columnsType = requireNonNull(columnsType, "columnsType");
-        this.batchSize = batchSize;
     }
 
     public QualifiedName getTable()
@@ -38,11 +36,6 @@ public class Index
     public ColumnsType getColumnsType()
     {
         return columnsType;
-    }
-
-    public int getBatchSize()
-    {
-        return batchSize;
     }
 
     @Override
@@ -67,7 +60,6 @@ public class Index
             Index that = (Index) obj;
             return table.equals(that.table)
                     && columns.equals(that.columns)
-                    && batchSize == that.batchSize
                     && columnsType == that.columnsType;
         }
         return false;

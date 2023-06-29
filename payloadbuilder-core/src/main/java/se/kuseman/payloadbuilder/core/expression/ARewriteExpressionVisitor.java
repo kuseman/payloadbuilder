@@ -20,12 +20,17 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IFunctionCallExpression;
 import se.kuseman.payloadbuilder.api.expression.IInExpression;
 import se.kuseman.payloadbuilder.api.expression.ILikeExpression;
+import se.kuseman.payloadbuilder.api.expression.ILiteralArrayExpression;
 import se.kuseman.payloadbuilder.api.expression.ILiteralBooleanExpression;
+import se.kuseman.payloadbuilder.api.expression.ILiteralDateTimeExpression;
+import se.kuseman.payloadbuilder.api.expression.ILiteralDateTimeOffsetExpression;
+import se.kuseman.payloadbuilder.api.expression.ILiteralDecimalExpression;
 import se.kuseman.payloadbuilder.api.expression.ILiteralDoubleExpression;
 import se.kuseman.payloadbuilder.api.expression.ILiteralFloatExpression;
 import se.kuseman.payloadbuilder.api.expression.ILiteralIntegerExpression;
 import se.kuseman.payloadbuilder.api.expression.ILiteralLongExpression;
 import se.kuseman.payloadbuilder.api.expression.ILiteralNullExpression;
+import se.kuseman.payloadbuilder.api.expression.ILiteralObjectExpression;
 import se.kuseman.payloadbuilder.api.expression.ILiteralStringExpression;
 import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.ILogicalNotExpression;
@@ -83,7 +88,7 @@ public abstract class ARewriteExpressionVisitor<C> extends AExpressionVisitor<IE
     public IExpression visit(UnresolvedFunctionCallExpression expression, C context)
     {
         return new UnresolvedFunctionCallExpression(expression.getCatalogAlias(), expression.getName(), expression.getAggregateMode(), visit(expression.getChildren(), context), expression.getToken());
-    };
+    }
 
     @Override
     public IExpression visit(IFunctionCallExpression expression, C context)
@@ -95,55 +100,85 @@ public abstract class ARewriteExpressionVisitor<C> extends AExpressionVisitor<IE
     public IExpression visit(IComparisonExpression expression, C context)
     {
         return new ComparisonExpression(expression.getComparisonType(), visit(expression.getLeft(), context), visit(expression.getRight(), context));
-    };
+    }
 
     @Override
     public IExpression visit(IArithmeticBinaryExpression expression, C context)
     {
         return new ArithmeticBinaryExpression(expression.getArithmeticType(), visit(expression.getLeft(), context), visit(expression.getRight(), context));
-    };
+    }
 
     @Override
     public IExpression visit(ILiteralBooleanExpression expression, C context)
     {
         return expression;
-    };
+    }
 
     @Override
     public IExpression visit(ILiteralNullExpression expression, C context)
     {
         return expression;
-    };
+    }
 
     @Override
     public IExpression visit(ILiteralFloatExpression expression, C context)
     {
         return expression;
-    };
+    }
 
     @Override
     public IExpression visit(ILiteralLongExpression expression, C context)
     {
         return expression;
-    };
+    }
+
+    @Override
+    public IExpression visit(ILiteralDecimalExpression expression, C context)
+    {
+        return expression;
+    }
 
     @Override
     public IExpression visit(ILiteralIntegerExpression expression, C context)
     {
         return expression;
-    };
+    }
 
     @Override
     public IExpression visit(ILiteralDoubleExpression expression, C context)
     {
         return expression;
-    };
+    }
 
     @Override
     public IExpression visit(ILiteralStringExpression expression, C context)
     {
         return expression;
-    };
+    }
+
+    @Override
+    public IExpression visit(ILiteralDateTimeExpression expression, C context)
+    {
+        return expression;
+    }
+
+    @Override
+    public IExpression visit(ILiteralDateTimeOffsetExpression expression, C context)
+    {
+        return expression;
+    }
+
+    @Override
+    public IExpression visit(ILiteralArrayExpression expression, C context)
+    {
+        return expression;
+    }
+
+    @Override
+    public IExpression visit(ILiteralObjectExpression expression, C context)
+    {
+        return expression;
+    }
 
     @Override
     public IExpression visit(ILogicalBinaryExpression expression, C context)
@@ -227,7 +262,7 @@ public abstract class ARewriteExpressionVisitor<C> extends AExpressionVisitor<IE
     }
 
     @Override
-    public IExpression visit(SubQueryExpression expression, C context)
+    public IExpression visit(UnresolvedSubQueryExpression expression, C context)
     {
         // Visiting the plan of sub query expression is up to clients
         return expression;

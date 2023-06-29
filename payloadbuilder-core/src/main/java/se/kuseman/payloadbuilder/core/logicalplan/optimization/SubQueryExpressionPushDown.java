@@ -16,7 +16,7 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.expression.ARewriteExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
-import se.kuseman.payloadbuilder.core.expression.SubQueryExpression;
+import se.kuseman.payloadbuilder.core.expression.UnresolvedSubQueryExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.Join;
@@ -167,13 +167,13 @@ public class SubQueryExpressionPushDown extends ALogicalPlanOptimizer<SubQueryEx
         }
         else if (context.current instanceof OperatorFunctionScan)
         {
-            // Remove this projection since the child is a tuple function which already has correct schema
+            // Remove this projection since the child is a operator function which already has correct schema
             // just change it's name
             if (alias != null
                     && size == 1)
             {
-                OperatorFunctionScan tf = (OperatorFunctionScan) context.current;
-                Schema schema = Schema.of(Column.of(alias, tf.getSchema()
+                OperatorFunctionScan ofs = (OperatorFunctionScan) context.current;
+                Schema schema = Schema.of(Column.of(alias, ofs.getSchema()
                         .getColumns()
                         .get(0)
                         .getType()));
@@ -181,7 +181,7 @@ public class SubQueryExpressionPushDown extends ALogicalPlanOptimizer<SubQueryEx
                 // Restore previous current plan
                 context.current = prevCurrent;
 
-                return new OperatorFunctionScan(schema, tf.getInput(), tf.getCatalogAlias(), tf.getFunction(), tf.getToken());
+                return new OperatorFunctionScan(schema, ofs.getInput(), ofs.getCatalogAlias(), ofs.getFunction(), ofs.getToken());
             }
         }
 
@@ -200,7 +200,7 @@ public class SubQueryExpressionPushDown extends ALogicalPlanOptimizer<SubQueryEx
         private static final SubQueryExpressionVisitor INSTANCE = new SubQueryExpressionVisitor();
 
         @Override
-        public IExpression visit(SubQueryExpression expression, Ctx ctx)
+        public IExpression visit(UnresolvedSubQueryExpression expression, Ctx ctx)
         {
             String alias = "__expr" + ctx.expressionCounter++;
 
@@ -229,13 +229,13 @@ public class SubQueryExpressionPushDown extends ALogicalPlanOptimizer<SubQueryEx
                 /*
                  * @formatter:off
                  * 
-                 * if we have a non-correlated sub query then we put the plan as outer in a nested loop (inner) because
+                 * if we have a non-correlated sub query then we put the plan as outer in a nested loop (left) because
                  * then that will only execute once BUT we must make sure that the query never circuit breaks
                  * the main query by returning zero rows (that will be catastrophic because the main query will be empty)
                  * so we nest it in another nested loop (left)
                  * with a constant scan as outer, that way we are guaranteed that we always end up with at least one row.
                  * 
-                 * nested loop (inner)
+                 * nested loop (left)
                  *   nested loop (left)             <-- Will always return at least 1 row
                  *     constant scan
                  *     sub query plan
@@ -264,17 +264,13 @@ public class SubQueryExpressionPushDown extends ALogicalPlanOptimizer<SubQueryEx
                 ILogicalPlan right = correlated ? plan
                         : ctx.current;
 
-                // Set the top join type based on correlation
-                Join.Type joinType = correlated ? Join.Type.LEFT
-                        : Join.Type.INNER;
-
                 // Nest plan in another nested loop to guarantee at least one row
                 if (!correlated)
                 {
                     left = new Join(ConstantScan.INSTANCE, left, Join.Type.LEFT, null, (IExpression) null, emptySet(), false);
                 }
 
-                ctx.current = new Join(left, right, joinType, null, (IExpression) null, expression.getOuterReferences(), !correlated);
+                ctx.current = new Join(left, right, Join.Type.LEFT, null, (IExpression) null, expression.getOuterReferences(), !correlated);
             }
 
             // A sub query plan can only have a single column (either an OperatorFunction or a single column projection)

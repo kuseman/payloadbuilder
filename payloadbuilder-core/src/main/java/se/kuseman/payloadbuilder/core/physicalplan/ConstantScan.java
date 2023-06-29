@@ -5,9 +5,9 @@ import static java.util.Collections.emptyList;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
 
 /** A scan operator returning one row with no schema. Used for example when having a query without a from clause etc. */
 public class ConstantScan implements IPhysicalPlan

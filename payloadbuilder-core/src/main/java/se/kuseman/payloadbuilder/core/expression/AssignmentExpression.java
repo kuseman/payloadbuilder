@@ -9,15 +9,15 @@ import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVectorAdapter;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
 
-/** Assignment expression. Used in projections to assaign variables from projection result */
+/** Assignment expression. Used in projections to assign variables from projection result */
 public class AssignmentExpression implements IExpression
 {
     private final IExpression expression;
@@ -43,15 +43,11 @@ public class AssignmentExpression implements IExpression
     @Override
     public ValueVector eval(TupleVector input, IExecutionContext context)
     {
-        RowTupleVector rowTupleVector = new RowTupleVector(input);
-
         int size = input.getRowCount();
         for (int i = 0; i < size; i++)
         {
-            rowTupleVector.setRow(i);
-            ValueVector eval = expression.eval(rowTupleVector, context);
-            // Set the last value of the vector.
-            ((ExecutionContext) context).setVariable(variable, eval.valueAsObject(eval.size() - 1));
+            ValueVector value = expression.eval(new RowTupleVector(input, i), context);
+            ((ExecutionContext) context).setVariable(variable, value);
         }
 
         // These expressions is never used so return an empty value vector
@@ -124,15 +120,11 @@ public class AssignmentExpression implements IExpression
     private static class RowTupleVector implements TupleVector
     {
         private TupleVector wrapped;
-        private int row;
+        private final int row;
 
-        RowTupleVector(TupleVector vector)
+        RowTupleVector(TupleVector vector, int row)
         {
             this.wrapped = vector;
-        }
-
-        void setRow(int row)
-        {
             this.row = row;
         }
 

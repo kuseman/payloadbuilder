@@ -1,9 +1,10 @@
 package se.kuseman.payloadbuilder.core.expression;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.ILiteralBooleanExpression;
 
@@ -17,7 +18,7 @@ public class LiteralBooleanExpression extends LiteralExpression implements ILite
 
     LiteralBooleanExpression(boolean value)
     {
-        super(Type.Boolean);
+        super(ResolvedType.of(Type.Boolean));
         this.value = value;
     }
 

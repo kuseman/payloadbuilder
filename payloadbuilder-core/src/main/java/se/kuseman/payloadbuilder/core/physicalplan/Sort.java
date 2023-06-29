@@ -16,16 +16,16 @@ import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.UTF8String;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVectorAdapter;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
-import se.kuseman.payloadbuilder.api.utils.ExpressionMath;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.QueryException;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
 import se.kuseman.payloadbuilder.core.common.SortItem;
+import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
+import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 import se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression;
 
 import it.unimi.dsi.fastutil.ints.IntArrays;
@@ -75,17 +75,17 @@ public class Sort implements IPhysicalPlan
     public TupleIterator execute(IExecutionContext context)
     {
         TupleIterator it = input.execute(context);
-        TupleVector all = PlanUtils.concat(it);
+        TupleVector all = PlanUtils.concat(((ExecutionContext) context).getBufferAllocator(), it);
 
         if (all.getRowCount() == 0)
         {
             return TupleIterator.EMPTY;
         }
 
-        int itemSize = sortItems.size();
-        ValueVector[] expressionVectors = new ValueVector[itemSize];
+        final int itemSize = sortItems.size();
+        final ValueVector[] expressionVectors = new ValueVector[itemSize];
 
-        int rowCount = all.getRowCount();
+        final int rowCount = all.getRowCount();
         // Result array to store the resulting sorted index of the value vector
         // Start with input order
         final int[] sortIndices = IntStream.range(0, rowCount)
@@ -124,14 +124,9 @@ public class Sort implements IPhysicalPlan
                 ResolvedType type = vals.type();
 
                 // CSOFF
-                boolean aIsNull = false;
-                boolean bIsNull = false;
+                boolean aIsNull = vals.isNull(a);
+                boolean bIsNull = vals.isNull(b);
                 // CSON
-                if (vals.isNullable())
-                {
-                    aIsNull = vals.isNull(a);
-                    bIsNull = vals.isNull(b);
-                }
                 NullOrder nullOrder = sortItem.getNullOrder();
 
                 if (aIsNull
@@ -154,41 +149,8 @@ public class Sort implements IPhysicalPlan
                                     : -1;
                 }
 
-                int c;
-                switch (type.getType())
-                {
-                    case Boolean:
-                        c = Boolean.compare(vals.getBoolean(a), vals.getBoolean(b));
-                        break;
-                    case Double:
-                        c = Double.compare(vals.getDouble(a), vals.getDouble(b));
-                        break;
-                    case Float:
-                        c = Float.compare(vals.getFloat(a), vals.getFloat(b));
-                        break;
-                    case Int:
-                        c = Integer.compare(vals.getInt(a), vals.getInt(b));
-                        break;
-                    case Long:
-                        c = Long.compare(vals.getLong(a), vals.getLong(b));
-                        break;
-                    case String:
-                        UTF8String aref = vals.getString(a);
-                        UTF8String bref = vals.getString(b);
-                        c = aref.compareTo(bref);
-                        break;
-                    case DateTime:
-                        c = vals.getDateTime(a)
-                                .compareTo(vals.getDateTime(b));
-                        break;
-                    default:
-                        Object aval = vals.getValue(a);
-                        Object bval = vals.getValue(b);
-                        c = ExpressionMath.cmp(aval, bval);
-                        break;
-                }
-
                 Order order = sortItem.getOrder();
+                int c = VectorUtils.compare(vals, vals, type.getType(), a, b);
                 if (c != 0)
                 {
                     return c * (order == Order.DESC ? -1

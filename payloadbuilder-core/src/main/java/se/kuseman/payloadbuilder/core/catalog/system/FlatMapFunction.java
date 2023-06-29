@@ -4,17 +4,21 @@ import static java.util.Collections.singletonList;
 
 import java.util.List;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.utils.VectorUtils;
 import se.kuseman.payloadbuilder.core.catalog.LambdaFunction;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.execution.LambdaUtils;
+import se.kuseman.payloadbuilder.core.execution.LambdaUtils.LambdaResultConsumer;
+import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 import se.kuseman.payloadbuilder.core.expression.LambdaExpression;
 
 /** Flat map function. Flat maps input turning nested value vectors into flat vectors */
@@ -22,9 +26,9 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
 {
     private static final List<LambdaBinding> LAMBDA_BINDINGS = singletonList(new LambdaBinding(1, 0));
 
-    FlatMapFunction(Catalog catalog)
+    FlatMapFunction()
     {
-        super(catalog, "flatmap", FunctionType.SCALAR);
+        super("flatmap", FunctionType.SCALAR);
     }
 
     @Override
@@ -34,182 +38,126 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
     }
 
     @Override
-    public int arity()
+    public Arity arity()
     {
-        return 2;
+        return Arity.TWO;
     }
 
     @Override
-    public ResolvedType getType(List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
+        // Flat map's type is like Map's type except if resulting lambda type is Array
+        // it's flattened it it's subtype
+
         LambdaExpression le = (LambdaExpression) arguments.get(1);
 
-        ResolvedType type = le.getExpression()
+        ResolvedType lambdaType = le.getExpression()
                 .getType();
 
         ResolvedType inputType = arguments.get(0)
                 .getType();
 
-        if (type.getType() == Type.ValueVector
-                && (inputType.getType() == Type.ValueVector
-                        || inputType.getType() == Type.TupleVector))
+        if (inputType.getType() == Type.Array
+                || inputType.getType() == Type.Table)
         {
-            return ResolvedType.valueVector(type.getSubType());
+            return ResolvedType.array(lambdaType.getType() == Column.Type.Array ? lambdaType.getSubType()
+                    : lambdaType);
+        }
+        else if (inputType.getType() == Type.Any)
+        {
+            return ResolvedType.of(Type.Any);
         }
 
-        return le.getExpression()
-                .getType();
+        return lambdaType;
     }
 
     @Override
-    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
     {
         ValueVector value = arguments.get(0)
                 .eval(input, context);
 
         LambdaExpression le = (LambdaExpression) arguments.get(1);
 
-        ResolvedType type = le.getExpression()
+        final ResolvedType lambdaType = le.getExpression()
                 .getType();
 
         Type inputType = value.type()
                 .getType();
 
-        if (type.getType() == Type.ValueVector
-                && (inputType == Type.ValueVector
-                        || inputType == Type.TupleVector))
+        if (LambdaUtils.supportsForEachLambdaResult(inputType))
         {
-            return new ValueVector()
+            ResolvedType functionType = getType(arguments);
+            ResolvedType resultType = functionType.getType() == Type.Array ? functionType.getSubType()
+                    : functionType;
+
+            IObjectVectorBuilder builder = context.getVectorBuilderFactory()
+                    .getObjectVectorBuilder(functionType, input.getRowCount());
+
+            LambdaResultConsumer mapper = (inputResult, lambdaResult, inputWasListType) ->
             {
-                LambdaUtils.RowTupleVector inputTupleVector = new LambdaUtils.RowTupleVector(input);
-
-                @Override
-                public ResolvedType type()
+                if (lambdaResult == null)
                 {
-                    return ResolvedType.valueVector(type.getSubType());
+                    builder.put(null);
+                    return;
+                }
+                else if (!inputWasListType)
+                {
+                    builder.copy(lambdaResult);
+                    return;
                 }
 
-                @Override
-                public int size()
-                {
-                    return input.getRowCount();
-                }
+                // TODO: size will be off if there are alot of inner vectors
+                int size = lambdaResult.size();
+                IValueVectorBuilder vectorBuilder = context.getVectorBuilderFactory()
+                        .getValueVectorBuilder(resultType, size);
 
-                @Override
-                public boolean isNull(int row)
-                {
-                    // Flatmap:ing null is null
-                    return value.isNull(row);
-                }
+                // Loop vector rows and add to builder
+                // If vector contains vectors then flatten one level adding it's values to builder
 
-                @Override
-                public Object getValue(int row)
+                for (int i = 0; i < size; i++)
                 {
-                    ValueVector lambdaValue;
-                    if (inputType == Type.TupleVector)
+                    if (lambdaResult.isNull(i))
                     {
-                        TupleVector vector = (TupleVector) value.getValue(row);
-                        lambdaValue = ValueVector.literalObject(ResolvedType.tupleVector(vector.getSchema()), vector, 1);
-                        inputTupleVector.setRowCount(vector.getRowCount());
-                    }
-                    else
-                    {
-                        lambdaValue = (ValueVector) value.getValue(row);
-                        inputTupleVector.setRowCount(lambdaValue.size());
+                        vectorBuilder.put(lambdaResult, i);
+                        continue;
                     }
 
-                    ((ExecutionContext) context).getStatementContext()
-                            .setLambdaValue(le.getLambdaIds()[0], lambdaValue);
-
-                    inputTupleVector.setRow(row);
-
-                    ValueVector vector = le.getExpression()
-                            .eval(inputTupleVector, context);
-
-                    // Concat all vectors into one
-                    ValueVector result = null;
-                    int size = vector.size();
-                    for (int i = 0; i < size; i++)
+                    // Flatten the inner vector
+                    if (lambdaType.getType() == Column.Type.Array)
                     {
-                        if (result == null)
+                        vectorBuilder.copy(lambdaResult.getArray(i));
+                        continue;
+                    }
+                    // Runtime check of value
+                    else if (lambdaType.getType() == Column.Type.Any)
+                    {
+                        Object vectorValue = VectorUtils.convert(lambdaResult.valueAsObject(i));
+
+                        // Flatten the inner vector
+                        if (vectorValue instanceof ValueVector)
                         {
-                            result = (ValueVector) vector.getValue(i);
-                        }
-                        else
-                        {
-                            result = VectorUtils.concat(result, (ValueVector) vector.getValue(i));
+                            vectorBuilder.copy((ValueVector) vectorValue);
+                            continue;
                         }
                     }
-                    return result;
+                    vectorBuilder.put(lambdaResult, i);
                 }
+
+                builder.put(vectorBuilder.build());
             };
+
+            LambdaUtils.forEachLambdaResult(context, input, value, le, mapper);
+
+            return builder.build();
         }
 
-        // Flat map flats value vectors, other values is considered flattened already so just map them with lambda expression
         ((ExecutionContext) context).getStatementContext()
                 .setLambdaValue(le.getLambdaIds()[0], value);
 
-        return le.getExpression()
+        ValueVector result = le.getExpression()
                 .eval(input, context);
-    }
 
-    // @Override
-    // public ExpressionCode generateCode(
-    // CodeGeneratorContext context,
-    // ExpressionCode parentCode,
-    // List<Expression> arguments)
-    // {
-    // ExpressionCode inputCode = arguments.get(0).generateCode(context, parentCode);
-    // ExpressionCode code = ExpressionCode.code(context, inputCode);
-    // code.addImport("se.kuseman.payloadbuilder.core.utils.CollectionUtils");
-    // code.addImport("java.util.Iterator");
-    // code.addImport("org.apache.commons.collections.iterators.ObjectGraphIterator");
-    // code.addImport("org.apache.commons.collections.Transformer");
-    //
-    // LambdaExpression le = (LambdaExpression) arguments.get(1);
-    //
-    // context.addLambdaParameters(le.getIdentifiers());
-    // ExpressionCode lambdaCode = le.getExpression().generateCode(context, parentCode);
-    // context.removeLambdaParameters(le.getIdentifiers());
-    //
-    // String template = "%s"
-    // + "boolean %s = true;\n"
-    // + "Iterator %s = null;\n"
-    // + "if (!%s)\n"
-    // + "{\n"
-    // + " %s = new ObjectGraphIterator(IteratorUtils.getIterator(%s), new Transformer()\n"
-    // + " {\n"
-    // + " Iterator<Object> it;\n"
-    // + " public Object transform(Object input)\n"
-    // + " {\n"
-    // + " if (it == null)\n"
-    // + " {\n"
-    // + " Object %s = input;\n"
-    // + " %s"
-    // + " it = IteratorUtils.getIterator(%s);\n"
-    // + " return it;\n"
-    // + " }\n"
-    // + " else if (!it.hasNext())\n"
-    // + " {\n"
-    // + " it=null;\n"
-    // + " }\n"
-    // + " return input;\n"
-    // + " }\n"
-    // + " });\n"
-    // + " %s = false;\n"
-    // + "}\n";
-    //
-    // code.setCode(String.format(template,
-    // inputCode.getCode(),
-    // code.getIsNull(),
-    // code.getResVar(),
-    // inputCode.getIsNull(),
-    // code.getResVar(), inputCode.getResVar(),
-    // le.getIdentifiers().get(0),
-    // lambdaCode.getCode(),
-    // lambdaCode.getResVar(),
-    // code.getIsNull()));
-    //
-    // return code;
-    // }
+        return result;
+    }
 }

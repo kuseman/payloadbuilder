@@ -24,6 +24,7 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 import se.kuseman.payloadbuilder.api.execution.IStatementContext;
 import se.kuseman.payloadbuilder.api.execution.NodeData;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Common test utils for catalog tests */
@@ -73,22 +74,14 @@ public final class TestUtils
             }
         });
 
-        when(session.getCatalogProperty(eq(catalogAlias), anyString(), any())).thenAnswer(new Answer<Object>()
-        {
-            @Override
-            public Object answer(InvocationOnMock invocation) throws Throwable
-            {
-                String key = invocation.getArgument(1);
-                return properties.getOrDefault(key, invocation.getArgument(2));
-            }
-        });
+        when(session.getCatalogProperty(eq(catalogAlias), anyString(), any())).thenCallRealMethod();
         when(session.getCatalogProperty(eq(catalogAlias), anyString())).thenAnswer(new Answer<Object>()
         {
             @Override
             public Object answer(InvocationOnMock invocation) throws Throwable
             {
                 String key = invocation.getArgument(1);
-                return properties.get(key);
+                return ValueVector.literalAny(properties.get(key));
             }
         });
 

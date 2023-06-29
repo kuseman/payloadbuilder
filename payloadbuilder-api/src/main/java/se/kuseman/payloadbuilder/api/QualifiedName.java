@@ -7,7 +7,6 @@ import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
-import static se.kuseman.payloadbuilder.api.utils.StringUtils.join;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -106,7 +105,8 @@ public class QualifiedName
     /** Returns a dot delimited representation of this qualified name */
     public String toDotDelimited()
     {
-        return join(parts, '.');
+        return parts.stream()
+                .collect(joining("."));
     }
 
     @Override

@@ -57,6 +57,43 @@
       ]
     },
     {
+      "name": "Select into with index",
+      "onlyAssertExpectedColumns": true,
+      "query": [
+        "select col1 * 2 newCol1, col2 * 10 newCol2 ",
+        "into #temp with (indices=array(array('newCol1'))) ",
+        "from source",
+        "",
+        "select * from #temp ",
+        "",
+        "describe ",
+        "select * ",
+        "from data d ",
+        "inner join #temp t ",
+        "  on t.newCol1 = d.id ",
+        "",
+        "select * ",
+        "from data d ",
+        "inner join #temp t ",
+        "  on t.newCol1 = d.id "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "newCol1", "value": 2 }, { "key": "newCol2", "value": 20 } ],
+          [{ "key": "newCol1", "value": 6 }, { "key": "newCol2", "value": 40 } ],
+          [{ "key": "newCol1", "value": 10 }, { "key": "newCol2", "value": 60 } ]
+        ],
+        [
+          [{ "key": "Node id", "value": 2 }, { "key": "Name", "value": "+- Nested Loop" }                          ],
+          [{ "key": "Node id", "value": 0 }, { "key": "Name", "value": "|  +- Scan: data" }                        ],
+          [{ "key": "Node id", "value": 1 }, { "key": "Name", "value": "|  +- Index Seek: #temp [newCol1] (ALL)" } ]
+        ],
+        [
+          [{ "key": "id", "value": 2 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "2_1" }, { "key": "newCol1", "value": 2 }, { "key": "newCol2", "value": 20 } ]
+        ]
+      ]
+    },
+    {
       "name": "Select into 2",
       "query": [
         "select 1 + 2 \"1 + 2\" into #temp",
@@ -84,13 +121,13 @@
       ],
       "expectedResultSets": [
         [
-          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 1 }, {"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "Session" } ]
+          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 1 }, {"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "InMemory" } ]
         ],
         [
-          [{ "key": "name", "value": "\"temp\"" }, { "key": "key", "value": "key" }, {"key": "expire_time", "value": null }, { "key": "type", "value": "TEMPTABLE" },{ "key": "provider", "value": "Session" } ]
+          [{ "key": "name", "value": "\"temp\"" }, { "key": "key", "value": "key" }, {"key": "expire_time", "value": null }, { "key": "type", "value": "TEMPTABLE" },{ "key": "provider", "value": "InMemory" } ]
         ],
         [
-          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 0 }, {"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "Session" } ]
+          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 0 }, {"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "InMemory" } ]
         ],
         []
       ]
@@ -111,10 +148,10 @@
       ],
       "expectedResultSets": [
         [
-          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 1 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "Session" } ]
+          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 1 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "InMemory" } ]
         ],
         [
-          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 0 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "Session" } ]
+          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 0 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "InMemory" } ]
         ],
         []
       ]
@@ -135,10 +172,10 @@
       ],
       "expectedResultSets": [
         [
-          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 2 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 2 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "Session" } ]
+          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 2 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 2 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "InMemory" } ]
         ],
         [
-          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 1 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 2 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "Session" } ]
+          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 1 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 2 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "InMemory" } ]
         ]
       ]
     },

@@ -8,12 +8,14 @@ import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IBooleanVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.IInExpression;
+import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 
 /** expression IN (expression1, expression2 [, expressionN ]) */
 public class InExpression implements IInExpression
@@ -50,9 +52,80 @@ public class InExpression implements IInExpression
     @Override
     public ValueVector eval(TupleVector input, IExecutionContext context)
     {
-        throw new RuntimeException("not implemented");
-        // ValueVector vector = expression.eval(input, context);
-        // return BitSetVector.not(vector);
+        ValueVector value = expression.eval(input, context);
+
+        Type valueType = value.type()
+                .getType();
+
+        int argumentsSize = arguments.size();
+        ValueVector[] args = new ValueVector[argumentsSize];
+
+        int rowCount = input.getRowCount();
+        IBooleanVectorBuilder builder = context.getVectorBuilderFactory()
+                .getBooleanVectorBuilder(rowCount);
+
+        for (int i = 0; i < rowCount; i++)
+        {
+            if (value.isNull(i))
+            {
+                builder.putNull();
+                continue;
+            }
+
+            boolean match = false;
+            boolean allNull = true;
+            for (int j = 0; j < argumentsSize; j++)
+            {
+                if (args[j] == null)
+                {
+                    args[j] = arguments.get(j)
+                            .eval(input, context);
+                }
+
+                if (args[j].isNull(i))
+                {
+                    continue;
+                }
+
+                allNull = false;
+
+                Type argType = args[j].type()
+                        .getType();
+
+                Type type = getType(valueType, argType);
+                int c = VectorUtils.compare(value, args[j], type, i, i);
+
+                // Break early
+                // If the argument matched then we can break
+                // If this is a NOT we know result is false
+                // If this is not A NOT we know result is true
+                if (c == 0)
+                {
+                    match = true;
+                    break;
+                }
+            }
+
+            if (allNull)
+            {
+                builder.putNull();
+                continue;
+            }
+
+            builder.put(not ? !match
+                    : match);
+        }
+
+        return builder.build();
+    }
+
+    private Type getType(Type one, Type two)
+    {
+        if (two.getPrecedence() > one.getPrecedence())
+        {
+            return two;
+        }
+        return one;
     }
 
     @Override

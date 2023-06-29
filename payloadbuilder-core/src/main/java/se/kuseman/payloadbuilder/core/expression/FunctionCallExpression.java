@@ -12,9 +12,9 @@ import org.apache.commons.lang3.ObjectUtils;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo.AggregateMode;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.IFunctionCallExpression;
@@ -76,6 +76,12 @@ public class FunctionCallExpression implements IFunctionCallExpression, IAggrega
     public ResolvedType getType()
     {
         return function.getType(arguments);
+    }
+
+    @Override
+    public ResolvedType getAggregateType()
+    {
+        return function.getAggregateType(arguments);
     }
 
     @Override

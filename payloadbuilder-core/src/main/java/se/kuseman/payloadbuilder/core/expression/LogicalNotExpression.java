@@ -7,16 +7,16 @@ import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IBooleanVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.ILogicalNotExpression;
-import se.kuseman.payloadbuilder.core.physicalplan.BitSetVector;
 
 /** Logical NOT */
-public class LogicalNotExpression implements ILogicalNotExpression
+public class LogicalNotExpression implements ILogicalNotExpression, Invertable
 {
     private final IExpression expression;
 
@@ -32,10 +32,58 @@ public class LogicalNotExpression implements ILogicalNotExpression
     }
 
     @Override
+    public IExpression getInvertedExpression()
+    {
+        // NOT NOT a => a
+        return expression;
+    }
+
+    @Override
+    public IExpression fold()
+    {
+        // Invert expressions
+        if (expression.isConstant())
+        {
+            ValueVector vector = expression.eval(null);
+            if (vector.isNull(0))
+            {
+                // NOT NULL => NULL
+                return new LiteralNullExpression(ResolvedType.of(Type.Boolean));
+            }
+
+            return !vector.getBoolean(0) ? LiteralBooleanExpression.TRUE
+                    : LiteralBooleanExpression.FALSE;
+        }
+        else if (expression instanceof Invertable)
+        {
+            return ((Invertable) expression).getInvertedExpression();
+        }
+        return this;
+    }
+
+    @Override
     public ValueVector eval(TupleVector input, IExecutionContext context)
     {
         ValueVector vector = expression.eval(input, context);
-        return BitSetVector.not(vector);
+
+        int rowCount = input.getRowCount();
+        IBooleanVectorBuilder builder = context.getVectorBuilderFactory()
+                .getBooleanVectorBuilder(rowCount);
+
+        for (int i = 0; i < rowCount; i++)
+        {
+            boolean isNull = vector.isNull(i);
+            if (isNull)
+            {
+                builder.putNull();
+            }
+            else
+            {
+                builder.put(!vector.getBoolean(i));
+            }
+        }
+
+        return builder.build();
     }
 
     @Override

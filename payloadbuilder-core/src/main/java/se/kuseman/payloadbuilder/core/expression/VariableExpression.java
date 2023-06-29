@@ -6,14 +6,15 @@ import static org.apache.commons.lang3.StringUtils.lowerCase;
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.UTF8String;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.IVariableExpression;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.StatementContext;
+import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
 
 /** A variable (@var) */
 public class VariableExpression implements IVariableExpression, HasAlias
@@ -47,7 +48,7 @@ public class VariableExpression implements IVariableExpression, HasAlias
     @Override
     public Alias getAlias()
     {
-        return new Alias(name, null);
+        return new Alias(name, "");
     }
 
     @Override
@@ -75,25 +76,32 @@ public class VariableExpression implements IVariableExpression, HasAlias
             }
             else if ("version".equals(name))
             {
-                return ValueVector.literalObject(ResolvedType.of(Type.String), UTF8String.from(ctx.getVersionString()), input.getRowCount());
+                return ValueVector.literalString(UTF8String.from(ctx.getVersionString()), input.getRowCount());
             }
 
             return null;
         }
 
-        Object value = ctx.getVariableValue(name);
-
-        if (value instanceof ValueVector)
-        {
-            return (ValueVector) value;
-        }
-
+        ValueVector value = ctx.getVariableValue(name);
         if (value == null)
         {
             return ValueVector.literalNull(ResolvedType.of(Type.Any), input.getRowCount());
         }
 
-        return ValueVector.literalObject(ResolvedType.of(Type.Any), value, input.getRowCount());
+        return new ValueVectorAdapter(value)
+        {
+            @Override
+            public int size()
+            {
+                return input.getRowCount();
+            }
+
+            @Override
+            protected int getRow(int row)
+            {
+                return 0;
+            }
+        };
     }
 
     @Override

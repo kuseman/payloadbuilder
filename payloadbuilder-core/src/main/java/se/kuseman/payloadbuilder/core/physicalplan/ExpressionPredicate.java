@@ -4,9 +4,9 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.function.BiFunction;
 
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Expression based predicate */
@@ -17,6 +17,11 @@ public class ExpressionPredicate implements BiFunction<TupleVector, IExecutionCo
     public ExpressionPredicate(IExpression predicate)
     {
         this.predicate = requireNonNull(predicate, "predicate");
+    }
+
+    public IExpression getPredicate()
+    {
+        return predicate;
     }
 
     @Override

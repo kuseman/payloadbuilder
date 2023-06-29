@@ -10,18 +10,19 @@ import org.junit.Assert;
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IArithmeticBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
-import se.kuseman.payloadbuilder.core.QuerySession;
 import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.logicalplan.optimization.LogicalPlanOptimizer;
 import se.kuseman.payloadbuilder.core.parser.QueryParser;
 
@@ -33,6 +34,12 @@ public abstract class AExpressionTest extends Assert
     protected IExpression e(String expression)
     {
         return PARSER.parseExpression(expression);
+    }
+
+    /** Return a simple unresolved column expression */
+    protected UnresolvedColumnExpression uce(String... parts)
+    {
+        return new UnresolvedColumnExpression(QualifiedName.of(parts), -1, null);
     }
 
     /** Return a simple reflective column expression that resolve values runtime by name */
@@ -195,39 +202,6 @@ public abstract class AExpressionTest extends Assert
                 .build();
     }
 
-    /** Create an {@link ColumnExpression} with lambda id and type and ordinal access */
-    protected ColumnExpression lce(String alias, int lambdaId, ResolvedType type, int ordinal)
-    {
-        if (lambdaId < 0)
-        {
-            throw new IllegalArgumentException("lambdaId must be grater of equal to zero");
-        }
-        else if (ordinal < 0)
-        {
-            throw new IllegalArgumentException("ordinal must be grater of equal to zero");
-        }
-
-        return ColumnExpression.Builder.of(alias, type)
-                .withLambdaId(lambdaId)
-                .withOrdinal(ordinal)
-                .build();
-    }
-
-    /** Create an {@link ColumnExpression} with lambda id and type and column access and column reference */
-    protected ColumnExpression lce(String alias, int lambdaId, ResolvedType type, ColumnReference cr, String column)
-    {
-        if (lambdaId < 0)
-        {
-            throw new IllegalArgumentException("lambdaId must be grater of equal to zero");
-        }
-
-        return ColumnExpression.Builder.of(alias, type)
-                .withLambdaId(lambdaId)
-                .withColumn(column)
-                .withColumnReference(cr)
-                .build();
-    }
-
     /** Create an aggregate wrapper expression */
     protected IAggregateExpression agg(IExpression expression, boolean singleValue)
     {
@@ -238,6 +212,16 @@ public abstract class AExpressionTest extends Assert
     protected ColumnExpression ocre(ColumnReference cr)
     {
         return ColumnExpression.Builder.of(cr.getName(), ResolvedType.of(Type.Any))
+                .withColumnReference(cr)
+                .withColumn(cr.getName())
+                .withOuterReference(true)
+                .build();
+    }
+
+    /** Create an {@link ColumnExpression} with type, no ordinal and outer reference */
+    protected ColumnExpression ocre(ColumnReference cr, ResolvedType type)
+    {
+        return ColumnExpression.Builder.of(cr.getName(), type)
                 .withColumnReference(cr)
                 .withColumn(cr.getName())
                 .withOuterReference(true)
@@ -376,151 +360,87 @@ public abstract class AExpressionTest extends Assert
     }
 
     /** Construct a column */
-    protected Column col(String name, Type type, ColumnReference columnReference)
+    protected CoreColumn col(String name, Type type, ColumnReference columnReference)
     {
-        return new Column(name, ResolvedType.of(type), columnReference);
+        return new CoreColumn(name, ResolvedType.of(type), columnReference);
     }
 
     /** Construct a column */
-    protected Column col(String name, Type type)
+    protected CoreColumn col(String name, Type type)
     {
-        return new Column(name, ResolvedType.of(type), null, false);
+        return new CoreColumn(name, ResolvedType.of(type), null);
     }
 
-    protected Column col(ColumnReference reference, Type type)
+    protected CoreColumn col(ColumnReference reference, Type type)
     {
-        return new Column(reference.getName(), ResolvedType.of(type), reference, false);
+        return CoreColumn.of(reference, ResolvedType.of(type));
     }
 
     protected void assertExpression(Object expected, Map<String, Object> values, String expression) throws Exception
     {
         ExecutionContext context = new ExecutionContext(new QuerySession(new CatalogRegistry()));
-        assertExpression(context, expected, values, expression, false, false);
+        assertExpression(context, expected, values, expression, false);
     }
 
-    protected void assertExpression(ExecutionContext context, Object expected, java.util.Map<String, Object> variables, String expression, boolean predicate, boolean function) throws Exception
+    protected void assertExpression(Object expected, Map<String, Object> values, String expression, boolean rethrow) throws Exception
+    {
+        ExecutionContext context = new ExecutionContext(new QuerySession(new CatalogRegistry()));
+        assertExpression(context, expected, values, expression, rethrow);
+    }
+
+    protected void assertExpression(ExecutionContext context, Object expected, java.util.Map<String, Object> variables, String expression) throws Exception
+    {
+        assertExpression(context, expected, variables, expression, false);
+    }
+
+    protected void assertExpression(ExecutionContext context, Object expected, java.util.Map<String, Object> variables, String expression, boolean rethrow) throws Exception
     {
         try
         {
-
             IExpression expr = e(expression);
             expr = LogicalPlanOptimizer.resolveExpression(context, expr);
 
-            TupleVector input = null;
+            TupleVector input = TupleVector.CONSTANT;
 
             if (variables != null)
             {
                 for (Entry<String, Object> e : variables.entrySet())
                 {
-                    context.setVariable(e.getKey(), e.getValue());
+                    context.setVariable(e.getKey(), ValueVector.literalAny(e.getValue()));
                 }
             }
-
-            // if (mapValues != null)
-            // {
-            // String[] columns = new String[mapValues.size()];
-            // Object[] values = new Object[mapValues.size()];
-            //
-            // MutableInt index = new MutableInt();
-            // mapValues.entrySet()
-            // .stream()
-            // .forEach(en ->
-            // {
-            // columns[index.intValue()] = lowerCase(en.getKey());
-            // values[index.getAndIncrement()] = en.getValue();
-            // });
-            //
-            // final Schema schema = new Schema(Arrays.stream(columns)
-            // .map(c -> Column.of(c, Type.Any))
-            // .collect(toList()));
-            //
-            // input = new TupleVector()
-            // {
-            // @Override
-            // public Schema getSchema()
-            // {
-            // return schema;
-            // }
-            //
-            // @Override
-            // public int getRowCount()
-            // {
-            // return mapValues.size();
-            // }
-            //
-            // @Override
-            // public ValueVector getColumn(int column)
-            // {
-            // return new ValueVector()
-            // {
-            //
-            // @Override
-            // public ResolvedType type()
-            // {
-            // return ResolvedType.of(Type.Any);
-            // }
-            //
-            // @Override
-            // public int size()
-            // {
-            // return mapValues.size();
-            // }
-            //
-            // @Override
-            // public boolean isNull(int row)
-            // {
-            // return values[row] == null;
-            // }
-            //
-            // @Override
-            // public Object getValue(int row)
-            // {
-            // return values[row];
-            // }
-            // };
-            // }
-            // };
-            // }
-            // else
-            // {
-            input = TupleVector.CONSTANT;
-            // }
 
             ValueVector vv = expr.eval(input, context);
-            if (predicate)
+            Object actual = vv.valueAsObject(0);
+            if (vv.type()
+                    .getType() == Type.DateTime)
             {
-                boolean actual = vv.getPredicateBoolean(0);
-                assertEquals("Eval: " + expression, expected, actual);
+                actual = vv.getDateTime(0)
+                        .getLocalDateTime();
             }
-            else
+            else if (expected instanceof String)
             {
-                Object actual = vv.valueAsObject(0);
-                if (vv.type()
-                        .getType() == Type.DateTime)
+                actual = String.valueOf(actual);
+            }
+            else if (actual instanceof ValueVector)
+            {
+                ValueVector v = (ValueVector) actual;
+                List<Object> list = new ArrayList<>(v.size());
+                for (int i = 0; i < v.size(); i++)
                 {
-                    actual = vv.getDateTime(0)
-                            .toZonedDateTime();
+                    list.add(v.valueAsObject(i));
                 }
-                else if (expected instanceof String)
-                {
-                    actual = String.valueOf(actual);
-                }
-                else if (actual instanceof ValueVector)
-                {
-                    ValueVector v = (ValueVector) actual;
-                    List<Object> list = new ArrayList<>(v.size());
-                    for (int i = 0; i < v.size(); i++)
-                    {
-                        list.add(v.valueAsObject(i));
-                    }
-                    actual = list;
-                }
+                actual = list;
+            }
 
-                assertEquals("Eval: " + expression, expected, actual);
-            }
+            assertEquals("Eval: " + expression, expected, actual);
         }
         catch (Exception e)
         {
+            if (rethrow)
+            {
+                throw e;
+            }
             e.printStackTrace();
             fail(expression + " " + e.getMessage());
         }

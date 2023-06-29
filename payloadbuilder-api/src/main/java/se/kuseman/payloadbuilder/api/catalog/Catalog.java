@@ -1,5 +1,6 @@
 package se.kuseman.payloadbuilder.api.catalog;
 
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 
 import java.util.ArrayList;
@@ -10,8 +11,11 @@ import java.util.Map;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
+import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
 
 /**
  * Catalog. Defines the hooking points for retrieving data, functions etc.
@@ -20,6 +24,8 @@ import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 public abstract class Catalog
 // CSON
 {
+    public static final String SYSTEM_CATALOG_ALIAS = "sys";
+
     protected static final String SYS_TABLES = "tables";
     protected static final String SYS_TABLES_NAME = "name";
 
@@ -57,8 +63,6 @@ public abstract class Catalog
     {
         return name;
     }
-
-    /* New methods with plb 1.x */
 
     /**
      * Return the table schema information for provided table.
@@ -114,21 +118,13 @@ public abstract class Catalog
         throw new IllegalArgumentException("Catalog " + name + " doesn't support system operator for: " + table);
     }
 
-    /* ---- New methods with plb 1.x */
-
-    // /**
-    // * Get indices for provided table
-    // *
-    // * @param session Current query session
-    // * @param catalogAlias Alias used for this catalog in the query
-    // * @param table Table to retrieve indices for
-    // * @return List of indices for provided table
-    // **/
-    // @Deprecated
-    // public List<Index> getIndices(IQuerySession session, String catalogAlias, QualifiedName table)
-    // {
-    // return emptyList();
-    // }
+    /**
+     * Return summarized execution statistics for provided context. This is executed after an ANALZYE query and lets catalogs aggregate data for all it's datasources
+     */
+    public Map<String, Object> getExecutionStatistics(IExecutionContext context)
+    {
+        return emptyMap();
+    }
 
     /** Return registered functions for this catalog */
     public Collection<FunctionInfo> getFunctions()
@@ -139,64 +135,9 @@ public abstract class Catalog
         functions.addAll(operatorFunctionByName.values());
         return functions;
     }
-    //
-    // /**
-    // * Get operator for provided data
-    // *
-    // * <pre>
-    // * NOTE! In main loop of operator add check of {@link IQuerySession#abortQuery()} to not hang a
-    // * thread in execution state.
-    // * </pre>
-    // */
-    // public Operator getScanOperator(OperatorData data)
-    // {
-    // throw new IllegalArgumentException("Catalog " + data.catalogAlias + " (" + name + ") doesn't support scan operators.");
-    // }
-    //
-    // /**
-    // * Get operator for provided alias
-    // *
-    // * <pre>
-    // * NOTE! In main loop of operator add check of {@link IQuerySession#abortQuery()} to not hang a
-    // * thread in execution state.
-    // * </pre>
-    // *
-    // * @param indexPredicate Predicate to use
-    // */
-    // public Operator getIndexOperator(OperatorData data, IIndexPredicate indexPredicate)
-    // {
-    // throw new IllegalArgumentException("Catalog " + data.catalogAlias + " (" + name + ") doesn't support index operators.");
-    // }
-
-    // /**
-    // * <pre>
-    // * Get system operator for provided data.
-    // * This method should return a system operator for various system tables like:
-    // * - tables
-    // * - Return tables in catalog
-    // * - Preferable to return at least one column 'name'
-    // * - columns
-    // * - Return columns in catalog
-    // * - Preferable to return at least two columns 'table', 'name'
-    // * - indices
-    // * - Return indices in catalog
-    // * - Preferable to return at least two columns 'table', 'columns'
-    // * - functions
-    // * - Return functions in catalog
-    // * - Preferable to return at least two columns 'name', 'description'
-    // *
-    // * NOTE! It's optional to implement this method, but it's a good way to expose
-    // * things that the catalog supports
-    // * NOTE! It's perfectly fine to support other system tables than listed above
-    // * </pre>
-    // */
-    // public Operator getSystemOperator(OperatorData data)
-    // {
-    // throw new IllegalArgumentException("Catalog " + data.catalogAlias + " (" + name + ") doesn't support system operators.");
-    // }
 
     /** Register function */
-    public void registerFunction(FunctionInfo functionInfo)
+    protected void registerFunction(FunctionInfo functionInfo)
     {
         requireNonNull(functionInfo);
 
@@ -251,10 +192,14 @@ public abstract class Catalog
     /**
      * Return a functions tuple vector that can be used for {@link Catalog#getSystemTableDataSource(IQuerySession, String, QualifiedName, DatasourceData)} when functions is requested.
      */
-    protected TupleVector getFunctionsTupleVector()
+    protected TupleVector getFunctionsTupleVector(Schema schema)
     {
+        if (schema.getSize() != SYS_FUNCTIONS_SCHEMA.getSize())
+        {
+            throw new IllegalArgumentException("Should should have the same column count as Catalog#SYS_FUNCTIONS_SCHEMA");
+        }
         List<FunctionInfo> functions = new ArrayList<>(getFunctions());
-        return new ObjectTupleVector(SYS_FUNCTIONS_SCHEMA, functions.size(), (row, col) ->
+        return new ObjectTupleVector(schema, functions.size(), (row, col) ->
         {
             FunctionInfo function = functions.get(row);
             // CSOFF

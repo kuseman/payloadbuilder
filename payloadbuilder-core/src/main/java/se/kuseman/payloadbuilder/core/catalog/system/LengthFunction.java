@@ -2,22 +2,21 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 
 import java.util.List;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.UTF8String;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Length of string function */
 class LengthFunction extends ScalarFunctionInfo
 {
-    LengthFunction(Catalog catalog)
+    LengthFunction()
     {
-        super(catalog, "length", FunctionType.SCALAR);
+        super("length", FunctionType.SCALAR);
     }
 
     @Override
@@ -27,19 +26,19 @@ class LengthFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public int arity()
+    public Arity arity()
     {
-        return 1;
+        return Arity.ONE;
     }
 
     @Override
-    public ResolvedType getType(List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
         return ResolvedType.of(Type.Long);
     }
 
     @Override
-    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
     {
         final ValueVector value = arguments.get(0)
                 .eval(input, context);
@@ -58,12 +57,6 @@ class LengthFunction extends ScalarFunctionInfo
             }
 
             @Override
-            public boolean isNullable()
-            {
-                return value.isNullable();
-            }
-
-            @Override
             public boolean isNull(int row)
             {
                 return value.isNull(row);
@@ -75,12 +68,6 @@ class LengthFunction extends ScalarFunctionInfo
                 UTF8String string = value.getString(row);
                 return string.toString()
                         .length();
-            }
-
-            @Override
-            public Object getValue(int row)
-            {
-                throw new IllegalArgumentException("getValue should not be called on typed vectors");
             }
         };
     }

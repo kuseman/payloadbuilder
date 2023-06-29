@@ -9,19 +9,22 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.utils.StringUtils;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.expression.HasAlias;
+import se.kuseman.payloadbuilder.core.expression.HasColumnReference;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 
 /** An aggregate either implicit or explicit */
 public class Aggregate implements ILogicalPlan
 {
+
     private final ILogicalPlan input;
     /** The expressions that is utilized when doing the aggregate. Empty if this is an implicit aggregate. */
     private final List<IExpression> aggregateExpressions;
@@ -53,6 +56,11 @@ public class Aggregate implements ILogicalPlan
     @Override
     public Schema getSchema()
     {
+        if (projectionExpressions.isEmpty())
+        {
+            return input.getSchema();
+        }
+
         List<Column> columns = new ArrayList<>(projectionExpressions.size());
         for (IAggregateExpression expression : projectionExpressions)
         {
@@ -72,9 +80,13 @@ public class Aggregate implements ILogicalPlan
             {
                 outputName = expression.toString();
             }
-            ResolvedType type = expression.getType();
-            ColumnReference columnReference = expression.getColumnReference();
-            columns.add(new Column(name, outputName, type, columnReference, expression.isInternal()));
+            ResolvedType type = expression.getAggregateType();
+            ColumnReference columnReference = null;
+            if (expression instanceof HasColumnReference)
+            {
+                columnReference = ((HasColumnReference) expression).getColumnReference();
+            }
+            columns.add(CoreColumn.of(name, type, outputName, expression.isInternal(), columnReference));
         }
         return new Schema(columns);
     }
@@ -121,6 +133,11 @@ public class Aggregate implements ILogicalPlan
     @Override
     public String toString()
     {
+        if (aggregateExpressions.isEmpty())
+        {
+            return "Distinct";
+        }
+
         return "Aggregate: On: " + aggregateExpressions.stream()
                 .map(IExpression::toVerboseString)
                 .collect(joining(", "))

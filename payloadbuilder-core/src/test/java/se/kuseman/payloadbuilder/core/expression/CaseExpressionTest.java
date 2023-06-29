@@ -2,7 +2,6 @@ package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Arrays.asList;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
-import static se.kuseman.payloadbuilder.test.VectorTestUtils.nvv;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import org.junit.Test;
@@ -11,8 +10,9 @@ import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.expression.ICaseExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
@@ -57,12 +57,12 @@ public class CaseExpressionTest extends APhysicalPlanTest
                 ));
         //@formatter:on
 
-        e = new CaseExpression(asList(new CaseExpression.WhenClause(gt(col1, col2), new LiteralStringExpression("first"))), null);
+        e = new CaseExpression(asList(new ICaseExpression.WhenClause(gt(col1, col2), new LiteralStringExpression("first"))), null);
         assertEquals(ResolvedType.of(Type.String), e.getType());
         actual = e.eval(input, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.String), null, null, null, null), actual);
 
-        e = new CaseExpression(asList(new CaseExpression.WhenClause(col4, add(col1, col2))), null);
+        e = new CaseExpression(asList(new ICaseExpression.WhenClause(col4, add(col1, col2))), null);
         assertEquals(ResolvedType.of(Type.Float), e.getType());
         actual = e.eval(input, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.Float), null, null, 8.0F, null), actual);
@@ -71,21 +71,21 @@ public class CaseExpressionTest extends APhysicalPlanTest
         // Which ends up in a class cast
         try
         {
-            e = new CaseExpression(asList(new CaseExpression.WhenClause(eq(col1, col2), add(col1, col2))), col3);
+            e = new CaseExpression(asList(new ICaseExpression.WhenClause(eq(col1, col2), add(col1, col2))), col3);
             assertEquals(ResolvedType.of(Type.Float), e.getType());
             actual = e.eval(input, context);
-            assertVectorsEquals(nvv(ResolvedType.of(Type.Float), "one", "two", 8.0F, 10.0F), actual);
+            assertVectorsEquals(vv(ResolvedType.of(Type.Float), "one", "two", 8.0F, 10.0F), actual);
             fail("Should fail with class cast string -> number");
         }
-        catch (ClassCastException exp)
+        catch (IllegalArgumentException exp)
         {
             assertTrue(exp.getMessage(), exp.getMessage()
-                    .contains("java.lang.String cannot be cast to java.lang.Number"));
+                    .contains("Cannot cast 'one' to Float"));
         }
 
         // Different value vectors for different rows
         // case when col1 = 4 then col2 when col1 = 5 then col5 end
-        e = new CaseExpression(asList(new CaseExpression.WhenClause(eq(col1, intLit(4)), col2), new CaseExpression.WhenClause(eq(col1, intLit(5)), col5)), null);
+        e = new CaseExpression(asList(new ICaseExpression.WhenClause(eq(col1, intLit(4)), col2), new CaseExpression.WhenClause(eq(col1, intLit(5)), col5)), null);
         assertEquals(ResolvedType.of(Type.Float), e.getType());
         actual = e.eval(input, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.Float), null, null, 4F, 400F), actual);

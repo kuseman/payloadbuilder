@@ -1,7 +1,6 @@
 package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Objects.requireNonNull;
-import static se.kuseman.payloadbuilder.api.utils.StringUtils.equalsIgnoreCase;
 
 import java.util.List;
 import java.util.Objects;
@@ -11,15 +10,17 @@ import org.apache.commons.lang3.StringUtils;
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IColumnExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.core.QueryException;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.StatementContext;
 
 /**
@@ -36,7 +37,7 @@ import se.kuseman.payloadbuilder.core.execution.StatementContext;
  * outerReference:        Is set if this column is resolved to the outer schema and then the outer tuple vector is used in context instead of input
  * </pre>
  */
-public class ColumnExpression implements IColumnExpression, HasAlias
+public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnReference
 {
     /** Alias for this expression. This is the column name (only used for presentation) */
     private final String alias;
@@ -79,24 +80,12 @@ public class ColumnExpression implements IColumnExpression, HasAlias
         {
             throw new IllegalArgumentException("Cannot construct a column expression without either ordinal nor column");
         }
+    }
 
-        // if (columnReference != null
-        // && !columnReference.isNamed()
-        // && (ordinal >= 0
-        // || outerReference
-        // || column != null))
-        // {
-        // throw new IllegalArgumentException("An asterisk column expression cannot have ordinal/path or be outer reference");
-        // }
-
-        // if (lambdaId >= 0
-        // && (column != null
-        // || columnReference != null
-        // || outerReference
-        // || ordinal >= 0))
-        // {
-        // throw new IllegalArgumentException("Lambda column expressions cannot have column references or be outer references or have ordinal access");
-        // }
+    /** Copy column expression but change the ordinal */
+    public ColumnExpression(ColumnExpression source, int ordinal)
+    {
+        this(source.alias, source.column, source.resolvedType, source.columnReference, ordinal, source.outerReference, source.lambdaId);
     }
 
     @Override
@@ -158,40 +147,26 @@ public class ColumnExpression implements IColumnExpression, HasAlias
                 throw new IllegalArgumentException("Expected a lambda value in context for id: " + lambdaId);
             }
 
-            ResolvedType type = lambdaValue.type();
-            // Unknown value in context, return the vector as is
-            if (type.getType() != Type.TupleVector)
-            {
-                return lambdaValue;
-            }
-
-            vector = (TupleVector) lambdaValue.getValue(0);
-
-            if (ordinal == -1
-                    && column == null)
-            {
-                return lambdaValue;
-            }
-
-            if (vector == null)
-            {
-                return ValueVector.literalNull(resolvedType, 0);
-            }
-
+            return lambdaValue;
         }
-
-        if (outerReference)
+        else if (outerReference)
         {
             vector = ((StatementContext) context.getStatementContext()).getOuterTupleVector();
             if (vector == null)
             {
-                throw new IllegalArgumentException("Expected a tuple vector in context");
+                throw new IllegalArgumentException("Expected a tuple vector in context when evaluating: " + alias);
             }
         }
 
         // Ordinal access
         if (ordinal >= 0)
         {
+            if (ordinal >= vector.getSchema()
+                    .getSize())
+            {
+                return ValueVector.literalNull(ResolvedType.of(Type.Any), vector.getRowCount());
+            }
+
             return vector.getColumn(ordinal);
         }
 
@@ -208,26 +183,27 @@ public class ColumnExpression implements IColumnExpression, HasAlias
         for (int i = 0; i < size; i++)
         {
             Column schemaColumn = columns.get(i);
+            ColumnReference schemaColRef = SchemaUtils.getColumnReference(schemaColumn);
 
             // Filter on column references table source if exists
             // This happens when having an asterisk schema and we only know which table source
             // this columns belongs to and we don't have an ordinal
             if (columnReference != null
-                    && (schemaColumn.getColumnReference() == null
+                    && (schemaColRef == null
                             || !columnReference.getTableSource()
-                                    .equals(schemaColumn.getColumnReference()
-                                            .getTableSource())))
+                                    .equals(schemaColRef.getTableSource())))
             {
                 continue;
             }
 
-            if (equalsIgnoreCase(column, schemaColumn.getName()))
+            if (StringUtils.equalsIgnoreCase(column, schemaColumn.getName()))
             {
                 // TODO: lenient setting that returns first match of column
                 if (indexMatch != -1)
                 {
                     // Internal columns should not throw
-                    if (schemaColumn.isInternal())
+                    if (schemaColumn instanceof CoreColumn
+                            && ((CoreColumn) schemaColumn).isInternal())
                     {
                         continue;
                     }
@@ -242,7 +218,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias
         // TODO: strict mode, throw if not found
         if (indexMatch == -1)
         {
-            return ValueVector.literalNull(lambdaId >= 0 ? ResolvedType.valueVector(ResolvedType.of(Type.Any))
+            return ValueVector.literalNull(lambdaId >= 0 ? ResolvedType.array(ResolvedType.of(Type.Any))
                     : ResolvedType.of(Type.Any), vector.getRowCount());
         }
 
@@ -274,7 +250,8 @@ public class ColumnExpression implements IColumnExpression, HasAlias
                     && Objects.equals(columnReference, that.columnReference)
                     && ordinal == that.ordinal
                     && outerReference == that.outerReference
-                    && lambdaId == that.lambdaId;
+                    && lambdaId == that.lambdaId
+                    && resolvedType.equals(that.resolvedType);
         }
         return false;
     }

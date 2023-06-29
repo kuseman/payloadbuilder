@@ -2,10 +2,12 @@ package se.kuseman.payloadbuilder.core.planning;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
+import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
 
@@ -13,7 +15,6 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.api.catalog.CompileException;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
@@ -22,27 +23,36 @@ import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.OperatorFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IColumnExpression;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IFunctionCallExpression;
 import se.kuseman.payloadbuilder.api.expression.IInExpression;
 import se.kuseman.payloadbuilder.api.expression.ILikeExpression;
+import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.INullPredicateExpression;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.execution.TemporaryTable;
 import se.kuseman.payloadbuilder.core.expression.AExpressionVisitor;
+import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
+import se.kuseman.payloadbuilder.core.expression.LogicalBinaryExpression;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzePair;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzeResult;
 import se.kuseman.payloadbuilder.core.logicalplan.Aggregate;
 import se.kuseman.payloadbuilder.core.logicalplan.Concatenation;
 import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
+import se.kuseman.payloadbuilder.core.logicalplan.ExpressionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlanVisitor;
@@ -51,7 +61,6 @@ import se.kuseman.payloadbuilder.core.logicalplan.Join.Type;
 import se.kuseman.payloadbuilder.core.logicalplan.Limit;
 import se.kuseman.payloadbuilder.core.logicalplan.MaxRowCountAssert;
 import se.kuseman.payloadbuilder.core.logicalplan.OperatorFunctionScan;
-import se.kuseman.payloadbuilder.core.logicalplan.OverScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Projection;
 import se.kuseman.payloadbuilder.core.logicalplan.Sort;
 import se.kuseman.payloadbuilder.core.logicalplan.SubQuery;
@@ -74,8 +83,6 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         IPhysicalPlan input = plan.getInput()
                 .accept(this, context);
 
-        // TODO: if the input plan is static that schema should be provided to the physical projection to
-        // avoid recreating the schema on each execution
         return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Projection(context.getNextNodeId(), input, plan.getExpressions(), plan.isAppendInputColumns()));
     }
 
@@ -154,6 +161,15 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             predicate = AnalyzeResult.getPredicate(tableSourcePushDown.predicatePairs);
         }
 
+        // If the catalog did not consume all predicates we will have the non pushable predicates
+        // on top and the pushable left overs as child, merge the predictes
+        if (input instanceof se.kuseman.payloadbuilder.core.physicalplan.Filter)
+        {
+            se.kuseman.payloadbuilder.core.physicalplan.Filter filter = (se.kuseman.payloadbuilder.core.physicalplan.Filter) input;
+            predicate = new LogicalBinaryExpression(ILogicalBinaryExpression.Type.AND, predicate, ((ExpressionPredicate) filter.getPredicate()).getPredicate());
+            input = filter.getInput();
+        }
+
         return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Filter(context.getNextNodeId(), input, new ExpressionPredicate(predicate)));
     }
 
@@ -197,36 +213,41 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
 
         int nodeId = context.getNextNodeId();
 
+        final Optional<Schema> schema = SchemaUtils.isAsterisk(plan.getSchema()) ? Optional.empty()
+                : Optional.of(plan.getSchema());
+
         if (plan.isTempTable())
         {
-            dataSource = new IDatasource()
-            {
-                @Override
-                public TupleIterator execute(IExecutionContext context, IDatasourceOptions options)
-                {
-                    TupleVector vector = ((ExecutionContext) context).getSession()
-                            .getTemporaryTable(plan.getTableSource()
-                                    .getName()
-                                    .toDotDelimited()
-                                    .toLowerCase());
-                    return TupleIterator.singleton(vector);
-                }
-            };
-        }
-        else
-        {
-            int sortItemCount = sortItems.size();
-            DatasourceData data = new DatasourceData(nodeId, predicatePairs, sortItems, plan.getProjection());
+            String tableName = plan.getTableSource()
+                    .getName()
+                    .toDotDelimited()
+                    .toLowerCase();
 
             if (context.seekPredicate != null)
             {
                 seekPredicate = context.seekPredicate;
-                dataSource = catalog.getSeekDataSource(context.getSession(), plan.getCatalogAlias(), context.seekPredicate, data);
                 context.seekPredicate = null;
+            }
+
+            dataSource = new TemporaryTableDataSource(schema, tableName, seekPredicate);
+        }
+        else
+        {
+            int sortItemCount = sortItems.size();
+            String catalogAlias = defaultIfBlank(plan.getCatalogAlias(), context.getSession()
+                    .getDefaultCatalogAlias());
+
+            DatasourceData data = new DatasourceData(nodeId, schema, predicatePairs, sortItems, plan.getProjection());
+
+            if (context.seekPredicate != null)
+            {
+                seekPredicate = context.seekPredicate;
+                context.seekPredicate = null;
+                dataSource = catalog.getSeekDataSource(context.getSession(), catalogAlias, seekPredicate, data);
             }
             else
             {
-                dataSource = catalog.getScanDataSource(context.getSession(), plan.getCatalogAlias(), plan.getTableSource()
+                dataSource = catalog.getScanDataSource(context.getSession(), catalogAlias, plan.getTableSource()
                         .getName(), data);
             }
 
@@ -256,9 +277,10 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
 
         context.topTableScanVisited = true;
 
-        return wrapWithAnalyze(context,
-                seekPredicate != null ? new se.kuseman.payloadbuilder.core.physicalplan.IndexSeek(nodeId, plan.getSchema(), plan.getTableSource(), seekPredicate, dataSource, plan.getOptions())
-                        : new se.kuseman.payloadbuilder.core.physicalplan.TableScan(nodeId, plan.getSchema(), plan.getTableSource(), plan.isTempTable(), dataSource, plan.getOptions()));
+        return wrapWithAnalyze(context, seekPredicate != null
+                ? new se.kuseman.payloadbuilder.core.physicalplan.IndexSeek(nodeId, plan.getSchema(), plan.getTableSource(), catalog.getName(), plan.isTempTable(), seekPredicate, dataSource,
+                        plan.getOptions())
+                : new se.kuseman.payloadbuilder.core.physicalplan.TableScan(nodeId, plan.getSchema(), plan.getTableSource(), catalog.getName(), plan.isTempTable(), dataSource, plan.getOptions()));
     }
 
     @Override
@@ -270,9 +292,19 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
                         .getFirst());
 
         String catalogAlias = pair.getKey();
+
+        Catalog catalog = context.getSession()
+                .getCatalog(catalogAlias);
+
         TableFunctionInfo functionInfo = pair.getValue();
-        return wrapWithAnalyze(context,
-                new se.kuseman.payloadbuilder.core.physicalplan.TableFunctionScan(context.getNextNodeId(), plan.getTableSource(), catalogAlias, functionInfo, plan.getArguments(), plan.getOptions()));
+        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.TableFunctionScan(context.getNextNodeId(), plan.getSchema(), plan.getTableSource(), catalogAlias,
+                catalog.getName(), functionInfo, plan.getArguments(), plan.getOptions()));
+    }
+
+    @Override
+    public IPhysicalPlan visit(ExpressionScan plan, Context context)
+    {
+        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ExpressionScan(context.getNextNodeId(), plan.getTableSource(), plan.getSchema(), plan.getExpression()));
     }
 
     @Override
@@ -350,7 +382,7 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
 
         if (plan.getType() == Type.RIGHT)
         {
-            throw new IllegalArgumentException("RIGHT joins are not supported yet");
+            throw new IllegalArgumentException("RIGHT joins are not supported");
         }
 
         IPhysicalPlan outer = plan.getOuter()
@@ -440,12 +472,6 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
     }
 
     @Override
-    public IPhysicalPlan visit(OverScan plan, Context context)
-    {
-        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.OverScan(context.getNextNodeId(), plan.getOrdinal(), plan.getOverAlias(), plan.getSchema()));
-    }
-
-    @Override
     public IPhysicalPlan visit(MaxRowCountAssert plan, Context context)
     {
         IPhysicalPlan input = plan.getInput()
@@ -466,7 +492,8 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
     private IPhysicalPlan createNestedLoop(Join plan, int nodeId, IPhysicalPlan outer, IPhysicalPlan inner, BiFunction<TupleVector, IExecutionContext, ValueVector> condition,
             boolean pushOuterReference)
     {
-        if (plan.getType() == Type.INNER)
+        if (plan.getType() == Type.INNER
+                || plan.getType() == Type.CROSS)
         {
             // CROSS JOIN / CROSS APPLY
             if (condition == null)
@@ -529,7 +556,7 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         return null;
     }
 
-    private IPhysicalPlan wrapWithAnalyze(Context context, IPhysicalPlan plan)
+    static IPhysicalPlan wrapWithAnalyze(Context context, IPhysicalPlan plan)
     {
         if (context.analyze)
         {
@@ -546,12 +573,124 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         @Override
         public Void visit(IColumnExpression expression, Set<TableSourceReference> context)
         {
-            ColumnReference colRef = expression.getColumnReference();
+            ColumnReference colRef = ((ColumnExpression) expression).getColumnReference();
             if (colRef != null)
             {
                 context.add(colRef.getTableSource());
             }
             return null;
+        }
+    }
+
+    /** Datasource used for temporary tables */
+    static class TemporaryTableDataSource implements IDatasource
+    {
+        private final Optional<Schema> plannedSchema;
+        private final String name;
+        private final ISeekPredicate seekPredicate;
+
+        TemporaryTableDataSource(Optional<Schema> plannedSchema, String name, ISeekPredicate seekPredicate)
+        {
+            this.plannedSchema = plannedSchema;
+            this.name = name;
+            this.seekPredicate = seekPredicate;
+        }
+
+        @Override
+        public TupleIterator execute(IExecutionContext context, IDatasourceOptions options)
+        {
+            TemporaryTable temporaryTable = ((ExecutionContext) context).getSession()
+                    .getTemporaryTable(name);
+            TupleVector vector = temporaryTable.getTupleVector();
+
+            Schema vectorSchema = vector.getSchema();
+            final Schema schema = plannedSchema.orElse(vectorSchema);
+
+            if (seekPredicate != null)
+            {
+                final TupleIterator indexIterator = temporaryTable.getIndexIterator(context, seekPredicate);
+                return new TupleIterator()
+                {
+                    @Override
+                    public int estimatedBatchCount()
+                    {
+                        return indexIterator.estimatedBatchCount();
+                    }
+
+                    @Override
+                    public TupleVector next()
+                    {
+                        return wrap(schema, indexIterator.next());
+                    }
+
+                    @Override
+                    public boolean hasNext()
+                    {
+                        return indexIterator.hasNext();
+                    }
+                };
+            }
+
+            // Return the tuple vector from context with the planned schema
+            return TupleIterator.singleton(wrap(schema, vector));
+        }
+
+        private TupleVector wrap(Schema schema, TupleVector temporaryTableVector)
+        {
+            final Schema vectorSchema = temporaryTableVector.getSchema();
+            return new TupleVector()
+            {
+                @Override
+                public Schema getSchema()
+                {
+                    return schema;
+                }
+
+                @Override
+                public int getRowCount()
+                {
+                    return temporaryTableVector.getRowCount();
+                }
+
+                @Override
+                public ValueVector getColumn(int column)
+                {
+                    if (column >= vectorSchema.getSize())
+                    {
+                        return ValueVector.literalNull(plannedSchema.get()
+                                .getColumns()
+                                .get(column)
+                                .getType(), temporaryTableVector.getRowCount());
+                    }
+                    return temporaryTableVector.getColumn(column);
+                }
+            };
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return plannedSchema.hashCode();
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (obj == this)
+            {
+                return true;
+            }
+            else if (obj == null)
+            {
+                return false;
+            }
+            else if (obj instanceof TemporaryTableDataSource)
+            {
+                TemporaryTableDataSource that = (TemporaryTableDataSource) obj;
+                return plannedSchema.equals(that.plannedSchema)
+                        && name.equals(that.name);
+            }
+            return false;
         }
     }
 
@@ -590,9 +729,20 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
                             .getLeft()
                             .getQualifiedColumn();
                 case FUNCTION_CALL:
+                    // Pick the first non null argument
+                    IFunctionCallExpression functionCallExpression = getFunctionCallExpression();
+                    for (IExpression arg : functionCallExpression.getArguments())
+                    {
+                        QualifiedName qualifiedColumn = arg.getQualifiedColumn();
+                        if (qualifiedColumn != null)
+                        {
+                            return qualifiedColumn;
+                        }
+                    }
                     return null;
                 case IN:
-                    return getInExpression().getExpression()
+                    IInExpression inExpression = getInExpression();
+                    return inExpression.getExpression()
                             .getQualifiedColumn();
                 case LIKE:
                     return getLikeExpression().getExpression()

@@ -8,10 +8,11 @@ import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.UTF8String;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.ITemplateStringExpression;
@@ -47,51 +48,29 @@ public class TemplateStringExpression implements ITemplateStringExpression
     @Override
     public ValueVector eval(final TupleVector input, IExecutionContext context)
     {
-        final int size = expressions.size();
-        final ValueVector[] vectors = new ValueVector[size];
+        int size = expressions.size();
+        ValueVector[] vectors = new ValueVector[size];
         for (int i = 0; i < size; i++)
         {
             vectors[i] = expressions.get(i)
                     .eval(input, context);
         }
-        return new ValueVector()
+
+        if (size == 1)
         {
-            @Override
-            public ResolvedType type()
-            {
-                return ResolvedType.of(Type.String);
-            }
+            return vectors[0];
+        }
 
-            @Override
-            public int size()
-            {
-                return input.getRowCount();
-            }
+        int rowCount = input.getRowCount();
+        IObjectVectorBuilder builder = context.getVectorBuilderFactory()
+                .getObjectVectorBuilder(ResolvedType.of(Type.String), rowCount);
 
-            @Override
-            public boolean isNull(int row)
-            {
-                // Can this be null ?
-                return false;
-            }
-
-            @Override
-            public UTF8String getString(int row)
-            {
-                List<UTF8String> strings = new ArrayList<>(size);
-                for (int i = 0; i < size; i++)
-                {
-                    strings.add(vectors[i].getString(row));
-                }
-                return UTF8String.concat(UTF8String.EMPTY, strings);
-            }
-
-            @Override
-            public Object getValue(int row)
-            {
-                throw new IllegalArgumentException("getValue should not be called");
-            }
-        };
+        List<UTF8String> strings = new ArrayList<>(size);
+        for (int i = 0; i < rowCount; i++)
+        {
+            builder.put(evalInternal(strings, vectors, i));
+        }
+        return builder.build();
     }
 
     @Override
@@ -100,8 +79,15 @@ public class TemplateStringExpression implements ITemplateStringExpression
         if (expressions.stream()
                 .allMatch(IExpression::isConstant))
         {
-            ValueVector valueVector = eval(TupleVector.CONSTANT, null);
-            return new LiteralStringExpression(valueVector.getString(0));
+            int size = expressions.size();
+            ValueVector[] vectors = new ValueVector[size];
+            for (int i = 0; i < size; i++)
+            {
+                vectors[i] = expressions.get(i)
+                        .eval(null);
+            }
+            List<UTF8String> strings = new ArrayList<>(size);
+            return new LiteralStringExpression(evalInternal(strings, vectors, 0));
         }
 
         return this;
@@ -154,5 +140,20 @@ public class TemplateStringExpression implements ITemplateStringExpression
         }
         sb.append("`");
         return sb.toString();
+    }
+
+    private UTF8String evalInternal(List<UTF8String> strings, ValueVector[] vectors, int row)
+    {
+        int size = vectors.length;
+        strings.clear();
+        for (int j = 0; j < size; j++)
+        {
+            if (vectors[j].isNull(row))
+            {
+                continue;
+            }
+            strings.add(vectors[j].getString(row));
+        }
+        return UTF8String.concat(UTF8String.EMPTY, strings);
     }
 }

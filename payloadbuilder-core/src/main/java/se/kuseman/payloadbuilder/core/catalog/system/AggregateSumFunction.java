@@ -1,14 +1,15 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
-import se.kuseman.payloadbuilder.api.utils.ExpressionMath;
+import se.kuseman.payloadbuilder.api.execution.Decimal;
+import se.kuseman.payloadbuilder.api.expression.IArithmeticBinaryExpression;
+import se.kuseman.payloadbuilder.core.execution.ExpressionMath;
 
 /** Sum aggregate. Sum all non null inputs */
 class AggregateSumFunction extends ANumericAggregateFunction
 {
-    AggregateSumFunction(Catalog catalog)
+    AggregateSumFunction()
     {
-        super(catalog, "sum");
+        super("sum");
     }
 
     @Override
@@ -21,6 +22,23 @@ class AggregateSumFunction extends ANumericAggregateFunction
     protected LongAggregator createLongAggregator()
     {
         return (a, b) -> Math.addExact(a, b);
+    }
+
+    @Override
+    protected DecimalAggregator createDecimalAggregator()
+    {
+        return new DecimalAggregator()
+        {
+            @Override
+            public Decimal aggregate(Decimal current, Decimal next)
+            {
+                if (current == null)
+                {
+                    return next;
+                }
+                return current.processArithmetic(next, IArithmeticBinaryExpression.Type.ADD);
+            }
+        };
     }
 
     @Override

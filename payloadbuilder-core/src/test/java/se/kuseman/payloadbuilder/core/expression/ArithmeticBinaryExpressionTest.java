@@ -1,6 +1,7 @@
 package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyMap;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.entry;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
@@ -19,11 +20,13 @@ import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.execution.Decimal;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IArithmeticBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
@@ -31,6 +34,8 @@ import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 /** Test of {@link ArithmeticBinaryExpression} */
 public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
 {
+    private static final IExpression NULL = new LiteralNullExpression(ResolvedType.of(Type.Boolean));
+
     @Test
     public void test_semantic_equals()
     {
@@ -49,58 +54,59 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_vector_size_1()
+    public void test_fold()
     {
-        TupleVector tv = TupleVector.of(schema(new Type[] { Type.Int }, "col"), asList(ValueVector.literalInt(10, 5)));
-        ArithmeticBinaryExpression e;
-        ValueVector actual;
+        IExpression e;
 
-        // Construct a literal int with a fixed size 1
-        LiteralIntegerExpression litInt = new LiteralIntegerExpression(0)
-        {
-            @Override
-            public ValueVector eval(TupleVector input, IExecutionContext context)
-            {
-                return ValueVector.literalInt(5, 1);
-            }
-        };
+        e = e("1+1");
+        assertTrue(e.isConstant());
+        assertEquals(e("2"), e);
+        e = e("1+2+3+4+5+6");
+        assertEquals(e("21"), e);
+        e = e("1+2+3.1");
+        assertEquals(e("6.1"), e);
+        e = e("1+a");
+        assertEquals(e("1+a"), e);
+        assertFalse(e.isConstant());
+        e = e("a+1");
+        assertEquals(e("a+1"), e);
+        assertFalse(e.isConstant());
+        e = e("1+null");
+        assertEquals(NULL, e);
+        e = e("null+1");
+        assertEquals(NULL, e);
 
-        e = new ArithmeticBinaryExpression(IArithmeticBinaryExpression.Type.ADD, litInt, ce("col"));
-        actual = e.eval(tv, context);
-        assertVectorsEquals(vv(ResolvedType.of(Type.Int), 15, 15, 15, 15, 15), actual);
+        e = e("'a' + 'b'");
+        assertEquals(e("'ab'"), e);
+        assertTrue(e.isConstant());
 
-        e = new ArithmeticBinaryExpression(IArithmeticBinaryExpression.Type.ADD, ce("col"), litInt);
-        actual = e.eval(tv, context);
-        assertVectorsEquals(vv(ResolvedType.of(Type.Int), 15, 15, 15, 15, 15), actual);
+        e = e("1+2+3+a");
+        assertEquals(e("6+a"), e);
 
-        // Test that size != 1 fails
-        LiteralIntegerExpression litInt2 = new LiteralIntegerExpression(0)
-        {
-            @Override
-            public ValueVector eval(TupleVector input, IExecutionContext context)
-            {
-                return ValueVector.literalInt(5, 2);
-            }
-        };
-        e = new ArithmeticBinaryExpression(IArithmeticBinaryExpression.Type.ADD, ce("col"), litInt2);
+        e = e("1+2+3+a+null");
+        assertEquals(NULL, e);
 
-        try
-        {
-            e.eval(tv, context);
-            fail("Should fail with different sizes");
-        }
-        catch (IllegalArgumentException ee)
-        {
-            assertTrue(ee.getMessage(), ee.getMessage()
-                    .contains("Evaluation of binary vectors requires equal size"));
-        }
+        e = e("10*0");
+        assertEquals(new LiteralIntegerExpression(0), e);
+
+        e = e("1+2L");
+        assertEquals(new LiteralLongExpression(3), e);
+
+        e = e("1+2F");
+        assertEquals(new LiteralFloatExpression(3), e);
+
+        e = e("1+2D");
+        assertEquals(new LiteralDoubleExpression(3), e);
+
+        e = new ArithmeticBinaryExpression(IArithmeticBinaryExpression.Type.ADD, new LiteralIntegerExpression(10), new LiteralDecimalExpression(Decimal.from(10))).fold();
+        assertEquals(new LiteralDecimalExpression(Decimal.from(20)), e);
     }
 
     @Test
     public void test_exceptions()
     {
-        assertCase(new TestCase(IArithmeticBinaryExpression.Type.ADD, Type.Boolean, true, Type.String, 10, null, null, "Cannot perform arithmetics on types Boolean and String"));
-        assertCase(new TestCase(IArithmeticBinaryExpression.Type.ADD, Type.String, 10, Type.Boolean, true, null, null, "Cannot perform arithmetics on types String and Boolean"));
+        assertCase(new TestCase(IArithmeticBinaryExpression.Type.ADD, Type.Boolean, true, Type.DateTime, 10, null, null, "Cannot perform arithmetics on types Boolean and DateTime"));
+        assertCase(new TestCase(IArithmeticBinaryExpression.Type.ADD, Type.DateTime, 10, Type.Boolean, true, null, null, "Cannot perform arithmetics on types DateTime and Boolean"));
     }
 
     @Test
@@ -122,6 +128,10 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
         cases.add(new TestCase(IArithmeticBinaryExpression.Type.ADD, Type.String, "ghj", Type.Float, 10, Type.Float, 11, "Cannot cast 'ghj' to Float"));
         cases.add(new TestCase(IArithmeticBinaryExpression.Type.ADD, Type.String, "klm", Type.Double, 10, Type.Double, 11, "Cannot cast 'klm' to Double"));
 
+        // Complex types
+        cases.add(new TestCase(IArithmeticBinaryExpression.Type.ADD, ResolvedType.object(Schema.EMPTY), emptyMap(), ResolvedType.of(Type.Double), 10, Type.Double, 11,
+                "Cannot perform arithmetics on types Object and Double"));
+
         // String (ints)
         cases.add(new TestCase(IArithmeticBinaryExpression.Type.ADD, Type.String, "1", Type.Int, 10, Type.Int, 11, null));
         cases.add(new TestCase(IArithmeticBinaryExpression.Type.ADD, Type.String, "1", Type.Long, 20L, Type.Long, 21L, null));
@@ -131,6 +141,9 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
         // String (decimals)
         cases.add(new TestCase(IArithmeticBinaryExpression.Type.ADD, Type.String, "3.1", Type.Float, 30F, Type.Float, 33.1F, null, false));
         cases.add(new TestCase(IArithmeticBinaryExpression.Type.ADD, Type.String, "4.1", Type.Double, 40D, Type.Double, 44.1D, null, false));
+
+        // String (non ADD)
+        cases.add(new TestCase(IArithmeticBinaryExpression.Type.SUBTRACT, Type.String, "hello", Type.Any, " world", Type.String, "??", "Arithmetics on Strings only supports ADD", false));
 
         for (TestCase c : cases)
         {
@@ -309,8 +322,7 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
 
     private void assertCase(TestCase test)
     {
-        TupleVector input = TupleVector.of(schema(new Type[] { test.left, test.right }, "col1", "col2"),
-                asList(vv(ResolvedType.of(test.left), test.leftValue), vv(ResolvedType.of(test.right), test.rightValue)));
+        TupleVector input = TupleVector.of(Schema.of(Column.of("col1", test.left), Column.of("col2", test.right)), asList(vv(test.left, test.leftValue), vv(test.right, test.rightValue)));
         ArithmeticBinaryExpression e = new ArithmeticBinaryExpression(test.op, ce("col1"), ce("col2"));
 
         try
@@ -352,9 +364,9 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
     public static class TestCase
     {
         private IArithmeticBinaryExpression.Type op;
-        private Type left;
+        private ResolvedType left;
         private Object leftValue;
-        private Type right;
+        private ResolvedType right;
         private Object rightValue;
         private Type resultType;
         private Object result;
@@ -363,10 +375,21 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
 
         TestCase(IArithmeticBinaryExpression.Type op, Type left, Object leftValue, Type right, Object rightValue, Type resultType, Object result, String assertExceptionMessage)
         {
-            this(op, left, leftValue, right, rightValue, resultType, result, assertExceptionMessage, true);
+            this(op, ResolvedType.of(left), leftValue, ResolvedType.of(right), rightValue, resultType, result, assertExceptionMessage, true);
         }
 
         TestCase(IArithmeticBinaryExpression.Type op, Type left, Object leftValue, Type right, Object rightValue, Type resultType, Object result, String assertExceptionMessage,
+                boolean performNumberCasts)
+        {
+            this(op, ResolvedType.of(left), leftValue, ResolvedType.of(right), rightValue, resultType, result, assertExceptionMessage, performNumberCasts);
+        }
+
+        TestCase(IArithmeticBinaryExpression.Type op, ResolvedType left, Object leftValue, ResolvedType right, Object rightValue, Type resultType, Object result, String assertExceptionMessage)
+        {
+            this(op, left, leftValue, right, rightValue, resultType, result, assertExceptionMessage, true);
+        }
+
+        TestCase(IArithmeticBinaryExpression.Type op, ResolvedType left, Object leftValue, ResolvedType right, Object rightValue, Type resultType, Object result, String assertExceptionMessage,
                 boolean performNumberCasts)
         {
             this.op = op;
@@ -420,7 +443,7 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
             }
 
             @Override
-            public Object getValue(int row)
+            public Object getAny(int row)
             {
                 return numbers[row];
             }

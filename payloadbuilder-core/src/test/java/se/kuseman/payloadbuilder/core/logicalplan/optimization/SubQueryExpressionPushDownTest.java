@@ -3,25 +3,30 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 import static java.util.Arrays.asList;
 import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
 
+import java.util.Random;
+
+import org.antlr.v4.runtime.CommonToken;
+import org.assertj.core.api.Assertions;
 import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
+import se.kuseman.payloadbuilder.core.logicalplan.ExpressionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.Join;
 import se.kuseman.payloadbuilder.core.logicalplan.MaxRowCountAssert;
 import se.kuseman.payloadbuilder.core.logicalplan.OperatorFunctionScan;
-import se.kuseman.payloadbuilder.core.logicalplan.OverScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Projection;
 
 /** Test of {@link SubQueryExpressionPushDown} */
@@ -47,16 +52,13 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                    + "         from PDProduct p "
                    + "         where a.col = p.col4 "
                    + "       ) val1, a.col5 "
-                   + "       for object_array over bb "
+                   + "       from (bb) bb "
+                   + "       for object_array "
                    + "     )"
                    + "   ) values           "
                    + "   from PDProduct_Article a        "
                    + "   cross populate apply tableB bb "
                    + "";
-
-        /*
-         * projection (val as values) projection (col as val) projection (col) scan table
-         */
 
         ILogicalPlan plan = getColumnResolvedPlan(q);
 
@@ -67,15 +69,21 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         TableSourceReference tableProduct = new TableSourceReference("", QualifiedName.of("PDProduct"), "p");
         TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "bb");
 
+        TableSourceReference e_bb = new TableSourceReference("", QualifiedName.of("bb"), "bb");
+
         ColumnReference paAst = new ColumnReference(tableProductArticle, "a", ColumnReference.Type.ASTERISK);
         ColumnReference aAst = new ColumnReference(tableArticle, "a", ColumnReference.Type.ASTERISK);
         ColumnReference pAst = new ColumnReference(tableProduct, "p", ColumnReference.Type.ASTERISK);
         ColumnReference bbAst = new ColumnReference(tableB, "bb", ColumnReference.Type.ASTERISK);
+        ColumnReference e_bbAst = new ColumnReference(e_bb, "bb", ColumnReference.Type.ASTERISK);
 
         Schema schemaProductArticle = Schema.of(col(paAst, Type.Any));
         Schema schemaArticle = Schema.of(col(aAst, Type.Any));
         Schema schemaProduct = Schema.of(col(pAst, Type.Any));
         Schema schemaTableB = Schema.of(col(bbAst, Type.Any));
+
+        Schema objectArraySchema = Schema.of(CoreColumn.of("val", ResolvedType.of(Type.Any)), CoreColumn.of("val1", ResolvedType.of(Type.Any)),
+                CoreColumn.of(paAst.rename("col5"), ResolvedType.of(Type.Any)));
 
         //@formatter:off
         ILogicalPlan expected = 
@@ -89,7 +97,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             (IExpression) null,
                             asSet(),
                             false),
-                        new OperatorFunctionScan(Schema.of(col("__expr0", Type.OutputWritable)),
+                        new OperatorFunctionScan(Schema.of(Column.of("__expr0", ResolvedType.table(objectArraySchema))),
                             projection(
                                new Join(
                                    new Join(
@@ -105,8 +113,12 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                            (IExpression) null,
                                            asSet(),
                                            false),
-                                       new OverScan(schemaTableB, "bb", -1, null),
-                                       Join.Type.INNER,
+                                       new ExpressionScan(
+                                           e_bb,
+                                           Schema.of(CoreColumn.of(e_bbAst, ResolvedType.of(Type.Any))),
+                                           ocre(bbAst.rename("bb"), ResolvedType.table(schemaTableB)),
+                                           null),
+                                       Join.Type.LEFT,
                                        null,
                                        (IExpression) null,
                                        asSet(),
@@ -132,10 +144,15 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
-                        asSet(new Column("bb", ResolvedType.tupleVector(schemaTableB), bbAst.rename("bb")), col(paAst.rename("col"), Type.Any), col(paAst.rename("col5"), Type.Any)),
+                        asSet(new CoreColumn("bb", ResolvedType.table(schemaTableB), bbAst.rename("bb")), col(paAst.rename("col"), Type.Any), col(paAst.rename("col5"), Type.Any)),
                         false),
-                    asList(cre(paAst.rename("column")), new AliasExpression(ce("__expr0"), "values")));
+                    asList(cre(paAst.rename("column")), new AliasExpression(ce("__expr0", ResolvedType.table(objectArraySchema)), "values")));
         //@formatter:on
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(CommonToken.class, Random.class)
+                .isEqualTo(expected);
 
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));
@@ -183,7 +200,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             asSet(),
                             false),
                         tableScan(schema, table),
-                        Join.Type.INNER,
+                        Join.Type.LEFT,
                         null,
                         (IExpression) null,
                         asSet(),
@@ -193,8 +210,8 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
 
         //@formatter:off
         assertEquals(Schema.of(
-                new Column("", "table.*", ResolvedType.of(Type.Any), ast, false),
-                col("values", Type.Any)), actual.getSchema());
+                CoreColumn.of("", ResolvedType.of(Type.Any), "table.*", false, ast),
+                CoreColumn.of("values", ResolvedType.of(Type.Any), "", false, null)), actual.getSchema());
         //@formatter:on
 
         // Validate the schema below the projection. The schema must stay consistent even if we switch outer/inner
@@ -266,12 +283,12 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                 asSet(),
                                 false),
                             tableScan(schema, table),
-                            Join.Type.INNER,
+                            Join.Type.LEFT,
                             null,
                             (IExpression) null,
                             asSet(),
                             true),
-                        Join.Type.INNER,
+                        Join.Type.LEFT,
                         null,
                         (IExpression) null,
                         asSet(),
@@ -281,9 +298,9 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
 
         //@formatter:off
         assertEquals(Schema.of(
-                new Column("", "table.*", ResolvedType.of(Type.Any), ast, false),
-                col("values", Type.Any),
-                col("otherValues", Type.Any)), actual.getSchema());
+                CoreColumn.of("", ResolvedType.of(Type.Any), "table.*", false, ast),
+                CoreColumn.of("values", Type.Any),
+                CoreColumn.of("otherValues", Type.Any)), actual.getSchema());
         //@formatter:on
 
         // Validate the schema below the projection
@@ -358,7 +375,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             (IExpression) null,
                             asSet(col(ast.rename("col2"), Type.Any)),
                             false),
-                        Join.Type.INNER,
+                        Join.Type.LEFT,
                         null,
                         (IExpression) null,
                         asSet(),
@@ -434,7 +451,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                 asSet(),
                                 false),
                             tableScan(schema, table),
-                            Join.Type.INNER,
+                            Join.Type.LEFT,
                             null,
                             (IExpression) null,
                             asSet(),
@@ -574,7 +591,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             asSet(),
                             false),
                         tableScan(schema, table),
-                        Join.Type.INNER,
+                        Join.Type.LEFT,
                         null,
                         (IExpression) null,
                         asSet(),
@@ -630,16 +647,21 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             asSet(),
                             false),
                         tableScan(schema, table),
-                        Join.Type.INNER,
+                        Join.Type.LEFT,
                         null,
                         (IExpression) null,
                         asSet(),
                         true),
-                    asList(cre(ast), new AliasExpression(ce("__expr0"), "values")));
+                    asList(cre(ast), new AliasExpression(ce("__expr0", ResolvedType.of(Type.Int)), "values")));
         //@formatter:on
 
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(CommonToken.class, Random.class)
+                .isEqualTo(expected);
 
         assertEquals(expected, actual);
     }
@@ -755,7 +777,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             (IExpression) null,
                             asSet(col(ast.rename("col2"), Type.Any)),
                             false),
-                        Join.Type.INNER,
+                        Join.Type.LEFT,
                         null,
                         (IExpression) null,
                         asSet(),

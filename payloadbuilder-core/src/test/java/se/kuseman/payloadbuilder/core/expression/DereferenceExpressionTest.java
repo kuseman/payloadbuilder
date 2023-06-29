@@ -4,7 +4,6 @@ import static java.util.Arrays.asList;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.entry;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
-import static se.kuseman.payloadbuilder.test.VectorTestUtils.nvv;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import org.junit.Test;
@@ -12,13 +11,16 @@ import org.junit.Test;
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.ObjectVector;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.core.parser.ParseException;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link DereferenceExpression} */
@@ -31,7 +33,7 @@ public class DereferenceExpressionTest extends APhysicalPlanTest
         IExpression e;
         ValueVector actual;
 
-        e = DereferenceExpression.create(ce("a"), QualifiedName.of("b"));
+        e = DereferenceExpression.create(ce("a"), QualifiedName.of("b"), null);
 
         tv = TupleVector.of(Schema.of(col("a", Type.Any)), asList(vv(ResolvedType.of(Type.Any), ofEntries(entry("b", 123)), null, ofEntries(entry("b", 456)))));
 
@@ -41,9 +43,76 @@ public class DereferenceExpressionTest extends APhysicalPlanTest
         assertEquals(ResolvedType.of(Type.Any), actual.type());
         assertEquals(3, actual.size());
 
-        assertEquals(123, actual.getValue(0));
+        assertEquals(123, actual.getAny(0));
         assertTrue(actual.isNull(1));
-        assertEquals(456, actual.getValue(2));
+        assertEquals(456, actual.getAny(2));
+    }
+
+    @Test
+    public void test_dereference_objectvector_missing_column()
+    {
+        Schema innerSchema = Schema.of(col("b", Type.Int));
+
+        try
+        {
+            DereferenceExpression.create(ce("a", ResolvedType.object(innerSchema)), QualifiedName.of("c"), null);
+            fail("Should fail cause of missing object column");
+        }
+        catch (ParseException e)
+        {
+            assertTrue(e.getMessage(), e.getMessage()
+                    .contains("No column found in object named: c, expected one of: [b (Int)]"));
+        }
+    }
+
+    @Test
+    public void test_dereference_objectvector_by_ordinal()
+    {
+        TupleVector tv;
+        IExpression e;
+        ValueVector actual;
+
+        Schema innerSchema = Schema.of(col("b", Type.Int));
+        Schema schema = Schema.of(new Column("a", ResolvedType.object(innerSchema)));
+
+        e = DereferenceExpression.create(ce("a", ResolvedType.object(innerSchema)), QualifiedName.of("b"), null);
+        //@formatter:off
+        tv = TupleVector.of(schema, asList(
+                vv(ResolvedType.object(innerSchema),
+                        ObjectVector.wrap(TupleVector.of(innerSchema, asList(vv(ResolvedType.of(Type.Int), 4, 5)))),
+                        ObjectVector.wrap(TupleVector.of(innerSchema, asList(vv(ResolvedType.of(Type.Int), 6, 7)))))));
+        //@formatter:on
+        assertEquals(ResolvedType.of(Type.Int), e.getType());
+        actual = e.eval(tv, context);
+        assertEquals(ResolvedType.of(Type.Int), actual.type());
+        assertEquals(2, actual.size());
+
+        assertVectorsEquals(vv(ResolvedType.of(Type.Int), 4, 6), actual);
+    }
+
+    @Test
+    public void test_dereference_objectvector_by_name()
+    {
+        TupleVector tv;
+        IExpression e;
+        ValueVector actual;
+
+        Schema innerSchema = Schema.of(col("b", Type.Int));
+        Schema schema = Schema.of(new Column("a", ResolvedType.object(innerSchema)));
+
+        e = new DereferenceExpression(ce("a", ResolvedType.object(innerSchema)), "b", -1, ResolvedType.of(Type.Any));
+        //@formatter:off
+        tv = TupleVector.of(schema, asList(
+                vv(ResolvedType.object(innerSchema),
+                        ObjectVector.wrap(TupleVector.of(innerSchema, asList(vv(ResolvedType.of(Type.Int), 4, 5)))),
+                        ObjectVector.wrap(TupleVector.of(innerSchema, asList(vv(ResolvedType.of(Type.Int), 6, 7)))))));
+        //@formatter:on
+        assertEquals(ResolvedType.of(Type.Any), e.getType());
+        actual = e.eval(tv, context);
+        assertEquals(ResolvedType.of(Type.Any), actual.type());
+        assertEquals(2, actual.size());
+
+        assertVectorsEquals(vv(ResolvedType.of(Type.Any), 4, 6), actual);
     }
 
     @Test
@@ -54,23 +123,23 @@ public class DereferenceExpressionTest extends APhysicalPlanTest
         ValueVector actual;
 
         Schema innerSchema = Schema.of(col("b", Type.Int));
-        Schema schema = Schema.of(new Column("a", ResolvedType.tupleVector(innerSchema)));
+        Schema schema = Schema.of(new Column("a", ResolvedType.table(innerSchema)));
 
         // Test nested tuple vector, this will return a vector of value vectors
-        e = DereferenceExpression.create(ce("a", ResolvedType.tupleVector(innerSchema)), QualifiedName.of("b"));
+        e = DereferenceExpression.create(ce("a", ResolvedType.table(innerSchema)), QualifiedName.of("b"), null);
         //@formatter:off
         tv = TupleVector.of(schema, asList(
-                vv(ResolvedType.tupleVector(innerSchema),
+                vv(ResolvedType.table(innerSchema),
                         TupleVector.of(innerSchema, asList(vv(ResolvedType.of(Type.Int), 4, 5))),
                         TupleVector.of(innerSchema, asList(vv(ResolvedType.of(Type.Int), 6, 7))))));
         //@formatter:on
-        assertEquals(ResolvedType.valueVector(ResolvedType.of(Type.Int)), e.getType());
+        assertEquals(ResolvedType.array(ResolvedType.of(Type.Int)), e.getType());
         actual = e.eval(tv, context);
-        assertEquals(ResolvedType.valueVector(ResolvedType.of(Type.Int)), actual.type());
+        assertEquals(ResolvedType.array(ResolvedType.of(Type.Int)), actual.type());
         assertEquals(2, actual.size());
 
-        assertVectorsEquals(vv(ResolvedType.of(Type.Int), 4, 5), (ValueVector) actual.getValue(0));
-        assertVectorsEquals(vv(ResolvedType.of(Type.Int), 6, 7), (ValueVector) actual.getValue(1));
+        assertVectorsEquals(vv(ResolvedType.of(Type.Int), 4, 5), actual.getArray(0));
+        assertVectorsEquals(vv(ResolvedType.of(Type.Int), 6, 7), actual.getArray(1));
     }
 
     @Test
@@ -83,24 +152,24 @@ public class DereferenceExpressionTest extends APhysicalPlanTest
         TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("table"), "");
 
         Schema runtimeInnerSchema = Schema.of(col("b", Type.Int));
-        Schema planInnerSchema = Schema.of(new Column("b", ResolvedType.of(Type.Int), new ColumnReference(tableA, "b", ColumnReference.Type.ASTERISK)));
-        Schema schema = Schema.of(new Column("a", ResolvedType.tupleVector(runtimeInnerSchema)));
+        Schema planInnerSchema = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Int), new ColumnReference(tableA, "b", ColumnReference.Type.ASTERISK)));
+        Schema schema = Schema.of(new Column("a", ResolvedType.table(runtimeInnerSchema)));
 
         // Test nested tuple vector, this will return a vector of value vectors
-        e = DereferenceExpression.create(ce("a", ResolvedType.tupleVector(planInnerSchema)), QualifiedName.of("b"));
+        e = DereferenceExpression.create(ce("a", ResolvedType.table(planInnerSchema)), QualifiedName.of("b"), null);
         //@formatter:off
         tv = TupleVector.of(schema, asList(
-                vv(ResolvedType.tupleVector(runtimeInnerSchema),
+                vv(ResolvedType.table(runtimeInnerSchema),
                         TupleVector.of(runtimeInnerSchema, asList(vv(ResolvedType.of(Type.Int), 4, 5))),
                         TupleVector.of(runtimeInnerSchema, asList(vv(ResolvedType.of(Type.Int), 6, 7))))));
         //@formatter:on
-        assertEquals(ResolvedType.valueVector(ResolvedType.of(Type.Int)), e.getType());
+        assertEquals(ResolvedType.array(ResolvedType.of(Type.Int)), e.getType());
         actual = e.eval(tv, context);
-        assertEquals(ResolvedType.valueVector(ResolvedType.of(Type.Int)), actual.type());
+        assertEquals(ResolvedType.array(ResolvedType.of(Type.Int)), actual.type());
         assertEquals(2, actual.size());
 
-        assertVectorsEquals(vv(ResolvedType.of(Type.Int), 4, 5), (ValueVector) actual.getValue(0));
-        assertVectorsEquals(vv(ResolvedType.of(Type.Int), 6, 7), (ValueVector) actual.getValue(1));
+        assertVectorsEquals(vv(ResolvedType.of(Type.Int), 4, 5), actual.getArray(0));
+        assertVectorsEquals(vv(ResolvedType.of(Type.Int), 6, 7), actual.getArray(1));
     }
 
     @Test
@@ -113,23 +182,23 @@ public class DereferenceExpressionTest extends APhysicalPlanTest
         TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("table"), "");
 
         Schema runtimeInnerSchema = Schema.of(col("b", Type.Int));
-        Schema planInnerSchema = Schema.of(new Column("b", ResolvedType.of(Type.Int), new ColumnReference(tableA, "b", ColumnReference.Type.ASTERISK)));
-        Schema schema = Schema.of(new Column("a", ResolvedType.tupleVector(runtimeInnerSchema)));
+        Schema planInnerSchema = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Int), new ColumnReference(tableA, "b", ColumnReference.Type.ASTERISK)));
+        Schema schema = Schema.of(new Column("a", ResolvedType.table(runtimeInnerSchema)));
 
         // Test nested tuple vector, this will return a vector of value vectors
-        e = DereferenceExpression.create(ce("a", ResolvedType.tupleVector(planInnerSchema)), QualifiedName.of("c"));
+        e = DereferenceExpression.create(ce("a", ResolvedType.table(planInnerSchema)), QualifiedName.of("c"), null);
         //@formatter:off
         tv = TupleVector.of(schema, asList(
-                vv(ResolvedType.tupleVector(runtimeInnerSchema),
+                vv(ResolvedType.table(runtimeInnerSchema),
                         TupleVector.of(runtimeInnerSchema, asList(vv(ResolvedType.of(Type.Int), 4, 5))),
                         TupleVector.of(runtimeInnerSchema, asList(vv(ResolvedType.of(Type.Int), 6, 7))))));
         //@formatter:on
-        assertEquals(ResolvedType.valueVector(ResolvedType.of(Type.Any)), e.getType());
+        assertEquals(ResolvedType.array(ResolvedType.of(Type.Any)), e.getType());
         actual = e.eval(tv, context);
-        assertEquals(ResolvedType.valueVector(ResolvedType.of(Type.Any)), actual.type());
+        assertEquals(ResolvedType.array(ResolvedType.of(Type.Any)), actual.type());
         assertEquals(2, actual.size());
 
-        assertVectorsEquals(nvv(ResolvedType.of(Type.Any)), (ValueVector) actual.getValue(0));
-        assertVectorsEquals(nvv(ResolvedType.of(Type.Any)), (ValueVector) actual.getValue(1));
+        assertVectorsEquals(vv(ResolvedType.of(Type.Any)), actual.getArray(0));
+        assertVectorsEquals(vv(ResolvedType.of(Type.Any)), actual.getArray(1));
     }
 }

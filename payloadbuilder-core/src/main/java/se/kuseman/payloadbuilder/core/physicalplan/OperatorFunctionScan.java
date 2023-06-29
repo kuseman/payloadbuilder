@@ -5,12 +5,15 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 
+import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.OperatorFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
+import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 
 /** Operator function scan that transforms input according to a {@link OperatorFunctionInfo}. */
 public class OperatorFunctionScan implements IPhysicalPlan
@@ -20,6 +23,7 @@ public class OperatorFunctionScan implements IPhysicalPlan
     private final OperatorFunctionInfo function;
     private final Schema schema;
     private final String catalogAlias;
+    private final boolean schemaIsAsterisk;
 
     public OperatorFunctionScan(int nodeId, IPhysicalPlan input, OperatorFunctionInfo function, String catalogAlias, Schema schema)
     {
@@ -28,7 +32,7 @@ public class OperatorFunctionScan implements IPhysicalPlan
         this.function = requireNonNull(function, "function");
         this.catalogAlias = requireNonNull(catalogAlias, "catalogAlias");
         this.schema = requireNonNull(schema, "schema");
-
+        this.schemaIsAsterisk = SchemaUtils.isAsterisk(schema);
         if (schema.getColumns()
                 .size() != 1)
         {
@@ -51,13 +55,26 @@ public class OperatorFunctionScan implements IPhysicalPlan
     @Override
     public TupleIterator execute(IExecutionContext context)
     {
-        final TupleVector inputVector = PlanUtils.concat(input.execute(context));
+        final TupleVector inputVector = PlanUtils.concat(((ExecutionContext) context).getBufferAllocator(), input.execute(context));
         if (inputVector.getRowCount() == 0)
         {
             return TupleIterator.EMPTY;
         }
 
         ValueVector vv = function.eval(context, catalogAlias, inputVector);
+        Schema schema;
+        // Recreate the schema from input if planed one was asterisk
+        if (schemaIsAsterisk)
+        {
+            schema = Schema.of(Column.of(this.schema.getColumns()
+                    .get(0)
+                    .getName(), vv.type()));
+        }
+        else
+        {
+            schema = this.schema;
+        }
+
         TupleVector result = TupleVector.of(schema, singletonList(vv));
         return TupleIterator.singleton(result);
     }
@@ -100,14 +117,15 @@ public class OperatorFunctionScan implements IPhysicalPlan
     @Override
     public String toString()
     {
+        //@formatter:off
         return "Operator function scan (" + nodeId
                + "): "
-               + function.getCatalog()
-                       .getName()
+               + catalogAlias
                + "#"
                + function.getName()
                + " ("
                + schema
                + ")";
+        //@formatter:on
     }
 }

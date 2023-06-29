@@ -2,7 +2,6 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Arrays.asList;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
-import static se.kuseman.payloadbuilder.test.VectorTestUtils.nvv;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import org.junit.Test;
@@ -12,8 +11,8 @@ import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
@@ -55,13 +54,13 @@ public class RegexpLikeFunctionTest extends APhysicalPlanTest
         ValueVector actual;
 
         actual = f.evalScalar(context, input, "", asList(col3, new LiteralStringExpression("o")));
-        assertVectorsEquals(nvv(ResolvedType.of(Type.Boolean), true, true, null, true), actual);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), true, true, null, true), actual);
 
         actual = f.evalScalar(context, input, "", asList(col3, col6));
-        assertVectorsEquals(nvv(ResolvedType.of(Type.Boolean), false, false, null, false), actual);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), false, false, null, false), actual);
 
         actual = f.evalScalar(context, input, "", asList(new LiteralStringExpression("a string"), col6));
-        assertVectorsEquals(nvv(ResolvedType.of(Type.Boolean), true, false, null, false), actual);
+        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), true, false, null, false), actual);
 
         actual = f.evalScalar(context, input, "", asList(new LiteralStringExpression("a string"), new LiteralStringExpression("o")));
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), false, false, false, false), actual);

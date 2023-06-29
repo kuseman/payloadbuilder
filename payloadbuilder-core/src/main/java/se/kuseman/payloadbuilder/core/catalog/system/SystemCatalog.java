@@ -10,6 +10,7 @@ import java.util.Map.Entry;
 import java.util.function.Function;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.commons.lang3.tuple.Triple;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
@@ -17,29 +18,28 @@ import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
-import se.kuseman.payloadbuilder.api.catalog.ObjectTupleVector;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
-import se.kuseman.payloadbuilder.core.QuerySession;
+import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.cache.Cache;
-import se.kuseman.payloadbuilder.core.cache.Cache.CacheEntryInfo;
-import se.kuseman.payloadbuilder.core.cache.CacheInfo;
+import se.kuseman.payloadbuilder.core.cache.CacheProvider;
 import se.kuseman.payloadbuilder.core.cache.CacheType;
 import se.kuseman.payloadbuilder.core.catalog.system.AMatchFunction.MatchType;
 import se.kuseman.payloadbuilder.core.catalog.system.TrimFunction.Type;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.execution.QuerySession;
+import se.kuseman.payloadbuilder.core.execution.TemporaryTable;
 
 /** Built in system catalog */
 public class SystemCatalog extends Catalog
 {
     public static final String NAME = "System";
-    public static final String ALIAS = "sys";
 
     //@formatter:off
     private static final Schema CATALOGS_SCHEMA = Schema.of(
@@ -89,68 +89,82 @@ public class SystemCatalog extends Catalog
         SystemCatalog catalog = new SystemCatalog();
 
         // String functions
-        catalog.registerFunction(new LowerUpperFunction(catalog, true));
-        catalog.registerFunction(new LowerUpperFunction(catalog, false));
-        catalog.registerFunction(new SubstringFunction(catalog));
-        catalog.registerFunction(new TrimFunction(catalog, Type.BOTH));
-        catalog.registerFunction(new TrimFunction(catalog, Type.LEFT));
-        catalog.registerFunction(new TrimFunction(catalog, Type.RIGHT));
-        catalog.registerFunction(new PadFunction(catalog, true));
-        catalog.registerFunction(new PadFunction(catalog, false));
-        catalog.registerFunction(new ReplaceFunction(catalog));
-        catalog.registerFunction(new LengthFunction(catalog));
-        catalog.registerFunction(new FormatFunction(catalog));
+        catalog.registerFunction(new LowerUpperFunction(true));
+        catalog.registerFunction(new LowerUpperFunction(false));
+        catalog.registerFunction(new SubstringFunction());
+        catalog.registerFunction(new TrimFunction(Type.BOTH));
+        catalog.registerFunction(new TrimFunction(Type.LEFT));
+        catalog.registerFunction(new TrimFunction(Type.RIGHT));
+        catalog.registerFunction(new PadFunction(true));
+        catalog.registerFunction(new PadFunction(false));
+        catalog.registerFunction(new ReplaceFunction());
+        catalog.registerFunction(new LengthFunction());
+        catalog.registerFunction(new FormatFunction());
+        catalog.registerFunction(new ConcatFunction());
+        catalog.registerFunction(new CharFunction());
+        catalog.registerFunction(new LeftRightFunction(true));
+        catalog.registerFunction(new LeftRightFunction(false));
+        catalog.registerFunction(new ReverseFunction());
+        catalog.registerFunction(new CharIndexFunction());
 
         // Date functions
-        catalog.registerFunction(new GetDateFunction(catalog, true));
-        catalog.registerFunction(new GetDateFunction(catalog, false));
-        catalog.registerFunction(new UnixTimeStampFunction(catalog));
+        catalog.registerFunction(new GetDateFunction(true));
+        catalog.registerFunction(new GetDateFunction(false));
+        catalog.registerFunction(new UnixTimeStampFunction());
 
-        // Scalar functions
-        catalog.registerFunction(new HashFunction(catalog));
-        catalog.registerFunction(new DistinctFunction(catalog));
-        catalog.registerFunction(new IsNullFunction(catalog));
-        catalog.registerFunction(new IsBlankFunction(catalog));
-        catalog.registerFunction(new CoalesceFunction(catalog));
-        catalog.registerFunction(new JsonValueFunction(catalog));
-        catalog.registerFunction(new RegexpLikeFunction(catalog));
-        catalog.registerFunction(new RegexpMatchFunction(catalog));
-        catalog.registerFunction(new TypeOfFunction(catalog));
-        catalog.registerFunction(new ContainsFunction(catalog));
+        // Json functions
+        catalog.registerFunction(IsJsonFunction.isJson());
+        catalog.registerFunction(IsJsonFunction.isJsonObject());
+        catalog.registerFunction(IsJsonFunction.isJsonArray());
+        catalog.registerFunction(new JsonValueFunction());
 
-        // Misc functions
-        catalog.registerFunction(new RandomInt(catalog));
-        catalog.registerFunction(new ConcatFunction(catalog));
-        catalog.registerFunction(new ListOfFunction(catalog));
-        catalog.registerFunction(new ToListFunction(catalog));
+        // Misc. functions
+        catalog.registerFunction(new HashFunction());
+        catalog.registerFunction(new DistinctFunction());
+        catalog.registerFunction(new IsNullFunction());
+        catalog.registerFunction(new IsBlankFunction());
+        catalog.registerFunction(new CoalesceFunction());
+        catalog.registerFunction(new RegexpLikeFunction());
+        catalog.registerFunction(new RegexpMatchFunction());
+        catalog.registerFunction(new TypeOfFunction());
+        catalog.registerFunction(new ContainsFunction());
+        catalog.registerFunction(new RandomInt());
+        catalog.registerFunction(new ArrayFunction());
+        catalog.registerFunction(new ToArrayFunction());
+        catalog.registerFunction(new ToTableFunction());
+        catalog.registerFunction(new LeastGreatestFunction(false));
+        catalog.registerFunction(new LeastGreatestFunction(true));
+
+        // Mathematical functions
+        catalog.registerFunction(new AbsFunction());
+        catalog.registerFunction(new CeilingFunction());
+        catalog.registerFunction(new FloorFunction());
 
         // Lambda functions
-        catalog.registerFunction(new FilterFunction(catalog));
-        catalog.registerFunction(new MapFunction(catalog));
-        catalog.registerFunction(new FlatMapFunction(catalog));
-        catalog.registerFunction(new AMatchFunction(catalog, MatchType.ANY));
-        catalog.registerFunction(new AMatchFunction(catalog, MatchType.ALL));
-        catalog.registerFunction(new AMatchFunction(catalog, MatchType.NONE));
+        catalog.registerFunction(new FilterFunction());
+        catalog.registerFunction(new MapFunction());
+        catalog.registerFunction(new FlatMapFunction());
+        catalog.registerFunction(new AMatchFunction(MatchType.ANY));
+        catalog.registerFunction(new AMatchFunction(MatchType.ALL));
+        catalog.registerFunction(new AMatchFunction(MatchType.NONE));
 
         // Table functions
-        catalog.registerFunction(new RangeFunction(catalog));
-        catalog.registerFunction(new StringSplitFunction(catalog));
-        catalog.registerFunction(new OpenMapCollectionFunction(catalog));
+        catalog.registerFunction(new RangeFunction());
+        catalog.registerFunction(new StringSplitFunction());
 
         // Aggregate functions
-        catalog.registerFunction(new AggregateAvgFunction(catalog));
-        catalog.registerFunction(new AggregateMinFunction(catalog));
-        catalog.registerFunction(new AggregateMaxFunction(catalog));
-        catalog.registerFunction(new AggregateCountFunction(catalog));
-        catalog.registerFunction(new AggregateSumFunction(catalog));
-        catalog.registerFunction(new AggregateStructureValueFunction(catalog, AStructureValueFunction.ARRAY));
-        catalog.registerFunction(new AggregateStructureValueFunction(catalog, AStructureValueFunction.OBJECT_ARRAY));
-        catalog.registerFunction(new AggregateStructureValueFunction(catalog, AStructureValueFunction.OBJECT));
+        catalog.registerFunction(new AggregateAvgFunction());
+        catalog.registerFunction(new AggregateMinMaxFunction(true));
+        catalog.registerFunction(new AggregateMinMaxFunction(false));
+        catalog.registerFunction(new AggregateCountFunction());
+        catalog.registerFunction(new AggregateSumFunction());
+        catalog.registerFunction(new AggregateObjectArrayFunction());
+        catalog.registerFunction(new ObjectFunction());
 
         // Operator functions
-        catalog.registerFunction(new OperatorStructureValueFunction(catalog, AStructureValueFunction.ARRAY));
-        catalog.registerFunction(new OperatorStructureValueFunction(catalog, AStructureValueFunction.OBJECT_ARRAY));
-        catalog.registerFunction(new OperatorStructureValueFunction(catalog, AStructureValueFunction.OBJECT));
+        catalog.registerFunction(new OperatorArrayFunction());
+        catalog.registerFunction(new OperatorObjectArrayFunction());
+        catalog.registerFunction(new OperatorObjectFunction());
 
         return catalog;
     }
@@ -203,49 +217,54 @@ public class SystemCatalog extends Catalog
                 {
                     final List<Entry<String, Catalog>> catalogs = new ArrayList<>(((QuerySession) ctx.getSession()).getCatalogRegistry()
                             .getCatalogs());
-                    return new ObjectTupleVector(CATALOGS_SCHEMA, catalogs.size(), (row, col) ->
-                    {
-                        Entry<String, Catalog> e = catalogs.get(row);
-                        if (col == 0)
-                        {
-                            return e.getKey();
-                        }
+                    return new ObjectTupleVector(data.getSchema()
+                            .get(), catalogs.size(), (row, col) ->
+                            {
+                                Entry<String, Catalog> e = catalogs.get(row);
+                                if (col == 0)
+                                {
+                                    return e.getKey();
+                                }
 
-                        return e.getValue()
-                                .getName();
-                    });
+                                return e.getValue()
+                                        .getName();
+                            });
                 };
 
             }
             else if (SYS_FUNCTIONS.equalsIgnoreCase(type))
             {
-                vector = ctx -> getFunctionsTupleVector();
+                vector = ctx -> getFunctionsTupleVector(data.getSchema()
+                        .get());
             }
             else if (SYS_TABLES.equalsIgnoreCase(type))
             {
                 vector = ctx ->
                 {
-                    final List<Entry<String, TupleVector>> tables = new ArrayList<>(((QuerySession) ctx.getSession()).getTemporaryTables());
-                    return new ObjectTupleVector(TABLES_SCHEMA, tables.size(), (row, col) ->
-                    {
-                        Entry<String, TupleVector> e = tables.get(row);
-                        if (col == 0)
-                        {
-                            return e.getKey();
-                        }
-                        else if (col == 1)
-                        {
-                            return e.getValue()
-                                    .getSchema()
-                                    .getColumns()
-                                    .stream()
-                                    .map(c -> c.getName() + " (" + c.getType() + ")")
-                                    .collect(joining(", "));
-                        }
+                    final List<Entry<String, TemporaryTable>> tables = new ArrayList<>(((QuerySession) ctx.getSession()).getTemporaryTables());
+                    return new ObjectTupleVector(data.getSchema()
+                            .get(), tables.size(), (row, col) ->
+                            {
+                                Entry<String, TemporaryTable> e = tables.get(row);
+                                if (col == 0)
+                                {
+                                    return e.getKey();
+                                }
+                                else if (col == 1)
+                                {
+                                    return e.getValue()
+                                            .getTupleVector()
+                                            .getSchema()
+                                            .getColumns()
+                                            .stream()
+                                            .map(c -> c.getName() + " (" + c.getType() + ")")
+                                            .collect(joining(", "));
+                                }
 
-                        return e.getValue()
-                                .getRowCount();
-                    });
+                                return e.getValue()
+                                        .getTupleVector()
+                                        .getRowCount();
+                            });
 
                 };
             }
@@ -254,53 +273,54 @@ public class SystemCatalog extends Catalog
                 vector = ctx ->
                 {
                     QuerySession querySession = (QuerySession) ctx.getSession();
-                    List<Pair<Cache, CacheInfo>> caches = asList(querySession.getBatchCache(), querySession.getTempTableCache(), querySession.getGenericCache()).stream()
+                    List<Pair<CacheProvider, Cache>> caches = asList(querySession.getTempTableCache(), querySession.getGenericCache()).stream()
                             .flatMap(p -> p.getCaches()
                                     .stream()
                                     .map(c -> Pair.of(p, c)))
                             .collect(toList());
-                    return new ObjectTupleVector(CACHES_SCHEMA, caches.size(), (row, col) ->
-                    {
-                        Pair<Cache, CacheInfo> pair = caches.get(row);
-                        // CSOFF
-                        switch (col)
-                        // CSON
-                        {
-                            case 0:
-                                return pair.getValue()
-                                        .getName();
-                            case 1:
-                                return pair.getValue()
-                                        .getSize();
-                            case 2:
-                                return pair.getValue()
-                                        .getCacheHits();
-                            case 3:
-                                return (float) pair.getValue()
-                                        .getCacheHits()
-                                        / (pair.getValue()
+                    return new ObjectTupleVector(data.getSchema()
+                            .get(), caches.size(), (row, col) ->
+                            {
+                                Pair<CacheProvider, Cache> pair = caches.get(row);
+                                // CSOFF
+                                switch (col)
+                                // CSON
+                                {
+                                    case 0:
+                                        return pair.getValue()
+                                                .getName();
+                                    case 1:
+                                        return pair.getValue()
+                                                .getSize();
+                                    case 2:
+                                        return pair.getValue()
+                                                .getCacheHits();
+                                    case 3:
+                                        return (float) pair.getValue()
                                                 .getCacheHits()
-                                                + pair.getValue()
-                                                        .getCacheMisses());
-                            case 4:
-                                return pair.getValue()
-                                        .getCacheMisses();
-                            case 5:
-                                return (float) pair.getValue()
-                                        .getCacheMisses()
-                                        / (pair.getValue()
-                                                .getCacheHits()
-                                                + pair.getValue()
-                                                        .getCacheMisses());
-                            case 6:
-                                return CacheType.from(pair.getKey());
-                            case 7:
-                                return pair.getKey()
-                                        .getName();
-                        }
+                                                / (pair.getValue()
+                                                        .getCacheHits()
+                                                        + pair.getValue()
+                                                                .getCacheMisses());
+                                    case 4:
+                                        return pair.getValue()
+                                                .getCacheMisses();
+                                    case 5:
+                                        return (float) pair.getValue()
+                                                .getCacheMisses()
+                                                / (pair.getValue()
+                                                        .getCacheHits()
+                                                        + pair.getValue()
+                                                                .getCacheMisses());
+                                    case 6:
+                                        return CacheType.from(pair.getKey());
+                                    case 7:
+                                        return pair.getKey()
+                                                .getName();
+                                }
 
-                        throw new IllegalArgumentException("Illegal column index: " + col);
-                    });
+                                throw new IllegalArgumentException("Illegal column index: " + col);
+                            });
 
                 };
             }
@@ -310,68 +330,63 @@ public class SystemCatalog extends Catalog
                 {
                     QuerySession querySession = (QuerySession) ctx.getSession();
 
-                    final List<Pair<Pair<Cache, CacheInfo>, CacheEntryInfo>> cacheKeys = asList(querySession.getBatchCache(), querySession.getTempTableCache(), querySession.getGenericCache()).stream()
-                            .flatMap(p -> p.getCaches()
-                                    .stream()
-                                    .map(c -> Pair.of(p, c)))
-                            .flatMap(p -> p.getKey()
-                                    .getCacheEntries(p.getValue()
-                                            .getName())
-                                    .stream()
-                                    .map(ce -> Pair.of(p, ce)))
-                            .collect(toList());
-
-                    return new ObjectTupleVector(CACHE_KEYS_SCHEMA, cacheKeys.size(), (row, col) ->
+                    final List<Triple<CacheProvider, Cache, Cache.CacheEntry>> cacheKeys = new ArrayList<>();
+                    for (CacheProvider provider : asList(querySession.getTempTableCache(), querySession.getGenericCache()))
                     {
-                        Pair<Pair<Cache, CacheInfo>, CacheEntryInfo> p = cacheKeys.get(row);
-                        // CSOFF
-                        switch (col)
-                        // CSON
+                        for (Cache cache : provider.getCaches())
                         {
-                            case 0:
-                                return p.getKey()
-                                        .getValue()
-                                        .getName();
-                            case 1:
-                                return p.getValue()
-                                        .getKey();
-                            case 2:
-                                return p.getValue()
-                                        .getExpireTime();
-                            case 3:
-                                return CacheType.from(p.getKey()
-                                        .getKey());
-                            case 4:
-                                return p.getKey()
-                                        .getKey()
-                                        .getName();
+                            for (Cache.CacheEntry entry : cache.getCacheEntries())
+                            {
+                                cacheKeys.add(Triple.of(provider, cache, entry));
+                            }
                         }
+                    }
 
-                        throw new IllegalArgumentException("Illegal column index: " + col);
-                    });
+                    return new ObjectTupleVector(data.getSchema()
+                            .get(), cacheKeys.size(), (row, col) ->
+                            {
+                                Triple<CacheProvider, Cache, Cache.CacheEntry> t = cacheKeys.get(row);
+                                // CSOFF
+                                switch (col)
+                                // CSON
+                                {
+                                    case 0:
+                                        return t.getMiddle()
+                                                .getName();
+                                    case 1:
+                                        return t.getRight()
+                                                .getKey();
+                                    case 2:
+                                        return t.getRight()
+                                                .getExpireTime();
+                                    case 3:
+                                        return CacheType.from(t.getLeft());
+                                    case 4:
+                                        return t.getLeft()
+                                                .getName();
+                                }
+
+                                throw new IllegalArgumentException("Illegal column index: " + col);
+                            });
                 };
             }
             else if ("variables".equalsIgnoreCase(type))
             {
                 vector = ctx ->
                 {
-                    final List<Entry<String, Object>> variables = new ArrayList<>(((ExecutionContext) ctx).getVariables()
+                    final List<Entry<String, ValueVector>> variables = new ArrayList<>(((ExecutionContext) ctx).getVariables()
                             .entrySet());
-                    return new ObjectTupleVector(VARIABLES_SCHEMA, variables.size(), (row, col) ->
-                    {
-                        Entry<String, Object> e = variables.get(row);
-                        if (col == 0)
-                        {
-                            return e.getKey();
-                        }
-
-                        if (e.getValue() instanceof ValueVector)
-                        {
-                            return ((ValueVector) e.getValue()).valueAsObject(0);
-                        }
-
-                        return e.getValue();
-                    });
+                    return new ObjectTupleVector(data.getSchema()
+                            .get(), variables.size(), (row, col) ->
+                            {
+                                Entry<String, ValueVector> e = variables.get(row);
+                                if (col == 0)
+                                {
+                                    return e.getKey();
+                                }
+                                return e.getValue()
+                                        .valueAsObject(0);
+                            });
                 };
             }
         }
@@ -425,7 +440,7 @@ public class SystemCatalog extends Catalog
             }
         }
 
-        DatasourceData newData = new DatasourceData(data.getNodeId(), data.getPredicates(), data.getSortItems(), data.getProjection());
+        DatasourceData newData = new DatasourceData(data.getNodeId(), data.getSchema(), data.getPredicates(), data.getSortItems(), data.getProjection());
         return catalog.getSystemTableDataSource(querySession, targetCatalogAlias, table, newData);
     }
 

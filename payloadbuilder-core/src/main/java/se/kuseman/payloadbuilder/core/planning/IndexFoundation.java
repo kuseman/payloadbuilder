@@ -9,8 +9,8 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.Index.ColumnsType;
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzePair;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzeResult;

@@ -15,8 +15,10 @@ import org.apache.commons.lang3.StringEscapeUtils;
 
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.catalog.IPredicate.Type;
+import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IColumnExpression;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
@@ -51,12 +53,16 @@ class PropertyPredicate
         return predicate.getSqlRepresentation();
     }
 
-    void appendBooleanClause(StringBuilder filterMust, StringBuilder filterMustNot, IExecutionContext context)
+    private ValueVector evalExpression(boolean describe, IExpression expression, IExecutionContext context)
+    {
+        return expression.eval(context);
+    }
+
+    void appendBooleanClause(boolean describe, StringBuilder filterMust, StringBuilder filterMustNot, IExecutionContext context)
     {
         if (predicate.getType() == IPredicate.Type.COMPARISION)
         {
-            ValueVector v = predicate.getComparisonExpression()
-                    .eval(context);
+            ValueVector v = evalExpression(describe, predicate.getComparisonExpression(), context);
             if (v.isNull(0))
             {
                 // if we have null here this means we have a
@@ -119,9 +125,9 @@ class PropertyPredicate
                     .append(property)
                     .append("\":[");
 
-            List<? extends IExpression> arguments = inExpression.getArguments();
+            List<IExpression> arguments = inExpression.getArguments();
             sb.append(arguments.stream()
-                    .map(e -> e.eval(context))
+                    .map(e -> evalExpression(describe, e, context))
                     .filter(v -> !v.isNull(0))
                     .map(o -> quote(o.valueAsObject(0)))
                     .collect(joining(",")));
@@ -135,9 +141,7 @@ class PropertyPredicate
             StringBuilder sb = likeExpression.isNot() ? filterMustNot
                     : filterMust;
 
-            Object value = likeExpression.getPatternExpression()
-                    .eval(context)
-                    .valueAsObject(0);
+            Object value = evalExpression(describe, likeExpression.getPatternExpression(), context).valueAsObject(0);
             String query = String.valueOf(value)
                     // Replace wildcard chars
                     .replace("?", "\\\\?")
@@ -158,7 +162,7 @@ class PropertyPredicate
         }
         else if (fullTextPredicate)
         {
-            appendFullTextOperator(context, predicate.getFunctionCallExpression(), filterMust);
+            appendFullTextOperator(describe, context, predicate.getFunctionCallExpression(), filterMust);
         }
     }
 
@@ -184,10 +188,10 @@ class PropertyPredicate
         sb.append("}}");
     }
 
-    private void appendFullTextOperator(IExecutionContext context, IFunctionCallExpression functionExpression, StringBuilder sb)
+    private void appendFullTextOperator(boolean describe, IExecutionContext context, IFunctionCallExpression functionExpression, StringBuilder sb)
     {
         FunctionInfo functionInfo = functionExpression.getFunctionInfo();
-        List<? extends IExpression> arguments = functionExpression.getArguments();
+        List<IExpression> arguments = functionExpression.getArguments();
 
         if (MatchFunction.NAME.equals(functionInfo.getName()))
         {
@@ -200,14 +204,10 @@ class PropertyPredicate
             }
             else
             {
-                arg0 = String.valueOf(arguments.get(0)
-                        .eval(context)
-                        .valueAsObject(0));
+                arg0 = String.valueOf(evalExpression(describe, arguments.get(0), context).valueAsObject(0));
             }
 
-            String match = String.valueOf(arguments.get(1)
-                    .eval(context)
-                    .valueAsObject(0));
+            String match = String.valueOf(evalExpression(describe, arguments.get(1), context).valueAsObject(0));
             String[] fields = arg0.split(",");
 
             // TODO: - options argument
@@ -237,9 +237,7 @@ class PropertyPredicate
         }
         else
         {
-            String query = String.valueOf(arguments.get(0)
-                    .eval(context)
-                    .valueAsObject(0));
+            String query = String.valueOf(evalExpression(describe, arguments.get(0), context).valueAsObject(0));
 
             sb.append("{\"query_string\":{")
                     .append("\"query\":\"")
@@ -290,5 +288,31 @@ class PropertyPredicate
             return "\"" + stringValue + "\"";
         }
         return stringValue;
+    }
+
+    static boolean isSupported(IPredicate predicate, String catalogAlias)
+    {
+        IPredicate.Type type = predicate.getType();
+        return type == Type.COMPARISION
+                || (type == Type.FUNCTION_CALL
+                        && isFullTextSearchPredicate(predicate.getFunctionCallExpression(), catalogAlias))
+                || type == Type.IN
+                || (type == Type.LIKE
+                        && predicate.getLikeExpression()
+                                .getEscapeCharacterExpression() == null);
+    }
+
+    static boolean isFullTextSearchPredicate(IFunctionCallExpression functionExpression, String catalogAlias)
+    {
+        // NOT an ES catalog function
+        if (!functionExpression.getCatalogAlias()
+                .equalsIgnoreCase(catalogAlias))
+        {
+            return false;
+        }
+        ScalarFunctionInfo functionInfo = functionExpression.getFunctionInfo();
+        String name = functionInfo.getName();
+        return MatchFunction.NAME.equalsIgnoreCase(name)
+                || QueryFunction.NAME.equalsIgnoreCase(name);
     }
 }

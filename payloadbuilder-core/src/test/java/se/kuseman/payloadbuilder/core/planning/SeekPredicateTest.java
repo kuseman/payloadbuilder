@@ -14,9 +14,9 @@ import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.Index.ColumnsType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.ISeekKey;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.SeekType;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
@@ -26,7 +26,7 @@ public class SeekPredicateTest extends APhysicalPlanTest
     @Test
     public void test()
     {
-        Index index = new Index(QualifiedName.of("table"), asList("col1", "col2"), ColumnsType.ANY, 100);
+        Index index = new Index(QualifiedName.of("table"), asList("col1", "col2"), ColumnsType.ANY);
 
         IExpression colValue = ce("value");
 
@@ -35,9 +35,10 @@ public class SeekPredicateTest extends APhysicalPlanTest
         assertEquals(index, p.getIndex());
         assertEquals(asList("col1"), p.getIndexColumns());
 
-        TupleVector tv = TupleVector.of(Schema.of(Column.of("value", Type.Int)), asList(vv(Type.Int, 1, 2, 3, 4, 5)));
+        // Verify that nulls and duplicates are removed
+        TupleVector tv = TupleVector.of(Schema.of(Column.of("value", Type.Int)), asList(vv(Type.Int, 1, 1, 2, 3, 4, 5, null)));
         context.getStatementContext()
-                .setOuterTupleVector(tv);
+                .setIndexSeekTupleVector(tv);
 
         List<ISeekKey> keys = p.getSeekKeys(context);
 

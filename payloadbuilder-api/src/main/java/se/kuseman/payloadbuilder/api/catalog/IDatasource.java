@@ -5,6 +5,7 @@ import static java.util.Collections.emptyMap;
 import java.util.Map;
 
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 
 /** Definition of a data source. The plugable extension point for scans for catalogs */
 public interface IDatasource

@@ -1,9 +1,10 @@
 package se.kuseman.payloadbuilder.core.expression;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.ILiteralDoubleExpression;
 
@@ -12,14 +13,14 @@ public class LiteralDoubleExpression extends LiteralExpression implements ILiter
 {
     private final double value;
 
-    LiteralDoubleExpression(String value)
+    public LiteralDoubleExpression(String value)
     {
         this(Double.parseDouble(value));
     }
 
-    LiteralDoubleExpression(double value)
+    public LiteralDoubleExpression(double value)
     {
-        super(Type.Double);
+        super(ResolvedType.of(Type.Double));
         this.value = value;
     }
 

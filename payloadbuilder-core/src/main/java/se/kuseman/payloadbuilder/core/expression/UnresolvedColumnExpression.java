@@ -7,9 +7,9 @@ import org.antlr.v4.runtime.Token;
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 
@@ -59,7 +59,7 @@ public class UnresolvedColumnExpression implements IExpression, HasAlias
     @Override
     public ResolvedType getType()
     {
-        return ResolvedType.of(Type.Any); // throw new IllegalArgumentException("An unresolved column expression have no type");
+        return ResolvedType.of(Type.Any);
     }
 
     @Override
@@ -99,8 +99,9 @@ public class UnresolvedColumnExpression implements IExpression, HasAlias
         else if (obj instanceof UnresolvedColumnExpression)
         {
             UnresolvedColumnExpression that = (UnresolvedColumnExpression) obj;
-            return qname.toDotDelimited()
-                    .equalsIgnoreCase(that.qname.toDotDelimited());
+            return lambdaId == that.lambdaId
+                    && qname.toDotDelimited()
+                            .equalsIgnoreCase(that.qname.toDotDelimited());
         }
         return false;
     }

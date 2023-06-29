@@ -1,14 +1,18 @@
 package se.kuseman.payloadbuilder.core.expression;
 
+import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.Decimal;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IArithmeticBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
-import se.kuseman.payloadbuilder.api.utils.ExpressionMath;
+import se.kuseman.payloadbuilder.core.execution.ExpressionMath;
 
 /** Expression that handles arithmetics +/- etc. */
 public class ArithmeticBinaryExpression extends ABinaryExpression implements IArithmeticBinaryExpression
@@ -27,33 +31,51 @@ public class ArithmeticBinaryExpression extends ABinaryExpression implements IAr
         return type;
     }
 
-    // @Override
-    // public IExpression fold()
-    // {
-    // if (left instanceof LiteralNullExpression
-    // || right instanceof LiteralNullExpression)
-    // {
-    // return new LiteralNullExpression(Type.Object);
-    // }
-    //
-    // boolean ll = left instanceof LiteralExpression;
-    // boolean rl = right instanceof LiteralExpression;
-    //
-    // if (ll
-    // || rl)
-    // {
-    // if (ll
-    // && rl)
-    // {
-    // return LiteralExpression.create(evalInternal(((LiteralExpression) left).getObjectValue(), ((LiteralExpression) right).getObjectValue()));
-    // }
-    //
-    // // TODO: more folding. multiply 0, 1
-    // // divide 1
-    // }
-    //
-    // return this;
-    // }
+    @Override
+    public IExpression fold()
+    {
+        if (left instanceof LiteralNullExpression
+                || right instanceof LiteralNullExpression)
+        {
+            return new LiteralNullExpression(getType());
+        }
+
+        boolean lconstant = left.isConstant();
+        boolean rconstant = right.isConstant();
+
+        if (lconstant
+                && rconstant)
+        {
+            ValueVector v = eval(null, 1, left.eval(null), right.eval(null));
+            if (v.isNull(0))
+            {
+                return new LiteralNullExpression(getType());
+            }
+
+            Column.Type resultType = v.type()
+                    .getType();
+
+            switch (resultType)
+            {
+                case Double:
+                    return new LiteralDoubleExpression(v.getDouble(0));
+                case Float:
+                    return new LiteralFloatExpression(v.getFloat(0));
+                case Int:
+                    return new LiteralIntegerExpression(v.getInt(0));
+                case Long:
+                    return new LiteralLongExpression(v.getLong(0));
+                case Decimal:
+                    return new LiteralDecimalExpression(v.getDecimal(0));
+                case String:
+                    return new LiteralStringExpression(v.getString(0));
+                default:
+                    throw new IllegalArgumentException("Unsupported result type: " + resultType);
+            }
+        }
+
+        return this;
+    }
 
     @Override
     public ResolvedType getType()
@@ -68,22 +90,11 @@ public class ArithmeticBinaryExpression extends ABinaryExpression implements IAr
     }
 
     @Override
-    ValueVector eval(ValueVector lvv, ValueVector rvv)
+    ValueVector eval(IExecutionContext context, int rowCount, ValueVector lvv, ValueVector rvv)
     {
         final Column.Type resultType = getType(lvv.type(), rvv.type()).getType();
-
-        // We use a lazy vector here to avoid allocation of a lot of primitive arrays
-        final boolean nullable = lvv.isNullable()
-                || rvv.isNullable();
-        final int size = lvv.size();
         return new ValueVector()
         {
-            @Override
-            public boolean isNullable()
-            {
-                return nullable;
-            }
-
             @Override
             public boolean isNull(int row)
             {
@@ -100,12 +111,18 @@ public class ArithmeticBinaryExpression extends ABinaryExpression implements IAr
             @Override
             public int size()
             {
-                return size;
+                return rowCount;
             }
 
             @Override
             public int getInt(int row)
             {
+                // Implicit cast
+                if (resultType != Column.Type.Int)
+                {
+                    return ValueVector.super.getInt(row);
+                }
+
                 // Can only be ints on both sides
                 int ileft = lvv.getInt(row);
                 int iright = rvv.getInt(row);
@@ -130,6 +147,12 @@ public class ArithmeticBinaryExpression extends ABinaryExpression implements IAr
             @Override
             public long getLong(int row)
             {
+                // Implicit cast
+                if (resultType != Column.Type.Long)
+                {
+                    return ValueVector.super.getLong(row);
+                }
+
                 // Let Vectors cast to correct value
                 long lleft = lvv.getLong(row);
                 long lright = rvv.getLong(row);
@@ -149,6 +172,20 @@ public class ArithmeticBinaryExpression extends ABinaryExpression implements IAr
                     default:
                         throw new IllegalArgumentException("Unsupported operation " + type);
                 }
+            }
+
+            @Override
+            public Decimal getDecimal(int row)
+            {
+                // Implicit cast
+                if (resultType != Column.Type.Decimal)
+                {
+                    return ValueVector.super.getDecimal(row);
+                }
+
+                Decimal dleft = lvv.getDecimal(row);
+                Decimal dright = rvv.getDecimal(row);
+                return dleft.processArithmetic(dright, type);
             }
 
             @Override
@@ -178,6 +215,12 @@ public class ArithmeticBinaryExpression extends ABinaryExpression implements IAr
             @Override
             public double getDouble(int row)
             {
+                // Implicit cast
+                if (resultType != Column.Type.Double)
+                {
+                    return ValueVector.super.getDouble(row);
+                }
+
                 // Let Vectors cast to correct value
                 double dleft = lvv.getDouble(row);
                 double dright = rvv.getDouble(row);
@@ -200,7 +243,20 @@ public class ArithmeticBinaryExpression extends ABinaryExpression implements IAr
             }
 
             @Override
-            public Object getValue(int row)
+            public UTF8String getString(int row)
+            {
+                // Implicit cast
+                if (resultType != Column.Type.String)
+                {
+                    return ValueVector.super.getString(row);
+                }
+
+                // Concats left and right
+                return UTF8String.concat(UTF8String.EMPTY, asList(lvv.getString(row), rvv.getString(row)));
+            }
+
+            @Override
+            public Object getAny(int row)
             {
                 if (resultType != Column.Type.Any)
                 {
@@ -210,15 +266,15 @@ public class ArithmeticBinaryExpression extends ABinaryExpression implements IAr
                 switch (type)
                 {
                     case ADD:
-                        return ExpressionMath.add(lvv.getValue(row), rvv.getValue(row));
+                        return ExpressionMath.add(lvv.getAny(row), rvv.getAny(row));
                     case DIVIDE:
-                        return ExpressionMath.divide(lvv.getValue(row), rvv.getValue(row));
+                        return ExpressionMath.divide(lvv.getAny(row), rvv.getAny(row));
                     case MODULUS:
-                        return ExpressionMath.modulo(lvv.getValue(row), rvv.getValue(row));
+                        return ExpressionMath.modulo(lvv.getAny(row), rvv.getAny(row));
                     case MULTIPLY:
-                        return ExpressionMath.multiply(lvv.getValue(row), rvv.getValue(row));
+                        return ExpressionMath.multiply(lvv.getAny(row), rvv.getAny(row));
                     case SUBTRACT:
-                        return ExpressionMath.subtract(lvv.getValue(row), rvv.getValue(row));
+                        return ExpressionMath.subtract(lvv.getAny(row), rvv.getAny(row));
                     default:
                         throw new IllegalArgumentException("Unsuppored operation " + type);
 
@@ -291,8 +347,10 @@ public class ArithmeticBinaryExpression extends ABinaryExpression implements IAr
         final Column.Type rightType = right.getType();
 
         boolean leftOk = (leftType.isNumber()
+                || leftType == Column.Type.String
                 || leftType == Column.Type.Any);
         boolean rightOk = (rightType.isNumber()
+                || rightType == Column.Type.String
                 || rightType == Column.Type.Any);
 
         if (!leftOk
@@ -309,6 +367,17 @@ public class ArithmeticBinaryExpression extends ABinaryExpression implements IAr
         {
             resultType = rightType;
         }
+
+        if (resultType.isComplex())
+        {
+            throw new IllegalArgumentException("Cannot perform arithmetics on types " + leftType + " and " + rightType);
+        }
+        else if (resultType == Column.Type.String
+                && type != Type.ADD)
+        {
+            throw new IllegalArgumentException("Arithmetics on Strings only supports ADD");
+        }
+
         return ResolvedType.of(resultType);
     }
 }

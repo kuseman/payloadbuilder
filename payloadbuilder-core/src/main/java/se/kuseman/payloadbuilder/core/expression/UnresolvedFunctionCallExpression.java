@@ -11,9 +11,9 @@ import org.antlr.v4.runtime.Token;
 
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo.AggregateMode;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 
@@ -61,6 +61,12 @@ public class UnresolvedFunctionCallExpression implements IExpression, IAggregate
     }
 
     @Override
+    public boolean isConstant()
+    {
+        return false;
+    }
+
+    @Override
     public List<IExpression> getChildren()
     {
         return arguments;
@@ -68,6 +74,12 @@ public class UnresolvedFunctionCallExpression implements IExpression, IAggregate
 
     @Override
     public ResolvedType getType()
+    {
+        throw new IllegalArgumentException("An unresolved function call expression have no type");
+    }
+
+    @Override
+    public ResolvedType getAggregateType()
     {
         throw new IllegalArgumentException("An unresolved function call expression have no type");
     }

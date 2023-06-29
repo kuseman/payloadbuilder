@@ -4,15 +4,14 @@ import static java.util.Objects.requireNonNull;
 import static se.kuseman.payloadbuilder.core.expression.LiteralBooleanExpression.FALSE;
 import static se.kuseman.payloadbuilder.core.expression.LiteralBooleanExpression.TRUE;
 
-import java.util.BitSet;
-
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IBooleanVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
-import se.kuseman.payloadbuilder.core.physicalplan.BitSetVector;
 
 /** AND/OR expression */
 public class LogicalBinaryExpression extends ABinaryExpression implements ILogicalBinaryExpression
@@ -83,7 +82,7 @@ public class LogicalBinaryExpression extends ABinaryExpression implements ILogic
     }
 
     @Override
-    ValueVector eval(ValueVector lvv, ValueVector rvv)
+    ValueVector eval(IExecutionContext context, int rowCount, ValueVector lvv, ValueVector rvv)
     {
         Column.Type leftType = lvv.type()
                 .getType();
@@ -98,116 +97,95 @@ public class LogicalBinaryExpression extends ABinaryExpression implements ILogic
             throw new IllegalArgumentException("Performing logical binary operation between two value vectors requires boolean type.");
         }
 
-        // Optimized versions
-        if (lvv instanceof BitSetVector)
-        {
-            if (type == Type.AND)
-            {
-                return ((BitSetVector) lvv).and(rvv);
-            }
-            return ((BitSetVector) lvv).or(rvv);
-        }
-        else if (rvv instanceof BitSetVector)
-        {
-            if (type == Type.AND)
-            {
-                return ((BitSetVector) rvv).and(lvv);
-            }
-            return ((BitSetVector) rvv).or(lvv);
-        }
+        IBooleanVectorBuilder builder = context.getVectorBuilderFactory()
+                .getBooleanVectorBuilder(rowCount);
 
-        int size = lvv.size();
-        BitSet bs = new BitSet(size);
-        BitSet nullBs = new BitSet(size);
         boolean isAnd = type == Type.AND;
 
-        for (int i = 0; i < size; i++)
+        for (int i = 0; i < rowCount; i++)
         {
-            boolean leftNull = lvv.isNullable()
-                    && lvv.isNull(i);
-            boolean rightNull = rvv.isNullable()
-                    && rvv.isNull(i);
+            // Optimize for lazy eval, which means we should not touch right side
+            // either for isNull or getBoolean if we don't need
+            boolean leftNull = lvv.isNull(i);
+            boolean lv = !leftNull ? lvv.getBoolean(i)
+                    : false;
+
+            if (!leftNull)
+            {
+                // true AND ? => Continue
+                // false AND ? => false
+                // true OR ? => true
+                // false OR ? => Continue
+
+                // false AND ? => false
+                if (!lv
+                        && isAnd)
+                {
+                    builder.put(false);
+                    continue;
+                }
+                // true OR ? => true
+                else if (lv
+                        && !isAnd)
+                {
+                    builder.put(true);
+                    continue;
+                }
+            }
+
+            // Here we must start to look at the right side to continue
+            boolean rightNull = rvv.isNull(i);
+
+            boolean rv = !rightNull ? rvv.getBoolean(i)
+                    : false;
 
             if (leftNull
                     && rightNull)
             {
-                // null and/or null => null
-                nullBs.set(i, true);
+                // null AND/OR null => null
+                builder.putNull();
+                continue;
+            }
+            else if (rightNull)
+            {
+                // true AND null
+                // false OR null
+                builder.putNull();
                 continue;
             }
             else if (leftNull)
             {
-                // null AND true => null
-                // null AND false => false
-                // null OR true => true
-                // null OR false => null
-
-                boolean rv = rvv.getBoolean(i);
-                if ((isAnd
-                        && rv)
-                        || (!isAnd
-                                && !rv))
-                {
-                    nullBs.set(i, true);
-                }
-                else
-                {
-                    bs.set(i, rv);
-                }
-            }
-            else if (rightNull)
-            {
-                // true AND null => null
-                // false AND null => false
-                // true OR null => true
-                // false OR null => null
-
-                boolean lv = lvv.getBoolean(i);
-                if ((lv
+                // null AND false
+                if (!rv
                         && isAnd)
-                        || (!lv
-                                && !isAnd))
                 {
-                    nullBs.set(i, true);
-                }
-                else
-                {
-                    bs.set(i, lv);
-                }
-            }
-            else
-            {
-                boolean lv = lvv.getBoolean(i);
-
-                if (isAnd
-                        && !lv)
-                {
-                    // false AND <any> => false
+                    builder.put(false);
                     continue;
                 }
-                else if (!isAnd
-                        && lv)
+                // null OR true
+                else if (rv
+                        && !isAnd)
                 {
-                    // true or <any> => true
-                    bs.set(i, true);
+                    builder.put(true);
                     continue;
                 }
 
-                boolean rv = rvv.getBoolean(i);
-                if (isAnd)
-                {
-                    bs.set(i, lv
-                            && rv);
-                }
-                else
-                {
-                    bs.set(i, lv
-                            || rv);
-                }
+                // null AND true
+                // null OR false
+                builder.putNull();
+                continue;
             }
+
+            boolean result = isAnd ? lv
+                    && rv
+                    : lv
+                            || rv;
+
+            builder.put(result);
         }
 
-        return new BitSetVector(size, bs, nullBs);
+        return builder.build();
+
     }
 
     private boolean isTrue(IExpression expression)

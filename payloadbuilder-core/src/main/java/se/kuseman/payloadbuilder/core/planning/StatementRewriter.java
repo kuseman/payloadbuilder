@@ -6,18 +6,25 @@ import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static se.kuseman.payloadbuilder.core.logicalplan.optimization.LogicalPlanOptimizer.resolveExpression;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
+import se.kuseman.payloadbuilder.api.catalog.Index;
+import se.kuseman.payloadbuilder.api.catalog.Index.ColumnsType;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.Option;
 import se.kuseman.payloadbuilder.core.common.SortItem;
+import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.Concatenation;
@@ -88,20 +95,23 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
     @Override
     public Statement visit(SetStatement statement, Context context)
     {
+        // Execute system properties at this stage to trigger settings that is needed
+        // during planning phase
+        if (statement.isSystemProperty())
+        {
+            ValueVector value = statement.getExpression()
+                    .eval(TupleVector.CONSTANT, context.context);
+            context.context.getSession()
+                    .setSystemProperty(statement.getName(), value);
+        }
         return new SetStatement(statement.getName(), resolveExpression(context.context, statement.getExpression()), statement.isSystemProperty());
     }
 
     @Override
     public Statement visit(UseStatement statement, Context context)
     {
-        // Change of default catalog that would be done runtime so that planning gets correct
-        if (statement.getExpression() == null)
-        {
-            context.getSession()
-                    .setDefaultCatalogAlias(statement.getQname()
-                            .getFirst());
-        }
-
+        // Execute the use statement to properly set properties during planning
+        statement.execute(context.context);
         return new UseStatement(statement.getQname(), resolveExpression(context.context, statement.getExpression()));
     }
 
@@ -115,11 +125,11 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
 
         PhysicalSelectStatement physicalDescribeStatement = new PhysicalSelectStatement(new DescribePlan(context.getNextNodeId(), physicalSelectStatement.getSelect(), statement.isAnalyze()));
 
-        if (statement.isIncludeLogicalPlan())
-        {
-            // ILogicalPlan logicalPlan = context.currentLogicalPlan;
-            // return new StatementList(asList( ))
-        }
+        // if (statement.isIncludeLogicalPlan())
+        // {
+        // ILogicalPlan logicalPlan = context.currentLogicalPlan;
+        // return new StatementList(asList( ))
+        // }
 
         return physicalDescribeStatement;
     }
@@ -202,25 +212,7 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
     @Override
     public Statement visit(LogicalSelectStatement statement, Context context)
     {
-        ILogicalPlan plan = statement.getSelect();
-
-        // Optimize plan
-        plan = LogicalPlanOptimizer.optimize(context.context, plan, context.schemaByTempTable);
-
-        context.currentLogicalPlan = plan;
-
-        // System.out.println(plan.print(0));
-
-        IPhysicalPlan physicalPlan = plan.accept(QUERY_PLANNER, context);
-
-        // Wrap plan to suppress writing to output
-        if (statement.isAssignmentSelect())
-        {
-            physicalPlan = new AssignmentPlan(context.getNextNodeId(), physicalPlan);
-        }
-
-        // Create a physical plan from the logical
-        return new PhysicalSelectStatement(physicalPlan);
+        return createPhysicalPlan(statement, context);
     }
 
     @Override
@@ -232,18 +224,72 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
     @Override
     public Statement visit(InsertIntoStatement statement, Context context)
     {
+        PhysicalSelectStatement selectStatement = createPhysicalPlan(statement, context);
+
+        List<Option> options = new ArrayList<>(statement.getOptions()
+                .size());
+
+        List<Index> indices = new ArrayList<>();
+
+        for (Option option : statement.getOptions())
+        {
+            IExpression expression = resolveExpression(context.context, option.getValueExpression());
+
+            if (option.getOption()
+                    .toDotDelimited()
+                    .equalsIgnoreCase(InsertIntoStatement.INDICES))
+            {
+                if (!expression.isConstant())
+                {
+                    throw new ParseException("Indices option must be constant", statement.getToken());
+                }
+                else if (!expression.getType()
+                        .equals(ResolvedType.array(ResolvedType.array(Type.String))))
+                {
+                    throw new ParseException("Indices option must be of type Array<Array<String>>", statement.getToken());
+                }
+
+                ValueVector vector = expression.eval(context.context);
+                ValueVector array = vector.getArray(0);
+                int size = array.size();
+                for (int i = 0; i < size; i++)
+                {
+                    if (array.isNull(i))
+                    {
+                        continue;
+                    }
+                    ValueVector columnsVector = array.getArray(i);
+                    int columnsSize = columnsVector.size();
+                    if (columnsSize <= 0)
+                    {
+                        continue;
+                    }
+                    List<String> columns = new ArrayList<>(columnsSize);
+                    for (int j = 0; j < columnsSize; j++)
+                    {
+                        if (columnsVector.isNull(j))
+                        {
+                            continue;
+                        }
+                        columns.add(columnsVector.getString(j)
+                                .toString());
+                    }
+                    indices.add(new Index(QualifiedName.of(statement.getTable()), columns, ColumnsType.ALL));
+                }
+            }
+            else
+            {
+                options.add(new Option(option.getOption(), expression));
+            }
+        }
+
+        TableSchema tableSchema = new TableSchema(context.currentLogicalPlan.getSchema(), indices);
+
         // Visit select statement to retrieve the schema for the temp table
-        PhysicalSelectStatement selectStatement = (PhysicalSelectStatement) statement.getSelectStatement()
-                .accept(this, context);
         context.schemaByTempTable.put(statement.getTable()
-                .toLowerCase(), context.currentLogicalPlan.getSchema());
+                .toLowerCase(), tableSchema);
 
-        List<Option> options = statement.getOptions()
-                .stream()
-                .map(o -> new Option(o.getOption(), resolveExpression(context.context, o.getValueExpression())))
-                .collect(toList());
-
-        return new PhysicalSelectStatement(new InsertInto(context.getNextNodeId(), selectStatement.getSelect(), statement.getTable(), options));
+        return new PhysicalSelectStatement(QueryPlanner.wrapWithAnalyze(context, new InsertInto(context.getNextNodeId(), selectStatement.getSelect(), statement.getTable(), indices, options)));
     }
 
     @Override
@@ -254,5 +300,45 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
             throw new ParseException("DROP TABLE can only be performed on temporary tables", statement.getToken());
         }
         return statement;
+    }
+
+    private PhysicalSelectStatement createPhysicalPlan(LogicalSelectStatement statement, Context context)
+    {
+        ILogicalPlan plan = statement.getSelect();
+        QuerySession s = context.getSession();
+
+        ValueVector printPlanProperty = s.getSystemProperty(QuerySession.PRINT_PLAN);
+        boolean printPlan = !printPlanProperty.isNull(0)
+                && printPlanProperty.getBoolean(0);
+
+        // Optimize plan
+        plan = LogicalPlanOptimizer.optimize(context.context, plan, context.schemaByTempTable);
+
+        if (printPlan)
+        {
+            s.printLine("Logical plan: " + System.lineSeparator());
+            s.printLine(plan.print(0));
+        }
+
+        context.currentLogicalPlan = plan;
+
+        // Reset counter for each statement
+        context.nodeIdCounter = 0;
+        IPhysicalPlan physicalPlan = plan.accept(QUERY_PLANNER, context);
+
+        // Wrap plan to suppress writing to output
+        if (statement.isAssignmentSelect())
+        {
+            physicalPlan = new AssignmentPlan(context.getNextNodeId(), physicalPlan);
+        }
+
+        if (printPlan)
+        {
+            s.printLine("Physical plan: " + System.lineSeparator());
+            s.printLine(physicalPlan.print(0));
+        }
+
+        // Create a physical plan from the logical
+        return new PhysicalSelectStatement(physicalPlan);
     }
 }

@@ -10,7 +10,7 @@ import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 
 /** Test of {@link BitSetVector} */
 public class BitsetVectorTest extends APhysicalPlanTest
@@ -21,7 +21,6 @@ public class BitsetVectorTest extends APhysicalPlanTest
         BitSetVector v1 = bsv(false, true, false);
         assertEquals(3, v1.size());
         assertEquals(ResolvedType.of(Column.Type.Boolean), v1.type());
-        assertEquals(false, v1.isNullable());
         assertVectorsEquals(vv(ResolvedType.of(Column.Type.Boolean), false, true, false), v1);
         assertTrue(v1.getBoolean(1));
         assertFalse(v1.getBoolean(0));
@@ -37,7 +36,6 @@ public class BitsetVectorTest extends APhysicalPlanTest
 
         // Verify that not nullable when there are no null bits set
         v1 = new BitSetVector(1, new BitSet(1), new BitSet(1));
-        assertFalse(v1.isNullable());
     }
 
     @Test(
@@ -59,18 +57,14 @@ public class BitsetVectorTest extends APhysicalPlanTest
     {
         BitSetVector v1 = bsv(true, false, null);
         assertVectorsEquals(vv(ResolvedType.of(Column.Type.Boolean), true, false, null), v1);
-        assertTrue(v1.isNullable());
         v1 = v1.not();
         assertVectorsEquals(vv(ResolvedType.of(Column.Type.Boolean), false, true, null), v1);
-        assertTrue(v1.isNullable());
 
         // Non null
         v1 = bsv(true, false);
         assertVectorsEquals(vv(ResolvedType.of(Column.Type.Boolean), true, false), v1);
-        assertFalse(v1.isNullable());
         v1 = v1.not();
         assertVectorsEquals(vv(ResolvedType.of(Column.Type.Boolean), false, true), v1);
-        assertFalse(v1.isNullable());
     }
 
     @Test
@@ -86,7 +80,6 @@ public class BitsetVectorTest extends APhysicalPlanTest
         actual = v1.or(bsv(                                          true, true,  false, false));
         assertVectorsEquals(vv(ResolvedType.of(Column.Type.Boolean), true, true,  true,  false), actual);
         //@formatter:on
-        assertFalse(actual.isNullable());
 
         // This not null
         // That null (but no nulls)
@@ -102,7 +95,6 @@ public class BitsetVectorTest extends APhysicalPlanTest
         assertVectorsEquals(vv(ResolvedType.of(Column.Type.Boolean),      true,  true,  true,  false, true,  null), actual);
         assertVectorsEqualsNulls(vv(ResolvedType.of(Column.Type.Boolean), false, false, false, false, false, true), actual);
         //@formatter:on
-        assertTrue(actual.isNullable());
 
         // This null
         // That not null
@@ -112,7 +104,6 @@ public class BitsetVectorTest extends APhysicalPlanTest
         assertVectorsEquals(vv(ResolvedType.of(Column.Type.Boolean),      true,  true,  true,  false, true,  null), actual);
         assertVectorsEqualsNulls(vv(ResolvedType.of(Column.Type.Boolean), false, false, false, false, false, true), actual);
         //@formatter:on
-        assertTrue(actual.isNullable());
 
         // This null
         // That not null (but no nulls)
@@ -129,7 +120,6 @@ public class BitsetVectorTest extends APhysicalPlanTest
         assertVectorsEquals(vv(ResolvedType.of(Column.Type.Boolean),      true,  true,  null,  true,  null,  null), actual);
         assertVectorsEqualsNulls(vv(ResolvedType.of(Column.Type.Boolean), false, false, true,  false, true,  true), actual);
         //@formatter:on
-        assertTrue(actual.isNullable());
     }
 
     @Test
@@ -145,7 +135,6 @@ public class BitsetVectorTest extends APhysicalPlanTest
         actual = v1.or(vv(ResolvedType.of(Column.Type.Boolean),      true, true,  false, false));
         assertVectorsEquals(vv(ResolvedType.of(Column.Type.Boolean), true, true,  true,  false), actual);
         //@formatter:on
-        assertFalse(actual.isNullable());
 
         // This not null
         // That null (but no nulls)
@@ -161,7 +150,6 @@ public class BitsetVectorTest extends APhysicalPlanTest
         assertVectorsEquals(vv(ResolvedType.of(Column.Type.Boolean),      true,  true,  true,  false, true,  null), actual);
         assertVectorsEqualsNulls(vv(ResolvedType.of(Column.Type.Boolean), false, false, false, false, false, true), actual);
         //@formatter:on
-        assertTrue(actual.isNullable());
 
         // This null
         // That not null
@@ -171,7 +159,6 @@ public class BitsetVectorTest extends APhysicalPlanTest
         assertVectorsEquals(vv(ResolvedType.of(Column.Type.Boolean),      true,  true,  true,  false, true,  null), actual);
         assertVectorsEqualsNulls(vv(ResolvedType.of(Column.Type.Boolean), false, false, false, false, false, true), actual);
         //@formatter:on
-        assertTrue(actual.isNullable());
 
         // This null
         // That not null (but no nulls)
@@ -188,7 +175,6 @@ public class BitsetVectorTest extends APhysicalPlanTest
         assertVectorsEquals(vv(ResolvedType.of(Column.Type.Boolean),      true,  true,  null,  true,  null,  null), actual);
         assertVectorsEqualsNulls(vv(ResolvedType.of(Column.Type.Boolean), false, false, true,  false, true,  true), actual);
         //@formatter:on
-        assertTrue(actual.isNullable());
     }
 
     @Test(
@@ -235,7 +221,6 @@ public class BitsetVectorTest extends APhysicalPlanTest
         assertVectorsEquals(vv(ResolvedType.of(Column.Type.Boolean),      true,  false, false, false, null, false), actual);
         assertVectorsEqualsNulls(vv(ResolvedType.of(Column.Type.Boolean), false, false, false, false, true, false), actual);
         //@formatter:on
-        assertTrue(actual.isNullable());
 
         // This null
         // That not null
@@ -245,7 +230,6 @@ public class BitsetVectorTest extends APhysicalPlanTest
         assertVectorsEquals(vv(ResolvedType.of(Column.Type.Boolean),      true,  false, null, false, false, false), actual);
         assertVectorsEqualsNulls(vv(ResolvedType.of(Column.Type.Boolean), false, false, true, false, false, false), actual);
         //@formatter:on
-        assertTrue(actual.isNullable());
 
         // This null
         // That null
@@ -255,7 +239,6 @@ public class BitsetVectorTest extends APhysicalPlanTest
         assertVectorsEquals(vv(ResolvedType.of(Column.Type.Boolean),      true,  false, false, false, false, null), actual);
         assertVectorsEqualsNulls(vv(ResolvedType.of(Column.Type.Boolean), false, false, false, false, false, true), actual);
         //@formatter:on
-        assertTrue(actual.isNullable());
     }
 
     @Test
@@ -298,7 +281,6 @@ public class BitsetVectorTest extends APhysicalPlanTest
         assertVectorsEquals(vv(ResolvedType.of(Column.Type.Boolean),      true,  false, false, false, null, false), actual);
         assertVectorsEqualsNulls(vv(ResolvedType.of(Column.Type.Boolean), false, false, false, false, true, false), actual);
         //@formatter:on
-        assertTrue(actual.isNullable());
 
         // This null
         // That not null
@@ -308,7 +290,6 @@ public class BitsetVectorTest extends APhysicalPlanTest
         assertVectorsEquals(vv(ResolvedType.of(Column.Type.Boolean),      true,  false, null, false, false, false), actual);
         assertVectorsEqualsNulls(vv(ResolvedType.of(Column.Type.Boolean), false, false, true, false, false, false), actual);
         //@formatter:on
-        assertTrue(actual.isNullable());
 
         // This null
         // That null
@@ -318,38 +299,7 @@ public class BitsetVectorTest extends APhysicalPlanTest
         assertVectorsEquals(vv(ResolvedType.of(Column.Type.Boolean),      true,  false, false, false, false, null), actual);
         assertVectorsEqualsNulls(vv(ResolvedType.of(Column.Type.Boolean), false, false, false, false, false, true), actual);
         //@formatter:on
-        assertTrue(actual.isNullable());
     }
-
-    // @Test
-    // public void test_convert_or_not_nullable()
-    // {
-    // BitSetVector actual;
-    // BitSetVector v1;
-    //
-    // v1 = bsv(false, false, false);
-    // actual = v1.or(vv(Type.Boolean, true, true, true), false);
-    // assertVectorsEquals(vv(Type.Boolean, true, true, true), actual);
-    // assertFalse(actual.isNullable());
-    //
-    // // Null in "this"
-    // v1 = bsv(true, false, null);
-    // actual = v1.or(vv(Type.Boolean, true, true, true), false);
-    // assertVectorsEquals(vv(Type.Boolean, true, true, true), actual);
-    // assertFalse(actual.isNullable());
-    //
-    // // Null in "that"
-    // v1 = bsv(true, false, true);
-    // actual = v1.or(vv(Type.Boolean, true, true, null), false);
-    // assertVectorsEquals(vv(Type.Boolean, true, true, true), actual);
-    // assertFalse(actual.isNullable());
-    //
-    // // Null in both
-    // v1 = bsv(null, false, false);
-    // actual = v1.or(vv(Type.Boolean, true, true, null), false);
-    // assertVectorsEquals(vv(Type.Boolean, true, true, false), actual);
-    // assertFalse(actual.isNullable());
-    // }
 
     private BitSetVector bsv(Boolean... bits)
     {

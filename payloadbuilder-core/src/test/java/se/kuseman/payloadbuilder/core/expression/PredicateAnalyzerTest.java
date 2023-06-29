@@ -12,16 +12,18 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzeItem;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzePair;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzeResult;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
+import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link PredicateAnalyzer} */
 public class PredicateAnalyzerTest extends APhysicalPlanTest
@@ -33,6 +35,36 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     private ColumnReference aFlag = tableA.column("flag");
     private ColumnReference bCol2 = tableB.column("col2");
     private ColumnReference bCol3 = tableB.column("col3");
+
+    @Test
+    public void test_outerreference_column_expressions()
+    {
+        AnalyzeResult actual;
+        AnalyzeResult expected;
+        Pair<List<AnalyzePair>, AnalyzeResult> actualPairs;
+        AnalyzePair actualPair;
+
+        actual = PredicateAnalyzer.analyze(eq(cre(aCol1), ocre(bCol2)));
+        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.EQUAL, cre(aCol1), asSet(tableA), "col1", ocre(bCol2), emptySet(), "col2"));
+
+        assertEquals(expected, actual);
+        assertEquals(eq(cre(aCol1), ocre(bCol2)), actual.getPredicate());
+        actualPairs = actual.extractPushdownPairs(tableA);
+        assertEquals(expected.getPairs(), actualPairs.getLeft());
+        assertEquals(AnalyzeResult.EMPTY, actualPairs.getValue());
+
+        actualPair = actualPairs.getLeft()
+                .get(0);
+
+        assertEquals("a.col1 = b.col2", actualPair.getSqlRepresentation());
+        assertEquals(IPredicate.Type.COMPARISION, actualPair.getType());
+        assertEquals(IComparisonExpression.Type.EQUAL, actualPair.getComparisonType());
+        assertEquals("col1", actualPair.getColumn(tableA));
+        assertNull(actualPair.getColumn(tableB));
+
+        assertTrue(actualPair.isEqui(tableA));
+        assertFalse(actualPair.isEqui(tableB));
+    }
 
     @Test
     public void test_equal_comparison_single_column_reference()
@@ -764,6 +796,65 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         assertEquals(cre(aCol1), actualPair.getExpressionPair(tableA)
                 .getLeft());
         assertEquals(in(cre(aCol1), asList(cre(bCol2)), false), actualPair.getExpressionPair(tableA)
+                .getRight());
+        assertFalse(actualPair.isEqui(tableA));
+        assertFalse(actualPair.isEqui(tableC));
+    }
+
+    @Test
+    public void test_in_predicate_with_column_reference_inside_argument_list()
+    {
+        AnalyzeResult actual;
+        AnalyzeResult expected;
+        Pair<List<AnalyzePair>, AnalyzeResult> actualPairs;
+        AnalyzePair actualPair;
+
+        actual = PredicateAnalyzer.analyze(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10f, 20f)), asList(cre(aCol1)), false));
+        expected = result(
+                pair(IPredicate.Type.UNDEFINED, null, in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10f, 20f)), asList(cre(aCol1)), false), asSet(tableA), null, null, null, null));
+
+        assertEquals(expected, actual);
+        assertEquals(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10f, 20f)), asList(cre(aCol1)), false), actual.getPredicate());
+
+        // No equi
+        assertEquals(emptyList(), actual.getEquiPairs(tableA));
+        assertEquals(emptyList(), actual.getEquiPairs(tableB));
+
+        // No matches for tableB and hence we will get the original expression back when extracting
+        assertEquals(actual.getPredicate(), actual.extractPushdownPairs(tableB)
+                .getRight()
+                .getPredicate());
+
+        assertNull(actual.extractPushdownPairs(tableA, false)
+                .getRight()
+                .getPredicate());
+
+        actualPairs = actual.extractPushdownPairs(tableA);
+
+        assertEquals(expected.getPairs(), actualPairs.getLeft());
+        assertEquals(AnalyzeResult.EMPTY, actualPairs.getRight());
+
+        actualPair = actual.getPairs()
+                .get(0);
+        assertEquals("array(10, 20) IN (a.col1)", actualPair.getSqlRepresentation());
+        assertEquals(IPredicate.Type.UNDEFINED, actualPair.getType());
+        assertNull(actualPair.getComparisonType());
+        assertNull(actualPair.getColumn(tableA));
+        assertNull(actualPair.getColumn(tableC));
+
+        try
+        {
+            actualPair.getExpressionPair(tableC);
+            fail("Should fail");
+        }
+        catch (IllegalArgumentException e)
+        {
+            assertTrue(e.getMessage(), e.getMessage()
+                    .contains("No expressions could be found in this pair for table source tableC"));
+        }
+        assertEquals(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10f, 20f)), asList(cre(aCol1)), false), actualPair.getExpressionPair(tableA)
+                .getLeft());
+        assertNull(actualPair.getExpressionPair(tableA)
                 .getRight());
         assertFalse(actualPair.isEqui(tableA));
         assertFalse(actualPair.isEqui(tableC));

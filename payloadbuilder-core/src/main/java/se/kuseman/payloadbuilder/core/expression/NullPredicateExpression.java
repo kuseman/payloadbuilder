@@ -7,15 +7,16 @@ import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IBooleanVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.INullPredicateExpression;
 
 /** IS (NOT?) NULL expression */
-public class NullPredicateExpression implements INullPredicateExpression
+public class NullPredicateExpression implements INullPredicateExpression, Invertable
 {
     private final IExpression expression;
     private final boolean not;
@@ -39,11 +40,35 @@ public class NullPredicateExpression implements INullPredicateExpression
     }
 
     @Override
+    public IExpression getInvertedExpression()
+    {
+        return new NullPredicateExpression(expression, !not);
+    }
+
+    @Override
     public ValueVector eval(TupleVector input, IExecutionContext context)
     {
-        throw new RuntimeException("not implemented");
-        // ValueVector vector = expression.eval(input, context);
-        // return BitSetVector.not(vector);
+        final ValueVector value = expression.eval(input, context);
+
+        int rowCount = input.getRowCount();
+        IBooleanVectorBuilder builder = context.getVectorBuilderFactory()
+                .getBooleanVectorBuilder(rowCount);
+        for (int i = 0; i < rowCount; i++)
+        {
+            boolean isNull = value.isNull(i);
+
+            // Special case for Any types, verify the Any value's actual nullness
+            if (!isNull
+                    && value.type()
+                            .getType() == Type.Any)
+            {
+                isNull = value.getAny(i) == null;
+            }
+
+            builder.put(not ? !isNull
+                    : isNull);
+        }
+        return builder.build();
     }
 
     @Override

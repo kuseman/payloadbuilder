@@ -3,45 +3,52 @@ package se.kuseman.payloadbuilder.core.physicalplan;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toList;
-import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
-import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
+import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.QuerySession;
+import se.kuseman.payloadbuilder.core.QueryException;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.Option;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
+import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 
 /** A table component in the logical plan */
 public class TableFunctionScan implements IPhysicalPlan
 {
     private final int nodeId;
     private final TableSourceReference tableSource;
+    private final Schema schema;
     private final String catalogAlias;
+    private final String catalogName;
     private final TableFunctionInfo functionInfo;
     private final List<IExpression> arguments;
     private final List<Option> options;
+    private final boolean asteriskSchema;
 
-    public TableFunctionScan(int nodeId, TableSourceReference tableSource, String catalogAlias, TableFunctionInfo functionInfo, List<IExpression> arguments, List<Option> options)
+    public TableFunctionScan(int nodeId, Schema schema, TableSourceReference tableSource, String catalogAlias, String catalogName, TableFunctionInfo functionInfo, List<IExpression> arguments,
+            List<Option> options)
     {
         this.nodeId = nodeId;
+        this.schema = requireNonNull(schema, "schema");
         this.tableSource = requireNonNull(tableSource, "tableSource");
         this.catalogAlias = requireNonNull(catalogAlias, "catalogAlias");
+        this.catalogName = requireNonNull(catalogName, "catalogName");
         this.functionInfo = requireNonNull(functionInfo, "functionInfo");
         this.arguments = requireNonNull(arguments, "arguments");
         this.options = requireNonNull(options, "options");
+        this.asteriskSchema = SchemaUtils.isAsterisk(schema);
     }
 
     @Override
@@ -60,12 +67,10 @@ public class TableFunctionScan implements IPhysicalPlan
     @Override
     public Map<String, Object> getDescribeProperties(IExecutionContext context)
     {
-        String catalogAlias = defaultIfBlank(tableSource.getCatalogAlias(), ((QuerySession) context.getSession()).getDefaultCatalogAlias());
-        Catalog catalog = ((QuerySession) context.getSession()).getCatalogRegistry()
-                .getCatalog(catalogAlias);
         Map<String, Object> properties = new LinkedHashMap<>();
-        properties.put(IDatasource.CATALOG, catalog.getName());
-        properties.put(IDatasource.OUTPUT, DescribeUtils.getOutputColumns(functionInfo.getSchema(arguments)));
+        properties.put(IDatasource.CATALOG, catalogName);
+
+        properties.put(IDatasource.OUTPUT, DescribeUtils.getOutputColumns(getSchema()));
         return properties;
     }
 
@@ -77,20 +82,27 @@ public class TableFunctionScan implements IPhysicalPlan
     @Override
     public TupleIterator execute(IExecutionContext context)
     {
-        final TupleIterator iterator = functionInfo.execute(context, catalogAlias, arguments, new DatasourceOptions(options));
+        Optional<Schema> schema = asteriskSchema ? Optional.empty()
+                : Optional.of(this.schema);
+        final IDatasourceOptions datasourceOptions = new DatasourceOptions(options);
+        final int batchSize = datasourceOptions.getBatchSize(context);
+        final TupleIterator iterator = functionInfo.execute(context, catalogAlias, schema, arguments, datasourceOptions);
         return new TupleIterator()
         {
             @Override
             public TupleVector next()
             {
-                final TupleVector next = iterator.next();
-                // Recreate the schema and attach a table source to make resolved column properly detect it
-                final Schema schema = new Schema(next.getSchema()
-                        .getColumns()
-                        .stream()
-                        .map(c -> new Column(c, tableSource))
-                        .collect(toList()));
+                // Concat the data source up to batch size, this might happen if catalog don't implement batch size correct
+                final TupleVector next = PlanUtils.concat(((ExecutionContext) context).getBufferAllocator(), iterator, batchSize);
+                Schema vectorSchema = next.getSchema();
+                validate(context, vectorSchema, next.getRowCount());
+                if (!asteriskSchema)
+                {
+                    return next;
+                }
 
+                // Recreate the schema and attach a table source to make resolved columns properly detect it
+                final Schema schema = TableScan.recreateSchema(tableSource, next.getSchema());
                 return new TupleVector()
                 {
                     @Override
@@ -130,13 +142,44 @@ public class TableFunctionScan implements IPhysicalPlan
     @Override
     public Schema getSchema()
     {
-        return functionInfo.getSchema(arguments);
+        return schema;
     }
 
     @Override
     public List<IPhysicalPlan> getChildren()
     {
         return emptyList();
+    }
+
+    private boolean validate(IExecutionContext context, Schema vectorSchema, int rowCount)
+    {
+        if (!asteriskSchema
+                && rowCount > 0
+                && !schema.equals(vectorSchema))
+        {
+            throw new QueryException("Schema for function: '" + functionInfo.getName()
+                                     + "' doesn't match the planned schema. Check implementation of Catalog: "
+                                     + catalogName
+                                     + System.lineSeparator()
+                                     + "Expected: "
+                                     + schema
+                                     + System.lineSeparator()
+                                     + "Actual: "
+                                     + vectorSchema
+                                     + System.lineSeparator()
+                                     + "Make sure to use the schema provided in execute method.");
+        }
+        else if (asteriskSchema
+                && vectorSchema.getSize() <= 0
+                && rowCount > 0)
+        {
+            throw new QueryException("Vector for function: '" + functionInfo.getName()
+                                     + "' returned an empty schema. Check implementation of Catalog: "
+                                     + catalogName
+                                     + System.lineSeparator()
+                                     + "Make sure to provide the actual runtime schema of the vector when using an asterisk schema.");
+        }
+        return true;
     }
 
     @Override
@@ -153,6 +196,7 @@ public class TableFunctionScan implements IPhysicalPlan
             TableFunctionScan that = (TableFunctionScan) obj;
             return nodeId == that.nodeId
                     && catalogAlias.equals(that.catalogAlias)
+                    && catalogName.equals(that.catalogName)
                     && functionInfo.equals(that.functionInfo)
                     && arguments.equals(that.arguments);
         }
@@ -162,8 +206,9 @@ public class TableFunctionScan implements IPhysicalPlan
     @Override
     public String toString()
     {
-        return "Function scan: " + functionInfo.getCatalog()
-                .getName()
+        //@formatter:off
+        return "Function scan: "
+               + catalogAlias
                + "#"
                + functionInfo.getName()
                + "("
@@ -171,5 +216,6 @@ public class TableFunctionScan implements IPhysicalPlan
                        .map(IExpression::toVerboseString)
                        .collect(joining(", "))
                + ")";
+        //@formatter:on
     }
 }

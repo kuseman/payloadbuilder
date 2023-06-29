@@ -1,25 +1,26 @@
 package se.kuseman.payloadbuilder.core;
 
 import static java.util.Objects.requireNonNull;
-import static org.apache.commons.lang3.StringUtils.join;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.time.StopWatch;
 
 import se.kuseman.payloadbuilder.api.OutputWriter;
-import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.cache.Cache;
+import se.kuseman.payloadbuilder.core.cache.CacheProvider;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.execution.OutputWriterUtils;
+import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.execution.StatementContext;
 import se.kuseman.payloadbuilder.core.physicalplan.IPhysicalPlan;
 import se.kuseman.payloadbuilder.core.statement.CacheFlushRemoveStatement;
@@ -110,32 +111,14 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     @Override
     public Void visit(UseStatement statement, Void ctx)
     {
-        // Change of default catalog
-        if (statement.getExpression() == null)
-        {
-            session.setDefaultCatalogAlias(statement.getQname()
-                    .getFirst());
-        }
-        // Set property
-        else
-        {
-            QualifiedName qname = statement.getQname();
-            String catalogAlias = qname.getFirst();
-            QualifiedName property = qname.extract(1);
-
-            String key = join(property.getParts(), ".");
-            ValueVector value = statement.getExpression()
-                    .eval(TupleVector.CONSTANT, context);
-            context.getSession()
-                    .setCatalogProperty(catalogAlias, key, value.valueAsObject(0));
-        }
+        statement.execute(context);
         return null;
     }
 
     @Override
     public Void visit(CacheFlushRemoveStatement statement, Void ctx)
     {
-        Cache provider = context.getSession()
+        CacheProvider provider = context.getSession()
                 .getCache(statement.getType());
         if (statement.isFlush())
         {
@@ -147,11 +130,20 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             {
                 ValueVector key = statement.getKey()
                         .eval(TupleVector.CONSTANT, context);
-                provider.flush(statement.getName(), key.valueAsObject(0));
+
+                Cache cache = provider.getCache(statement.getName());
+                if (cache != null)
+                {
+                    cache.flush(key.valueAsObject(0));
+                }
             }
             else
             {
-                provider.flush(statement.getName());
+                Cache cache = provider.getCache(statement.getName());
+                if (cache != null)
+                {
+                    cache.flush();
+                }
             }
         }
         // Remove
@@ -208,7 +200,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             if (currentPlan != null
                     && !currentPlan.hasWritableOutput())
             {
-                writeInternal(currentPlan, null, null);
+                writeInternal(currentPlan, null);
                 currentPlan = null;
             }
         }
@@ -230,12 +222,12 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
             throw new IllegalArgumentException("No more results");
         }
 
-        writeInternal(currentPlan, writer, null);
+        writeInternal(currentPlan, writer);
         currentPlan = null;
     }
 
     // CSOFF
-    private void writeInternal(IPhysicalPlan plan, OutputWriter writer, Consumer<TupleVector> vectorConsumer)
+    private void writeInternal(IPhysicalPlan plan, OutputWriter writer)
     // CSON
     {
         StopWatch sw = StopWatch.createStarted();
@@ -245,12 +237,11 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         try
         {
             Schema schema = plan.getSchema();
-
             if (writer != null)
             {
                 // Asterisk schema, then we cannot init the result with it since
                 // it's not the actual one that will come
-                if (schema.isAsterisk())
+                if (SchemaUtils.isAsterisk(schema))
                 {
                     writer.initResult(ArrayUtils.EMPTY_STRING_ARRAY);
                 }
@@ -258,8 +249,17 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                 {
                     writer.initResult(schema.getColumns()
                             .stream()
-                            .filter(c -> !c.isInternal())
-                            .map(Column::getOutputName)
+                            .filter(c -> !(c instanceof CoreColumn)
+                                    || !((CoreColumn) c).isInternal())
+                            .map(c ->
+                            {
+                                String outputName = c.getName();
+                                if (c instanceof CoreColumn)
+                                {
+                                    outputName = ((CoreColumn) c).getOutputName();
+                                }
+                                return outputName;
+                            })
                             .toArray(String[]::new));
                 }
             }
@@ -278,11 +278,9 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
                 rowCount += tv.getRowCount();
                 if (writer != null)
                 {
-                    tv.write(writer, context, true);
-                }
-                if (vectorConsumer != null)
-                {
-                    vectorConsumer.accept(tv);
+                    OutputWriterUtils.write(tv, writer, context, true);
+                    // Flush after each batch
+                    writer.flush();
                 }
             }
             if (writer != null)
@@ -308,6 +306,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         sw.stop();
         long queryTime = sw.getTime(TimeUnit.MILLISECONDS);
         session.setLastQueryExecutionTime(queryTime);
+        session.setLastQueryRowCount(rowCount);
     }
 
     /* Non executable statements */
@@ -337,5 +336,4 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         throw new IllegalArgumentException("DescribeSelectStatement cannot be executed");
     }
     // CSON
-
 }

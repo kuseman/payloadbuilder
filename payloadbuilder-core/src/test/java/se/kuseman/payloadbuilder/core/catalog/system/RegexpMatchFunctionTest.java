@@ -3,7 +3,6 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
-import static se.kuseman.payloadbuilder.test.VectorTestUtils.nvv;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import org.junit.Test;
@@ -13,8 +12,8 @@ import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
@@ -28,7 +27,7 @@ public class RegexpMatchFunctionTest extends APhysicalPlanTest
     @Test
     public void test()
     {
-        assertEquals(ResolvedType.valueVector(Type.String), f.getType(emptyList()));
+        assertEquals(ResolvedType.array(Type.String), f.getType(emptyList()));
 
         IExpression col1 = ce("col1", ResolvedType.of(Type.String));
         IExpression col2 = ce("col2", ResolvedType.of(Type.Any));
@@ -73,7 +72,7 @@ public class RegexpMatchFunctionTest extends APhysicalPlanTest
                 ));
 
         ValueVector actual = f.evalScalar(context, input, "", asList(col1, col2));
-        assertVectorsEquals(nvv(ResolvedType.valueVector(Type.String),
+        assertVectorsEquals(vv(ResolvedType.array(Type.String),
                 null,
                 null,
                 null,
@@ -90,7 +89,7 @@ public class RegexpMatchFunctionTest extends APhysicalPlanTest
         
         // Constant pattern
         actual = f.evalScalar(context, input, "", asList(col1, new LiteralStringExpression("([a-z]{3})")));
-        assertVectorsEquals(nvv(ResolvedType.valueVector(Type.String),
+        assertVectorsEquals(vv(ResolvedType.array(Type.String),
                 null,
                 null,
                 vv(Type.String, "tex"),
@@ -107,7 +106,7 @@ public class RegexpMatchFunctionTest extends APhysicalPlanTest
         
         // Constant value and pattern
         actual = f.evalScalar(context, input, "", asList(new LiteralStringExpression("123"), new LiteralStringExpression("([a-z]{3})")));
-        assertVectorsEquals(vv(ResolvedType.valueVector(Type.String),
+        assertVectorsEquals(vv(ResolvedType.array(Type.String),
                 vv(Type.String),
                 vv(Type.String),
                 vv(Type.String),

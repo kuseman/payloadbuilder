@@ -32,6 +32,7 @@ import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedColumnExpression;
+import se.kuseman.payloadbuilder.core.expression.UnresolvedSubQueryExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.Aggregate;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
@@ -58,6 +59,7 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
         }
 
         Deque<PlanData> planDatas = new ArrayDeque<>();
+        ComputedExpressionPushDown visitor;
     }
 
     static class PlanData
@@ -74,7 +76,9 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
     @Override
     Ctx createContext(IExecutionContext context)
     {
-        return new Ctx(context);
+        Ctx ctx = new Ctx(context);
+        ctx.visitor = this;
+        return ctx;
     }
 
     @Override
@@ -112,20 +116,16 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
     {
         PlanData planData = context.planDatas.peek();
 
-        // Nothing to rewrite
-        if (planData.sortItems.isEmpty())
-        {
-            return plan;
-        }
-
         Map<String, Integer> projectionExpressionByName = new HashMap<>();
 
-        List<IExpression> projectionExpressions = plan.getExpressions();
-        int size = projectionExpressions.size();
+        int size = plan.getExpressions()
+                .size();
+        List<IExpression> projectionExpressions = new ArrayList<>(size);
         int firstAsteriskIndex = -1;
         for (int i = 0; i < size; i++)
         {
-            IExpression e = projectionExpressions.get(i);
+            IExpression e = plan.getExpressions()
+                    .get(i);
             if (e instanceof AsteriskExpression
                     && firstAsteriskIndex == -1)
             {
@@ -140,11 +140,20 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
                 projectionExpressionByName.put(alias.getAlias()
                         .toLowerCase(), i);
             }
+
+            // Traverse projection expression and compute any sub queries
+            projectionExpressions.add(UnresolvedSubQueryExpressionVisitor.INSTANCE.visit(e, context));
+        }
+
+        // Nothing more to do, return new plan with rewritten expressions
+        if (planData.sortItems.isEmpty())
+        {
+            return new Projection(plan.getInput(), projectionExpressions, plan.isAppendInputColumns());
         }
 
         List<Pair<String, Integer>> pushDownProjections = new ArrayList<>();
 
-        List<IExpression> newProjectionExpressions = new ArrayList<>(plan.getExpressions());
+        List<IExpression> newProjectionExpressions = new ArrayList<>(projectionExpressions);
 
         // Search sort items for rewrite
         // - Ordinal sorts (ORDER BY 1)
@@ -304,6 +313,13 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
     @Override
     public ILogicalPlan visit(Aggregate plan, Ctx context)
     {
+        // Distinct should not be processed here
+        if (plan.getProjectionExpressions()
+                .isEmpty())
+        {
+            return plan;
+        }
+
         // CSOFF
         PlanData planData = context.planDatas.peek();
         // CSON
@@ -413,6 +429,23 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
             {
                 planProjections.add(new AggregateWrapperExpression(ce, false, true));
             }
+        }
+    }
+
+    /** Visitor that traverses sub queries and pushes down computations inside those */
+    static class UnresolvedSubQueryExpressionVisitor extends ARewriteExpressionVisitor<Ctx>
+    {
+        static final UnresolvedSubQueryExpressionVisitor INSTANCE = new UnresolvedSubQueryExpressionVisitor();
+
+        @Override
+        public IExpression visit(UnresolvedSubQueryExpression expression, Ctx context)
+        {
+            // Push a new plan data before processing the subquery to don't mess up stuff
+            context.planDatas.push(new PlanData());
+            ILogicalPlan plan = expression.getInput()
+                    .accept(context.visitor, context);
+            context.planDatas.pop();
+            return new UnresolvedSubQueryExpression(plan, expression.getOuterReferences(), expression.getToken());
         }
     }
 

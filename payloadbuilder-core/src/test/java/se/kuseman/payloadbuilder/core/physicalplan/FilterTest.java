@@ -14,12 +14,13 @@ import org.junit.Test;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.ComparisonExpression;
 
@@ -38,9 +39,9 @@ public class FilterTest extends APhysicalPlanTest
         Schema schema = schema("col1", "col2");
 
         IPhysicalPlan plan = new Filter(1,
-                scan(schemaLessDS(() -> closed.setTrue(), TupleVector.of(schema, asList(vv(ResolvedType.of(Type.Any), 1, 2, 3), vv(ResolvedType.of(Type.Any), 4, 5, 6)))), table, schema),
+                scan(schemaLessDS(() -> closed.setTrue(), TupleVector.of(schema, asList(vv(ResolvedType.of(Type.Any), 1, 2, 3), vv(ResolvedType.of(Type.Any), 4, 5, 6)))), table, Schema.EMPTY),
                 (tv, ctx) -> predicate.eval(tv, ctx));
-        assertEquals(schema, plan.getSchema());
+        assertEquals(Schema.EMPTY, plan.getSchema());
 
         TupleIterator it = plan.execute(context);
         assertFalse(it.hasNext());
@@ -68,12 +69,14 @@ public class FilterTest extends APhysicalPlanTest
 
         Schema schema = schema("col1", "col2");
 
-        IPhysicalPlan plan = new Filter(1, scan(schemaLessDS(() -> closed.setTrue(), TupleVector.of(schema, asList(vv(Type.Any, 1, 2, 3, 4, 5), vv(Type.Any, 4, 5, 3, 2, 1)))), table, schema),
+        IPhysicalPlan plan = new Filter(1, scan(schemaLessDS(() -> closed.setTrue(), TupleVector.of(schema, asList(vv(Type.Any, 1, 2, 3, 4, 5), vv(Type.Any, 4, 5, 3, 2, 1)))), table, Schema.EMPTY),
                 (tv, ctx) -> predicate.eval(tv, ctx));
-        assertEquals(schema, plan.getSchema());
+        assertEquals(Schema.EMPTY, plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(it);
+        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        assertEquals(Schema.of(CoreColumn.of(table.column("col1"), ResolvedType.of(Type.Any)), CoreColumn.of(table.column("col2"), ResolvedType.of(Type.Any))), actual.getSchema());
+
         assertEquals(3, actual.getRowCount());
         assertVectorsEquals(vv(Type.Any, 3, 4, 5), actual.getColumn(0));
         assertVectorsEquals(vv(Type.Any, 3, 2, 1), actual.getColumn(1));
@@ -83,8 +86,6 @@ public class FilterTest extends APhysicalPlanTest
     @Test
     public void test_outer_reference_is_preserved_until_evaluation()
     {
-        Schema schema = schema("col1", "col3");
-
         TupleVector tv = TupleVector.of(schema("col1", "col3"), asList(vv(Type.Any, 3, 4), vv(Type.Any, 5, 3)));
 
         List<ValueVector> outerVectors = new ArrayList<>();
@@ -102,7 +103,7 @@ public class FilterTest extends APhysicalPlanTest
         };
 
         MutableBoolean closed = new MutableBoolean(false);
-        IPhysicalPlan plan = new Filter(1, scan(schemaDS(() -> closed.setTrue(), tv), table, schema), new ExpressionPredicate(eq(col1, ocol4)));
+        IPhysicalPlan plan = new Filter(1, scan(schemaDS(() -> closed.setTrue(), tv), table, Schema.EMPTY), new ExpressionPredicate(eq(col1, ocol4)));
 
         Schema outerSchema = schema("col4");
 
@@ -111,7 +112,7 @@ public class FilterTest extends APhysicalPlanTest
             context.getStatementContext()
                     .setOuterTupleVector(TupleVector.of(outerSchema, asList(vv(Type.Any, i, i))));
             TupleIterator iterator = plan.execute(context);
-            TupleVector actual = PlanUtils.concat(iterator);
+            TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), iterator);
 
             // Traverse vectors to trigg evaluation
             for (int c = 0; c < actual.getSchema()
@@ -120,7 +121,7 @@ public class FilterTest extends APhysicalPlanTest
                 for (int r = 0; r < actual.getRowCount(); r++)
                 {
                     actual.getColumn(c)
-                            .getValue(r);
+                            .getAny(r);
                 }
             }
         }

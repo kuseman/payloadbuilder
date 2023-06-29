@@ -1,5 +1,6 @@
 package se.kuseman.payloadbuilder.core.parser;
 
+import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.toList;
@@ -32,6 +33,7 @@ import org.apache.commons.lang3.EnumUtils;
 import org.apache.commons.lang3.StringUtils;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
+import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
@@ -42,15 +44,18 @@ import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo.AggregateMode;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.api.expression.IArithmeticBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.IArithmeticUnaryExpression;
+import se.kuseman.payloadbuilder.api.expression.ICaseExpression;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IDatePartExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
-import se.kuseman.payloadbuilder.core.QuerySession;
+import se.kuseman.payloadbuilder.core.CompiledQuery;
+import se.kuseman.payloadbuilder.core.CompiledQuery.Warning;
 import se.kuseman.payloadbuilder.core.cache.CacheType;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.core.common.Option;
 import se.kuseman.payloadbuilder.core.common.SortItem;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
@@ -79,20 +84,20 @@ import se.kuseman.payloadbuilder.core.expression.LogicalNotExpression;
 import se.kuseman.payloadbuilder.core.expression.NamedExpression;
 import se.kuseman.payloadbuilder.core.expression.NestedExpression;
 import se.kuseman.payloadbuilder.core.expression.NullPredicateExpression;
-import se.kuseman.payloadbuilder.core.expression.SubQueryExpression;
 import se.kuseman.payloadbuilder.core.expression.SubscriptExpression;
 import se.kuseman.payloadbuilder.core.expression.TemplateStringExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedFunctionCallExpression;
+import se.kuseman.payloadbuilder.core.expression.UnresolvedSubQueryExpression;
 import se.kuseman.payloadbuilder.core.expression.VariableExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.Aggregate;
 import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
+import se.kuseman.payloadbuilder.core.logicalplan.ExpressionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.Join;
 import se.kuseman.payloadbuilder.core.logicalplan.Limit;
 import se.kuseman.payloadbuilder.core.logicalplan.OperatorFunctionScan;
-import se.kuseman.payloadbuilder.core.logicalplan.OverScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Projection;
 import se.kuseman.payloadbuilder.core.logicalplan.Sort;
 import se.kuseman.payloadbuilder.core.logicalplan.SubQuery;
@@ -110,6 +115,7 @@ import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CaseExpre
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CastExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.ColumnReferenceContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.ComparisonExpressionContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CountExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.DateAddExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.DateDiffExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.DatePartExpressionContext;
@@ -119,7 +125,7 @@ import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.DropTable
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.FullCacheQualifierContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.FunctionArgumentContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.FunctionCallContext;
-import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.FunctionCallExpressionContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.GenericFunctionCallExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.IdentifierContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.IfStatementContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.InExpressionContext;
@@ -167,25 +173,25 @@ import se.kuseman.payloadbuilder.core.statement.UseStatement;
 public class QueryParser
 {
     /** Parse query */
-    public QueryStatement parseQuery(QuerySession session, String query)
+    public QueryStatement parseQuery(String query, List<CompiledQuery.Warning> warnings)
     {
-        return getTree(session, query, p -> p.query());
+        return getTree(query, warnings, p -> p.query());
     }
 
     /** Parse select. NOTE! Used in test only */
     public Statement parseSelect(String query)
     {
-        return getTree(null, query, p -> p.topSelect());
+        return getTree(query, null, p -> p.topSelect());
     }
 
     /** Parse expression. NOTE! Used in test only */
     public IExpression parseExpression(String expression)
     {
-        return getTree(null, expression, p -> p.topExpression());
+        return getTree(expression, null, p -> p.topExpression());
     }
 
     @SuppressWarnings("unchecked")
-    private <T> T getTree(QuerySession session, String body, Function<PayloadBuilderQueryParser, ParserRuleContext> function)
+    private <T> T getTree(String body, List<CompiledQuery.Warning> warnings, Function<PayloadBuilderQueryParser, ParserRuleContext> function)
     {
         BaseErrorListener errorListener = new BaseErrorListener()
         {
@@ -226,24 +232,23 @@ public class QueryParser
             tree = function.apply(parser);
         }
 
-        return (T) new AstBuilder(session).visit(tree);
+        return (T) new AstBuilder(warnings).visit(tree);
     }
 
     /** Builds tree */
     private static class AstBuilder extends PayloadBuilderQueryParserBaseVisitor<Object>
     {
-        private final QuerySession session;
         /** Lambda parameters and slot id in current scope */
         private final Map<String, Integer> lambdaParameters = new HashMap<>();
-        private IExpression leftDereference;
 
         private boolean insideProjection;
         private boolean insideSubQuery;
         private boolean assignmentSelect = false;
+        private List<Warning> warnings;
 
-        private AstBuilder(QuerySession session)
+        private AstBuilder(List<CompiledQuery.Warning> warnings)
         {
-            this.session = session;
+            this.warnings = warnings;
         }
 
         @Override
@@ -286,7 +291,8 @@ public class QueryParser
         @Override
         public Object visitSetStatement(SetStatementContext ctx)
         {
-            boolean systemProperty = ctx.AT() == null;
+            boolean systemProperty = ctx.AT()
+                    .size() == 2;
             return new SetStatement(lowerCase(join(getQualifiedName(ctx.qname()).getParts(), ".")), getExpression(ctx.expression()), systemProperty);
         }
 
@@ -400,8 +406,13 @@ public class QueryParser
              * 
              * @formatter:on
              */
+            boolean prevInsideProjection = insideProjection;
+            insideProjection = false;
 
             ILogicalPlan plan = getTableSource(ctx);
+
+            insideProjection = prevInsideProjection;
+
             plan = wrapFilter(plan, ctx);
             plan = wrapAggregate(plan, ctx);
             plan = wrapHaving(plan, ctx);
@@ -413,7 +424,7 @@ public class QueryParser
             plan = wrapTop(plan, ctx);
             plan = wrapOperatorFunction(plan, ctx);
 
-            Statement statement = new LogicalSelectStatement(plan, assignmentSelect);
+            LogicalSelectStatement statement = new LogicalSelectStatement(plan, assignmentSelect);
 
             if (ctx.into != null)
             {
@@ -426,27 +437,13 @@ public class QueryParser
                     throw new ParseException("SELECT INTO are not allowed in sub query context", ctx.into.start);
                 }
 
-                boolean prevInsideProjection = insideProjection;
-                insideProjection = true;
-                for (SelectItemContext selectItem : ctx.selectItem())
-                {
-                    IExpression e = (IExpression) visit(selectItem);
-                    if (!(e instanceof AsteriskExpression)
-                            && !(e instanceof AliasExpression
-                                    || e instanceof UnresolvedColumnExpression))
-                    {
-                        throw new ParseException("All select items must have an alias when selecting into a table", selectItem.start);
-                    }
-                }
-                insideProjection = prevInsideProjection;
-
-                List<se.kuseman.payloadbuilder.core.common.Option> intoOptions = ctx.intoOptions != null ? ctx.intoOptions.options.stream()
-                        .map(to -> (se.kuseman.payloadbuilder.core.common.Option) visit(to))
+                List<Option> intoOptions = ctx.intoOptions != null ? ctx.intoOptions.options.stream()
+                        .map(to -> (Option) visit(to))
                         .collect(toList())
                         : emptyList();
 
                 String tableName = getQualifiedName(ctx.into.qname()).toDotDelimited();
-                statement = new InsertIntoStatement((SelectStatement) statement, tableName, intoOptions);
+                statement = new InsertIntoStatement(statement, tableName, intoOptions, ctx.into.start);
             }
 
             return statement;
@@ -475,11 +472,7 @@ public class QueryParser
             IExpression expression = getExpression(ctx.expression());
             if (ctx.variable() != null)
             {
-                if (ctx.ASTERISK() != null)
-                {
-                    throw new ParseException("Cannot assign variables to asterisks", ctx.start);
-                }
-                else if (ctx.variable().system != null)
+                if (ctx.variable().system != null)
                 {
                     throw new ParseException("Cannot assign to system variables", ctx.start);
                 }
@@ -516,7 +509,7 @@ public class QueryParser
                     .size() > 0
                     && !hasAlias)
             {
-                throw new ParseException("Alias is mandatory.", ctx.tableSource().start);
+                throw new ParseException("Alias is mandatory on table sources when having joins", ctx.tableSource().start);
             }
 
             ILogicalPlan current = (ILogicalPlan) visit(ctx.tableSource());
@@ -527,7 +520,7 @@ public class QueryParser
                 if (joinCtx.tableSource()
                         .identifier() == null)
                 {
-                    throw new ParseException("Alias is mandatory.", joinCtx.tableSource().start);
+                    throw new ParseException("Alias is mandatory on joined table sources", joinCtx.tableSource().start);
                 }
 
                 boolean requiresCondition = joinCtx.INNER() != null
@@ -551,7 +544,7 @@ public class QueryParser
                     }
                     else
                     {
-                        type = Join.Type.INNER;
+                        type = Join.Type.CROSS;
                     }
                 }
                 else
@@ -585,12 +578,11 @@ public class QueryParser
                     {
                         QualifiedName qname = getQualifiedName(opt.qname());
 
-                        if ("populate".equalsIgnoreCase(qname.toDotDelimited()))
+                        if (PayloadBuilderQueryLexer.VOCABULARY.getSymbolicName(PayloadBuilderQueryLexer.POPULATE)
+                                .equalsIgnoreCase(qname.toDotDelimited()))
                         {
-                            if (session != null)
-                            {
-                                session.printLine("Deprecated usage of populating join. Use \"" + type + " POPULATE JOIN\" instead of table source hint.");
-                            }
+                            addDeprecationWarning("Deprecated usage of populating join. Use \"" + type + " POPULATE JOIN\" instead of table source hint.", joinCtx.start);
+                            populate = true;
                         }
                     }
                 }
@@ -637,6 +629,19 @@ public class QueryParser
                 insideSubQuery = prevInsideSubQuery;
                 return new SubQuery(stm.getSelect(), alias, ctx.selectStatement().start);
             }
+            else if (ctx.expression() != null)
+            {
+                if (!options.isEmpty())
+                {
+                    throw new ParseException("Expression scans cannot have options", ctx.tableSourceOptions().start);
+                }
+
+                IExpression expression = getExpression(ctx.expression());
+
+                TableSourceReference tableSource = new TableSourceReference("", QualifiedName.of(expression.toString()), alias);
+
+                return new ExpressionScan(tableSource, Schema.EMPTY, expression, ctx.expression().start);
+            }
 
             FunctionCallContext functionCall = ctx.functionCall();
             String catalogAlias = defaultIfBlank(getIdentifier(functionCall.functionName().catalog), "");
@@ -660,9 +665,9 @@ public class QueryParser
         @Override
         public Object visitCaseExpression(CaseExpressionContext ctx)
         {
-            List<CaseExpression.WhenClause> whenClauses = ctx.when()
+            List<ICaseExpression.WhenClause> whenClauses = ctx.when()
                     .stream()
-                    .map(w -> new CaseExpression.WhenClause(getExpression(w.condition), getExpression(w.result)))
+                    .map(w -> new ICaseExpression.WhenClause(getExpression(w.condition), getExpression(w.result)))
                     .collect(toList());
 
             IExpression elseExpression = getExpression(ctx.elseExpr);
@@ -686,6 +691,33 @@ public class QueryParser
         }
 
         @Override
+        public Object visitCountExpression(CountExpressionContext ctx)
+        {
+            if (ctx.ASTERISK() != null
+                    && (ctx.ALL() != null
+                            || ctx.DISTINCT() != null))
+            {
+                throw new ParseException("COUNT asterisk doesn't support ALL/DISTINCT", ctx.start);
+            }
+
+            AggregateMode mode = null;
+            if (ctx.ALL() != null)
+            {
+                mode = AggregateMode.ALL;
+            }
+            else if (ctx.DISTINCT() != null)
+            {
+                mode = AggregateMode.DISTINCT;
+            }
+
+            IExpression argument = ctx.ASTERISK() != null ? new AsteriskExpression(ctx.ASTERISK()
+                    .getSymbol())
+                    : getExpression(ctx.arg);
+
+            return new UnresolvedFunctionCallExpression(Catalog.SYSTEM_CATALOG_ALIAS, "count", mode, asList(argument), ctx.start);
+        }
+
+        @Override
         public Object visitCastExpression(CastExpressionContext ctx)
         {
             IExpression expression = getExpression(ctx.input);
@@ -694,11 +726,7 @@ public class QueryParser
             if (ctx.COMMA() != null)
             {
                 // Old style cast as ordinary function call
-                if (session != null)
-                {
-                    session.printLine("Deprecated CAST function call. Use CAST(<expression> AS <datatype>)");
-                }
-
+                addDeprecationWarning("Deprecated CAST function call. Use CAST(<expression> AS <datatype>)", ctx.start);
                 IExpression typeArg = getExpression(ctx.arg);
                 if (typeArg instanceof LiteralStringExpression)
                 {
@@ -723,9 +751,9 @@ public class QueryParser
 
             ResolvedType resolvedType;
             Type type = EnumUtils.getEnumIgnoreCase(Type.class, dataType);
-            if (type == Type.ValueVector)
+            if (type == Type.Array)
             {
-                resolvedType = ResolvedType.valueVector(Type.Any);
+                resolvedType = ResolvedType.array(Type.Any);
             }
             else
             {
@@ -741,11 +769,7 @@ public class QueryParser
             if (ctx.datepartE != null)
             {
                 // Old style dateadd as ordinary function call
-                if (session != null)
-                {
-                    session.printLine("Deprecated DATEADD function call. Use DATEADD(<datepart-literal>, <number-expression>, <date-expression>)");
-                }
-
+                addDeprecationWarning("Deprecated DATEADD function call. Use DATEADD(<datepart-literal>, <number-expression>, <date-expression>)", ctx.datepartE.start);
                 IExpression partArg = getExpression(ctx.datepartE);
                 if (partArg instanceof LiteralStringExpression)
                 {
@@ -781,11 +805,7 @@ public class QueryParser
             if (ctx.datepartE != null)
             {
                 // Old style dateadd as ordinary function call
-                if (session != null)
-                {
-                    session.printLine("Deprecated DATEPART function call. Use DATEPART(<datepart-literal>, <date-expression>)");
-                }
-
+                addDeprecationWarning("Deprecated DATEPART function call. Use DATEPART(<datepart-literal>, <date-expression>)", ctx.datepartE.start);
                 IExpression partArg = getExpression(ctx.datepartE);
                 if (partArg instanceof LiteralStringExpression)
                 {
@@ -822,7 +842,7 @@ public class QueryParser
         }
 
         @Override
-        public Object visitFunctionCallExpression(FunctionCallExpressionContext ctx)
+        public Object visitGenericFunctionCallExpression(GenericFunctionCallExpressionContext ctx)
         {
             FunctionCallInfo functionCallInfo = (FunctionCallInfo) visit(ctx.functionCall());
 
@@ -847,10 +867,6 @@ public class QueryParser
         @Override
         public Object visitFunctionCall(FunctionCallContext ctx)
         {
-            // Store left dereference
-            IExpression prevLeftDereference = leftDereference;
-            leftDereference = null;
-
             AggregateMode mode = null;
             if (ctx.ALL() != null)
             {
@@ -864,23 +880,6 @@ public class QueryParser
             List<IExpression> arguments = ctx.arguments.stream()
                     .map(a -> getExpression(a))
                     .collect(toList());
-
-            /* @formatter:off
-             * Wrap argument in a dereference expression if we are inside a dereference Ie. ¨
-             * 
-             * Left dereference: func(field)
-             *
-             * Right: field.func2()
-             *
-             * Rewrite to:
-             *
-             * func2(func(field).field)
-             * @formatter:on
-             */
-            if (prevLeftDereference != null)
-            {
-                arguments.add(0, prevLeftDereference);
-            }
 
             String catalog = lowerCase(ctx.functionName().catalog != null ? ctx.functionName().catalog.getText()
                     : null);
@@ -988,7 +987,7 @@ public class QueryParser
 
             ILogicalPlan plan = selectStatement.getSelect();
 
-            return new SubQueryExpression(plan, ctx.bracket_expression()
+            return new UnresolvedSubQueryExpression(plan, ctx.bracket_expression()
                     .selectStatement().start);
         }
 
@@ -1002,7 +1001,6 @@ public class QueryParser
         public Object visitDereference(DereferenceContext ctx)
         {
             IExpression left = getExpression(ctx.left);
-            leftDereference = left;
 
             IExpression result;
             // Dereferenced field
@@ -1013,12 +1011,25 @@ public class QueryParser
             // Dereferenced function call
             else
             {
-                FunctionCallInfo functionCallInfo = (FunctionCallInfo) visit(ctx.functionCall());
-                result = new UnresolvedFunctionCallExpression(functionCallInfo.catalogAlias, functionCallInfo.name, functionCallInfo.aggregateMode, functionCallInfo.arguments,
-                        ctx.functionCall().start);
+                result = (IExpression) visit(ctx.scalarFunctionCall());
+
+                // Prepend left expression as first argument of function
+                // x.map(y -> ....) => map(x, y -> ....)
+                if (result instanceof UnresolvedFunctionCallExpression)
+                {
+                    UnresolvedFunctionCallExpression ufc = (UnresolvedFunctionCallExpression) result;
+                    List<IExpression> arguments = new ArrayList<>(ufc.getArguments());
+                    arguments.add(0, left);
+                    result = new UnresolvedFunctionCallExpression(ufc.getCatalogAlias(), ufc.getName(), ufc.getAggregateMode(), arguments, ufc.getToken());
+                }
+                // Throw here since we are dereferencing a built-in function expression
+                else
+                {
+                    throw new ParseException(result.getClass()
+                            .getSimpleName() + " cannot be used as a dereference", ctx.scalarFunctionCall().start);
+                }
             }
 
-            leftDereference = null;
             return result;
         }
 
@@ -1117,7 +1128,7 @@ public class QueryParser
             if (ctx.NULL() != null)
             {
                 // Actual type is unknown here
-                return new LiteralNullExpression(Type.Any);
+                return new LiteralNullExpression(ResolvedType.of(Type.Any));
             }
             else if (ctx.booleanLiteral() != null)
             {
@@ -1222,7 +1233,7 @@ public class QueryParser
 
         private ILogicalPlan wrapProjection(ILogicalPlan plan, SelectStatementContext ctx)
         {
-            /* Aggregate has it's own projection */
+            /* Aggregates has it's own projection */
             if (!ctx.groupBy.isEmpty())
             {
                 return plan;
@@ -1246,9 +1257,7 @@ public class QueryParser
                 throw new ParseException("Must specify table source", ctx.start);
             }
             else if (containsNonQualifiedAsterisks
-                    && (ctx.tableSourceJoined() == null
-                            && (ctx.forClause() == null
-                                    || ctx.forClause().alias == null)))
+                    && ctx.tableSourceJoined() == null)
             {
                 throw new ParseException("Must specify table source", ctx.start);
             }
@@ -1329,18 +1338,9 @@ public class QueryParser
         {
             if (ctx.DISTINCT() != null)
             {
-                // Make all projected expressions both aggregate and projected
-                List<IExpression> aggregateExpressions = ctx.selectItem()
-                        .stream()
-                        .map(this::getExpression)
-                        .collect(toList());
-
-                List<IAggregateExpression> projectionExpressions = ctx.selectItem()
-                        .stream()
-                        .map(this::getAggregateExpression)
-                        .collect(toList());
-
-                plan = new Aggregate(plan, aggregateExpressions, projectionExpressions);
+                // Empty aggregate and projection
+                // We will aggregate the whole input
+                plan = new Aggregate(plan, emptyList(), emptyList());
             }
 
             return plan;
@@ -1359,10 +1359,13 @@ public class QueryParser
                         .map(this::getExpression)
                         .collect(toList());
 
+                boolean prevInsideProjection = insideProjection;
+                insideProjection = true;
                 List<IAggregateExpression> projectionExpressions = ctx.selectItem()
                         .stream()
-                        .map(this::getAggregateExpression)
+                        .map(s -> getAggregateExpression(s))
                         .collect(toList());
+                insideProjection = prevInsideProjection;
 
                 plan = new Aggregate(plan, aggregateExpressions, projectionExpressions);
             }
@@ -1371,23 +1374,9 @@ public class QueryParser
 
         private ILogicalPlan getTableSource(SelectStatementContext ctx)
         {
-            boolean haveOverScan = ctx.forClause() != null
-                    && ctx.forClause().alias != null;
-
-            if (haveOverScan
-                    && ctx.tableSourceJoined() != null)
-            {
-                throw new ParseException("Cannot combine an over clause with a table source", ctx.forClause().start);
-            }
-
             if (ctx.tableSourceJoined() != null)
             {
                 return (ILogicalPlan) visit(ctx.tableSourceJoined());
-            }
-            else if (haveOverScan)
-            {
-                String overAlias = getIdentifier(ctx.forClause().alias);
-                return new OverScan(Schema.EMPTY, overAlias, -1, ctx.forClause().alias.start);
             }
             else
             {
@@ -1484,16 +1473,15 @@ public class QueryParser
             IExpression expression = (IExpression) visit(ctx);
             expression.fold();
 
-            // Function call already implementes IAggregateExpression
+            // Function call already implements IAggregateExpression
             if (expression instanceof IAggregateExpression)
             {
                 return (IAggregateExpression) expression;
             }
 
-            // Else wrap it
-            // This will be resolved later to return single value
+            // ... else wrap it
+            // This will be resolved later to return single value if needed
             return new AggregateWrapperExpression(expression, false, false);
-
         }
 
         private QualifiedName getQualifiedName(QnameContext ctx)
@@ -1553,17 +1541,22 @@ public class QueryParser
         {
             if ("attimezone".equalsIgnoreCase(functionCallInfo.name))
             {
-                if (session != null)
-                {
-                    session.printLine("Deprecated usage of ATTIMEZONE function. Use \"<expression> AT TIME ZONE <timezone-expression>\".");
-                }
-
+                addDeprecationWarning("Deprecated usage of ATTIMEZONE function. Use \"<expression> AT TIME ZONE <timezone-expression>\".", token);
                 IExpression expression = functionCallInfo.arguments.get(0);
                 IExpression timeZone = functionCallInfo.arguments.get(1);
                 return new AtTimeZoneExpression(expression, timeZone);
             }
 
             return null;
+        }
+
+        private void addDeprecationWarning(String message, Token token)
+        {
+            if (warnings == null)
+            {
+                return;
+            }
+            warnings.add(new Warning(message, token.getLine(), token.getCharPositionInLine()));
         }
     }
 }

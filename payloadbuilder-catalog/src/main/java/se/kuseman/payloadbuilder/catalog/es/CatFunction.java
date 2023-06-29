@@ -6,27 +6,25 @@ import static org.apache.commons.lang3.StringUtils.defaultString;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpStatus;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.utils.URIBuilder;
-import org.apache.http.util.EntityUtils;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.HttpStatus;
+import org.apache.hc.core5.net.URIBuilder;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
-import se.kuseman.payloadbuilder.api.catalog.ObjectTupleVector;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** TVF that exposes ES cat api */
@@ -36,9 +34,9 @@ class CatFunction extends TableFunctionInfo
     {
     };
 
-    CatFunction(Catalog catalog)
+    CatFunction()
     {
-        super(catalog, "cat");
+        super("cat");
     }
 
     @Override
@@ -55,7 +53,7 @@ class CatFunction extends TableFunctionInfo
     }
 
     @Override
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments, IDatasourceOptions options)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, IDatasourceOptions options)
     {
         String catspec;
         String endpoint;
@@ -63,7 +61,8 @@ class CatFunction extends TableFunctionInfo
         if (arguments.size() == 1)
         {
             endpoint = context.getSession()
-                    .getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY);
+                    .getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY)
+                    .valueAsString(0);
             catspec = String.valueOf(arguments.get(0)
                     .eval(context)
                     .valueAsObject(0));
@@ -94,21 +93,23 @@ class CatFunction extends TableFunctionInfo
             throw new IllegalArgumentException("Missing cat speficitation.");
         }
 
-        List<Map<String, Object>> result;
-        HttpEntity entity = null;
         HttpGet get = new HttpGet(getCatUrl(endpoint, catspec));
-        try (CloseableHttpResponse response = HttpClientUtils.execute(context.getSession(), catalogAlias, get))
-        {
-            entity = response.getEntity();
-            if (response.getStatusLine()
-                    .getStatusCode() != HttpStatus.SC_OK)
-            {
-                String body = IOUtils.toString(response.getEntity()
-                        .getContent(), StandardCharsets.UTF_8);
-                throw new RuntimeException("Error querying ES cat-api: " + body);
-            }
+        List<Map<String, Object>> result;
 
-            result = ESDatasource.MAPPER.readValue(entity.getContent(), LIST_OF_OBJ);
+        try
+        {
+            result = HttpClientUtils.execute(context.getSession(), catalogAlias, get, response ->
+            {
+                HttpEntity entity = response.getEntity();
+                if (response.getCode() != HttpStatus.SC_OK)
+                {
+                    String body = IOUtils.toString(response.getEntity()
+                            .getContent(), StandardCharsets.UTF_8);
+                    throw new RuntimeException("Error querying ES cat-api: " + body);
+                }
+
+                return ESDatasource.MAPPER.readValue(entity.getContent(), LIST_OF_OBJ);
+            });
         }
         catch (Exception e)
         {
@@ -118,35 +119,25 @@ class CatFunction extends TableFunctionInfo
             }
             throw new RuntimeException("Error querying ES cat-api", e);
         }
-        finally
-        {
-            EntityUtils.consumeQuietly(entity);
-        }
 
         if (result.isEmpty())
         {
             return TupleIterator.EMPTY;
         }
 
-        Schema schema = new Schema(result.get(0)
+        Schema catSchema = new Schema(result.get(0)
                 .keySet()
                 .stream()
                 .map(c -> Column.of(c, ResolvedType.of(Type.Any)))
                 .collect(toList()));
 
-        return TupleIterator.singleton(new ObjectTupleVector(schema, result.size(), (row, col) ->
+        return TupleIterator.singleton(new ObjectTupleVector(catSchema, result.size(), (row, col) ->
         {
             Map<String, Object> map = result.get(row);
-            Column column = schema.getColumns()
+            Column column = catSchema.getColumns()
                     .get(col);
             return map.get(column.getName());
         }));
-        // String[] columns = result.get(0)
-        // .keySet()
-        // .toArray(ArrayUtils.EMPTY_STRING_ARRAY);
-        // return TupleIterator.wrap(result.stream()
-        // .map(map -> (Tuple) Row.of(tableAlias, columns, new Row.MapValues(map, columns)))
-        // .iterator());
     }
 
     static String getCatUrl(String endpoint, String catspec)
@@ -173,7 +164,9 @@ class CatFunction extends TableFunctionInfo
         }
         else
         {
-            builder.setPath(existingPath + "_cat/" + catspec);
+            builder.setPath(existingPath + "_cat/"
+                            + (catspec.charAt(0) == '/' ? catspec.substring(1, catspec.length())
+                                    : catspec));
         }
         builder.addParameter("format", "json");
         return ESQueryUtils.toUrl(builder);

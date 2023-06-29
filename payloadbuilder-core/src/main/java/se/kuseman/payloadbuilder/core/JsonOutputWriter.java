@@ -6,6 +6,7 @@ import static org.apache.commons.lang3.StringUtils.isEmpty;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
+import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.Map;
@@ -37,6 +38,23 @@ public class JsonOutputWriter implements OutputWriter
 
     public JsonOutputWriter(Writer writer, JsonSettings settings)
     {
+        if (settings.allResultSetsAsOneArray
+                && settings.resultSetsAsArrays)
+        {
+            throw new IllegalArgumentException("Cannot combine 'allResultSetsAsOneArray' and 'resultSetsAsArrays'");
+        }
+        else if (settings.allResultSetsAsOneArray
+                && (!isEmpty(settings.rowSeparator)
+                        || !isEmpty(settings.resultSetSeparator)))
+        {
+            throw new IllegalArgumentException("Cannot combine 'rowSeparator' or 'resultSetSeparator' with 'allResultSetsAsOneArray'");
+        }
+        else if (settings.resultSetsAsArrays
+                && !isEmpty(settings.rowSeparator))
+        {
+            throw new IllegalArgumentException("Cannot combine 'rowSeparator' with 'resultSetsAsArrays'");
+        }
+
         this.settings = settings;
         try
         {
@@ -95,6 +113,15 @@ public class JsonOutputWriter implements OutputWriter
     }
 
     @Override
+    public void endResult()
+    {
+        if (settings.resultSetsAsArrays)
+        {
+            endArray();
+        }
+    }
+
+    @Override
     public void initResult(String[] columns)
     {
         // Init separators to avoid creating strings for every row
@@ -119,20 +146,12 @@ public class JsonOutputWriter implements OutputWriter
         }
         else
         {
-            if (settings.resultSetsAsArrays
-                    && !settings.allResultSetsAsOneArray)
-            {
-                endArray();
-            }
-
-            if (!settings.allResultSetsAsOneArray
-                    && !isEmpty(resultSetSeparator))
+            if (!isEmpty(resultSetSeparator))
             {
                 writeRaw(resultSetSeparator);
             }
 
-            if (settings.resultSetsAsArrays
-                    && !settings.allResultSetsAsOneArray)
+            if (settings.resultSetsAsArrays)
             {
                 startArray();
             }
@@ -185,6 +204,10 @@ public class JsonOutputWriter implements OutputWriter
             else if (value instanceof Integer)
             {
                 generator.writeNumber(((Integer) value).intValue());
+            }
+            else if (value instanceof BigDecimal)
+            {
+                generator.writeNumber((BigDecimal) value);
             }
             else if (value instanceof Number)
             {

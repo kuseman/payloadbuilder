@@ -5,22 +5,21 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.UTF8String;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Regexp match. Matches input with a regular expression and outputs pattern based on matching */
 class RegexpMatchFunction extends ScalarFunctionInfo
 {
-    RegexpMatchFunction(Catalog catalog)
+    RegexpMatchFunction()
     {
-        super(catalog, "regexp_match", FunctionType.SCALAR);
+        super("regexp_match", FunctionType.SCALAR);
     }
 
     @Override
@@ -36,19 +35,19 @@ class RegexpMatchFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public int arity()
+    public Arity arity()
     {
-        return 2;
+        return Arity.TWO;
     }
 
     @Override
-    public ResolvedType getType(List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
-        return ResolvedType.valueVector(Type.String);
+        return ResolvedType.array(Type.String);
     }
 
     @Override
-    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
     {
         final ValueVector value = arguments.get(0)
                 .eval(input, context);
@@ -65,20 +64,13 @@ class RegexpMatchFunction extends ScalarFunctionInfo
             @Override
             public ResolvedType type()
             {
-                return ResolvedType.valueVector(Type.String);
+                return ResolvedType.array(Type.String);
             }
 
             @Override
             public int size()
             {
                 return input.getRowCount();
-            }
-
-            @Override
-            public boolean isNullable()
-            {
-                return value.isNullable()
-                        || pattern.isNullable();
             }
 
             @Override
@@ -89,7 +81,7 @@ class RegexpMatchFunction extends ScalarFunctionInfo
             }
 
             @Override
-            public Object getValue(int row)
+            public ValueVector getArray(int row)
             {
                 Pattern regexPattern;
                 if (constantPattern != null)
@@ -117,12 +109,11 @@ class RegexpMatchFunction extends ScalarFunctionInfo
                 if (matches.isEmpty())
                 {
                     // Empty vector
-                    return ValueVector.literalObject(ResolvedType.of(Type.String), "", 0);
+                    return ValueVector.literalString(UTF8String.EMPTY, 0);
                 }
 
                 return new ValueVector()
                 {
-
                     @Override
                     public ResolvedType type()
                     {
@@ -136,12 +127,6 @@ class RegexpMatchFunction extends ScalarFunctionInfo
                     }
 
                     @Override
-                    public boolean isNullable()
-                    {
-                        return false;
-                    }
-
-                    @Override
                     public boolean isNull(int row)
                     {
                         return false;
@@ -151,12 +136,6 @@ class RegexpMatchFunction extends ScalarFunctionInfo
                     public UTF8String getString(int row)
                     {
                         return matches.get(row);
-                    }
-
-                    @Override
-                    public Object getValue(int row)
-                    {
-                        throw new IllegalArgumentException("getValue should not be called on typed vectors");
                     }
                 };
             }

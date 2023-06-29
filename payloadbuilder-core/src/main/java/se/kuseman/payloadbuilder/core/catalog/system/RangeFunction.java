@@ -2,18 +2,18 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Range table valued function that emits row in range */
@@ -21,19 +21,25 @@ class RangeFunction extends TableFunctionInfo
 {
     private static final Schema SCHEMA = Schema.of(Column.of("Value", ResolvedType.of(Type.Int)));
 
-    RangeFunction(Catalog catalog)
+    RangeFunction()
     {
-        super(catalog, "range");
+        super("range");
     }
 
     @Override
-    public Schema getSchema(List<? extends IExpression> arguments)
+    public Schema getSchema(List<IExpression> arguments)
     {
         return SCHEMA;
     }
 
     @Override
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments, IDatasourceOptions options)
+    public Arity arity()
+    {
+        return new Arity(1, 2);
+    }
+
+    @Override
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, IDatasourceOptions options)
     {
         ValueVector vv;
 
@@ -42,7 +48,8 @@ class RangeFunction extends TableFunctionInfo
         // to
         if (arguments.size() <= 1)
         {
-            vv = eval(context, arguments.get(0));
+            vv = arguments.get(0)
+                    .eval(context);
             if (vv.isNull(0))
             {
                 throw new IllegalArgumentException("From argument to range cannot be null.");
@@ -52,13 +59,15 @@ class RangeFunction extends TableFunctionInfo
         // from, to
         else if (arguments.size() <= 2)
         {
-            vv = eval(context, arguments.get(0));
+            vv = arguments.get(0)
+                    .eval(context);
             if (vv.isNull(0))
             {
                 throw new IllegalArgumentException("From argument to range cannot be null.");
             }
             from = vv.getInt(0);
-            vv = eval(context, arguments.get(1));
+            vv = arguments.get(1)
+                    .eval(context);
             if (vv.isNull(0))
             {
                 throw new IllegalArgumentException("To argument to range cannot be null.");
@@ -73,14 +82,20 @@ class RangeFunction extends TableFunctionInfo
 
         if (rowCount <= batchSize)
         {
-            return TupleIterator.singleton(getVector(start, stop));
+            return TupleIterator.singleton(getVector(schema.get(), start, stop));
         }
 
         final int batchCount = rowCount / batchSize;
         return new TupleIterator()
         {
-            int batchNumber = 0;
-            TupleVector next;
+            private int batchNumber;
+            private TupleVector next;
+
+            @Override
+            public int estimatedBatchCount()
+            {
+                return batchCount;
+            }
 
             @Override
             public TupleVector next()
@@ -111,7 +126,7 @@ class RangeFunction extends TableFunctionInfo
 
                     int batchStart = start + (batchSize * batchNumber);
                     int batchStop = Math.min(batchStart + batchSize, stop);
-                    next = getVector(batchStart, batchStop);
+                    next = getVector(schema.get(), batchStart, batchStop);
                     batchNumber++;
                 }
                 return true;
@@ -119,7 +134,7 @@ class RangeFunction extends TableFunctionInfo
         };
     }
 
-    private TupleVector getVector(int start, int stop)
+    private TupleVector getVector(Schema schema, int start, int stop)
     {
         int rowCount = Math.max(stop - start, 0);
         return new TupleVector()
@@ -127,7 +142,7 @@ class RangeFunction extends TableFunctionInfo
             @Override
             public Schema getSchema()
             {
-                return SCHEMA;
+                return schema;
             }
 
             @Override
@@ -154,12 +169,6 @@ class RangeFunction extends TableFunctionInfo
                     }
 
                     @Override
-                    public boolean isNullable()
-                    {
-                        return false;
-                    }
-
-                    @Override
                     public boolean isNull(int row)
                     {
                         return false;
@@ -169,12 +178,6 @@ class RangeFunction extends TableFunctionInfo
                     public int getInt(int row)
                     {
                         return start + row;
-                    }
-
-                    @Override
-                    public Object getValue(int row)
-                    {
-                        throw new IllegalArgumentException("getValue should not be called on typed vectors");
                     }
                 };
             }

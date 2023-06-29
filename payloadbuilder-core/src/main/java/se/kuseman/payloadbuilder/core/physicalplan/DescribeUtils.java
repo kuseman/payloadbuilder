@@ -15,9 +15,10 @@ import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
 
 /** Utility class for building a describe result set */
@@ -45,11 +46,20 @@ public class DescribeUtils
     {
         return schema.getColumns()
                 .stream()
-                .filter(c -> !c.isInternal())
-                .map(c -> c.getOutputName() + " ("
-                          + c.getType()
-                                  .toTypeString()
-                          + ")")
+                .filter(c -> !(c instanceof CoreColumn)
+                        || !((CoreColumn) c).isInternal())
+                .map(c ->
+                {
+                    String output = c.getName();
+                    if (c instanceof CoreColumn)
+                    {
+                        output = ((CoreColumn) c).getOutputName();
+                    }
+                    return output + " ("
+                           + c.getType()
+                                   .toTypeString()
+                           + ")";
+                })
                 .collect(joining(", "));
     }
 
@@ -153,7 +163,7 @@ public class DescribeUtils
                     }
 
                     @Override
-                    public Object getValue(int row)
+                    public Object getAny(int row)
                     {
                         Object value = rows.get(row)[column];
                         return value;

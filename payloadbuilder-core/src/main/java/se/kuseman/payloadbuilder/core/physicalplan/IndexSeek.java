@@ -8,9 +8,9 @@ import java.util.Map;
 
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.Option;
 
 /** Seek operator that seeks a datasource with a set of seek keys */
@@ -18,16 +18,18 @@ public class IndexSeek extends TableScan
 {
     private final ISeekPredicate seekPredicate;
 
-    public IndexSeek(int nodeId, Schema schema, TableSourceReference tableSource, ISeekPredicate seekPredicate, IDatasource datasource, List<Option> options)
+    public IndexSeek(int nodeId, Schema schema, TableSourceReference tableSource, String catalogAlias, boolean tempTable, ISeekPredicate seekPredicate, IDatasource datasource, List<Option> options)
     {
-        super(nodeId, schema, tableSource, false, datasource, options);
+        super(nodeId, schema, tableSource, catalogAlias, tempTable, datasource, options);
         this.seekPredicate = requireNonNull(seekPredicate, "seekPredicate");
     }
 
     @Override
     public String getName()
     {
-        return "Index Seek: " + seekPredicate.getIndex();
+        return "Index Seek: " + (tempTable ? "#"
+                : "")
+               + seekPredicate.getIndex();
     }
 
     @Override

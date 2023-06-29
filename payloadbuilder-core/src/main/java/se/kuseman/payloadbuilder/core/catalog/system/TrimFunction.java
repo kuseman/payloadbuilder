@@ -4,14 +4,13 @@ import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.UTF8String;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Lower and upper function */
@@ -19,9 +18,9 @@ class TrimFunction extends ScalarFunctionInfo
 {
     private final Type type;
 
-    TrimFunction(Catalog catalog, Type type)
+    TrimFunction(Type type)
     {
-        super(catalog, type.name, FunctionType.SCALAR);
+        super(type.name, FunctionType.SCALAR);
         this.type = type;
     }
 
@@ -32,23 +31,26 @@ class TrimFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public int arity()
+    public Arity arity()
     {
-        return 1;
+        return new Arity(1, 2);
     }
 
     @Override
-    public ResolvedType getType(List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
         return ResolvedType.of(Column.Type.String);
     }
 
     @Override
-    public ValueVector evalScalar(IExecutionContext context, final TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    public ValueVector evalScalar(IExecutionContext context, final TupleVector input, String catalogAlias, List<IExpression> arguments)
     {
         final ValueVector value = arguments.get(0)
                 .eval(input, context);
 
+        final ValueVector trimChars = arguments.size() > 1 ? arguments.get(1)
+                .eval(input, context)
+                : null;
         return new ValueVector()
         {
             @Override
@@ -72,26 +74,22 @@ class TrimFunction extends ScalarFunctionInfo
             @Override
             public UTF8String getString(int row)
             {
-                // Boxing here for now
-                Object arg = value.valueAsObject(row);
-                String strArg = String.valueOf(arg);
+                String strArg = value.getString(row)
+                        .toString();
+                String stripChars = trimChars != null ? trimChars.getString(row)
+                        .toString()
+                        : null;
                 switch (type)
                 {
                     case BOTH:
-                        return UTF8String.from(StringUtils.trim(strArg));
+                        return UTF8String.from(StringUtils.strip(strArg, stripChars));
                     case LEFT:
-                        return UTF8String.from(StringUtils.stripStart(strArg, null));
+                        return UTF8String.from(StringUtils.stripStart(strArg, stripChars));
                     case RIGHT:
-                        return UTF8String.from(StringUtils.stripEnd(strArg, null));
+                        return UTF8String.from(StringUtils.stripEnd(strArg, stripChars));
                     default:
                         throw new IllegalArgumentException("Unsupported trim type: " + type);
                 }
-            }
-
-            @Override
-            public Object getValue(int row)
-            {
-                throw new IllegalArgumentException("getValue should not be called on typed vectors");
             }
         };
     }

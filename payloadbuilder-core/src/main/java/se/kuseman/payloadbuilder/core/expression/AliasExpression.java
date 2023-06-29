@@ -5,17 +5,18 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
+import org.apache.commons.lang3.StringUtils;
+
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
-import se.kuseman.payloadbuilder.api.utils.StringUtils;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 
 /** An aliased expression */
-public class AliasExpression implements IExpression, HasAlias
+public class AliasExpression implements IExpression, HasAlias, HasColumnReference
 {
     private final IExpression expression;
     private final String alias;
@@ -64,7 +65,11 @@ public class AliasExpression implements IExpression, HasAlias
     @Override
     public ColumnReference getColumnReference()
     {
-        return expression.getColumnReference();
+        if (expression instanceof HasColumnReference)
+        {
+            return ((HasColumnReference) expression).getColumnReference();
+        }
+        return null;
     }
 
     @Override

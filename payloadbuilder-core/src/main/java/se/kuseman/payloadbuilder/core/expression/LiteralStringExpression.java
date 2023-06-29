@@ -4,10 +4,10 @@ import static java.util.Objects.requireNonNull;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.UTF8String;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.ILiteralStringExpression;
 
@@ -23,7 +23,7 @@ public class LiteralStringExpression extends LiteralExpression implements ILiter
 
     public LiteralStringExpression(UTF8String string)
     {
-        super(Type.String);
+        super(ResolvedType.of(Type.String));
         this.string = requireNonNull(string, "string");
     }
 
@@ -42,7 +42,7 @@ public class LiteralStringExpression extends LiteralExpression implements ILiter
     @Override
     public ValueVector eval(TupleVector input, IExecutionContext context)
     {
-        return ValueVector.literalObject(ResolvedType.of(Type.String), string, input.getRowCount());
+        return ValueVector.literalString(string, input.getRowCount());
     }
 
     @Override

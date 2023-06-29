@@ -9,13 +9,24 @@ import java.util.Random;
 import org.junit.Assert;
 import org.junit.Test;
 
-import se.kuseman.payloadbuilder.api.catalog.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
 
 /** Test of {@link UTF8String} */
 public class UTF8StringTest extends Assert
 {
     @Test
-    public void test_concat()
+    public void test_get_bytes()
+    {
+        byte[] bytes = "hello world".getBytes(StandardCharsets.UTF_8);
+        UTF8String str = UTF8String.utf8(bytes, 0, 5);
+        assertEquals(UTF8String.from("hello"), str);
+
+        byte[] slice = str.getBytes();
+        assertEquals("hello", new String(slice, StandardCharsets.UTF_8));
+    }
+
+    @Test
+    public void test_concat_builder()
     {
         List<UTF8String> strings = new ArrayList<>();
         assertEquals("", UTF8String.concat(UTF8String.from(","), strings)
@@ -32,6 +43,38 @@ public class UTF8StringTest extends Assert
         }
         UTF8String actual = UTF8String.concat(UTF8String.from(","), strings);
         assertEquals("str0,str1,str2,str3,str4,str5,str6,str7,str8,str9", actual.toString());
+    }
+
+    @Test
+    public void test_concat_bytes()
+    {
+        List<UTF8String> strings = new ArrayList<>();
+        assertEquals("", UTF8String.concat(UTF8String.from(","), strings)
+                .toString());
+
+        for (int i = 0; i < 10; i++)
+        {
+            strings.add(UTF8String.utf8(("str" + i).getBytes(StandardCharsets.UTF_8)));
+
+            if (i == 0)
+            {
+                assertSame(UTF8String.concat(UTF8String.from(","), strings), strings.get(0));
+            }
+        }
+        UTF8String actual = UTF8String.concat(UTF8String.from(","), strings);
+        assertEquals("str0,str1,str2,str3,str4,str5,str6,str7,str8,str9", actual.toString());
+    }
+
+    @Test
+    public void test_concat_latin_bytes()
+    {
+        List<UTF8String> strings = new ArrayList<>();
+        strings.add(UTF8String.latin(("someCharStringText").getBytes(StandardCharsets.ISO_8859_1)));
+        strings.add(UTF8String.latin(("_").getBytes(StandardCharsets.ISO_8859_1)));
+        strings.add(UTF8String.latin(("second").getBytes(StandardCharsets.ISO_8859_1)));
+
+        UTF8String actual = UTF8String.concat(UTF8String.EMPTY, strings);
+        assertEquals("someCharStringText_second", actual.toString());
     }
 
     @Test

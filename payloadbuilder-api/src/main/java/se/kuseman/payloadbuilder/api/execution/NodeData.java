@@ -13,6 +13,7 @@ public class NodeData
     private Duration nodeTimeDuration;
     private int executionCount;
     private long rowCount;
+
     /**
      * <pre>
      *

@@ -13,18 +13,18 @@ import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.ComparisonExpression;
 
@@ -42,14 +42,14 @@ public class ProjectionTest extends APhysicalPlanTest
         IExpression col3 = ce("col3");
 
         MutableBoolean closed = new MutableBoolean(false);
-        IPhysicalPlan plan = new Projection(1, scan(schemaDS(() -> closed.setTrue(), tv), table, schema),
+        IPhysicalPlan plan = new Projection(1, scan(schemaDS(() -> closed.setTrue(), tv), table, Schema.EMPTY),
                 asList(col1, new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN_EQUAL, col1, col3), col3), false);
 
         //@formatter:off
         Schema expectedSchema = Schema.of(
-                new Column("col1", "", ResolvedType.of(Type.Any), null, false),
-                new Column("", "col1 >= col3", ResolvedType.of(Type.Boolean), null, false),
-                new Column("col3", "", ResolvedType.of(Type.Any), null, false));
+                new CoreColumn("col1", ResolvedType.of(Type.Any), "", false),
+                new CoreColumn("", ResolvedType.of(Type.Boolean), "col1 >= col3", false),
+                new CoreColumn("col3", ResolvedType.of(Type.Any), "", false));
         //@formatter:on
 
         assertEquals(expectedSchema, plan.getSchema());
@@ -164,14 +164,14 @@ public class ProjectionTest extends APhysicalPlanTest
         // Asterisks => empty schema
         //@formatter:off
         assertEquals(Schema.of(
-                Column.of(aAst, ResolvedType.of(Type.Any)),
-                Column.of(bCol3, ResolvedType.of(Type.Any)),
-                new Column("", "a.col2 > b.col2", ResolvedType.of(Type.Boolean), null, false)
+                CoreColumn.of(aAst, ResolvedType.of(Type.Any)),
+                CoreColumn.of(bCol3, ResolvedType.of(Type.Any)),
+                new CoreColumn("", ResolvedType.of(Type.Boolean), "a.col2 > b.col2", false)
                 ), plan.getSchema());
         //@formatter:on
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(it);
+        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
 
         //@formatter:off
         Schema expectedSchema = Schema.of(
@@ -179,7 +179,7 @@ public class ProjectionTest extends APhysicalPlanTest
                 col(aCol2, Type.Any), 
                 col(aCol3, Type.Any), 
                 col(bCol3, Type.Any), 
-                new Column("", "a.col2 > b.col2", ResolvedType.of(Type.Boolean), null, false));
+                new CoreColumn("", ResolvedType.of(Type.Boolean), "a.col2 > b.col2", false));
         //@formatter:on
 
         assertEquals(expectedSchema, actual.getSchema());
@@ -222,7 +222,7 @@ public class ProjectionTest extends APhysicalPlanTest
         };
 
         MutableBoolean closed = new MutableBoolean(false);
-        IPhysicalPlan plan = new Projection(1, scan(schemaDS(() -> closed.setTrue(), tv), table, schema), asList(col1, col3, ocol4), false);
+        IPhysicalPlan plan = new Projection(1, scan(schemaDS(() -> closed.setTrue(), tv), table, Schema.EMPTY), asList(col1, col3, ocol4), false);
 
         Schema outerSchema = schema("col4");
 
@@ -231,7 +231,7 @@ public class ProjectionTest extends APhysicalPlanTest
             context.getStatementContext()
                     .setOuterTupleVector(TupleVector.of(outerSchema, asList(vv(Type.Any, i, i))));
             TupleIterator iterator = plan.execute(context);
-            TupleVector actual = PlanUtils.concat(iterator);
+            TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), iterator);
 
             // Traverse vectors to trigg evaluation
             for (int c = 0; c < actual.getSchema()
@@ -240,7 +240,7 @@ public class ProjectionTest extends APhysicalPlanTest
                 for (int r = 0; r < actual.getRowCount(); r++)
                 {
                     actual.getColumn(c)
-                            .getValue(r);
+                            .getAny(r);
                 }
             }
         }

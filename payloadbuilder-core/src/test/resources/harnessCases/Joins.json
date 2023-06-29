@@ -279,8 +279,18 @@
     },
     {
       "name": "Left join with grouped by sub query",
+      "description": [
+        "x.pk[0].name[0]   =>  x is an Object of a populated join, pk is a group by column and hence an Array of Tables",
+        "                      and we subscript to get the Table at row 0, then we dereference it with 'name' giving us ",
+        "                      an array of 'names' and we subscript it to get the element at index 0",
+        "",
+        "y.value[0]        =>  y is an Array of Tables (y => x.pv is a group by column and hence an Array of Tables), ",
+        "                      we feed it to a lambda function then it gets a Table ",
+        "                      then we dereference it with 'value' giving us a an Array that we subscript to get us ",
+        "                      element at index 0"
+      ],
       "query": [
-        "select a.art_id, ap.map(x -> listOf(x.pk[0].name[0], x.pv.map(y -> y[0].value[0]))) properties ",
+        "select a.art_id, ap.map(x -> array(x.pk[0].name[0], x.pv.map(y -> y.value[0]))) properties ",
         "",
         "from article a",
         "left populate join ",
@@ -309,10 +319,10 @@
       "name": "Inner join, with dereference and subscript",
       "query": [
         "select s.col1, ",
-        "x[0].row_id[0] row_id_1,   -- first joined row ",
-        "x[0].col3[0] col3_1,       -- first joined rows ",
-        "x[1].row_id[0] row_id_2,   -- second joined row ", 
-        "x[1].col3[0] col3_2        -- second joined rows ",
+        "x[0].row_id row_id_1,   -- first joined row ",
+        "x[0].col3 col3_1,       -- first joined rows ",
+        "x[1].row_id row_id_2,   -- second joined row ",
+        "x[1].col3 col3_2        -- second joined rows ",
         "from source s ",
         "inner populate join ",
         "(",
@@ -408,11 +418,11 @@
       ]
     },
     {
-      "name": "Open_map_collection",
+      "name": "totable",
       "query": [
         "select s.id, sh.sku_id, sh.wareh_id, sh.qty ",
         "from shopcart s ",
-        "cross apply open_map_collection(s.stockhouses) sh ",
+        "cross apply (totable(s.stockhouses)) sh ",
         "where s.id <= 301 "
       ],
       "expectedResultSets": [
@@ -434,7 +444,7 @@
         "( ",
         "  select * ",
         "  from reservation rs ",
-        "  cross apply open_map_collection(rs.stockhouses) sh",
+        "  cross apply (totable(rs.stockhouses)) sh",
         ") reservation "
       ],
       "expectedResultSets": [
@@ -452,7 +462,7 @@
         "( ",
         "  select * ",
         "  from reservation rs ",
-        "  cross apply open_map_collection(rs.stockhouses) sh",
+        "  cross apply (totable(rs.stockhouses)) sh",
         ") reservation "
       ],
       "expectedResultSets": [
@@ -470,7 +480,7 @@
         "( ",
         "  select rs.index, rs.id, sh.wareh_id ",
         "  from reservation rs ",
-        "  cross apply open_map_collection(rs.stockhouses) sh",
+        "  cross apply (totable(rs.stockhouses)) sh",
         "  group by rs.index, rs.id, sh.wareh_id ",
         ") reservation "
       ],
@@ -486,7 +496,7 @@
       "query": [
         "select rs.index, rs.id, sh.wareh_id ",
         "  from reservation rs ",
-        "  cross apply open_map_collection(rs.stockhouses) sh",
+        "  cross apply (totable(rs.stockhouses)) sh",
         "  group by rs.index, rs.id, sh.wareh_id "
       ],
       "expectedResultSets": [
@@ -505,7 +515,7 @@
         "( ",
         "  select *",
         "  from shopcart s ",
-        "  cross apply open_map_collection(s.stockhouses) sh ",
+        "  cross apply (totable(s.stockhouses)) sh ",
         "  where s.id = 101 ",
         ") s "
       ],
@@ -525,7 +535,7 @@
         "( ",
         "  select s.id, s.index, sh.wareh_id, sh.qty ",
         "  from shopcart s ",
-        "  cross apply open_map_collection(s.stockhouses) sh ",
+        "  cross apply (totable(s.stockhouses)) sh ",
         "  where s.id = 101 ",
         ") s "
       ],
@@ -544,7 +554,7 @@
         "( ",
         "  select s.index, sh.sku_id, sh.wareh_id, sum(sh.qty) qty",
         "  from shopcart s ",
-        "  cross apply open_map_collection(s.stockhouses) sh",
+        "  cross apply (totable(s.stockhouses)) sh",
         "  group by s.index, sh.sku_id, sh.wareh_id ",
         ") shopcart ",
         "order by index, sku_id "
@@ -581,30 +591,6 @@
         [
           [{ "key": "Value", "value": 1 },{ "key": "map", "value": { "key": 1 } }],
           [{ "key": "Value", "value": 2 },{ "key": "map", "value": { "key": 2 } }]
-        ]
-      ]
-    },
-    {
-      "name": "Join with sub query with sub query expression (array)",
-      "query": [
-      	"select x.* ",
-		"from range(1, 3) v ",
-		"inner join ",
-		"( ",
-		"    select ",
-		"    Value ", 
-		"    , ( ",
-		"        select Value ",
-		"        for array ",
-		"      ) list ",
-		"    from range(1, 3) ",
-		") x ",
-		"  on  x.value = v.Value "
-      ],
-      "expectedResultSets": [
-        [
-          [{ "key": "Value", "value": 1 },{ "key": "list", "value": [1] }],
-          [{ "key": "Value", "value": 2 },{ "key": "list", "value": [2] }]
         ]
       ]
     }

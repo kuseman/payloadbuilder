@@ -7,7 +7,6 @@ import static java.util.stream.Collectors.toList;
 import static se.kuseman.payloadbuilder.catalog.es.ElasticsearchMetaUtils.getMeta;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -30,17 +29,15 @@ import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.Index;
-import se.kuseman.payloadbuilder.api.catalog.ObjectTupleVector;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
+import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
-import se.kuseman.payloadbuilder.api.expression.IFunctionCallExpression;
 import se.kuseman.payloadbuilder.catalog.es.ESQueryUtils.SortItemMeta;
 import se.kuseman.payloadbuilder.catalog.es.ElasticsearchMetaUtils.MappedProperty;
 import se.kuseman.payloadbuilder.catalog.es.ElasticsearchMetaUtils.MappedType;
@@ -58,22 +55,19 @@ public class ESCatalog extends Catalog
     public static final String ENDPOINT_KEY = "endpoint";
     public static final String INDEX_KEY = "index";
     static final String SINGLE_TYPE_TABLE_NAME = "_doc";
-    private static final int BATCH_SIZE = 250;
+    static final TableSchema INDICES_SCHEMA = new TableSchema(Schema.of(Column.of(SYS_INDICES_TABLE, ResolvedType.of(Type.String)), Column.of(SYS_INDICES_COLUMNS, ResolvedType.of(Type.Any))));
 
     /** Construct a new ES catalog */
     public ESCatalog()
     {
         super("EsCatalog");
-        registerFunction(new MustacheCompileFunction(this));
-        registerFunction(new SearchFunction(this));
-        registerFunction(new MatchFunction(this));
-        registerFunction(new QueryFunction(this));
-        registerFunction(new CatFunction(this));
-        registerFunction(new RenderTemplateFunction(this));
+        registerFunction(new MustacheCompileFunction());
+        registerFunction(new SearchFunction());
+        registerFunction(new MatchFunction());
+        registerFunction(new QueryFunction());
+        registerFunction(new CatFunction());
+        registerFunction(new RenderTemplateFunction());
     }
-
-    private static final TableSchema INDICES_SCHEMA = new TableSchema(
-            Schema.of(Column.of(SYS_INDICES_TABLE, ResolvedType.of(Type.String)), Column.of(SYS_INDICES_COLUMNS, ResolvedType.of(Type.String))));
 
     @Override
     public TableSchema getSystemTableSchema(IQuerySession session, String catalogAlias, QualifiedName table)
@@ -116,11 +110,13 @@ public class ESCatalog extends Catalog
         }
         else if (SYS_FUNCTIONS.equalsIgnoreCase(type))
         {
-            return (context, options) -> TupleIterator.singleton(getFunctionsTupleVector());
+            return (context, options) -> TupleIterator.singleton(getFunctionsTupleVector(data.getSchema()
+                    .get()));
         }
         else if (SYS_INDICES.equalsIgnoreCase(type))
         {
-            return getIndicesDatasource(session, catalogAlias);
+            return getIndicesDatasource(session, catalogAlias, data.getSchema()
+                    .get());
         }
 
         throw new RuntimeException(table + " is not supported");
@@ -187,30 +183,33 @@ public class ESCatalog extends Catalog
             }
         }
 
-        List<PropertyPredicate> propertyPredicates = collectPredicates(data.getPredicates(), properties);
+        List<PropertyPredicate> propertyPredicates = collectPredicates(catalogAlias, data.getPredicates(), properties);
         List<SortItemMeta> sortItems = collectSortItems(properties, data.getSortItems());
 
         return new ESDatasource(data.getNodeId(), meta.getStrategy(), catalogAlias, table, seekPredicate, indexProperty, propertyPredicates, sortItems);
     }
 
-    private List<PropertyPredicate> collectPredicates(List<IPredicate> predicates, Map<String, MappedProperty> properties)
+    private List<PropertyPredicate> collectPredicates(String catalogAlias, List<IPredicate> predicates, Map<String, MappedProperty> properties)
     {
         List<PropertyPredicate> propertyPredicates = new ArrayList<>();
         Iterator<IPredicate> it = predicates.iterator();
         while (it.hasNext())
         {
             IPredicate predicate = it.next();
+
+            if (!PropertyPredicate.isSupported(predicate, catalogAlias))
+            {
+                continue;
+            }
+
             if (predicate.getType() == IPredicate.Type.FUNCTION_CALL)
             {
                 // TODO: analyze function arguments to properly find a field that is searchable
                 // ie. ESC mapping for: http.request.body.content
                 // has a field ".text" with type text that should
                 // be used in full text search instead
-                if (isFullTextSearchPredicate(predicate))
-                {
-                    propertyPredicates.add(new PropertyPredicate("", predicate, true));
-                    it.remove();
-                }
+                propertyPredicates.add(new PropertyPredicate("", predicate, true));
+                it.remove();
 
                 continue;
             }
@@ -266,18 +265,6 @@ public class ESCatalog extends Catalog
         return propertyPredicates;
     }
 
-    private boolean isFullTextSearchPredicate(IPredicate pair)
-    {
-        if (pair.getType() != IPredicate.Type.FUNCTION_CALL)
-        {
-            return false;
-        }
-        IFunctionCallExpression functionExpression = pair.getFunctionCallExpression();
-        ScalarFunctionInfo functionInfo = functionExpression.getFunctionInfo();
-        return functionInfo instanceof MatchFunction
-                || functionInfo instanceof QueryFunction;
-    }
-
     private List<SortItemMeta> collectSortItems(Map<String, MappedProperty> properties, List<? extends ISortItem> sortItems)
     {
         List<SortItemMeta> result = new ArrayList<>();
@@ -319,8 +306,10 @@ public class ESCatalog extends Catalog
 
     private IDatasource getTablesDatasource(IQuerySession session, String catalogAlias)
     {
-        String endpoint = session.getCatalogProperty(catalogAlias, ENDPOINT_KEY);
-        String index = session.getCatalogProperty(catalogAlias, INDEX_KEY);
+        String endpoint = session.getCatalogProperty(catalogAlias, ENDPOINT_KEY)
+                .valueAsString(0);
+        String index = session.getCatalogProperty(catalogAlias, INDEX_KEY)
+                .valueAsString(0);
         Map<String, MappedType> types = getMeta(session, catalogAlias, endpoint, index).getMappedTypes();
 
         // Collect result and columns
@@ -363,8 +352,10 @@ public class ESCatalog extends Catalog
     private IDatasource getColumnsDatasource(IQuerySession session, String catalogAlias)
     {
         final List<Map<String, Object>> result = new ArrayList<>();
-        final String endpoint = session.getCatalogProperty(catalogAlias, ENDPOINT_KEY);
-        final String index = session.getCatalogProperty(catalogAlias, INDEX_KEY);
+        final String endpoint = session.getCatalogProperty(catalogAlias, ENDPOINT_KEY)
+                .valueAsString(0);
+        final String index = session.getCatalogProperty(catalogAlias, INDEX_KEY)
+                .valueAsString(0);
         Map<String, MappedType> types = getMeta(session, catalogAlias, endpoint, index).getMappedTypes();
 
         Set<String> columns = new LinkedHashSet<>();
@@ -425,13 +416,14 @@ public class ESCatalog extends Catalog
         };
     }
 
-    private IDatasource getIndicesDatasource(IQuerySession session, String catalogAlias)
+    private IDatasource getIndicesDatasource(IQuerySession session, String catalogAlias, Schema schema)
     {
-        final String endpoint = session.getCatalogProperty(catalogAlias, ENDPOINT_KEY);
-        final String index = session.getCatalogProperty(catalogAlias, INDEX_KEY);
+        final String endpoint = session.getCatalogProperty(catalogAlias, ENDPOINT_KEY)
+                .valueAsString(0);
+        final String index = session.getCatalogProperty(catalogAlias, INDEX_KEY)
+                .valueAsString(0);
         Map<String, MappedType> properties = getMeta(session, catalogAlias, endpoint, index).getMappedTypes();
 
-        String[] columns = new String[] { SYS_INDICES_TABLE, SYS_INDICES_COLUMNS };
         List<Object[]> result = new ArrayList<>(properties.size());
 
         for (Entry<String, MappedType> e : properties.entrySet())
@@ -443,11 +435,6 @@ public class ESCatalog extends Catalog
                 result.add(new Object[] { e.getKey(), ix.getColumns() });
             }
         }
-
-        Schema schema = new Schema(Arrays.stream(columns)
-                .map(c -> Column.of(c, ResolvedType.of(SYS_INDICES_TABLE.equalsIgnoreCase(c) ? Type.String
-                        : Type.Any)))
-                .collect(toList()));
 
         return new IDatasource()
         {
@@ -467,7 +454,7 @@ public class ESCatalog extends Catalog
     {
         List<Index> result = new ArrayList<>(2 + properties.size());
         // All tables have a doc id index
-        result.add(new Index(table, singletonList(ESDatasource.DOCID), Index.ColumnsType.ALL, BATCH_SIZE));
+        result.add(new Index(table, singletonList(ESDatasource.DOCID), Index.ColumnsType.ALL));
 
         for (MappedProperty p : properties.values())
         {
@@ -486,7 +473,7 @@ public class ESCatalog extends Catalog
                 continue;
             }
 
-            result.add(new Index(table, singletonList(field), Index.ColumnsType.ALL, BATCH_SIZE));
+            result.add(new Index(table, singletonList(field), Index.ColumnsType.ALL));
         }
 
         return result;

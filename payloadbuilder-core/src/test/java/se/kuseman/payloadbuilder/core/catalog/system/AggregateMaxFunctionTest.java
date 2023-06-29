@@ -14,31 +14,32 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo.AggregateMode;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
-/** Test of {@link AggregateMaxFunction} */
+/** Test of {@link AggregateMinMaxFunction} */
 public class AggregateMaxFunctionTest extends APhysicalPlanTest
 {
-    private IExpression col1 = ce("col1");
     private ScalarFunctionInfo function = SystemCatalog.get()
             .getScalarFunction("max");
 
     @Test
     public void test_object()
     {
-        ValueVector one = ValueVector.literalObject(ResolvedType.of(Type.Any), 10, 20, -20F, -200D);
-        ValueVector two = ValueVector.literalObject(ResolvedType.of(Type.Any), 10_000_000, 4);
+        IExpression col1 = ce("col1", ResolvedType.of(Type.Any));
+
+        ValueVector one = ValueVector.literalAny(10, 20, -20F, -200D);
+        ValueVector two = ValueVector.literalAny(4, 10_000_000);
         ValueVector three = ValueVector.literalNull(ResolvedType.of(Type.Any), 4);
-        ValueVector four = ValueVector.literalObject(ResolvedType.of(Type.Any), "one", "two", "three");
-        ValueVector five = ValueVector.literalObject(ResolvedType.of(Type.Any), new BigDecimal("100.10"), new BigDecimal("-200.10"), new BigDecimal("2000.10"));
+        ValueVector four = ValueVector.literalAny("one", "two", "three");
+        ValueVector five = ValueVector.literalAny(new BigDecimal("100.10"), new BigDecimal("-200.10"), new BigDecimal("2000.10"));
 
         Schema schema = schema(new Type[] { Type.Any }, "col1");
 
         //@formatter:off
-        ValueVector v = ValueVector.literalObject(ResolvedType.tupleVector(schema),
+        ValueVector v = ValueVector.literalTable(
                 TupleVector.of(schema, asList(one)),
                 TupleVector.of(schema, asList(two)),
                 TupleVector.of(schema, asList(three)),
@@ -55,6 +56,8 @@ public class AggregateMaxFunctionTest extends APhysicalPlanTest
     @Test
     public void test_int()
     {
+        IExpression col1 = ce("col1", ResolvedType.of(Type.Int));
+
         ValueVector smallInts = vv(Type.Int, -10, 10, 200, -200);
         ValueVector mediumInts = ValueVector.literalInt(10_000_000, 4);
         ValueVector nulls = ValueVector.literalNull(ResolvedType.of(Type.Int), 4);
@@ -62,7 +65,7 @@ public class AggregateMaxFunctionTest extends APhysicalPlanTest
         Schema schema = schema(new Type[] { Type.Int }, "col1");
 
         //@formatter:off
-        ValueVector v = ValueVector.literalObject(ResolvedType.tupleVector(schema),
+        ValueVector v = ValueVector.literalTable(
                 TupleVector.of(schema, asList(smallInts)),
                 TupleVector.of(schema, asList(mediumInts)),
                 TupleVector.of(schema, asList(nulls)));
@@ -77,6 +80,8 @@ public class AggregateMaxFunctionTest extends APhysicalPlanTest
     @Test
     public void test_long()
     {
+        IExpression col1 = ce("col1", ResolvedType.of(Type.Long));
+
         ValueVector smallLongs = vv(Type.Long, 10L, -1L, 100L, -200L);
         ValueVector mediumLongs = ValueVector.literalLong(10_000_000L, 4);
         ValueVector nulls = ValueVector.literalNull(ResolvedType.of(Type.Long), 4);
@@ -84,7 +89,7 @@ public class AggregateMaxFunctionTest extends APhysicalPlanTest
         Schema schema = schema(new Type[] { Type.Long }, "col1");
 
         //@formatter:off
-        ValueVector v = ValueVector.literalObject(ResolvedType.tupleVector(schema),
+        ValueVector v = ValueVector.literalTable(
                 TupleVector.of(schema, asList(smallLongs)),
                 TupleVector.of(schema, asList(mediumLongs)),
                 TupleVector.of(schema, asList(nulls)));
@@ -99,6 +104,8 @@ public class AggregateMaxFunctionTest extends APhysicalPlanTest
     @Test
     public void test_float()
     {
+        IExpression col1 = ce("col1", ResolvedType.of(Type.Float));
+
         ValueVector one = vv(Type.Float, 10F, -1F, 100F, -200F);
         ValueVector two = ValueVector.literalFloat(10, 4);
         ValueVector three = ValueVector.literalFloat(10_000_000, 4);
@@ -107,7 +114,7 @@ public class AggregateMaxFunctionTest extends APhysicalPlanTest
         Schema schema = schema(new Type[] { Type.Float }, "col1");
 
         //@formatter:off
-        ValueVector v = ValueVector.literalObject(ResolvedType.tupleVector(schema),
+        ValueVector v = ValueVector.literalTable(
                 TupleVector.of(schema, asList(one)),
                 TupleVector.of(schema, asList(two)),
                 TupleVector.of(schema, asList(three)),
@@ -123,6 +130,8 @@ public class AggregateMaxFunctionTest extends APhysicalPlanTest
     @Test
     public void test_double()
     {
+        IExpression col1 = ce("col1", ResolvedType.of(Type.Double));
+
         ValueVector one = vv(Type.Double, 10D, -1D, 100D, -200D);
         ValueVector two = ValueVector.literalDouble(10, 4);
         ValueVector three = ValueVector.literalDouble(10_000_000, 4);
@@ -131,7 +140,7 @@ public class AggregateMaxFunctionTest extends APhysicalPlanTest
         Schema schema = schema(new Type[] { Type.Double }, "col1");
 
         //@formatter:off
-        ValueVector v = ValueVector.literalObject(ResolvedType.tupleVector(schema),
+        ValueVector v = ValueVector.literalTable(
                 TupleVector.of(schema, asList(one)),
                 TupleVector.of(schema, asList(two)),
                 TupleVector.of(schema, asList(three)),
@@ -147,6 +156,8 @@ public class AggregateMaxFunctionTest extends APhysicalPlanTest
     @Test
     public void test_double_scalar()
     {
+        IExpression col1 = ce("col1", ResolvedType.of(Type.Double));
+
         ValueVector one = vv(Type.Double, 10D, -1D, 100D, -200D);
 
         Schema schema = schema(new Type[] { Type.Double }, "col1");
@@ -162,14 +173,16 @@ public class AggregateMaxFunctionTest extends APhysicalPlanTest
     @Test
     public void test_double_scalar_value_vector()
     {
+        IExpression col1 = ce("col1", ResolvedType.array(ResolvedType.of(Type.Double)));
+
         ValueVector one = vv(Type.Double, 10D, -1D, 100D, -200D);
         ValueVector two = ValueVector.literalDouble(10, 4);
         ValueVector three = ValueVector.literalDouble(10_000_000, 4);
         ValueVector nulls = ValueVector.literalNull(ResolvedType.of(Type.Double), 4);
 
-        Schema schema = Schema.of(Column.of("col1", ResolvedType.valueVector(ResolvedType.of(Type.Double))));
+        Schema schema = Schema.of(Column.of("col1", ResolvedType.array(ResolvedType.of(Type.Double))));
 
-        TupleVector input = TupleVector.of(schema, asList(vv(ResolvedType.valueVector(ResolvedType.of(Type.Double)), one, two, three, nulls)));
+        TupleVector input = TupleVector.of(schema, asList(vv(ResolvedType.array(ResolvedType.of(Type.Double)), one, two, three, nulls)));
 
         ValueVector actual = function.evalScalar(context, input, "", asList(col1));
         assertEquals(ResolvedType.of(Type.Double), actual.type());

@@ -3,24 +3,28 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 
+import java.util.Random;
+
+import org.antlr.v4.runtime.CommonToken;
+import org.assertj.core.api.Assertions;
 import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
-import se.kuseman.payloadbuilder.core.expression.SubQueryExpression;
+import se.kuseman.payloadbuilder.core.expression.UnresolvedSubQueryExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.Limit;
 import se.kuseman.payloadbuilder.core.logicalplan.OperatorFunctionScan;
-import se.kuseman.payloadbuilder.core.logicalplan.TableFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
 import se.kuseman.payloadbuilder.core.parser.ParseException;
 
@@ -64,30 +68,10 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         Schema expectedSchema = Schema.of(col(name, Type.String), col(type, Type.String), col(description, Type.String));
 
         //@formatter:off
-        ILogicalPlan expected = 
+        ILogicalPlan expected =
                 new Limit(
                         new TableScan(new TableSchema(expectedSchema), tableSource, emptyList(), false, emptyList(), null),
                         e("10"));
-        //@formatter:on
-
-        assertEquals(expectedSchema, actual.getSchema());
-        assertEquals(expected, actual);
-    }
-
-    @Test
-    public void test_table_function_resolving()
-    {
-        ILogicalPlan plan = s("select * from range(1, 10) x");
-        ILogicalPlan actual = optimize(context, plan);
-
-        TableSourceReference tableSource = new TableSourceReference("", QualifiedName.of("range"), "x");
-        ColumnReference value = tableSource.column("Value");
-
-        Schema expectedSchema = Schema.of(new Column("Value", ResolvedType.of(Type.Int), value, false));
-
-        //@formatter:off
-        ILogicalPlan expected = 
-                        new TableFunctionScan(tableSource, expectedSchema, asList(intLit(1), intLit(10)), emptyList(), null);
         //@formatter:on
 
         assertEquals(expectedSchema, actual.getSchema());
@@ -100,7 +84,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select concat('hello', 123)");
         ILogicalPlan actual = optimize(context, plan);
 
-        Schema expectedSchema = Schema.of(new Column("", "concat('hello', 123)", ResolvedType.of(Type.String), null, false));
+        Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.String), "'hello123'", false));
         assertEquals(expectedSchema, actual.getSchema());
     }
 
@@ -110,7 +94,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select sum(col2) from table group by col");
         ILogicalPlan actual = optimize(context, plan);
 
-        Schema expectedSchema = Schema.of(new Column("", "sum(col2)", ResolvedType.of(Type.Any), null, false));
+        Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), "sum(col2)", false));
         assertEquals(expectedSchema, actual.getSchema());
     }
 
@@ -120,14 +104,14 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select sum(sum(col2)) from table group by col");
         ILogicalPlan actual = optimize(context, plan);
 
-        Schema expectedSchema = Schema.of(new Column("", "sum(sum(col2))", ResolvedType.of(Type.Any), null, false));
+        Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), "sum(sum(col2))", false));
         assertEquals(expectedSchema, actual.getSchema());
     }
 
     @Test
     public void test_nested_aggregate_functions()
     {
-        ILogicalPlan plan = s("select object(object('col')) from table group by col");
+        ILogicalPlan plan = s("select object_array(object_array('col')) from table group by col");
 
         try
         {
@@ -177,9 +161,9 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
                 asList(
                         intLit(12345),
                         new AliasExpression(
-                            new SubQueryExpression(
+                            new UnresolvedSubQueryExpression(
                                 new OperatorFunctionScan(
-                                   Schema.of(col("output", Type.OutputWritable)),
+                                   Schema.of(Column.of("output", Type.Any)),
                                    new TableScan(new TableSchema(expectedSchema), tableSource, asList(), false, emptyList(), null),
                                    "",
                                    "object_array",
@@ -188,6 +172,11 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
                             "tables"))
                 );
         //@formatter:on
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(CommonToken.class, Random.class)
+                .isEqualTo(expected);
 
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));

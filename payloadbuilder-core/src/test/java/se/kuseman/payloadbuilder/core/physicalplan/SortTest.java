@@ -20,11 +20,12 @@ import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.UTF8String;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.QueryException;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 
 /** Test of {@link Sort} */
 public class SortTest extends APhysicalPlanTest
@@ -46,10 +47,10 @@ public class SortTest extends APhysicalPlanTest
 
         MutableBoolean closed = new MutableBoolean();
         IPhysicalPlan sort = new Sort(1,
-                scan(schemaLessDS(() -> closed.setTrue(), TupleVector.of(schema, asList(vv(Type.Int, null, 20, 10, 30, 20, null), vv(Type.Any, -1, 0, 1, 2, 3, 4)))), table, schema),
+                scan(schemaLessDS(() -> closed.setTrue(), TupleVector.of(schema, asList(vv(Type.Int, null, 20, 10, 30, 20, null), vv(Type.Any, -1, 0, 1, 2, 3, 4)))), table, Schema.EMPTY),
                 asList(sortItem(ce("col1"), Order.ASC, NullOrder.UNDEFINED), sortItem(ce("col2"), Order.DESC, NullOrder.UNDEFINED)));
 
-        assertEquals(schema, sort.getSchema());
+        assertEquals(Schema.EMPTY, sort.getSchema());
 
         TupleIterator it = sort.execute(context);
         // CSOFF
@@ -84,10 +85,10 @@ public class SortTest extends APhysicalPlanTest
 
         MutableBoolean closed = new MutableBoolean();
         IPhysicalPlan sort = new Sort(1,
-                scan(schemaLessDS(() -> closed.setTrue(), TupleVector.of(schema, asList(vv(Type.Long, null, 20L, 10L, 30L, 20L, null), vv(Type.Any, -1, 0, 1, 2, 3, 4)))), table, schema),
+                scan(schemaLessDS(() -> closed.setTrue(), TupleVector.of(schema, asList(vv(Type.Long, null, 20L, 10L, 30L, 20L, null), vv(Type.Any, -1, 0, 1, 2, 3, 4)))), table, Schema.EMPTY),
                 asList(sortItem(ce("col1"), Order.ASC, NullOrder.FIRST), sortItem(ce("col2"), Order.DESC, NullOrder.UNDEFINED)));
 
-        assertEquals(schema, sort.getSchema());
+        assertEquals(Schema.EMPTY, sort.getSchema());
 
         TupleIterator it = sort.execute(context);
         // There is now only one vector returned
@@ -95,8 +96,7 @@ public class SortTest extends APhysicalPlanTest
         assertFalse(it.hasNext());
         it.close();
 
-        assertEquals(2, actual.getSchema()
-                .getSize());
+        assertEquals(Schema.of(CoreColumn.of(table.column("col1"), ResolvedType.of(Type.Long)), CoreColumn.of(table.column("col2"), ResolvedType.of(Type.Any))), actual.getSchema());
 
         assertVectorsEquals(vv(Type.Long, null, null, 10L, 20L, 20L, 30L), actual.getColumn(0));
         assertVectorsEquals(vv(Type.Any, 4, -1, 1, 3, 0, 2), actual.getColumn(1));
@@ -111,10 +111,10 @@ public class SortTest extends APhysicalPlanTest
 
         MutableBoolean closed = new MutableBoolean();
         IPhysicalPlan sort = new Sort(1,
-                scan(schemaLessDS(() -> closed.setTrue(), TupleVector.of(schema, asList(vv(Type.Float, null, 20F, 10F, 30F, 20F, null), vv(Type.Any, -1, 0, 1, 2, 3, 4)))), table, schema),
+                scan(schemaLessDS(() -> closed.setTrue(), TupleVector.of(schema, asList(vv(Type.Float, null, 20F, 10F, 30F, 20F, null), vv(Type.Any, -1, 0, 1, 2, 3, 4)))), table, Schema.EMPTY),
                 asList(sortItem(ce("col1"), Order.ASC, NullOrder.LAST), sortItem(ce("col2"), Order.DESC, NullOrder.UNDEFINED)));
 
-        assertEquals(schema, sort.getSchema());
+        assertEquals(Schema.EMPTY, sort.getSchema());
 
         TupleIterator it = sort.execute(context);
         // There is now only one vector returned
@@ -138,10 +138,10 @@ public class SortTest extends APhysicalPlanTest
         MutableBoolean closed = new MutableBoolean();
         IPhysicalPlan sort = new Sort(1,
                 scan(schemaLessDS(() -> closed.setTrue(), TupleVector.of(schema, asList(vv(Type.Double, 20D, 10D), vv(Type.Any, 1, 2))),
-                        TupleVector.of(schema, asList(vv(Type.Double, 30D, 20D), vv(Type.Any, 3, 4)))), table, schema),
+                        TupleVector.of(schema, asList(vv(Type.Double, 30D, 20D), vv(Type.Any, 3, 4)))), table, Schema.EMPTY),
                 asList(sortItem(ce("col1"), Order.ASC, NullOrder.UNDEFINED), sortItem(ce("col2"), Order.ASC, NullOrder.UNDEFINED)));
 
-        assertEquals(schema, sort.getSchema());
+        assertEquals(Schema.EMPTY, sort.getSchema());
 
         TupleIterator it = sort.execute(context);
         // There is now only one vector returned
@@ -164,10 +164,10 @@ public class SortTest extends APhysicalPlanTest
     {
         Schema schema = schema(new Type[] { Type.Boolean, Type.Any }, "col1", "col2");
         MutableBoolean closed = new MutableBoolean();
-        IPhysicalPlan sort = new Sort(1, scan(schemaLessDS(() -> closed.setTrue(), TupleVector.of(schema, asList(vv(Type.Boolean, true, false), vv(Type.Any, 1, 2)))), table, schema),
+        IPhysicalPlan sort = new Sort(1, scan(schemaLessDS(() -> closed.setTrue(), TupleVector.of(schema, asList(vv(Type.Boolean, true, false), vv(Type.Any, 1, 2)))), table, Schema.EMPTY),
                 asList(sortItem(ce("col1"), Order.ASC, NullOrder.UNDEFINED)));
 
-        assertEquals(schema, sort.getSchema());
+        assertEquals(Schema.EMPTY, sort.getSchema());
 
         TupleIterator it = sort.execute(context);
         // There is now only one vector returned
@@ -191,11 +191,11 @@ public class SortTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan sort = new Sort(1,
                 scan(schemaLessDS(() -> closed.setTrue(), 
-                        TupleVector.of(schema, asList(vv(Type.String, "abcåäö", "åäöabc"), vv(Type.Any, 1, 2)))), table, schema),
+                        TupleVector.of(schema, asList(vv(Type.String, "abcåäö", "åäöabc"), vv(Type.Any, 1, 2)))), table, Schema.EMPTY),
                 asList(sortItem(ce("col1"), Order.ASC, NullOrder.UNDEFINED)));
         //@formatter:on
 
-        assertEquals(schema, sort.getSchema());
+        assertEquals(Schema.EMPTY, sort.getSchema());
 
         TupleIterator it = sort.execute(context);
         // There is now only one vector returned
@@ -219,11 +219,11 @@ public class SortTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan sort = new Sort(1,
                 scan(schemaLessDS(() -> closed.setTrue(), 
-                        TupleVector.of(schema, asList(vv(Type.String, "abcåäö", "åäöabc"), vv(Type.Any, 1, 2)))), table, schema),
+                        TupleVector.of(schema, asList(vv(Type.String, "abcåäö", "åäöabc"), vv(Type.Any, 1, 2)))), table, Schema.EMPTY),
                 asList(sortItem(intLit(1), Order.ASC, NullOrder.UNDEFINED)));
         //@formatter:on
 
-        assertEquals(schema, sort.getSchema());
+        assertEquals(Schema.EMPTY, sort.getSchema());
 
         TupleIterator it = sort.execute(context);
         // There is now only one vector returned
@@ -248,13 +248,13 @@ public class SortTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan sort = new Sort(1,
                 scan(schemaLessDS(() -> closed.setTrue(), 
-                        TupleVector.of(schema, asList(vv(Type.String, "abcåäö", "åäöabc"), vv(Type.Any, 1, 2)))), table, schema),
+                        TupleVector.of(schema, asList(vv(Type.String, "abcåäö", "åäöabc"), vv(Type.Any, 1, 2)))), table, Schema.EMPTY),
                 asList(sortItem(intLit(0), Order.ASC, NullOrder.UNDEFINED)));
         //@formatter:on
 
         try
         {
-            PlanUtils.concat(sort.execute(context));
+            PlanUtils.concat(context.getBufferAllocator(), sort.execute(context));
             fail("Should fail with out of range");
         }
         catch (QueryException e)
@@ -273,13 +273,13 @@ public class SortTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan sort = new Sort(1,
                 scan(schemaLessDS(() -> closed.setTrue(), 
-                        TupleVector.of(schema, asList(vv(Type.String, "abcåäö", "åäöabc"), vv(Type.Any, 1, 2)))), table, schema),
+                        TupleVector.of(schema, asList(vv(Type.String, "abcåäö", "åäöabc"), vv(Type.Any, 1, 2)))), table, Schema.EMPTY),
                 asList(sortItem(intLit(10), Order.ASC, NullOrder.UNDEFINED)));
         //@formatter:on
 
         try
         {
-            PlanUtils.concat(sort.execute(context));
+            PlanUtils.concat(context.getBufferAllocator(), sort.execute(context));
             fail("Should fail with out of range");
         }
         catch (QueryException e)
@@ -327,7 +327,7 @@ public class SortTest extends APhysicalPlanTest
             }
 
             @Override
-            public Object getValue(int row)
+            public Object getAny(int row)
             {
                 return strings.get(row);
             }

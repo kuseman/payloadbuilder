@@ -46,6 +46,11 @@ public interface IExpressionVisitor<T, C>
         return visitChildren(context, expression);
     };
 
+    default T visit(ILiteralDecimalExpression expression, C context)
+    {
+        return visitChildren(context, expression);
+    };
+
     default T visit(ILiteralIntegerExpression expression, C context)
     {
         return visitChildren(context, expression);
@@ -57,6 +62,26 @@ public interface IExpressionVisitor<T, C>
     };
 
     default T visit(ILiteralStringExpression expression, C context)
+    {
+        return visitChildren(context, expression);
+    };
+
+    default T visit(ILiteralDateTimeExpression expression, C context)
+    {
+        return visitChildren(context, expression);
+    }
+
+    default T visit(ILiteralDateTimeOffsetExpression expression, C context)
+    {
+        return visitChildren(context, expression);
+    };
+
+    default T visit(ILiteralArrayExpression expression, C context)
+    {
+        return visitChildren(context, expression);
+    };
+
+    default T visit(ILiteralObjectExpression expression, C context)
     {
         return visitChildren(context, expression);
     };

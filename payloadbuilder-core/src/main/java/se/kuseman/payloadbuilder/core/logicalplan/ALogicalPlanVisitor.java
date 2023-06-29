@@ -61,6 +61,12 @@ public abstract class ALogicalPlanVisitor<T, C> implements ILogicalPlanVisitor<T
     }
 
     @Override
+    public T visit(ExpressionScan plan, C context)
+    {
+        return visitChildren(context, plan);
+    }
+
+    @Override
     public T visit(SubQuery plan, C context)
     {
         return visitChildren(context, plan);
@@ -86,12 +92,6 @@ public abstract class ALogicalPlanVisitor<T, C> implements ILogicalPlanVisitor<T
 
     @Override
     public T visit(Limit plan, C context)
-    {
-        return visitChildren(context, plan);
-    }
-
-    @Override
-    public T visit(OverScan plan, C context)
     {
         return visitChildren(context, plan);
     }

@@ -11,9 +11,9 @@ import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.QueryException;
 
 /** Test of {@link Assert} */
@@ -24,7 +24,7 @@ public class AssertTest extends APhysicalPlanTest
     {
         MutableBoolean closed = new MutableBoolean();
         Schema schema = Schema.of(Column.of("col", ResolvedType.of(Type.Int)));
-        IPhysicalPlan plan = scan(schemaLessDS(() -> closed.setTrue(), TupleVector.of(schema, asList(ValueVector.literalInt(100, 100)))), table, schema);
+        IPhysicalPlan plan = scan(schemaLessDS(() -> closed.setTrue(), TupleVector.of(schema, asList(ValueVector.literalInt(100, 100)))), table, Schema.EMPTY);
 
         Assert assertPlan = Assert.maxRowCount(1, plan, 99);
         TupleIterator it = assertPlan.execute(context);

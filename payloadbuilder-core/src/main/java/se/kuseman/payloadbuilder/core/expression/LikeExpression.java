@@ -3,23 +3,22 @@ package se.kuseman.payloadbuilder.core.expression;
 import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 
-import java.util.BitSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IBooleanVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.ILikeExpression;
-import se.kuseman.payloadbuilder.core.physicalplan.BitSetVector;
 
 /** Like expression */
-public class LikeExpression implements ILikeExpression
+public class LikeExpression implements ILikeExpression, Invertable
 {
     private final IExpression expression;
     private final IExpression patternExpression;
@@ -52,11 +51,18 @@ public class LikeExpression implements ILikeExpression
     }
 
     @Override
+    public IExpression getInvertedExpression()
+    {
+        return new LikeExpression(expression, patternExpression, !not, escapeCharacterExpression);
+    }
+
+    @Override
     public boolean isNot()
     {
         return not;
     }
 
+    @Override
     public IExpression getEscapeCharacterExpression()
     {
         return escapeCharacterExpression;
@@ -99,8 +105,9 @@ public class LikeExpression implements ILikeExpression
         }
 
         int rowCount = input.getRowCount();
-        BitSet bitSet = new BitSet(input.getRowCount());
-        BitSet nullBitSet = null;
+
+        IBooleanVectorBuilder builder = context.getVectorBuilderFactory()
+                .getBooleanVectorBuilder(rowCount);
 
         for (int i = 0; i < rowCount; i++)
         {
@@ -113,21 +120,16 @@ public class LikeExpression implements ILikeExpression
 
             if (value.isNull(i))
             {
-                if (nullBitSet == null)
-                {
-                    nullBitSet = new BitSet(input.getRowCount());
-                }
-                nullBitSet.set(i, true);
+                builder.putNull();
                 continue;
             }
 
             String matchValue = String.valueOf(value.getString(i));
 
-            bitSet.set(i, pattern.matcher(matchValue)
+            builder.put(currentPattern.matcher(matchValue)
                     .find());
-
         }
-        return new BitSetVector(input.getRowCount(), bitSet, nullBitSet);
+        return builder.build();
     }
 
     private Pattern create(String pattern)

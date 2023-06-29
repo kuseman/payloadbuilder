@@ -1,17 +1,16 @@
 package se.kuseman.payloadbuilder.core.expression;
 
-import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.ILiteralNullExpression;
 
 /** Null expression */
 public class LiteralNullExpression extends LiteralExpression implements ILiteralNullExpression
 {
-    public LiteralNullExpression(Type type)
+    public LiteralNullExpression(ResolvedType type)
     {
         super(type);
     }
@@ -25,7 +24,7 @@ public class LiteralNullExpression extends LiteralExpression implements ILiteral
     @Override
     public ValueVector eval(TupleVector input, IExecutionContext context)
     {
-        return ValueVector.literalNull(ResolvedType.of(type), input.getRowCount());
+        return ValueVector.literalNull(type, input.getRowCount());
     }
 
     @Override

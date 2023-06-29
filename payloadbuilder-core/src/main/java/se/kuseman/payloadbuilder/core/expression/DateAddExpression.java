@@ -5,12 +5,14 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 
+import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.EpochDateTime;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IDateAddExpression;
 import se.kuseman.payloadbuilder.api.expression.IDatePartExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
@@ -66,25 +68,20 @@ public class DateAddExpression implements IDateAddExpression
         final ValueVector value = expression.eval(input, context);
         final ValueVector number = this.number.eval(input, context);
 
+        final ResolvedType type = getType();
+
         return new ValueVector()
         {
             @Override
             public ResolvedType type()
             {
-                return ResolvedType.of(Type.DateTime);
+                return type;
             }
 
             @Override
             public int size()
             {
                 return input.getRowCount();
-            }
-
-            @Override
-            public boolean isNullable()
-            {
-                return value.isNullable()
-                        || number.isNullable();
             }
 
             @Override
@@ -95,19 +92,33 @@ public class DateAddExpression implements IDateAddExpression
             }
 
             @Override
-            public EpochDateTime getDateTime(int row)
+            public EpochDateTimeOffset getDateTimeOffset(int row)
             {
-                EpochDateTime dateTime = value.getDateTime(row);
-                int add = number.getInt(row);
+                // Implicit cast
+                if (type.getType() != Column.Type.DateTimeOffset)
+                {
+                    return ValueVector.super.getDateTimeOffset(row);
+                }
 
-                return dateTime.add(add, part.getChronoField()
-                        .getBaseUnit());
+                long add = number.getLong(row);
+                return value.getDateTimeOffset(row)
+                        .add(add, part.getChronoField()
+                                .getBaseUnit());
             }
 
             @Override
-            public Object getValue(int row)
+            public EpochDateTime getDateTime(int row)
             {
-                throw new IllegalArgumentException("getValue should not be called on typed vectors");
+                // Implicit cast
+                if (type.getType() != Column.Type.DateTime)
+                {
+                    return ValueVector.super.getDateTime(row);
+                }
+
+                long add = number.getLong(row);
+                return value.getDateTime(row)
+                        .add(add, part.getChronoField()
+                                .getBaseUnit());
             }
         };
     }
@@ -115,6 +126,15 @@ public class DateAddExpression implements IDateAddExpression
     @Override
     public ResolvedType getType()
     {
+        ResolvedType type = expression.getType();
+
+        // If we have an offset as input we keep it
+        if (type.getType() == Column.Type.DateTimeOffset)
+        {
+            return type;
+        }
+
+        // ... all other is promoted to datetime
         return ResolvedType.of(Type.DateTime);
     }
 

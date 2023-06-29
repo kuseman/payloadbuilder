@@ -6,13 +6,12 @@ import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.IntFunction;
 
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVectorAdapter;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.ICaseExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
@@ -105,65 +104,59 @@ public class CaseExpression implements ICaseExpression
     @Override
     public ValueVector eval(TupleVector input, IExecutionContext context)
     {
-        final ResolvedType type = getType();
-        final int size = whenClauses.size();
+        ResolvedType type = getType();
+        int size = whenClauses.size();
+        ValueVector[] whenConditions = new ValueVector[size];
+        ValueVector[] whenResults = new ValueVector[size];
+        ValueVector elseResult = null;
 
-        return new ValueVectorAdapter(new IntFunction<ValueVector>()
+        int rowCount = input.getRowCount();
+        IValueVectorBuilder builder = context.getVectorBuilderFactory()
+                .getValueVectorBuilder(type, rowCount);
+
+        for (int i = 0; i < rowCount; i++)
         {
-            ValueVector[] whenConditions = new ValueVector[size];
-            ValueVector[] whenResults = new ValueVector[size];
-            ValueVector elseResult;
-            ValueVector nullResult;
-
-            @Override
-            public ValueVector apply(int row)
+            boolean allFalse = true;
+            for (int j = 0; j < size; j++)
             {
-                for (int i = 0; i < size; i++)
+                if (whenConditions[j] == null)
                 {
-                    ValueVector whenCondition = whenConditions[i];
-                    if (whenCondition == null)
+                    whenConditions[j] = whenClauses.get(j)
+                            .getCondition()
+                            .eval(input, context);
+                }
+                if (whenConditions[j].getPredicateBoolean(i))
+                {
+                    if (whenResults[j] == null)
                     {
-                        // Evaluate condition
-                        whenCondition = whenClauses.get(i)
-                                .getCondition()
+                        whenResults[j] = whenClauses.get(j)
+                                .getResult()
                                 .eval(input, context);
-                        whenConditions[i] = whenCondition;
                     }
-
-                    if (whenCondition.getPredicateBoolean(row))
-                    {
-                        ValueVector whenResult = whenResults[i];
-                        if (whenResult == null)
-                        {
-                            // Evaluate result
-                            whenResult = whenClauses.get(i)
-                                    .getResult()
-                                    .eval(input, context);
-                            whenResults[i] = whenResult;
-                        }
-                        return whenResult;
-                    }
-
-                    if (elseExpression != null)
-                    {
-                        if (elseResult == null)
-                        {
-                            elseResult = elseExpression.eval(input, context);
-                        }
-
-                        return elseResult;
-                    }
+                    allFalse = false;
+                    builder.put(whenResults[j], i);
+                    break;
                 }
-
-                if (nullResult == null)
-                {
-                    nullResult = ValueVector.literalNull(type, input.getRowCount());
-                }
-
-                return nullResult;
             }
 
-        }, input.getRowCount(), true, type);
+            if (allFalse)
+            {
+                if (elseExpression != null)
+                {
+                    if (elseResult == null)
+                    {
+                        elseResult = elseExpression.eval(input, context);
+                    }
+                    builder.put(elseResult, i);
+                }
+                else
+                {
+                    builder.putNull();
+                }
+            }
+        }
+
+        return builder.build();
     }
 
     @Override

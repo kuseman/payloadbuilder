@@ -3,7 +3,6 @@ package se.kuseman.payloadbuilder.api.execution;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Index;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 
 /** Index seek predicate used when creating index seek scan operators from catalogs */
 public interface ISeekPredicate

@@ -1,6 +1,7 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
@@ -13,18 +14,18 @@ import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IArithmeticBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
 import se.kuseman.payloadbuilder.core.expression.ArithmeticBinaryExpression;
@@ -33,6 +34,65 @@ import se.kuseman.payloadbuilder.core.expression.FunctionCallExpression;
 /** Test of {@link HashAggregate} */
 public class HashAggregateTest extends APhysicalPlanTest
 {
+    @Test(
+            expected = IllegalArgumentException.class)
+    public void test_invalid_input()
+    {
+        Schema schema = schema(new Type[] { Type.Int, Type.Any }, "col1", "col2");
+        IDatasource ds = schemaLessDS(() ->
+        {
+        });
+
+        new HashAggregate(0, scan(ds, table, schema), asList(ce("col1")), emptyList());
+    }
+
+    @Test(
+            expected = IllegalArgumentException.class)
+    public void test_invalid_input_2()
+    {
+        Schema schema = schema(new Type[] { Type.Int, Type.Any }, "col1", "col2");
+        IDatasource ds = schemaLessDS(() ->
+        {
+        });
+
+        new HashAggregate(0, scan(ds, table, schema), emptyList(), asList(new AggregateWrapperExpression(ce("col1"), false, false)));
+    }
+
+    @Test
+    public void test_distinct()
+    {
+        Schema schema = schema(new Type[] { Type.Int, Type.Any }, "col1", "col2");
+
+        IDatasource ds = schemaLessDS(() ->
+        {
+        }, TupleVector.of(schema, asList(vv(Type.Int, 1, null, 2, 3, 3, 3, 4, 4, 4, 4, null), vv(Type.Any, 1, 2, 2, 3, 3, 6, 4, 4, 9, 10, null))));
+
+        //@formatter:off
+        IPhysicalPlan plan =
+                new Sort(2,
+                        new HashAggregate(1, scan(ds, table, Schema.EMPTY), emptyList(), emptyList()),
+                asList(sortItem(ce("col1", 0), Order.ASC, NullOrder.UNDEFINED)));
+        //@formatter:on
+
+        // Plan schema
+        assertEquals(Schema.EMPTY, plan.getSchema());
+
+        TupleIterator it = plan.execute(context);
+        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+
+        // Runtime schema
+        //@formatter:off
+        assertEquals(Schema.of(
+                new CoreColumn("col1", ResolvedType.of(Type.Int), table.column("col1")),
+                new CoreColumn("col2", ResolvedType.of(Type.Any), table.column("col2"))), actual.getSchema());
+        //@formatter:on
+
+        //@formatter:off
+        assertVectorsEquals(vv(Type.Int, null, null, 1, 2, 3, 3, 4, 4,  4), actual.getColumn(0));
+        assertVectorsEquals(vv(Type.Any, null, 2,    1, 2, 3, 6, 9, 10, 4), actual.getColumn(1));
+        //@formatter:on
+    }
+
     @Test
     public void test_schema_less()
     {
@@ -48,7 +108,7 @@ public class HashAggregateTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan plan =
                 new Sort(2,
-                        new HashAggregate(1, scan(ds, table, schema), asList(col1),
+                        new HashAggregate(1, scan(ds, table, Schema.EMPTY), asList(col1),
                                 asList(
                                     new FunctionCallExpression("", SystemCatalog.get().getScalarFunction("count"), null, asList(col1)),
                                     new AggregateWrapperExpression(col2, false, false),
@@ -60,10 +120,10 @@ public class HashAggregateTest extends APhysicalPlanTest
         // Plan schema
         //@formatter:off
         assertEquals(Schema.of(
-                new Column("", "count(col1)", ResolvedType.of(Type.Int), null, false),
-                new Column("col2", "", ResolvedType.valueVector(ResolvedType.of(Type.Any)), null, false),
-                new Column("", "sum(col1)", ResolvedType.of(Type.Int), null, false),
-                new Column("", "col1 + col2", ResolvedType.valueVector(ResolvedType.of(Type.Int)), null, false)),
+                new CoreColumn("", ResolvedType.of(Type.Int), "count(col1)", false),
+                new CoreColumn("col2", ResolvedType.array(ResolvedType.of(Type.Any)), "", false),
+                new CoreColumn("", ResolvedType.of(Type.Int), "sum(col1)", false),
+                new CoreColumn("", ResolvedType.array(ResolvedType.of(Type.Int)), "col1 + col2", false)),
                 plan.getSchema());
         //@formatter:on
 
@@ -83,10 +143,10 @@ public class HashAggregateTest extends APhysicalPlanTest
         // Runtime schema (now we have data to return an INT that was object on plan level)
         //@formatter:off
         assertEquals(Schema.of(
-                new Column("", "count(col1)", ResolvedType.of(Type.Int), null, false),
-                new Column("col2", "", ResolvedType.valueVector(ResolvedType.of(Type.Any)), null, false),
-                new Column("", "sum(col1)", ResolvedType.of(Type.Int), null, false),
-                new Column("", "col1 + col2", ResolvedType.valueVector(ResolvedType.of(Type.Int)), null, false)),
+                new CoreColumn("", ResolvedType.of(Type.Int), "count(col1)", false),
+                new CoreColumn("col2", ResolvedType.array(ResolvedType.of(Type.Any)), "", false),
+                new CoreColumn("", ResolvedType.of(Type.Int), "sum(col1)", false),
+                new CoreColumn("", ResolvedType.array(ResolvedType.of(Type.Int)), "col1 + col2", false)),
                 actual.getSchema());
         //@formatter:on
         assertEquals(4, actual.getRowCount());
@@ -95,14 +155,14 @@ public class HashAggregateTest extends APhysicalPlanTest
         assertVectorsEquals(vv(Type.Int, 1, 2, 3, 4), actual.getColumn(0));
 
         ValueVector vvCol1 = actual.getColumn(1);
-        assertEquals(ResolvedType.valueVector(ResolvedType.of(Type.Any)), vvCol1.type());
+        assertEquals(ResolvedType.array(ResolvedType.of(Type.Any)), vvCol1.type());
         assertEquals(4, vvCol1.size());
 
         // Assert groups
-        assertVectorsEquals(vv(Type.Any, 1), (ValueVector) vvCol1.getValue(0));
-        assertVectorsEquals(vv(Type.Any, 2, 3), (ValueVector) vvCol1.getValue(1));
-        assertVectorsEquals(vv(Type.Any, 4, 5, 6), (ValueVector) vvCol1.getValue(2));
-        assertVectorsEquals(vv(Type.Any, 7, 8, 9, 10), (ValueVector) vvCol1.getValue(3));
+        assertVectorsEquals(vv(Type.Any, 1), vvCol1.getArray(0));
+        assertVectorsEquals(vv(Type.Any, 2, 3), vvCol1.getArray(1));
+        assertVectorsEquals(vv(Type.Any, 4, 5, 6), vvCol1.getArray(2));
+        assertVectorsEquals(vv(Type.Any, 7, 8, 9, 10), vvCol1.getArray(3));
 
         // Sum
         assertVectorsEquals(vv(Type.Int, 1, 4, 9, 16), actual.getColumn(2));
@@ -110,15 +170,13 @@ public class HashAggregateTest extends APhysicalPlanTest
 
         // Arithmetic
         ValueVector arith = actual.getColumn(3);
-        assertEquals(ResolvedType.valueVector(ResolvedType.of(Type.Int)), arith.type());
+        assertEquals(ResolvedType.array(ResolvedType.of(Type.Int)), arith.type());
         assertEquals(4, arith.size());
-        assertVectorsEquals(vv(Type.Int, 2), (ValueVector) arith.getValue(0));
-        assertVectorsEquals(vv(Type.Int, 4, 5), (ValueVector) arith.getValue(1));
-        assertVectorsEquals(vv(Type.Int, 7, 8, 9), (ValueVector) arith.getValue(2));
-        assertVectorsEquals(vv(Type.Int, 11, 12, 13, 14), (ValueVector) arith.getValue(3));
+        assertVectorsEquals(vv(Type.Int, 2), arith.getArray(0));
+        assertVectorsEquals(vv(Type.Int, 4, 5), arith.getArray(1));
+        assertVectorsEquals(vv(Type.Int, 7, 8, 9), arith.getArray(2));
+        assertVectorsEquals(vv(Type.Int, 11, 12, 13, 14), arith.getArray(3));
     }
-
-    // TODO: test with all primitive types
 
     @Ignore
     @Test
@@ -153,7 +211,7 @@ public class HashAggregateTest extends APhysicalPlanTest
             }
 
             @Override
-            public Object getValue(int row)
+            public Object getAny(int row)
             {
                 return numbers[row];
             }

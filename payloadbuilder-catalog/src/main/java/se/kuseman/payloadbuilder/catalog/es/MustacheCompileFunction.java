@@ -11,14 +11,13 @@ import com.github.mustachejava.DefaultMustacheFactory;
 import com.github.mustachejava.Mustache;
 import com.github.mustachejava.MustacheFactory;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.UTF8String;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Compile mustable template */
@@ -26,9 +25,9 @@ class MustacheCompileFunction extends ScalarFunctionInfo
 {
     private static final MustacheFactory FACTORY = new DefaultMustacheFactory();
 
-    MustacheCompileFunction(Catalog catalog)
+    MustacheCompileFunction()
     {
-        super(catalog, "mustachecompile", FunctionType.SCALAR);
+        super("mustachecompile", FunctionType.SCALAR);
     }
 
     @Override
@@ -41,19 +40,19 @@ class MustacheCompileFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public int arity()
+    public Arity arity()
     {
-        return 2;
+        return Arity.TWO;
     }
 
     @Override
-    public ResolvedType getType(List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
         return ResolvedType.of(Type.String);
     }
 
     @Override
-    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
     {
         final ValueVector value = arguments.get(0)
                 .eval(input, context);
@@ -101,12 +100,6 @@ class MustacheCompileFunction extends ScalarFunctionInfo
                 StringWriter writer = new StringWriter();
                 compiledTemplate.execute(writer, params);
                 return UTF8String.from(writer.toString());
-            }
-
-            @Override
-            public Object getValue(int row)
-            {
-                throw new IllegalArgumentException("getValue should not be called on typed vectors");
             }
         };
     }

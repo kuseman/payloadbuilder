@@ -12,8 +12,9 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo.AggregateMode;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.Decimal;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
@@ -33,22 +34,22 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
         e = ce("col", ResolvedType.of(Type.Float));
         assertEquals(ResolvedType.of(Type.Float), function.getType(asList(e)));
 
-        e = ce("col", ResolvedType.valueVector(ResolvedType.of(Type.Float)));
+        e = ce("col", ResolvedType.array(ResolvedType.of(Type.Float)));
         assertEquals(ResolvedType.of(Type.Float), function.getType(asList(e)));
     }
 
     @Test
     public void test_object()
     {
-        ValueVector smallInts = ValueVector.literalObject(ResolvedType.of(Type.Any), 10, 4);
-        ValueVector mediumInts = ValueVector.literalObject(ResolvedType.of(Type.Any), 10_000_000, 4);
+        ValueVector smallInts = ValueVector.literalAny(4, 10);
+        ValueVector mediumInts = ValueVector.literalAny(4, 10_000_000);
         ValueVector nulls = ValueVector.literalNull(ResolvedType.of(Type.Any), 4);
 
         Schema schema = schema(new Type[] { Type.Any }, "col1");
 
         //@formatter:off
-        ValueVector v = ValueVector.literalObject(ResolvedType.tupleVector(schema), 
-                TupleVector.of(schema, asList(smallInts)), 
+        ValueVector v = ValueVector.literalTable(
+                TupleVector.of(schema, asList(smallInts)),
                 TupleVector.of(schema, asList(mediumInts)),
                 TupleVector.of(schema, asList(nulls)));
         //@formatter:on
@@ -60,9 +61,31 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
     }
 
     @Test
+    public void test_decimal()
+    {
+        ValueVector smallInts = ValueVector.literalDecimal(Decimal.from(10), 4);
+        ValueVector mediumInts = ValueVector.literalDecimal(Decimal.from(10_000_000), 4);
+        ValueVector nulls = ValueVector.literalNull(ResolvedType.of(Type.Decimal), 4);
+
+        Schema schema = schema(new Type[] { Type.Decimal }, "col1");
+
+        //@formatter:off
+        ValueVector v = ValueVector.literalTable(
+                TupleVector.of(schema, asList(smallInts)),
+                TupleVector.of(schema, asList(mediumInts)),
+                TupleVector.of(schema, asList(nulls)));
+        //@formatter:on
+
+        ValueVector actual = function.evalAggregate(context, AggregateMode.ALL, v, "", asList(col1));
+        assertEquals(ResolvedType.of(Type.Decimal), actual.type());
+        assertEquals(3, actual.size());
+        assertVectorsEquals(vv(Type.Decimal, Decimal.from(40), Decimal.from(40_000_000), null), actual);
+    }
+
+    @Test
     public void test_object_scalar()
     {
-        ValueVector mediumInts = ValueVector.literalObject(ResolvedType.of(Type.Any), 10_000_000, 4);
+        ValueVector mediumInts = ValueVector.literalAny(4, 10_000_000);
         Schema schema = schema(new Type[] { Type.Any }, "col1");
         TupleVector input = TupleVector.of(schema, asList(mediumInts));
 
@@ -80,9 +103,9 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
         ValueVector mediumInts = ValueVector.literalInt(10_000_000, 4);
         ValueVector nulls = ValueVector.literalNull(ResolvedType.of(Type.Int), 4);
 
-        Schema schema = Schema.of(Column.of("col1", ResolvedType.valueVector(ResolvedType.of(Type.Any))));
+        Schema schema = Schema.of(Column.of("col1", ResolvedType.array(ResolvedType.of(Type.Any))));
 
-        TupleVector input = TupleVector.of(schema, asList(vv(ResolvedType.valueVector(ResolvedType.of(Type.Any)), smallInts, mediumInts, nulls)));
+        TupleVector input = TupleVector.of(schema, asList(vv(ResolvedType.array(ResolvedType.of(Type.Any)), smallInts, mediumInts, nulls)));
 
         ValueVector actual = function.evalScalar(context, input, "", asList(col1));
 
@@ -100,8 +123,12 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
 
         Schema schema = schema(new Type[] { Type.Int }, "col1");
 
-        ValueVector v = ValueVector.literalObject(ResolvedType.tupleVector(schema), TupleVector.of(schema, asList(smallInts)), TupleVector.of(schema, asList(mediumInts)),
+        //@formatter:off
+        ValueVector v = ValueVector.literalTable(
+                TupleVector.of(schema, asList(smallInts)),
+                TupleVector.of(schema, asList(mediumInts)),
                 TupleVector.of(schema, asList(nulls)));
+        //@formatter:on
 
         ValueVector actual = function.evalAggregate(context, AggregateMode.ALL, v, "", asList(col1));
         assertEquals(ResolvedType.of(Type.Int), actual.type());
@@ -118,8 +145,12 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
 
         Schema schema = schema(new Type[] { Type.Long }, "col1");
 
-        ValueVector v = ValueVector.literalObject(ResolvedType.tupleVector(schema), TupleVector.of(schema, asList(smallLongs)), TupleVector.of(schema, asList(mediumLongs)),
+        //@formatter:off
+        ValueVector v = ValueVector.literalTable(
+                TupleVector.of(schema, asList(smallLongs)),
+                TupleVector.of(schema, asList(mediumLongs)),
                 TupleVector.of(schema, asList(nulls)));
+        //@formatter:on
 
         ValueVector actual = function.evalAggregate(context, AggregateMode.ALL, v, "", asList(col1));
         assertEquals(ResolvedType.of(Type.Long), actual.type());
@@ -136,8 +167,12 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
 
         Schema schema = schema(new Type[] { Type.Float }, "col1");
 
-        ValueVector v = ValueVector.literalObject(ResolvedType.tupleVector(schema), TupleVector.of(schema, asList(smallInts)), TupleVector.of(schema, asList(mediumInts)),
+        //@formatter:off
+        ValueVector v = ValueVector.literalTable(
+                TupleVector.of(schema, asList(smallInts)),
+                TupleVector.of(schema, asList(mediumInts)),
                 TupleVector.of(schema, asList(nulls)));
+        //@formatter:on
 
         ValueVector actual = function.evalAggregate(context, AggregateMode.ALL, v, "", asList(col1));
         assertEquals(ResolvedType.of(Type.Float), actual.type());
@@ -155,7 +190,7 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
         Schema schema = schema(new Type[] { Type.Double }, "col1");
 
         //@formatter:off
-        ValueVector v = ValueVector.literalObject(ResolvedType.tupleVector(schema),
+        ValueVector v = ValueVector.literalTable(
                 TupleVector.of(schema, asList(mediumInts)),
                 TupleVector.of(schema, asList(smallInts)),
                 TupleVector.of(schema, asList(nulls)));
@@ -175,7 +210,7 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
 
         Schema schema = schema(new Type[] { Type.Long }, "col1");
 
-        ValueVector v = ValueVector.literalObject(ResolvedType.tupleVector(schema), TupleVector.of(schema, asList(longs)));
+        ValueVector v = ValueVector.literalTable(TupleVector.of(schema, asList(longs)));
         function.evalAggregate(context, AggregateMode.ALL, v, "", asList(col1));
     }
 
@@ -191,7 +226,7 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
         Schema schema = schema(new Type[] { Type.Int }, "col1");
 
         //@formatter:off
-        ValueVector v = ValueVector.literalObject(ResolvedType.tupleVector(schema),
+        ValueVector v = ValueVector.literalTable(
                 TupleVector.of(schema, asList(smallInts)),
                 TupleVector.of(schema, asList(largeInts)),
                 TupleVector.of(schema, asList(mediumInts)),

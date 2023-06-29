@@ -5,14 +5,14 @@ import static java.util.Objects.requireNonNull;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.common.Option;
 
 /** Implementation of {@link IDatasourceOptions} */
 public class DatasourceOptions implements IDatasourceOptions
 {
-    private static final String BATCH_SIZE = "batch_size";
+    public static final String BATCH_SIZE = "batch_size";
     private static final int DEFAULT_BATCH_SIZE = 500;
     private final List<Option> options;
 

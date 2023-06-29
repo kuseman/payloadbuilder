@@ -12,11 +12,13 @@ import java.util.function.BiFunction;
 
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
+import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.execution.vector.TupleVectorBuilder;
 
 /** Filter plan. Evaluates a predicate on input and return matched rows */
 public class Filter implements IPhysicalPlan
@@ -38,10 +40,20 @@ public class Filter implements IPhysicalPlan
         return nodeId;
     }
 
+    public IPhysicalPlan getInput()
+    {
+        return input;
+    }
+
     @Override
     public String getName()
     {
         return "Filter";
+    }
+
+    public BiFunction<TupleVector, IExecutionContext, ValueVector> getPredicate()
+    {
+        return predicate;
     }
 
     @Override
@@ -64,6 +76,7 @@ public class Filter implements IPhysicalPlan
     @Override
     public TupleIterator execute(IExecutionContext context)
     {
+        final ExecutionContext executionContext = (ExecutionContext) context;
         final TupleIterator iterator = input.execute(context);
 
         return new TupleIterator()
@@ -107,13 +120,16 @@ public class Filter implements IPhysicalPlan
                     TupleVector vector = iterator.next();
                     ValueVector result = predicate.apply(vector, context);
 
+                    int cardinality = result.getCardinality();
                     // No matched rows
-                    if (result.getCardinality() == 0)
+                    if (cardinality == 0)
                     {
                         continue;
                     }
 
-                    next = new PredicatedTupleVector(vector, result);
+                    TupleVectorBuilder b = new TupleVectorBuilder(executionContext.getBufferAllocator(), cardinality);
+                    b.append(vector, result);
+                    next = b.build();
                 }
                 return true;
             }

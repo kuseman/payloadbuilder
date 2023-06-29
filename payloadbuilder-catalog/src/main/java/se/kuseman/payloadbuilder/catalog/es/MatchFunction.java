@@ -2,11 +2,10 @@ package se.kuseman.payloadbuilder.catalog.es;
 
 import java.util.List;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /**
@@ -16,9 +15,9 @@ class MatchFunction extends ScalarFunctionInfo
 {
     static final String NAME = "match";
 
-    MatchFunction(Catalog catalog)
+    MatchFunction()
     {
-        super(catalog, NAME, FunctionType.SCALAR);
+        super(NAME, FunctionType.SCALAR);
     }
 
     @Override
@@ -31,7 +30,7 @@ class MatchFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
     {
         throw new IllegalArgumentException("'match' cannot be used in non Elastic query context.");
     }

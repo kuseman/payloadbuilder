@@ -15,9 +15,9 @@ import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IFunctionCallExpression;
@@ -94,14 +94,14 @@ public class IPredicateMock
 
         when(inExpression.isNot()).thenReturn(not);
 
-        List<? extends IExpression> arguments = values.stream()
+        List<IExpression> arguments = values.stream()
                 .map(v -> expression(v))
                 .collect(toList());
 
-        when(inExpression.getArguments()).then(new Answer<List<? extends IExpression>>()
+        when(inExpression.getArguments()).then(new Answer<List<IExpression>>()
         {
             @Override
-            public List<? extends IExpression> answer(InvocationOnMock invocation) throws Throwable
+            public List<IExpression> answer(InvocationOnMock invocation) throws Throwable
             {
                 return arguments;
             }
@@ -138,30 +138,33 @@ public class IPredicateMock
         return pair;
     }
 
-    /** Mock UNDEFINED scalar function pair */
-    public static IPredicate function(ScalarFunctionInfo functioInfo, List<Object> arguments)
+    /** Mock FUNCTION_CALL with arguments */
+    public static IPredicate function(String catalogAlias, String functionName, List<Object> arguments)
     {
-        IPredicate pair = mock(IPredicate.class);
-        when(pair.getType()).thenReturn(IPredicate.Type.FUNCTION_CALL);
+        IPredicate predicate = mock(IPredicate.class);
+        when(predicate.getType()).thenReturn(IPredicate.Type.FUNCTION_CALL);
 
         IFunctionCallExpression functionExpression = mock(IFunctionCallExpression.class);
-        when(pair.getFunctionCallExpression()).thenReturn(functionExpression);
-        when(functionExpression.getFunctionInfo()).thenReturn(functioInfo);
+        ScalarFunctionInfo functionInfo = mock(ScalarFunctionInfo.class);
+        when(functionInfo.getName()).thenReturn(functionName);
+        when(predicate.getFunctionCallExpression()).thenReturn(functionExpression);
+        when(functionExpression.getCatalogAlias()).thenReturn(catalogAlias);
+        when(functionExpression.getFunctionInfo()).thenReturn(functionInfo);
 
-        List<? extends IExpression> functionArguments = arguments.stream()
+        List<IExpression> functionArguments = arguments.stream()
                 .map(v -> v instanceof IExpression ? (IExpression) v
                         : expression(v))
                 .collect(toList());
 
-        when(functionExpression.getArguments()).then(new Answer<List<? extends IExpression>>()
+        when(functionExpression.getArguments()).then(new Answer<List<IExpression>>()
         {
             @Override
-            public List<? extends IExpression> answer(InvocationOnMock invocation) throws Throwable
+            public List<IExpression> answer(InvocationOnMock invocation) throws Throwable
             {
                 return functionArguments;
             }
         });
-        return pair;
+        return predicate;
     }
 
     /** Mock an expression */
@@ -175,7 +178,7 @@ public class IPredicateMock
         }
         else
         {
-            vector = ValueVector.literalObject(ResolvedType.of(Type.Any), value, 1);
+            vector = ValueVector.literalAny(1, value);
         }
         when(mock.eval(any(IExecutionContext.class))).thenReturn(vector);
         when(mock.eval(any(TupleVector.class), any(IExecutionContext.class))).thenReturn(vector);

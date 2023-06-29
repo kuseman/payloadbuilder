@@ -1,175 +1,226 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
-import java.time.ZonedDateTime;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.text.NumberFormat;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.Temporal;
 import java.util.List;
-import java.util.Locale;
 
 import org.apache.commons.lang3.LocaleUtils;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.UTF8String;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Format function that can format numeric and date time values */
 class FormatFunction extends ScalarFunctionInfo
 {
-    FormatFunction(Catalog catalog)
+    FormatFunction()
     {
-        super(catalog, "format", FunctionType.SCALAR);
+        super("format", FunctionType.SCALAR);
     }
 
     @Override
-    public ResolvedType getType(List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
         return ResolvedType.of(Type.String);
     }
 
     @Override
-    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    public Arity arity()
     {
-        if (!(arguments.size() == 2
-                || arguments.size() == 3))
-        {
-            throw new IllegalArgumentException("Function " + getName() + " expects 2 or 3 arguments");
-        }
+        return new Arity(2, 3);
+    }
 
-        final ValueVector value = arguments.get(0)
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
+    {
+        ValueVector value = arguments.get(0)
                 .eval(input, context);
-        final ValueVector format = arguments.get(1)
+        ValueVector format = arguments.get(1)
                 .eval(input, context);
 
-        IExpression localeExpression = arguments.size() == 3 ? arguments.get(2)
+        boolean hasLocale = arguments.size() == 3;
+        IExpression localeExpression = hasLocale ? arguments.get(2)
                 : null;
 
-        final ValueVector locale = localeExpression != null ? localeExpression.eval(input, context)
+        ValueVector locale = hasLocale ? localeExpression.eval(input, context)
                 : null;
 
-        final String constantFormat = arguments.get(1)
-                .isConstant()
-                        ? format.getString(0)
-                                .toString()
+        String constantFormat = arguments.get(1)
+                .isConstant() ? format.valueAsString(0)
                         : null;
-        final String constantLocale = localeExpression != null
-                && localeExpression.isConstant()
-                        ? locale.getString(0)
-                                .toString()
+        String constantLocale = hasLocale
+                && localeExpression.isConstant() ? locale.valueAsString(0)
                         : null;
 
-        return new ValueVector()
+        int rowCount = input.getRowCount();
+        IObjectVectorBuilder builder = context.getVectorBuilderFactory()
+                .getObjectVectorBuilder(ResolvedType.of(Type.String), rowCount);
+
+        Type valueType = value.type()
+                .getType();
+
+        NumberFormat constantNumberFormat = null;
+        DateTimeFormatter constantDateTimeFormatter = null;
+
+        for (int i = 0; i < rowCount; i++)
         {
-            DateTimeFormatter constantDateTimeFormatter;
-
-            @Override
-            public ResolvedType type()
+            if (value.isNull(i)
+                    || format.isNull(i)
+                    || (locale != null
+                            && locale.isNull(i)))
             {
-                return ResolvedType.of(Type.String);
+                builder.putNull();
+                continue;
             }
 
-            @Override
-            public int size()
+            Object anyValue = null;
+
+            if (valueType == Type.Any)
             {
-                return input.getRowCount();
+                anyValue = value.valueAsObject(i);
             }
 
-            @Override
-            public boolean isNullable()
-            {
-                return value.isNullable()
-                        || format.isNullable()
-                        || (locale != null
-                                && locale.isNullable());
-            }
+            // - Number/any-number => NumberFormat
+            // - DateTime/DateTimeOffset/any-datetime/offset => DateTimeFormat
+            // - other -> String.format
 
-            @Override
-            public boolean isNull(int row)
+            if (valueType.isNumber()
+                    || anyValue instanceof Number)
             {
-                return value.isNull(row)
-                        || format.isNull(row)
-                        || (locale != null
-                                && locale.isNull(row));
-            }
+                NumberFormat numberFormat = constantNumberFormat;
 
-            @Override
-            public UTF8String getString(int row)
-            {
-                String formatStr = constantFormat;
-                if (formatStr == null)
+                if (numberFormat == null)
                 {
-                    formatStr = format.getString(row)
-                            .toString();
-                }
-
-                Locale currentLocale = null;
-                if (locale != null)
-                {
-                    String localeStr = constantLocale;
-                    if (localeStr == null)
+                    if (constantLocale != null
+                            && constantFormat != null)
                     {
-                        localeStr = locale.getString(row)
-                                .toString();
+                        constantNumberFormat = new DecimalFormat(constantFormat, DecimalFormatSymbols.getInstance(LocaleUtils.toLocale(constantLocale)));
+                        numberFormat = constantNumberFormat;
                     }
-
-                    currentLocale = LocaleUtils.toLocale(localeStr);
-                }
-
-                Object val;
-
-                // For date times we use date time formatter in stead of string format
-                if (value.type()
-                        .getType() == Type.DateTime)
-                {
-                    val = value.getDateTime(row)
-                            .toZonedDateTime();
-
-                    DateTimeFormatter dateTimeFormatter;
-                    if (constantFormat != null)
+                    else if (constantFormat != null
+                            && !hasLocale)
                     {
-                        if (constantDateTimeFormatter == null)
-                        {
-                            if (currentLocale != null)
-                            {
-                                constantDateTimeFormatter = DateTimeFormatter.ofPattern(formatStr, currentLocale);
-                            }
-                            else
-                            {
-                                constantDateTimeFormatter = DateTimeFormatter.ofPattern(formatStr);
-                            }
-                        }
-                        dateTimeFormatter = constantDateTimeFormatter;
+                        constantNumberFormat = new DecimalFormat(constantFormat);
+                        numberFormat = constantNumberFormat;
+                    }
+                    else if (hasLocale)
+                    {
+                        numberFormat = new DecimalFormat(format.valueAsString(i), DecimalFormatSymbols.getInstance(LocaleUtils.toLocale(locale.valueAsString(i))));
                     }
                     else
                     {
-                        dateTimeFormatter = DateTimeFormatter.ofPattern(formatStr);
+                        numberFormat = new DecimalFormat(format.valueAsString(i));
                     }
+                }
 
-                    return UTF8String.from(dateTimeFormatter.format((ZonedDateTime) val));
+                if (valueType == Type.Int
+                        || valueType == Type.Long)
+                {
+                    builder.put(UTF8String.from(numberFormat.format(value.getLong(rowCount))));
+                }
+                else if (valueType == Type.Float
+                        || valueType == Type.Double)
+                {
+                    builder.put(UTF8String.from(numberFormat.format(value.getDouble(rowCount))));
+                }
+                else if (valueType == Type.Decimal)
+                {
+                    builder.put(UTF8String.from(numberFormat.format(value.getDecimal(rowCount)
+                            .asBigDecimal())));
                 }
                 else
                 {
-                    // Boxing for now
-                    val = value.valueAsObject(row);
+                    builder.put(UTF8String.from(numberFormat.format(anyValue)));
                 }
 
-                if (currentLocale != null)
-                {
-                    return UTF8String.from(String.format(currentLocale, formatStr, val));
-                }
-
-                return UTF8String.from(String.format(formatStr, val));
+                continue;
             }
-
-            @Override
-            public Object getValue(int row)
+            // Date time formatter
+            else if (valueType == Type.DateTime
+                    || valueType == Type.DateTimeOffset
+                    || isDateTime(anyValue))
             {
-                throw new IllegalArgumentException("getValue should not be called on typed vectors");
+                DateTimeFormatter dateTimeFormatter = constantDateTimeFormatter;
+                if (dateTimeFormatter == null)
+                {
+                    if (constantLocale != null
+                            && constantFormat != null)
+                    {
+                        constantDateTimeFormatter = DateTimeFormatter.ofPattern(constantFormat, LocaleUtils.toLocale(constantLocale));
+                        dateTimeFormatter = constantDateTimeFormatter;
+                    }
+                    else if (constantFormat != null
+                            && !hasLocale)
+                    {
+                        constantDateTimeFormatter = DateTimeFormatter.ofPattern(constantFormat);
+                        dateTimeFormatter = constantDateTimeFormatter;
+                    }
+                    else if (hasLocale)
+                    {
+                        dateTimeFormatter = DateTimeFormatter.ofPattern(format.valueAsString(i), LocaleUtils.toLocale(locale.valueAsString(i)));
+                    }
+                    else
+                    {
+                        dateTimeFormatter = DateTimeFormatter.ofPattern(format.valueAsString(i));
+                    }
+                }
+
+                if (valueType == Type.DateTime)
+                {
+                    builder.put(UTF8String.from(dateTimeFormatter.format(value.getDateTime(i)
+                            .getLocalDateTime())));
+                }
+                else if (valueType == Type.DateTimeOffset)
+                {
+                    builder.put(UTF8String.from(dateTimeFormatter.format(value.getDateTimeOffset(i)
+                            .getZonedDateTime())));
+                }
+                else if (anyValue instanceof EpochDateTime)
+                {
+                    builder.put(UTF8String.from(dateTimeFormatter.format(((EpochDateTime) anyValue).getLocalDateTime())));
+                }
+                else if (anyValue instanceof EpochDateTimeOffset)
+                {
+                    builder.put(UTF8String.from(dateTimeFormatter.format(((EpochDateTimeOffset) anyValue).getZonedDateTime())));
+                }
+                else
+                {
+                    builder.put(UTF8String.from(dateTimeFormatter.format((Temporal) anyValue)));
+                }
+
+                continue;
             }
-        };
+
+            // String format
+            // bools etc.
+            if (hasLocale)
+            {
+                builder.put(UTF8String.from(String.format(LocaleUtils.toLocale(locale.valueAsString(i)), format.valueAsString(i), value.valueAsObject(i))));
+            }
+            else
+            {
+                builder.put(UTF8String.from(String.format(format.valueAsString(i), value.valueAsObject(i))));
+            }
+        }
+
+        return builder.build();
+    }
+
+    private boolean isDateTime(Object value)
+    {
+        return value instanceof EpochDateTime
+                || value instanceof EpochDateTimeOffset
+                || value instanceof Temporal;
     }
 }

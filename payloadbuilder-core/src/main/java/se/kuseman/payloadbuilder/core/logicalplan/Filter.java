@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.Objects;
 
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 
 /** A filter that filters input according to a predicate */
 public class Filter implements ILogicalPlan

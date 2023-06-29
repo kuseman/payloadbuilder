@@ -1,40 +1,35 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
 import java.util.List;
-import java.util.NoSuchElementException;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVectorAdapter;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.LambdaFunction;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.execution.LambdaUtils;
+import se.kuseman.payloadbuilder.core.execution.LambdaUtils.LambdaResultConsumer;
+import se.kuseman.payloadbuilder.core.execution.vector.TupleVectorBuilder;
 import se.kuseman.payloadbuilder.core.expression.LambdaExpression;
-import se.kuseman.payloadbuilder.core.physicalplan.PredicatedTupleVector;
 
 /** Filter input argument with a lambda */
 class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
 {
     private static final List<LambdaBinding> LAMBDA_BINDINGS = singletonList(new LambdaBinding(1, 0));
 
-    FilterFunction(Catalog catalog)
+    FilterFunction()
     {
-        super(catalog, "filter", FunctionType.SCALAR);
+        super("filter", FunctionType.SCALAR);
     }
-
-    // @Override
-    // public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Set<TableAlias>> argumentAliases)
-    // {
-    // // Resulting alias is the result of argument 0
-    // return argumentAliases.get(0);
-    // }
 
     @Override
     public List<LambdaBinding> getLambdaBindings()
@@ -43,13 +38,13 @@ class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
     }
 
     @Override
-    public int arity()
+    public Arity arity()
     {
-        return 2;
+        return Arity.TWO;
     }
 
     @Override
-    public ResolvedType getType(List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
         // Result type of filter is the same as input ie. argument 0
         return arguments.get(0)
@@ -57,67 +52,69 @@ class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
     }
 
     @Override
-    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
     {
-        ValueVector value = arguments.get(0)
+        final ValueVector value = arguments.get(0)
                 .eval(input, context);
 
         LambdaExpression le = (LambdaExpression) arguments.get(1);
 
-        Type type = value.type()
+        final Type type = value.type()
                 .getType();
 
         // Filter each individual vector
-        if (type == Type.ValueVector
-                || type == Type.TupleVector)
+        if (LambdaUtils.supportsForEachLambdaResult(type))
         {
-            return new ValueVector()
+            IObjectVectorBuilder builder = context.getVectorBuilderFactory()
+                    .getObjectVectorBuilder(value.type(), input.getRowCount());
+
+            LambdaResultConsumer consumer = (inputResult, lambdaResult, inputWasListType) ->
             {
-                LambdaUtils.RowTupleVector inputTupleVector = new LambdaUtils.RowTupleVector(input);
-
-                @Override
-                public ResolvedType type()
+                if (lambdaResult == null)
                 {
-                    return value.type();
+                    builder.put(null);
+                    return;
                 }
-
-                @Override
-                public int size()
+                else if (!inputWasListType)
                 {
-                    return value.size();
-                }
-
-                @Override
-                public boolean isNull(int row)
-                {
-                    // Filter a null is null
-                    return value.isNull(row);
-                }
-
-                @Override
-                public Object getValue(int row)
-                {
-                    inputTupleVector.setRow(row);
-                    if (type == Type.ValueVector)
+                    if (lambdaResult.getPredicateBoolean(0))
                     {
-                        ValueVector lambdaValue = (ValueVector) value.getValue(row);
-                        inputTupleVector.setRowCount(lambdaValue.size());
-                        return createFilteredVector(context, inputTupleVector, le, lambdaValue);
+                        builder.put(inputResult);
+                    }
+                    return;
+                }
+
+                if (inputResult instanceof ValueVector)
+                {
+                    builder.put(createFilteredVector(context, (ValueVector) inputResult, lambdaResult));
+                    return;
+                }
+                else if (inputResult instanceof TupleVector)
+                {
+                    TupleVector table = (TupleVector) inputResult;
+
+                    int cardinality = lambdaResult.getCardinality();
+                    if (cardinality == 0)
+                    {
+                        builder.put(TupleVector.of(table.getSchema(), emptyList()));
+                        return;
                     }
 
-                    TupleVector vector = (TupleVector) value.getValue(row);
-                    inputTupleVector.setRowCount(vector.getRowCount());
-
-                    ((ExecutionContext) context).getStatementContext()
-                            .setLambdaValue(le.getLambdaIds()[0], ValueVector.literalObject(ResolvedType.tupleVector(vector.getSchema()), vector, 1));
-
-                    ValueVector filter = le.getExpression()
-                            .eval(inputTupleVector, context);
-
-                    return new PredicatedTupleVector(vector, filter);
-
+                    TupleVectorBuilder b = new TupleVectorBuilder(((ExecutionContext) context).getBufferAllocator(), cardinality);
+                    b.append(table, lambdaResult);
+                    builder.put(b.build());
+                }
+                else
+                {
+                    if (lambdaResult.getPredicateBoolean(0))
+                    {
+                        builder.put(inputResult);
+                    }
                 }
             };
+
+            LambdaUtils.forEachLambdaResult(context, input, value, le, consumer);
+            return builder.build();
         }
 
         // Filter the whole input
@@ -130,92 +127,32 @@ class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
         ((ExecutionContext) context).getStatementContext()
                 .setLambdaValue(lambdaExpression.getLambdaIds()[0], value);
 
-        final ValueVector predicate = lambdaExpression.getExpression()
+        ValueVector filter = lambdaExpression.getExpression()
                 .eval(input, context);
 
-        final int predicateSize = predicate.size();
-        final int resultSize = predicate.getCardinality();
-
-        // Then return a filtered value vector
-        return new ValueVectorAdapter(value)
-        {
-            @Override
-            public int size()
-            {
-                return resultSize;
-            }
-
-            @Override
-            protected int getRow(int row)
-            {
-                // Find match from input row
-                int match = -1;
-                for (int i = 0; i < predicateSize; i++)
-                {
-                    if (predicate.getPredicateBoolean(i))
-                    {
-                        match++;
-                        if (match == row)
-                        {
-                            return i;
-                        }
-                    }
-                }
-
-                throw new NoSuchElementException();
-            }
-
-        };
-
+        return createFilteredVector(context, value, filter);
     }
 
-    // @Override
-    // public ExpressionCode generateCode(
-    // CodeGeneratorContext context,
-    // ExpressionCode parentCode,
-    // List<Expression> arguments)
-    // {
-    // ExpressionCode inputCode = arguments.get(0).generateCode(context, parentCode);
-    // ExpressionCode code = ExpressionCode.code(context, inputCode);
-    // code.addImport("se.kuseman.payloadbuilder.core.utils.CollectionUtils");
-    // code.addImport("java.util.Iterator");
-    // code.addImport("org.apache.commons.collections.iterators.FilterIterator");
-    // code.addImport("org.apache.commons.collections.Predicate");
-    //
-    // LambdaExpression le = (LambdaExpression) arguments.get(1);
-    //
-    // context.addLambdaParameters(le.getIdentifiers());
-    // ExpressionCode lambdaCode = le.getExpression().generateCode(context, parentCode);
-    // context.removeLambdaParameters(le.getIdentifiers());
-    //
-    // String template = "%s"
-    // + "boolean %s = true;\n"
-    // + "Iterator %s = null;\n"
-    // + "if (!%s)\n"
-    // + "{\n"
-    // + " %s = new FilterIterator(IteratorUtils.getIterator(%s), new Predicate()\n"
-    // + " {\n"
-    // + " public boolean evaluate(Object object)\n"
-    // + " {\n"
-    // + " Object %s = object;\n"
-    // + " %s"
-    // + " return %s;\n"
-    // + " }\n"
-    // + " });\n"
-    // + " %s = false;\n"
-    // + "}\n";
-    //
-    // code.setCode(String.format(template,
-    // inputCode.getCode(),
-    // code.getIsNull(),
-    // code.getResVar(),
-    // inputCode.getIsNull(),
-    // code.getResVar(), inputCode.getResVar(),
-    // le.getIdentifiers().get(0),
-    // lambdaCode.getCode(),
-    // lambdaCode.getResVar(),
-    // code.getIsNull()));
-    //
-    // return code;
-    // }
+    private ValueVector createFilteredVector(IExecutionContext context, ValueVector value, ValueVector filter)
+    {
+        int rowCount = value.size();
+        int resultSize = filter.getCardinality();
+
+        if (resultSize == 0)
+        {
+            return ValueVector.empty(value.type());
+        }
+
+        IValueVectorBuilder builder = context.getVectorBuilderFactory()
+                .getValueVectorBuilder(value.type(), resultSize);
+
+        for (int i = 0; i < rowCount; i++)
+        {
+            if (filter.getPredicateBoolean(i))
+            {
+                builder.put(value, i);
+            }
+        }
+        return builder.build();
+    }
 }

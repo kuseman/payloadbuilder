@@ -7,8 +7,8 @@ import org.assertj.core.api.Assertions;
 import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.expression.LiteralBooleanExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
@@ -64,13 +64,12 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                 table,
                 eq(cre(tCol.rename("col1")), LiteralBooleanExpression.TRUE)      // Predicate analyzer rewrites this to an equal
                 );
-        //@formatter:opn
-        
-        
-//                System.out.println(expected.print(0));
-//                System.out.println(actual.print(0));
+        //@formatter:on
+
+        // System.out.println(expected.print(0));
+        // System.out.println(actual.print(0));
         // Assert that we actual got any paris populated
-//        assertTrue(actual.getPredicatePairs().size() > 0);
+        // assertTrue(actual.getPredicatePairs().size() > 0);
         assertEquals(expected, actual);
     }
 

@@ -2,7 +2,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>se.kuseman</groupId>
     <artifactId>payloadbuilder</artifactId>
-    <version>0.8.7-SNAPSHOT</version>
+    <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>Payloadbuilder</name>
     <description>SQL Query engine</description>
@@ -19,8 +19,8 @@
         <junit.version>4.13.1</junit.version>
         <mockito-core.version>4.3.1</mockito-core.version>
         <spotless.version>2.22.0</spotless.version>
-        <jackson.version>2.13.4.2</jackson.version>
-        <commons-io.version>2.11.0</commons-io.version>
+        <jackson.version>2.15.2</jackson.version>
+        <commons-io.version>2.13.0</commons-io.version>
         <commons-lang3.version>3.12.0</commons-lang3.version>
         <commons-collections4.version>4.4</commons-collections4.version>
     </properties>
@@ -67,6 +67,7 @@
         <module>payloadbuilder-api</module>
         <module>payloadbuilder-core</module>
         <module>payloadbuilder-catalog</module>
+        <module>payloadbuilder-bytes</module>
     </modules>
 
     <dependencyManagement>
@@ -117,20 +118,6 @@
             </activation>
             <build>
                 <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-source-plugin</artifactId>
-                        <version>3.2.1</version>
-                        <executions>
-                            <execution>
-                                <id>attach-sources</id>
-                                <phase>verify</phase>
-                                <goals>
-                                    <goal>jar-no-fork</goal>
-                                </goals>
-                            </execution>
-                        </executions>
-                    </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-javadoc-plugin</artifactId>
@@ -222,6 +209,20 @@
             </plugins>
         </pluginManagement>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.2.1</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>

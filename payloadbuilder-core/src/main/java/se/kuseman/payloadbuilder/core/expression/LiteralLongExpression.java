@@ -1,9 +1,10 @@
 package se.kuseman.payloadbuilder.core.expression;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.ILiteralLongExpression;
 
@@ -12,14 +13,14 @@ public class LiteralLongExpression extends LiteralExpression implements ILiteral
 {
     private final long value;
 
-    LiteralLongExpression(String value)
+    public LiteralLongExpression(String value)
     {
         this(Long.parseLong(value));
     }
 
-    LiteralLongExpression(long value)
+    public LiteralLongExpression(long value)
     {
-        super(Type.Long);
+        super(ResolvedType.of(Type.Long));
         this.value = value;
     }
 

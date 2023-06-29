@@ -2,26 +2,32 @@ package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.Map;
 import java.util.Objects;
 
+import org.antlr.v4.runtime.Token;
 import org.apache.commons.lang3.tuple.Pair;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.ObjectVector;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IDereferenceExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
+import se.kuseman.payloadbuilder.core.execution.VectorUtils;
+import se.kuseman.payloadbuilder.core.parser.ParseException;
 
 /** Dereference expression. expression.column reference */
-public class DereferenceExpression implements IDereferenceExpression, HasAlias
+public class DereferenceExpression implements IDereferenceExpression, HasAlias, HasColumnReference
 {
     private final IExpression left;
     private final String right;
@@ -77,7 +83,11 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias
     @Override
     public ColumnReference getColumnReference()
     {
-        return left.getColumnReference();
+        if (left instanceof HasColumnReference)
+        {
+            return ((HasColumnReference) left).getColumnReference();
+        }
+        return null;
     }
 
     @Override
@@ -111,94 +121,113 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias
             throw new IllegalArgumentException("An un-resolved dereference expression cannot be evaluated");
         }
 
+        final int rowCount = input.getRowCount();
         ValueVector leftResult = left.eval(input, context);
 
-        // ValueVector result, extract tuple vector and return column
-        if (resolvedType.getType() == Type.ValueVector)
+        if (leftResult.type()
+                .getType() == Type.Table)
         {
-            if (leftResult.type()
-                    .getType() != Type.TupleVector)
+            IObjectVectorBuilder builder = context.getVectorBuilderFactory()
+                    .getObjectVectorBuilder(resolvedType, rowCount);
+
+            for (int i = 0; i < rowCount; i++)
             {
-                throw new IllegalArgumentException("Expected a tupe vector type in result but got: " + leftResult.type());
-            }
-            return new ValueVector()
-            {
-                @Override
-                public ResolvedType type()
+                if (leftResult.isNull(i))
                 {
-                    return resolvedType;
+                    builder.putNull();
                 }
-
-                @Override
-                public int size()
+                else
                 {
-                    return leftResult.size();
-                }
-
-                @Override
-                public boolean isNull(int row)
-                {
-                    return leftResult.isNull(row);
-                }
-
-                @Override
-                public Object getValue(int row)
-                {
-                    TupleVector vector = (TupleVector) leftResult.getValue(row);
+                    TupleVector vector = leftResult.getTable(i);
 
                     int ordinal = DereferenceExpression.this.ordinal;
                     if (ordinal < 0)
                     {
-                        ordinal = getOrdinalInternal(vector.getSchema(), right).getValue();
+                        ordinal = getOrdinalInternal(vector.getSchema(), right, null, false).getValue();
                         if (ordinal < 0)
                         {
-                            return ValueVector.literalNull(ResolvedType.of(Type.Any), 0);
+                            builder.put(ValueVector.literalNull(ResolvedType.of(Type.Any), 0));
+                            continue;
                         }
                     }
 
-                    return vector.getColumn(ordinal);
+                    builder.put(vector.getColumn(ordinal));
                 }
-            };
+            }
+            return builder.build();
+        }
+        else if (leftResult.type()
+                .getType() == Type.Object)
+        {
+            IValueVectorBuilder builder = context.getVectorBuilderFactory()
+                    .getValueVectorBuilder(resolvedType, rowCount);
+
+            Schema schema = leftResult.type()
+                    .getSchema();
+
+            for (int i = 0; i < rowCount; i++)
+            {
+                if (leftResult.isNull(i))
+                {
+                    builder.putNull();
+                }
+                else
+                {
+                    int ordinal = this.ordinal;
+                    if (ordinal < 0)
+                    {
+                        // Asterisk schema, resolve
+                        Pair<Column, Integer> pair = getOrdinalInternal(schema, right, null, false);
+                        if (pair.getKey() == null)
+                        {
+                            builder.putNull();
+                            continue;
+                        }
+                        ordinal = pair.getValue();
+                    }
+
+                    ObjectVector object = leftResult.getObject(i);
+                    ValueVector value = object.getValue(ordinal);
+                    builder.put(value, object.getRow());
+                }
+            }
+            return builder.build();
         }
 
-        // Unknown result, PLB only supports Map's at the moment
-        return new ValueVector()
+        IObjectVectorBuilder builder = context.getVectorBuilderFactory()
+                .getObjectVectorBuilder(resolvedType, rowCount);
+
+        for (int i = 0; i < rowCount; i++)
         {
-            @Override
-            public ResolvedType type()
+            if (leftResult.isNull(i))
             {
-                return resolvedType;
+                builder.putNull();
             }
-
-            @Override
-            public int size()
+            else
             {
-                return leftResult.size();
-            }
-
-            @Override
-            public boolean isNull(int row)
-            {
-                return getValue(row) == null;
-            }
-
-            @SuppressWarnings("unchecked")
-            @Override
-            public Object getValue(int row)
-            {
-                Object value = leftResult.getValue(row);
-                if (value == null)
+                Object value = VectorUtils.convert(leftResult.getAny(i));
+                if (value instanceof ObjectVector)
                 {
-                    return null;
+                    ObjectVector object = (ObjectVector) value;
+                    Pair<Column, Integer> pair = getOrdinalInternal(object.getSchema(), right, null, false);
+                    if (pair.getKey() == null)
+                    {
+                        builder.putNull();
+                    }
+                    else
+                    {
+                        ValueVector objectValue = object.getValue(pair.getValue());
+                        builder.put(objectValue, object.getRow());
+                    }
                 }
-                else if (value instanceof Map)
+                else
                 {
-                    return ((Map<String, Object>) value).get(right);
+                    throw new IllegalArgumentException("Cannot de-reference '" + right + "' from: " + value);
                 }
-
-                throw new IllegalArgumentException("Cannot de-reference '" + right + "' from: " + value);
             }
-        };
+        }
+
+        return builder.build();
     }
 
     @Override
@@ -207,7 +236,7 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias
         return visitor.visit(this, context);
     }
 
-    private static Pair<Column, Integer> getOrdinalInternal(Schema schema, String right)
+    private static Pair<Column, Integer> getOrdinalInternal(Schema schema, String right, Token token, boolean throwIfNotFound)
     {
         boolean asteriskInSchema = false;
         int size = schema.getSize();
@@ -218,10 +247,8 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias
             Column column = schema.getColumns()
                     .get(i);
 
-            ColumnReference colRef = column.getColumnReference();
             asteriskInSchema = asteriskInSchema
-                    || (colRef != null
-                            && colRef.isAsterisk());
+                    || SchemaUtils.isAsterisk(column);
 
             if (right.equalsIgnoreCase(column.getName()))
             {
@@ -229,6 +256,13 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias
                 ordinal = i;
                 break;
             }
+        }
+
+        if (!asteriskInSchema
+                && match == null
+                && throwIfNotFound)
+        {
+            throw new ParseException("No column found in object named: " + right + ", expected one of: " + schema.getColumns(), token);
         }
 
         return Pair.of(match, asteriskInSchema ? -1
@@ -286,7 +320,7 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias
     }
 
     /** Create a resolved dereference expression. NOTE! Requires that expression is resolved */
-    public static IExpression create(IExpression expression, QualifiedName qname)
+    public static IExpression create(IExpression expression, QualifiedName qname, Token token)
     {
         IExpression result = expression;
         // Create nested dereference for all parts in qname
@@ -301,18 +335,28 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias
 
             // Resolve this de-reference ordinal and type
             ResolvedType type = result.getType();
-            if (type.getType() == Type.TupleVector)
+            if (type.getType() == Type.Table)
             {
-                Pair<Column, Integer> pair = getOrdinalInternal(type.getSchema(), part);
+                Pair<Column, Integer> pair = getOrdinalInternal(type.getSchema(), part, token, true);
                 ordinal = pair.getValue();
                 if (pair.getKey() != null)
                 {
-                    resolvedType = ResolvedType.valueVector(pair.getKey()
+                    resolvedType = ResolvedType.array(pair.getKey()
                             .getType());
                 }
                 else
                 {
-                    resolvedType = ResolvedType.valueVector(resolvedType);
+                    resolvedType = ResolvedType.array(resolvedType);
+                }
+            }
+            else if (type.getType() == Type.Object)
+            {
+                Pair<Column, Integer> pair = getOrdinalInternal(type.getSchema(), part, token, true);
+                ordinal = pair.getValue();
+                if (pair.getKey() != null)
+                {
+                    resolvedType = pair.getKey()
+                            .getType();
                 }
             }
 

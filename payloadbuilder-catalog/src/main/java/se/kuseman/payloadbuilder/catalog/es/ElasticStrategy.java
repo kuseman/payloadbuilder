@@ -1,15 +1,15 @@
 package se.kuseman.payloadbuilder.catalog.es;
 
-import org.apache.http.client.methods.HttpRequestBase;
+import org.apache.hc.core5.http.ClassicHttpRequest;
 
 /** Strategy used when building queryies etc. Different strategies are used for different elastic versions */
 interface ElasticStrategy
 {
     /** Return scroll request from provided parts */
-    HttpRequestBase getScrollRequest(String endpoint, String scrollId);
+    ClassicHttpRequest getScrollRequest(String endpoint, String scrollId);
 
     /** Return delete scroll request from provided parts */
-    HttpRequestBase getDeleteScrollRequest(String endpoint, String scrollId);
+    ClassicHttpRequest getDeleteScrollRequest(String endpoint, String scrollId);
 
     /** Returns whether this elastic supports the filter clause in boolean queries or not */
     boolean supportsFilterInBoolQuery();

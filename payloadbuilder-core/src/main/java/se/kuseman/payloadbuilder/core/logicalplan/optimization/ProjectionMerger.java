@@ -71,7 +71,7 @@ class ProjectionMerger
                 outputAlias = outer.toString();
             }
 
-            IExpression outerResult = outer.accept(ExpressionReplacer.INSTANCE, context);
+            IExpression outerResult = ExpressionReplacer.INSTANCE.visit(outer, context);
 
             // We know that the result cannot be an alias expression since we have unwrapped all of those
             // before replacing
@@ -91,7 +91,6 @@ class ProjectionMerger
             else
             {
                 result.add(outerResult);
-
             }
         }
 

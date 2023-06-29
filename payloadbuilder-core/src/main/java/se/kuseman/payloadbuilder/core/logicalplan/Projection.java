@@ -7,13 +7,16 @@ import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.lang3.StringUtils;
+
 import se.kuseman.payloadbuilder.api.catalog.Column;
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.utils.StringUtils;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.expression.HasAlias;
+import se.kuseman.payloadbuilder.core.expression.HasColumnReference;
 
 /** Projects input with a list of expressions */
 public class Projection implements ILogicalPlan
@@ -72,8 +75,12 @@ public class Projection implements ILogicalPlan
                 outputName = expression.toString();
             }
             ResolvedType type = expression.getType();
-            ColumnReference columnReference = expression.getColumnReference();
-            columns.add(new Column(name, outputName, type, columnReference, expression.isInternal()));
+            ColumnReference columnReference = null;
+            if (expression instanceof HasColumnReference)
+            {
+                columnReference = ((HasColumnReference) expression).getColumnReference();
+            }
+            columns.add(CoreColumn.of(name, type, outputName, expression.isInternal(), columnReference));
         }
 
         if (appendInputColumns)
@@ -116,18 +123,9 @@ public class Projection implements ILogicalPlan
         else if (obj instanceof Projection)
         {
             Projection that = (Projection) obj;
-            boolean b = input.equals(that.input)
+            return input.equals(that.input)
                     && expressions.equals(that.expressions)
                     && appendInputColumns == that.appendInputColumns;
-
-            if (!b)
-            {
-                System.out.println(this);
-                System.out.println(that);
-
-            }
-
-            return b;
         }
         return false;
     }

@@ -2,8 +2,8 @@ package se.kuseman.payloadbuilder.core.statement;
 
 import static java.util.Objects.requireNonNull;
 
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 
 /** Logical select statement. Statement in the planning phase. Will be transformed in to a {@link PhysicalSelectStatement} further down the lane */

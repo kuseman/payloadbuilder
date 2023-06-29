@@ -7,14 +7,14 @@ import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVectorAdapter;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.ICastExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
-import se.kuseman.payloadbuilder.api.utils.VectorUtils;
+import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
+import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 
 /** Explicit cast operator/expression */
 public class CastExpression implements ICastExpression
@@ -27,16 +27,24 @@ public class CastExpression implements ICastExpression
     {
         this.expression = requireNonNull(expression, "expression");
         this.type = requireNonNull(type, "type");
+
         if (type.getType()
                 .isComplex())
         {
-            throw new IllegalArgumentException("Cannot cast to complex types");
+            if (type.getType() != Type.Array)
+            {
+                throw new IllegalArgumentException("Cannot cast to complex types");
+            }
+            if (type.getType() == Type.Array
+                    && type.getSubType()
+                            .getType() != Type.Any)
+            {
+                throw new IllegalArgumentException("Cannot only cast to Any arrays types");
+            }
         }
-        else if (type.getType() == Type.ValueVector
-                && type.getSubType()
-                        .getType() != Type.Any)
+        else if (type.getType() == Type.Any)
         {
-            throw new IllegalArgumentException("Cannot only cast to Any arrays types");
+            throw new IllegalArgumentException("Cannot cast to " + Type.Any);
         }
     }
 
@@ -53,6 +61,54 @@ public class CastExpression implements ICastExpression
     }
 
     @Override
+    public IExpression fold()
+    {
+        if (expression.isConstant())
+        {
+            ValueVector eval = eval(null);
+
+            if (eval.isNull(0))
+            {
+                return new LiteralNullExpression(type);
+            }
+
+            // CSOFF
+            switch (type.getType())
+            // CSON
+            {
+                case Array:
+                    return new LiteralArrayExpression(eval.getArray(0));
+                case Boolean:
+                    return eval.getBoolean(0) ? LiteralBooleanExpression.TRUE
+                            : LiteralBooleanExpression.FALSE;
+                case DateTime:
+                    return new LiteralDateTimeExpression(eval.getDateTime(0));
+                case DateTimeOffset:
+                    return new LiteralDateTimeOffsetExpression(eval.getDateTimeOffset(0));
+                case Decimal:
+                    return new LiteralDecimalExpression(eval.getDecimal(0));
+                case Double:
+                    return new LiteralDoubleExpression(eval.getDouble(0));
+                case Float:
+                    return new LiteralFloatExpression(eval.getFloat(0));
+                case Int:
+                    return new LiteralIntegerExpression(eval.getInt(0));
+                case Long:
+                    return new LiteralLongExpression(eval.getLong(0));
+                case String:
+                    return new LiteralStringExpression(eval.getString(0));
+                case Object:
+                case Table:
+                case Any:
+                    throw new IllegalArgumentException("Cannot cast to " + eval.type()
+                            .getType());
+                // NOTE!! No default case here
+            }
+        }
+        return this;
+    }
+
+    @Override
     public ValueVector eval(TupleVector input, IExecutionContext context)
     {
         final ValueVector value = expression.eval(input, context);
@@ -64,9 +120,15 @@ public class CastExpression implements ICastExpression
             return value;
         }
 
-        // Use implicit casts in ValueVector
+        // Use implicit casts in ValueVector for simple types
         return new ValueVectorAdapter(value)
         {
+            @Override
+            public int size()
+            {
+                return input.getRowCount();
+            }
+
             @Override
             public ResolvedType type()
             {
@@ -74,19 +136,21 @@ public class CastExpression implements ICastExpression
             }
 
             @Override
-            public Object getValue(int row)
+            public ValueVector getArray(int row)
             {
-                // Convert value to ValueVector
-                if (type.getType() == Type.ValueVector)
+                // Implicit cast
+                if (type.getType() != Type.Array)
                 {
-                    Object obj = value.valueAsObject(row);
-                    if (obj instanceof ValueVector)
-                    {
-                        return obj;
-                    }
-                    return VectorUtils.convertToValueVector(obj);
+                    return super.getArray(row);
                 }
-                return super.getValue(row);
+
+                // Convert value to ValueVector
+                Object obj = value.valueAsObject(row);
+                if (obj instanceof ValueVector)
+                {
+                    return (ValueVector) obj;
+                }
+                return VectorUtils.convertToValueVector(obj);
             }
         };
     }

@@ -15,24 +15,25 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 
 import org.apache.commons.io.FileUtils;
 
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.EpochDateTime;
 import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
-import se.kuseman.payloadbuilder.api.catalog.ObjectTupleVector;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.UTF8String;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Catalog providing file system functionality */
@@ -54,63 +55,62 @@ public class FilesystemCatalog extends Catalog
     public FilesystemCatalog()
     {
         super("Filesystem");
-        registerFunction(new ListFunction(this));
-        registerFunction(new FileFunction(this));
-        registerFunction(new ContentsFunction(this));
+        registerFunction(new ListFunction());
+        registerFunction(new FileFunction());
+        registerFunction(new ContentsFunction());
     }
 
     /** File function */
     private static class FileFunction extends TableFunctionInfo
     {
-        FileFunction(Catalog catalog)
+        FileFunction()
         {
-            super(catalog, "file");
+            super("file");
         }
 
         @Override
-        public Schema getSchema(List<? extends IExpression> arguments)
+        public Schema getSchema(List<IExpression> arguments)
         {
             return SCHEMA;
         }
 
         @Override
-        public int arity()
+        public Arity arity()
         {
-            return 1;
+            return Arity.ONE;
         }
 
         @Override
-        public TupleIterator execute(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments, IDatasourceOptions options)
+        public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, IDatasourceOptions options)
         {
-            Object obj = arguments.get(0)
+            ValueVector value = arguments.get(0)
                     .eval(context);
-            if (obj == null)
+            if (value.isNull(0))
             {
                 return TupleIterator.EMPTY;
             }
-            String strPath = String.valueOf(obj);
+            String strPath = value.valueAsString(0);
             Path path = FileSystems.getDefault()
                     .getPath(strPath);
             Object[] values = ListFunction.fromPath(path);
-            return TupleIterator.singleton(new ObjectTupleVector(SCHEMA, 1, (row, col) -> values[col]));
+            return TupleIterator.singleton(new ObjectTupleVector(schema.get(), 1, (row, col) -> values[col]));
         }
     }
 
     /** Contents function, outputs path contents as string */
     private static class ContentsFunction extends ScalarFunctionInfo
     {
-        ContentsFunction(Catalog catalog)
+        ContentsFunction()
         {
-            super(catalog, "contents", FunctionType.SCALAR);
+            super("contents", FunctionType.SCALAR);
         }
 
         @Override
-        public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+        public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
         {
             final ValueVector value = arguments.get(0)
                     .eval(input, context);
             final int size = input.getRowCount();
-            final boolean nullable = value.isNullable();
             return new ValueVector()
             {
                 @Override
@@ -126,19 +126,13 @@ public class FilesystemCatalog extends Catalog
                 }
 
                 @Override
-                public boolean isNullable()
-                {
-                    return nullable;
-                }
-
-                @Override
                 public boolean isNull(int row)
                 {
                     return value.isNull(row);
                 }
 
                 @Override
-                public Object getValue(int row)
+                public Object getAny(int row)
                 {
                     String strPath = String.valueOf(value.getString(row)
                             .toString());
@@ -186,24 +180,23 @@ public class FilesystemCatalog extends Catalog
     /** List function. Traverses a path */
     private static class ListFunction extends TableFunctionInfo
     {
-        ListFunction(Catalog catalog)
+        ListFunction()
         {
-            super(catalog, "list");
+            super("list");
         }
 
         @Override
-        public Schema getSchema(List<? extends IExpression> arguments)
+        public Schema getSchema(List<IExpression> arguments)
         {
             return SCHEMA;
         }
 
         @Override
-        public TupleIterator execute(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments, IDatasourceOptions options)
+        public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, IDatasourceOptions options)
         {
             ValueVector value = arguments.get(0)
                     .eval(context);
-            if (value.isNullable()
-                    && value.isNull(0))
+            if (value.isNull(0))
             {
                 return TupleIterator.EMPTY;
             }
@@ -222,8 +215,7 @@ public class FilesystemCatalog extends Catalog
 
             final Iterator<Path> it = getIterator(path, recursive);
 
-            // TODO: batch size option
-            final int batchSize = 500;
+            final int batchSize = options.getBatchSize(context);
 
             return new TupleIterator()
             {
@@ -271,7 +263,7 @@ public class FilesystemCatalog extends Catalog
                             @Override
                             public Schema getSchema()
                             {
-                                return SCHEMA;
+                                return schema.get();
                             }
 
                             @Override
@@ -288,7 +280,8 @@ public class FilesystemCatalog extends Catalog
                                     @Override
                                     public ResolvedType type()
                                     {
-                                        return SCHEMA.getColumns()
+                                        return schema.get()
+                                                .getColumns()
                                                 .get(column)
                                                 .getType();
                                     }
@@ -306,93 +299,18 @@ public class FilesystemCatalog extends Catalog
                                     }
 
                                     @Override
-                                    public Object getValue(int row)
+                                    public Object getAny(int row)
                                     {
                                         return batch.get(row)[column];
                                     }
                                 };
                             }
                         };
-
-                        // next = new ObjectTupleVector(SCHEMA, batch.size(), (row, col) ->
-                        // {
-                        // Object[] values = fromPath(batch.get(row));
-                        // return
-                        // });
-
-                        // next = new TupleVector()
-                        // {
-                        // @Override
-                        // public Schema getSchema()
-                        // {
-                        // return SCHEMA;
-                        // }
-                        //
-                        // @Override
-                        // public int getRowCount()
-                        // {
-                        // return batch.size();
-                        // }
-                        //
-                        // @Override
-                        // public ValueVector getColumn(int column)
-                        // {
-                        // // TODO Auto-generated method stub
-                        // return null;
-                        // }
-                        // };
                     }
                     return true;
                 }
             };
         }
-        //
-        // @Override
-        // public TupleIterator open(IExecutionContext context, String catalogAlias, TableAlias tableAlias, List<? extends IExpression> arguments)
-        // {
-        // Object obj = arguments.get(0)
-        // .eval(context);
-        // if (obj == null)
-        // {
-        // return TupleIterator.EMPTY;
-        // }
-        // String path = String.valueOf(obj);
-        // boolean recursive = false;
-        // if (arguments.size() > 1)
-        // {
-        // recursive = (boolean) arguments.get(1)
-        // .eval(context);
-        // }
-        //
-        // final Iterator<Path> it = getIterator(path, recursive);
-        // // CSOFF
-        // return new TupleIterator()
-        // // CSON
-        // {
-        // @Override
-        // public Row next()
-        // {
-        // Path p = it.next();
-        // return fromPath(tableAlias, p);
-        // }
-        //
-        // @Override
-        // public boolean hasNext()
-        // {
-        // while (true)
-        // {
-        // try
-        // {
-        // return it.hasNext();
-        // }
-        // catch (Exception e)
-        // {
-        // e.printStackTrace();
-        // }
-        // }
-        // }
-        // };
-        // }
 
         static Object[] fromPath(Path path)
         {

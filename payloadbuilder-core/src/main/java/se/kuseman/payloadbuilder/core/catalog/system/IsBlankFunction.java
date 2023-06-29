@@ -2,22 +2,22 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 
 import java.util.List;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.UTF8String;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVectorAdapter;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Returns first item that is not a blank string (null or empty) */
 class IsBlankFunction extends ScalarFunctionInfo
 {
-    IsBlankFunction(Catalog catalog)
+    IsBlankFunction()
     {
-        super(catalog, "isblank", FunctionType.SCALAR);
+        super("isblank", FunctionType.SCALAR);
     }
 
     @Override
@@ -32,46 +32,53 @@ class IsBlankFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public int arity()
+    public Arity arity()
     {
-        return 2;
+        return Arity.TWO;
     }
 
     @Override
-    public ResolvedType getType(List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
-        ResolvedType arg0Type = arguments.get(0)
-                .getType();
-        ResolvedType arg1Type = arguments.get(1)
-                .getType();
-
-        return arg0Type.getType()
-                .getPrecedence() >= arg1Type.getType()
-                        .getPrecedence() ? arg0Type
-                                : arg1Type;
+        return ResolvedType.of(Type.String);
     }
 
     @Override
-    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
     {
-        final ValueVector value = arguments.get(0)
+        ValueVector value = arguments.get(0)
                 .eval(input, context);
-        final ValueVector arg1 = arguments.get(1)
-                .eval(input, context);
+        ValueVector arg1 = null;
 
-        boolean nullable = value.isNullable()
-                || arg1.isNullable();
-        ResolvedType type = getType(arguments);
+        int rowCount = input.getRowCount();
+        IObjectVectorBuilder builder = context.getVectorBuilderFactory()
+                .getObjectVectorBuilder(getType(arguments), rowCount);
 
-        return new ValueVectorAdapter(row ->
+        for (int i = 0; i < rowCount; i++)
         {
-            if (value.isNull(row)
-                    || UTF8String.EMPTY.equals(value.getString(row)))
+            UTF8String str;
+            if (value.isNull(i)
+                    || UTF8String.EMPTY.equals(str = value.getString(i)))
             {
-                return arg1;
+                if (arg1 == null)
+                {
+                    arg1 = arguments.get(1)
+                            .eval(input, context);
+                }
+                if (arg1.isNull(i))
+                {
+                    builder.put(null);
+                }
+                else
+                {
+                    builder.put(arg1.getString(i));
+                }
             }
-
-            return value;
-        }, input.getRowCount(), nullable, type);
+            else
+            {
+                builder.put(str);
+            }
+        }
+        return builder.build();
     }
 }

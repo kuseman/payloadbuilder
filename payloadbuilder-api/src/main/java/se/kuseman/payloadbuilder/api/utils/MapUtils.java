@@ -41,31 +41,4 @@ public class MapUtils
     {
         return new SimpleEntry<>(key, value);
     }
-
-    /**
-     * <pre>
-     * Traverses a map by keys provided. Assumes map type all the way down to parts.size - 1, if not null is returned
-     * </pre>
-     *
-     * @param map Map to traverse
-     * @param startIndex Index to start traverse from in #parts
-     * @param parts Parts to traverse
-     */
-    @SuppressWarnings("unchecked")
-    public static Object traverse(Map<Object, Object> map, int startIndex, String[] parts)
-    {
-        Map<Object, Object> current = map;
-        int size = parts.length;
-        for (int i = startIndex; i < size - 1; i++)
-        {
-            Object o = current.get(parts[i]);
-            if (!(o instanceof Map))
-            {
-                return null;
-            }
-            current = (Map<Object, Object>) o;
-        }
-
-        return current.get(parts[size - 1]);
-    }
 }

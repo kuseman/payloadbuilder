@@ -9,9 +9,9 @@ import java.util.Set;
 
 import org.apache.commons.lang3.tuple.Pair;
 
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzePair;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzeResult;
@@ -188,7 +188,8 @@ class PredicatePushDown extends ALogicalPlanOptimizer<PredicatePushDown.Ctx>
         List<AnalyzePair> pairs = context.extractPushDownPredicate(tableSource);
         if (pairs != null)
         {
-            return new Filter(plan, plan.getTableSource(), AnalyzeResult.getPredicate(pairs));
+            IExpression predicate = AnalyzeResult.getPredicate(pairs);
+            return new Filter(plan, plan.getTableSource(), predicate);
         }
 
         // No predicates was found, just return the input plan since it won't be altered

@@ -8,11 +8,11 @@ import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.EpochDateTime;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
@@ -31,7 +31,7 @@ public class CastExpressionTest extends APhysicalPlanTest
                 Column.of("long", ResolvedType.of(Type.Long)),
                 Column.of("datetime", ResolvedType.of(Type.DateTime)),
                 Column.of("stringInt", ResolvedType.of(Type.String)),
-                Column.of("anyValueVector", ResolvedType.valueVector(Type.Any))
+                Column.of("anyValueVector", ResolvedType.array(Type.Any))
                 );
                 
         TupleVector input = TupleVector.of(schema, asList(
@@ -42,7 +42,7 @@ public class CastExpressionTest extends APhysicalPlanTest
                 vv(Type.Long, 100L, 200L, 300L, 400L),
                 vv(Type.DateTime, EpochDateTime.from("2010-10-10"), EpochDateTime.from("2011-10-10"), EpochDateTime.from("2012-10-10"), EpochDateTime.from("2013-10-10")),
                 vv(Type.String, "1", "2", null, "4"),
-                vv(ResolvedType.valueVector(Type.Any), vv(Type.Int, 1), vv(Type.Long, 2L), null, vv(Type.String, "hello"))
+                vv(ResolvedType.array(Type.Any), vv(Type.Int, 1), vv(Type.Long, 2L), null, vv(Type.String, "hello"))
                 ));
         //@formatter:on
 
@@ -84,29 +84,29 @@ public class CastExpressionTest extends APhysicalPlanTest
             actual = ce.eval(input, context);
             assertVectorsEquals(vv(Type.Int, 100, 200, 300, 400), actual);
         }
-        catch (ClassCastException e)
+        catch (IllegalArgumentException e)
         {
             assertTrue(e.getMessage(), e.getMessage()
-                    .contains("se.kuseman.payloadbuilder.api.catalog.EpochDateTime cannot be cast to java.lang.Number"));
+                    .contains("Cannot cast type DateTime to Int"));
         }
 
         ce = new CastExpression(ce("stringInt"), ResolvedType.of(Type.Int));
         actual = ce.eval(input, context);
         assertVectorsEquals(vv(Type.Int, 1, 2, null, 4), actual);
 
-        // Cast to value vector
-        ce = new CastExpression(ce("stringInt"), ResolvedType.valueVector(Type.Any));
+        // Cast to array
+        ce = new CastExpression(ce("stringInt"), ResolvedType.array(Type.Any));
         actual = ce.eval(input, context);
-        assertVectorsEquals(vv(ResolvedType.valueVector(Type.Any), vv(ResolvedType.of(Type.Any), "1"), vv(ResolvedType.of(Type.Any), "2"), null, vv(ResolvedType.of(Type.Any), "4")), actual);
+        assertVectorsEquals(vv(ResolvedType.array(Type.Any), vv(ResolvedType.of(Type.Any), "1"), vv(ResolvedType.of(Type.Any), "2"), null, vv(ResolvedType.of(Type.Any), "4")), actual);
 
         // Cast to value vector
-        ce = new CastExpression(ce("stringInt"), ResolvedType.valueVector(Type.Any));
+        ce = new CastExpression(ce("stringInt"), ResolvedType.array(Type.Any));
         actual = ce.eval(input, context);
-        assertVectorsEquals(vv(ResolvedType.valueVector(Type.Any), vv(ResolvedType.of(Type.Any), "1"), vv(ResolvedType.of(Type.Any), "2"), null, vv(ResolvedType.of(Type.Any), "4")), actual);
+        assertVectorsEquals(vv(ResolvedType.array(Type.Any), vv(ResolvedType.of(Type.Any), "1"), vv(ResolvedType.of(Type.Any), "2"), null, vv(ResolvedType.of(Type.Any), "4")), actual);
 
         // Cast to value vector
-        ce = new CastExpression(ce("anyValueVector"), ResolvedType.valueVector(Type.Any));
+        ce = new CastExpression(ce("anyValueVector"), ResolvedType.array(Type.Any));
         actual = ce.eval(input, context);
-        assertVectorsEquals(vv(ResolvedType.valueVector(Type.Any), vv(ResolvedType.of(Type.Int), 1), vv(ResolvedType.of(Type.Long), 2L), null, vv(ResolvedType.of(Type.String), "hello")), actual);
+        assertVectorsEquals(vv(ResolvedType.array(Type.Any), vv(ResolvedType.of(Type.Int), 1), vv(ResolvedType.of(Type.Long), 2L), null, vv(ResolvedType.of(Type.String), "hello")), actual);
     }
 }

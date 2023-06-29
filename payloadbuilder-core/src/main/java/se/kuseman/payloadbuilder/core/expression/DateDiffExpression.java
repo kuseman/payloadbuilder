@@ -8,9 +8,9 @@ import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IDateDiffExpression;
 import se.kuseman.payloadbuilder.api.expression.IDatePartExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
@@ -87,13 +87,6 @@ public class DateDiffExpression implements IDateDiffExpression
             }
 
             @Override
-            public boolean isNullable()
-            {
-                return start.isNullable()
-                        || end.isNullable();
-            }
-
-            @Override
             public boolean isNull(int row)
             {
                 return start.isNull(row)
@@ -103,19 +96,13 @@ public class DateDiffExpression implements IDateDiffExpression
             @Override
             public long getLong(int row)
             {
-                ZonedDateTime startDateTime = start.getDateTime(row)
-                        .toZonedDateTime();
-                ZonedDateTime endDateTime = end.getDateTime(row)
-                        .toZonedDateTime();
+                ZonedDateTime startDateTime = start.getDateTimeOffset(row)
+                        .getZonedDateTime();
+                ZonedDateTime endDateTime = end.getDateTimeOffset(row)
+                        .getZonedDateTime();
                 return part.getChronoField()
                         .getBaseUnit()
                         .between(startDateTime, endDateTime);
-            }
-
-            @Override
-            public Object getValue(int row)
-            {
-                throw new IllegalArgumentException("getValue should not be called on typed vectors");
             }
         };
     }

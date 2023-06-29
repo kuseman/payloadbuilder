@@ -10,25 +10,29 @@ import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
-import se.kuseman.payloadbuilder.api.catalog.Column;
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
+import org.apache.commons.lang3.time.DurationFormatUtils;
+
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVectorAdapter;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.NodeData;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.utils.StringUtils;
-import se.kuseman.payloadbuilder.api.utils.VectorUtils;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
 import se.kuseman.payloadbuilder.core.execution.StatementContext;
+import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
+import se.kuseman.payloadbuilder.core.execution.VectorUtils;
+import se.kuseman.payloadbuilder.core.execution.vector.BufferAllocator;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.HasAlias;
+import se.kuseman.payloadbuilder.core.expression.HasColumnReference;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
@@ -45,7 +49,6 @@ public class HashAggregate implements IPhysicalPlan
     private final List<IAggregateExpression> projectionExpressions;
     private final List<IExpression> aggregateExpressions;
     private final boolean hasAsteriskProjections;
-    private final boolean hasAsteriskAggregations;
 
     public HashAggregate(int nodeId, IPhysicalPlan input, List<IExpression> aggregateExpressions, List<IAggregateExpression> projectionExpressions)
     {
@@ -54,13 +57,28 @@ public class HashAggregate implements IPhysicalPlan
         this.projectionExpressions = requireNonNull(projectionExpressions, "projectionExpressions");
         this.aggregateExpressions = requireNonNull(aggregateExpressions, "aggregateExpressions");
         this.hasAsteriskProjections = projectionExpressions.stream()
-                .anyMatch(e -> e.getColumnReference() != null
-                        && e.getColumnReference()
-                                .isAsterisk());
-        this.hasAsteriskAggregations = aggregateExpressions.stream()
-                .anyMatch(e -> e.getColumnReference() != null
-                        && e.getColumnReference()
-                                .isAsterisk());
+                .anyMatch(e ->
+                {
+                    if (e instanceof HasColumnReference)
+                    {
+                        ColumnReference colRef = ((HasColumnReference) e).getColumnReference();
+                        if (colRef != null
+                                && colRef.isAsterisk())
+                        {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                });
+
+        if ((aggregateExpressions.isEmpty()
+                && !projectionExpressions.isEmpty())
+                || (!aggregateExpressions.isEmpty()
+                        && projectionExpressions.isEmpty()))
+        {
+            throw new IllegalArgumentException("Both aggregate and projection expressions must be empty or not empty");
+        }
     }
 
     @Override
@@ -72,15 +90,27 @@ public class HashAggregate implements IPhysicalPlan
     @Override
     public String getName()
     {
-        return "Hash Aggregate";
+        return aggregateExpressions.isEmpty() ? "Hash Distinct"
+                : "Hash Aggregate";
     }
 
     @Override
     public Map<String, Object> getDescribeProperties(IExecutionContext context)
     {
+        Data data = context.getStatementContext()
+                .getNodeData(nodeId);
+        long hashTime = data != null ? data.hashTime
+                : 0;
+
+        Schema schema = getSchema();
+        if (aggregateExpressions.isEmpty())
+        {
+            return ofEntries(true, entry(IDatasource.OUTPUT, DescribeUtils.getOutputColumns(schema)), entry("Hash time", DurationFormatUtils.formatDurationHMS(hashTime)));
+        }
+
         return ofEntries(true, entry("Group By", aggregateExpressions.stream()
                 .map(e -> e.toString())
-                .collect(toList())), entry(IDatasource.OUTPUT, DescribeUtils.getOutputColumns(createSchema())), entry(IDatasource.DEFINED_VALUES,
+                .collect(toList())), entry(IDatasource.OUTPUT, DescribeUtils.getOutputColumns(schema)), entry(IDatasource.DEFINED_VALUES,
                         projectionExpressions.stream()
                                 .filter(e -> e instanceof AggregateWrapperExpression
                                         && ((AggregateWrapperExpression) e).isInternal())
@@ -105,17 +135,18 @@ public class HashAggregate implements IPhysicalPlan
 
                                     return alias + ": " + ee.toString();
                                 })
-                                .collect(joining(", "))));
+                                .collect(joining(", "))),
+                entry("Hash time", DurationFormatUtils.formatDurationHMS(hashTime)));
     }
 
     @Override
     public Schema getSchema()
     {
-        if (hasAsteriskProjections)
+        if (projectionExpressions.isEmpty())
         {
-            return Schema.EMPTY;
+            return input.getSchema();
         }
-        return ProjectionUtils.createSchema(Schema.EMPTY, projectionExpressions, false);
+        return ProjectionUtils.createSchema(Schema.EMPTY, projectionExpressions, false, true);
     }
 
     @Override
@@ -125,25 +156,45 @@ public class HashAggregate implements IPhysicalPlan
         TupleVector outerTupleVector = ((StatementContext) context.getStatementContext()).getOuterTupleVector();
         // CSON
         TupleIterator iterator = input.execute(context);
-        final TupleVector all = PlanUtils.concat(iterator);
+        final TupleVector all = PlanUtils.concat(new BufferAllocator(), iterator);
         if (all.getRowCount() == 0)
         {
             return TupleIterator.EMPTY;
         }
 
-        Schema outerSchema = outerTupleVector != null ? outerTupleVector.getSchema()
-                : null;
-
-        List<? extends IExpression> actualExpressions = hasAsteriskAggregations ? ProjectionUtils.expandExpressions(aggregateExpressions, outerSchema, all.getSchema())
-                : aggregateExpressions;
-
-        int size = actualExpressions.size();
-        ValueVector[] vectors = new ValueVector[size];
-
-        for (int i = 0; i < size; i++)
+        // CSOFF
+        Data data = context.getStatementContext()
+                .getOrCreateNodeData(nodeId, () -> new Data());
+        long start = System.nanoTime();
+        // CSON
+        Schema outerSchema = null;
+        ValueVector[] vectors;
+        if (!aggregateExpressions.isEmpty())
         {
-            vectors[i] = actualExpressions.get(i)
-                    .eval(all, context);
+            outerSchema = outerTupleVector != null ? outerTupleVector.getSchema()
+                    : null;
+
+            List<? extends IExpression> actualExpressions = aggregateExpressions;
+            int size = actualExpressions.size();
+            vectors = new ValueVector[size];
+
+            for (int i = 0; i < size; i++)
+            {
+                vectors[i] = actualExpressions.get(i)
+                        .eval(all, context);
+            }
+        }
+        else
+        {
+            // Aggregate whole input
+            int size = all.getSchema()
+                    .getSize();
+            vectors = new ValueVector[size];
+
+            for (int i = 0; i < size; i++)
+            {
+                vectors[i] = all.getColumn(i);
+            }
         }
 
         // We use a map-impl. with a custom hash/equals strategy to be able to eliminate
@@ -164,6 +215,7 @@ public class HashAggregate implements IPhysicalPlan
             }
         });
 
+        // Fill table and group rows
         int rowCount = all.getRowCount();
         for (int i = 0; i < rowCount; i++)
         {
@@ -172,26 +224,65 @@ public class HashAggregate implements IPhysicalPlan
                     .add(i);
         }
 
-        List<IntList> groups = new ArrayList<>(table.values());
+        final List<IntList> groups = new ArrayList<>(table.values());
+        final int groupSize = groups.size();
 
-        actualExpressions = hasAsteriskProjections ? ProjectionUtils.expandExpressions(projectionExpressions, outerSchema, all.getSchema())
-                : projectionExpressions;
+        Schema s;
+        List<ValueVector> r;
 
-        int projectionSize = actualExpressions.size();
-        List<ValueVector> result = new ArrayList<>(projectionSize);
-
-        // Create a wrapper value vector that returns a tuple vector for each group
-        GroupsValueVector valueVector = new GroupsValueVector(all, groups);
-
-        // Evaluate each projection
-        for (int i = 0; i < projectionSize; i++)
+        if (!projectionExpressions.isEmpty())
         {
-            result.add(((IAggregateExpression) actualExpressions.get(i)).eval(valueVector, context));
+            // Create a wrapper value vector that returns a tuple vector for each group
+            GroupsValueVector valueVector = new GroupsValueVector(all, groups);
+
+            List<? extends IExpression> actualExpressions = hasAsteriskProjections ? ProjectionUtils.expandExpressions(projectionExpressions, outerSchema, all.getSchema())
+                    : projectionExpressions;
+
+            int projectionSize = actualExpressions.size();
+            r = new ArrayList<>(projectionSize);
+
+            // Evaluate each projection
+            for (int i = 0; i < projectionSize; i++)
+            {
+                r.add(((IAggregateExpression) actualExpressions.get(i)).eval(valueVector, context));
+            }
+
+            // Create the actual schema from the expressions
+            // TODO: this should done only once in planning if the input schema is static
+            s = ProjectionUtils.createSchema(all.getSchema(), actualExpressions, false, true);
+        }
+        else
+        {
+            // Distinct output from input
+            s = all.getSchema();
+            int size = s.getSize();
+            r = new ArrayList<>(size);
+
+            for (int i = 0; i < size; i++)
+            {
+                r.add(new ValueVectorAdapter(all.getColumn(i))
+                {
+                    @Override
+                    public int size()
+                    {
+                        return groupSize;
+                    };
+
+                    @Override
+                    protected int getRow(int row)
+                    {
+                        // Return the first row from each group
+                        return groups.get(row)
+                                .getInt(0);
+                    };
+                });
+            }
         }
 
-        // Create the actual schema from the expressions
-        // TODO: this should done only once in planning if the input schema is static
-        final Schema schema = ProjectionUtils.createSchema(all.getSchema(), actualExpressions, false);
+        data.hashTime = TimeUnit.MILLISECONDS.convert(System.nanoTime() - start, TimeUnit.NANOSECONDS);
+
+        final Schema schema = s;
+        final List<ValueVector> result = r;
 
         // We only have one resulting vector from an aggregate
         return TupleIterator.singleton(new TupleVector()
@@ -205,7 +296,7 @@ public class HashAggregate implements IPhysicalPlan
             @Override
             public int getRowCount()
             {
-                return groups.size();
+                return groupSize;
             }
 
             @Override
@@ -259,35 +350,18 @@ public class HashAggregate implements IPhysicalPlan
     @Override
     public String toString()
     {
+        if (aggregateExpressions.isEmpty())
+        {
+            return "Distinct (" + nodeId + ")";
+        }
+
         return "HashAggregate (" + nodeId + "), on: " + aggregateExpressions + ", projection: " + projectionExpressions;
     }
 
-    private Schema createSchema()
+    /** Node data */
+    static class Data extends NodeData
     {
-        int size = projectionExpressions.size();
-        List<Column> columns = new ArrayList<>(size);
-        for (int i = 0; i < size; i++)
-        {
-            IAggregateExpression e = projectionExpressions.get(i);
-            String name = "";
-            String outputName = "";
-            if (e instanceof HasAlias)
-            {
-                HasAlias.Alias alias = ((HasAlias) e).getAlias();
-                name = alias.getAlias();
-                outputName = alias.getOutputAlias();
-            }
-
-            if (StringUtils.isBlank(name))
-            {
-                outputName = e.toString();
-            }
-
-            ResolvedType type = e.getType();
-            ColumnReference colRef = e.getColumnReference();
-            columns.add(new Column(name, outputName, type, colRef, e.isInternal()));
-        }
-        return new Schema(columns);
+        long hashTime;
     }
 
     /** Value vector that has all grouped rows as separate TupleVector's used by {@link IAggregateFunction}'s to evaluate result */
@@ -311,7 +385,7 @@ public class HashAggregate implements IPhysicalPlan
         @Override
         public ResolvedType type()
         {
-            return ResolvedType.tupleVector(vector.getSchema());
+            return ResolvedType.table(vector.getSchema());
         }
 
         @Override
@@ -321,13 +395,7 @@ public class HashAggregate implements IPhysicalPlan
         }
 
         @Override
-        public boolean isNullable()
-        {
-            return false;
-        }
-
-        @Override
-        public Object getValue(int row)
+        public TupleVector getTable(int row)
         {
             // Return a tuple vector for row's group
             final IntList group = groups.get(row);

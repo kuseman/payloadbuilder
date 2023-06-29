@@ -2,19 +2,20 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 
 import static java.util.Arrays.asList;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
-import static se.kuseman.payloadbuilder.test.VectorTestUtils.nvv;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import org.junit.Test;
 
+import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.expression.DereferenceExpression;
 import se.kuseman.payloadbuilder.core.expression.FunctionCallExpression;
 import se.kuseman.payloadbuilder.core.expression.LambdaExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
@@ -24,10 +25,10 @@ public class FlatMapFunctionTest extends APhysicalPlanTest
 {
     private final ScalarFunctionInfo flatMapFunction = SystemCatalog.get()
             .getScalarFunction("flatmap");
-    private final ScalarFunctionInfo listOfFunction = SystemCatalog.get()
-            .getScalarFunction("listof");
-    private final ScalarFunctionInfo toListFunction = SystemCatalog.get()
-            .getScalarFunction("toList");
+    private final ScalarFunctionInfo arrayFunction = SystemCatalog.get()
+            .getScalarFunction("array");
+    private final ScalarFunctionInfo toArrayFunction = SystemCatalog.get()
+            .getScalarFunction("toarray");
 
     @Test
     public void test_iterable_input()
@@ -37,48 +38,88 @@ public class FlatMapFunctionTest extends APhysicalPlanTest
         IExpression input;
         IExpression lambdaExpression;
 
-        // List
+        // Any
         // col is Object of Lists
-        // col: [ [1,2,3], [4,5,6] ]
-        // result: [ [10,20,30], [40,50,60] ]
-        // col.map(x -> x + 10) ==> boom [1,2,3] + 10 invalid
-        // col.map(x -> vector(x).map(y -> y + 10))
-        //
+        // col: [ [1,2,3], [4,null,6], [10] ]
+        // col.flatMap(x -> toarray(x, 10))
+        // result: [ [1,10,2,10,3,10], [4,10,null,10,6,10], [10,10] ]
 
-        tv = TupleVector.of(Schema.of(col("col", Type.Any)), asList(vv(ResolvedType.of(Type.Any), asList(1, 2, 3), asList(4, null, 6), asList(10))));
-        input = new FunctionCallExpression("", toListFunction, null, asList(ce("col", ResolvedType.of(Type.Any), 0)));
-        lambdaExpression = new LambdaExpression(asList("x"), new FunctionCallExpression("", listOfFunction, null, asList(lce("x", 0, ResolvedType.of(Type.Any)), intLit(10))), new int[] { 0 });
+        tv = TupleVector.of(Schema.of(col("col", Type.Any)), asList(vv(ResolvedType.of(Type.Any), asList(1, 2, 3), asList(4, null, 6), null, asList(10))));
+        input = new FunctionCallExpression("", toArrayFunction, null, asList(ce("col", ResolvedType.of(Type.Any), 0)));
+        lambdaExpression = new LambdaExpression(asList("x"), new FunctionCallExpression("", arrayFunction, null, asList(lce("x", 0, ResolvedType.of(Type.Any)), intLit(10))), new int[] { 0 });
         actual = flatMapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
 
-        assertEquals(ResolvedType.valueVector(ResolvedType.of(Type.Any)), flatMapFunction.getType(asList(input, lambdaExpression)));
-        assertEquals(3, actual.size());
-        assertEquals(ResolvedType.valueVector(ResolvedType.of(Type.Any)), actual.type());
-        assertVectorsEquals(nvv(ResolvedType.of(Type.Any), 1, 10, 2, 10, 3, 10), (ValueVector) actual.getValue(0));
-        assertVectorsEquals(nvv(ResolvedType.of(Type.Any), 4, 10, null, 10, 6, 10), (ValueVector) actual.getValue(1));
-        assertVectorsEquals(nvv(ResolvedType.of(Type.Any), 10, 10), (ValueVector) actual.getValue(2));
+        assertEquals(ResolvedType.array(ResolvedType.of(Type.Any)), flatMapFunction.getType(asList(input, lambdaExpression)));
+        assertEquals(4, actual.size());
+        assertEquals(ResolvedType.array(ResolvedType.of(Type.Any)), actual.type());
+        assertVectorsEquals(vv(ResolvedType.of(Type.Any), 1, 10, 2, 10, 3, 10), actual.getArray(0));
+        assertVectorsEquals(vv(ResolvedType.of(Type.Any), 4, 10, null, 10, 6, 10), actual.getArray(1));
+        assertVectorsEquals(vv(ResolvedType.of(Type.Any), null, 10), actual.getArray(2));
+        assertVectorsEquals(vv(ResolvedType.of(Type.Any), 10, 10), actual.getArray(3));
 
         // TupleVector
         Schema innerSchema = Schema.of(col("key1", Type.Int), col("key2", Type.String));
         //@formatter:off
-            tv = TupleVector.of(Schema.of(new Column("col", ResolvedType.tupleVector(innerSchema))), asList(
-                    vv(ResolvedType.tupleVector(innerSchema), 
+            tv = TupleVector.of(Schema.of(new Column("col", ResolvedType.table(innerSchema))), asList(
+                    vv(ResolvedType.table(innerSchema),
                             TupleVector.of(innerSchema, asList(vv(ResolvedType.of(Type.Int), 1, 2, 3), vv(ResolvedType.of(Type.String), "one", "two", "three"))),
                             TupleVector.of(innerSchema, asList(vv(ResolvedType.of(Type.Int), 4, 5, 6), vv(ResolvedType.of(Type.String), "four", "five", "six"))),
                             TupleVector.of(innerSchema, asList(vv(ResolvedType.of(Type.Int), 7, 8, 9), vv(ResolvedType.of(Type.String), "seven", "eight", "nine"))))
                     ));
         //@formatter:on
 
-        input = ce("col", ResolvedType.tupleVector(innerSchema), 0);
-        lambdaExpression = new LambdaExpression(asList("x"), new FunctionCallExpression("", listOfFunction, null, asList(lce("x", 0, ResolvedType.of(Type.String), 1), intLit(10))), new int[] { 0 });
+        input = ce("col", ResolvedType.table(innerSchema), 0);
+        lambdaExpression = new LambdaExpression(asList("x"),
+                new FunctionCallExpression("", arrayFunction, null, asList(DereferenceExpression.create(lce("x", 0, ResolvedType.object(innerSchema)), QualifiedName.of("key2"), null), intLit(10))),
+                new int[] { 0 });
         actual = flatMapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
 
-        assertEquals(ResolvedType.valueVector(ResolvedType.of(Type.Any)), flatMapFunction.getType(asList(input, lambdaExpression)));
+        assertEquals(ResolvedType.array(ResolvedType.of(Type.Any)), flatMapFunction.getType(asList(input, lambdaExpression)));
 
         //@formatter:off
-        assertVectorsEquals(nvv(ResolvedType.valueVector(ResolvedType.of(Type.Any)),
-                nvv(ResolvedType.of(Type.Any), "one", 10, "two", 10, "three", 10),
-                nvv(ResolvedType.of(Type.Any), "four", 10, "five", 10, "six", 10),
-                nvv(ResolvedType.of(Type.Any), "seven", 10, "eight", 10, "nine", 10)
+        assertVectorsEquals(vv(ResolvedType.array(ResolvedType.of(Type.Any)),
+                vv(ResolvedType.of(Type.Any), "one", 10, "two", 10, "three", 10),
+                vv(ResolvedType.of(Type.Any), "four", 10, "five", 10, "six", 10),
+                vv(ResolvedType.of(Type.Any), "seven", 10, "eight", 10, "nine", 10)
+                ), actual);
+        //@formatter:on
+
+        // Any lambda type with mixed single value and arrays
+        //@formatter:off
+        tv = TupleVector.of(Schema.of(Column.of("col", ResolvedType.array(Type.Any))),
+                asList(vv(ResolvedType.array(Type.Any),
+                    vv(ResolvedType.of(Type.Any)),
+                    null,
+                    vv(ResolvedType.of(Type.Any), 1, vv(ResolvedType.of(Type.Any), 2, 3, null, 4))
+                )));
+        //@formatter:on
+        input = ce("col", ResolvedType.array(Type.Any), 0);
+        lambdaExpression = new LambdaExpression(asList("x"), lce("x", 0, ResolvedType.of(Type.Any)), new int[] { 0 });
+        actual = flatMapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
+
+        assertEquals(ResolvedType.array(Type.Any), flatMapFunction.getType(asList(input, lambdaExpression)));
+
+        //@formatter:off
+        assertVectorsEquals(vv(ResolvedType.array(Type.Any),
+                vv(ResolvedType.of(Type.Any)),
+                null,
+                vv(ResolvedType.of(Type.Any), 1, 2, 3, null, 4)
+                ), actual);
+        //@formatter:on
+
+        // Mix of different values as Any
+        tv = TupleVector.of(Schema.of(col("col", Type.Any)), asList(vv(ResolvedType.of(Type.Any), new Object[] { 1, 2, asList(4, 5, 6), null }, "hello", asList(10.11F, 20.22F))));
+        input = ce("col", ResolvedType.of(Type.Any), 0);
+        lambdaExpression = new LambdaExpression(asList("x"), lce("x", 0, ResolvedType.of(Type.Any)), new int[] { 0 });
+        actual = flatMapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
+
+        assertEquals(ResolvedType.of(Type.Any), flatMapFunction.getType(asList(input, lambdaExpression)));
+
+        //@formatter:off
+        assertVectorsEquals(vv(ResolvedType.of(Type.Any),
+                vv(ResolvedType.of(Type.Any), 1, 2, 4, 5, 6, null),
+                "hello",
+                vv(ResolvedType.of(Type.Any), 10.11F, 20.22F)
                 ), actual);
         //@formatter:on
     }
@@ -94,19 +135,19 @@ public class FlatMapFunctionTest extends APhysicalPlanTest
         // Int output, this behaves the same as map since the input is flat already
         tv = TupleVector.of(Schema.of(col("col", Type.Int)), asList(vv(ResolvedType.of(Type.Int), 1, 2, 3, null)));
         input = ce("col", ResolvedType.of(Type.Int), 0);
-        lambdaExpression = new LambdaExpression(asList("x"), new FunctionCallExpression("", listOfFunction, null, asList(lce("x", 0, ResolvedType.of(Type.Int)), intLit(10))), new int[] { 0 });
+        lambdaExpression = new LambdaExpression(asList("x"), new FunctionCallExpression("", arrayFunction, null, asList(lce("x", 0, ResolvedType.of(Type.Int)), intLit(10))), new int[] { 0 });
         actual = flatMapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
 
         // input: [1,2,3,null]
-        // col.flatMap(x -> listOf(x, 10))
+        // col.flatMap(x -> arrayOf(x, 10))
         // output: [ [1,10], [2, 10], [3, 10], [null, 10] ]
 
-        assertEquals(ResolvedType.valueVector(ResolvedType.of(Type.Any)), flatMapFunction.getType(asList(input, lambdaExpression)));
+        assertEquals(ResolvedType.array(ResolvedType.of(Type.Int)), flatMapFunction.getType(asList(input, lambdaExpression)));
         assertEquals(4, actual.size());
-        assertEquals(ResolvedType.valueVector(ResolvedType.of(Type.Any)), actual.type());
-        assertVectorsEquals(nvv(ResolvedType.of(Type.Any), 1, 10), (ValueVector) actual.getValue(0));
-        assertVectorsEquals(nvv(ResolvedType.of(Type.Any), 2, 10), (ValueVector) actual.getValue(1));
-        assertVectorsEquals(nvv(ResolvedType.of(Type.Any), 3, 10), (ValueVector) actual.getValue(2));
-        assertVectorsEquals(vv(ResolvedType.of(Type.Any), null, 10), (ValueVector) actual.getValue(3));
+        assertEquals(ResolvedType.array(ResolvedType.of(Type.Int)), actual.type());
+        assertVectorsEquals(vv(ResolvedType.of(Type.Int), 1, 10), actual.getArray(0));
+        assertVectorsEquals(vv(ResolvedType.of(Type.Int), 2, 10), actual.getArray(1));
+        assertVectorsEquals(vv(ResolvedType.of(Type.Int), 3, 10), actual.getArray(2));
+        assertVectorsEquals(vv(ResolvedType.of(Type.Int), null, 10), actual.getArray(3));
     }
 }

@@ -1,23 +1,21 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import java.util.List;
-import java.util.function.IntFunction;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVectorAdapter;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Returns first non null argument */
 class CoalesceFunction extends ScalarFunctionInfo
 {
-    CoalesceFunction(Catalog catalog)
+    CoalesceFunction()
     {
-        super(catalog, "coalesce", FunctionType.SCALAR);
+        super("coalesce", FunctionType.SCALAR);
     }
 
     @Override
@@ -30,7 +28,7 @@ class CoalesceFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public ResolvedType getType(List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
         // Find the highest precedence return type
         ResolvedType type = arguments.get(0)
@@ -51,43 +49,37 @@ class CoalesceFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
     {
-        final ResolvedType type = getType(arguments);
-        final int size = arguments.size();
+        ResolvedType type = getType(arguments);
+        int size = arguments.size();
+        ValueVector[] values = new ValueVector[size];
+        int rowCount = input.getRowCount();
+        IValueVectorBuilder builder = context.getVectorBuilderFactory()
+                .getValueVectorBuilder(type, rowCount);
 
-        return new ValueVectorAdapter(new IntFunction<ValueVector>()
+        for (int i = 0; i < rowCount; i++)
         {
-            ValueVector[] vectors = new ValueVector[size];
-            ValueVector nullResult;
-
-            @Override
-            public ValueVector apply(int row)
+            boolean allNull = true;
+            for (int j = 0; j < size; j++)
             {
-                for (int i = 0; i < size; i++)
+                if (values[j] == null)
                 {
-                    ValueVector current = vectors[i];
-                    if (current == null)
-                    {
-                        current = arguments.get(i)
-                                .eval(input, context);
-                        vectors[i] = current;
-                    }
-
-                    if (!current.isNullable()
-                            || !current.isNull(row))
-                    {
-                        return current;
-                    }
+                    values[j] = arguments.get(j)
+                            .eval(input, context);
                 }
-
-                if (nullResult == null)
+                if (!values[j].isNull(i))
                 {
-                    nullResult = ValueVector.literalNull(type, size);
+                    allNull = false;
+                    builder.put(values[j], i);
+                    break;
                 }
-                return nullResult;
             }
-
-        }, input.getRowCount(), true, type);
+            if (allNull)
+            {
+                builder.putNull();
+            }
+        }
+        return builder.build();
     }
 }

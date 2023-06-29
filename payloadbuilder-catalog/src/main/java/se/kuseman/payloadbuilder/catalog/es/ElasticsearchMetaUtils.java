@@ -19,14 +19,13 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpStatus;
-import org.apache.http.client.methods.CloseableHttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.util.EntityUtils;
+import org.apache.hc.client5.http.classic.methods.HttpGet;
+import org.apache.hc.core5.http.HttpEntity;
+import org.apache.hc.core5.http.HttpStatus;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 
 /** Utils used to build meta about an elastic search instance */
 class ElasticsearchMetaUtils
@@ -44,7 +43,8 @@ class ElasticsearchMetaUtils
         {
             throw new IllegalArgumentException("Missing endpoint/index in catalog properties with alias: " + catalogAlias);
         }
-        Integer ttl = session.getCatalogProperty(catalogAlias, CACHE_MAPPINGS_TTL, MAPPINGS_CACHE_TTL);
+        int ttl = session.getCatalogProperty(catalogAlias, CACHE_MAPPINGS_TTL, ValueVector.literalInt(MAPPINGS_CACHE_TTL, 1))
+                .getInt(0);
         QualifiedName cacheName = QualifiedName.of(ESCatalog.NAME, endpoint, index);
         return session.getGenericCache()
                 .computIfAbsent(cacheName, "meta", Duration.ofMinutes(ttl), () ->
@@ -201,18 +201,21 @@ class ElasticsearchMetaUtils
     @SuppressWarnings("unchecked")
     private static <T> Map<String, Object> get(IQuerySession session, String catalogAlias, String endpoint, String path)
     {
-        HttpEntity entity = null;
-        HttpGet getAlias = new HttpGet(String.format("%s/%s", endpoint, path));
-        try (CloseableHttpResponse response = execute(session, catalogAlias, getAlias))
-        {
-            entity = response.getEntity();
-            if (response.getStatusLine()
-                    .getStatusCode() != HttpStatus.SC_OK)
-            {
-                throw new RuntimeException("Error query Elastic: " + IOUtils.toString(entity.getContent(), StandardCharsets.UTF_8));
-            }
 
-            return MAPPER.readValue(entity.getContent(), Map.class);
+        HttpGet getAlias = new HttpGet(String.format("%s/%s", endpoint, path));
+        try
+        {
+            return execute(session, catalogAlias, getAlias, response ->
+            {
+                HttpEntity entity = response.getEntity();
+                if (response.getCode() != HttpStatus.SC_OK)
+                {
+                    throw new RuntimeException("Error query Elastic: " + IOUtils.toString(entity.getContent(), StandardCharsets.UTF_8));
+                }
+
+                return MAPPER.readValue(entity.getContent(), Map.class);
+            });
+
         }
         catch (Exception e)
         {
@@ -221,10 +224,6 @@ class ElasticsearchMetaUtils
                 throw (RuntimeException) e;
             }
             throw new RuntimeException("Error query Elastic at: " + endpoint, e);
-        }
-        finally
-        {
-            EntityUtils.consumeQuietly(entity);
         }
     }
 

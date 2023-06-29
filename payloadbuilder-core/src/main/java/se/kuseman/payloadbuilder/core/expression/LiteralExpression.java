@@ -2,16 +2,15 @@ package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Objects.requireNonNull;
 
-import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Base class for literal expressions */
 public abstract class LiteralExpression implements IExpression
 {
-    protected final Type type;
+    protected final ResolvedType type;
 
-    public LiteralExpression(Type type)
+    public LiteralExpression(ResolvedType type)
     {
         this.type = requireNonNull(type);
     }
@@ -19,7 +18,7 @@ public abstract class LiteralExpression implements IExpression
     @Override
     public ResolvedType getType()
     {
-        return ResolvedType.of(type);
+        return type;
     }
 
     @Override

@@ -4,7 +4,7 @@ import java.util.BitSet;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 
 /** {@link ValueVector} implementation based on {@link BitSet} */
 public class BitSetVector implements ValueVector
@@ -35,12 +35,6 @@ public class BitSetVector implements ValueVector
     }
 
     @Override
-    public boolean isNullable()
-    {
-        return nullBs != null;
-    }
-
-    @Override
     public boolean isNull(int row)
     {
         if (nullBs == null)
@@ -57,7 +51,7 @@ public class BitSetVector implements ValueVector
     }
 
     @Override
-    public Object getValue(int row)
+    public Object getAny(int row)
     {
         if (isNull(row))
         {
@@ -106,12 +100,10 @@ public class BitSetVector implements ValueVector
         int size = vector.size();
         BitSet bitSet = new BitSet(size);
         BitSet nullSet = null;
-        boolean isNullable = vector.isNullable();
 
         for (int i = 0; i < size; i++)
         {
-            if (isNullable
-                    && vector.isNull(i))
+            if (vector.isNull(i))
             {
                 if (nullSet == null)
                 {

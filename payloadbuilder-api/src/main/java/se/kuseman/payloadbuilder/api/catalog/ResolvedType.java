@@ -7,7 +7,7 @@ import java.util.Objects;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 
-/** Holder class for a type resolving for an expression. Contains type and other data needed. For example a {@link Column.Type#TupleVector} needs a {@link Schema} */
+/** Holder class for a type resolving for an expression. Contains type and other data needed. For example a {@link Column.Type#Table} needs a {@link Schema} */
 public class ResolvedType
 {
     private static final EnumMap<Type, ResolvedType> CONSTANTS;
@@ -17,8 +17,9 @@ public class ResolvedType
         CONSTANTS = new EnumMap<>(Type.class);
         for (Type type : Type.values())
         {
-            if (!(type == Type.TupleVector
-                    || type == Type.ValueVector))
+            if (!(type == Type.Table
+                    || type == Type.Array
+                    || type == Type.Object))
             {
                 CONSTANTS.put(type, new ResolvedType(type));
             }
@@ -26,7 +27,7 @@ public class ResolvedType
     }
 
     private final Type type;
-    /** Type used do specify the contained type if {@link #type} is {@link Type#ValueVector} */
+    /** Type used do specify the contained type if {@link #type} is {@link Type#Array} */
     private final ResolvedType subType;
     private final Schema schema;
 
@@ -37,15 +38,20 @@ public class ResolvedType
 
     public ResolvedType(Type type, ResolvedType subType, Schema schema)
     {
-        if (type == Type.TupleVector
+        if (type == Type.Table
                 && schema == null)
         {
-            throw new IllegalArgumentException("Must supply schema for a TupleVector type");
+            throw new IllegalArgumentException("Must supply schema for a Table type");
         }
-        if (type == Type.ValueVector
+        else if (type == Type.Object
+                && schema == null)
+        {
+            throw new IllegalArgumentException("Must supply schema for a Object type");
+        }
+        else if (type == Type.Array
                 && subType == null)
         {
-            throw new IllegalArgumentException("Must supply sub type for ValueVector type");
+            throw new IllegalArgumentException("Must supply sub type for Array type");
         }
 
         this.type = requireNonNull(type, "type");
@@ -107,38 +113,45 @@ public class ResolvedType
     /** Return this type as a friendly type string. Resolving all sub types etc. */
     public String toTypeString()
     {
-        if (type != Type.ValueVector)
+        if (type != Type.Array)
         {
             return type.name();
         }
         return "Array<" + subType.toTypeString() + ">";
     }
 
-    /** Create a resolved type of type TupleVector */
-    public static ResolvedType tupleVector(Schema schema)
+    /** Create a resolved type of type Table */
+    public static ResolvedType table(Schema schema)
     {
-        return new ResolvedType(Type.TupleVector, null, schema);
+        return new ResolvedType(Type.Table, null, schema);
     }
 
-    /** Create a resolved type of type ValueVector */
-    public static ResolvedType valueVector(ResolvedType type)
+    /** Create a resolved type of type Object */
+    public static ResolvedType object(Schema schema)
     {
-        return new ResolvedType(Type.ValueVector, type, null);
+        return new ResolvedType(Type.Object, null, schema);
     }
 
-    /** Create a resolved type of type ValueVector */
-    public static ResolvedType valueVector(Type type)
+    /** Create a resolved type of type Array */
+    public static ResolvedType array(ResolvedType type)
     {
-        return new ResolvedType(Type.ValueVector, ResolvedType.of(type), null);
+        return new ResolvedType(Type.Array, type, null);
+    }
+
+    /** Create a resolved type of type Array */
+    public static ResolvedType array(Type type)
+    {
+        return new ResolvedType(Type.Array, ResolvedType.of(type), null);
     }
 
     /** Get resolved type from provided type. Convenience method when non TupleVector type is used */
     public static ResolvedType of(Type type)
     {
-        if (type == Type.TupleVector
-                || type == Type.ValueVector)
+        if (type == Type.Table
+                || type == Type.Array
+                || type == Type.Object)
         {
-            throw new IllegalArgumentException("Must supply schema/sub type for a Value and TupleVector types");
+            throw new IllegalArgumentException("Must supply schema/sub type for a Table/Array/Object types");
         }
 
         return CONSTANTS.get(type);

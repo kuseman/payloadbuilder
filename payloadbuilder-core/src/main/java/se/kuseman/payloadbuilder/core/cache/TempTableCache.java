@@ -4,10 +4,10 @@ import java.time.Duration;
 import java.util.function.Supplier;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
+import se.kuseman.payloadbuilder.core.execution.TemporaryTable;
 
 /** Cache provider for temporary tables */
-public interface TempTableCache extends Cache
+public interface TempTableCache extends CacheProvider
 {
     /**
      * Get temporary table by cache name and key
@@ -18,5 +18,5 @@ public interface TempTableCache extends Cache
      * @param supplier Supplier that is executed if temporary table is not found in cache.
      * @return Cached temporary table
      */
-    TupleVector computIfAbsent(QualifiedName name, Object key, Duration ttl, Supplier<TupleVector> supplier);
+    TemporaryTable computIfAbsent(QualifiedName name, Object key, Duration ttl, Supplier<TemporaryTable> supplier);
 }

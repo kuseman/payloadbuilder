@@ -16,6 +16,8 @@ class TestCase
     /** Filter for only run on schema or shema less */
     private Boolean schemaLess;
 
+    private boolean onlyAssertExpectedColumns;
+
     private List<List<List<ColumnValue>>> expectedResultSets;
     private Class<? extends Exception> expectedException;
     private String expectedMessageContains;
@@ -68,6 +70,16 @@ class TestCase
     void setSchemaLess(Boolean schemaLess)
     {
         this.schemaLess = schemaLess;
+    }
+
+    boolean isOnlyAssertExpectedColumns()
+    {
+        return onlyAssertExpectedColumns;
+    }
+
+    void setOnlyAssertExpectedColumns(boolean onlyAssertExpectedColumns)
+    {
+        this.onlyAssertExpectedColumns = onlyAssertExpectedColumns;
     }
 
     List<List<List<ColumnValue>>> getExpectedResultSets()

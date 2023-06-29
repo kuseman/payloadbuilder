@@ -1,7 +1,9 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
+import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -12,15 +14,16 @@ import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.QuerySession;
 import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.core.common.Option;
 import se.kuseman.payloadbuilder.core.common.SortItem;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.expression.AExpressionTest;
 
 /** Base class for physical plan tests */
@@ -92,7 +95,13 @@ public abstract class APhysicalPlanTest extends AExpressionTest
 
     protected TableScan scan(IDatasource ds, TableSourceReference tableSource, Schema schema)
     {
-        return new TableScan(0, schema, tableSource, false, ds, emptyList());
+        return new TableScan(0, schema, tableSource, "", false, ds, emptyList());
+    }
+
+    protected TableScan scan(IDatasource ds, TableSourceReference tableSource, Schema schema, int batchSize)
+    {
+        List<Option> options = asList(new Option(QualifiedName.of(DatasourceOptions.BATCH_SIZE), intLit(batchSize)));
+        return new TableScan(0, schema, tableSource, "", false, ds, options);
     }
 
     /** Create a schema less datasource with provided vectors. */

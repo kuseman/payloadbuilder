@@ -12,12 +12,13 @@ import java.util.NoSuchElementException;
 
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.StatementContext;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 
@@ -27,9 +28,10 @@ public class Projection implements IPhysicalPlan
     private final int nodeId;
     private final IPhysicalPlan input;
     private final List<IExpression> expressions;
-    private final boolean hasAsteriskExpressions;
     /** True if input column should be appended to output. Used if thie projection is used to computed new values to input */
     private final boolean appendInputColumns;
+    private final Schema schema;
+    private final boolean asteriskSchema;
 
     public Projection(int nodeId, IPhysicalPlan input, List<IExpression> expressions, boolean appendInputColumns)
     {
@@ -37,10 +39,8 @@ public class Projection implements IPhysicalPlan
         this.appendInputColumns = appendInputColumns;
         this.input = requireNonNull(input, "input");
         this.expressions = requireNonNull(expressions, "expressions");
-        this.hasAsteriskExpressions = expressions.stream()
-                .anyMatch(e -> e.getColumnReference() != null
-                        && e.getColumnReference()
-                                .isAsterisk());
+        this.schema = ProjectionUtils.createSchema(input.getSchema(), expressions, appendInputColumns, false);
+        this.asteriskSchema = SchemaUtils.isAsterisk(schema);
     }
 
     @Override
@@ -73,7 +73,7 @@ public class Projection implements IPhysicalPlan
     @Override
     public Schema getSchema()
     {
-        return ProjectionUtils.createSchema(input.getSchema(), expressions, appendInputColumns);
+        return schema;
     }
 
     @Override
@@ -92,25 +92,14 @@ public class Projection implements IPhysicalPlan
                 }
 
                 final TupleVector vector = it.next();
-
-                // if (hasAsteriskExpressions)
-                // {
-                // System.out.println("has asterisk " + expressions
-                // + " "
-                // + nodeId
-                // + " "
-                // + (outerTupleVector != null ? outerTupleVector.getSchema()
-                // : null));
-                // }
-                //
                 Schema outerSchema = outerTupleVector != null ? outerTupleVector.getSchema()
                         : null;
 
-                List<IExpression> actualExpressions = hasAsteriskExpressions ? ProjectionUtils.expandExpressions(expressions, outerSchema, vector.getSchema())
+                List<IExpression> actualExpressions = asteriskSchema ? ProjectionUtils.expandExpressions(expressions, outerSchema, vector.getSchema())
                         : expressions;
                 // Create the actual schema from the expressions
-                // TODO: this should done only once in planning if the input schema is static
-                final Schema schema = ProjectionUtils.createSchema(vector.getSchema(), actualExpressions, appendInputColumns);
+                final Schema schema = asteriskSchema ? ProjectionUtils.createSchema(vector.getSchema(), actualExpressions, appendInputColumns, false)
+                        : Projection.this.schema;
                 final int expressionSize = actualExpressions.size();
                 final ValueVector[] vectors = new ValueVector[expressionSize];
                 for (int i = 0; i < expressionSize; i++)
@@ -141,7 +130,7 @@ public class Projection implements IPhysicalPlan
                             return vectors[column];
                         }
 
-                        // Columns is appended last return column from vecor
+                        // Columns is appended last return column from vector
                         return vector.getColumn(column - expressionSize);
                     }
                 };

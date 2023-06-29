@@ -2,20 +2,18 @@ package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Objects.requireNonNull;
 
-import java.util.BitSet;
-
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.UTF8String;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IBooleanVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
-import se.kuseman.payloadbuilder.api.utils.ExpressionMath;
-import se.kuseman.payloadbuilder.core.physicalplan.BitSetVector;
+import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 
 /** Comparison expression */
-public class ComparisonExpression extends ABinaryExpression implements IComparisonExpression
+public class ComparisonExpression extends ABinaryExpression implements IComparisonExpression, Invertable
 {
     private final IComparisonExpression.Type type;
 
@@ -44,46 +42,97 @@ public class ComparisonExpression extends ABinaryExpression implements IComparis
     }
 
     @Override
-    ValueVector eval(ValueVector lvv, ValueVector rvv)
+    public IExpression getInvertedExpression()
+    {
+        return new ComparisonExpression(type.getInvertedType(), left, right);
+    }
+
+    @Override
+    public IExpression fold()
+    {
+        boolean lconstant = left.isConstant();
+        boolean rconstant = right.isConstant();
+
+        if (lconstant
+                && rconstant)
+        {
+            ValueVector l = left.eval(null);
+            ValueVector r = right.eval(null);
+            Column.Type resultType = getResultType(l, r);
+
+            if (l.isNull(0)
+                    || r.isNull(0))
+            {
+                return new LiteralNullExpression(ResolvedType.of(Column.Type.Boolean));
+            }
+
+            return compare(l, r, resultType, 0) ? LiteralBooleanExpression.TRUE
+                    : LiteralBooleanExpression.FALSE;
+        }
+
+        return this;
+    }
+
+    @Override
+    ValueVector eval(IExecutionContext context, int rowCount, ValueVector lvv, ValueVector rvv)
+    {
+        Column.Type resultType = getResultType(lvv, rvv);
+        IBooleanVectorBuilder builder = context.getVectorBuilderFactory()
+                .getBooleanVectorBuilder(rowCount);
+        for (int row = 0; row < rowCount; row++)
+        {
+            boolean isNull = lvv.isNull(row)
+                    || rvv.isNull(row);
+            if (isNull)
+            {
+                builder.putNull();
+            }
+            else
+            {
+                boolean result = compare(lvv, rvv, resultType, row);
+                builder.put(result);
+            }
+        }
+
+        return builder.build();
+    }
+
+    private Column.Type getResultType(ValueVector lvv, ValueVector rvv)
     {
         // Determine which type to use for vectors
         Column.Type leftType = lvv.type()
                 .getType();
         Column.Type rightType = rvv.type()
                 .getType();
-        Column.Type resultType = leftType;
-        if (rightType.getPrecedence() > resultType.getPrecedence())
+        return rightType.getPrecedence() > leftType.getPrecedence() ? rightType
+                : leftType;
+    }
+
+    private boolean compare(ValueVector left, ValueVector right, Column.Type resultType, int row)
+    {
+        if (type == Type.EQUAL)
         {
-            resultType = rightType;
+            return VectorUtils.equals(left, right, resultType, row, row, false);
+        }
+        else if (type == Type.NOT_EQUAL)
+        {
+            return !VectorUtils.equals(left, right, resultType, row, row, false);
         }
 
-        int size = lvv.size();
-        BitSet bs = new BitSet(size);
-        BitSet nullBs = null;
-
-        for (int i = 0; i < size; i++)
+        int c = VectorUtils.compare(left, right, resultType, row, row);
+        switch (type)
         {
-            boolean leftNull = lvv.isNullable()
-                    && lvv.isNull(i);
-            boolean rightNull = rvv.isNullable()
-                    && rvv.isNull(i);
-
-            if (leftNull
-                    || rightNull)
-            {
-                if (nullBs == null)
-                {
-                    nullBs = new BitSet(size);
-                }
-                nullBs.set(i, true);
-            }
-            else
-            {
-                bs.set(i, compare(i, resultType, lvv, rvv));
-            }
+            case GREATER_THAN:
+                return c > 0;
+            case GREATER_THAN_EQUAL:
+                return c >= 0;
+            case LESS_THAN:
+                return c < 0;
+            case LESS_THAN_EQUAL:
+                return c <= 0;
+            default:
+                throw new IllegalArgumentException("Unsupported comparison op " + type);
         }
-
-        return new BitSetVector(size, bs, nullBs);
     }
 
     @Override
@@ -117,55 +166,5 @@ public class ComparisonExpression extends ABinaryExpression implements IComparis
     public String toVerboseString()
     {
         return String.format("%s %s %s", left.toVerboseString(), type, right.toVerboseString());
-    }
-
-    private boolean compare(int row, Column.Type vectorType, ValueVector left, ValueVector right)
-    {
-        int c;
-        switch (vectorType)
-        {
-            case Boolean:
-                c = Boolean.compare(left.getBoolean(row), right.getBoolean(row));
-                break;
-            case Double:
-                c = Double.compare(left.getDouble(row), right.getDouble(row));
-                break;
-            case Float:
-                c = Float.compare(left.getFloat(row), right.getFloat(row));
-                break;
-            case Int:
-                c = Integer.compare(left.getInt(row), right.getInt(row));
-                break;
-            case Long:
-                c = Long.compare(left.getLong(row), right.getLong(row));
-                break;
-            case String:
-                UTF8String refL = left.getString(row);
-                UTF8String refR = right.getString(row);
-                c = refL.compareTo(refR);
-                break;
-            default:
-                // Reflective compare
-                c = ExpressionMath.cmp(left.getValue(row), right.getValue(row));
-                break;
-        }
-
-        switch (type)
-        {
-            case EQUAL:
-                return c == 0;
-            case NOT_EQUAL:
-                return c != 0;
-            case GREATER_THAN:
-                return c > 0;
-            case GREATER_THAN_EQUAL:
-                return c >= 0;
-            case LESS_THAN:
-                return c < 0;
-            case LESS_THAN_EQUAL:
-                return c <= 0;
-            default:
-                throw new IllegalArgumentException("Unsupported comparison op " + type);
-        }
     }
 }

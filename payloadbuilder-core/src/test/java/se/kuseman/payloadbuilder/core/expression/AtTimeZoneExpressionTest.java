@@ -2,7 +2,6 @@ package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Arrays.asList;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
-import static se.kuseman.payloadbuilder.test.VectorTestUtils.nvv;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.time.LocalDateTime;
@@ -13,7 +12,7 @@ import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
@@ -26,21 +25,21 @@ public class AtTimeZoneExpressionTest extends APhysicalPlanTest
         AtTimeZoneExpression e;
         ValueVector actual;
 
-        e = new AtTimeZoneExpression(new LiteralNullExpression(Type.String), new LiteralNullExpression(Type.String));
+        e = new AtTimeZoneExpression(new LiteralNullExpression(ResolvedType.of(Type.String)), new LiteralNullExpression(ResolvedType.of(Type.String)));
         actual = e.eval(context);
-        assertVectorsEquals(nvv(ResolvedType.of(Type.DateTime), new Object[1]), actual);
+        assertVectorsEquals(vv(ResolvedType.of(Type.DateTimeOffset), new Object[1]), actual);
 
         e = new AtTimeZoneExpression(new FunctionCallExpression("", SystemCatalog.get()
-                .getScalarFunction("getdate"), null, asList()), new LiteralNullExpression(Type.String));
+                .getScalarFunction("getdate"), null, asList()), new LiteralNullExpression(ResolvedType.of(Type.String)));
         actual = e.eval(context);
-        assertVectorsEquals(nvv(ResolvedType.of(Type.DateTime), new Object[1]), actual);
+        assertVectorsEquals(vv(ResolvedType.of(Type.DateTimeOffset), new Object[1]), actual);
 
         e = new AtTimeZoneExpression(new FunctionCallExpression("", SystemCatalog.get()
                 .getScalarFunction("getdate"), null, asList()), new LiteralStringExpression("dummy"));
         actual = e.eval(context);
         try
         {
-            assertVectorsEquals(vv(ResolvedType.of(Type.DateTime), "2000-10-10"), actual);
+            assertVectorsEquals(vv(ResolvedType.of(Type.DateTimeOffset), "2000-10-10"), actual);
             fail("Should fail cause of invalid time zone");
         }
         catch (IllegalArgumentException ee)
@@ -53,7 +52,7 @@ public class AtTimeZoneExpressionTest extends APhysicalPlanTest
         actual = e.eval(context);
         try
         {
-            assertVectorsEquals(vv(ResolvedType.of(Type.DateTime), "2000-10-10"), actual);
+            assertVectorsEquals(vv(ResolvedType.of(Type.DateTimeOffset), "2000-10-10"), actual);
             fail("Should fail cause of invalid time zone");
         }
         catch (IllegalArgumentException ee)
@@ -64,33 +63,30 @@ public class AtTimeZoneExpressionTest extends APhysicalPlanTest
 
         e = new AtTimeZoneExpression(new LiteralStringExpression("2000-10-10"), new LiteralStringExpression("Z"));
         actual = e.eval(context);
-        assertVectorsEquals(vv(ResolvedType.of(Type.DateTime), "2000-10-10"), actual);
+        assertVectorsEquals(vv(ResolvedType.of(Type.DateTimeOffset), "2000-10-10"), actual);
 
         e = new AtTimeZoneExpression(new LiteralStringExpression("2000-10-10T10:10:10"), new LiteralStringExpression("Z"));
         actual = e.eval(context);
-        assertVectorsEquals(vv(ResolvedType.of(Type.DateTime), ZonedDateTime.of(LocalDateTime.parse("2000-10-10T10:10:10"), ZoneId.systemDefault())
-                .withZoneSameInstant(ZoneId.of("Z"))), actual);
+        assertVectorsEquals(vv(ResolvedType.of(Type.DateTimeOffset), ZonedDateTime.of(LocalDateTime.parse("2000-10-10T10:10:10"), ZoneId.of("UTC"))), actual);
 
         e = new AtTimeZoneExpression(new LiteralStringExpression("2000-10-10T12:10:10+02:00"), new LiteralStringExpression("Z"));
         actual = e.eval(context);
-        assertVectorsEquals(vv(ResolvedType.of(Type.DateTime), ZonedDateTime.parse("2000-10-10T10:10:10Z")), actual);
+        assertVectorsEquals(vv(ResolvedType.of(Type.DateTimeOffset), ZonedDateTime.parse("2000-10-10T10:10:10Z")), actual);
 
-        //
-        // Map<String, Object> values = new HashMap<>();
-        // values.put("a", LocalDate.parse("2000-10-10"));
-        // values.put("b", LocalDateTime.parse("2000-10-10T10:10:10"));
-        // values.put("c", ZonedDateTime.parse("2000-10-10T12:10:10+02:00"));
-        //
-        // Object expected = ZonedDateTime.of(LocalDate.parse("2000-10-10"), LocalTime.parse("00:00:00"), ZoneId.systemDefault())
-        // .withZoneSameInstant(ZoneId.of("Z"));
-        //
-        // assertExpression(expected, values, "attimezone(a, 'Z')");
-        //
-        // expected = ZonedDateTime.of(LocalDateTime.parse("2000-10-10T10:10:10"), ZoneId.systemDefault())
-        // .withZoneSameInstant(ZoneId.of("Z"));
-        //
-        // assertExpression(expected, values, "attimezone(b, 'Z')");
-        //
-        // assertExpression(ZonedDateTime.parse("2000-10-10T10:10:10Z"), values, "attimezone(c, 'Z')");
+        // Test zoning a DateTime
+        // 1. We cast '2000-10-10T12:10:10' to datetime => we get a LocalDateTime = 2000-10-10T12:10:10
+        // 2. We set the zone to "Europe/Berlin" yielding 2000-10-10T12:10:10+02:00 (we don't change any date/time here only zone)
+        e = new AtTimeZoneExpression(new CastExpression(new LiteralStringExpression("2000-10-10T12:10:10"), ResolvedType.of(Type.DateTime)), new LiteralStringExpression("Europe/Berlin"));
+        actual = e.eval(context);
+        assertVectorsEquals(vv(ResolvedType.of(Type.DateTimeOffset), ZonedDateTime.parse("2000-10-10T12:10:10+02:00")), actual);
+
+        // Test zoning a casted DateTimeOffset
+        // 1. We cast '2000-10-10T12:10:10' to datetime => we get a LocalDateTime = 2000-10-10T12:10:10
+        // 2. We cast that to UTC offset => we get a ZonedDateTime = 2000-10-10T12:10:10+00:00
+        // 3. We set the zone to "Europe/Berlin" and now zone rules kicks in and we get "2000-10-10T14:10:10+02:00"
+        e = new AtTimeZoneExpression(new CastExpression(new CastExpression(new LiteralStringExpression("2000-10-10T12:10:10"), ResolvedType.of(Type.DateTime)), ResolvedType.of(Type.DateTimeOffset)),
+                new LiteralStringExpression("Europe/Berlin"));
+        actual = e.eval(context);
+        assertVectorsEquals(vv(ResolvedType.of(Type.DateTimeOffset), ZonedDateTime.parse("2000-10-10T14:10:10+02:00")), actual);
     }
 }

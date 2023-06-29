@@ -8,9 +8,9 @@ import org.antlr.v4.runtime.Token;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 
@@ -106,7 +106,7 @@ public class AsteriskExpression implements IExpression
     @Override
     public String toString()
     {
-        return (qname != null ? qname.toDotDelimited()
+        return (qname != null ? qname.toDotDelimited() + "."
                 : "")
                + "*";
     }

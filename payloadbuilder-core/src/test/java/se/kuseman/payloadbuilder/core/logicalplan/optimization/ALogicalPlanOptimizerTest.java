@@ -9,11 +9,13 @@ import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
-import se.kuseman.payloadbuilder.core.QuerySession;
 import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.logicalplan.ALogicalPlanTest;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.statement.LogicalSelectStatement;
@@ -35,12 +37,32 @@ public abstract class ALogicalPlanOptimizerTest extends ALogicalPlanTest
     protected TableSourceReference sTableB = new TableSourceReference("", of("stableB"), "b");
     protected TableSourceReference sTableC = new TableSourceReference("", of("stableC"), "c");
     protected TableSourceReference sTableD = new TableSourceReference("", of("stableD"), "d");
+
+    protected TableSourceReference sTableE = new TableSourceReference("", of("stableE"), "e");
     // CSON
+
+    protected ColumnReference stACol1 = new ColumnReference(sTableA, "col1", ColumnReference.Type.REGULAR);
+    protected ColumnReference stACol2 = new ColumnReference(sTableA, "col2", ColumnReference.Type.REGULAR);
+    protected ColumnReference stACol3 = new ColumnReference(sTableA, "col3", ColumnReference.Type.REGULAR);
+    protected ColumnReference stBCol1 = new ColumnReference(sTableB, "col1", ColumnReference.Type.REGULAR);
+    protected ColumnReference stBCol2 = new ColumnReference(sTableB, "col2", ColumnReference.Type.REGULAR);
+    protected ColumnReference stBCol3 = new ColumnReference(sTableB, "col3", ColumnReference.Type.REGULAR);
 
     protected Schema schemaSTableA = Schema.of(col("col1", Type.Int), col("col2", Type.String), col("col3", Type.Float));
     protected Schema schemaSTableB = Schema.of(col("col1", Type.Boolean), col("col2", Type.String), col("col3", Type.Float));
     protected Schema schemaSTableC = Schema.of(col("col1", Type.Double), col("col2", Type.Boolean), col("col3", Type.Long));
-    protected Schema schemaSTableD = Schema.of(Column.of(sTableD.column("col1"), ResolvedType.of(Type.Double)), Column.of(sTableD.column("col6"), ResolvedType.of(Type.String)));
+    protected Schema schemaSTableD = Schema.of(CoreColumn.of(sTableD.column("col1"), ResolvedType.of(Type.Double)), CoreColumn.of(sTableD.column("col6"), ResolvedType.of(Type.String)));
+
+    //@formatter:off
+    protected Schema schemaSTableE = Schema.of(
+            CoreColumn.of(sTableE.column("col1"), ResolvedType.of(Type.Double)),
+            CoreColumn.of(sTableE.column("col3"), ResolvedType.table(
+                    Schema.of(
+                            Column.of("nCol1", Type.Int),
+                            Column.of("nCol2", Type.String)
+                            ))),
+            CoreColumn.of(sTableE.column("col6"), ResolvedType.of(Type.String)));
+    //@formatter:on
 
     private final CatalogRegistry registry = new CatalogRegistry();
     protected final QuerySession session = new QuerySession(registry);
@@ -66,6 +88,10 @@ public abstract class ALogicalPlanOptimizerTest extends ALogicalPlanTest
             else if (t.equalsIgnoreCase("stableD"))
             {
                 return new TableSchema(schemaSTableD);
+            }
+            else if (t.equalsIgnoreCase("stableE"))
+            {
+                return new TableSchema(schemaSTableE);
             }
             return TableSchema.EMPTY;
         };

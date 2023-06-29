@@ -8,7 +8,7 @@ import org.testcontainers.elasticsearch.ElasticsearchContainer;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.catalog.es.ElasticsearchMeta.Version;
 
 /** Test with elastic search 8.X */

@@ -1,19 +1,19 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import java.util.List;
+import java.util.Optional;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.UTF8String;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Table valued function that splits a string and returns a table from the splitted result */
@@ -21,33 +21,33 @@ class StringSplitFunction extends TableFunctionInfo
 {
     private static final Schema SCHEMA = Schema.of(Column.of("Value", ResolvedType.of(Type.String)));
 
-    StringSplitFunction(Catalog catalog)
+    StringSplitFunction()
     {
-        super(catalog, "string_split");
+        super("string_split");
     }
 
     @Override
-    public Schema getSchema(List<? extends IExpression> arguments)
+    public Schema getSchema(List<IExpression> arguments)
     {
         return SCHEMA;
     }
 
     @Override
-    public int arity()
+    public Arity arity()
     {
-        return 2;
+        return Arity.TWO;
     }
 
     @Override
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments, IDatasourceOptions options)
+    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, IDatasourceOptions options)
     {
-        final ValueVector value = eval(context, arguments.get(0));
-        final ValueVector separator = eval(context, arguments.get(1));
+        final ValueVector value = arguments.get(0)
+                .eval(context);
+        final ValueVector separator = arguments.get(1)
+                .eval(context);
 
-        if ((value.isNullable()
-                && value.isNull(0))
-                || (separator.isNullable()
-                        && separator.isNull(0)))
+        if (value.isNull(0)
+                || separator.isNull(0))
         {
             return TupleIterator.EMPTY;
         }
@@ -63,7 +63,7 @@ class StringSplitFunction extends TableFunctionInfo
             @Override
             public Schema getSchema()
             {
-                return SCHEMA;
+                return schema.get();
             }
 
             @Override
@@ -90,12 +90,6 @@ class StringSplitFunction extends TableFunctionInfo
                     }
 
                     @Override
-                    public boolean isNullable()
-                    {
-                        return false;
-                    }
-
-                    @Override
                     public boolean isNull(int row)
                     {
                         return false;
@@ -105,12 +99,6 @@ class StringSplitFunction extends TableFunctionInfo
                     public UTF8String getString(int row)
                     {
                         return UTF8String.from(parts[row]);
-                    }
-
-                    @Override
-                    public Object getValue(int row)
-                    {
-                        throw new IllegalArgumentException("getValue should not be called on typed vectors");
                     }
                 };
             }

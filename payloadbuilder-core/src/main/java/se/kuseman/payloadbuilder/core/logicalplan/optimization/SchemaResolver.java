@@ -2,6 +2,8 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
+import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
+import static org.apache.commons.lang3.StringUtils.lowerCase;
 
 import java.util.List;
 
@@ -9,29 +11,30 @@ import org.antlr.v4.runtime.Token;
 import org.apache.commons.lang3.tuple.Pair;
 
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
-import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.FunctionInfo.Arity;
 import se.kuseman.payloadbuilder.api.catalog.Index;
-import se.kuseman.payloadbuilder.api.catalog.OperatorFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.QueryException;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.expression.ARewriteExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
 import se.kuseman.payloadbuilder.core.expression.FunctionCallExpression;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
-import se.kuseman.payloadbuilder.core.expression.SubQueryExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedFunctionCallExpression;
+import se.kuseman.payloadbuilder.core.expression.UnresolvedSubQueryExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.Aggregate;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
-import se.kuseman.payloadbuilder.core.logicalplan.OperatorFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.TableFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
 import se.kuseman.payloadbuilder.core.parser.ParseException;
@@ -102,56 +105,60 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
                 .collect(toList());
 
         context.resolvingAggregateProjectionExpression = false;
-
         return new Aggregate(input, aggregateExpressions, projectionExpressions);
-    }
-
-    @Override
-    public ILogicalPlan create(OperatorFunctionScan plan, Ctx context)
-    {
-        Pair<String, OperatorFunctionInfo> pair = context.getSession()
-                .resolveOperatorFunctionInfo(plan.getCatalogAlias(), plan.getFunction());
-        if (pair == null)
-        {
-            throw new ParseException("No operator function found named: " + plan.getFunction(), plan.getToken());
-        }
-        ILogicalPlan input = plan.getInput()
-                .accept(this, context);
-
-        // Create a temporary schema, this will be corrected in SubQueryExpressionPushDown later on
-        Schema schema = Schema.of(Column.of("output", pair.getValue()
-                .getType()));
-        return new OperatorFunctionScan(schema, input, plan.getCatalogAlias(), plan.getFunction(), plan.getToken());
     }
 
     @Override
     protected ILogicalPlan create(TableScan plan, Ctx context)
     {
+        String catalogAlias = lowerCase(defaultIfBlank(plan.getCatalogAlias(), context.getSession()
+                .getDefaultCatalogAlias()));
+
         Catalog catalog = context.getSession()
-                .getCatalog(plan.getCatalogAlias());
+                .getCatalog(catalogAlias);
 
         Schema schema;
         List<Index> indices = emptyList();
         if (plan.isTempTable())
         {
-            schema = context.schemaByTempTable.getOrDefault(plan.getTableSource()
+            String table = plan.getTableSource()
                     .getName()
                     .toDotDelimited()
-                    .toLowerCase(), Schema.EMPTY);
+                    .toLowerCase();
+
+            if (!context.schemaByTempTable.containsKey(table))
+            {
+                throw new QueryException("No temporary table found with name #" + table);
+            }
+
+            TableSchema tableSchema = context.schemaByTempTable.get(table);
+            schema = tableSchema.getSchema();
+            indices = tableSchema.getIndices();
         }
         else
         {
-            TableSchema tableSchema = catalog.getTableSchema(context.getSession(), plan.getCatalogAlias(), plan.getTableSource()
+            TableSchema tableSchema = catalog.getTableSchema(context.getSession(), catalogAlias, plan.getTableSource()
                     .getName());
 
             schema = tableSchema.getSchema();
+            if (schema.getSize() > 0
+                    && schema.getColumns()
+                            .stream()
+                            .anyMatch(SchemaUtils::isAsterisk))
+            {
+                throw new ParseException("Schema for table: " + plan.getTableSource()
+                                         + " is invalid. Schema must be either empty (asterisk) or have only regular columns. Check implementation of Catalog: "
+                                         + catalog.getName(),
+                        plan.getToken());
+            }
+
             indices = tableSchema.getIndices();
             // No schema returned, create an asterisk
             if (schema.getColumns()
                     .isEmpty())
             {
                 ColumnReference ast = new ColumnReference(plan.getTableSource(), plan.getAlias(), ColumnReference.Type.ASTERISK);
-                schema = Schema.of(Column.of(ast, ResolvedType.of(Type.Any)));
+                schema = Schema.of(CoreColumn.of(ast, ResolvedType.of(Type.Any)));
             }
         }
 
@@ -163,6 +170,9 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
         return new TableScan(new TableSchema(schema, indices), plan.getTableSource(), plan.getProjection(), plan.isTempTable(), plan.getOptions(), plan.getToken());
     }
 
+    /**
+     * This validates that the function exists and has correct arity etc. Is also folds and schema resolves it's arguments.
+     */
     @Override
     protected ILogicalPlan create(TableFunctionScan plan, Ctx context)
     {
@@ -178,27 +188,19 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
         }
 
         TableFunctionInfo functionInfo = pair.getValue();
+        validateArity(functionInfo, plan.getArguments()
+                .size(), plan.getToken());
 
-        Schema schema = functionInfo.getSchema(plan.getArguments());
-        // No schema returned, create an asterisk
-        if (schema.getColumns()
-                .isEmpty())
-        {
-            ColumnReference ast = new ColumnReference(plan.getTableSource(), plan.getAlias(), ColumnReference.Type.ASTERISK);
-            schema = Schema.of(Column.of(ast, ResolvedType.of(Type.Any)));
-        }
-
-        List<? extends se.kuseman.payloadbuilder.api.expression.IExpression> foldedArguments = functionInfo.foldArguments(plan.getArguments());
-        List<IExpression> arguments = foldedArguments.stream()
-                .map(e -> ((IExpression) e).accept(ExpressionResolver.INSTANCE, context))
+        // List<IExpression> foldedArguments = functionInfo.foldArguments(plan.getArguments());
+        List<IExpression> arguments = plan.getArguments()
+                .stream()
+                .map(e -> e.accept(ExpressionResolver.INSTANCE, context))
                 .collect(toList());
 
-        // Recreate schema with correct table and column references
-        TableSourceReference tableSource = plan.getTableSource();
-        return new TableFunctionScan(plan.getTableSource(), recreate(tableSource, schema), arguments, plan.getOptions(), plan.getToken());
+        return new TableFunctionScan(plan.getTableSource(), plan.getSchema(), arguments, plan.getOptions(), plan.getToken());
     }
 
-    private Schema recreate(final TableSourceReference tableSource, Schema schema)
+    static Schema recreate(final TableSourceReference tableSource, Schema schema)
     {
         return new Schema(schema.getColumns()
                 .stream()
@@ -206,7 +208,7 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
                 {
                     ResolvedType type = c.getType();
                     // Force all columns to have a column reference
-                    ColumnReference colRef = c.getColumnReference();
+                    ColumnReference colRef = SchemaUtils.getColumnReference(c);
                     if (colRef == null)
                     {
                         colRef = tableSource.column(c.getName());
@@ -219,7 +221,7 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
                         colRef = new ColumnReference(tableSource, colRef.getName(), colRef.getType());
                     }
 
-                    return Column.of(colRef, type);
+                    return CoreColumn.of(c.getName(), type, colRef);
                 })
                 .collect(toList()));
     }
@@ -230,16 +232,16 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
         static final ExpressionResolver INSTANCE = new ExpressionResolver();
 
         @Override
-        public IExpression visit(SubQueryExpression exp, Ctx context)
+        public IExpression visit(UnresolvedSubQueryExpression exp, Ctx context)
         {
-            SubQueryExpression expression = exp;
+            UnresolvedSubQueryExpression expression = exp;
 
             if (context.insideAggregateFunction)
             {
                 throw new ParseException("Cannot aggregate sub query expressions", expression.getToken());
             }
 
-            return new SubQueryExpression(expression.getInput()
+            return new UnresolvedSubQueryExpression(expression.getInput()
                     .accept(context.schemaResolver, context), expression.getToken());
         }
 
@@ -262,8 +264,9 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
                 throw new ParseException("No scalar function found named: " + expression.getName(), token);
             }
 
-            String catalogAlias = pair.getKey();
             ScalarFunctionInfo functionInfo = pair.getValue();
+            validateArity(functionInfo, expression.getChildren()
+                    .size(), token);
 
             // Validate
             if (context.insideAggregateFunction
@@ -279,18 +282,6 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
             {
                 throw new ParseException(functionInfo.getName() + " is not an aggregate function", token);
             }
-            else if (functionInfo.arity() >= 0
-                    && expression.getChildren()
-                            .size() != functionInfo.arity())
-            {
-                throw new ParseException("Function " + expression.getName()
-                                         + " expected "
-                                         + functionInfo.arity()
-                                         + " argument(s) but got "
-                                         + expression.getChildren()
-                                                 .size(),
-                        token);
-            }
 
             boolean isAggregate = functionInfo.getFunctionType()
                     .isAggregate();
@@ -299,14 +290,24 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
                 context.insideAggregateFunction = true;
             }
 
-            List<? extends se.kuseman.payloadbuilder.api.expression.IExpression> foldedArguments = functionInfo.foldArguments(expression.getArguments());
-
             // Resolve arguments
-            List<IExpression> arguments = foldedArguments.stream()
-                    .map(e -> ((IExpression) e).accept(this, context))
+            List<IExpression> arguments = expression.getArguments()
+                    .stream()
+                    .map(e -> e.accept(this, context))
                     .collect(toList());
 
-            IExpression result = new FunctionCallExpression(catalogAlias, functionInfo, expression.getAggregateMode(), arguments);
+            IExpression result;
+
+            IExpression foldedExpression = functionInfo.fold(context.context, arguments);
+            if (foldedExpression != null)
+            {
+                result = foldedExpression;
+            }
+            else
+            {
+                String catalogAlias = pair.getKey();
+                result = new FunctionCallExpression(catalogAlias, functionInfo, expression.getAggregateMode(), arguments);
+            }
 
             if (isAggregate)
             {
@@ -314,6 +315,31 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
             }
 
             return result;
+        }
+    }
+
+    private static void validateArity(FunctionInfo functionInfo, int argumentCount, Token token)
+    {
+        Arity arity = functionInfo.arity();
+        if (!arity.satisfies(argumentCount))
+        {
+            String arityDescription;
+            int min = arity.getMin();
+            int max = arity.getMax();
+
+            if (min == max)
+            {
+                arityDescription = "" + min;
+            }
+            else if (max < 0)
+            {
+                arityDescription = "at least " + min;
+            }
+            else
+            {
+                arityDescription = "between " + min + " and " + max;
+            }
+            throw new ParseException("Function " + functionInfo.getName() + " expected " + arityDescription + " argument(s) but got " + argumentCount, token);
         }
     }
 }

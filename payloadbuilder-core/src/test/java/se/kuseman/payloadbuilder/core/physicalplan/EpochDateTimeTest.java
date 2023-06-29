@@ -7,52 +7,41 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoField;
 import java.time.temporal.ChronoUnit;
 
+import org.junit.Assert;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import se.kuseman.payloadbuilder.api.catalog.EpochDateTime;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
 
 /** Test of {@link EpochDateTime} */
-public class EpochDateTimeTest extends org.junit.Assert
+public class EpochDateTimeTest extends Assert
 {
-    // @Test
-    // public void test_()
-    // {
-    // long longNow = Instant.parse("2010-10-10T00:10:00.00Z")
-    // .toEpochMilli();
-    //
-    // ZonedDateTime zone = ZonedDateTime.ofInstant(Instant.ofEpochMilli(longNow), ZoneId.of("UTC"));
-    // ZonedDateTime local = ZonedDateTime.ofInstant(Instant.ofEpochMilli(longNow), ZoneId.systemDefault());
-    //
-    // System.out.println(zone.toEpochSecond() + " " + local.toEpochSecond());
-    //
-    // System.out.println(zone + " " + local);
-    // System.out.println(zone.compareTo(local));
-    // }
-
     @Test
     public void test()
     {
         EpochDateTime d = EpochDateTime.now();
-        assertFalse(d.isExplicitZone());
         assertFalse(d.equals(null));
         assertTrue(d.equals(d));
         assertFalse(d.equals(EpochDateTime.from("2010-10-10T00:10:00.00Z")));
 
-        d = d.atZone(ZoneId.systemDefault());
-        assertTrue(d.isExplicitZone());
+        assertSame(d, EpochDateTime.from(d));
 
         assertEquals(EpochDateTime.from("2010-10-10T00:10:00.00Z"), EpochDateTime.from((Object) EpochDateTime.from("2010-10-10T00:10:00.00Z")
                 .getEpoch()));
         assertEquals(EpochDateTime.from("2010-10-10T00:10:00.00Z"), EpochDateTime.from((Object) "2010-10-10T00:10:00.00Z"));
 
+        // Test that offsets are stripped from zoned date time
+        assertEquals(EpochDateTime.from("2010-10-10T00:10:00.00Z"), EpochDateTime.from(ZonedDateTime.parse("2010-10-10T00:10:00.00+03:00")));
+        assertEquals(EpochDateTime.from("2010-10-10T00:10:00.00Z"), EpochDateTime.from(EpochDateTimeOffset.from(ZonedDateTime.parse("2010-10-10T00:10:00.00+03:00"))));
+
         Object o = EpochDateTime.from("2010-10-10T00:10:00.00Z")
-                .toZonedDateTime();
+                .getLocalDateTime();
 
         assertEquals(EpochDateTime.from("2010-10-10T00:10:00.00Z"), EpochDateTime.from(o));
 
         o = EpochDateTime.from("2010-10-10T00:10:00.00Z")
-                .toZonedDateTime()
+                .getLocalDateTime()
                 .toLocalDate();
 
         assertEquals(EpochDateTime.from("2010-10-10"), EpochDateTime.from(o));
@@ -75,6 +64,11 @@ public class EpochDateTimeTest extends org.junit.Assert
         long longNow = Instant.parse("2010-10-10T00:10:00.00Z")
                 .toEpochMilli();
         EpochDateTime now = EpochDateTime.from(longNow);
+
+        assertEquals("2010-10-10T00:10:00", now.toString());
+
+        assertEquals("2010-10-10T00:10:00+02:00", now.toOffset(ZoneId.of("Europe/Berlin"))
+                .toString());
 
         EpochDateTime actual = now.add(10, ChronoUnit.YEARS);
 
@@ -117,8 +111,16 @@ public class EpochDateTimeTest extends org.junit.Assert
         assertEquals(EpochDateTime.from(LocalDateTime.of(2010, 10, 10, 10, 10, 10)), EpochDateTime.from("2010-10-10 10:10:10"));
         // ISO T separator
         assertEquals(EpochDateTime.from(LocalDateTime.of(2020, 10, 10, 10, 20, 10)), EpochDateTime.from("2020-10-10T10:20:10"));
-        assertEquals(EpochDateTime.from(LocalDateTime.of(2010, 10, 10, 10, 10, 10)
-                .atZone(ZoneId.of("+03:00"))), EpochDateTime.from("2010-10-10T10:10:10+03:00"));
+        // UTC marker
+        assertEquals(EpochDateTime.from(LocalDateTime.of(2010, 10, 10, 00, 10, 10)), EpochDateTime.from("2010-10-10T00:10:10Z"));
+        // UTC marker with nanos
+        assertEquals(EpochDateTime.from(LocalDateTime.of(2023, 07, 04, 11, 55, 07, 600000000)), EpochDateTime.from("2023-07-04T11:55:07.600000000Z"));
+        // UTC marker with second fraction (3 digit)
+        assertEquals(EpochDateTime.from(LocalDateTime.of(2023, 07, 04, 11, 55, 07, 600000000)), EpochDateTime.from("2023-07-04T11:55:07.600Z"));
+        // UTC marker with second fraction (2 digit)
+        assertEquals(EpochDateTime.from(LocalDateTime.of(2023, 07, 04, 11, 55, 07, 600000000)), EpochDateTime.from("2023-07-04T11:55:07.60Z"));
+        // UTC marker with second fraction (1 digit)
+        assertEquals(EpochDateTime.from(LocalDateTime.of(2023, 07, 04, 11, 55, 07, 600000000)), EpochDateTime.from("2023-07-04T11:55:07.6Z"));
 
         try
         {

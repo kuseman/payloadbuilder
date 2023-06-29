@@ -4,14 +4,13 @@ import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.UTF8String;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Left and -right pad function */
@@ -19,10 +18,10 @@ class PadFunction extends ScalarFunctionInfo
 {
     private final boolean left;
 
-    PadFunction(Catalog catalog, boolean left)
+    PadFunction(boolean left)
     {
-        super(catalog, left ? "leftpad"
-                : "rightpad", FunctionType.SCALAR);
+        super(left ? "lpad"
+                : "rpad", FunctionType.SCALAR);
         this.left = left;
     }
 
@@ -38,27 +37,28 @@ class PadFunction extends ScalarFunctionInfo
                + "A optional third argument can be supplied for pad string (defaults to single white space). "
                + System.lineSeparator()
                + "Ex. "
-               + (left ? "left"
-                       : "right")
+               + (left ? "l"
+                       : "r")
                + "pad(expression, integerExpression [, expression])"
                + System.lineSeparator()
                + "NOTE! First argument is converted to a string.";
     }
 
     @Override
-    public ResolvedType getType(List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
         return ResolvedType.of(Type.String);
     }
 
     @Override
-    public ValueVector evalScalar(IExecutionContext context, final TupleVector input, String catalogAlias, List<? extends IExpression> arguments)
+    public Arity arity()
     {
-        if (arguments.size() < 2)
-        {
-            throw new IllegalArgumentException("Function " + getName() + " expects at least 2 arguments.");
-        }
+        return new Arity(2, 3);
+    }
 
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, final TupleVector input, String catalogAlias, List<IExpression> arguments)
+    {
         final ValueVector value = arguments.get(0)
                 .eval(input, context);
 
@@ -105,12 +105,6 @@ class PadFunction extends ScalarFunctionInfo
 
                 return UTF8String.from(left ? StringUtils.leftPad(strArg, lengthArg, padString)
                         : StringUtils.rightPad(strArg, lengthArg, padString));
-            }
-
-            @Override
-            public Object getValue(int row)
-            {
-                throw new IllegalArgumentException("getValue should not be called on typed vectors");
             }
         };
     }

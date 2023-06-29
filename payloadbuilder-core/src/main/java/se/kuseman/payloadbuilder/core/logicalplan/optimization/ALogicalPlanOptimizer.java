@@ -9,29 +9,30 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
-import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IColumnExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.QuerySession;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.common.Option;
 import se.kuseman.payloadbuilder.core.common.SortItem;
+import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.expression.AExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.ARewriteExpressionVisitor;
+import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedColumnExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.ALogicalPlanVisitor;
 import se.kuseman.payloadbuilder.core.logicalplan.Aggregate;
 import se.kuseman.payloadbuilder.core.logicalplan.Concatenation;
 import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
+import se.kuseman.payloadbuilder.core.logicalplan.ExpressionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.Join;
 import se.kuseman.payloadbuilder.core.logicalplan.Limit;
 import se.kuseman.payloadbuilder.core.logicalplan.MaxRowCountAssert;
 import se.kuseman.payloadbuilder.core.logicalplan.OperatorFunctionScan;
-import se.kuseman.payloadbuilder.core.logicalplan.OverScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Projection;
 import se.kuseman.payloadbuilder.core.logicalplan.Sort;
 import se.kuseman.payloadbuilder.core.logicalplan.SubQuery;
@@ -53,7 +54,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
     static class Context
     {
         final IExecutionContext context;
-        Map<String, Schema> schemaByTempTable = emptyMap();
+        Map<String, TableSchema> schemaByTempTable = emptyMap();
         // Counter used to generate unique expression column names for each pushed down sub expression
         int expressionCounter;
 
@@ -87,6 +88,17 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
 
     @Override
     public ILogicalPlan visit(TableFunctionScan plan, C context)
+    {
+        if (preVisit(plan, context))
+        {
+            return create(plan, context);
+        }
+
+        return plan;
+    }
+
+    @Override
+    public ILogicalPlan visit(ExpressionScan plan, C context)
     {
         if (preVisit(plan, context))
         {
@@ -187,16 +199,6 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
     }
 
     @Override
-    public ILogicalPlan visit(OverScan plan, C context)
-    {
-        if (preVisit(plan, context))
-        {
-            return create(plan, context);
-        }
-        return plan;
-    }
-
-    @Override
     public ILogicalPlan visit(MaxRowCountAssert plan, C context)
     {
         if (preVisit(plan, context))
@@ -216,12 +218,14 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         return plan;
     }
 
-    protected void visit(IExpression expression, C context)
+    protected IExpression visit(ILogicalPlan plan, IExpression expression, C context)
     {
+        return expression;
     }
 
-    protected void visit(List<IExpression> expressions, C context)
+    protected List<IExpression> visit(ILogicalPlan plan, List<IExpression> expressions, C context)
     {
+        return expressions;
     }
 
     protected boolean preVisit(TableScan plan, C context)
@@ -230,6 +234,11 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
     }
 
     protected boolean preVisit(TableFunctionScan plan, C context)
+    {
+        return true;
+    }
+
+    protected boolean preVisit(ExpressionScan plan, C context)
     {
         return true;
     }
@@ -279,11 +288,6 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         return true;
     }
 
-    protected boolean preVisit(OverScan plan, C context)
-    {
-        return true;
-    }
-
     protected boolean preVisit(MaxRowCountAssert plan, C context)
     {
         return true;
@@ -307,10 +311,9 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         }
         else
         {
-            for (Option option : options)
-            {
-                visit(option.getValueExpression(), context);
-            }
+            options = options.stream()
+                    .map(o -> new Option(o.getOption(), visit(plan, o.getValueExpression(), context)))
+                    .collect(toList());
         }
 
         return new TableScan(plan.getTableSchema(), plan.getTableSource(), plan.getProjection(), plan.isTempTable(), options, plan.getToken());
@@ -334,13 +337,28 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         }
         else
         {
-            visit(arguments, context);
-            for (Option option : options)
-            {
-                visit(option.getValueExpression(), context);
-            }
+            arguments = visit(plan, arguments, context);
+            options = options.stream()
+                    .map(o -> new Option(o.getOption(), visit(plan, o.getValueExpression(), context)))
+                    .collect(toList());
         }
         return new TableFunctionScan(plan.getTableSource(), plan.getSchema(), arguments, options, plan.getToken());
+    }
+
+    protected ILogicalPlan create(ExpressionScan plan, C context)
+    {
+        IExpression expression = plan.getExpression();
+
+        if (expressionRewriter != null)
+        {
+            expression = expression.accept(expressionRewriter, context);
+        }
+        else
+        {
+            expression = visit(plan, expression, context);
+        }
+
+        return new ExpressionScan(plan.getTableSource(), plan.getSchema(), expression, plan.getToken());
     }
 
     protected ILogicalPlan create(Projection plan, C context)
@@ -355,8 +373,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         }
         else
         {
-            // Visit expressions before plan
-            visit(plan.getExpressions(), context);
+            expressions = visit(plan, plan.getExpressions(), context);
         }
         return new Projection(plan.getInput()
                 .accept(this, context), expressions, plan.isAppendInputColumns());
@@ -378,11 +395,11 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         }
         else
         {
-            visit(aggregateExpressions, context);
-            for (IAggregateExpression projectionExpression : projectionExpressions)
-            {
-                visit(projectionExpression, context);
-            }
+            aggregateExpressions = visit(plan, aggregateExpressions, context);
+
+            projectionExpressions = projectionExpressions.stream()
+                    .map(e -> (IAggregateExpression) visit(plan, e, context))
+                    .collect(toList());
         }
 
         return new Aggregate(plan.getInput()
@@ -400,7 +417,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
             }
             else
             {
-                visit(condition, context);
+                condition = visit(plan, condition, context);
             }
         }
         return new Join(plan.getOuter()
@@ -423,7 +440,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
                     }
                     else
                     {
-                        visit(expression, context);
+                        expression = visit(plan, expression, context);
                     }
                     return new SortItem(expression, si.getOrder(), si.getNullOrder(), si.getToken());
                 })
@@ -442,7 +459,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         }
         else
         {
-            visit(predicate, context);
+            predicate = visit(plan, predicate, context);
         }
         return new Filter(plan.getInput()
                 .accept(this, context), plan.getTableSource(), predicate);
@@ -463,7 +480,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         }
         else
         {
-            visit(limitExpression, context);
+            limitExpression = visit(plan, limitExpression, context);
         }
         return new Limit(plan.getInput()
                 .accept(this, context), limitExpression);
@@ -476,11 +493,6 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
     }
 
     protected ILogicalPlan create(ConstantScan plan, C context)
-    {
-        return plan;
-    }
-
-    protected ILogicalPlan create(OverScan plan, C context)
     {
         return plan;
     }
@@ -524,9 +536,10 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         @Override
         public Void visit(IColumnExpression expression, Set<ColumnReference> context)
         {
-            if (expression.getColumnReference() != null)
+            ColumnReference colRef = ((ColumnExpression) expression).getColumnReference();
+            if (colRef != null)
             {
-                context.add(expression.getColumnReference());
+                context.add(colRef);
             }
             return null;
         }

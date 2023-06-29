@@ -1,14 +1,15 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
-import se.kuseman.payloadbuilder.api.utils.ExpressionMath;
+import se.kuseman.payloadbuilder.api.execution.Decimal;
+import se.kuseman.payloadbuilder.api.expression.IArithmeticBinaryExpression;
+import se.kuseman.payloadbuilder.core.execution.ExpressionMath;
 
 /** Avg aggregate. Return the avg value among values */
 class AggregateAvgFunction extends ANumericAggregateFunction
 {
-    AggregateAvgFunction(Catalog catalog)
+    AggregateAvgFunction()
     {
-        super(catalog, "avg");
+        super("avg");
     }
 
     @Override
@@ -53,6 +54,33 @@ class AggregateAvgFunction extends ANumericAggregateFunction
             {
                 return count == 0 ? result
                         : (result / count);
+            }
+        };
+    }
+
+    @Override
+    protected DecimalAggregator createDecimalAggregator()
+    {
+        return new DecimalAggregator()
+        {
+            private int count = 0;
+
+            @Override
+            public Decimal aggregate(Decimal current, Decimal next)
+            {
+                count++;
+                if (current == null)
+                {
+                    return next;
+                }
+                return current.processArithmetic(next, IArithmeticBinaryExpression.Type.ADD);
+            }
+
+            @Override
+            public Decimal combine(Decimal result)
+            {
+                return count == 0 ? result
+                        : result.processArithmetic(Decimal.from(count), IArithmeticBinaryExpression.Type.DIVIDE);
             }
         };
     }

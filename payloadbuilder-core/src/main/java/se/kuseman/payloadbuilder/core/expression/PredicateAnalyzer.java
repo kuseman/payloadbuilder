@@ -2,7 +2,6 @@ package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
-import static java.util.Collections.singleton;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
@@ -18,11 +17,12 @@ import org.apache.commons.lang3.tuple.Pair;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.api.expression.IColumnExpression;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 
 /**
  * Analyzes a join predicate
@@ -508,15 +508,19 @@ public class PredicateAnalyzer
                 InExpression ie = (InExpression) expression;
                 AnalyzeItem leftItem = getQualifiedItem(ie.getExpression());
 
-                // Fetch all table sources from arguments
-                Set<TableSourceReference> tableSources = new HashSet<>();
-                for (IExpression arg : ie.getArguments())
+                // In expressions can only be used as predicates if we have a table source on the left hand side
+                if (!leftItem.tableSources.isEmpty())
                 {
-                    ColumnExpressionVisitor.getTableSources(arg, tableSources);
-                }
+                    // Fetch all table sources from arguments
+                    Set<TableSourceReference> tableSources = new HashSet<>();
+                    for (IExpression arg : ie.getArguments())
+                    {
+                        ColumnExpressionVisitor.getTableSources(arg, tableSources);
+                    }
 
-                AnalyzeItem rightItem = new AnalyzeItem(ie, tableSources, null);
-                return new AnalyzePair(IPredicate.Type.IN, leftItem, rightItem);
+                    AnalyzeItem rightItem = new AnalyzeItem(ie, tableSources, null);
+                    return new AnalyzePair(IPredicate.Type.IN, leftItem, rightItem);
+                }
             }
             else if (expression instanceof LikeExpression)
             {
@@ -550,13 +554,14 @@ public class PredicateAnalyzer
 
                 return AnalyzePair.of(new ComparisonExpression(IComparisonExpression.Type.EQUAL, expression, LiteralBooleanExpression.TRUE));
             }
-            else if (expression instanceof LogicalNotExpression
-                    && ((LogicalNotExpression) expression).getExpression() instanceof ColumnExpression)
+            else if (expression instanceof LogicalNotExpression)
             {
-                // A single qualified expression in a predicate is a boolean expression
-                // Turn this into a comparison expression
-                // ie. not active_flg
-                return AnalyzePair.of(new ComparisonExpression(IComparisonExpression.Type.EQUAL, ((LogicalNotExpression) expression).getExpression(), LiteralBooleanExpression.FALSE));
+                LogicalNotExpression lne = (LogicalNotExpression) expression;
+                if (lne.getExpression() instanceof ColumnExpression)
+                {
+                    // NOT a.col => a.col = False
+                    return AnalyzePair.of(new ComparisonExpression(IComparisonExpression.Type.EQUAL, ((LogicalNotExpression) expression).getExpression(), LiteralBooleanExpression.FALSE));
+                }
             }
 
             Set<TableSourceReference> tableSources = new HashSet<>();
@@ -566,24 +571,21 @@ public class PredicateAnalyzer
 
         private static AnalyzeItem getQualifiedItem(IExpression expression)
         {
-            // This is a single column then just add the analyze item
-            if (expression instanceof ColumnExpression)
-            {
-                ColumnExpression qre = (ColumnExpression) expression;
-                if (qre.getColumnReference() != null)
-                {
-                    String column = qre.getColumnReference()
-                            .getName();
-
-                    return new AnalyzeItem(expression, singleton(qre.getColumnReference()
-                            .getTableSource()), column);
-                }
-            }
-
-            // Else fetch all aliases if this is a complex expression with nested stuff
             Set<TableSourceReference> tableSources = new HashSet<>();
             ColumnExpressionVisitor.getTableSources(expression, tableSources);
-            return new AnalyzeItem(expression, tableSources, null);
+
+            String column = null;
+            ColumnReference colRef = null;
+            if (expression instanceof HasColumnReference)
+            {
+                colRef = ((HasColumnReference) expression).getColumnReference();
+            }
+            if (colRef != null)
+            {
+                column = colRef.getName();
+            }
+
+            return new AnalyzeItem(expression, tableSources, column);
         }
     }
 
@@ -633,7 +635,15 @@ public class PredicateAnalyzer
         @Override
         public boolean equals(Object obj)
         {
-            if (obj instanceof AnalyzeItem)
+            if (obj == null)
+            {
+                return false;
+            }
+            else if (obj == this)
+            {
+                return true;
+            }
+            else if (obj instanceof AnalyzeItem)
             {
                 AnalyzeItem that = (AnalyzeItem) obj;
                 return Objects.equals(expression, that.expression)
@@ -681,15 +691,39 @@ public class PredicateAnalyzer
         @Override
         public Void visit(IColumnExpression expression, Context context)
         {
-            if (expression.getColumnReference() != null)
+            ColumnExpression ce = (ColumnExpression) expression;
+
+            /*
+             * @formatter:off
+             * Outer references are not a table source per se when analyzing a predicate, they
+             * can be seen as a constant.
+             * ie. correlated sub query
+             *
+             * (
+             *   select *
+             *   from table b
+             *   where b.col = a.col  <--- a.col is an outer reference
+             *                             and is eligible as both an index source and predicate pushdown source
+             *                             and hence we should not collect it's table source which would prevent it from being used
+             * ) x
+             *
+             * @formatter:on
+             */
+            if (ce.isOuterReference())
             {
-                context.result.add(expression.getColumnReference()
-                        .getTableSource());
+                return null;
             }
-            else
+
+            TableSourceReference tableSource = AnalyzeItem.UNKNOWN_TABLE_SOURCE;
+            if (expression instanceof HasColumnReference)
             {
-                context.result.add(AnalyzeItem.UNKNOWN_TABLE_SOURCE);
+                ColumnReference colRef = ((HasColumnReference) expression).getColumnReference();
+                if (colRef != null)
+                {
+                    tableSource = colRef.getTableSource();
+                }
             }
+            context.result.add(tableSource);
             return null;
         }
     }

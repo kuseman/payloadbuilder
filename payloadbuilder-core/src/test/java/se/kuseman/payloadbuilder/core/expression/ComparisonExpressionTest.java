@@ -15,63 +15,47 @@ import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.UTF8String;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
+import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
-import se.kuseman.payloadbuilder.core.physicalplan.BitSetVector;
 
 /** Test of {@link ComparisonExpression} */
 public class ComparisonExpressionTest extends APhysicalPlanTest
 {
+    private static final IExpression NULL = new LiteralNullExpression(ResolvedType.of(Type.Boolean));
+    private static final IExpression TRUE = LiteralBooleanExpression.TRUE;
+    private static final IExpression FALSE = LiteralBooleanExpression.FALSE;
+
     @Test
-    public void test_vector_size_1()
+    public void test_fold()
     {
-        TupleVector tv = TupleVector.of(schema(new Type[] { Type.Int }, "col"), asList(ValueVector.literalInt(10, 5)));
-        ComparisonExpression e;
-        ValueVector actual;
+        IExpression e;
 
-        // Construct a literal int with a fixed size 1
-        LiteralIntegerExpression litInt = new LiteralIntegerExpression(0)
-        {
-            @Override
-            public ValueVector eval(TupleVector input, IExecutionContext context)
-            {
-                return ValueVector.literalInt(5, 1);
-            }
-        };
+        e = e("1=1");
+        assertTrue(e.isConstant());
+        assertEquals(TRUE, e);
+        e = e("1 > 1");
+        assertEquals(FALSE, e);
+        e = e("1=a");
+        assertFalse(e.isConstant());
+        assertEquals(e("1=a"), e);
+        e = e("a=1");
+        assertEquals(e("a=1"), e);
+        assertFalse(e.isConstant());
 
-        e = new ComparisonExpression(IComparisonExpression.Type.EQUAL, litInt, ce("col"));
-        actual = e.eval(tv, context);
-        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), false, false, false, false, false), actual);
-
-        e = new ComparisonExpression(IComparisonExpression.Type.EQUAL, ce("col"), litInt);
-        actual = e.eval(tv, context);
-        assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), false, false, false, false, false), actual);
-
-        // Test that size != 1 fails
-        LiteralIntegerExpression litInt2 = new LiteralIntegerExpression(0)
-        {
-            @Override
-            public ValueVector eval(TupleVector input, IExecutionContext context)
-            {
-                return ValueVector.literalInt(5, 2);
-            }
-        };
-        e = new ComparisonExpression(IComparisonExpression.Type.EQUAL, ce("col"), litInt2);
-
-        try
-        {
-            e.eval(tv, context);
-            fail("Should fail with different sizes");
-        }
-        catch (IllegalArgumentException ee)
-        {
-            assertTrue(ee.getMessage(), ee.getMessage()
-                    .contains("Evaluation of binary vectors requires equal size"));
-        }
+        e = e("null=1");
+        assertEquals(NULL, e);
+        e = e("1=null");
+        assertEquals(NULL, e);
+        e = e("(1+2) > 10");
+        assertEquals(FALSE, e);
+        e = e("10 > (1+2)");
+        assertEquals(TRUE, e);
+        e = e("(1+2+a) > 10");
+        assertEquals(e("(3+a) > 10"), e);
     }
 
     @Test
@@ -367,24 +351,18 @@ public class ComparisonExpressionTest extends APhysicalPlanTest
 
         // a = b
         e = new ComparisonExpression(IComparisonExpression.Type.EQUAL, new LiteralIntegerExpression(5), new LiteralIntegerExpression(5));
-        actual = e.eval(tv, null);
-        assertTrue(actual instanceof BitSetVector);
+        actual = e.eval(tv, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), true, true, true, true, true), actual);
-        assertFalse(actual.isNullable());
 
         // a = null
-        e = new ComparisonExpression(IComparisonExpression.Type.EQUAL, new LiteralIntegerExpression(5), new LiteralNullExpression(Type.Int));
-        actual = e.eval(tv, null);
-        assertTrue(actual instanceof BitSetVector);
+        e = new ComparisonExpression(IComparisonExpression.Type.EQUAL, new LiteralIntegerExpression(5), new LiteralNullExpression(ResolvedType.of(Type.Int)));
+        actual = e.eval(tv, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
-        assertTrue(actual.isNullable());
 
         // null = a
-        e = new ComparisonExpression(IComparisonExpression.Type.EQUAL, new LiteralNullExpression(Type.Int), new LiteralIntegerExpression(5));
-        actual = e.eval(tv, null);
-        assertTrue(actual instanceof BitSetVector);
+        e = new ComparisonExpression(IComparisonExpression.Type.EQUAL, new LiteralNullExpression(ResolvedType.of(Type.Int)), new LiteralIntegerExpression(5));
+        actual = e.eval(tv, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
-        assertTrue(actual.isNullable());
     }
 
     @Test
@@ -397,24 +375,18 @@ public class ComparisonExpressionTest extends APhysicalPlanTest
 
         // a != b
         e = new ComparisonExpression(IComparisonExpression.Type.NOT_EQUAL, new LiteralIntegerExpression(5), new LiteralIntegerExpression(5));
-        actual = e.eval(tv, null);
-        assertTrue(actual instanceof BitSetVector);
+        actual = e.eval(tv, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), false, false, false, false, false), actual);
-        assertFalse(actual.isNullable());
 
         // a != null
-        e = new ComparisonExpression(IComparisonExpression.Type.NOT_EQUAL, new LiteralIntegerExpression(5), new LiteralNullExpression(Type.Int));
-        actual = e.eval(tv, null);
-        assertTrue(actual instanceof BitSetVector);
+        e = new ComparisonExpression(IComparisonExpression.Type.NOT_EQUAL, new LiteralIntegerExpression(5), new LiteralNullExpression(ResolvedType.of(Type.Int)));
+        actual = e.eval(tv, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
-        assertTrue(actual.isNullable());
 
         // null != a
-        e = new ComparisonExpression(IComparisonExpression.Type.NOT_EQUAL, new LiteralNullExpression(Type.Int), new LiteralIntegerExpression(5));
-        actual = e.eval(tv, null);
-        assertTrue(actual instanceof BitSetVector);
+        e = new ComparisonExpression(IComparisonExpression.Type.NOT_EQUAL, new LiteralNullExpression(ResolvedType.of(Type.Int)), new LiteralIntegerExpression(5));
+        actual = e.eval(tv, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
-        assertTrue(actual.isNullable());
     }
 
     @Test
@@ -427,24 +399,18 @@ public class ComparisonExpressionTest extends APhysicalPlanTest
 
         // a > b
         e = new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN, new LiteralIntegerExpression(5), new LiteralIntegerExpression(5));
-        actual = e.eval(tv, null);
-        assertTrue(actual instanceof BitSetVector);
+        actual = e.eval(tv, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), false, false, false, false, false), actual);
-        assertFalse(actual.isNullable());
 
         // a > null
-        e = new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN, new LiteralIntegerExpression(5), new LiteralNullExpression(Type.Int));
-        actual = e.eval(tv, null);
-        assertTrue(actual instanceof BitSetVector);
+        e = new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN, new LiteralIntegerExpression(5), new LiteralNullExpression(ResolvedType.of(Type.Int)));
+        actual = e.eval(tv, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
-        assertTrue(actual.isNullable());
 
         // null > a
-        e = new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN, new LiteralNullExpression(Type.Int), new LiteralIntegerExpression(5));
-        actual = e.eval(tv, null);
-        assertTrue(actual instanceof BitSetVector);
+        e = new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN, new LiteralNullExpression(ResolvedType.of(Type.Int)), new LiteralIntegerExpression(5));
+        actual = e.eval(tv, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
-        assertTrue(actual.isNullable());
     }
 
     @Test
@@ -457,24 +423,18 @@ public class ComparisonExpressionTest extends APhysicalPlanTest
 
         // a >= b
         e = new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN_EQUAL, new LiteralIntegerExpression(5), new LiteralIntegerExpression(5));
-        actual = e.eval(tv, null);
-        assertTrue(actual instanceof BitSetVector);
+        actual = e.eval(tv, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), true, true, true, true, true), actual);
-        assertFalse(actual.isNullable());
 
         // a >= null
-        e = new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN_EQUAL, new LiteralIntegerExpression(5), new LiteralNullExpression(Type.Int));
-        actual = e.eval(tv, null);
-        assertTrue(actual instanceof BitSetVector);
+        e = new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN_EQUAL, new LiteralIntegerExpression(5), new LiteralNullExpression(ResolvedType.of(Type.Int)));
+        actual = e.eval(tv, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
-        assertTrue(actual.isNullable());
 
         // null >= a
-        e = new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN_EQUAL, new LiteralNullExpression(Type.Int), new LiteralIntegerExpression(5));
-        actual = e.eval(tv, null);
-        assertTrue(actual instanceof BitSetVector);
+        e = new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN_EQUAL, new LiteralNullExpression(ResolvedType.of(Type.Int)), new LiteralIntegerExpression(5));
+        actual = e.eval(tv, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
-        assertTrue(actual.isNullable());
     }
 
     @Test
@@ -487,24 +447,18 @@ public class ComparisonExpressionTest extends APhysicalPlanTest
 
         // a < b
         e = new ComparisonExpression(IComparisonExpression.Type.LESS_THAN, new LiteralIntegerExpression(5), new LiteralIntegerExpression(5));
-        actual = e.eval(tv, null);
-        assertTrue(actual instanceof BitSetVector);
+        actual = e.eval(tv, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), false, false, false, false, false), actual);
-        assertFalse(actual.isNullable());
 
         // a < null
-        e = new ComparisonExpression(IComparisonExpression.Type.LESS_THAN, new LiteralIntegerExpression(5), new LiteralNullExpression(Type.Int));
-        actual = e.eval(tv, null);
-        assertTrue(actual instanceof BitSetVector);
+        e = new ComparisonExpression(IComparisonExpression.Type.LESS_THAN, new LiteralIntegerExpression(5), new LiteralNullExpression(ResolvedType.of(Type.Int)));
+        actual = e.eval(tv, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
-        assertTrue(actual.isNullable());
 
         // null < a
-        e = new ComparisonExpression(IComparisonExpression.Type.LESS_THAN, new LiteralNullExpression(Type.Int), new LiteralIntegerExpression(5));
-        actual = e.eval(tv, null);
-        assertTrue(actual instanceof BitSetVector);
+        e = new ComparisonExpression(IComparisonExpression.Type.LESS_THAN, new LiteralNullExpression(ResolvedType.of(Type.Int)), new LiteralIntegerExpression(5));
+        actual = e.eval(tv, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
-        assertTrue(actual.isNullable());
     }
 
     @Test
@@ -517,24 +471,18 @@ public class ComparisonExpressionTest extends APhysicalPlanTest
 
         // a <= b
         e = new ComparisonExpression(IComparisonExpression.Type.LESS_THAN_EQUAL, new LiteralIntegerExpression(5), new LiteralIntegerExpression(5));
-        actual = e.eval(tv, null);
-        assertTrue(actual instanceof BitSetVector);
+        actual = e.eval(tv, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), true, true, true, true, true), actual);
-        assertFalse(actual.isNullable());
 
         // a <= null
-        e = new ComparisonExpression(IComparisonExpression.Type.LESS_THAN_EQUAL, new LiteralIntegerExpression(5), new LiteralNullExpression(Type.Int));
-        actual = e.eval(tv, null);
-        assertTrue(actual instanceof BitSetVector);
+        e = new ComparisonExpression(IComparisonExpression.Type.LESS_THAN_EQUAL, new LiteralIntegerExpression(5), new LiteralNullExpression(ResolvedType.of(Type.Int)));
+        actual = e.eval(tv, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
-        assertTrue(actual.isNullable());
 
         // null <= a
-        e = new ComparisonExpression(IComparisonExpression.Type.LESS_THAN_EQUAL, new LiteralNullExpression(Type.Int), new LiteralIntegerExpression(5));
-        actual = e.eval(tv, null);
-        assertTrue(actual instanceof BitSetVector);
+        e = new ComparisonExpression(IComparisonExpression.Type.LESS_THAN_EQUAL, new LiteralNullExpression(ResolvedType.of(Type.Int)), new LiteralIntegerExpression(5));
+        actual = e.eval(tv, context);
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), null, null, null, null, null), actual);
-        assertTrue(actual.isNullable());
     }
 
     private void assertCase(TestCase test)

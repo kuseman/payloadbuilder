@@ -9,10 +9,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import se.kuseman.payloadbuilder.api.catalog.ColumnReference;
-import se.kuseman.payloadbuilder.api.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
 
@@ -83,13 +83,14 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
      */
 
     @Override
-    protected void visit(IExpression expression, Ctx context)
+    protected IExpression visit(ILogicalPlan plan, IExpression expression, Ctx context)
     {
-        visit(singletonList(expression), context);
+        visit(plan, singletonList(expression), context);
+        return expression;
     }
 
     @Override
-    protected void visit(List<IExpression> expressions, Ctx context)
+    protected List<IExpression> visit(ILogicalPlan plan, List<IExpression> expressions, Ctx context)
     {
         Set<ColumnReference> columns = collectColumns(expressions);
 
@@ -104,6 +105,8 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
             context.columnsByAlias.computeIfAbsent(tableSource, k -> new HashSet<>())
                     .add(extractedColumn.getName());
         }
+
+        return expressions;
     }
 
     @Override

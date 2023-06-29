@@ -6,10 +6,10 @@ import java.util.List;
 import java.util.NoSuchElementException;
 
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.api.catalog.TupleIterator;
-import se.kuseman.payloadbuilder.api.catalog.TupleVector;
-import se.kuseman.payloadbuilder.api.catalog.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 
 /** Concat inputs into a single output stream. UNION ALL etc. */
 public class Concatenation implements IPhysicalPlan
@@ -46,11 +46,10 @@ public class Concatenation implements IPhysicalPlan
     {
         return new TupleIterator()
         {
-            int inputIndex = 0;
-            TupleIterator inputIterator;
-            TupleVector next;
-
-            Schema schema = null;
+            private int inputIndex = 0;
+            private TupleIterator inputIterator;
+            private TupleVector next;
+            private Schema schema = null;
 
             @Override
             public TupleVector next()
@@ -63,6 +62,7 @@ public class Concatenation implements IPhysicalPlan
                 // Use schema from first input
                 if (schema == null)
                 {
+                    // TODO: might be weird since we will also get the columnreferences which if wrong for other vectors than form the first input
                     schema = result.getSchema();
                 }
                 next = null;
