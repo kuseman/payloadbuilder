@@ -6,8 +6,8 @@ import java.util.List;
  * Definition of a test harness.
  *
  * <pre>
- * Works by setting a test harness containng
- * a set of catalog with their
+ * Works by setting a test harness containing
+ * a set of catalogs with their test cases
  * </pre>
  **/
 class TestHarness

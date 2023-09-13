@@ -6,6 +6,12 @@ public interface ILikeExpression extends IExpression
     /** Return true if this is expression in a NOT IN */
     boolean isNot();
 
+    /** Return left side expression */
+    IExpression getExpression();
+
     /** Return pattern expression for this LIKE expression */
     IExpression getPatternExpression();
+
+    /** Return the escape character expression for this LIKE expression */
+    IExpression getEscapeCharacterExpression();
 }

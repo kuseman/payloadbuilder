@@ -7,7 +7,7 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.api.session.IQuerySession;
+import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 
 /** Class representing a endpoint/index/type combo. */
 class ESType
@@ -25,7 +25,8 @@ class ESType
 
     static String getEndpoint(IQuerySession session, String catalogAlias)
     {
-        String endpoint = session.getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY);
+        String endpoint = session.getCatalogProperty(catalogAlias, ESCatalog.ENDPOINT_KEY)
+                .valueAsString(0);
         if (isBlank(endpoint))
         {
             throw new IllegalArgumentException("Missing endpoint key in catalog properties for: " + catalogAlias);
@@ -35,7 +36,8 @@ class ESType
 
     static String getIndex(IQuerySession session, String catalogAlias)
     {
-        String index = session.getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY);
+        String index = session.getCatalogProperty(catalogAlias, ESCatalog.INDEX_KEY)
+                .valueAsString(0);
         if (isBlank(index))
         {
             throw new IllegalArgumentException("Missing index key in catalog properties for: " + catalogAlias);

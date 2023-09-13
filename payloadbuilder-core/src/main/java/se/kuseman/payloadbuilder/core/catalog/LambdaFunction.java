@@ -14,8 +14,8 @@ public interface LambdaFunction
      *
      * Ie.
      *
-     * <i>map(list, x -> x.id)</i>
-     * Here argument <b>list</b> binds to the lambda expression <b>x -> x.id</b>.
+     * <i>map(list, x -&gt; x.id)</i>
+     * Here argument <b>list</b> binds to the lambda expression <b>x -&gt; x.id</b>.
      * </pre>
      */
     List<LambdaBinding> getLambdaBindings();

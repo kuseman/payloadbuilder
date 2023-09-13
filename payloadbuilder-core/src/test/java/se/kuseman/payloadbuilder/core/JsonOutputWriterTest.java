@@ -16,6 +16,117 @@ import se.kuseman.payloadbuilder.core.JsonOutputWriter.JsonSettings;
 public class JsonOutputWriterTest extends Assert
 {
     @Test
+    public void test_allResultSetsAsOneArray()
+    {
+        JsonSettings settings = new JsonSettings();
+        settings.setAllResultSetsAsOneArray(true);
+
+        Pair<StringWriter, JsonOutputWriter> p = writer(settings);
+
+        //@formatter:off
+        // First result set
+        p.getValue().initResult(new String[0]);
+        p.getValue().startRow();
+        p.getValue().startObject();
+        p.getValue().writeFieldName("key");
+        p.getValue().writeInt(123);
+        p.getValue().endObject();
+        p.getValue().endResult();
+
+        // Second
+        p.getValue().initResult(new String[0]);
+        p.getValue().startRow();
+        p.getValue().startObject();
+        p.getValue().writeFieldName("key2");
+        p.getValue().writeInt(456);
+        p.getValue().endObject();
+        p.getValue().endResult();
+        //@formatter:on
+
+        p.getValue()
+                .close();
+
+        assertEquals("[{\"key\":123},{\"key2\":456}]", p.getKey()
+                .toString());
+    }
+
+    @Test
+    public void test_resultSetsAsArrays()
+    {
+        JsonSettings settings = new JsonSettings();
+        settings.setResultSetsAsArrays(true);
+        settings.setResultSetSeparator("======");
+
+        Pair<StringWriter, JsonOutputWriter> p = writer(settings);
+
+        //@formatter:off
+        // First result set
+        p.getValue().initResult(new String[0]);
+        p.getValue().startRow();
+        p.getValue().startObject();
+        p.getValue().writeFieldName("key");
+        p.getValue().writeInt(123);
+        p.getValue().endObject();
+        p.getValue().endResult();
+        p.getValue().flush();
+
+        // Second
+        p.getValue().initResult(new String[0]);
+        p.getValue().startRow();
+        p.getValue().startObject();
+        p.getValue().writeFieldName("key2");
+        p.getValue().writeInt(456);
+        p.getValue().endObject();
+        p.getValue().endResult();
+        //@formatter:on
+
+        p.getValue()
+                .close();
+
+        assertEquals("[{\"key\":123}]====== [{\"key2\":456}]", p.getKey()
+                .toString());
+    }
+
+    @Test
+    public void test_row_and_resultset_separator()
+    {
+        JsonSettings settings = new JsonSettings();
+        settings.setRowSeparator("####");
+        settings.setResultSetSeparator("====");
+
+        Pair<StringWriter, JsonOutputWriter> p = writer(settings);
+
+        //@formatter:off
+        // First result set
+        p.getValue().initResult(new String[0]);
+        p.getValue().startRow();
+        p.getValue().startObject();
+        p.getValue().writeFieldName("key");
+        p.getValue().writeInt(123);
+        p.getValue().endObject();
+        p.getValue().endRow();
+        p.getValue().endResult();
+        p.getValue().flush();
+
+        // Second
+        p.getValue().initResult(new String[0]);
+        p.getValue().startRow();
+        p.getValue().startObject();
+        p.getValue().writeFieldName("key2");
+        p.getValue().writeInt(456);
+        p.getValue().endObject();
+        p.getValue().endRow();
+        p.getValue().endResult();
+        //@formatter:on
+
+        p.getValue()
+                .close();
+
+        assertEquals("{\"key\":123}####==== {\"key2\":456}####", p.getKey()
+                .toString());
+    }
+
+    @Test
     public void test()
     {
         Pair<StringWriter, JsonOutputWriter> p = writer();

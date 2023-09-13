@@ -2,17 +2,21 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 
 import java.util.List;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 
 /** Substring function */
 class SubstringFunction extends ScalarFunctionInfo
 {
-    SubstringFunction(Catalog catalog)
+    SubstringFunction()
     {
-        super(catalog, "substring");
+        super("substring", FunctionType.SCALAR);
     }
 
     @Override
@@ -22,45 +26,68 @@ class SubstringFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
-        Object obj = arguments.get(0)
-                .eval(context);
-        if (obj == null)
-        {
-            return null;
-        }
+        return ResolvedType.of(Type.String);
+    }
 
-        String value = String.valueOf(obj);
-        obj = arguments.get(1)
-                .eval(context);
-        if (obj == null)
-        {
-            return null;
-        }
-        if (!(obj instanceof Integer))
-        {
-            throw new IllegalArgumentException("Expected integer argument for start to function " + getName() + " but got: " + obj);
-        }
+    @Override
+    public Arity arity()
+    {
+        return new Arity(2, 3);
+    }
 
-        int start = (Integer) obj;
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
+    {
+        final ValueVector value = arguments.get(0)
+                .eval(input, context);
 
-        if (arguments.size() > 2)
+        final ValueVector start = arguments.get(1)
+                .eval(input, context);
+
+        final ValueVector length = arguments.size() > 2 ? arguments.get(2)
+                .eval(input, context)
+                : null;
+
+        return new ValueVector()
         {
-            obj = arguments.get(2)
-                    .eval(context);
-            if (obj == null)
+            @Override
+            public ResolvedType type()
             {
-                return null;
-            }
-            if (!(obj instanceof Integer))
-            {
-                throw new IllegalArgumentException("Expected integer argument for length to function " + getName() + " but got: " + obj);
+                return ResolvedType.of(Type.String);
             }
 
-            return value.substring(start, start + (int) obj);
-        }
+            @Override
+            public int size()
+            {
+                return input.getRowCount();
+            }
 
-        return value.substring(start);
+            @Override
+            public boolean isNull(int row)
+            {
+                return value.isNull(row)
+                        || start.isNull(row)
+                        || (length != null
+                                && length.isNull(row));
+            }
+
+            @Override
+            public UTF8String getString(int row)
+            {
+                String strArg = value.getString(row)
+                        .toString();
+                int startArg = start.getInt(row);
+
+                if (length != null)
+                {
+                    int lengthArg = length.getInt(row);
+                    return UTF8String.from(strArg.substring(startArg, startArg + lengthArg));
+                }
+
+                return UTF8String.from(strArg.substring(startArg));
+            }
+        };
     }
 }

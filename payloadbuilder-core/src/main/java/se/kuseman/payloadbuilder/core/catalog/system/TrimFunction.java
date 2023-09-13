@@ -4,19 +4,23 @@ import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 
 /** Lower and upper function */
 class TrimFunction extends ScalarFunctionInfo
 {
     private final Type type;
 
-    TrimFunction(Catalog catalog, Type type)
+    TrimFunction(Type type)
     {
-        super(catalog, type.name);
+        super(type.name, FunctionType.SCALAR);
         this.type = type;
     }
 
@@ -27,35 +31,67 @@ class TrimFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public int arity()
+    public Arity arity()
     {
-        return 1;
+        return new Arity(1, 2);
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
-        Object obj = arguments.get(0)
-                .eval(context);
-        if (obj == null)
-        {
-            return null;
-        }
+        return ResolvedType.of(Column.Type.String);
+    }
 
-        String value = String.valueOf(obj);
-        // CSOFF
-        switch (type)
-        // CSON
-        {
-            case BOTH:
-                return StringUtils.trim(value);
-            case LEFT:
-                return StringUtils.stripStart(value, null);
-            case RIGHT:
-                return StringUtils.stripEnd(value, null);
-        }
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, final TupleVector input, String catalogAlias, List<IExpression> arguments)
+    {
+        final ValueVector value = arguments.get(0)
+                .eval(input, context);
 
-        return null;
+        final ValueVector trimChars = arguments.size() > 1 ? arguments.get(1)
+                .eval(input, context)
+                : null;
+        return new ValueVector()
+        {
+            @Override
+            public ResolvedType type()
+            {
+                return ResolvedType.of(Column.Type.String);
+            }
+
+            @Override
+            public int size()
+            {
+                return input.getRowCount();
+            }
+
+            @Override
+            public boolean isNull(int row)
+            {
+                return value.isNull(row);
+            }
+
+            @Override
+            public UTF8String getString(int row)
+            {
+                String strArg = value.getString(row)
+                        .toString();
+                String stripChars = trimChars != null ? trimChars.getString(row)
+                        .toString()
+                        : null;
+                switch (type)
+                {
+                    case BOTH:
+                        return UTF8String.from(StringUtils.strip(strArg, stripChars));
+                    case LEFT:
+                        return UTF8String.from(StringUtils.stripStart(strArg, stripChars));
+                    case RIGHT:
+                        return UTF8String.from(StringUtils.stripEnd(strArg, stripChars));
+                    default:
+                        throw new IllegalArgumentException("Unsupported trim type: " + type);
+                }
+            }
+        };
     }
 
     /** Type */

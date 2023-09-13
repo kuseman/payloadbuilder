@@ -11,7 +11,7 @@ public interface QueryResult
     boolean hasMoreResults();
 
     /**
-     * Write current result set to provided writer
+     * Write current result set to provided writer. NOTE! Caller has the responsibility to close the writer when all results has been written
      *
      * @throws IllegalArgumentException if there are no more results
      */

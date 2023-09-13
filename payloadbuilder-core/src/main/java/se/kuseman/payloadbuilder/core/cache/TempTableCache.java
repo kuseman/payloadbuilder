@@ -4,19 +4,18 @@ import java.time.Duration;
 import java.util.function.Supplier;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.core.operator.TemporaryTable;
+import se.kuseman.payloadbuilder.core.execution.TemporaryTable;
 
 /** Cache provider for temporary tables */
-public interface TempTableCache extends Cache
+public interface TempTableCache extends CacheProvider
 {
     /**
-     * Get temporary table by cache name and key
+     * Compute temporary table by cache name, ttl and supplier
      *
      * @param name Name of cache
-     * @param key Cache key to use
      * @param ttl TTL Duration for cache entry. NULL if no TTL
      * @param supplier Supplier that is executed if temporary table is not found in cache.
      * @return Cached temporary table
      */
-    TemporaryTable computIfAbsent(QualifiedName name, Object key, Duration ttl, Supplier<TemporaryTable> supplier);
+    TemporaryTable computIfAbsent(QualifiedName name, Duration ttl, Supplier<TemporaryTable> supplier);
 }

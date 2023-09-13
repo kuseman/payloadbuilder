@@ -57,10 +57,59 @@
       ]
     },
     {
+      "name": "Select into with index",
+      "onlyAssertExpectedColumns": true,
+      "query": [
+        "select col1 * 2 newCol1, col2 * 10 newCol2 ",
+        "into #temp with (indices=array(array('newCol1'))) ",
+        "from source",
+        "",
+        "select * from #temp ",
+        "",
+        "describe ",
+        "select * ",
+        "from data d ",
+        "inner join #temp t ",
+        "  on t.newCol1 = d.id ",
+        "",
+        "select * ",
+        "from data d ",
+        "inner join #temp t ",
+        "  on t.newCol1 = d.id "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "newCol1", "value": 2 }, { "key": "newCol2", "value": 20 } ],
+          [{ "key": "newCol1", "value": 6 }, { "key": "newCol2", "value": 40 } ],
+          [{ "key": "newCol1", "value": 10 }, { "key": "newCol2", "value": 60 } ]
+        ],
+        [
+          [{ "key": "Node id", "value": 2 }, { "key": "Name", "value": "+- Nested Loop" }                          ],
+          [{ "key": "Node id", "value": 0 }, { "key": "Name", "value": "|  +- Scan: data" }                        ],
+          [{ "key": "Node id", "value": 1 }, { "key": "Name", "value": "|  +- Index Seek: #temp [newCol1] (ALL)" } ]
+        ],
+        [
+          [{ "key": "id", "value": 2 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "2_1" }, { "key": "newCol1", "value": 2 }, { "key": "newCol2", "value": 20 } ]
+        ]
+      ]
+    },
+    {
+      "name": "Select into 2",
+      "query": [
+        "select 1 + 2 \"1 + 2\" into #temp",
+        "select * from #temp"
+      ],
+      "expectedResultSets": [
+        [
+          [ { "key": "1 + 2", "value": 3 } ]
+        ]
+      ]
+    },
+    {
       "name": "Select into with cache",
       "query": [
         "select 1 col ",
-        "into #temp with (cacheName = 'temp', cacheKey = 'key') ",
+        "into #temp with (cacheTtl = 'PT10M') ",
         "from source",
         "",
         "show caches ",
@@ -72,13 +121,13 @@
       ],
       "expectedResultSets": [
         [
-          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 1 }, {"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "Session" } ]
+          [{ "key": "name", "value": "temp" }, { "key": "size", "value": 1 }, {"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "" } ]
         ],
         [
-          [{ "key": "name", "value": "\"temp\"" }, { "key": "key", "value": "key" }, {"key": "expire_time", "value": null }, { "key": "type", "value": "TEMPTABLE" },{ "key": "provider", "value": "Session" } ]
+          [{ "key": "name", "value": "temp" }, { "key": "key", "value": "temp" }, {"key": "expire_time", "value": "###IGNORE###" }, { "key": "type", "value": "TEMPTABLE" },{ "key": "provider", "value": "" } ]
         ],
         [
-          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 0 }, {"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "Session" } ]
+          [{ "key": "name", "value": "temp" }, { "key": "size", "value": 0 }, {"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "" } ]
         ],
         []
       ]
@@ -87,7 +136,7 @@
       "name": "Select into with cache, flush/remove all",
       "query": [
         "select 1 col ",
-        "into #temp with (cacheName = 'temp', cacheKey = 'key') ",
+        "into #temp with (cacheTtl = 'PT10M', cachePrefix='tenant_') ",
         "from source",
         "",
         "show caches",
@@ -99,45 +148,63 @@
       ],
       "expectedResultSets": [
         [
-          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 1 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "Session" } ]
+          [{ "key": "name", "value": "tenant_.temp" }, { "key": "size", "value": 1 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "" } ]
         ],
         [
-          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 0 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "Session" } ]
+          [{ "key": "name", "value": "tenant_.temp" }, { "key": "size", "value": 0 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "" } ]
         ],
         []
       ]
     },
     {
-      "name": "Select into with cache, flush key",
+      "name": "Select into with cache, flush",
       "query": [
         "select 1 col ",
-        "into #temp with (cacheName = 'temp', cacheKey = 'key') ",
+        "into #temp with (cacheTtl = 'PT10M') ",
         "from source ",
         "select 2 col ",
-        "into #temp2 with (cacheName = 'temp', cacheKey = 'key2') ",
-        "from source",
+        "into #temp2 with (cacheTtl = 'PT10M') ",
+        "from source ",
         "",
-        "show caches",
-        "cache flush temptable/temp 'key'",
-        "select * from sys#caches"
+        "show caches ",
+        "cache flush temptable/temp ",
+        "select * from sys#caches "
       ],
       "expectedResultSets": [
         [
-          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 2 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 2 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "Session" } ]
+          [{ "key": "name", "value": "temp" }, { "key": "size", "value": 1 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "" } ],
+          [{ "key": "name", "value": "temp2" }, { "key": "size", "value": 1 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "" } ]
         ],
         [
-          [{ "key": "name", "value": "\"temp\"" }, { "key": "size", "value": 1 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 2 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "Session" } ]
+          [{ "key": "name", "value": "temp" }, { "key": "size", "value": 0 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "" } ],
+          [{ "key": "name", "value": "temp2" }, { "key": "size", "value": 1 },{"key": "hits", "value": 0 }, { "key": "hit_ratio", "value": 0.0 },{ "key": "misses", "value": 1 }, { "key": "miss_ratio", "value": 1.0 }, { "key": "type", "value": "TEMPTABLE" }, { "key": "provider", "value": "" } ]
         ]
       ]
+    },
+    {
+      "name": "Select into table with cache, missing ttl",
+      "query": [
+        "select 1 col into #temp with (cachePrefix='cache_')"
+      ],
+      "expectedException": "java.lang.IllegalArgumentException",
+      "expectedMessageContains": "CacheTTL hint is mandatory to enable cache on temporary table: #temp"
+    },
+    {
+      "name": "Select into table with cache, null prefix",
+      "query": [
+        "select 1 col into #temp with (cachettl = 'PT10M', cachePrefix=@tenant)"
+      ],
+      "expectedException": "se.kuseman.payloadbuilder.core.QueryException",
+      "expectedMessageContains": "Cache prefix expression: @tenant evaluated to null"
     },
     {
       "name": "Select into table already exists",
       "query": [
         "select 1 col into #temp",
-        "select col into #temp from source"
+        "select 2 col into #temp from source"
       ],
-      "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
-      "expectedMessageContains": "Temporary table '#temp' already exists"
+      "expectedException": "se.kuseman.payloadbuilder.core.QueryException",
+      "expectedMessageContains": "Temporary table #temp already exists in session"
     },
     {
       "name": "Drop table fail",
@@ -176,8 +243,8 @@
       "query": [
         "select * from #temp"
       ],
-      "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
-      "expectedMessageContains": "No temporary table found named '#temp'"
+      "expectedException": "se.kuseman.payloadbuilder.core.QueryException",
+      "expectedMessageContains": "No temporary table found with name #temp"
     },
     {
       "name": "Select fail 2",
@@ -185,17 +252,8 @@
         "select 1 col into #temp",
         "select * from #temp2"
       ],
-      "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
-      "expectedMessageContains": "No temporary table found named '#temp2'"
-    },
-    {
-      "name": "Select fail 3",
-      "query": [
-        "select 1 + 2 into #temp",
-        "select * from #temp"
-      ],
-      "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
-      "expectedMessageContains": "All items must have an identifier when using a SELECT INTO"
+      "expectedException": "se.kuseman.payloadbuilder.core.QueryException",
+      "expectedMessageContains": "No temporary table found with name #temp2"
     },
     {
       "name": "Select fail 4",
@@ -214,7 +272,7 @@
       ],
       "expectedResultSets": [
         [
-          [{ "key": "col", "value": 1 }, { "key": "", "value": 10 } ]
+          [{ "key": "col", "value": 1 }, { "key": "col * 10", "value": 10 } ]
         ]
       ]
     },
@@ -246,7 +304,7 @@
 		"from #temp t ",
 		"inner join #temp1 t1 ",
 		"  on t1.Value = t.Value ",
-		"order by t1.newCol_temp_1 desc"      
+		"order by t1.newCol_temp_1 desc"
 	  ],
       "expectedResultSets": [
         [
@@ -258,8 +316,8 @@
     {
       "name": "Select into with asterisk and computed",
       "query": [
-        "select d.id + d.row_id col, d into #temp from data d",
-        "select d.id, d.row_id, d.data, col from #temp"
+        "select d.id + d.row_id col, d.id, d.row_id, d.data into #temp from data d",
+        "select d.id, d.row_id, d.data, col from #temp d "
       ],
       "expectedResultSets": [
         [
@@ -273,15 +331,15 @@
       ]
     },
     {
-      "name": "Traverse into temp table hierarchy",
+      "name": "Select into 3",
       "query": [
-        "select d.row_id * s.col2 calc, s, d ",
+        "select d.row_id * s.col2 calc, s.col1, d.data ",
         "into #temp ",
         "from source s ",
         "inner join data d ",
         "  on d.id = s.col1 ",
         " ",
-        "select calc, t.s.col1, t.d.data ",
+        "select calc, t.col1, t.data ",
         "from #temp t "
 	  ],
 	  "expectedResultSets": [
@@ -297,22 +355,22 @@
     {
       "name": "Complex value in temp table",
       "query": [
-        "select (select d.row_id * s.col2 calc for object) obj, s, d ",
+        "select (select d.row_id * s.col2 calc for object) obj, s.col1, d.data ",
         "into #temp ",
         "from source s ",
         "inner join data d ",
         "  on d.id = s.col1 ",
         " ",
-        "select obj, t.obj.calc, t.s.col1, t.d.data ",
+        "select obj, t.col1, t.data ",
         "from #temp t "
 	  ],
 	  "expectedResultSets": [
         [
-          [{ "key": "obj", "value": {"calc": 2 } }, { "key": "calc", "value": 2 }, { "key": "col1", "value": 1 }, { "key": "data", "value": "1_1" }],
-          [{ "key": "obj", "value": {"calc": 4 } }, { "key": "calc", "value": 4 }, { "key": "col1", "value": 1 }, { "key": "data", "value": "1_2" }],
-          [{ "key": "obj", "value": {"calc": 4 } }, { "key": "calc", "value": 4 }, { "key": "col1", "value": 3 }, { "key": "data", "value": "3_1" }],
-          [{ "key": "obj", "value": {"calc": 8 } }, { "key": "calc", "value": 8 }, { "key": "col1", "value": 3 }, { "key": "data", "value": "3_2" }],
-          [{ "key": "obj", "value": {"calc": 12 } },{ "key": "calc", "value": 12 }, { "key": "col1", "value": 3 }, { "key": "data", "value": "3_3" }]
+          [{ "key": "obj", "value": {"calc": 2 } },  { "key": "col1", "value": 1 }, { "key": "data", "value": "1_1" }],
+          [{ "key": "obj", "value": {"calc": 4 } },  { "key": "col1", "value": 1 }, { "key": "data", "value": "1_2" }],
+          [{ "key": "obj", "value": {"calc": 4 } },  { "key": "col1", "value": 3 }, { "key": "data", "value": "3_1" }],
+          [{ "key": "obj", "value": {"calc": 8 } },  { "key": "col1", "value": 3 }, { "key": "data", "value": "3_2" }],
+          [{ "key": "obj", "value": {"calc": 12 } }, { "key": "col1", "value": 3 }, { "key": "data", "value": "3_3" }]
         ]
 	  ]    
     },

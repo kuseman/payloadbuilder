@@ -2,75 +2,130 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 
 import java.util.List;
 
-import se.kuseman.payloadbuilder.api.TableMeta;
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
-import se.kuseman.payloadbuilder.api.codegen.CodeGeneratorContext;
-import se.kuseman.payloadbuilder.api.codegen.ExpressionCode;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
-import se.kuseman.payloadbuilder.core.utils.ObjectUtils;
+import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 
 /** Function listOf. Creates a list of provided arguments */
 class ContainsFunction extends ScalarFunctionInfo
 {
-    ContainsFunction(Catalog catalog)
+    ContainsFunction()
     {
-        super(catalog, "contains");
+        super("contains", FunctionType.SCALAR);
     }
 
     @Override
     public String getDescription()
     {
-        return "Checks if provided collection contains value argument" + System.lineSeparator() + "ie. contains(<collection expression>, <value expression>)";
+        return "Checks if provided array contains value argument" + System.lineSeparator() + "ie. contains(<array expression>, <value expression>)";
     }
 
     @Override
-    public int arity()
+    public Arity arity()
     {
-        return 2;
+        return Arity.TWO;
     }
 
     @Override
-    public TableMeta.DataType getDataType(List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
-        return TableMeta.DataType.BOOLEAN;
+        return ResolvedType.of(Column.Type.Boolean);
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
     {
-        // Function has a declared getInputTypes method that guards against wrong argument count
-        Object arg0 = arguments.get(0)
-                .eval(context);
-        Object arg1 = arguments.get(1)
-                .eval(context);
+        final ValueVector array = arguments.get(0)
+                .eval(input, context);
+        final ValueVector findValue = arguments.get(1)
+                .eval(input, context);
 
-        return ObjectUtils.contains(arg0, arg1);
+        final Type arrayType = array.type()
+                .getType();
+        final Type equalsType = getEqualsType(array, findValue);
+
+        return new ValueVector()
+        {
+            @Override
+            public ResolvedType type()
+            {
+                return ResolvedType.of(Column.Type.Boolean);
+            }
+
+            @Override
+            public int size()
+            {
+                return input.getRowCount();
+            }
+
+            @Override
+            public boolean isNull(int row)
+            {
+                return false;
+            }
+
+            @Override
+            public boolean getBoolean(int row)
+            {
+                // A null array cannot be searched and hence => false
+                if (array.isNull(row))
+                {
+                    return false;
+                }
+
+                ValueVector currentArray = null;
+                if (arrayType == Type.Any)
+                {
+                    Object arrayValue = VectorUtils.convertToValueVector(array.valueAsObject(row), false);
+                    if (arrayValue instanceof ValueVector)
+                    {
+                        currentArray = (ValueVector) arrayValue;
+                    }
+                }
+                else if (arrayType == Type.Array)
+                {
+                    currentArray = array.getArray(row);
+                }
+
+                if (currentArray != null)
+                {
+                    int size = currentArray.size();
+                    for (int i = 0; i < size; i++)
+                    {
+                        // NOTE! When searching arrays we compare nulls so it's possible to perform a "arr.contains(null)"
+                        if (VectorUtils.equals(currentArray, findValue, equalsType, i, row, true))
+                        {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+
+                return VectorUtils.equals(array, findValue, equalsType, row, row, false);
+            }
+        };
     }
 
-    @Override
-    public boolean isCodeGenSupported(List<? extends IExpression> arguments)
+    private Type getEqualsType(ValueVector array, ValueVector findValue)
     {
-        return arguments.stream()
-                .allMatch(IExpression::isCodeGenSupported);
-    }
+        Type arrayType = array.type()
+                .getType();
+        if (arrayType == Type.Array)
+        {
+            arrayType = array.type()
+                    .getSubType()
+                    .getType();
+        }
+        Type findValueType = findValue.type()
+                .getType();
 
-    @Override
-    public ExpressionCode generateCode(CodeGeneratorContext context, List<? extends IExpression> arguments)
-    {
-        ExpressionCode code = context.getExpressionCode();
-        context.addImport("se.kuseman.payloadbuilder.core.utils.ObjectUtils");
-
-        ExpressionCode arg0Code = arguments.get(0)
-                .generateCode(context);
-        ExpressionCode arg1Code = arguments.get(1)
-                .generateCode(context);
-
-        String template = "%s%s" // arg0Code, arg1Code
-                          + "boolean %s = false;\n" // nullVar
-                          + "boolean %s = ObjectUtils.contains(%s, %s);\n"; // arg0 resVar, org1 resVar
-        code.setCode(String.format(template, arg0Code.getCode(), arg1Code.getCode(), code.getNullVar(), code.getResVar(), arg0Code.getResVar(), arg1Code.getResVar()));
-        return code;
+        return arrayType.getPrecedence() > findValueType.getPrecedence() ? arrayType
+                : findValueType;
     }
 }

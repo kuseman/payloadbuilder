@@ -1,63 +1,128 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 
-import se.kuseman.payloadbuilder.api.TableAlias;
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
+import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
+import se.kuseman.payloadbuilder.core.execution.VectorUtils;
+
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntHash.Strategy;
+import it.unimi.dsi.fastutil.ints.IntOpenCustomHashSet;
 
 /** Distinct input */
 class DistinctFunction extends ScalarFunctionInfo
 {
-    DistinctFunction(Catalog catalog)
+    DistinctFunction()
     {
-        super(catalog, "distinct");
+        super("distinct", FunctionType.SCALAR);
     }
 
     @Override
-    public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Set<TableAlias>> argumentAliases)
+    public Arity arity()
     {
-        // Distinct result aliases is the input arguments aliases
-        return argumentAliases.get(0);
+        return Arity.ONE;
     }
 
     @Override
-    public int arity()
+    public ResolvedType getType(List<IExpression> arguments)
     {
-        return 1;
+        return arguments.get(0)
+                .getType();
     }
 
-    @SuppressWarnings({ "unchecked" })
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
     {
-        Object obj = arguments.get(0)
-                .eval(context);
-        Set<Object> result = null;
-        if (obj instanceof Iterator)
+        ValueVector value = arguments.get(0)
+                .eval(input, context);
+
+        // Non array types are already distinct by definition
+        if (value.type()
+                .getType() != Type.Array)
         {
-            result = new HashSet<>();
-            Iterator<Object> it = (Iterator<Object>) obj;
-            while (it.hasNext())
+            return value;
+        }
+
+        final Int2ObjectMap<ValueVector> distinctIdsByRow = new Int2ObjectOpenHashMap<>(value.size());
+
+        return new ValueVector()
+        {
+            @Override
+            public ResolvedType type()
             {
-                result.add(it.next());
+                return value.type();
             }
-        }
-        else if (obj instanceof Set)
-        {
-            result = (Set<Object>) obj;
-        }
-        else if (obj instanceof Collection)
-        {
-            result = new HashSet<>((Collection<Object>) obj);
-        }
 
-        return result;
+            @Override
+            public int size()
+            {
+                return value.size();
+            }
+
+            @Override
+            public boolean isNull(int row)
+            {
+                return value.isNull(row);
+            }
+
+            @Override
+            public ValueVector getArray(int row)
+            {
+                // Cache result to avoid calculating distinct multilpe times
+                return distinctIdsByRow.computeIfAbsent(row, r ->
+                {
+                    ValueVector vv = value.getArray(r);
+                    int size = vv.size();
+
+                    final ValueVector[] vectors = new ValueVector[] { vv };
+
+                    IntOpenCustomHashSet set = new IntOpenCustomHashSet(size, new Strategy()
+                    {
+                        @Override
+                        public int hashCode(int e)
+                        {
+                            return VectorUtils.hash(vectors, e);
+                        }
+
+                        @Override
+                        public boolean equals(int a, int b)
+                        {
+                            return VectorUtils.equals(vectors, a, b);
+                        }
+                    });
+
+                    // Populate set to get unique ordinals
+                    for (int i = 0; i < size; i++)
+                    {
+                        set.add(i);
+                    }
+
+                    final int[] ordinals = set.toIntArray();
+
+                    return new ValueVectorAdapter(vv)
+                    {
+                        @Override
+                        public int size()
+                        {
+                            return ordinals.length;
+                        }
+
+                        @Override
+                        public int getRow(int row)
+                        {
+                            return ordinals[row];
+                        }
+                    };
+                });
+            }
+        };
     }
 }

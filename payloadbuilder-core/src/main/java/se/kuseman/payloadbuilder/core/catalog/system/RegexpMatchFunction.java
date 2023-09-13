@@ -1,23 +1,25 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
-import static java.util.Collections.emptyIterator;
-
-import java.util.Iterator;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 
 /** Regexp match. Matches input with a regular expression and outputs pattern based on matching */
 class RegexpMatchFunction extends ScalarFunctionInfo
 {
-    RegexpMatchFunction(Catalog catalog)
+    RegexpMatchFunction()
     {
-        super(catalog, "regexp_match");
+        super("regexp_match", FunctionType.SCALAR);
     }
 
     @Override
@@ -28,87 +30,115 @@ class RegexpMatchFunction extends ScalarFunctionInfo
                + "Ex. regexp_match(expression, stringExpression)." + System.lineSeparator()
                + "This returns an array of values with matched gorups." + System.lineSeparator()
                + System.lineSeparator()
-               + "Returns a list of values.";
+               + "Returns an array of values.";
         //@formatter:on
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public Arity arity()
     {
-        Object obj = arguments.get(0)
-                .eval(context);
+        return Arity.TWO;
+    }
 
-        if (obj == null)
+    @Override
+    public ResolvedType getType(List<IExpression> arguments)
+    {
+        return ResolvedType.array(Type.String);
+    }
+
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
+    {
+        final ValueVector value = arguments.get(0)
+                .eval(input, context);
+        final ValueVector pattern = arguments.get(1)
+                .eval(input, context);
+        final Pattern constantPattern = arguments.get(1)
+                .isConstant()
+                        ? Pattern.compile(pattern.getString(0)
+                                .toString())
+                        : null;
+
+        return new ValueVector()
         {
-            return null;
-        }
-
-        Object patternObj = arguments.get(1)
-                .eval(context);
-        if (!(patternObj instanceof String))
-        {
-            throw new IllegalArgumentException("Expected a String pattern for function " + getName() + " but got " + patternObj);
-        }
-
-        String value = String.valueOf(obj);
-        Pattern pattern = Pattern.compile((String) patternObj);
-
-        final Matcher matcher = pattern.matcher(value);
-
-        if (!matcher.find())
-        {
-            return emptyIterator();
-        }
-
-        final int count = matcher.groupCount();
-
-        if (count == 0)
-        {
-            return emptyIterator();
-        }
-
-        Iterator<Object> it = new Iterator<Object>()
-        {
-            int currentGroup = 1;
-            String next = matcher.group(currentGroup);
-
             @Override
-            public Object next()
+            public ResolvedType type()
             {
-                String result = next;
-                next = null;
-                return result;
+                return ResolvedType.array(Type.String);
             }
 
             @Override
-            public boolean hasNext()
+            public int size()
             {
-                if (next != null)
+                return input.getRowCount();
+            }
+
+            @Override
+            public boolean isNull(int row)
+            {
+                return value.isNull(row)
+                        || pattern.isNull(row);
+            }
+
+            @Override
+            public ValueVector getArray(int row)
+            {
+                Pattern regexPattern;
+                if (constantPattern != null)
                 {
-                    return true;
+                    regexPattern = constantPattern;
+                }
+                else
+                {
+                    regexPattern = Pattern.compile(pattern.getString(row)
+                            .toString());
                 }
 
-                return setNext();
-            }
+                final Matcher matcher = regexPattern.matcher(value.getString(row)
+                        .toString());
 
-            private boolean setNext()
-            {
-                currentGroup++;
-                if (currentGroup > count)
+                final List<UTF8String> matches = new ArrayList<>();
+                int groupCount = matcher.groupCount();
+                while (matcher.find())
                 {
-                    // End of current find, move to next
-                    currentGroup = 0;
-                    if (!matcher.find())
+                    for (int i = 1; i <= groupCount; i++)
+                    {
+                        matches.add(UTF8String.from(matcher.group(i)));
+                    }
+                }
+                if (matches.isEmpty())
+                {
+                    // Empty vector
+                    return ValueVector.literalString(UTF8String.EMPTY, 0);
+                }
+
+                return new ValueVector()
+                {
+                    @Override
+                    public ResolvedType type()
+                    {
+                        return ResolvedType.of(Type.String);
+                    }
+
+                    @Override
+                    public int size()
+                    {
+                        return matches.size();
+                    }
+
+                    @Override
+                    public boolean isNull(int row)
                     {
                         return false;
                     }
-                    return setNext();
-                }
 
-                next = matcher.group(currentGroup);
-                return true;
+                    @Override
+                    public UTF8String getString(int row)
+                    {
+                        return matches.get(row);
+                    }
+                };
             }
         };
-        return it;
     }
 }

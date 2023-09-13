@@ -10,54 +10,60 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.Temporal;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 
-import se.kuseman.payloadbuilder.api.QualifiedName;
+import org.apache.commons.lang3.StringEscapeUtils;
+
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo;
-import se.kuseman.payloadbuilder.api.catalog.IAnalyzePair;
-import se.kuseman.payloadbuilder.api.catalog.IAnalyzePair.Type;
+import se.kuseman.payloadbuilder.api.catalog.IPredicate;
+import se.kuseman.payloadbuilder.api.catalog.IPredicate.Type;
+import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.expression.IColumnExpression;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.api.expression.IFunctionCallExpression;
 import se.kuseman.payloadbuilder.api.expression.IInExpression;
 import se.kuseman.payloadbuilder.api.expression.ILikeExpression;
-import se.kuseman.payloadbuilder.api.expression.IQualifiedFunctionCallExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 
 /** Predicate for a property */
+@SuppressWarnings("deprecation")
 class PropertyPredicate
 {
-    final String alias;
     final String property;
     final String nestedPath;
-    final IAnalyzePair pair;
+    final IPredicate predicate;
     final boolean fullTextPredicate;
 
-    PropertyPredicate(String alias, String property, IAnalyzePair pair, boolean fullTextPredicate)
+    PropertyPredicate(String property, IPredicate predicate, boolean fullTextPredicate)
     {
-        this(alias, property, null, pair, fullTextPredicate);
+        this(property, null, predicate, fullTextPredicate);
     }
 
-    PropertyPredicate(String alias, String property, String nestedPath, IAnalyzePair pair, boolean fullTextPredicate)
+    PropertyPredicate(String property, String nestedPath, IPredicate predicate, boolean fullTextPredicate)
     {
-        this.alias = alias;
         this.property = requireNonNull(property, "property");
         this.nestedPath = nestedPath;
-        this.pair = requireNonNull(pair, "pair");
+        this.predicate = requireNonNull(predicate, "predicate");
         this.fullTextPredicate = fullTextPredicate;
     }
 
     String getDescription()
     {
-        return pair.getSqlRepresentation();
+        return predicate.getSqlRepresentation();
     }
 
-    void appendBooleanClause(StringBuilder filterMust, StringBuilder filterMustNot, IExecutionContext context)
+    private ValueVector evalExpression(boolean describe, IExpression expression, IExecutionContext context)
     {
-        if (pair.getType() == Type.COMPARISION)
+        return expression.eval(context);
+    }
+
+    void appendBooleanClause(boolean describe, StringBuilder filterMust, StringBuilder filterMustNot, IExecutionContext context)
+    {
+        if (predicate.getType() == IPredicate.Type.COMPARISION)
         {
-            Object value = pair.getComparisonExpression(alias)
-                    .eval(context);
-            if (value == null)
+            ValueVector v = evalExpression(describe, predicate.getComparisonExpression(), context);
+            if (v.isNull(0))
             {
                 // if we have null here this means we have a
                 // query that should always return no rows
@@ -69,16 +75,17 @@ class PropertyPredicate
                 return;
             }
 
+            Object value = v.valueAsObject(0);
             String stringValue = quote(value);
             // CSOFF
-            switch (pair.getComparisonType())
+            switch (predicate.getComparisonType())
             // CSON
             {
                 case NOT_EQUAL:
                 case EQUAL:
                     // CSON
                     // { "term": { "property": value }}
-                    StringBuilder sb = pair.getComparisonType() == IComparisonExpression.Type.NOT_EQUAL ? filterMustNot
+                    StringBuilder sb = predicate.getComparisonType() == IComparisonExpression.Type.NOT_EQUAL ? filterMustNot
                             : filterMust;
                     prependNested(sb);
                     sb.append("{\"term\":{\"")
@@ -98,18 +105,18 @@ class PropertyPredicate
                     filterMust.append("{\"range\":{\"")
                             .append(property)
                             .append("\":{\"")
-                            .append(getRangeOp(pair.getComparisonType()))
+                            .append(getRangeOp(predicate.getComparisonType()))
                             .append("\":")
                             .append(stringValue)
                             .append("}}}");
                     appendNested(filterMust);
             }
         }
-        else if (pair.getType() == Type.IN)
+        else if (predicate.getType() == IPredicate.Type.IN)
         {
             // { "terms": { "property": [ "value", "value2"] }}
 
-            IInExpression inExpression = pair.getInExpression(alias);
+            IInExpression inExpression = predicate.getInExpression();
             StringBuilder sb = inExpression.isNot() ? filterMustNot
                     : filterMust;
 
@@ -118,24 +125,23 @@ class PropertyPredicate
                     .append(property)
                     .append("\":[");
 
-            List<? extends IExpression> arguments = inExpression.getArguments();
+            List<IExpression> arguments = inExpression.getArguments();
             sb.append(arguments.stream()
-                    .map(e -> e.eval(context))
-                    .filter(Objects::nonNull)
-                    .map(o -> quote(o))
+                    .map(e -> evalExpression(describe, e, context))
+                    .filter(v -> !v.isNull(0))
+                    .map(o -> quote(o.valueAsObject(0)))
                     .collect(joining(",")));
 
             sb.append("]}}");
             appendNested(sb);
         }
-        else if (pair.getType() == Type.LIKE)
+        else if (predicate.getType() == IPredicate.Type.LIKE)
         {
-            ILikeExpression likeExpression = pair.getLikeExpression(alias);
+            ILikeExpression likeExpression = predicate.getLikeExpression();
             StringBuilder sb = likeExpression.isNot() ? filterMustNot
                     : filterMust;
 
-            Object value = likeExpression.getPatternExpression()
-                    .eval(context);
+            Object value = evalExpression(describe, likeExpression.getPatternExpression(), context).valueAsObject(0);
             String query = String.valueOf(value)
                     // Replace wildcard chars
                     .replace("?", "\\\\?")
@@ -156,7 +162,7 @@ class PropertyPredicate
         }
         else if (fullTextPredicate)
         {
-            appendFullTextOperator(context, pair.getUndefinedValueExpression(IQualifiedFunctionCallExpression.class), filterMust);
+            appendFullTextOperator(describe, context, predicate.getFunctionCallExpression(), filterMust);
         }
     }
 
@@ -182,30 +188,26 @@ class PropertyPredicate
         sb.append("}}");
     }
 
-    private void appendFullTextOperator(IExecutionContext context, IQualifiedFunctionCallExpression functionExpression, StringBuilder sb)
+    private void appendFullTextOperator(boolean describe, IExecutionContext context, IFunctionCallExpression functionExpression, StringBuilder sb)
     {
         FunctionInfo functionInfo = functionExpression.getFunctionInfo();
-        List<? extends IExpression> arguments = functionExpression.getArguments();
+        List<IExpression> arguments = functionExpression.getArguments();
 
         if (MatchFunction.NAME.equals(functionInfo.getName()))
         {
             String arg0;
 
-            QualifiedName qname = arguments.get(0)
-                    .getQualifiedName();
-            // Qualified reference, pick the Qname as fields
-            if (qname != null)
+            IExpression arg0Expression = arguments.get(0);
+            if (arg0Expression instanceof IColumnExpression)
             {
-                arg0 = qname.toDotDelimited();
+                arg0 = ((IColumnExpression) arg0Expression).getColumn();
             }
             else
             {
-                arg0 = String.valueOf(arguments.get(0)
-                        .eval(context));
+                arg0 = String.valueOf(evalExpression(describe, arguments.get(0), context).valueAsObject(0));
             }
 
-            String match = String.valueOf(arguments.get(1)
-                    .eval(context));
+            String match = String.valueOf(evalExpression(describe, arguments.get(1), context).valueAsObject(0));
             String[] fields = arg0.split(",");
 
             // TODO: - options argument
@@ -235,12 +237,11 @@ class PropertyPredicate
         }
         else
         {
-            String query = String.valueOf(arguments.get(0)
-                    .eval(context));
+            String query = String.valueOf(evalExpression(describe, arguments.get(0), context).valueAsObject(0));
 
             sb.append("{\"query_string\":{")
                     .append("\"query\":\"")
-                    .append(query)
+                    .append(StringEscapeUtils.escapeJson(query))
                     .append("\"")
                     .append("}}");
         }
@@ -287,5 +288,31 @@ class PropertyPredicate
             return "\"" + stringValue + "\"";
         }
         return stringValue;
+    }
+
+    static boolean isSupported(IPredicate predicate, String catalogAlias)
+    {
+        IPredicate.Type type = predicate.getType();
+        return type == Type.COMPARISION
+                || (type == Type.FUNCTION_CALL
+                        && isFullTextSearchPredicate(predicate.getFunctionCallExpression(), catalogAlias))
+                || type == Type.IN
+                || (type == Type.LIKE
+                        && predicate.getLikeExpression()
+                                .getEscapeCharacterExpression() == null);
+    }
+
+    static boolean isFullTextSearchPredicate(IFunctionCallExpression functionExpression, String catalogAlias)
+    {
+        // NOT an ES catalog function
+        if (!functionExpression.getCatalogAlias()
+                .equalsIgnoreCase(catalogAlias))
+        {
+            return false;
+        }
+        ScalarFunctionInfo functionInfo = functionExpression.getFunctionInfo();
+        String name = functionInfo.getName();
+        return MatchFunction.NAME.equalsIgnoreCase(name)
+                || QueryFunction.NAME.equalsIgnoreCase(name);
     }
 }

@@ -16,7 +16,7 @@ public interface OutputWriter
     /**
      * Start a new a result set with provided columns.
      *
-     * @param columns Columns for this result result. NOTE! Can be empty if columns are unknown (select *).
+     * @param columns Columns for this result result. NOTE! Can be empty if columns are unknown until query time, then columns will be written as they come in {@link #writeFieldName(String)}.
      */
     default void initResult(String[] columns)
     {

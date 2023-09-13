@@ -2,20 +2,24 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 
 import java.util.List;
 
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 
 /** Lower and upper function */
 class LowerUpperFunction extends ScalarFunctionInfo
 {
     private final boolean lower;
 
-    LowerUpperFunction(Catalog catalog, boolean lower)
+    LowerUpperFunction(boolean lower)
     {
-        super(catalog, lower ? "lower"
-                : "upper");
+        super(lower ? "lower"
+                : "upper", FunctionType.SCALAR);
         this.lower = lower;
     }
 
@@ -30,22 +34,51 @@ class LowerUpperFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public int arity()
+    public Arity arity()
     {
-        return 1;
+        return Arity.ONE;
     }
 
     @Override
-    public Object eval(IExecutionContext context, String catalogAlias, List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
-        Object obj = arguments.get(0)
-                .eval(context);
-        if (obj == null)
+        return ResolvedType.of(Type.String);
+    }
+
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
+    {
+        final ValueVector value = arguments.get(0)
+                .eval(input, context);
+
+        return new ValueVector()
         {
-            return null;
-        }
-        String value = String.valueOf(obj);
-        return lower ? value.toLowerCase()
-                : value.toUpperCase();
+            @Override
+            public ResolvedType type()
+            {
+                return ResolvedType.of(Type.String);
+            }
+
+            @Override
+            public int size()
+            {
+                return input.getRowCount();
+            }
+
+            @Override
+            public boolean isNull(int row)
+            {
+                return value.isNull(row);
+            }
+
+            @Override
+            public UTF8String getString(int row)
+            {
+                String strValue = value.getString(row)
+                        .toString();
+                return UTF8String.from(lower ? strValue.toLowerCase()
+                        : strValue.toUpperCase());
+            }
+        };
     }
 }

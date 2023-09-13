@@ -3,36 +3,29 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 import static java.util.Collections.singletonList;
 
 import java.util.List;
-import java.util.Set;
 
-import org.apache.commons.collections4.iterators.TransformIterator;
-
-import se.kuseman.payloadbuilder.api.TableAlias;
-import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.operator.IExecutionContext;
 import se.kuseman.payloadbuilder.core.catalog.LambdaFunction;
-import se.kuseman.payloadbuilder.core.operator.EvalUtils;
-import se.kuseman.payloadbuilder.core.operator.ExecutionContext;
-import se.kuseman.payloadbuilder.core.parser.LambdaExpression;
-import se.kuseman.payloadbuilder.core.utils.CollectionUtils;
+import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.execution.LambdaUtils;
+import se.kuseman.payloadbuilder.core.execution.LambdaUtils.LambdaResultConsumer;
+import se.kuseman.payloadbuilder.core.expression.LambdaExpression;
 
 /** Map function. Maps input into another form */
 class MapFunction extends ScalarFunctionInfo implements LambdaFunction
 {
     private static final List<LambdaBinding> LAMBDA_BINDINGS = singletonList(new LambdaBinding(1, 0));
 
-    MapFunction(Catalog catalog)
+    MapFunction()
     {
-        super(catalog, "map");
-    }
-
-    @Override
-    public Set<TableAlias> resolveAlias(Set<TableAlias> parentAliases, List<Set<TableAlias>> argumentAliases)
-    {
-        // Map function has resulting alias as the mapping lambda
-        return argumentAliases.get(1);
+        super("map", FunctionType.SCALAR);
     }
 
     @Override
@@ -42,79 +35,70 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
     }
 
     @Override
-    public int arity()
+    public Arity arity()
     {
-        return 2;
+        return Arity.TWO;
     }
 
     @Override
-    public Object eval(IExecutionContext ctx, String catalogAlias, List<? extends IExpression> arguments)
+    public ResolvedType getType(List<IExpression> arguments)
     {
-        Object argResult = arguments.get(0)
-                .eval(ctx);
-        if (argResult == null)
-        {
-            return null;
-        }
-        ExecutionContext context = (ExecutionContext) ctx;
         LambdaExpression le = (LambdaExpression) arguments.get(1);
-        int lambdaId = le.getLambdaIds()[0];
-        return new TransformIterator<>(CollectionUtils.getIterator(argResult), input ->
+
+        Type inputType = arguments.get(0)
+                .getType()
+                .getType();
+
+        ResolvedType lambdaType = le.getExpression()
+                .getType();
+
+        if (inputType == Type.Array
+                || inputType == Type.Table)
         {
-            context.getStatementContext()
-                    .setLambdaValue(lambdaId, input);
-            return EvalUtils.unwrap(context, le.getExpression()
-                    .eval(context));
-        });
+            return ResolvedType.array(lambdaType);
+        }
+        else if (inputType == Type.Any)
+        {
+            return ResolvedType.of(Type.Any);
+        }
+
+        return lambdaType;
     }
 
-    // @Override
-    // public ExpressionCode generateCode(
-    // CodeGeneratorContext context,
-    // ExpressionCode parentCode,
-    // List<Expression> arguments)
-    // {
-    // ExpressionCode inputCode = arguments.get(0).generateCode(context, parentCode);
-    // ExpressionCode code = ExpressionCode.code(context, inputCode);
-    // code.addImport("se.kuseman.payloadbuilder.core.utils.CollectionUtils");
-    // code.addImport("java.util.Iterator");
-    // code.addImport("org.apache.commons.collections.iterators.TransformIterator");
-    // code.addImport("org.apache.commons.collections.Transformer");
-    //
-    // LambdaExpression le = (LambdaExpression) arguments.get(1);
-    //
-    // context.addLambdaParameters(le.getIdentifiers());
-    // ExpressionCode lambdaCode = le.getExpression().generateCode(context, parentCode);
-    // context.removeLambdaParameters(le.getIdentifiers());
-    //
-    // String template = "%s"
-    // + "boolean %s = true;\n"
-    // + "Iterator %s = null;\n"
-    // + "if (!%s)\n"
-    // + "{\n"
-    // + " %s = new TransformIterator(IteratorUtils.getIterator(%s), new Transformer()\n"
-    // + " {\n"
-    // + " public Object transform(Object object)\n"
-    // + " {\n"
-    // + " Object %s = object;\n"
-    // + " %s"
-    // + " return %s;\n"
-    // + " }\n"
-    // + " });\n"
-    // + " %s = false;\n"
-    // + "}\n";
-    //
-    // code.setCode(String.format(template,
-    // inputCode.getCode(),
-    // code.getIsNull(),
-    // code.getResVar(),
-    // inputCode.getIsNull(),
-    // code.getResVar(), inputCode.getResVar(),
-    // le.getIdentifiers().get(0),
-    // lambdaCode.getCode(),
-    // lambdaCode.getResVar(),
-    // code.getIsNull()));
-    //
-    // return code;
-    // }
+    @Override
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
+    {
+        final ValueVector value = arguments.get(0)
+                .eval(input, context);
+        final LambdaExpression le = (LambdaExpression) arguments.get(1);
+        final Type type = value.type()
+                .getType();
+        if (LambdaUtils.supportsForEachLambdaResult(type))
+        {
+            IObjectVectorBuilder builder = context.getVectorBuilderFactory()
+                    .getObjectVectorBuilder(getType(arguments), input.getRowCount());
+
+            LambdaResultConsumer consumer = (inputResult, lambdaResult, inputWasListType) ->
+            {
+                if (inputWasListType)
+                {
+                    builder.put(lambdaResult);
+                }
+                else
+                {
+                    builder.copy(lambdaResult);
+                }
+            };
+
+            LambdaUtils.forEachLambdaResult(context, input, value, le, consumer);
+            return builder.build();
+        }
+
+        // Simple type just eval the lambda with inputs
+        ((ExecutionContext) context).getStatementContext()
+                .setLambdaValue(le.getLambdaIds()[0], value);
+
+        return le.getExpression()
+                .eval(input, context);
+    }
 }

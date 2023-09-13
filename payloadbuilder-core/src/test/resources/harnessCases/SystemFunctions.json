@@ -1,5 +1,5 @@
 {
-  "name": "BuiltInFunctions",
+  "name": "SystemFunctions",
   "catalogs": [
     {
       "alias": "c",
@@ -12,6 +12,15 @@
             [3, 4],
             [5, 6]
           ]
+        },
+        {
+          "name": "table",
+          "columns": [ "col1", "col2" ],
+          "rows": [
+            [1, 2],
+            [null, 4],
+            [5, 6]
+          ]
         }
       ]
     }
@@ -21,8 +30,16 @@
       "name": "String functions",
       "query": [
         "select trim(' A ') trim, ltrim(' A ') ltrim, rtrim(' A ') rtrim ",
-        "select leftpad('A', 4) leftpad1, leftpad('A', 4, '#') leftpad2, rightpad('A', 4) rightpad1, rightpad('A', 4, '#') rightpad2 ",
-        "select substring('hello', 2) start, substring('hello', 2, 2) startEnd"
+        "select lpad('A', 4) leftpad1, lpad('A', 4, '#') leftpad2, rpad('A', 4) rightpad1, rpad('A', 4, '#') rightpad2 ",
+        "select substring('hello', 2) start, substring('hello', 2, 2) startEnd, substring(null, 2) nullValue, substring('hello', null) nullStart, substring('hello', 2, null) nullLength ",
+        "select lower('ABC-123') lower, upper('def-456') upper, lower(123) lowerInt, upper(456F) upperFloat",
+        "select length(concat(col1, col2)) len1, length(123) lenInt, length('abcdef') lenString from \"table\"",
+        "select replace(null, null, null) valueNull, ",
+        "       replace('string', null, null) searchNull, ",
+        "       replace('string', 'st', null) replaceNull, ", 
+        "       replace(null, 'st', null) valueReplaceNull, ",
+        "       replace('world', 'w', 'hello w') str ",
+        "select format(10.12345F, '#.##', 'de') float,  format(10.12345F, '#.##', 'us') floatLoc, format(cast('2010-10-10T10:10:10' AS datetime), 'yyyy/MM/dd hh:mm:ss') date, format(cast('2010-10-10T10:10:10+03:00' AS datetimeoffset), 'yyyy/MM/dd hh:mm:ss Z') dateOffset, format(cast('2010-10-10T10:10:10+03:00' AS datetimeoffset) at time zone 'Europe/Berlin', 'yyyy/MM/dd hh:mm:ss Z') dateAtTimeZone"
       ],
       "expectedResultSets": [
         [
@@ -32,23 +49,116 @@
           [{ "key": "leftpad1", "value": "   A" }, { "key": "leftpad2", "value": "###A" },{ "key": "rightpad1", "value": "A   " }, { "key": "rightpad2", "value": "A###" }]
         ],
         [
-          [{ "key": "start", "value": "llo" }, { "key": "startEnd", "value": "ll" }]
+          [{ "key": "start", "value": "llo" }, { "key": "startEnd", "value": "ll" }, { "key": "nullValue", "value": null }, { "key": "nullStart", "value": null }, { "key": "nullLength", "value": null }]
+        ],
+        [
+          [{ "key": "lower", "value": "abc-123" }, { "key": "upper", "value": "DEF-456" }, { "key": "lowerInt", "value": "123" }, { "key": "upperFloat", "value": "456.0" }]
+        ],
+        [
+          [{ "key": "len1", "value": 2 }, { "key": "lenInt", "value": 3 }, { "key": "lenString", "value": 6 }],
+          [{ "key": "len1", "value": 1 }, { "key": "lenInt", "value": 3 }, { "key": "lenString", "value": 6 }],
+          [{ "key": "len1", "value": 2 }, { "key": "lenInt", "value": 3 }, { "key": "lenString", "value": 6 }]
+        ],
+        [
+          [{ "key": "valueNull", "value": null},{ "key": "searchNull", "value": null},{ "key": "replaceNull", "value": null},{ "key": "valueReplaceNull", "value": null},{ "key": "str", "value": "hello world"}]
+        ],
+        [
+          [{ "key": "float", "value": "10,12"}, { "key": "floatLoc", "value": "10.12"}, { "key": "date", "value": "2010/10/10 10:10:10"}, { "key": "dateOffset", "value": "2010/10/10 10:10:10 +0300"}, { "key": "dateAtTimeZone", "value": "2010/10/10 09:10:10 +0200" }]
         ]
       ]
     },
     {
       "name": "Date functions",
       "query": [
-        "set @date = cast('2000-01-01T10:00:00', 'datetime') ",
-        "select cast(dateadd('day', 1, @date), 'string') tomorrow, cast(dateadd('day', -1, @date), 'string') yesterday ",
-        "select datepart('year', @date) year, datepart('month', @date) month, datepart('day', @date) day, datepart('hour', @date) hour, datepart('minute', @date) minute "
+        "set @date = cast('2000-01-01T10:00:00' as datetime) ",
+        "set @dateOffset = cast(@date  as datetimeoffset) AT TIME ZONE 'Europe/Berlin' ",
+        "select cast(dateadd(day, 1, @date) as string) tomorrow, cast(dateadd(day, -1, @date) as string) yesterday ",
+        "-- Test DATETIME ",
+        "select datepart(year, @date) year, datepart(month, @date) month, datepart(day, @date) day, datepart(hour, @date) hour, datepart(minute, @date) minute ",
+        "-- Test DATETIMEOFFSET ",
+        "select datepart(year, @dateOffset) year, datepart(month, @dateOffset) month, datepart(day, @dateOffset) day, datepart(hour, @dateOffset) hour, datepart(minute, @dateOffset) minute ",
+        "select datediff(day, @date, '2000-05-12T10:00:00+00:00') day, datediff(second, @date, '2000-01-01T23:00:00+00:00') second",
+        "-- Test DATETIME with AT TIME ZONE ",
+        "select @date at time zone 'Europe/Berlin' europeBerlin, @date at time zone 'America/Anguilla' americaAnguilla, cast('2023-03-30T11:10:23.915Z' as datetime) dd, unix_timestamp(cast('2023-03-30T11:10:23.915Z' as datetime)) epoch ",
+        "-- Test DATETIMEOFFSET with AT TIME ZONE ",
+        "select cast(@date as datetimeoffset) date, cast(@date as datetimeoffset) at time zone 'Europe/Berlin' europeBerlin, cast(@date as datetimeoffset) at time zone 'America/Anguilla' americaAnguilla "
       ],
       "expectedResultSets": [
         [
-          [{ "key": "tomorrow", "value": "2000-01-02T10:00" }, { "key": "yesterday", "value": "1999-12-31T10:00" }]
+          [{ "key": "tomorrow", "value": "2000-01-02T10:00:00" }, { "key": "yesterday", "value": "1999-12-31T10:00:00" }]
         ],
         [
           [{ "key": "year", "value": 2000 }, { "key": "month", "value": 1 }, { "key": "day", "value": 1 }, { "key": "hour", "value": 10 }, { "key": "minute", "value": 0 }]
+        ],
+        [
+          [{ "key": "year", "value": 2000 }, { "key": "month", "value": 1 }, { "key": "day", "value": 1 }, { "key": "hour", "value": 11 }, { "key": "minute", "value": 0 }]
+        ],
+        [
+          [{ "key": "day", "value": 132 }, { "key": "second", "value": 46800 } ]
+        ],
+        [
+          [{ "key": "europeBerlin", "value": "2000-01-01T10:00:00+01:00" }, { "key": "americaAnguilla", "value": "2000-01-01T10:00:00-04:00" }, { "key": "dd", "value": "2023-03-30T11:10:23.915" }, { "key": "epoch", "value": 1680174623915 } ]
+        ],
+        [
+          [{ "key": "date", "value": "2000-01-01T10:00:00Z" }, { "key": "europeBerlin", "value": "2000-01-01T11:00:00+01:00" }, { "key": "americaAnguilla", "value": "2000-01-01T06:00:00-04:00" } ]
+        ]
+      ]
+    },
+    {
+      "name": "Range function",
+      "query": [
+        "select * from range(12,15) ",
+        "select * from range(3) "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "Value", "value": 12 }],
+          [{ "key": "Value", "value": 13 }],
+          [{ "key": "Value", "value": 14 }]
+        ],
+        [
+          [{ "key": "Value", "value": 0 }],
+          [{ "key": "Value", "value": 1 }],
+          [{ "key": "Value", "value": 2 }]
+        ]
+      ]
+    },
+    {
+      "name": "String spilt function",
+      "query": [
+        "select * from string_split('Lorem ipsum dolor sit amet.', ' ') ",
+        "select * from string_split('Lorem ipsum dolor sit amet.', 's') "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "Value", "value": "Lorem" }],
+          [{ "key": "Value", "value": "ipsum" }],
+          [{ "key": "Value", "value": "dolor" }],
+          [{ "key": "Value", "value": "sit"   }],
+          [{ "key": "Value", "value": "amet." }]
+        ],
+        [
+          [{ "key": "Value", "value": "Lorem ip"  }],
+          [{ "key": "Value", "value": "um dolor " }],
+          [{ "key": "Value", "value": "it amet."  }]
+        ]
+      ]
+    },
+    {
+      "name": "Misc. functions",
+      "query": [
+        "select isnull(null, 'a') a, isnull(123, null) b, isnull(null, null) c, isnull(col1, 'default') d, isnull(null, col1) e ",
+        "from \"table\"",
+        "select typeof(null) nullType, typeof(123) intType, typeof(456L) longType, typeof(789F) floatType, typeof(array(123, 'str')) arrayType" 
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "a", "value": "a" }, { "key": "b", "value": 123 }, { "key": "c", "value": null }, { "key": "d", "value": 1         }, { "key": "e", "value": 1    }],
+          [{ "key": "a", "value": "a" }, { "key": "b", "value": 123 }, { "key": "c", "value": null }, { "key": "d", "value": "default" }, { "key": "e", "value": null }],
+          [{ "key": "a", "value": "a" }, { "key": "b", "value": 123 }, { "key": "c", "value": null }, { "key": "d", "value": 5         }, { "key": "e", "value": 5    }]
+        ],
+        [
+          [{ "key": "nullType", "value": "Any<null>" },{ "key": "intType", "value": "Int" },{ "key": "longType", "value": "Long" },{ "key": "floatType", "value": "Float" },{ "key": "arrayType", "value": "Array<Any>" }]
         ]
       ]
     }
