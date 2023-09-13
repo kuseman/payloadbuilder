@@ -168,12 +168,17 @@ public class ESCatalog extends Catalog
                 throw new IllegalArgumentException("Invalid index, catalog only supports single column indices");
             }
 
-            QualifiedName indexColumn = QualifiedName.of(seekPredicate.getIndexColumns()
-                    .get(0));
-            // Fetch mapped property for index column. Not needed for _id
-            if (!ESDatasource.DOCID.equalsIgnoreCase(indexColumn))
+            String indexColumn = seekPredicate.getIndexColumns()
+                    .get(0);
+
+            if (ESDatasource.DOCID_COLUMN.equalsIgnoreCase(indexColumn))
             {
-                indexProperty = properties.get(indexColumn);
+                indexProperty = MappedProperty.of(QualifiedName.of(ESDatasource.ID), "keyword");
+            }
+            else
+            {
+                // Fetch mapped property for index column.
+                indexProperty = getMappedProperty(properties, QualifiedName.of(indexColumn));
                 // CSOFF
                 if (indexProperty == null)
                 // CSON
@@ -187,6 +192,31 @@ public class ESCatalog extends Catalog
         List<SortItemMeta> sortItems = collectSortItems(properties, data.getSortItems());
 
         return new ESDatasource(data.getNodeId(), meta.getStrategy(), catalogAlias, table, seekPredicate, indexProperty, propertyPredicates, sortItems);
+    }
+
+    private MappedProperty getMappedProperty(Map<QualifiedName, MappedProperty> properties, QualifiedName qname)
+    {
+        if (qname == null)
+        {
+            return null;
+        }
+
+        qname = qname.toLowerCase();
+        MappedProperty property = properties.get(qname);
+
+        // If we did not find any column and we have single qname with a dot in it, it's highly likely
+        // that the column we are searching for is a multi qname
+        if (property == null
+                && qname.size() == 1
+                && qname.getFirst()
+                        .contains("."))
+        {
+            qname = QualifiedName.of(qname.getFirst()
+                    .split("\\."));
+            property = properties.get(qname);
+        }
+
+        return property;
     }
 
     private List<PropertyPredicate> collectPredicates(String catalogAlias, List<IPredicate> predicates, Map<QualifiedName, MappedProperty> properties)
@@ -215,25 +245,7 @@ public class ESCatalog extends Catalog
             }
 
             QualifiedName qname = predicate.getQualifiedColumn();
-            if (qname == null)
-            {
-                continue;
-            }
-
-            qname = qname.toLowerCase();
-            MappedProperty property = properties.get(qname);
-
-            // If we did not find any column and we have single qname with a dot in it, it's highly likely
-            // that the column we are searching for is a multi qname
-            if (property == null
-                    && qname.size() == 1
-                    && qname.getFirst()
-                            .contains("."))
-            {
-                qname = QualifiedName.of(qname.getFirst()
-                        .split("\\."));
-                property = properties.get(qname);
-            }
+            MappedProperty property = getMappedProperty(properties, qname);
 
             // Extra columns only support EQUALS
             if (ESDatasource.INDEX.equalsIgnoreCase(qname)
@@ -286,11 +298,7 @@ public class ESCatalog extends Catalog
         {
             QualifiedName qname = sortItem.getExpression()
                     .getQualifiedColumn();
-            if (qname == null)
-            {
-                return emptyList();
-            }
-            qname = qname.toLowerCase();
+
             // String column = qname.toString();
             if (ESDatasource.INDEX.equalsIgnoreCase(qname))
             {
@@ -305,7 +313,7 @@ public class ESCatalog extends Catalog
             // continue;
             // }
 
-            MappedProperty property = properties.get(qname);
+            MappedProperty property = getMappedProperty(properties, qname);
             if (property == null)
             {
                 return emptyList();

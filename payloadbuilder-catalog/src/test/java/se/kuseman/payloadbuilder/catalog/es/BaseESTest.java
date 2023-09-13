@@ -621,8 +621,9 @@ abstract class BaseESTest extends Assert
             index(endpoint, INDEX, type, MAPPER.writeValueAsString(p.getValue()), p.getKey());
         }
 
-        List<ISortItem> sortItems = new ArrayList<>(asList(mockSortItem(QualifiedName.of("key", "value"), Order.DESC)));
-        List<IPredicate> predicates = new ArrayList<>(asList(IPredicateMock.comparison(QualifiedName.of("key", "sum"), 100, IComparisonExpression.Type.LESS_THAN)));
+        // Test single qualifier with mixed case gets splitted and works
+        List<ISortItem> sortItems = new ArrayList<>(asList(mockSortItem(QualifiedName.of("key.VALUE"), Order.DESC)));
+        List<IPredicate> predicates = new ArrayList<>(asList(IPredicateMock.comparison(QualifiedName.of("key", "SUM"), 100, IComparisonExpression.Type.LESS_THAN)));
 
         ESDatasource.Data data = new ESDatasource.Data();
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, data);
@@ -660,7 +661,8 @@ abstract class BaseESTest extends Assert
 
         ESDatasource.Data data = new ESDatasource.Data();
         IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, ofEntries(entry("endpoint", endpoint), entry("index", INDEX)), 0, data);
-        ISeekPredicate seekPredicate = mockSeekPrecidate(context, "key", 123, null); // Null values should be excluded
+        // Test non matching case of index field
+        ISeekPredicate seekPredicate = mockSeekPrecidate(context, "KEY", 123, null); // Null values should be excluded
         IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(), emptyList()));
         IDatasourceOptions options = mockOptions(500);
 
@@ -689,7 +691,7 @@ abstract class BaseESTest extends Assert
         }
         it.close();
 
-        assertEquals(data.requestCount, 3);
+        assertEquals(3, data.requestCount);
         assertEquals(1, rowCount);
     }
 
@@ -1419,13 +1421,14 @@ abstract class BaseESTest extends Assert
         Index index = tableSchema.getIndices()
                 .stream()
                 .filter(i -> i.getColumns()
-                        .contains(column))
+                        .stream()
+                        .anyMatch(c -> c.equalsIgnoreCase(column)))
                 .findAny()
                 .orElseThrow(() -> new RuntimeException("Index on key should exist"));
 
         ISeekPredicate seekPredicate = mock(ISeekPredicate.class);
         when(seekPredicate.getIndex()).thenReturn(index);
-        when(seekPredicate.getIndexColumns()).thenReturn(index.getColumns());
+        when(seekPredicate.getIndexColumns()).thenReturn(asList(column));
         ISeekPredicate.ISeekKey seekKey = mock(ISeekPredicate.ISeekKey.class);
         when(seekPredicate.getSeekKeys(any(IExecutionContext.class))).thenReturn(asList(seekKey));
         when(seekKey.getType()).thenReturn(SeekType.EQ);

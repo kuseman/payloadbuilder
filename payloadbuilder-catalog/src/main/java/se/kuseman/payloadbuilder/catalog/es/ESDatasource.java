@@ -78,7 +78,7 @@ import se.kuseman.payloadbuilder.catalog.es.ElasticsearchMetaUtils.MappedPropert
 /** Operator for Elastic search */
 class ESDatasource implements IDatasource
 {
-    private static final String ID = "_id";
+    static final String ID = "_id";
 
     static final QualifiedName INDEX = QualifiedName.of("__index");
     static final QualifiedName TYPE = QualifiedName.of("__type");
@@ -243,29 +243,27 @@ class ESDatasource implements IDatasource
 
     private String getIndexField()
     {
-        if (indexPredicate == null)
+        if (indexProperty == null)
         {
             return null;
         }
 
-        String column = indexPredicate.getIndexColumns()
-                .get(0);
-        String field = column;
+        String column = indexProperty.name.toDotDelimited();
 
         // Fix field name for special fields
         if (DOCID_COLUMN.equalsIgnoreCase(column))
         {
-            field = ID;
+            return ID;
         }
         else if (indexProperty.isFreeTextMapping())
         {
             // Translate to non freetext
             MappedProperty nonFreeTextField = indexProperty.getNonFreeTextField();
-            field = nonFreeTextField != null ? nonFreeTextField.name.toDotDelimited()
+            return nonFreeTextField != null ? nonFreeTextField.name.toDotDelimited()
                     : null;
         }
 
-        return field;
+        return column;
     }
 
     private boolean useMgets(ESType esType, String indexField)
