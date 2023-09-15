@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
+import org.apache.commons.lang3.ArrayUtils;
+
 import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.Index.ColumnsType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -129,9 +131,7 @@ public class TemporaryTable
         }
 
         int rowCount = vector.getRowCount();
-        int size = vector.getSchema()
-                .getSize();
-        size = indices.size();
+        int size = indices.size();
         Map<Index, Object2ObjectMap<IndexKey, IntList>> result = new HashMap<>(size);
 
         for (int i = 0; i < size; i++)
@@ -145,7 +145,8 @@ public class TemporaryTable
 
             Object2ObjectMap<IndexKey, IntList> table = new Object2ObjectOpenCustomHashMap<IndexKey, IntList>(STRATEGY);
 
-            int[] ordinals = getOrdinals(currentIndex);
+            int[] ordinals = rowCount > 0 ? getOrdinals(currentIndex)
+                    : ArrayUtils.EMPTY_INT_ARRAY;
             int ordinalsSize = ordinals.length;
             ValueVector[] vectors = new ValueVector[ordinalsSize];
             for (int j = 0; j < ordinalsSize; j++)

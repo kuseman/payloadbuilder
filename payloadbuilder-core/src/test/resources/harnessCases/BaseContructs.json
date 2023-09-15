@@ -364,9 +364,9 @@
     {
       "name": "Group by. Single value etc.",
       "query": [
-        "select id * id               single   -- Only single values included in expression ",
-        ",      id * row_id           mixed    -- Mixed single value and grouped values ",
-        ",      row_id * row_id       group    -- Only group values ",
+        "select id * id               single    -- Only single values included in expression ",
+        ",      id * row_id           mixed     -- Mixed single value and grouped values ",
+        ",      row_id * row_id       \"group\" -- Only group values ",
         "from data ",
         "group by id ",
         "order by id "
@@ -431,9 +431,9 @@
     {
       "name": "Group by with having",
       "query": [
-        "select id * id               single   -- Only single values included in expression ",
-        ",      id * row_id           mixed    -- Mixed single value and grouped values ",
-        ",      row_id * row_id       group    -- Only group values ",
+        "select id * id               single    -- Only single values included in expression ",
+        ",      id * row_id           mixed     -- Mixed single value and grouped values ",
+        ",      row_id * row_id       \"group\" -- Only group values ",
         "from data ",
         "group by id ",
         "having count(1) = 1 "

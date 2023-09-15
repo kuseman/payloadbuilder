@@ -108,9 +108,9 @@ selectStatement
    (INTO into=tableName intoOptions=tableSourceOptions?)?
    (FROM tableSourceJoined)?
    (WHERE where=expression)?
-   (GROUPBY groupBy+=expression (COMMA groupBy+=expression)*)?
+   (GROUP BY groupBy+=expression (COMMA groupBy+=expression)*)?
    (HAVING having=expression)?
-   (ORDERBY sortItem (COMMA sortItem)*)?
+   (ORDER BY sortItem (COMMA sortItem)*)?
    (forClause)?
  ;
 

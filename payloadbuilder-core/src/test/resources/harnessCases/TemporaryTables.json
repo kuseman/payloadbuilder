@@ -94,6 +94,38 @@
       ]
     },
     {
+      "name": "Select into with index with no rows",
+      "onlyAssertExpectedColumns": true,
+      "query": [
+        "select col1 * 2 newCol1, col2 * 10 newCol2 ",
+        "into #temp with (indices=array(array('newCol1'))) ",
+        "from source ",
+        "where 1=0 ",
+        "",
+        "select * from #temp ",
+        "",
+        "describe ",
+        "select * ",
+        "from data d ",
+        "inner join #temp t ",
+        "  on t.newCol1 = d.id ",
+        "",
+        "select * ",
+        "from data d ",
+        "inner join #temp t ",
+        "  on t.newCol1 = d.id "
+      ],
+      "expectedResultSets": [
+        [],
+        [
+          [{ "key": "Node id", "value": 2 }, { "key": "Name", "value": "+- Nested Loop" }                          ],
+          [{ "key": "Node id", "value": 0 }, { "key": "Name", "value": "|  +- Scan: data" }                        ],
+          [{ "key": "Node id", "value": 1 }, { "key": "Name", "value": "|  +- Index Seek: #temp [newCol1] (ALL)" } ]
+        ],
+        []
+      ]
+    },
+    {
       "name": "Select into 2",
       "query": [
         "select 1 + 2 \"1 + 2\" into #temp",
