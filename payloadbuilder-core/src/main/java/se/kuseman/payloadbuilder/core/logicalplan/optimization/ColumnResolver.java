@@ -492,7 +492,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             schema = Schema.EMPTY;
         }
 
-        if (SchemaUtils.isAsterisk(schema))
+        if (SchemaUtils.isAsterisk(schema, true))
         {
             // Set an asterisk schema with expression scans table source
             ColumnReference ast = new ColumnReference(plan.getTableSource(), plan.getAlias(), ColumnReference.Type.ASTERISK);

@@ -48,6 +48,12 @@ public class SchemaUtils
     /** Returns true if this schema contains asterisk columns */
     public static boolean isAsterisk(Schema schema)
     {
+        return isAsterisk(schema, false);
+    }
+
+    /** Returns true if this schema contains asterisk columns */
+    public static boolean isAsterisk(Schema schema, boolean currentLevelOnly)
+    {
         int size = schema.getSize();
         if (size == 0)
         {
@@ -62,13 +68,18 @@ public class SchemaUtils
             {
                 return true;
             }
-            if (column.getType()
-                    .getType() == Column.Type.Table
-                    || column.getType()
-                            .getType() == Column.Type.Object)
+
+            if (!currentLevelOnly
+                    && (column.getType()
+                            .getType() == Column.Type.Table
+                            || column.getType()
+                                    .getType() == Column.Type.Object))
             {
-                return isAsterisk(column.getType()
-                        .getSchema());
+                if (isAsterisk(column.getType()
+                        .getSchema()))
+                {
+                    return true;
+                }
             }
         }
         return false;
