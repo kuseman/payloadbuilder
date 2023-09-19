@@ -3,7 +3,7 @@
     <parent>
         <groupId>se.kuseman</groupId>
         <artifactId>payloadbuilder</artifactId>
-        <version>1.0.0-RC3</version>
+        <version>1.0.0-SNAPSHOT</version>
     </parent>
     <groupId>se.kuseman.payloadbuilder</groupId>
     <artifactId>payloadbuilder-bytes</artifactId>
