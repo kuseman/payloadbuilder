@@ -3,6 +3,8 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 import static java.util.Arrays.asList;
 import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Random;
 
 import org.assertj.core.api.Assertions;
@@ -11,6 +13,7 @@ import org.junit.Test;
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
@@ -18,21 +21,116 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
+import se.kuseman.payloadbuilder.core.expression.FunctionCallExpression;
+import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
 import se.kuseman.payloadbuilder.core.logicalplan.ExpressionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.Join;
+import se.kuseman.payloadbuilder.core.logicalplan.Limit;
 import se.kuseman.payloadbuilder.core.logicalplan.MaxRowCountAssert;
 import se.kuseman.payloadbuilder.core.logicalplan.OperatorFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Projection;
+import se.kuseman.payloadbuilder.core.logicalplan.Sort;
 import se.kuseman.payloadbuilder.core.parser.Location;
+import se.kuseman.payloadbuilder.core.statement.LogicalSelectStatement;
 
 /** Test of {@link SubQueryExpressionPushDown} */
 public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
 {
     private final SubQueryExpressionPushDown rule = new SubQueryExpressionPushDown();
+
+    @Test
+    public void test_subquery_epxression_with_multiple_column_references()
+    {
+        String q = """
+                SELECT
+                (
+                  SELECT TOP 1 ar.filename
+                  FROM (a.resource) ar
+                  WHERE ar.typeid = 'Fs'
+                  OR ISNULL(ar.defaultfront, 0) = 1
+                  ORDER BY ISNULL(ar.defaultfront, 0)
+                ) images
+                FROM PDArticle a
+                """;
+
+        ILogicalPlan plan = ((LogicalSelectStatement) PARSER.parseQuery(q, new ArrayList<>())
+                .getStatements()
+                .get(0)).getSelect();
+
+        plan = LogicalPlanOptimizer.optimize(context, plan, new HashMap<>());
+        ILogicalPlan actual = optimize(context, plan);
+
+        TableSourceReference pdArticle = new TableSourceReference("", QualifiedName.of("PDArticle"), "a");
+        TableSourceReference a_resource = new TableSourceReference("", QualifiedName.of("a.resource"), "ar");
+
+        ColumnReference pdArticleAst = new ColumnReference(pdArticle, "a", ColumnReference.Type.ASTERISK);
+        ColumnReference a_resourceAst = new ColumnReference(a_resource, "ar", ColumnReference.Type.ASTERISK);
+
+        Schema schemaPDArticle = Schema.of(CoreColumn.of("a", ResolvedType.of(Type.Any), pdArticleAst));
+        Schema schemaa_resource = Schema.of(CoreColumn.of("ar", ResolvedType.of(Type.Any), a_resourceAst));
+
+        //@formatter:off
+        ILogicalPlan expected =
+                projection(
+                    new Join(
+                        tableScan(schemaPDArticle, pdArticle),
+                            new Limit(
+                                new Sort(
+                                    projection(
+                                        new Filter(
+                                            new ExpressionScan(
+                                                a_resource,
+                                                schemaa_resource,
+                                                ocre(pdArticleAst.rename("resource"), ResolvedType.of(Type.Any)),
+                                                null),
+                                            null,
+                                            or(
+                                                eq(cre(a_resourceAst.rename("typeid"), ResolvedType.of(Type.Any)), new LiteralStringExpression("Fs")),
+                                                eq(new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("isnull"), null,
+                                                        asList(cre(a_resourceAst.rename("defaultfront")), intLit(0))), intLit(1))
+                                            )
+                                        ),
+                                        asList(
+                                            new AliasExpression(cre(a_resourceAst.rename("filename")), "__expr0"),
+                                            new AliasExpression(cre(a_resourceAst.rename("defaultfront")), "defaultfront", true)
+                                        )
+                                    ),
+                                    asList(sortItem(new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("isnull"), null,
+                                                        asList(cre(a_resourceAst.rename("defaultfront")), intLit(0))), ISortItem.Order.ASC))
+                                ),
+                            intLit(1)),
+                        Join.Type.LEFT,
+                        null,
+                        (IExpression) null,
+                        asSet(CoreColumn.of(pdArticleAst.rename("resource"), ResolvedType.of(Type.Any))),
+                        false),
+                    asList(new AliasExpression(ce("__expr0"), "images")));
+        //@formatter:on
+
+        //@formatter:off
+        Assertions.assertThat(actual.getSchema())
+            .usingRecursiveComparison()
+            .ignoringFieldsOfTypes(Location.class, Random.class)
+            .isEqualTo(Schema.of(
+                    CoreColumn.of("images", ResolvedType.of(Type.Any), "", false, null)));
+        //@formatter:on
+
+        // System.out.println(expected.print(0));
+        // System.out.println(actual.print(0));
+
+        //@formatter:off
+        Assertions.assertThat(actual)
+            .usingRecursiveComparison()
+            .ignoringFieldsOfTypes(Location.class, Random.class)
+            .isEqualTo(expected);
+        //@formatter:on
+        assertEquals(expected, actual);
+    }
 
     @Test
     public void test_operator_function_mixed_with_sub_query_scalar_and_correlation()

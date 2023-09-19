@@ -3,9 +3,12 @@ package se.kuseman.payloadbuilder.core.physicalplan;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.OperatorFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
@@ -50,6 +53,14 @@ public class OperatorFunctionScan implements IPhysicalPlan
     public Schema getSchema()
     {
         return schema;
+    }
+
+    @Override
+    public Map<String, Object> getDescribeProperties(IExecutionContext context)
+    {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put(IDatasource.OUTPUT, DescribeUtils.getOutputColumns(getSchema()));
+        return properties;
     }
 
     @Override

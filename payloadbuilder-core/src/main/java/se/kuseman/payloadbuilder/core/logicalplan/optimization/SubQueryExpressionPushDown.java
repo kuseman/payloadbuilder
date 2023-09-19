@@ -16,10 +16,12 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.expression.ARewriteExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
+import se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedSubQueryExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.Join;
+import se.kuseman.payloadbuilder.core.logicalplan.Limit;
 import se.kuseman.payloadbuilder.core.logicalplan.MaxRowCountAssert;
 import se.kuseman.payloadbuilder.core.logicalplan.OperatorFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Projection;
@@ -149,7 +151,12 @@ public class SubQueryExpressionPushDown extends ALogicalPlanOptimizer<SubQueryEx
             e = e.accept(SubQueryExpressionVisitor.INSTANCE, context);
 
             // Project the expression from previous expression rewrite
-            if (alias != null)
+            // NOTE! This is only done for the first projection expression
+            // since that is the one we are "pushing down"
+            // there can be other projection expressions, for example
+            // an internal order by column that should not get aliased
+            if (alias != null
+                    && i == 0)
             {
                 e = new AliasExpression(e, alias);
             }
@@ -223,7 +230,23 @@ public class SubQueryExpressionPushDown extends ALogicalPlanOptimizer<SubQueryEx
                 // If the plan is a OperatorFunctionScan it always return one row
                 if (!(plan instanceof OperatorFunctionScan))
                 {
-                    plan = new MaxRowCountAssert(plan, 1);
+                    boolean addAssert = true;
+
+                    // If we have a limit plan with a literal 1 then we don't need an assert
+                    if (plan instanceof Limit)
+                    {
+                        Limit limit = (Limit) plan;
+                        if (limit.getLimitExpression() instanceof LiteralIntegerExpression
+                                && ((LiteralIntegerExpression) limit.getLimitExpression()).getValue() <= 1)
+                        {
+                            addAssert = false;
+                        }
+                    }
+
+                    if (addAssert)
+                    {
+                        plan = new MaxRowCountAssert(plan, 1);
+                    }
                 }
 
                 /*

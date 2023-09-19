@@ -3,8 +3,11 @@ package se.kuseman.payloadbuilder.core.physicalplan;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
@@ -42,6 +45,14 @@ public class ExpressionScan implements IPhysicalPlan
     public Schema getSchema()
     {
         return schema;
+    }
+
+    @Override
+    public Map<String, Object> getDescribeProperties(IExecutionContext context)
+    {
+        Map<String, Object> properties = new HashMap<>();
+        properties.put(IDatasource.OUTPUT, DescribeUtils.getOutputColumns(getSchema()));
+        return properties;
     }
 
     @Override

@@ -3,18 +3,20 @@ package se.kuseman.payloadbuilder.core.physicalplan;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
-import se.kuseman.payloadbuilder.api.utils.MapUtils;
 import se.kuseman.payloadbuilder.core.QueryException;
+import se.kuseman.payloadbuilder.core.common.DescribableNode;
 
 /** Assert plan that asserts a condition on input. Throws exception if not fullfilled */
 public class Assert implements IPhysicalPlan
@@ -45,7 +47,10 @@ public class Assert implements IPhysicalPlan
     @Override
     public Map<String, Object> getDescribeProperties(IExecutionContext context)
     {
-        return MapUtils.ofEntries(MapUtils.entry("Predicate", predicateSupplier.toString()));
+        Map<String, Object> properties = new HashMap<>();
+        properties.put(IDatasource.OUTPUT, DescribeUtils.getOutputColumns(getSchema()));
+        properties.put("Predicate", predicateSupplier.toString());
+        return properties;
     }
 
     @Override
@@ -90,6 +95,12 @@ public class Assert implements IPhysicalPlan
 
     @Override
     public List<IPhysicalPlan> getChildren()
+    {
+        return singletonList(input);
+    }
+
+    @Override
+    public List<DescribableNode> getChildNodes()
     {
         return singletonList(input);
     }
