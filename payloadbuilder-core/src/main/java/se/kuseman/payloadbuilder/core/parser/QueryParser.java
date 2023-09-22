@@ -1125,38 +1125,12 @@ public class QueryParser
         @Override
         public Object visitLiteral(LiteralContext ctx)
         {
-            if (ctx.NULL() != null)
-            {
-                // Actual type is unknown here
-                return new LiteralNullExpression(ResolvedType.of(Type.Any));
-            }
-            else if (ctx.booleanLiteral() != null)
-            {
-                return ctx.booleanLiteral()
-                        .TRUE() != null ? LiteralBooleanExpression.TRUE
-                                : LiteralBooleanExpression.FALSE;
-            }
-            else if (ctx.numericLiteral() != null)
-            {
-                return LiteralExpression.createLiteralNumericExpression(ctx.numericLiteral()
-                        .getText());
-            }
-            else if (ctx.decimalLiteral() != null)
-            {
-                return LiteralExpression.createLiteralDecimalExpression(ctx.decimalLiteral()
-                        .getText());
-            }
-            else if (ctx.templateStringLiteral() != null)
+            if (ctx.templateStringLiteral() != null)
             {
                 return visit(ctx.templateStringLiteral());
             }
 
-            String text = ctx.stringLiteral()
-                    .getText();
-            text = text.substring(1, text.length() - 1);
-            // Remove escaped single quotes
-            text = text.replaceAll("''", "'");
-            return new LiteralStringExpression(text);
+            return getLiteralExpression(ctx);
         }
 
         @Override
@@ -1440,19 +1414,6 @@ public class QueryParser
             return getIdentifierString(ctx.getText());
         }
 
-        private String getIdentifierString(String string)
-        {
-            String text = string;
-            // Strip starting quotes
-            if (text.charAt(0) == '"')
-            {
-                text = text.substring(1, text.length() - 1);
-                // Remove escaped double quotes
-                text = text.replaceAll("\"\"", "\"");
-            }
-            return text;
-        }
-
         private IExpression getExpression(ParserRuleContext ctx)
         {
             if (ctx == null)
@@ -1483,37 +1444,6 @@ public class QueryParser
             // ... else wrap it
             // This will be resolved later to return single value if needed
             return new AggregateWrapperExpression(expression, false, false);
-        }
-
-        private QualifiedName getQualifiedName(QnameContext ctx)
-        {
-            if (ctx == null)
-            {
-                return null;
-            }
-
-            return getQualifiedName(ctx.identifier());
-        }
-
-        private QualifiedName getQualifiedName(CacheNameContext ctx)
-        {
-            if (ctx == null)
-            {
-                return null;
-            }
-
-            return getQualifiedName(ctx.identifier());
-        }
-
-        private QualifiedName getQualifiedName(List<IdentifierContext> identifier)
-        {
-            int size = identifier.size();
-            List<String> parts = new ArrayList<>(size);
-            identifier.stream()
-                    .map(i -> getIdentifierString(i.getText()))
-                    .forEach(i -> parts.add(i));
-
-            return new QualifiedName(parts);
         }
 
         /** Cache qualifier with type and name */
@@ -1563,4 +1493,87 @@ public class QueryParser
             warnings.add(new Warning(message, Location.from(ctx)));
         }
     }
+
+    /** Contruct a {@link QualifiedName} from {@link QnameContext} */
+    public static QualifiedName getQualifiedName(QnameContext ctx)
+    {
+        if (ctx == null)
+        {
+            return null;
+        }
+
+        return getQualifiedName(ctx.identifier());
+    }
+
+    /** Construct a {@link LiteralExpression} from {@link LiteralContext} */
+    public static IExpression getLiteralExpression(LiteralContext ctx)
+    {
+        if (ctx.NULL() != null)
+        {
+            // Actual type is unknown here
+            return new LiteralNullExpression(ResolvedType.of(Type.Any));
+        }
+        else if (ctx.booleanLiteral() != null)
+        {
+            return ctx.booleanLiteral()
+                    .TRUE() != null ? LiteralBooleanExpression.TRUE
+                            : LiteralBooleanExpression.FALSE;
+        }
+        else if (ctx.numericLiteral() != null)
+        {
+            return LiteralExpression.createLiteralNumericExpression(ctx.numericLiteral()
+                    .getText());
+        }
+        else if (ctx.decimalLiteral() != null)
+        {
+            return LiteralExpression.createLiteralDecimalExpression(ctx.decimalLiteral()
+                    .getText());
+        }
+        else if (ctx.templateStringLiteral() != null)
+        {
+            return null;
+        }
+
+        String text = ctx.stringLiteral()
+                .getText();
+        text = text.substring(1, text.length() - 1);
+        // Remove escaped single quotes
+        text = text.replaceAll("''", "'");
+        return new LiteralStringExpression(text);
+    }
+
+    private static QualifiedName getQualifiedName(CacheNameContext ctx)
+    {
+        if (ctx == null)
+        {
+            return null;
+        }
+
+        return getQualifiedName(ctx.identifier());
+    }
+
+    private static QualifiedName getQualifiedName(List<IdentifierContext> identifier)
+    {
+        int size = identifier.size();
+        List<String> parts = new ArrayList<>(size);
+        identifier.stream()
+                .map(i -> getIdentifierString(i.getText()))
+                .forEach(i -> parts.add(i));
+
+        return new QualifiedName(parts);
+    }
+
+    private static String getIdentifierString(String string)
+    {
+        String text = string;
+        // Strip starting quotes
+        if (text.charAt(0) == '"')
+        {
+            text = text.substring(1, text.length() - 1);
+            // Remove escaped double quotes
+            text = text.replaceAll("\"\"", "\"");
+        }
+        return text;
+    }
+
 }

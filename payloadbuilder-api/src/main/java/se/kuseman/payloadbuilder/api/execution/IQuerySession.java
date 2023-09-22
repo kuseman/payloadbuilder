@@ -52,7 +52,7 @@ public interface IQuerySession
     default void setCatalogProperty(String catalogAlias, String key, Object value)
     {
         setCatalogProperty(catalogAlias, key, value == null ? ValueVector.literalNull(ResolvedType.of(Type.Any), 1)
-                : ValueVector.literalAny(value, 1));
+                : ValueVector.literalAny(1, value));
     }
 
     /** Get the generic cache */

@@ -548,6 +548,17 @@ public class QueryParserTest extends Assert
         assertExpression("a NOT IN (1,2,3)");
         assertExpression("@a");
         assertExpression("@@rowcount");
+
+        // Test PEMDAS operator order
+        // (P)arenthesis
+        // (E)xponents
+        // (M)ultiplication and (D)ivision
+        // (A)ddition and (S)ubtraction
+        // Left to right
+        // 6/2*(1+2)
+        // 6/2*3
+        // 3*3 = 9
+        assertExpression("6/2*(1+2)", new LiteralIntegerExpression(9));
     }
 
     @Test

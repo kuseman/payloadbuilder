@@ -177,7 +177,7 @@ abstract class AInMemoryCache<TValue> implements CacheProvider
                                 entry.value = supplier.get();
                                 entry.setExpire(ttl);
                             }
-                            catch (Exception e)
+                            catch (Throwable e)
                             {
                                 // Swallow. We keep the old data in cache and return it.
                                 // Reload will be retried next time the cache entry is requested
