@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.catalog.jdbc;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.entry;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
 
@@ -11,6 +12,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -355,15 +357,47 @@ class JdbcDatasource implements IDatasource
         final String database = context.getSession()
                 .getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE)
                 .valueAsString(0);
+        final String schema = context.getSession()
+                .getCatalogProperty(catalogAlias, JdbcCatalog.SCHEMA)
+                .valueAsString(0);
 
         // CSOFF
         return new TupleIterator()
         // CSON
         {
+            private AbortRunnable abortRunnable = new AbortRunnable();
             private PreparedStatement statement;
             private ResultSet rs;
             private String[] columns;
             private boolean resultSetEnded = false;
+            private volatile boolean abort = false;
+
+            {
+                context.getSession()
+                        .registerAbortListener(abortRunnable);
+            }
+
+            class AbortRunnable implements Runnable
+            {
+                @Override
+                public void run()
+                {
+                    abort = true;
+
+                    Statement stm = statement;
+                    if (stm != null)
+                    {
+                        try
+                        {
+                            stm.cancel();
+                        }
+                        catch (SQLException e)
+                        {
+                            // Swallow this
+                        }
+                    }
+                }
+            }
 
             @Override
             public TupleVector next()
@@ -386,6 +420,11 @@ class JdbcDatasource implements IDatasource
                         Object[] values = new Object[length];
                         for (int i = 0; i < length; i++)
                         {
+                            if (abort)
+                            {
+                                break;
+                            }
+
                             try
                             {
                                 values[i] = rs.getObject(i + 1);
@@ -394,6 +433,12 @@ class JdbcDatasource implements IDatasource
                             {
                                 throw new RuntimeException("Error fetching value from result set", e);
                             }
+                        }
+
+                        if (abort)
+                        {
+                            statement.close();
+                            break;
                         }
 
                         batch.add(values);
@@ -417,6 +462,11 @@ class JdbcDatasource implements IDatasource
             @Override
             public boolean hasNext()
             {
+                if (abort)
+                {
+                    return false;
+                }
+
                 try
                 {
                     if (rs == null)
@@ -484,7 +534,14 @@ class JdbcDatasource implements IDatasource
                 Connection connection = catalog.getConnection(context.getSession(), catalogAlias);
                 try
                 {
-                    connection.setCatalog(database);
+                    if (!isBlank(database))
+                    {
+                        connection.setCatalog(database);
+                    }
+                    if (!isBlank(schema))
+                    {
+                        connection.setSchema(schema);
+                    }
                     statement = connection.prepareStatement(query, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
                     if (parameters != null)
                     {

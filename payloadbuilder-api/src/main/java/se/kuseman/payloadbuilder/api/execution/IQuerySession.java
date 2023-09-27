@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.api.execution;
 import java.io.Writer;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 
 /** Definition of a query session. */
@@ -60,6 +61,12 @@ public interface IQuerySession
 
     /** Returns true if the query should be aborted */
     boolean abortQuery();
+
+    /**
+     * Register an abort query listener to session. This is called if the query should be aborted and {@link IDatasource}'s can register to close connections etc. NOTE! Are called on a separate thread
+     * from the thread that executes the query
+     */
+    void registerAbortListener(Runnable listener);
 
     /** Get the print writer used for message outputs from session */
     Writer getPrintWriter();

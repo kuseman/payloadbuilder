@@ -47,6 +47,7 @@ public class JdbcCatalog extends Catalog
     public static final String USERNAME = "username";
     public static final String PASSWORD = "password";
     public static final String DATABASE = "database";
+    public static final String SCHEMA = "schema";
 
     private final Map<String, HikariDataSource> dataSourceByURL = new ConcurrentHashMap<>();
 
@@ -281,6 +282,8 @@ public class JdbcCatalog extends Catalog
     {
         String database = session.getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE)
                 .valueAsString(0);
+        String schema = session.getCatalogProperty(catalogAlias, JdbcCatalog.SCHEMA)
+                .valueAsString(0);
         Connection connection = null;
         ResultSet rs = null;
         try
@@ -289,12 +292,12 @@ public class JdbcCatalog extends Catalog
             if (tables)
             {
                 rs = connection.getMetaData()
-                        .getTables(database, null, null, null);
+                        .getTables(database, schema, null, null);
             }
             else
             {
                 rs = connection.getMetaData()
-                        .getColumns(database, null, tableFilter, null);
+                        .getColumns(database, schema, tableFilter, null);
             }
             int count = rs.getMetaData()
                     .getColumnCount();
@@ -325,7 +328,7 @@ public class JdbcCatalog extends Catalog
                 }
             }
 
-            Schema schema = new Schema(Arrays.stream(columns)
+            Schema plbSchema = new Schema(Arrays.stream(columns)
                     .map(c -> Column.of(c, Type.String))
                     .collect(toList()));
 
@@ -341,7 +344,7 @@ public class JdbcCatalog extends Catalog
                 rows.add(values);
             }
 
-            return TupleIterator.singleton(new ObjectTupleVector(schema, rows.size(), (row, col) -> rows.get(row)[col]));
+            return TupleIterator.singleton(new ObjectTupleVector(plbSchema, rows.size(), (row, col) -> rows.get(row)[col]));
         }
         catch (Exception e)
         {

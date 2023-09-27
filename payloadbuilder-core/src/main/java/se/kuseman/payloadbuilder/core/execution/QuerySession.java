@@ -38,6 +38,7 @@ import se.kuseman.payloadbuilder.core.cache.InMemoryTempTableCache;
 import se.kuseman.payloadbuilder.core.cache.TempTableCache;
 import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
 import se.kuseman.payloadbuilder.core.expression.VariableExpression;
+import se.kuseman.payloadbuilder.core.utils.WeakListenerList;
 
 /**
  * A query session. Holds properties for catalog implementations etc.
@@ -68,6 +69,7 @@ public class QuerySession implements IQuerySession
     private Map<QualifiedName, ValueVector> systemProperties;
     private Writer printWriter;
     private BooleanSupplier abortSupplier;
+    private WeakListenerList abortQueryListeners;
     private Map<QualifiedName, TemporaryTable> temporaryTables;
     private TempTableCache tempTableCache = new InMemoryTempTableCache();
     private GenericCache genericCache = new InMemoryGenericCache("QuerySession");
@@ -211,6 +213,26 @@ public class QuerySession implements IQuerySession
     {
         return abortSupplier != null
                 && abortSupplier.getAsBoolean();
+    }
+
+    /** Register abort listener to session */
+    @Override
+    public void registerAbortListener(Runnable listener)
+    {
+        if (abortQueryListeners == null)
+        {
+            abortQueryListeners = new WeakListenerList();
+        }
+        abortQueryListeners.registerListener(listener);
+    }
+
+    /** Fire all registered abort query listeners */
+    public void fireAbortQueryListeners()
+    {
+        if (abortQueryListeners != null)
+        {
+            abortQueryListeners.fire();
+        }
     }
 
     /** Return catalog registry */
