@@ -12,7 +12,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -35,7 +34,6 @@ import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.SeekType;
 import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
-import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IInExpression;
@@ -259,7 +257,8 @@ class JdbcDatasource implements IDatasource
                         sb.append("y.")
                                 .append(qname.toString());
                         sb.append(" LIKE ");
-                        sb.append(convertValue(valueSupplier.eval(context)));
+                        sb.append(convertValue(valueSupplier.eval(context)
+                                .valueAsObject(0)));
                         break;
                     case NULL:
                         INullPredicateExpression nullExpression = predicate.getNullPredicateExpression();
@@ -312,11 +311,11 @@ class JdbcDatasource implements IDatasource
     {
         if (value instanceof Boolean)
         {
-            return (Boolean) value ? "1"
-                    : "0";
+            value = (Boolean) value ? 1
+                    : 0;
         }
-        else if (value instanceof String
-                || value instanceof UTF8String)
+
+        if (!(value instanceof Number))
         {
             return "'" + String.valueOf(value) + "'";
         }
@@ -366,6 +365,7 @@ class JdbcDatasource implements IDatasource
         // CSON
         {
             private AbortRunnable abortRunnable = new AbortRunnable();
+            private Connection connection;
             private PreparedStatement statement;
             private ResultSet rs;
             private String[] columns;
@@ -383,38 +383,22 @@ class JdbcDatasource implements IDatasource
                 public void run()
                 {
                     abort = true;
-
-                    Statement stm = statement;
-                    if (stm != null)
-                    {
-                        try
-                        {
-                            stm.cancel();
-                        }
-                        catch (SQLException e)
-                        {
-                            // Swallow this
-                        }
-                    }
+                    Utils.cancelQuiet(statement);
                 }
             }
 
             @Override
             public TupleVector next()
             {
-                if (columns == null)
-                {
-                    populateMeta();
-                }
-
-                Schema schema = new Schema(Arrays.stream(columns)
-                        .map(c -> Column.of(c, Type.Any))
-                        .collect(toList()));
-
-                List<Object[]> batch = new ArrayList<>(batchSize);
-                int length = columns.length;
                 try
                 {
+                    if (columns == null)
+                    {
+                        populateMeta();
+                    }
+
+                    List<Object[]> batch = new ArrayList<>(batchSize);
+                    int length = columns.length;
                     do
                     {
                         Object[] values = new Object[length];
@@ -424,20 +408,11 @@ class JdbcDatasource implements IDatasource
                             {
                                 break;
                             }
-
-                            try
-                            {
-                                values[i] = rs.getObject(i + 1);
-                            }
-                            catch (SQLException e)
-                            {
-                                throw new RuntimeException("Error fetching value from result set", e);
-                            }
+                            values[i] = rs.getObject(i + 1);
                         }
 
                         if (abort)
                         {
-                            statement.close();
                             break;
                         }
 
@@ -450,90 +425,104 @@ class JdbcDatasource implements IDatasource
 
                         resultSetEnded = !rs.next();
                     } while (!resultSetEnded);
+
+                    Utils.printWarnings(rs, context.getSession());
+                    Utils.printWarnings(statement, context.getSession());
+                    Utils.printWarnings(connection, context.getSession());
+
+                    Schema schema = new Schema(Arrays.stream(columns)
+                            .map(c -> Column.of(c, Type.Any))
+                            .collect(toList()));
+                    return new ObjectTupleVector(schema, batch.size(), (row, col) -> batch.get(row)[col]);
                 }
-                catch (SQLException e)
+                catch (Exception e)
                 {
+                    // Close everything here just to be safe
+                    // close on iterator should be called but better safe than sorry
+                    Utils.closeQuiet(connection, statement, rs);
                     throw new RuntimeException("Error fetching value from result set", e);
                 }
-
-                return new ObjectTupleVector(schema, batch.size(), (row, col) -> batch.get(row)[col]);
             }
 
             @Override
             public boolean hasNext()
             {
-                if (abort)
+                while (true)
                 {
-                    return false;
-                }
-
-                try
-                {
-                    if (rs == null)
+                    if (abort)
                     {
-                        setNextResultSet();
-                    }
-                    else
-                    {
-                        return !resultSetEnded;
+                        return false;
                     }
 
-                    resultSetEnded = rs == null
-                            || !rs.next();
-                    return !resultSetEnded;
-                }
-                catch (SQLException e)
-                {
-                    throw new RuntimeException("Error advancing result set", e);
+                    try
+                    {
+                        if (rs == null)
+                        {
+                            rs = setNextResultSet();
+                            // No more result, we're done
+                            if (rs == null)
+                            {
+                                return false;
+                            }
+
+                            // Set result set at row 1
+                            resultSetEnded = !rs.next();
+                        }
+
+                        // Current result set ended, fetch next
+                        if (resultSetEnded)
+                        {
+                            columns = null;
+                            rs = null;
+                        }
+                        else
+                        {
+                            return true;
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        // Close everything here just to be safe
+                        // close on iterator should be called but better safe than sorry
+                        Utils.closeQuiet(connection, statement, rs);
+                        throw new RuntimeException("Error advancing result set", e);
+                    }
                 }
             }
 
             @Override
             public void close()
             {
-                if (statement != null)
+                Utils.printWarnings(rs, context.getSession());
+                Utils.printWarnings(statement, context.getSession());
+                Utils.printWarnings(connection, context.getSession());
+                Utils.closeQuiet(connection, statement, rs);
+                columns = null;
+                rs = null;
+                statement = null;
+                connection = null;
+            }
+
+            private void populateMeta() throws SQLException
+            {
+                ResultSetMetaData metaData = rs.getMetaData();
+                int count = metaData.getColumnCount();
+                columns = new String[count];
+
+                for (int i = 0; i < count; i++)
                 {
-                    try
-                    {
-                        statement.getConnection()
-                                .close();
-                    }
-                    catch (SQLException e)
-                    {
-                        throw new RuntimeException("Error closing result set", e);
-                    }
-                    statement = null;
-                    rs = null;
-                    columns = null;
+                    columns[i] = metaData.getColumnLabel(i + 1);
                 }
             }
 
-            private void populateMeta()
+            private ResultSet setNextResultSet() throws Exception
             {
-                try
+                boolean first = connection == null;
+                // First result set, open connection an create statement
+                if (connection == null)
                 {
-                    ResultSetMetaData metaData = rs.getMetaData();
-                    int count = metaData.getColumnCount();
-                    columns = new String[count];
-
-                    for (int i = 0; i < count; i++)
-                    {
-                        columns[i] = metaData.getColumnLabel(i + 1);
-                    }
-                }
-                catch (SQLException e)
-                {
-                    throw new RuntimeException("Error fetching columns from result set", e);
-                }
-            }
-
-            private void setNextResultSet()
-            {
-                // TODO: traverse to next result set if statement already created
-
-                Connection connection = catalog.getConnection(context.getSession(), catalogAlias);
-                try
-                {
+                    connection = catalog.getConnection(context.getSession(), catalogAlias);
+                    Utils.printWarnings(connection, context.getSession());
                     if (!isBlank(database))
                     {
                         connection.setCatalog(database);
@@ -543,6 +532,7 @@ class JdbcDatasource implements IDatasource
                         connection.setSchema(schema);
                     }
                     statement = connection.prepareStatement(query, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+                    Utils.printWarnings(statement, context.getSession());
                     if (parameters != null)
                     {
                         int size = parameters.size();
@@ -551,16 +541,40 @@ class JdbcDatasource implements IDatasource
                             statement.setObject(i + 1, parameters.get(i));
                         }
                     }
+                }
 
-                    if (statement.execute())
+                // Skip a while loop here to protect against bugs/bad drivers etc.
+                // Traverse until we have a result set or there are no more result sets
+                for (int iteration = 0; iteration < 256; iteration++)
+                {
+                    boolean isResultSet = first ? statement.execute()
+                            : statement.getMoreResults();
+                    first = false;
+                    Utils.printWarnings(statement, context.getSession());
+                    if (isResultSet)
                     {
-                        rs = statement.getResultSet();
+                        ResultSet rs = statement.getResultSet();
+                        Utils.printWarnings(statement, context.getSession());
+                        return rs;
+                    }
+                    else
+                    {
+                        int updateCount = statement.getUpdateCount();
+                        // We're done
+                        if (updateCount < 0)
+                        {
+                            return null;
+                        }
+
+                        context.getSession()
+                                .getPrintWriter()
+                                .append(String.valueOf(updateCount))
+                                .append(" row(s) affected")
+                                .append(System.lineSeparator());
                     }
                 }
-                catch (SQLException e)
-                {
-                    throw new RuntimeException("Error creating result set. (" + e.getMessage() + ")", e);
-                }
+
+                throw new RuntimeException("Max iteration count reached when trying to fetch a result set.");
             }
         };
     }

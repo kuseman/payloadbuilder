@@ -6,6 +6,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.StringWriter;
+import java.io.Writer;
 import java.time.Duration;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -54,8 +56,14 @@ public final class TestUtils
     }
 
     /** Mock {@link IExecutionContext} with provided data */
-    @SuppressWarnings("unchecked")
     public static IExecutionContext mockExecutionContext(String catalogAlias, Map<String, Object> properties, int nodeId, NodeData data)
+    {
+        return mockExecutionContext(catalogAlias, properties, nodeId, data, new StringWriter());
+    }
+
+    /** Mock {@link IExecutionContext} with provided data */
+    @SuppressWarnings("unchecked")
+    public static IExecutionContext mockExecutionContext(String catalogAlias, Map<String, Object> properties, int nodeId, NodeData data, Writer writer)
     {
         IExecutionContext context = Mockito.mock(IExecutionContext.class);
         IQuerySession session = Mockito.mock(IQuerySession.class);
@@ -84,6 +92,8 @@ public final class TestUtils
                 return ValueVector.literalAny(properties.get(key));
             }
         });
+
+        when(session.getPrintWriter()).thenReturn(writer);
 
         return context;
     }

@@ -2,6 +2,7 @@ package se.kuseman.payloadbuilder.catalog.jdbc;
 
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
+import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -9,8 +10,12 @@ import static se.kuseman.payloadbuilder.api.utils.MapUtils.entry;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
 import static se.kuseman.payloadbuilder.catalog.TestUtils.mockOptions;
 import static se.kuseman.payloadbuilder.catalog.TestUtils.mockSortItem;
+import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertTupleVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
+import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
+import java.io.StringWriter;
+import java.io.Writer;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -44,6 +49,7 @@ import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.catalog.TestUtils;
+import se.kuseman.payloadbuilder.test.ExpressionTestUtils;
 import se.kuseman.payloadbuilder.test.IPredicateMock;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
@@ -114,22 +120,82 @@ abstract class BaseJDBCTest extends Assert
             con.prepareStatement("CREATE TABLE " + TEST_TABLE + " ( " + " col1 INT," + " col2 VARCHAR(100))")
                     .execute();
 
-            //@formatter:off
-            con.prepareStatement(
-                    "INSERT INTO " + TEST_TABLE + " ( col1, col2 ) "
-                            + "      SELECT 1, 'one' "
-                            + "UNION SELECT 2, 'two' "
-                            + "UNION SELECT 3, 'three' "
-                            + "UNION SELECT 4, 'four' "
-                            + "UNION SELECT 5, 'five' "
-            )
-            .execute();
-            //@formatter:on
+            String stms = """
+                    INSERT INTO %1$s ( col1, col2 ) VALUES (1, 'one')
+                    INSERT INTO %1$s ( col1, col2 ) VALUES (2, 'two')
+                    INSERT INTO %1$s ( col1, col2 ) VALUES (3, 'three')
+                    INSERT INTO %1$s ( col1, col2 ) VALUES (4, 'four')
+                    INSERT INTO %1$s ( col1, col2 ) VALUES (5, 'five')
+                    """.formatted(TEST_TABLE);
+
+            for (String s : Arrays.stream(stms.split("[\\n\\r]"))
+                    .toArray(String[]::new))
+            {
+                con.prepareStatement(s)
+                        .execute();
+            }
         }
         catch (SQLException e)
         {
             throw new RuntimeException(e);
         }
+    }
+
+    @Test
+    public void test_warnings_exceptions()
+    {
+        // Multi statement queries is not supported by all rdbms:es
+        assumeTrue(jdbcUrl.contains("sqlserver"));
+
+        StringWriter writer = new StringWriter();
+        IExecutionContext context = mockExecutionContext(writer);
+        QueryFunction query = new QueryFunction(catalog);
+
+        TupleIterator it = query.execute(context, CATALOG_ALIAS, Optional.empty(), asList(ExpressionTestUtils.createStringExpression("""
+                raiserror('warn 0', 0, 2);       -- Warn level
+                create table vals
+                (
+                    rowId int
+                );
+                raiserror('warn 1', 5, 2);       -- Warn level
+                insert into vals values (1);
+                raiserror('warn 2', 10, 2);      -- Warn level
+                insert into vals values (2);
+                select * from vals;
+                drop table vals;
+                select 'done'
+                """)
+
+        ), mockOptions(500));
+
+        int batchCount = 0;
+        while (it.hasNext())
+        {
+            TupleVector next = it.next();
+
+            if (batchCount == 0)
+            {
+                assertTupleVectorsEquals(TupleVector.of(Schema.of(Column.of("rowId", Type.Any)), asList(vv(Type.Any, 1, 2))), next);
+            }
+            else
+            {
+                assertTupleVectorsEquals(TupleVector.of(Schema.of(Column.of("", Type.Any)), asList(vv(Type.Any, "done"))), next);
+            }
+
+            batchCount++;
+        }
+        it.close();
+        assertEquals(2, batchCount);
+
+        assertEquals("""
+                warn 0
+                0 row(s) affected
+                warn 1
+                1 row(s) affected
+                warn 2
+                1 row(s) affected
+                0 row(s) affected
+                """.replaceAll("[\\n\\r]", System.lineSeparator()), writer.toString());
     }
 
     @Test
@@ -328,6 +394,11 @@ abstract class BaseJDBCTest extends Assert
 
     private IExecutionContext mockExecutionContext()
     {
+        return mockExecutionContext(null);
+    }
+
+    private IExecutionContext mockExecutionContext(Writer writer)
+    {
         //@formatter:off
          IExecutionContext context = TestUtils.mockExecutionContext(CATALOG_ALIAS, 
                  ofEntries(
@@ -336,7 +407,7 @@ abstract class BaseJDBCTest extends Assert
                      entry(JdbcCatalog.DATABASE        ,TEST_DB),
                      entry(JdbcCatalog.USERNAME        ,username),
                      entry(JdbcCatalog.PASSWORD        ,password)
-                 ), 0, null);
+                 ), 0, null, writer);
          //@formatter:on
         return context;
     }

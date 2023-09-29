@@ -348,7 +348,7 @@ public class JdbcCatalog extends Catalog
         }
         catch (Exception e)
         {
-            Utils.closeQuiet(connection, rs);
+            Utils.closeQuiet(connection, null, rs);
             throw new RuntimeException("Error listing tables", e);
         }
     }
