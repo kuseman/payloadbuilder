@@ -68,6 +68,7 @@ public class QuerySession implements IQuerySession
     /** System properties */
     private Map<QualifiedName, ValueVector> systemProperties;
     private Writer printWriter;
+    private ExceptionHandler exceptionHandler;
     private BooleanSupplier abortSupplier;
     private WeakListenerList abortQueryListeners;
     private Map<QualifiedName, TemporaryTable> temporaryTables;
@@ -195,10 +196,27 @@ public class QuerySession implements IQuerySession
         return printWriter;
     }
 
+    @Override
+    public void handleKnownException(Exception e)
+    {
+        if (exceptionHandler != null)
+        {
+            exceptionHandler.handle(e);
+            return;
+        }
+        IQuerySession.super.handleKnownException(e);
+    }
+
     /** Set print writer */
     public void setPrintWriter(Writer printWriter)
     {
         this.printWriter = printWriter;
+    }
+
+    /** Set exception handler */
+    public void setExceptionHandler(ExceptionHandler exceptionHandler)
+    {
+        this.exceptionHandler = exceptionHandler;
     }
 
     /** Set abort supplier. */
@@ -439,5 +457,11 @@ public class QuerySession implements IQuerySession
     public void setLastQueryRowCount(long lastQueryRowCount)
     {
         this.lastQueryRowCount = lastQueryRowCount;
+    }
+
+    /** Exception handle for known exceptions thrown during execution */
+    public interface ExceptionHandler
+    {
+        void handle(Exception e);
     }
 }

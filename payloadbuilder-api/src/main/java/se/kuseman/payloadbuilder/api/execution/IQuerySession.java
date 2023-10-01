@@ -1,5 +1,6 @@
 package se.kuseman.payloadbuilder.api.execution;
 
+import java.io.IOException;
 import java.io.Writer;
 
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -68,8 +69,24 @@ public interface IQuerySession
      */
     void registerAbortListener(Runnable listener);
 
-    /** Get the print writer used for message outputs from session */
+    /** Get the print writer used for message outputs */
     Writer getPrintWriter();
+
+    /**
+     * Handle known exception from catalogs. For example a SQLException that is thrown during execution but is not crucial for the whole execution.
+     */
+    default void handleKnownException(Exception e)
+    {
+        try
+        {
+            getPrintWriter().append(e.getMessage())
+                    .append(System.lineSeparator());
+        }
+        catch (IOException e1)
+        {
+            // Swallow this
+        }
+    }
 
     /** Return the execution time in ms. for the last executed statement */
     long getLastQueryExecutionTime();

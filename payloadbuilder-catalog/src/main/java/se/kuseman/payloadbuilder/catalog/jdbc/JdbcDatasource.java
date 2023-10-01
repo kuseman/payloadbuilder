@@ -547,30 +547,42 @@ class JdbcDatasource implements IDatasource
                 // Traverse until we have a result set or there are no more result sets
                 for (int iteration = 0; iteration < 256; iteration++)
                 {
-                    boolean isResultSet = first ? statement.execute()
-                            : statement.getMoreResults();
-                    first = false;
-                    Utils.printWarnings(statement, context.getSession());
-                    if (isResultSet)
+                    try
                     {
-                        ResultSet rs = statement.getResultSet();
+                        boolean isResultSet = first ? statement.execute()
+                                : statement.getMoreResults();
+                        first = false;
                         Utils.printWarnings(statement, context.getSession());
-                        return rs;
-                    }
-                    else
-                    {
-                        int updateCount = statement.getUpdateCount();
-                        // We're done
-                        if (updateCount < 0)
+                        if (isResultSet)
                         {
-                            return null;
+                            ResultSet rs = statement.getResultSet();
+                            Utils.printWarnings(statement, context.getSession());
+                            return rs;
                         }
+                        else
+                        {
+                            int updateCount = statement.getUpdateCount();
+                            // We're done
+                            if (updateCount < 0)
+                            {
+                                return null;
+                            }
 
+                            context.getSession()
+                                    .getPrintWriter()
+                                    .append(String.valueOf(updateCount))
+                                    .append(" row(s) affected")
+                                    .append(System.lineSeparator());
+                        }
+                    }
+                    catch (SQLException e)
+                    {
                         context.getSession()
-                                .getPrintWriter()
-                                .append(String.valueOf(updateCount))
-                                .append(" row(s) affected")
-                                .append(System.lineSeparator());
+                                .handleKnownException(e);
+                    }
+                    finally
+                    {
+                        first = false;
                     }
                 }
 

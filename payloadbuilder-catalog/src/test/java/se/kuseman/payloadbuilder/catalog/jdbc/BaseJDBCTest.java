@@ -162,6 +162,7 @@ abstract class BaseJDBCTest extends Assert
                 raiserror('warn 2', 10, 2);      -- Warn level
                 insert into vals values (2);
                 select * from vals;
+                raiserror('error 1', 15, 2);      -- Error level
                 drop table vals;
                 select 'done'
                 """)
@@ -194,6 +195,7 @@ abstract class BaseJDBCTest extends Assert
                 1 row(s) affected
                 warn 2
                 1 row(s) affected
+                error 1
                 0 row(s) affected
                 """.replaceAll("[\\n\\r]", System.lineSeparator()), writer.toString());
     }

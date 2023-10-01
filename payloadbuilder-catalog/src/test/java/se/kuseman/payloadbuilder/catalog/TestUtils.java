@@ -94,6 +94,9 @@ public final class TestUtils
         });
 
         when(session.getPrintWriter()).thenReturn(writer);
+        Mockito.doCallRealMethod()
+                .when(session)
+                .handleKnownException(any(Exception.class));
 
         return context;
     }
