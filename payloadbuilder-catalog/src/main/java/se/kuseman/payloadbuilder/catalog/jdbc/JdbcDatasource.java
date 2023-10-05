@@ -369,6 +369,7 @@ class JdbcDatasource implements IDatasource
             private PreparedStatement statement;
             private ResultSet rs;
             private String[] columns;
+            private int[] jdbcTypes;
             private boolean resultSetEnded = false;
             private volatile boolean abort = false;
 
@@ -408,7 +409,7 @@ class JdbcDatasource implements IDatasource
                             {
                                 break;
                             }
-                            values[i] = rs.getObject(i + 1);
+                            values[i] = Utils.getAndConvertValue(rs, i + 1, jdbcTypes[i]);
                         }
 
                         if (abort)
@@ -473,6 +474,7 @@ class JdbcDatasource implements IDatasource
                         if (resultSetEnded)
                         {
                             columns = null;
+                            jdbcTypes = null;
                             rs = null;
                         }
                         else
@@ -498,6 +500,7 @@ class JdbcDatasource implements IDatasource
                 Utils.printWarnings(connection, context.getSession());
                 Utils.closeQuiet(connection, statement, rs);
                 columns = null;
+                jdbcTypes = null;
                 rs = null;
                 statement = null;
                 connection = null;
@@ -508,10 +511,12 @@ class JdbcDatasource implements IDatasource
                 ResultSetMetaData metaData = rs.getMetaData();
                 int count = metaData.getColumnCount();
                 columns = new String[count];
+                jdbcTypes = new int[count];
 
                 for (int i = 0; i < count; i++)
                 {
                     columns[i] = metaData.getColumnLabel(i + 1);
+                    jdbcTypes[i] = metaData.getColumnType(i + 1);
                 }
             }
 

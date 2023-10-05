@@ -1,6 +1,7 @@
 package se.kuseman.payloadbuilder.catalog.jdbc;
 
 import java.io.IOException;
+import java.io.Reader;
 import java.io.Writer;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -8,11 +9,31 @@ import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
 
+import org.apache.commons.io.IOUtils;
+
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 
 /** Jdbc utils */
 class Utils
 {
+    /**
+     * Converts provided value according to jdbc type. Stringifies LOBs etc.
+     */
+    static Object getAndConvertValue(ResultSet rs, int ordinal, int jdbcType) throws SQLException, IOException
+    {
+        if (jdbcType == java.sql.Types.CLOB)
+        {
+            Reader reader = rs.getCharacterStream(ordinal);
+            if (rs.wasNull())
+            {
+                return null;
+            }
+            return IOUtils.toString(reader);
+        }
+
+        return rs.getObject(ordinal);
+    }
+
     static void cancelQuiet(Statement statement)
     {
         if (statement != null)
