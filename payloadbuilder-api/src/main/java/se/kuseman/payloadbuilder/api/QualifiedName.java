@@ -125,6 +125,11 @@ public class QualifiedName
     /** Returns true if this qualified names parts equals other parts ignoring case */
     public boolean equalsIgnoreCase(QualifiedName name)
     {
+        if (name == null)
+        {
+            return false;
+        }
+
         int size = parts.size();
         if (size != name.size())
         {
