@@ -5,7 +5,6 @@ import java.sql.SQLException;
 import javax.sql.DataSource;
 
 import org.junit.AfterClass;
-import org.junit.Ignore;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
 import org.testcontainers.utility.DockerImageName;
@@ -13,12 +12,17 @@ import org.testcontainers.utility.DockerImageName;
 import oracle.jdbc.datasource.impl.OracleDataSource;
 
 /** Test of Oracle21.x */
-@Ignore("Way to much customization is needed in both test and plb for Oracle. TODO: fix")
 public class Oracle21xTest extends BaseJDBCTest
 {
     public Oracle21xTest()
     {
-        super(Oracle.getDatasource(), Oracle.getUrl(), "oracle.jdbc.OracleDriver", "plbuser", Oracle.PASSWORD);
+        super(Oracle.getDatasource(), Oracle.getUrl(), "oracle.jdbc.OracleDriver", TEST_DB, Oracle.PASSWORD);
+    }
+
+    @Override
+    protected String getColumn(String name)
+    {
+        return name.toUpperCase();
     }
 
     @AfterClass
@@ -34,7 +38,7 @@ public class Oracle21xTest extends BaseJDBCTest
         private static final String IMAGE_NAME = "gvenzl/oracle-xe:21-slim";
         private static final GenericContainer<?> CONTAINER = new GenericContainer<>(DockerImageName.parse(IMAGE_NAME)).withExposedPorts(PORT)
                 .withEnv("ORACLE_RANDOM_PASSWORD", "true")
-                .withEnv("APP_USER", "plbuser")
+                .withEnv("APP_USER", TEST_DB)
                 .withEnv("APP_USER_PASSWORD", PASSWORD);
 
         static
@@ -52,7 +56,7 @@ public class Oracle21xTest extends BaseJDBCTest
             {
                 OracleDataSource ds = new OracleDataSource();
                 ds.setURL(getUrl());
-                ds.setUser("plbuser");
+                ds.setUser(TEST_DB);
                 ds.setPassword(PASSWORD);
                 return ds;
             }

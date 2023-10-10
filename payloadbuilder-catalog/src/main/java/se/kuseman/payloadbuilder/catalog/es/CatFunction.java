@@ -1,11 +1,11 @@
 package se.kuseman.payloadbuilder.catalog.es;
 
 import static java.util.stream.Collectors.toList;
-import static org.apache.commons.lang3.StringUtils.defaultString;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.apache.commons.io.IOUtils;
@@ -143,7 +143,7 @@ class CatFunction extends TableFunctionInfo
     static String getCatUrl(String endpoint, String catspec)
     {
         URIBuilder builder = ESQueryUtils.uriBuilder(endpoint);
-        String existingPath = defaultString(builder.getPath(), "");
+        String existingPath = Objects.toString(builder.getPath(), "");
         if (!existingPath.endsWith("/"))
         {
             existingPath = existingPath + "/";

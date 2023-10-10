@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets;
 
 import org.apache.hc.client5.http.classic.methods.HttpDelete;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
-import org.apache.hc.core5.http.ClassicHttpRequest;
+import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 
@@ -12,7 +12,7 @@ import org.apache.hc.core5.http.io.entity.StringEntity;
 class Elastic1XStrategy extends GenericStrategy
 {
     @Override
-    public ClassicHttpRequest getScrollRequest(String scrollUrl, String scrollId)
+    public HttpUriRequestBase getScrollRequest(String scrollUrl, String scrollId)
     {
         HttpPost post = new HttpPost(scrollUrl);
         post.removeHeaders(HttpHeaders.CONTENT_TYPE);
@@ -21,7 +21,7 @@ class Elastic1XStrategy extends GenericStrategy
     }
 
     @Override
-    public ClassicHttpRequest getDeleteScrollRequest(String endpoint, String scrollId)
+    public HttpUriRequestBase getDeleteScrollRequest(String endpoint, String scrollId)
     {
         HttpDelete delete = new HttpDelete(endpoint + "/_search/scroll");
         delete.setEntity(new StringEntity(scrollId, StandardCharsets.UTF_8));

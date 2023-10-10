@@ -37,6 +37,8 @@ import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.catalog.CredentialsException;
+import se.kuseman.payloadbuilder.catalog.jdbc.dialect.DialectProvider;
+import se.kuseman.payloadbuilder.catalog.jdbc.dialect.SqlDialect;
 
 /** Jdbc catalog */
 public class JdbcCatalog extends Catalog
@@ -47,7 +49,6 @@ public class JdbcCatalog extends Catalog
     public static final String USERNAME = "username";
     public static final String PASSWORD = "password";
     public static final String DATABASE = "database";
-    public static final String SCHEMA = "schema";
 
     private final Map<String, HikariDataSource> dataSourceByURL = new ConcurrentHashMap<>();
 
@@ -282,8 +283,9 @@ public class JdbcCatalog extends Catalog
     {
         String database = session.getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE)
                 .valueAsString(0);
-        String schema = session.getCatalogProperty(catalogAlias, JdbcCatalog.SCHEMA)
-                .valueAsString(0);
+
+        SqlDialect dialect = DialectProvider.getDialect(session, catalogAlias);
+
         Connection connection = null;
         ResultSet rs = null;
         try
@@ -292,12 +294,20 @@ public class JdbcCatalog extends Catalog
             if (tables)
             {
                 rs = connection.getMetaData()
-                        .getTables(database, schema, null, null);
+                        .getTables(dialect.usesSchemaAsDatabase() ? null
+                                : database,
+                                dialect.usesSchemaAsDatabase() ? database
+                                        : null,
+                                null, null);
             }
             else
             {
                 rs = connection.getMetaData()
-                        .getColumns(database, schema, tableFilter, null);
+                        .getColumns(dialect.usesSchemaAsDatabase() ? null
+                                : database,
+                                dialect.usesSchemaAsDatabase() ? database
+                                        : null,
+                                tableFilter, null);
             }
             int count = rs.getMetaData()
                     .getColumnCount();
@@ -348,7 +358,7 @@ public class JdbcCatalog extends Catalog
         }
         catch (Exception e)
         {
-            Utils.closeQuiet(connection, null, rs);
+            JdbcUtils.closeQuiet(connection, null, rs);
             throw new RuntimeException("Error listing tables", e);
         }
     }

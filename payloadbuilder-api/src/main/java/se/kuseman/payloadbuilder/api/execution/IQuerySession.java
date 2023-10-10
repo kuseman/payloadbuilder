@@ -69,6 +69,9 @@ public interface IQuerySession
      */
     void registerAbortListener(Runnable listener);
 
+    /** Unregister provided abort listener */
+    void unregisterAbortListener(Runnable listener);
+
     /** Get the print writer used for message outputs */
     Writer getPrintWriter();
 

@@ -156,10 +156,30 @@ public class QualifiedName
     @Override
     public boolean equals(Object obj)
     {
-        if (obj instanceof QualifiedName)
+        if (obj == null)
         {
-            QualifiedName that = (QualifiedName) obj;
-            return parts.equals(that.parts);
+            return false;
+        }
+        else if (obj == this)
+        {
+            return true;
+        }
+        else if (obj instanceof QualifiedName that)
+        {
+            int size = parts.size();
+            if (size != that.parts.size())
+            {
+                return false;
+            }
+            for (int i = 0; i < size; i++)
+            {
+                if (!parts.get(i)
+                        .equals(that.parts.get(i)))
+                {
+                    return false;
+                }
+            }
+            return true;
         }
         return false;
     }

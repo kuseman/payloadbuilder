@@ -92,6 +92,46 @@ abstract class BaseJDBCTest extends Assert
         }
     }
 
+    protected String getColumn(String name)
+    {
+        return name;
+    }
+
+    private ValueVector integer(ValueVector vector)
+    {
+        return new ValueVector()
+        {
+            @Override
+            public ResolvedType type()
+            {
+                return ResolvedType.of(Type.Any);
+            }
+
+            @Override
+            public int size()
+            {
+                return vector.size();
+            }
+
+            @Override
+            public Object getAny(int row)
+            {
+                return integer(vector.getAny(row));
+            }
+
+            @Override
+            public boolean isNull(int row)
+            {
+                return vector.isNull(row);
+            }
+        };
+    }
+
+    private int integer(Object value)
+    {
+        return ((Number) value).intValue();
+    }
+
     @After
     public void shutdown()
     {
@@ -216,7 +256,7 @@ abstract class BaseJDBCTest extends Assert
         {
             TupleVector v = it.next();
 
-            assertEquals(Schema.of(Column.of("col2", ResolvedType.of(Type.Any))), v.getSchema());
+            assertEquals(Schema.of(Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
 
             for (int i = 0; i < expectedSize; i++)
             {
@@ -253,15 +293,15 @@ abstract class BaseJDBCTest extends Assert
         {
             TupleVector v = it.next();
 
-            assertEquals(Schema.of(Column.of("col1", ResolvedType.of(Type.Any)), Column.of("col2", ResolvedType.of(Type.Any))), v.getSchema());
+            assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Any)), Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
 
             for (int i = 0; i < expectedSize; i++)
             {
                 for (int j = 0; j < expectedSize; j++)
                 {
                     if (col1Expected.get(i)
-                            .equals(v.getColumn(0)
-                                    .getAny(j))
+                            .equals(integer(v.getColumn(0)
+                                    .getAny(j)))
                             && col2Expected.get(i)
                                     .equals(v.getColumn(1)
                                             .getAny(j)))
@@ -294,8 +334,8 @@ abstract class BaseJDBCTest extends Assert
         {
             TupleVector v = it.next();
 
-            assertEquals(Schema.of(Column.of("col1", ResolvedType.of(Type.Any)), Column.of("col2", ResolvedType.of(Type.Any))), v.getSchema());
-            assertVectorsEquals(VectorTestUtils.vv(Type.Any, 5, 4, 3, 2, 1), v.getColumn(0));
+            assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Any)), Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
+            assertVectorsEquals(VectorTestUtils.vv(Type.Any, 5, 4, 3, 2, 1), integer(v.getColumn(0)));
             assertVectorsEquals(VectorTestUtils.vv(Type.Any, "five", "four", "three", "two", "one"), v.getColumn(1));
 
             rowCount += v.getRowCount();
@@ -325,8 +365,8 @@ abstract class BaseJDBCTest extends Assert
         {
             TupleVector v = it.next();
 
-            assertEquals(Schema.of(Column.of("col1", ResolvedType.of(Type.Any)), Column.of("col2", ResolvedType.of(Type.Any))), v.getSchema());
-            assertVectorsEquals(VectorTestUtils.vv(Type.Any, 4, 1), v.getColumn(0));
+            assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Any)), Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
+            assertVectorsEquals(VectorTestUtils.vv(Type.Any, 4, 1), integer(v.getColumn(0)));
             assertVectorsEquals(VectorTestUtils.vv(Type.Any, "four", "one"), v.getColumn(1));
 
             rowCount += v.getRowCount();
@@ -354,8 +394,8 @@ abstract class BaseJDBCTest extends Assert
         {
             TupleVector v = it.next();
 
-            assertEquals(Schema.of(Column.of("col1", ResolvedType.of(Type.Any)), Column.of("col2", ResolvedType.of(Type.Any))), v.getSchema());
-            assertVectorsEquals(VectorTestUtils.vv(Type.Any, 5, 3, 1), v.getColumn(0));
+            assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Any)), Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
+            assertVectorsEquals(VectorTestUtils.vv(Type.Any, 5, 3, 1), integer(v.getColumn(0)));
             assertVectorsEquals(VectorTestUtils.vv(Type.Any, "five", "three", "one"), v.getColumn(1));
 
             rowCount += v.getRowCount();
@@ -383,8 +423,8 @@ abstract class BaseJDBCTest extends Assert
         {
             TupleVector v = it.next();
 
-            assertEquals(Schema.of(Column.of("col1", ResolvedType.of(Type.Any)), Column.of("col2", ResolvedType.of(Type.Any))), v.getSchema());
-            assertVectorsEquals(VectorTestUtils.vv(Type.Any, 1), v.getColumn(0));
+            assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Any)), Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
+            assertVectorsEquals(VectorTestUtils.vv(Type.Any, 1), integer(v.getColumn(0)));
             assertVectorsEquals(VectorTestUtils.vv(Type.Any, "one"), v.getColumn(1));
 
             rowCount += v.getRowCount();

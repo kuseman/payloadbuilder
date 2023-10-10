@@ -5,7 +5,6 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptySet;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
-import static org.apache.commons.lang3.StringUtils.defaultString;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
 import static org.apache.commons.lang3.StringUtils.upperCase;
 
@@ -1598,7 +1597,7 @@ public class QueryParser
 
             FunctionCallInfo(String catalogAlias, String name, ScalarFunctionInfo.AggregateMode aggregateMode, List<IExpression> arguments)
             {
-                this.catalogAlias = defaultString(catalogAlias, "");
+                this.catalogAlias = Objects.toString(catalogAlias, "");
                 this.name = name;
                 this.aggregateMode = aggregateMode;
                 this.arguments = arguments;

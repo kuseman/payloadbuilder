@@ -1,7 +1,8 @@
 package se.kuseman.payloadbuilder.core.catalog;
 
 import static java.util.Objects.requireNonNull;
-import static org.apache.commons.lang3.StringUtils.defaultString;
+
+import java.util.Objects;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.core.catalog.ColumnReference.Type;
@@ -17,7 +18,7 @@ public class TableSourceReference
     {
         this.catalogAlias = requireNonNull(catalogAlias, "catalogAlias");
         this.name = requireNonNull(name, "name");
-        this.alias = defaultString(alias, "");
+        this.alias = Objects.toString(alias, "");
     }
 
     public String getCatalogAlias()

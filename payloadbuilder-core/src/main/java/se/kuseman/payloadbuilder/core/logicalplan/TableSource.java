@@ -1,9 +1,9 @@
 package se.kuseman.payloadbuilder.core.logicalplan;
 
 import static java.util.Collections.emptyList;
-import static org.apache.commons.lang3.StringUtils.defaultString;
 
 import java.util.List;
+import java.util.Objects;
 
 /** Base class for table sources */
 public abstract class TableSource implements ILogicalPlan
@@ -15,8 +15,8 @@ public abstract class TableSource implements ILogicalPlan
 
     TableSource(String catalogAlias, String alias)
     {
-        this.catalogAlias = defaultString(catalogAlias, "");
-        this.alias = defaultString(alias, "");
+        this.catalogAlias = Objects.toString(catalogAlias, "");
+        this.alias = Objects.toString(alias, "");
     }
 
     public String getCatalogAlias()

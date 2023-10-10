@@ -244,6 +244,17 @@ public class QuerySession implements IQuerySession
         abortQueryListeners.registerListener(listener);
     }
 
+    @Override
+    public void unregisterAbortListener(Runnable listener)
+    {
+        if (abortQueryListeners == null)
+        {
+            return;
+        }
+
+        abortQueryListeners.unregisterListener(listener);
+    }
+
     /** Fire all registered abort query listeners */
     public void fireAbortQueryListeners()
     {

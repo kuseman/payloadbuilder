@@ -21,7 +21,7 @@
         <spotless.version>2.39.0</spotless.version>
         <jackson.version>2.15.2</jackson.version>
         <commons-io.version>2.13.0</commons-io.version>
-        <commons-lang3.version>3.12.0</commons-lang3.version>
+        <commons-lang3.version>3.13.0</commons-lang3.version>
         <commons-collections4.version>4.4</commons-collections4.version>
         <slf4j.version>1.7.36</slf4j.version>
     </properties>
