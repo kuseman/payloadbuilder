@@ -158,7 +158,6 @@ public class QueryParserTest extends Assert
 
         // Assert that builtin expression functions cannot be dereferenced
         assertExpressionFail(ParseException.class, "DateAddExpression cannot be used as a dereference", "x.map(y -> y).dateadd(day, 10, col)");
-
     }
 
     @Test
@@ -389,6 +388,8 @@ public class QueryParserTest extends Assert
     @Test
     public void test_dereference()
     {
+        assertExpression("(a.b).c");
+
         assertExpression("a.b.c", new UnresolvedColumnExpression(QualifiedName.of("a", "b", "c"), -1, null));
         assertExpression("@list.filter(x -> x.value)", new UnresolvedFunctionCallExpression("", "filter", null,
                 asList(new VariableExpression(QualifiedName.of("list")), new LambdaExpression(asList("x"), new UnresolvedColumnExpression(QualifiedName.of("x", "value"), 0, null), new int[] { 0 })),
@@ -407,6 +408,17 @@ public class QueryParserTest extends Assert
                         asList(new UnresolvedFunctionCallExpression("", "hash", null, asList(new UnresolvedColumnExpression(QualifiedName.of("a", "b", "c"), -1, null)), null),
                                 new LiteralIntegerExpression(123)),
                         null));
+    }
+
+    @Test
+    public void test_subscript_dereference()
+    {
+        assertExpression("st[0].id");
+        assertExpression("st[0].id");
+        assertExpression("st[0][1]");
+        assertExpression("a.b.func().d.d[0].d");
+        assertExpression("st.id[0]");
+        assertExpression("x.pk[0].name[0]");
     }
 
     @Test
@@ -502,9 +514,12 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_ands()
+    public void test_logical_booleans()
     {
         assertExpression("a and (b or c)");
+        assertExpression("a and b and c and d");
+        assertExpression("a or b or c or d");
+        assertExpression("a or b and c or d and e");
     }
 
     @Test
@@ -651,7 +666,11 @@ public class QueryParserTest extends Assert
         }
         catch (Exception e)
         {
-            assertTrue(expected.isAssignableFrom(e.getClass()));
+            if (!expected.isAssignableFrom(e.getClass()))
+            {
+                throw e;
+            }
+
             assertTrue(e.getMessage(), e.getMessage()
                     .contains(messageContains));
         }
