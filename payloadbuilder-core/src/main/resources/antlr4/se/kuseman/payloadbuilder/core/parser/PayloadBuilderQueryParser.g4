@@ -170,59 +170,109 @@ sortItem
    (NULLS nullOrder=(FIRST | LAST))?
  ;
 
-// Expressions
+// ---------------------- Expressions ----------------------------------
 
 topExpression
  : expression EOF
  ;
 
+/*
+    Precedence of operators (higest to lowest, inspired from postgres parser)
+    .                               left    Dereference identifier / chain function calls
+    [ ]                             left    array element selection
+    + -                             right   unary plus, unary minus
+    ^                               left    exponentiation
+    * / %                           left    multiplication, division, modulo
+    + -                             left    addition, subtraction
+    BETWEEN IN LIKE ILIKE SIMILAR           range containment, set membership, string matching
+    < > = <= >= <>                          comparison operators
+    IS ISNULL NOTNULL                       IS TRUE, IS FALSE, IS NULL, IS DISTINCT FROM, etc
+    NOT                             right   logical negation
+    AND                             left    logical conjunction
+    OR                              left    logical disjunction
+
+    Note! The rules starting from expression is in opposite order according
+    to precedence
+*/
+
 expression
- : primary                                                     #primaryExpression
+ : expr_or
+ ;
 
- //
+expr_or
+ : left=expr_and (OR right+=expr_and)*
+ ;
+expr_and
+ : left=expr_unary_not (AND right+=expr_unary_not)*
+ ;
 
- | op=(MINUS | PLUS) expression                                #arithmeticUnary
- | left=expression
-   op=(ASTERISK | SLASH | PERCENT | PLUS | MINUS)
-   right=expression                                            #arithmeticBinary
-   
- | expression timeZone                                         #atTimeZoneExpression
-   
- | left=expression
-   op=(EQUALS | NOTEQUALS| LESSTHAN | LESSTHANEQUAL | GREATERTHAN| GREATERTHANEQUAL)
-   right=expression                                            #comparisonExpression
+expr_unary_not
+ : NOT* expr_is_not_null
+ ;
 
- //
+expr_is_not_null
+ : expr_compare (IS NOT? NULL)?
+ ;
 
- | left=expression
-   NOT? IN
-   PARENO expression (COMMA expression)* PARENC                #inExpression
- | left=expression
-   // Have to use primary here to solve ambiguity when ie. nesting AND's
-   NOT? LIKE right=primary
-   (ESCAPE escape=expression)?                                 #likeExpression
- | expression IS NOT? NULL                                     #nullPredicate
+expr_compare
+ : left=expr_in (op=(EQUALS | NOTEQUALS | LESSTHAN | LESSTHANEQUAL | GREATERTHAN| GREATERTHANEQUAL) right=expr_in)?
+ ;
 
- //
+expr_in
+ : left=expr_like (NOT? IN PARENO expr_list PARENC)?
+ ;
+expr_like
+ : left=expr_add (NOT? LIKE right=expr_add (ESCAPE escape=expression)?)?
+ ;
 
- | NOT expression                                              #logicalNot
- | left=expression
-   op=(AND | OR)
-   right=expression                                            #logicalBinary
+// expr_between
+//  :
+//  ;
+
+expr_add
+ : left=expr_mul (op+=(MINUS | PLUS) right+=expr_mul)*
+ ;
+
+expr_mul
+ : left=expr_unary_sign (op+=(ASTERISK | SLASH | PERCENT) right+=expr_unary_sign)*
+ ;
+
+//expr_pow
+// :
+// ;
+
+expr_unary_sign
+ : op=(MINUS | PLUS)? expr_at_time_zone
+ ;
+
+expr_at_time_zone
+ : value=primary (AT_WORD TIME ZONE expression)?
  ;
 
 primary
- : literal                                                     #literalExpression
- | left=primary DOT (identifier | scalarFunctionCall)          #dereference
- | qname                                                       #columnReference
+ : columnRef                                                   #columnReference
+ | literal                                                     #literalExpression
+ | variable indirection*                                       #variableExpression
+ | bracket_expression indirection*                             #bracketExpression
+ | CASE when+ (ELSE elseExpr=expression)? END                  #caseExpression
  | scalarFunctionCall                                          #functionCallExpression
  | identifier ARROW expression                                 #lambdaExpression
  | PARENO identifier (COMMA identifier)+ PARENC ARROW expression
                                                                #lambdaExpression
- | value=primary BRACKETO subscript=expression BRACKETC        #subscript
- | variable                                                    #variableExpression
- | bracket_expression                                          #bracketExpression
- | CASE when+ (ELSE elseExpr=expression)? END                  #caseExpression
+ ;
+
+columnRef
+ : qname indirection*
+ ;
+
+// Chaining of functions, subcripts etc.
+indirection
+ : DOT (identifier | scalarFunctionCall)
+ | (BRACKETO expression BRACKETC)
+ ;
+
+expr_list
+ : expression (COMMA expression)*
  ;
 
 bracket_expression
@@ -241,10 +291,6 @@ scalarFunctionCall
  | DATEPART PARENO (datepart=IDENTIFIER | datepartE=expression) COMMA date=expression PARENC                            #datePartExpression
  | DATEDIFF PARENO datepart=IDENTIFIER COMMA start=expression COMMA end=expression PARENC                               #dateDiffExpression
  | functionCall                                                                                                         #genericFunctionCallExpression
- ;
- 
- timeZone
- : AT_WORD TIME ZONE expression
  ;
 
 functionCall

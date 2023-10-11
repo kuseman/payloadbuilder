@@ -103,38 +103,41 @@ import se.kuseman.payloadbuilder.core.logicalplan.SubQuery;
 import se.kuseman.payloadbuilder.core.logicalplan.TableFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.AnalyzeStatementContext;
-import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.ArithmeticBinaryContext;
-import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.ArithmeticUnaryContext;
-import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.AtTimeZoneExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.BracketExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CacheFlushContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CacheNameContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CacheRemoveContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CaseExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CastExpressionContext;
-import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.ColumnReferenceContext;
-import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.ComparisonExpressionContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.ColumnRefContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CountExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.DateAddExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.DateDiffExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.DatePartExpressionContext;
-import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.DereferenceContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.DescribeStatementContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.DropTableStatementContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.Expr_addContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.Expr_andContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.Expr_at_time_zoneContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.Expr_compareContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.Expr_inContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.Expr_is_not_nullContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.Expr_likeContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.Expr_listContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.Expr_mulContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.Expr_orContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.Expr_unary_notContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.Expr_unary_signContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.FullCacheQualifierContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.FunctionArgumentContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.FunctionCallContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.GenericFunctionCallExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.IdentifierContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.IfStatementContext;
-import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.InExpressionContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.IndirectionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.JoinPartContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.LambdaExpressionContext;
-import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.LikeExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.LiteralContext;
-import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.LogicalBinaryContext;
-import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.LogicalNotContext;
-import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.NullPredicateContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.PrintStatementContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.QnameContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.QueryContext;
@@ -143,7 +146,6 @@ import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.SelectSta
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.SetStatementContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.ShowStatementContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.SortItemContext;
-import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.SubscriptContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceJoinedContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.TableSourceOptionContext;
@@ -260,6 +262,15 @@ public class QueryParser
     /** Builds tree */
     private static class AstBuilder extends PayloadBuilderQueryParserBaseVisitor<Object>
     {
+        //@formatter:off
+        private static final Map<Integer, IArithmeticBinaryExpression.Type> ARITHMETIC_TYPES = Map.of(
+                PayloadBuilderQueryLexer.PLUS, IArithmeticBinaryExpression.Type.ADD,
+                PayloadBuilderQueryLexer.MINUS, IArithmeticBinaryExpression.Type.SUBTRACT,
+                PayloadBuilderQueryLexer.ASTERISK, IArithmeticBinaryExpression.Type.MULTIPLY,
+                PayloadBuilderQueryLexer.SLASH, IArithmeticBinaryExpression.Type.DIVIDE,
+                PayloadBuilderQueryLexer.PERCENT, IArithmeticBinaryExpression.Type.MODULUS);
+        //@formatter:on
+
         /** Lambda parameters and slot id in current scope */
         private final Map<String, Integer> lambdaParameters = new HashMap<>();
 
@@ -676,18 +687,34 @@ public class QueryParser
         }
 
         @Override
-        public Object visitColumnReference(ColumnReferenceContext ctx)
+        public Object visitColumnRef(ColumnRefContext ctx)
         {
             QualifiedName qname = getQualifiedName(ctx.qname());
             int lambdaId = lambdaParameters.getOrDefault(qname.getFirst(), -1);
-            return new UnresolvedColumnExpression(qname, lambdaId, Location.from(ctx.qname()));
+            IExpression colE = new UnresolvedColumnExpression(qname, lambdaId, Location.from(ctx));
+
+            if (!ctx.indirection()
+                    .isEmpty())
+            {
+                return wrapIndirection(colE, ctx.indirection());
+            }
+
+            return colE;
         }
 
         @Override
         public Object visitVariableExpression(VariableExpressionContext ctx)
         {
-            return new VariableExpression(getQualifiedName(ctx.variable()
+            IExpression result = new VariableExpression(getQualifiedName(ctx.variable()
                     .qname()), ctx.variable().system != null);
+
+            if (!ctx.indirection()
+                    .isEmpty())
+            {
+                return wrapIndirection(result, ctx.indirection());
+            }
+
+            return result;
         }
 
         @Override
@@ -857,14 +884,6 @@ public class QueryParser
         }
 
         @Override
-        public Object visitSubscript(SubscriptContext ctx)
-        {
-            IExpression value = getExpression(ctx.value);
-            IExpression subscript = getExpression(ctx.subscript);
-            return new SubscriptExpression(value, subscript);
-        }
-
-        @Override
         public Object visitFunctionCall(FunctionCallContext ctx)
         {
             AggregateMode mode = null;
@@ -898,139 +917,139 @@ public class QueryParser
         }
 
         @Override
-        public Object visitComparisonExpression(ComparisonExpressionContext ctx)
+        public Object visitExpr_compare(Expr_compareContext ctx)
         {
             IExpression left = getExpression(ctx.left);
-            IExpression right = getExpression(ctx.right);
-            IComparisonExpression.Type type = null;
 
-            switch (ctx.op.getType())
+            /* Fall through */
+            if (ctx.op == null)
             {
-                case PayloadBuilderQueryLexer.EQUALS:
-                    type = IComparisonExpression.Type.EQUAL;
-                    break;
-                case PayloadBuilderQueryLexer.NOTEQUALS:
-                    type = IComparisonExpression.Type.NOT_EQUAL;
-                    break;
-                case PayloadBuilderQueryLexer.LESSTHAN:
-                    type = IComparisonExpression.Type.LESS_THAN;
-                    break;
-                case PayloadBuilderQueryLexer.LESSTHANEQUAL:
-                    type = IComparisonExpression.Type.LESS_THAN_EQUAL;
-                    break;
-                case PayloadBuilderQueryLexer.GREATERTHAN:
-                    type = IComparisonExpression.Type.GREATER_THAN;
-                    break;
-                case PayloadBuilderQueryLexer.GREATERTHANEQUAL:
-                    type = IComparisonExpression.Type.GREATER_THAN_EQUAL;
-                    break;
-                default:
-                    throw new RuntimeException("Unkown comparison operator");
+                return left;
             }
+
+            IExpression right = getExpression(ctx.right);
+            IComparisonExpression.Type type = switch (ctx.op.getType())
+            {
+                case PayloadBuilderQueryLexer.EQUALS -> IComparisonExpression.Type.EQUAL;
+                case PayloadBuilderQueryLexer.NOTEQUALS -> IComparisonExpression.Type.NOT_EQUAL;
+                case PayloadBuilderQueryLexer.LESSTHAN -> IComparisonExpression.Type.LESS_THAN;
+                case PayloadBuilderQueryLexer.LESSTHANEQUAL -> IComparisonExpression.Type.LESS_THAN_EQUAL;
+                case PayloadBuilderQueryLexer.GREATERTHAN -> IComparisonExpression.Type.GREATER_THAN;
+                case PayloadBuilderQueryLexer.GREATERTHANEQUAL -> IComparisonExpression.Type.GREATER_THAN_EQUAL;
+                default -> throw new RuntimeException("Unkown comparison operator");
+            };
 
             return new ComparisonExpression(type, left, right);
         }
 
         @Override
-        public Object visitLogicalBinary(LogicalBinaryContext ctx)
+        public Object visitExpr_and(Expr_andContext ctx)
+        {
+            return buildLogicalTree(ILogicalBinaryExpression.Type.AND, ctx.left, ctx.right);
+        }
+
+        @Override
+        public Object visitExpr_or(Expr_orContext ctx)
+        {
+            return buildLogicalTree(ILogicalBinaryExpression.Type.OR, ctx.left, ctx.right);
+        }
+
+        @Override
+        public Object visitExpr_unary_not(Expr_unary_notContext ctx)
+        {
+            IExpression expression = getExpression(ctx.expr_is_not_null());
+
+            // Fall through
+            // Even number of NOT's
+            if (ctx.NOT()
+                    .size() % 2 == 0)
+            {
+                return expression;
+            }
+
+            return new LogicalNotExpression(getExpression(ctx.expr_is_not_null()));
+        }
+
+        @Override
+        public Object visitExpr_like(Expr_likeContext ctx)
+        {
+            IExpression expression = getExpression(ctx.left);
+
+            // Fall through
+            if (ctx.LIKE() == null)
+            {
+                return expression;
+            }
+
+            boolean not = ctx.NOT() != null;
+            return new LikeExpression(expression, getExpression(ctx.right), not, getExpression(ctx.escape));
+        }
+
+        @Override
+        public Object visitExpr_in(Expr_inContext ctx)
         {
             IExpression left = getExpression(ctx.left);
-            IExpression right = getExpression(ctx.right);
-            ILogicalBinaryExpression.Type type = ctx.AND() != null ? ILogicalBinaryExpression.Type.AND
-                    : ILogicalBinaryExpression.Type.OR;
 
-            return new LogicalBinaryExpression(type, left, right);
-        }
+            // Fall through
+            if (ctx.expr_list() == null)
+            {
+                return left;
+            }
 
-        @Override
-        public Object visitLogicalNot(LogicalNotContext ctx)
-        {
-            return new LogicalNotExpression(getExpression(ctx.expression()));
-        }
-
-        @Override
-        public Object visitLikeExpression(LikeExpressionContext ctx)
-        {
-            boolean not = ctx.NOT() != null;
-            return new LikeExpression(getExpression(ctx.left), getExpression(ctx.right), not, getExpression(ctx.escape));
-        }
-
-        @Override
-        public Object visitInExpression(InExpressionContext ctx)
-        {
-            return new InExpression(getExpression(ctx.expression(0)), ctx.expression()
-                    .stream()
-                    .skip(1)
-                    .map(e -> getExpression(e))
-                    .collect(toList()), ctx.NOT() != null);
+            List<IExpression> arguments = getExpressionList(ctx.expr_list());
+            return new InExpression(left, arguments, ctx.NOT() != null);
         }
 
         @Override
         public Object visitBracketExpression(BracketExpressionContext ctx)
         {
+            IExpression result;
             // Plain nested parenthesis expression
             if (ctx.bracket_expression()
                     .expression() != null)
             {
-                return new NestedExpression(getExpression(ctx.bracket_expression()
+                result = new NestedExpression(getExpression(ctx.bracket_expression()
                         .expression()));
             }
-
-            if (!insideProjection)
-            {
-                throw new ParseException("Sub query expressions are only supported in projections", ctx.bracket_expression()
-                        .selectStatement());
-            }
-
-            LogicalSelectStatement selectStatement = (LogicalSelectStatement) visit(ctx.bracket_expression()
-                    .selectStatement());
-
-            ILogicalPlan plan = selectStatement.getSelect();
-
-            return new UnresolvedSubQueryExpression(plan, Location.from(ctx.bracket_expression()
-                    .selectStatement()));
-        }
-
-        @Override
-        public Object visitNullPredicate(NullPredicateContext ctx)
-        {
-            return new NullPredicateExpression(getExpression(ctx.expression()), ctx.NOT() != null);
-        }
-
-        @Override
-        public Object visitDereference(DereferenceContext ctx)
-        {
-            IExpression left = getExpression(ctx.left);
-
-            IExpression result;
-            // Dereferenced field
-            if (ctx.identifier() != null)
-            {
-                result = new DereferenceExpression(left, getIdentifier(ctx.identifier()));
-            }
-            // Dereferenced function call
             else
             {
-                result = (IExpression) visit(ctx.scalarFunctionCall());
 
-                // Prepend left expression as first argument of function
-                // x.map(y -> ....) => map(x, y -> ....)
-                if (result instanceof UnresolvedFunctionCallExpression)
+                if (!insideProjection)
                 {
-                    UnresolvedFunctionCallExpression ufc = (UnresolvedFunctionCallExpression) result;
-                    List<IExpression> arguments = new ArrayList<>(ufc.getArguments());
-                    arguments.add(0, left);
-                    result = new UnresolvedFunctionCallExpression(ufc.getCatalogAlias(), ufc.getName(), ufc.getAggregateMode(), arguments, ufc.getLocation());
+                    throw new ParseException("Sub query expressions are only supported in projections", ctx.bracket_expression()
+                            .selectStatement());
                 }
-                // Throw here since we are dereferencing a built-in function expression
-                else
-                {
-                    throw new ParseException(result.getClass()
-                            .getSimpleName() + " cannot be used as a dereference", ctx.scalarFunctionCall());
-                }
+
+                LogicalSelectStatement selectStatement = (LogicalSelectStatement) visit(ctx.bracket_expression()
+                        .selectStatement());
+
+                ILogicalPlan plan = selectStatement.getSelect();
+
+                result = new UnresolvedSubQueryExpression(plan, Location.from(ctx.bracket_expression()
+                        .selectStatement()));
+            }
+
+            if (!ctx.indirection()
+                    .isEmpty())
+            {
+                return wrapIndirection(result, ctx.indirection());
             }
 
             return result;
+        }
+
+        @Override
+        public Object visitExpr_is_not_null(Expr_is_not_nullContext ctx)
+        {
+            IExpression expression = getExpression(ctx.expr_compare());
+
+            // Fall through
+            if (ctx.IS() == null)
+            {
+                return expression;
+            }
+
+            return new NullPredicateExpression(expression, ctx.NOT() != null);
         }
 
         @Override
@@ -1061,64 +1080,50 @@ public class QueryParser
         }
 
         @Override
-        public Object visitArithmeticUnary(ArithmeticUnaryContext ctx)
+        public Object visitExpr_unary_sign(Expr_unary_signContext ctx)
         {
-            IExpression expression = getExpression(ctx.expression());
-            IArithmeticUnaryExpression.Type type = null;
+            IExpression expression = getExpression(ctx.expr_at_time_zone());
 
-            // CSOFF
-            switch (ctx.op.getType())
-            // CSOn
+            // Fall through
+            if (ctx.op == null)
             {
-                case PayloadBuilderQueryLexer.PLUS:
-                    type = IArithmeticUnaryExpression.Type.PLUS;
-                    break;
-                case PayloadBuilderQueryLexer.MINUS:
-                    type = IArithmeticUnaryExpression.Type.MINUS;
-                    break;
+                return expression;
             }
+
+            IArithmeticUnaryExpression.Type type = switch (ctx.op.getType())
+            {
+                case PayloadBuilderQueryLexer.PLUS -> IArithmeticUnaryExpression.Type.PLUS;
+                case PayloadBuilderQueryLexer.MINUS -> IArithmeticUnaryExpression.Type.MINUS;
+                default -> throw new RuntimeException("Unkown unary operator " + ctx.op.getType());
+            };
 
             return new ArithmeticUnaryExpression(type, expression);
         }
 
         @Override
-        public Object visitArithmeticBinary(ArithmeticBinaryContext ctx)
+        public Object visitExpr_add(Expr_addContext ctx)
         {
-            IExpression left = getExpression(ctx.left);
-            IExpression right = getExpression(ctx.right);
-            IArithmeticBinaryExpression.Type type = null;
-
-            switch (ctx.op.getType())
-            {
-                case PayloadBuilderQueryLexer.PLUS:
-                    type = IArithmeticBinaryExpression.Type.ADD;
-                    break;
-                case PayloadBuilderQueryLexer.MINUS:
-                    type = IArithmeticBinaryExpression.Type.SUBTRACT;
-                    break;
-                case PayloadBuilderQueryLexer.ASTERISK:
-                    type = IArithmeticBinaryExpression.Type.MULTIPLY;
-                    break;
-                case PayloadBuilderQueryLexer.SLASH:
-                    type = IArithmeticBinaryExpression.Type.DIVIDE;
-                    break;
-                case PayloadBuilderQueryLexer.PERCENT:
-                    type = IArithmeticBinaryExpression.Type.MODULUS;
-                    break;
-                default:
-                    throw new RuntimeException("Unkown artithmetic operator");
-            }
-
-            return new ArithmeticBinaryExpression(type, left, right);
+            return buildArithmeticTree(ctx.op, ctx.left, ctx.right);
         }
 
         @Override
-        public Object visitAtTimeZoneExpression(AtTimeZoneExpressionContext ctx)
+        public Object visitExpr_mul(Expr_mulContext ctx)
         {
-            IExpression expression = getExpression(ctx.expression());
-            IExpression timeZone = getExpression(ctx.timeZone()
-                    .expression());
+            return buildArithmeticTree(ctx.op, ctx.left, ctx.right);
+        }
 
+        @Override
+        public Object visitExpr_at_time_zone(Expr_at_time_zoneContext ctx)
+        {
+            IExpression expression = getExpression(ctx.value);
+
+            // Fall through
+            if (ctx.AT_WORD() == null)
+            {
+                return expression;
+            }
+
+            IExpression timeZone = getExpression(ctx.expression());
             return new AtTimeZoneExpression(expression, timeZone);
         }
 
@@ -1165,6 +1170,121 @@ public class QueryParser
             }
 
             return new TemplateStringExpression(expressions);
+        }
+
+        private IExpression wrapIndirection(IExpression target, List<IndirectionContext> list)
+        {
+            IExpression result = null;
+            for (IndirectionContext indirection : list)
+            {
+                if (indirection.DOT() != null)
+                {
+                    // Identifier
+                    if (indirection.identifier() != null)
+                    {
+                        result = new DereferenceExpression(result == null ? target
+                                : result, getIdentifier(indirection.identifier())).fold();
+                    }
+                    // Function call
+                    else
+                    {
+                        Object visitedFunc = visit(indirection.scalarFunctionCall());
+
+                        if (!(visitedFunc instanceof UnresolvedFunctionCallExpression))
+                        {
+                            throw new ParseException(visitedFunc.getClass()
+                                    .getSimpleName() + " cannot be used as a dereference", indirection.scalarFunctionCall());
+                        }
+                        UnresolvedFunctionCallExpression ufc = (UnresolvedFunctionCallExpression) visitedFunc;
+                        List<IExpression> args = new ArrayList<>(ufc.getArguments());
+                        args.add(0, result == null ? target
+                                : result);
+                        // Folding of function calls are done at a later stage
+                        result = new UnresolvedFunctionCallExpression(ufc.getCatalogAlias(), ufc.getName(), ufc.getAggregateMode(), args, ufc.getLocation());
+                    }
+                }
+                // Subscript
+                else
+                {
+                    result = new SubscriptExpression(result == null ? target
+                            : result, getExpression(indirection.expression())).fold();
+                }
+            }
+
+            return result;
+        }
+
+        private IExpression buildLogicalTree(ILogicalBinaryExpression.Type type, ParserRuleContext left, List<? extends ParserRuleContext> right)
+        {
+            IExpression le = getExpression(left);
+
+            // Fall through
+            if (right.isEmpty())
+            {
+                return le;
+            }
+
+            IExpression result = null;
+
+            List<IExpression> rightList = right.stream()
+                    .map(e -> (IExpression) visit(e))
+                    .collect(toList());
+
+            // TODO: This could be keep as a list to avoid building a tree
+            for (IExpression r : rightList)
+            {
+                if (result == null)
+                {
+                    result = new LogicalBinaryExpression(type, le, r).fold();
+                }
+                else
+                {
+                    result = new LogicalBinaryExpression(type, result, r).fold();
+                }
+            }
+
+            return result;
+        }
+
+        private IExpression buildArithmeticTree(List<Token> op, ParserRuleContext left, List<? extends ParserRuleContext> right)
+        {
+            IExpression leftE = getExpression(left);
+
+            // Fall through
+            if (op.isEmpty())
+            {
+                return leftE;
+            }
+
+            // TODO: This could be keep as a list to avoid building a tree
+            int count = right.size();
+            IExpression result = null;
+            for (int i = 0; i < count; i++)
+            {
+                IArithmeticBinaryExpression.Type type = ARITHMETIC_TYPES.get(op.get(i)
+                        .getType());
+
+                IExpression rightE = getExpression(right.get(i));
+
+                if (result == null)
+                {
+                    result = new ArithmeticBinaryExpression(type, leftE, rightE).fold();
+                }
+                else
+                {
+                    result = new ArithmeticBinaryExpression(type, result, rightE).fold();
+                }
+            }
+
+            return result;
+        }
+
+        private List<IExpression> getExpressionList(Expr_listContext ctx)
+        {
+            return ctx.expression()
+                    .stream()
+                    .map(e -> (IExpression) visit(e))
+                    .collect(toList());
         }
 
         private ILogicalPlan wrapOperatorFunction(ILogicalPlan plan, SelectStatementContext ctx)
@@ -1494,17 +1614,6 @@ public class QueryParser
         }
     }
 
-    /** Contruct a {@link QualifiedName} from {@link QnameContext} */
-    public static QualifiedName getQualifiedName(QnameContext ctx)
-    {
-        if (ctx == null)
-        {
-            return null;
-        }
-
-        return getQualifiedName(ctx.identifier());
-    }
-
     /** Construct a {@link LiteralExpression} from {@link LiteralContext} */
     public static IExpression getLiteralExpression(LiteralContext ctx)
     {
@@ -1540,6 +1649,17 @@ public class QueryParser
         // Remove escaped single quotes
         text = text.replaceAll("''", "'");
         return new LiteralStringExpression(text);
+    }
+
+    /** Contruct a {@link QualifiedName} from {@link QnameContext} */
+    public static QualifiedName getQualifiedName(QnameContext ctx)
+    {
+        if (ctx == null)
+        {
+            return null;
+        }
+
+        return getQualifiedName(ctx.identifier());
     }
 
     private static QualifiedName getQualifiedName(CacheNameContext ctx)
