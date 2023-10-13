@@ -109,7 +109,7 @@ import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CacheName
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CacheRemoveContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CaseExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CastExpressionContext;
-import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.ColumnRefContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.ColumnReferenceContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.CountExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.DateAddExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.DateDiffExpressionContext;
@@ -131,6 +131,7 @@ import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.Expr_unar
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.FullCacheQualifierContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.FunctionArgumentContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.FunctionCallContext;
+import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.FunctionCallExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.GenericFunctionCallExpressionContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.IdentifierContext;
 import se.kuseman.payloadbuilder.core.parser.PayloadBuilderQueryParser.IfStatementContext;
@@ -687,7 +688,7 @@ public class QueryParser
         }
 
         @Override
-        public Object visitColumnRef(ColumnRefContext ctx)
+        public Object visitColumnReference(ColumnReferenceContext ctx)
         {
             QualifiedName qname = getQualifiedName(ctx.qname());
             int lambdaId = lambdaParameters.getOrDefault(qname.getFirst(), -1);
@@ -700,6 +701,20 @@ public class QueryParser
             }
 
             return colE;
+        }
+
+        @Override
+        public Object visitFunctionCallExpression(FunctionCallExpressionContext ctx)
+        {
+            IExpression functionCallExpression = (IExpression) visit(ctx.scalarFunctionCall());
+
+            if (!ctx.indirection()
+                    .isEmpty())
+            {
+                return wrapIndirection(functionCallExpression, ctx.indirection());
+            }
+
+            return functionCallExpression;
         }
 
         @Override

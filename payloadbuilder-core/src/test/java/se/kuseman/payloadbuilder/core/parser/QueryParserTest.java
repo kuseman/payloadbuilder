@@ -97,6 +97,12 @@ public class QueryParserTest extends Assert
     }
 
     @Test
+    public void test_case()
+    {
+        assertExpression("case when a = 1 then 0 else 1 end");
+    }
+
+    @Test
     public void test_backtick()
     {
         //@formatter:off
@@ -411,10 +417,79 @@ public class QueryParserTest extends Assert
     }
 
     @Test
-    public void test_subscript_dereference()
+    public void test_indirection()
     {
+        // ==== Column ref
+
+        // Subscript
+        assertExpression("st[0]");
+        assertExpression("st[0][1]");
+
+        // Dereference
         assertExpression("st[0].id");
+        assertExpression("st[0].id.id2");
+
+        // Function call
+        assertExpression("st.func()");
+        assertExpression("st.func().func2()");
+
+        // Mix
+        assertExpression("st.func().b.a[0].func2()");
+
+        // ==== Variable
+
+        // Subscript
+        assertExpression("@st[0]");
+        assertExpression("@st[0][1]");
+
+        // Dereference
+        assertExpression("@st.id");
+        assertExpression("@st.id.id2");
+
+        // Function call
+        assertExpression("@st.func()");
+        assertExpression("@st.func().func2()");
+
+        // Mix
+        assertExpression("@st.func().b.a[0].func2()");
+
+        // ==== Bracket
+
+        // Subscript
+        assertExpression("(a+b)[0]");
+        assertExpression("(a+b)[0][1]");
+
+        // Dereference
+        assertExpression("(a+b).id");
+        assertExpression("(a+b).id.id2");
+
+        // Function call
+        assertExpression("(a+b).func()");
+        assertExpression("(a+b).func().func2()");
+
+        // Mix
+        assertExpression("(a+b).func().b.a[0].func2()");
+
+        // ==== Function
+
+        // Subscript
+        assertExpression("func()[0]");
+        assertExpression("func()[0][1]");
+
+        // Dereference
+        assertExpression("func().id");
+        assertExpression("func().id.id2");
+
+        // Function call
+        assertExpression("func().func()");
+        assertExpression("func().func().func2()");
+
+        // Mix
+        assertExpression("func().func().b.a[0].func2()");
+
+        // Misc
         assertExpression("st[0].id");
+        assertExpression("sys#regexp_match(message, 'SKU (.*) java.lang')[0]");
         assertExpression("st[0][1]");
         assertExpression("a.b.func().d.d[0].d");
         assertExpression("st.id[0]");

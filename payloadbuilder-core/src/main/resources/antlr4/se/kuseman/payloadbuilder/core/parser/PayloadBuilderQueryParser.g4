@@ -250,19 +250,15 @@ expr_at_time_zone
  ;
 
 primary
- : columnRef                                                   #columnReference
+ : qname indirection*                                          #columnReference
  | literal                                                     #literalExpression
  | variable indirection*                                       #variableExpression
  | bracket_expression indirection*                             #bracketExpression
  | CASE when+ (ELSE elseExpr=expression)? END                  #caseExpression
- | scalarFunctionCall                                          #functionCallExpression
+ | scalarFunctionCall indirection*                             #functionCallExpression
  | identifier ARROW expression                                 #lambdaExpression
  | PARENO identifier (COMMA identifier)+ PARENC ARROW expression
                                                                #lambdaExpression
- ;
-
-columnRef
- : qname indirection*
  ;
 
 // Chaining of functions, subcripts etc.
