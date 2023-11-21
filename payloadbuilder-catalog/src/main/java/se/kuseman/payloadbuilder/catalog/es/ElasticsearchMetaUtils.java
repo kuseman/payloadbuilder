@@ -4,6 +4,7 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static se.kuseman.payloadbuilder.catalog.es.ESDatasource.MAPPER;
 import static se.kuseman.payloadbuilder.catalog.es.HttpClientUtils.execute;
@@ -18,6 +19,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.apache.commons.collections4.ListUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.core5.http.HttpEntity;
@@ -30,6 +32,7 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 /** Utils used to build meta about an elastic search instance */
 class ElasticsearchMetaUtils
 {
+    private static final int MAX_INDICES_TO_FETCH = 10;
     private static final QualifiedName CACHE_NAME = QualifiedName.of("ElasticSearch", "Meta");
     private static final String CACHE_MAPPINGS_TTL = "cache.mappings.ttl";
     /** Default cache time for mappings */
@@ -51,64 +54,79 @@ class ElasticsearchMetaUtils
                 .computIfAbsent(CACHE_NAME, key, Duration.ofMinutes(ttl), () ->
                 {
                     // Fetch version
-                    Map<String, Object> map = get(session, catalogAlias, endpoint, "");
+                    Map<String, Object> map = get(Map.class, session, catalogAlias, endpoint, "");
                     String versionString = (String) ((Map<String, Object>) map.get("version")).get("number");
                     ElasticsearchMeta.Version version = ElasticsearchMeta.Version.fromString(versionString);
 
-                    map = get(session, catalogAlias, endpoint, index + "/_mappings");
                     Map<String, MappedType> result = new HashMap<>();
 
-                    // Traverse all indices matching mappings
-                    // if this is a multi indices query like wildcard (*) or
-                    // comma separated then we will have multiple indices to fetch properties
-                    // for and should be merged
-                    for (Entry<String, Object> indexEntry : map.entrySet())
+                    map = get(Map.class, session, catalogAlias, endpoint, index + "/_alias");
+                    List<String> allIndices = new ArrayList<>(map.keySet());
+
+                    // Batch up indices and retrieve mappings in partitions
+                    // to avoid memory propblems since some aliases can contain serveral hundreds
+                    // of concrete indices
+                    List<List<String>> partitions = ListUtils.partition(allIndices, MAX_INDICES_TO_FETCH);
+
+                    for (List<String> parition : partitions)
                     {
-                        Object obj = indexEntry.getValue();
+                        String indices = parition.stream()
+                                .collect(joining(","));
 
-                        Map<String, Object> currentIndexMappings = (Map<String, Object>) obj;
-                        Map<String, Object> mappings = (Map<String, Object>) currentIndexMappings.get("mappings");
-                        Map<String, Object> properties = (Map<String, Object>) mappings.get("properties");
+                        map = get(Map.class, session, catalogAlias, endpoint, indices + "/_mappings");
 
-                        // Single type ES version, return dummy table_name
-                        if (properties != null
-                                && !properties.containsKey("properties"))
+                        // Traverse all indices matching mappings
+                        // if this is a multi indices query like wildcard (*) or
+                        // comma separated then we will have multiple indices to fetch properties
+                        // for and should be merged
+                        for (Entry<String, Object> indexEntry : map.entrySet())
                         {
-                            mergeProperties(result, ESCatalog.SINGLE_TYPE_TABLE_NAME, mappings, properties, indexEntry.getKey());
-                        }
-                        else
-                        {
-                            Map<String, Object> allMeta = new HashMap<>();
-                            Map<QualifiedName, MappedProperty> allProperties = new HashMap<>();
+                            Object obj = indexEntry.getValue();
 
-                            // Old es version with types
-                            for (Entry<String, Object> e : mappings.entrySet())
+                            Map<String, Object> currentIndexMappings = (Map<String, Object>) obj;
+                            Map<String, Object> mappings = (Map<String, Object>) currentIndexMappings.get("mappings");
+                            Map<String, Object> properties = (Map<String, Object>) mappings.get("properties");
+
+                            // Single type ES version, return dummy table_name
+                            if (properties != null
+                                    && !properties.containsKey("properties"))
                             {
-                                Map<String, Object> currentMappings = (Map<String, Object>) e.getValue();
-                                properties = (Map<String, Object>) currentMappings.getOrDefault("properties", emptyMap());
-
-                                allMeta.putAll(currentMappings);
-
-                                mergeProperties(result, e.getKey(), currentMappings, properties, indexEntry.getKey());
+                                mergeProperties(result, ESCatalog.SINGLE_TYPE_TABLE_NAME, mappings, properties, indexEntry.getKey());
                             }
-
-                            // Store all mappings under fake _doc table to be able to query multi type
-                            for (MappedType mappedType : result.values())
+                            else
                             {
-                                allProperties.putAll(mappedType.properties);
-                            }
+                                Map<String, Object> allMeta = new HashMap<>();
+                                Map<QualifiedName, MappedProperty> allProperties = new HashMap<>();
 
-                            // This is a version of ES that still has type mappings but
-                            // don't support more than one type so clear out all types
-                            // and use _doc for everything
-                            if (!version.getStrategy()
-                                    .supportsTypes())
-                            {
-                                result.clear();
-                            }
+                                // Old es version with types
+                                for (Entry<String, Object> e : mappings.entrySet())
+                                {
+                                    Map<String, Object> currentMappings = (Map<String, Object>) e.getValue();
+                                    properties = (Map<String, Object>) currentMappings.getOrDefault("properties", emptyMap());
 
-                            MappedType docType = new MappedType(allMeta, allProperties);
-                            result.put(ESCatalog.SINGLE_TYPE_TABLE_NAME, docType);
+                                    allMeta.putAll(currentMappings);
+
+                                    mergeProperties(result, e.getKey(), currentMappings, properties, indexEntry.getKey());
+                                }
+
+                                // Store all mappings under fake _doc table to be able to query multi type
+                                for (MappedType mappedType : result.values())
+                                {
+                                    allProperties.putAll(mappedType.properties);
+                                }
+
+                                // This is a version of ES that still has type mappings but
+                                // don't support more than one type so clear out all types
+                                // and use _doc for everything
+                                if (!version.getStrategy()
+                                        .supportsTypes())
+                                {
+                                    result.clear();
+                                }
+
+                                MappedType docType = new MappedType(allMeta, allProperties);
+                                result.put(ESCatalog.SINGLE_TYPE_TABLE_NAME, docType);
+                            }
                         }
                     }
 
@@ -202,10 +220,8 @@ class ElasticsearchMetaUtils
         return new MappedProperty(name, type, index, nestedPath, fields, meta);
     }
 
-    @SuppressWarnings("unchecked")
-    private static <T> Map<String, Object> get(IQuerySession session, String catalogAlias, String endpoint, String path)
+    private static <T> T get(Class<T> clazz, IQuerySession session, String catalogAlias, String endpoint, String path)
     {
-
         HttpGet getAlias = new HttpGet(String.format("%s/%s", endpoint, path));
         try
         {
@@ -217,7 +233,7 @@ class ElasticsearchMetaUtils
                     throw new RuntimeException("Error query Elastic: " + IOUtils.toString(entity.getContent(), StandardCharsets.UTF_8));
                 }
 
-                return MAPPER.readValue(entity.getContent(), Map.class);
+                return MAPPER.readValue(entity.getContent(), clazz);
             });
 
         }
