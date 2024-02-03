@@ -3,7 +3,6 @@ package se.kuseman.payloadbuilder.catalog.jdbc;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.collections4.CollectionUtils.isEmpty;
-import static org.apache.commons.lang3.StringUtils.isBlank;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.entry;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
 
@@ -12,6 +11,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -39,6 +39,8 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IInExpression;
 import se.kuseman.payloadbuilder.api.expression.ILikeExpression;
 import se.kuseman.payloadbuilder.api.expression.INullPredicateExpression;
+import se.kuseman.payloadbuilder.catalog.jdbc.dialect.DialectProvider;
+import se.kuseman.payloadbuilder.catalog.jdbc.dialect.SqlDialect;
 
 /** Jdbc datasource */
 class JdbcDatasource implements IDatasource
@@ -67,6 +69,8 @@ class JdbcDatasource implements IDatasource
     {
         Map<String, Object> result = ofEntries(true, entry(CATALOG, JdbcCatalog.NAME));
 
+        SqlDialect dialect = DialectProvider.getDialect(context.getSession(), catalogAlias);
+
         if (!isEmpty(predicates))
         {
             result.put(PREDICATE, predicates.stream()
@@ -80,7 +84,7 @@ class JdbcDatasource implements IDatasource
                     .collect(joining(",")));
         }
 
-        result.put("Query", buildSql(context, true));
+        result.put("Query", buildSql(dialect, context, true));
 
         return result;
     }
@@ -88,12 +92,13 @@ class JdbcDatasource implements IDatasource
     @Override
     public TupleIterator execute(IExecutionContext context, IDatasourceOptions options)
     {
-        String sql = buildSql(context, false);
-        return getIterator(catalog, context, catalogAlias, sql, null, options.getBatchSize(context));
+        SqlDialect dialect = DialectProvider.getDialect(context.getSession(), catalogAlias);
+        String sql = buildSql(dialect, context, false);
+        return getIterator(dialect, catalog, context, catalogAlias, sql, null, options.getBatchSize(context));
     }
 
     // CSOFF
-    private String buildSql(IExecutionContext context, boolean describe)
+    private String buildSql(SqlDialect dialect, IExecutionContext context, boolean describe)
     // CSON
     {
         StringBuilder sb = new StringBuilder("SELECT ");
@@ -107,24 +112,6 @@ class JdbcDatasource implements IDatasource
 
         if (indexPredicate != null)
         {
-            /*
-             * Build index sql from context values
-             * @formatter:off
-             * INNER JOIN
-             * (
-             *         SELECT 1 col1, 2 col2
-             *   UNION SELECT 2,      4
-             *   UNION SELECT 3,      6
-             * 
-             * ) xx
-             *   ON xx.col1 = y.col1
-             *   AND xx.col2 = y.col2
-             * @formatter:on
-             *
-             */
-
-            sb.append(" INNER JOIN (");
-
             List<ISeekKey> seekKeys;
             if (describe)
             {
@@ -151,55 +138,7 @@ class JdbcDatasource implements IDatasource
             {
                 seekKeys = indexPredicate.getSeekKeys(context);
             }
-
-            int keySize = seekKeys.size();
-            int rowCount = seekKeys.get(0)
-                    .getValue()
-                    .size();
-            for (int i = 0; i < rowCount; i++)
-            {
-                if (i > 0)
-                {
-                    sb.append(" UNION ");
-                }
-
-                sb.append("SELECT ");
-
-                for (int j = 0; j < keySize; j++)
-                {
-                    ValueVector values = seekKeys.get(j)
-                            .getValue();
-                    if (j > 0)
-                    {
-                        sb.append(", ");
-                    }
-                    Object value = convertValue(values.valueAsObject(i));
-                    sb.append(value);
-                    if (i == 0)
-                    {
-                        // Name columns on first row
-                        sb.append(" ")
-                                .append(indexPredicate.getIndexColumns()
-                                        .get(j));
-                    }
-                }
-            }
-
-            sb.append(") xx ON ");
-            for (int i = 0; i < keySize; i++)
-            {
-                if (i > 0)
-                {
-                    sb.append(" AND ");
-                }
-
-                String indexCol = indexPredicate.getIndexColumns()
-                        .get(i);
-                sb.append("xx.")
-                        .append(indexCol)
-                        .append(" = y.")
-                        .append(indexCol);
-            }
+            dialect.appendIndexJoinStatement(sb, indexPredicate, seekKeys);
         }
 
         if (!predicates.isEmpty())
@@ -211,8 +150,8 @@ class JdbcDatasource implements IDatasource
                 if (!first)
                 {
                     sb.append(" AND ");
-                    first = false;
                 }
+                first = false;
                 QualifiedName qname = predicate.getQualifiedColumn();
                 switch (predicate.getType())
                 {
@@ -351,13 +290,10 @@ class JdbcDatasource implements IDatasource
     }
 
     /** Returns a row iterator with provided query and parameters */
-    static TupleIterator getIterator(JdbcCatalog catalog, IExecutionContext context, String catalogAlias, String query, List<Object> parameters, int batchSize)
+    static TupleIterator getIterator(SqlDialect dialect, JdbcCatalog catalog, IExecutionContext context, String catalogAlias, String query, List<Object> parameters, int batchSize)
     {
         final String database = context.getSession()
                 .getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE)
-                .valueAsString(0);
-        final String schema = context.getSession()
-                .getCatalogProperty(catalogAlias, JdbcCatalog.SCHEMA)
                 .valueAsString(0);
 
         // CSOFF
@@ -366,7 +302,7 @@ class JdbcDatasource implements IDatasource
         {
             private AbortRunnable abortRunnable = new AbortRunnable();
             private Connection connection;
-            private PreparedStatement statement;
+            private volatile Statement statement;
             private ResultSet rs;
             private String[] columns;
             private int[] jdbcTypes;
@@ -384,7 +320,7 @@ class JdbcDatasource implements IDatasource
                 public void run()
                 {
                     abort = true;
-                    Utils.cancelQuiet(statement);
+                    JdbcUtils.cancelQuiet(statement);
                 }
             }
 
@@ -409,7 +345,7 @@ class JdbcDatasource implements IDatasource
                             {
                                 break;
                             }
-                            values[i] = Utils.getAndConvertValue(rs, i + 1, jdbcTypes[i]);
+                            values[i] = JdbcUtils.getAndConvertValue(rs, i + 1, jdbcTypes[i]);
                         }
 
                         if (abort)
@@ -419,17 +355,20 @@ class JdbcDatasource implements IDatasource
 
                         batch.add(values);
 
+                        resultSetEnded = !rs.next();
+
                         if (batch.size() >= batchSize)
                         {
                             break;
                         }
-
-                        resultSetEnded = !rs.next();
                     } while (!resultSetEnded);
 
-                    Utils.printWarnings(rs, context.getSession());
-                    Utils.printWarnings(statement, context.getSession());
-                    Utils.printWarnings(connection, context.getSession());
+                    JdbcUtils.printWarnings(rs, context.getSession()
+                            .getPrintWriter());
+                    JdbcUtils.printWarnings(statement, context.getSession()
+                            .getPrintWriter());
+                    JdbcUtils.printWarnings(connection, context.getSession()
+                            .getPrintWriter());
 
                     Schema schema = new Schema(Arrays.stream(columns)
                             .map(c -> Column.of(c, Type.Any))
@@ -440,7 +379,7 @@ class JdbcDatasource implements IDatasource
                 {
                     // Close everything here just to be safe
                     // close on iterator should be called but better safe than sorry
-                    Utils.closeQuiet(connection, statement, rs);
+                    JdbcUtils.closeQuiet(connection, statement, rs);
                     throw new RuntimeException("Error fetching value from result set", e);
                 }
             }
@@ -459,7 +398,11 @@ class JdbcDatasource implements IDatasource
                     {
                         if (rs == null)
                         {
-                            rs = setNextResultSet();
+                            boolean first = statement == null;
+                            rs = JdbcUtils.getNextResultSet(e -> context.getSession()
+                                    .handleKnownException(e), context.getSession()
+                                            .getPrintWriter(),
+                                    getStatement(), query, first);
                             // No more result, we're done
                             if (rs == null)
                             {
@@ -486,7 +429,7 @@ class JdbcDatasource implements IDatasource
                     {
                         // Close everything here just to be safe
                         // close on iterator should be called but better safe than sorry
-                        Utils.closeQuiet(connection, statement, rs);
+                        JdbcUtils.closeQuiet(connection, statement, rs);
                         throw new RuntimeException("Error advancing result set", e);
                     }
                 }
@@ -495,10 +438,15 @@ class JdbcDatasource implements IDatasource
             @Override
             public void close()
             {
-                Utils.printWarnings(rs, context.getSession());
-                Utils.printWarnings(statement, context.getSession());
-                Utils.printWarnings(connection, context.getSession());
-                Utils.closeQuiet(connection, statement, rs);
+                context.getSession()
+                        .unregisterAbortListener(abortRunnable);
+                JdbcUtils.printWarnings(rs, context.getSession()
+                        .getPrintWriter());
+                JdbcUtils.printWarnings(statement, context.getSession()
+                        .getPrintWriter());
+                JdbcUtils.printWarnings(connection, context.getSession()
+                        .getPrintWriter());
+                JdbcUtils.closeQuiet(connection, statement, rs);
                 columns = null;
                 jdbcTypes = null;
                 rs = null;
@@ -520,79 +468,44 @@ class JdbcDatasource implements IDatasource
                 }
             }
 
-            private ResultSet setNextResultSet() throws Exception
+            private Statement getStatement() throws SQLException
             {
-                boolean first = connection == null;
                 // First result set, open connection an create statement
-                if (connection == null)
+                if (statement == null)
                 {
                     connection = catalog.getConnection(context.getSession(), catalogAlias);
-                    Utils.printWarnings(connection, context.getSession());
-                    if (!isBlank(database))
+                    JdbcUtils.printWarnings(connection, context.getSession()
+                            .getPrintWriter());
+
+                    if (dialect.usesSchemaAsDatabase())
+                    {
+                        connection.setSchema(database);
+                    }
+                    else
                     {
                         connection.setCatalog(database);
                     }
-                    if (!isBlank(schema))
-                    {
-                        connection.setSchema(schema);
-                    }
-                    statement = connection.prepareStatement(query, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
-                    Utils.printWarnings(statement, context.getSession());
+
                     if (parameters != null)
                     {
+                        statement = connection.prepareStatement(query, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
                         int size = parameters.size();
                         for (int i = 0; i < size; i++)
                         {
-                            statement.setObject(i + 1, parameters.get(i));
+                            ((PreparedStatement) statement).setObject(i + 1, parameters.get(i));
                         }
                     }
+                    else
+                    {
+                        statement = connection.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY);
+                    }
+
+                    JdbcUtils.printWarnings(statement, context.getSession()
+                            .getPrintWriter());
                 }
 
-                // Skip a while loop here to protect against bugs/bad drivers etc.
-                // Traverse until we have a result set or there are no more result sets
-                for (int iteration = 0; iteration < 256; iteration++)
-                {
-                    try
-                    {
-                        boolean isResultSet = first ? statement.execute()
-                                : statement.getMoreResults();
-                        first = false;
-                        Utils.printWarnings(statement, context.getSession());
-                        if (isResultSet)
-                        {
-                            ResultSet rs = statement.getResultSet();
-                            Utils.printWarnings(statement, context.getSession());
-                            return rs;
-                        }
-                        else
-                        {
-                            int updateCount = statement.getUpdateCount();
-                            // We're done
-                            if (updateCount < 0)
-                            {
-                                return null;
-                            }
-
-                            context.getSession()
-                                    .getPrintWriter()
-                                    .append(String.valueOf(updateCount))
-                                    .append(" row(s) affected")
-                                    .append(System.lineSeparator());
-                        }
-                    }
-                    catch (SQLException e)
-                    {
-                        context.getSession()
-                                .handleKnownException(e);
-                    }
-                    finally
-                    {
-                        first = false;
-                    }
-                }
-
-                throw new RuntimeException("Max iteration count reached when trying to fetch a result set.");
-            }
+                return statement;
+            };
         };
     }
 }

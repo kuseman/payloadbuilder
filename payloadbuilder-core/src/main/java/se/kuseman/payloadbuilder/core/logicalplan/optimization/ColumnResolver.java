@@ -2,7 +2,6 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
-import static org.apache.commons.lang3.StringUtils.defaultString;
 import static org.apache.commons.lang3.StringUtils.equalsAnyIgnoreCase;
 
 import java.util.ArrayDeque;
@@ -11,6 +10,7 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import org.apache.commons.collections4.CollectionUtils;
@@ -945,7 +945,8 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                         .build(), path, expression.getLocation());
             }
 
-            alias = defaultString(path.getAlias(), "").toLowerCase();
+            alias = Objects.toString(path.getAlias(), "")
+                    .toLowerCase();
             path = "".equals(alias) ? path
                     : path.extract(1);
 

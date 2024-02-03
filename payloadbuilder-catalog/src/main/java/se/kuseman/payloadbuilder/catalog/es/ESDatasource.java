@@ -37,6 +37,7 @@ import org.apache.commons.lang3.mutable.MutableObject;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 import org.apache.commons.lang3.time.StopWatch;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
+import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
 import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.HttpEntity;
@@ -347,7 +348,7 @@ class ESDatasource implements IDatasource
     }
 
     static TupleIterator getIterator(IExecutionContext context, ElasticStrategy strategy, String catalogAlias, String endpoint, Data data,
-            Function<MutableObject<String>, ClassicHttpRequest> requestSupplier)
+            Function<MutableObject<String>, HttpUriRequestBase> requestSupplier)
     {
         // CSOFF
         return new TupleIterator()
@@ -358,6 +359,31 @@ class ESDatasource implements IDatasource
             private final MutableObject<String> scrollId = new MutableObject<>();
             private TupleVector next;
             private boolean closed;
+            private volatile HttpUriRequestBase currentRequest;
+            private volatile boolean abort;
+            private final Runnable abortListener = new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    HttpUriRequestBase r = currentRequest;
+                    abort = true;
+                    if (r != null)
+                    {
+                        try
+                        {
+                            r.abort();
+                        }
+                        catch (UnsupportedOperationException e)
+                        {
+                        }
+                    }
+                }
+            };
+            {
+                context.getSession()
+                        .registerAbortListener(abortListener);
+            }
 
             @Override
             public boolean hasNext()
@@ -381,6 +407,9 @@ class ESDatasource implements IDatasource
             @Override
             public void close()
             {
+                context.getSession()
+                        .unregisterAbortListener(abortListener);
+
                 if (!isBlank(scrollId.getValue()))
                 {
                     data.requestCount++;
@@ -419,14 +448,13 @@ class ESDatasource implements IDatasource
             {
                 while (next == null)
                 {
-                    if (context.getSession()
-                            .abortQuery())
+                    if (abort)
                     {
                         return false;
                     }
 
-                    ClassicHttpRequest request = requestSupplier.apply(scrollId);
-                    if (request == null)
+                    currentRequest = requestSupplier.apply(scrollId);
+                    if (currentRequest == null)
                     {
                         return false;
                     }
@@ -437,7 +465,7 @@ class ESDatasource implements IDatasource
 
                     try
                     {
-                        esReponse = HttpClientUtils.execute(context.getSession(), catalogAlias, request, response ->
+                        esReponse = HttpClientUtils.execute(context.getSession(), catalogAlias, currentRequest, response ->
                         {
                             HttpEntity entity = response.getEntity();
                             if (response.getCode() != HttpStatus.SC_OK)
@@ -468,9 +496,14 @@ class ESDatasource implements IDatasource
                     {
                         throw e;
                     }
-                    catch (IOException e)
+                    catch (Exception e)
                     {
-                        throw new RuntimeException("Error query", e);
+                        // Only throw if we didn't abort the query
+                        if (!abort)
+                        {
+                            throw new RuntimeException("Error query", e);
+                        }
+                        return false;
                     }
                     finally
                     {

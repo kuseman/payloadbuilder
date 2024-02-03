@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
+import org.apache.commons.lang3.ThreadUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -22,6 +23,8 @@ public class InMemoryGenericCacheTest extends Assert
         AtomicInteger i = new AtomicInteger();
         Supplier<Object> supplier = () ->
         {
+            ThreadUtils.sleepQuietly(Duration.ofMillis(1));
+
             int call = i.getAndIncrement();
             if (call == 0)
             {
@@ -43,7 +46,7 @@ public class InMemoryGenericCacheTest extends Assert
         assertEquals(1, cacheImpl.getCacheStaleHits());
 
         // Let executor get value
-        Thread.sleep(10);
+        Thread.sleep(50);
 
         // First value back on next call when we loaded async
         val = cacheImpl.computeIfAbsent("key", Duration.ofMillis(200), supplier);

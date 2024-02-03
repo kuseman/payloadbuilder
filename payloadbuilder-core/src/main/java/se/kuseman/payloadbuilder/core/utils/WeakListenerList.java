@@ -18,6 +18,11 @@ public class WeakListenerList
         map.put(runnable, null);
     }
 
+    public void unregisterListener(Runnable runnable)
+    {
+        map.remove(runnable);
+    }
+
     /** Fire listeners */
     public void fire()
     {

@@ -4,17 +4,17 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
+import java.util.function.Consumer;
 
 import org.apache.commons.io.IOUtils;
 
-import se.kuseman.payloadbuilder.api.execution.IQuerySession;
-
-/** Jdbc utils */
-class Utils
+/** Jdbc utils. Managing resources etc. */
+class JdbcUtils
 {
     /**
      * Converts provided value according to jdbc type. Stringifies LOBs etc.
@@ -41,6 +41,20 @@ class Utils
             try
             {
                 statement.cancel();
+            }
+            catch (SQLException e)
+            {
+            }
+        }
+    }
+
+    static void rollbackQuiet(Connection connection)
+    {
+        if (connection != null)
+        {
+            try
+            {
+                connection.rollback();
             }
             catch (SQLException e)
             {
@@ -110,7 +124,7 @@ class Utils
         }
     }
 
-    static void printWarnings(Connection connection, IQuerySession session)
+    static void printWarnings(Connection connection, Writer messageWriter)
     {
         if (connection == null)
         {
@@ -118,7 +132,7 @@ class Utils
         }
         try
         {
-            printWarnings(connection.getWarnings(), session);
+            printWarnings(connection.getWarnings(), messageWriter);
             connection.clearWarnings();
         }
         catch (SQLException e)
@@ -126,7 +140,7 @@ class Utils
         }
     }
 
-    static void printWarnings(Statement statement, IQuerySession session)
+    static void printWarnings(Statement statement, Writer messageWriter)
     {
         if (statement == null)
         {
@@ -134,7 +148,7 @@ class Utils
         }
         try
         {
-            printWarnings(statement.getWarnings(), session);
+            printWarnings(statement.getWarnings(), messageWriter);
             statement.clearWarnings();
         }
         catch (SQLException e)
@@ -142,7 +156,7 @@ class Utils
         }
     }
 
-    static void printWarnings(ResultSet resultSet, IQuerySession session)
+    static void printWarnings(ResultSet resultSet, Writer messageWriter)
     {
         if (resultSet == null)
         {
@@ -150,7 +164,7 @@ class Utils
         }
         try
         {
-            printWarnings(resultSet.getWarnings(), session);
+            printWarnings(resultSet.getWarnings(), messageWriter);
             resultSet.clearWarnings();
         }
         catch (SQLException e)
@@ -158,14 +172,13 @@ class Utils
         }
     }
 
-    private static void printWarnings(SQLWarning warning, IQuerySession session)
+    private static void printWarnings(SQLWarning warning, Writer messageWriter)
     {
-        Writer writer = session.getPrintWriter();
         while (warning != null)
         {
             try
             {
-                writer.append(warning.getMessage())
+                messageWriter.append(warning.getMessage())
                         .append(System.lineSeparator());
             }
             catch (IOException e)
@@ -173,5 +186,65 @@ class Utils
             }
             warning = warning.getNextWarning();
         }
+    }
+
+    static ResultSet getNextResultSet(Consumer<SQLException> exceptionHandler, Writer messageWriter, Statement statement, String query, boolean first) throws Exception
+    {
+        // Skip a while loop here to protect against bugs/bad drivers etc.
+        // Traverse until we have a result set or there are no more result sets
+        for (int iteration = 0; iteration < 256; iteration++)
+        {
+            try
+            {
+                boolean isResultSet;
+                if (first)
+                {
+                    if (statement instanceof PreparedStatement)
+                    {
+                        isResultSet = ((PreparedStatement) statement).execute();
+                    }
+                    else
+                    {
+                        isResultSet = statement.execute(query);
+                    }
+                }
+                else
+                {
+                    isResultSet = statement.getMoreResults();
+                }
+
+                first = false;
+                JdbcUtils.printWarnings(statement, messageWriter);
+                if (isResultSet)
+                {
+                    ResultSet rs = statement.getResultSet();
+                    JdbcUtils.printWarnings(statement, messageWriter);
+                    return rs;
+                }
+                else
+                {
+                    int updateCount = statement.getUpdateCount();
+                    // We're done
+                    if (updateCount < 0)
+                    {
+                        return null;
+                    }
+
+                    messageWriter.append(String.valueOf(updateCount))
+                            .append(" row(s) affected")
+                            .append(System.lineSeparator());
+                }
+            }
+            catch (SQLException e)
+            {
+                exceptionHandler.accept(e);
+            }
+            finally
+            {
+                first = false;
+            }
+        }
+
+        throw new RuntimeException("Max iteration count reached when trying to fetch a result set.");
     }
 }

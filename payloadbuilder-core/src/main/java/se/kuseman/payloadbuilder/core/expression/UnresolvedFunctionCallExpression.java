@@ -2,7 +2,6 @@ package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
-import static org.apache.commons.lang3.StringUtils.defaultString;
 
 import java.util.List;
 import java.util.Objects;
@@ -27,7 +26,7 @@ public class UnresolvedFunctionCallExpression implements IExpression, IAggregate
 
     public UnresolvedFunctionCallExpression(String catalogAlias, String name, AggregateMode aggregateMode, List<IExpression> arguments, Location location)
     {
-        this.catalogAlias = defaultString(catalogAlias, "");
+        this.catalogAlias = Objects.toString(catalogAlias, "");
         this.name = requireNonNull(name, "name");
         this.aggregateMode = aggregateMode;
         this.arguments = requireNonNull(arguments, "arguments");

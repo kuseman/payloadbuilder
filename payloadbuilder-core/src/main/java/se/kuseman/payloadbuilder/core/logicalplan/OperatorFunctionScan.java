@@ -2,9 +2,9 @@ package se.kuseman.payloadbuilder.core.logicalplan;
 
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
-import static org.apache.commons.lang3.StringUtils.defaultString;
 
 import java.util.List;
+import java.util.Objects;
 
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.core.parser.Location;
@@ -22,7 +22,7 @@ public class OperatorFunctionScan implements ILogicalPlan
     {
         this.schema = requireNonNull(schema, "schema");
         this.input = requireNonNull(input, "input");
-        this.catalogAlias = defaultString(catalogAlias, "");
+        this.catalogAlias = Objects.toString(catalogAlias, "");
         this.function = requireNonNull(function, "function");
         this.location = location;
 

@@ -10,6 +10,8 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.catalog.jdbc.dialect.DialectProvider;
+import se.kuseman.payloadbuilder.catalog.jdbc.dialect.SqlDialect;
 
 /** Query function. Sends an unprocessed SQL query to the server */
 class QueryFunction extends TableFunctionInfo
@@ -59,6 +61,9 @@ class QueryFunction extends TableFunctionInfo
             }
             parameters = (List<Object>) obj;
         }
-        return JdbcDatasource.getIterator(catalog, context, catalogAlias, query, parameters, options.getBatchSize(context));
+
+        SqlDialect dialect = DialectProvider.getDialect(context.getSession(), catalogAlias);
+
+        return JdbcDatasource.getIterator(dialect, catalog, context, catalogAlias, query, parameters, options.getBatchSize(context));
     }
 }
