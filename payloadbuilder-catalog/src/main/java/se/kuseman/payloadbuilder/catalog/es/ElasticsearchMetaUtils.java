@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.catalog.es;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -61,12 +62,22 @@ class ElasticsearchMetaUtils
                     Map<String, MappedType> result = new HashMap<>();
 
                     map = get(Map.class, session, catalogAlias, endpoint, index + "/_alias");
-                    List<String> allIndices = new ArrayList<>(map.keySet());
 
-                    // Batch up indices and retrieve mappings in partitions
-                    // to avoid memory propblems since some aliases can contain serveral hundreds
-                    // of concrete indices
-                    List<List<String>> partitions = ListUtils.partition(allIndices, MAX_INDICES_TO_FETCH);
+                    List<List<String>> partitions;
+
+                    // No aliases -> simply use the input index
+                    if (map.isEmpty())
+                    {
+                        partitions = singletonList(singletonList(index));
+                    }
+                    else
+                    {
+                        List<String> allIndices = new ArrayList<>(map.keySet());
+                        // Batch up indices and retrieve mappings in partitions
+                        // to avoid memory propblems since some aliases can contain serveral hundreds
+                        // of concrete indices
+                        partitions = ListUtils.partition(allIndices, MAX_INDICES_TO_FETCH);
+                    }
 
                     for (List<String> parition : partitions)
                     {
