@@ -275,7 +275,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                                     asSet(),
                                     false),
                             null,
-                            e("b.col4 is null and a.active")     // Cannot be pushed down => LEFT + IS NULL
+                            e("b.col4 is null and a.active")     // b.col4 is null Cannot be pushed down => LEFT
                         );
         //@formatter:on
 
@@ -329,33 +329,38 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                                 asSet(),
                                 false),
                             null,
-                            e("b.col4 is not null")     // Can be pushed down
+                            e("b.col4 is not null")     // Cannot be pushed down since b is a left join
                         );
         //@formatter:on
 
-        Join actual = (Join) optimize(plan);
+        ILogicalPlan actual = optimize(plan);
 
         //@formatter:off
-        ILogicalPlan expected = 
+        ILogicalPlan expected =
+                new Filter(
                     new Join(
                         tableScan(schemaA, tableA),
                         new Filter(
                             tableScan(schemaB, tableB),
                             tableB,
-                            and(eq(cre(bCol.rename("col9")), LiteralBooleanExpression.TRUE), nullP(cre(bCol.rename("col4")), true))),
+                            eq(cre(bCol.rename("col9")), LiteralBooleanExpression.TRUE)),
                         Join.Type.LEFT,
                         null,
                         and(eq(cre(aCol.rename("col3")), cre(bCol.rename("col4"))), eq(cre(aCol.rename("col10")), new LiteralStringExpression("test2"))),
                         asSet(),
-                        false);
+                        false),
+                    null,
+                    nullP(cre(bCol.rename("col4")), true));
         //@formatter:on
 
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));
 
-        // Assert we have predicate pairs populated
-        // assertTrue(actual.getPredicatePairs()
-        // .size() > 0);
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
+                .isEqualTo(expected);
+
         assertEquals(expected, actual);
     }
 
@@ -425,7 +430,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                                 asSet(),
                                 false),
                             null,
-                            e("b.col4 is not null")     // Can be pushed down
+                            e("b.col4 is not null")     // Cannot be pushed down since b is a left
                         );
         //@formatter:on
 
@@ -433,17 +438,20 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
 
         //@formatter:off
         ILogicalPlan expected = 
+                new Filter(
                     new Join(
                         tableScan(schemaA, tableA),
                         new Filter(
                             tableScan(schemaB, tableB),
                             tableB,
-                            and(eq(cre(bCol.rename("col9")), LiteralBooleanExpression.TRUE), nullP(cre(bCol.rename("col4")), true))),
+                            eq(cre(bCol.rename("col9")), LiteralBooleanExpression.TRUE)),
                         Join.Type.LEFT,
                         null,
                         and(eq(cre(aCol.rename("col3")), cre(bCol.rename("col4"))), eq(cre(aCol.rename("col10")), new LiteralStringExpression("test2"))),
                         asSet(),
-                        false);
+                        false),
+                    null,
+                    nullP(cre(bCol.rename("col4")), true));
         //@formatter:on
 
         // System.out.println(expected.print(0));

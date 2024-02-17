@@ -126,8 +126,11 @@ public class LikeExpression implements ILikeExpression, Invertable
 
             String matchValue = String.valueOf(value.getString(i));
 
-            builder.put(currentPattern.matcher(matchValue)
-                    .find());
+            boolean result = currentPattern.matcher(matchValue)
+                    .find();
+
+            builder.put(not ? !result
+                    : result);
         }
         return builder.build();
     }

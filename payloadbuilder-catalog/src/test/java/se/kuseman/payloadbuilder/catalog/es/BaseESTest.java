@@ -1417,7 +1417,7 @@ abstract class BaseESTest extends Assert
         QualifiedName table = QualifiedName.of(version.getStrategy()
                 .supportsTypes() ? type
                         : ESCatalog.SINGLE_TYPE_TABLE_NAME);
-        TableSchema tableSchema = catalog.getTableSchema(context.getSession(), CATALOG_ALIAS, table);
+        TableSchema tableSchema = catalog.getTableSchema(context.getSession(), CATALOG_ALIAS, table, emptyList());
         Index index = tableSchema.getIndices()
                 .stream()
                 .filter(i -> i.getColumns()

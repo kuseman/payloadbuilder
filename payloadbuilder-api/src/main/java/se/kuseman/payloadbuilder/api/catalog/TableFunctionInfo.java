@@ -38,10 +38,7 @@ public abstract class TableFunctionInfo extends FunctionInfo
      * @param arguments Function arguments
      * @param options Options for this table source such as batch size etc.
      */
-    public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, IDatasourceOptions options)
-    {
-        return TupleIterator.EMPTY;
-    }
+    public abstract TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, IDatasourceOptions options);
 
     /** Exception that can be thrown during schema resolving for TVS to properly trigg compile exception. */
     public static class SchemaResolveException extends RuntimeException

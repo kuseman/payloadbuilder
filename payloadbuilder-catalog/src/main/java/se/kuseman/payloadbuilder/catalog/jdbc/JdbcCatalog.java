@@ -28,6 +28,7 @@ import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.Index;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
@@ -59,7 +60,7 @@ public class JdbcCatalog extends Catalog
     }
 
     @Override
-    public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table)
+    public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
     {
         return new TableSchema(Schema.EMPTY, singletonList(new Index(table, emptyList(), Index.ColumnsType.WILDCARD)));
     }

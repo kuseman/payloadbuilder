@@ -281,6 +281,17 @@
       "expectedMessageContains": "d.id cannot be bound"
     },
     {
+      "name": "Like ",
+      "query": [
+        "select 'hello' like '%ell%' _like, 'hello' not like '%ell%' _notLike "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "_like", "value": true }, { "key": "_notLike", "value": false }]
+        ]
+      ]
+    },
+    {
       "name": "Distinct",
       "query": [
         "select distinct d.row_id, length(data) len from data d"

@@ -458,7 +458,7 @@ abstract class BaseJDBCTest extends Assert
     {
         // Fetch indices and extract the one on key field
         QualifiedName table = QualifiedName.of(TEST_TABLE);
-        TableSchema tableSchema = catalog.getTableSchema(context.getSession(), CATALOG_ALIAS, table);
+        TableSchema tableSchema = catalog.getTableSchema(context.getSession(), CATALOG_ALIAS, table, emptyList());
         Index index = tableSchema.getIndices()
                 .get(0);
 

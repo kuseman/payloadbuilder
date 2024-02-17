@@ -573,24 +573,48 @@
     {
       "name": "Join with sub query with sub query expression (object)",
       "query": [
-      	"select x.* ",
-		"from range(1, 3) v ",
-		"inner join ",
-		"( ",
-		"    select ",
-		"    Value ",
-		"    , ( ",
-		"        select Value key ",
-		"        for object ",
-		"      ) map ",
-		"    from range(1, 3) ",
-		") x ",
-		"  on  x.Value = v.Value "
+        "select x.* ",
+        "from range(1, 3) v ",
+        "inner join ",
+        "( ",
+        "    select ",
+        "    Value ",
+        "    , ( ",
+        "        select Value key ",
+        "        for object ",
+        "      ) map ",
+        "    from range(1, 3) ",
+        ") x ",
+        "  on  x.Value = v.Value "
       ],
       "expectedResultSets": [
         [
           [{ "key": "Value", "value": 1 },{ "key": "map", "value": { "key": 1 } }],
           [{ "key": "Value", "value": 2 },{ "key": "map", "value": { "key": 2 } }]
+        ]
+      ]
+    },
+    {
+      "name": "Left joins with where predicates",
+      "query": [
+        "select x.Value valueX, y.Value valueY ",
+        "from range(1, 3) x ",
+        "left join range(2, 4) y ",
+        "  on y.Value = x.Value ",
+        "where y.Value is null ",
+        "",
+        "select x.Value valueX, y.Value valueY ",
+        "from range(1, 3) x ",
+        "left join range(2, 4) y ",
+        "  on y.Value = x.Value ",
+        "where y.Value is not null "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "valueX", "value": 1 }, { "key": "valueY", "value": null }]
+        ],
+        [
+          [{ "key": "valueX", "value": 2 }, { "key": "valueY", "value": 2 }]
         ]
       ]
     }

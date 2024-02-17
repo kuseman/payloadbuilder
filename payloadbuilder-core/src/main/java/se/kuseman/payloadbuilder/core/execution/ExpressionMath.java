@@ -28,6 +28,11 @@ public final class ExpressionMath
         requireNonNull(left);
         requireNonNull(right);
 
+        if (left == right)
+        {
+            return 0;
+        }
+
         ValueVector leftLiteral = getLiteral(left);
         ValueVector rightLiteral = getLiteral(right);
 

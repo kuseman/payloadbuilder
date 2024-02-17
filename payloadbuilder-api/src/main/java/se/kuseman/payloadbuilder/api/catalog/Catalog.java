@@ -66,10 +66,21 @@ public abstract class Catalog
 
     /**
      * Return the table schema information for provided table.
+     *
+     * @deprecated Use {@link #getTableSchema(IExecutionContext, String, QualifiedName, List)} instead
      */
+    @Deprecated
     public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table)
     {
         return TableSchema.EMPTY;
+    }
+
+    /**
+     * Return the table schema information for provided table.
+     */
+    public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+    {
+        return getTableSchema(session, catalogAlias, table);
     }
 
     /** Create a scan {@link IDatasource} for provided table */
