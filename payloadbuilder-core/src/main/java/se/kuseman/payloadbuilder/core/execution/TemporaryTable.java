@@ -47,6 +47,11 @@ public class TemporaryTable
         return vector;
     }
 
+    public List<Index> getIndices()
+    {
+        return indices;
+    }
+
     /** Return a tuple iterator from this temporary table by provided index */
     public TupleIterator getIndexIterator(IExecutionContext context, ISeekPredicate seekPredicate)
     {

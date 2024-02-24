@@ -2,10 +2,13 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
 import static se.kuseman.payloadbuilder.api.QualifiedName.of;
 
+import java.util.List;
+
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
@@ -69,7 +72,7 @@ public abstract class ALogicalPlanOptimizerTest extends ALogicalPlanTest
     private final Catalog asteriskCatalog = new Catalog(TEST)
     {
         @Override
-        public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table)
+        public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
         {
             String t = table.toString()
                     .toLowerCase();

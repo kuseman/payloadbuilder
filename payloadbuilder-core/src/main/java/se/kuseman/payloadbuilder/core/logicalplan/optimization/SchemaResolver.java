@@ -139,7 +139,7 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
         else
         {
             TableSchema tableSchema = catalog.getTableSchema(context.getSession(), catalogAlias, plan.getTableSource()
-                    .getName());
+                    .getName(), plan.getOptions());
 
             schema = tableSchema.getSchema();
             if (schema.getSize() > 0

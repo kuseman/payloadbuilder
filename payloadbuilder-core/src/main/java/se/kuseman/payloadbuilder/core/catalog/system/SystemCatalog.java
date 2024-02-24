@@ -18,6 +18,7 @@ import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
@@ -446,7 +447,7 @@ public class SystemCatalog extends Catalog
     }
 
     @Override
-    public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table)
+    public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
     {
         int size = table.size();
         QuerySession querySession = (QuerySession) session;

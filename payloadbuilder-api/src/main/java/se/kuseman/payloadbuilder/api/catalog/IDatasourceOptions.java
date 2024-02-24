@@ -1,5 +1,7 @@
 package se.kuseman.payloadbuilder.api.catalog;
 
+import java.util.List;
+
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
@@ -14,4 +16,7 @@ public interface IDatasourceOptions
 
     /** Return value for provided option name. If no option found with provided name null is returned */
     ValueVector getOption(QualifiedName name, IExecutionContext context);
+
+    /** Return options */
+    List<Option> getOptions();
 }

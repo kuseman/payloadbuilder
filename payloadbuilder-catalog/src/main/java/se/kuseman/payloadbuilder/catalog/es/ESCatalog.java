@@ -29,6 +29,7 @@ import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.Index;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
@@ -123,7 +124,7 @@ public class ESCatalog extends Catalog
     }
 
     @Override
-    public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table)
+    public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
     {
         ESType esType = ESType.of(session, catalogAlias, table);
         // All indexed non-free-text fields are index candidates

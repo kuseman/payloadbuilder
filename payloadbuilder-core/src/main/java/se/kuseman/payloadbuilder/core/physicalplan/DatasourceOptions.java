@@ -1,5 +1,6 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
+import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 
 import java.util.List;
@@ -19,7 +20,7 @@ public class DatasourceOptions implements IDatasourceOptions
 
     public DatasourceOptions(List<Option> options)
     {
-        this.options = requireNonNull(options, "options");
+        this.options = unmodifiableList(requireNonNull(options, "options"));
     }
 
     @Override
@@ -51,4 +52,9 @@ public class DatasourceOptions implements IDatasourceOptions
         return null;
     }
 
+    @Override
+    public List<Option> getOptions()
+    {
+        return options;
+    }
 }

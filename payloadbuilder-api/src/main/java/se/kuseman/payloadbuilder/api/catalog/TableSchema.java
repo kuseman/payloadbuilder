@@ -56,12 +56,17 @@ public class TableSchema
         {
             return true;
         }
-        else if (obj instanceof TableSchema)
+        else if (obj instanceof TableSchema that)
         {
-            TableSchema that = (TableSchema) obj;
             return schema.equals(that.schema)
                     && indices.equals(that.indices);
         }
         return false;
+    }
+
+    @Override
+    public String toString()
+    {
+        return schema.toString() + " (" + indices + ")";
     }
 }

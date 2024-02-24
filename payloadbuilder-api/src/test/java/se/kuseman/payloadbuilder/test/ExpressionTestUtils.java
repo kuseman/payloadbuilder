@@ -10,6 +10,7 @@ import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.api.expression.ILiteralNullExpression;
 import se.kuseman.payloadbuilder.api.expression.ILiteralStringExpression;
 
 /** Test utils when working with {@link IExpression}'s */
@@ -22,6 +23,15 @@ public class ExpressionTestUtils
         ILiteralStringExpression mock = Mockito.mock(ILiteralStringExpression.class);
         when(mock.eval(any(IExecutionContext.class))).thenReturn(VectorTestUtils.vv(Type.String, value));
         when(mock.getValue()).thenReturn(UTF8String.from(value));
+        when(mock.toString()).thenReturn(value);
+        return mock;
+    }
+
+    /** Create a null expression */
+    public static ILiteralNullExpression createNullExpression()
+    {
+        ILiteralNullExpression mock = Mockito.mock(ILiteralNullExpression.class);
+        when(mock.eval(any(IExecutionContext.class))).thenReturn(VectorTestUtils.vv(Type.Any, new Object[] { null }));
         return mock;
     }
 }

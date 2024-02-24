@@ -77,6 +77,17 @@ public class StatementPlanner
     {
         ExecutionContext context = new ExecutionContext(session);
         Context ctx = new Context(context);
+
+        // Add existing session tables into context
+        // This is used when working in a state full session system like Queryeer
+        // where the session is reused across executions.
+        session.getTemporaryTables()
+                .forEach(e -> ctx.schemaByTempTable.put(e.getKey(), new TableSchema(e.getValue()
+                        .getTupleVector()
+                        .getSchema(),
+                        e.getValue()
+                                .getIndices())));
+
         return new QueryStatement(query.getStatements()
                 .stream()
                 .map(s -> s.accept(STATEMENT_REWRITER, ctx))

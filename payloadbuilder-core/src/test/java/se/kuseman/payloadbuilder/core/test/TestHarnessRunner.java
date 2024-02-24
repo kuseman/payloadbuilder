@@ -36,6 +36,7 @@ import se.kuseman.payloadbuilder.api.catalog.DatasourceData;
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo.FunctionType;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -373,7 +374,7 @@ public class TestHarnessRunner
         }
 
         @Override
-        public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table)
+        public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
         {
             if (schemaLess)
             {

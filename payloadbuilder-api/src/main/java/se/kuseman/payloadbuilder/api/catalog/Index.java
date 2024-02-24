@@ -55,9 +55,8 @@ public class Index
         {
             return true;
         }
-        else if (obj instanceof Index)
+        else if (obj instanceof Index that)
         {
-            Index that = (Index) obj;
             return table.equals(that.table)
                     && columns.equals(that.columns)
                     && columnsType == that.columnsType;

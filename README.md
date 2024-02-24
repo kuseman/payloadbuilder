@@ -85,7 +85,7 @@ Simple query using multiple catalogs:
                        + "outer apply fs#file(concat('/path/to/files/', d.fileName)) f "
                        + "where d._docType = 'pdfFiles'";
 
-        CompiledQuery compiledQuery = Payloadbuilder.compile(query, session);
+        CompiledQuery compiledQuery = Payloadbuilder.compile(session, query);
         QueryResult queryResult = compiledQuery.execute(session);
         JsonOutputWriter writer = new JsonOutputWriter(new PrintWriter(System.out));
         while (queryResult.hasMoreResults())
