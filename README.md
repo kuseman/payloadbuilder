@@ -43,7 +43,7 @@ data operators for tables.
 
 ### Built With
 
-* JDK 8
+* JDK 17
 * Maven
 
 ## Usage
