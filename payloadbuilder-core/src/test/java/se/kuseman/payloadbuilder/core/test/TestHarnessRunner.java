@@ -16,6 +16,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.TimeZone;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -40,6 +41,7 @@ import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
@@ -47,6 +49,7 @@ import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.CompiledQuery;
 import se.kuseman.payloadbuilder.core.Payloadbuilder;
 import se.kuseman.payloadbuilder.core.QueryResult;
@@ -348,6 +351,53 @@ public class TestHarnessRunner
 
             registerFunction(new ScalarFunctionInfo("testFunc", FunctionType.SCALAR)
             {
+            });
+
+            registerFunction(new TableFunctionInfo("testTVFOptions")
+            {
+                @Override
+                public Arity arity()
+                {
+                    return Arity.ZERO;
+                }
+
+                @Override
+                public TupleIterator execute(IExecutionContext context, String catalogAlias, Optional<Schema> schema, List<IExpression> arguments, IDatasourceOptions options)
+                {
+                    // Returns a tuple vector with all options evaluated
+                    List<Column> columns = new ArrayList<>();
+                    List<ValueVector> vectors = new ArrayList<>();
+                    for (Option option : options.getOptions())
+                    {
+                        columns.add(new Column(option.getOption()
+                                .toDotDelimited(),
+                                option.getValueExpression()
+                                        .getType()));
+                        vectors.add(option.getValueExpression()
+                                .eval(context));
+                    }
+                    final Schema s = new Schema(columns);
+                    return TupleIterator.singleton(new TupleVector()
+                    {
+                        @Override
+                        public Schema getSchema()
+                        {
+                            return s;
+                        }
+
+                        @Override
+                        public int getRowCount()
+                        {
+                            return columns.size();
+                        }
+
+                        @Override
+                        public ValueVector getColumn(int column)
+                        {
+                            return vectors.get(column);
+                        }
+                    });
+                }
             });
         }
 

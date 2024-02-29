@@ -21,6 +21,7 @@ import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.OperatorFunctionInfo;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
@@ -457,15 +458,26 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         context.planSchema.push(new ResolveSchema(schema, plan.getTableSource()
                 .getAlias()));
 
-        return new TableFunctionScan(plan.getTableSource(), schema, expressions, plan.getOptions(), plan.getLocation());
+        List<Option> options = plan.getOptions()
+                .stream()
+                .map(o -> new Option(o.getOption(), ColumnResolverVisitor.rewrite(context, o.getValueExpression())))
+                .toList();
+
+        return new TableFunctionScan(plan.getTableSource(), schema, expressions, options, plan.getLocation());
     }
 
     @Override
     public ILogicalPlan visit(TableScan plan, Ctx context)
     {
+        List<Option> options = plan.getOptions()
+                .stream()
+                .map(o -> new Option(o.getOption(), ColumnResolverVisitor.rewrite(context, o.getValueExpression())))
+                .toList();
+
         context.planSchema.push(new ResolveSchema(plan.getSchema(), plan.getTableSource()
                 .getAlias()));
-        return super.visit(plan, context);
+
+        return new TableScan(plan.getTableSchema(), plan.getTableSource(), plan.getProjection(), plan.isTempTable(), options, plan.getLocation());
     }
 
     @Override
