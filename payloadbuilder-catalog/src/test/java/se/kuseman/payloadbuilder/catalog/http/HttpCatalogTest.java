@@ -428,12 +428,10 @@ public class HttpCatalogTest
         TableFunctionInfo function = catalog.getTableFunction("query");
         assertEquals(Arity.ONE, function.arity());
 
-        ILiteralStringExpression failOnNon200 = ExpressionTestUtils.createStringExpression("false");
-
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
         IDatasourceOptions options = Mockito.mock(IDatasourceOptions.class);
-        Mockito.when(options.getOptions())
-                .thenReturn(List.of(new Option(QualifiedName.of(HttpCatalog.FAIL_ON_NON_200), failOnNon200)));
+        Mockito.when(options.getOption(QualifiedName.of(HttpCatalog.FAIL_ON_NON_200), context))
+                .thenReturn(vv(Type.Boolean, false));
 
         TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort())), options);
         assertFalse(it.hasNext());

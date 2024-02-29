@@ -83,6 +83,9 @@ public class HttpCatalog extends Catalog
     static final String QUERY_PATTERN = "querypattern";
     static final String BODY_PATTERN = "bodypattern";
     static final String FAIL_ON_NON_200 = "failonnon200";
+    static final String CONNECT_TIMEOUT = "connecttimeout";
+    static final String RECEIVE_TIMEOUT = "receivetimeout";
+
     /** Placeholder regex */
     static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{(.+?)\\}\\}");
 

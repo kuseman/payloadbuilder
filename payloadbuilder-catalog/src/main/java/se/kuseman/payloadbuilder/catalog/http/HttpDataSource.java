@@ -21,13 +21,17 @@ import org.apache.hc.client5.http.classic.methods.HttpPatch;
 import org.apache.hc.client5.http.classic.methods.HttpPost;
 import org.apache.hc.client5.http.classic.methods.HttpPut;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
+import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.HttpException;
 import org.apache.hc.core5.http.io.HttpClientResponseHandler;
 import org.apache.hc.core5.http.io.entity.StringEntity;
+import org.apache.hc.core5.util.Timeout;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
@@ -45,6 +49,9 @@ import se.kuseman.payloadbuilder.catalog.http.HttpCatalog.Request;
 @SuppressWarnings("deprecation")
 class HttpDataSource implements IDatasource
 {
+    static final int DEFAULT_RECIEVE_TIMEOUT = 15000;
+    static final int DEFAULT_CONNECT_TIMEOUT = 1500;
+
     static final String POST = "post";
     static final String PUT = "put";
     static final String PATCH = "patch";
@@ -55,6 +62,13 @@ class HttpDataSource implements IDatasource
     private final ISeekPredicate seekPredicate;
     private final Request request;
     private final List<IResponseTransformer> responseTransformers;
+
+    private static final PoolingHttpClientConnectionManager DEFAULT_MANAGER = PoolingHttpClientConnectionManagerBuilder.create()
+            .setDefaultConnectionConfig(ConnectionConfig.custom()
+                    .setConnectTimeout(Timeout.ofMilliseconds(DEFAULT_CONNECT_TIMEOUT))
+                    .setSocketTimeout(Timeout.ofMilliseconds(DEFAULT_RECIEVE_TIMEOUT))
+                    .build())
+            .build();
 
     HttpDataSource(String catalogAlias, String endpoint, ISeekPredicate seekPredicate, Request request, List<IResponseTransformer> responseTransformers)
     {
@@ -80,20 +94,58 @@ class HttpDataSource implements IDatasource
             }
         }
 
+        HttpUriRequestBase request = getBaseRequest(context, endpoint);
+        addHeaders(request, context);
+        return execute(request, responseTransformers, context, options);
+    }
+
+    static TupleIterator execute(HttpUriRequestBase request, List<IResponseTransformer> responseTransformers, IExecutionContext context, IDatasourceOptions options)
+    {
         ValueVector vv = options.getOption(QualifiedName.of(HttpCatalog.FAIL_ON_NON_200), context);
         boolean failOnNon200 = vv == null
                 || vv.isNull(0) ? true
                         : vv.getBoolean(0);
 
-        HttpUriRequestBase request = getBaseRequest(context, endpoint);
-        addHeaders(request, context);
-        return execute(request, responseTransformers, failOnNon200);
-    }
+        vv = options.getOption(QualifiedName.of(HttpCatalog.CONNECT_TIMEOUT), context);
+        int connectTimeout = vv == null
+                || vv.isNull(0) ? DEFAULT_CONNECT_TIMEOUT
+                        : vv.getInt(0);
 
-    static TupleIterator execute(HttpUriRequestBase request, List<IResponseTransformer> responseTransformers, boolean failOnNon200)
-    {
+        vv = options.getOption(QualifiedName.of(HttpCatalog.RECEIVE_TIMEOUT), context);
+        int receiveTimeout = vv == null
+                || vv.isNull(0) ? DEFAULT_RECIEVE_TIMEOUT
+                        : vv.getInt(0);
+
+        PoolingHttpClientConnectionManager manager = DEFAULT_MANAGER;
+
+        if (connectTimeout != DEFAULT_CONNECT_TIMEOUT
+                || receiveTimeout != DEFAULT_RECIEVE_TIMEOUT)
+        {
+            manager = PoolingHttpClientConnectionManagerBuilder.create()
+                    .setDefaultConnectionConfig(ConnectionConfig.custom()
+                            .setConnectTimeout(Timeout.ofMilliseconds(connectTimeout))
+                            .setSocketTimeout(Timeout.ofMilliseconds(receiveTimeout))
+                            .build())
+                    .build();
+        }
+
         CloseableHttpClient client = HttpClients.custom()
+                .setConnectionManager(manager)
                 .build();
+
+        Runnable abortListener = () ->
+        {
+            try
+            {
+                request.abort();
+            }
+            catch (UnsupportedOperationException e)
+            {
+            }
+        };
+
+        context.getSession()
+                .registerAbortListener(abortListener);
 
         try
         {
@@ -128,7 +180,17 @@ class HttpDataSource implements IDatasource
         }
         catch (IOException e)
         {
+            if (!failOnNon200)
+            {
+                return TupleIterator.EMPTY;
+            }
+
             throw new RuntimeException("Error performing HTTP request", e);
+        }
+        finally
+        {
+            context.getSession()
+                    .unregisterAbortListener(abortListener);
         }
     }
 

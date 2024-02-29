@@ -85,8 +85,6 @@ class QueryFunction extends TableFunctionInfo
             httpRequest.setEntity(new StringEntity(body, StandardCharsets.UTF_8));
         }
 
-        boolean failOnNon200 = true;
-
         for (Option option : options.getOptions())
         {
             QualifiedName name = option.getOption();
@@ -99,16 +97,8 @@ class QueryFunction extends TableFunctionInfo
                 httpRequest.addHeader(name.getParts()
                         .get(1), value);
             }
-            else if (name.size() == 1
-                    && HttpCatalog.FAIL_ON_NON_200.equalsIgnoreCase(name.getFirst()))
-            {
-                vv = option.getValueExpression()
-                        .eval(context);
-                failOnNon200 = vv.isNull(0) ? true
-                        : vv.getBoolean(0);
-            }
         }
 
-        return HttpDataSource.execute(httpRequest, responseTransformers, failOnNon200);
+        return HttpDataSource.execute(httpRequest, responseTransformers, context, options);
     }
 }
