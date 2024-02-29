@@ -1462,6 +1462,30 @@
           [{"key":"col1","value": 50}, {"key":"col2", "value": 60}]
         ]
       ]
+    },
+    {
+      "name": "Variable as table source",
+      "query": [
+        "set @tbl = totable(json_value('[ { \"key\": 123 }, { \"key\": 456 } ]')) ",
+        "select * ",
+        "from @tbl "
+      ],
+      "expectedResultSets": [
+        [
+          [{"key":"key","value": 123}],
+          [{"key":"key","value": 456}]
+        ]
+      ]
+    },
+    {
+      "name": "Variable as table source invalid type",
+      "query": [
+        "set @tbl = 123 ",
+        "select * ",
+        "from @tbl "
+      ],
+      "expectedException": "java.lang.IllegalArgumentException",
+      "expectedMessageContains": "Cannot cast Int to Table"
     }
   ]
 }
