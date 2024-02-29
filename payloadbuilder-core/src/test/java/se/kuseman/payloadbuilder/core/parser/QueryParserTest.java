@@ -579,6 +579,8 @@ public class QueryParserTest extends Assert
 
         assertSelectFail(ParseException.class, "Expression scans cannot have options", "select * from (a.b) a with (a=123)");
 
+        assertSelectFail(ParseException.class, "Variable scans cannot be a system variable", "select * from @@tbl");
+
         assertQuery("select ( select 'value' key for object) select ( select 'value2' key for object)");
 
         assertSelectFail(ParseException.class, "Cannot have a GROUP BY clause without a FROM", "select 1 group by 1");

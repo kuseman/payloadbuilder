@@ -143,6 +143,7 @@ tableSourceJoined
 tableSource
  : tableName                                    identifier? tableSourceOptions?
  | functionCall                                 identifier? tableSourceOptions?
+ | variable                                     identifier?
  | PARENO (selectStatement | expression) PARENC identifier  tableSourceOptions?
  ;
 

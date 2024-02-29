@@ -640,6 +640,19 @@ public class QueryParser
                 insideSubQuery = prevInsideSubQuery;
                 return new SubQuery(stm.getSelect(), alias, Location.from(ctx.selectStatement()));
             }
+            else if (ctx.variable() != null)
+            {
+                if (ctx.variable().system != null)
+                {
+                    throw new ParseException("Variable scans cannot be a system variable", ctx.variable());
+                }
+
+                QualifiedName qname = getQualifiedName(ctx.variable()
+                        .qname());
+                IExpression expression = new VariableExpression(qname);
+                TableSourceReference tableSource = new TableSourceReference("", qname, alias);
+                return new ExpressionScan(tableSource, Schema.EMPTY, expression, Location.from(ctx.variable()));
+            }
             else if (ctx.expression() != null)
             {
                 if (!options.isEmpty())
@@ -648,9 +661,7 @@ public class QueryParser
                 }
 
                 IExpression expression = getExpression(ctx.expression());
-
                 TableSourceReference tableSource = new TableSourceReference("", QualifiedName.of(expression.toString()), alias);
-
                 return new ExpressionScan(tableSource, Schema.EMPTY, expression, Location.from(ctx.expression()));
             }
 
