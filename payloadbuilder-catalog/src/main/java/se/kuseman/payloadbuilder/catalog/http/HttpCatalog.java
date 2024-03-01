@@ -4,6 +4,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -13,7 +14,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.util.TimeValue;
+import org.apache.hc.core5.util.Timeout;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
@@ -79,17 +87,20 @@ public class HttpCatalog extends Catalog
 {
     public static final String NAME = "HttpCatalog";
     static final String HEADER = "header";
-    static final String METHOD = "method";
+    static final QualifiedName METHOD = QualifiedName.of("method");
     static final String QUERY_PATTERN = "querypattern";
     static final String BODY_PATTERN = "bodypattern";
-    static final String FAIL_ON_NON_200 = "failonnon200";
-    static final String CONNECT_TIMEOUT = "connecttimeout";
-    static final String RECEIVE_TIMEOUT = "receivetimeout";
+    static final QualifiedName FAIL_ON_NON_200 = QualifiedName.of("failonnon200");
+    static final QualifiedName CONNECT_TIMEOUT = QualifiedName.of("connecttimeout");
+    static final QualifiedName RECEIVE_TIMEOUT = QualifiedName.of("receivetimeout");
+    static final int DEFAULT_RECIEVE_TIMEOUT = 15000;
+    static final int DEFAULT_CONNECT_TIMEOUT = 1500;
 
     /** Placeholder regex */
     static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{(.+?)\\}\\}");
 
-    private List<IResponseTransformer> responseTransformers;
+    private final List<IResponseTransformer> responseTransformers;
+    private final CloseableHttpClient httpClient;
 
     public HttpCatalog()
     {
@@ -100,7 +111,32 @@ public class HttpCatalog extends Catalog
     {
         super(NAME);
         this.responseTransformers = requireNonNull(responseTransformers, "responseTransformers");
-        registerFunction(new QueryFunction(responseTransformers));
+
+        PoolingHttpClientConnectionManager manager = PoolingHttpClientConnectionManagerBuilder.create()
+                .setDefaultConnectionConfig(ConnectionConfig.custom()
+                        .setConnectTimeout(Timeout.ofMilliseconds(DEFAULT_CONNECT_TIMEOUT))
+                        .setSocketTimeout(Timeout.ofMilliseconds(DEFAULT_RECIEVE_TIMEOUT))
+                        .build())
+                .build();
+        this.httpClient = HttpClients.custom()
+                .setConnectionManager(manager)
+                .evictExpiredConnections()
+                .evictIdleConnections(TimeValue.ofSeconds(60))
+                .build();
+
+        registerFunction(new QueryFunction(httpClient, responseTransformers));
+    }
+
+    @Override
+    public void close()
+    {
+        try
+        {
+            httpClient.close();
+        }
+        catch (IOException e)
+        {
+        }
     }
 
     @Override
@@ -169,7 +205,7 @@ public class HttpCatalog extends Catalog
             throw new CompileException("All request placeholders must be used. Placeholders not processed: " + fields.values());
         }
 
-        return new HttpDataSource(catalogAlias, endpoint, seekPredicate, request, responseTransformers);
+        return new HttpDataSource(httpClient, catalogAlias, endpoint, seekPredicate, request, responseTransformers);
     }
 
     private void addIndexFields(Map<String, String> fields, IExpression expression)
@@ -185,8 +221,6 @@ public class HttpCatalog extends Catalog
 
     private Request getRequest(IQuerySession session, List<Option> options, List<IPredicate> predicates, Map<String, String> fields)
     {
-        List<Header> headers = new ArrayList<>();
-        IExpression method = null;
         IExpression queryExpression = null;
         IExpression bodyExpression = null;
         IExpression contentType = null;
@@ -207,13 +241,6 @@ public class HttpCatalog extends Catalog
                 {
                     contentType = option.getValueExpression();
                 }
-
-                headers.add(new Header(headerName, option.getValueExpression()));
-            }
-            else if (qname.size() == 1
-                    && METHOD.equalsIgnoreCase(qname.getFirst()))
-            {
-                method = option.getValueExpression();
             }
             else if (qname.size() == 1
                     && QUERY_PATTERN.equalsIgnoreCase(qname.getFirst()))
@@ -243,7 +270,7 @@ public class HttpCatalog extends Catalog
             }
         }
 
-        return new Request(method, contentType, headers, queryExpression, bodyExpression, requestPredicates);
+        return new Request(contentType, queryExpression, bodyExpression, requestPredicates);
     }
 
     private Predicate getPredicate(IPredicate predicate, Map<String, String> singleValueIndices)
@@ -280,15 +307,11 @@ public class HttpCatalog extends Catalog
         return null;
     }
 
-    record Request(IExpression method, IExpression contentType, List<Header> headers, IExpression queryExpression, IExpression bodyExpression, List<Predicate> predicates)
+    record Request(IExpression contentType, IExpression queryExpression, IExpression bodyExpression, List<Predicate> predicates)
     {
     }
 
     record Predicate(String name, List<IExpression> values)
-    {
-    }
-
-    record Header(String name, IExpression expression)
     {
     }
 }

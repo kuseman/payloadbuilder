@@ -1,5 +1,6 @@
 package se.kuseman.payloadbuilder.catalog;
 
+import static java.util.Collections.emptyList;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -9,6 +10,7 @@ import static org.mockito.Mockito.when;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
@@ -21,6 +23,7 @@ import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.execution.GenericCache;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
@@ -104,7 +107,15 @@ public final class TestUtils
     /** Mock {@link IDatasourceOptions} */
     public static IDatasourceOptions mockOptions(int batchSize)
     {
+        return mockOptions(batchSize, emptyList());
+    }
+
+    /** Mock {@link IDatasourceOptions} */
+    public static IDatasourceOptions mockOptions(int batchSize, List<Option> tableOptions)
+    {
         IDatasourceOptions options = Mockito.mock(IDatasourceOptions.class);
+        when(options.getOptions()).thenReturn(tableOptions);
+        when(options.getOption(any(QualifiedName.class), any(IExecutionContext.class))).thenCallRealMethod();
         when(options.getBatchSize(Mockito.any(IExecutionContext.class))).thenReturn(batchSize);
         return options;
     }

@@ -3,6 +3,8 @@ package se.kuseman.payloadbuilder.catalog.http;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 
+import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 
 /** Transformer that transforms a http response into a tuple iterator */
@@ -12,5 +14,5 @@ public interface IResponseTransformer
     boolean canHandle(HttpUriRequestBase request, ClassicHttpResponse response);
 
     /** Transform provided request/response to a {@link TupleIterator}. */
-    TupleIterator transform(HttpUriRequestBase request, ClassicHttpResponse response);
+    TupleIterator transform(HttpUriRequestBase request, ClassicHttpResponse response, IExecutionContext context, IDatasourceOptions options);
 }

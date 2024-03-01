@@ -38,21 +38,6 @@ public class DatasourceOptions implements IDatasourceOptions
     }
 
     @Override
-    public ValueVector getOption(QualifiedName name, IExecutionContext context)
-    {
-        for (Option option : options)
-        {
-            if (option.getOption()
-                    .equalsIgnoreCase(name))
-            {
-                return option.getValueExpression()
-                        .eval(context);
-            }
-        }
-        return null;
-    }
-
-    @Override
     public List<Option> getOptions()
     {
         return options;

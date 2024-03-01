@@ -14,19 +14,25 @@ import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpHeaders;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 
 /** Transformer that transforms JSON responses */
 public class JsonResponseTransformer implements IResponseTransformer
 {
+    static final QualifiedName RESPONSE_PATH = QualifiedName.of("jsonresponsepath");
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Override
@@ -53,10 +59,32 @@ public class JsonResponseTransformer implements IResponseTransformer
     }
 
     @Override
-    public TupleIterator transform(HttpUriRequestBase request, ClassicHttpResponse response)
+    public TupleIterator transform(HttpUriRequestBase request, ClassicHttpResponse response, IExecutionContext context, IDatasourceOptions options)
     {
+        ValueVector vv = options.getOption(RESPONSE_PATH, context);
+        String jsonresponsepath = vv == null ? null
+                : vv.getString(0)
+                        .toString();
+
         try
         {
+            if (jsonresponsepath != null)
+            {
+                JsonNode node = MAPPER.readTree(response.getEntity()
+                        .getContent());
+                if (node == null
+                        || node.isNull())
+                {
+                    return TupleIterator.EMPTY;
+                }
+                JsonNode at = node.at(jsonresponsepath);
+                if (at.isMissingNode())
+                {
+                    return TupleIterator.EMPTY;
+                }
+                return TupleIterator.singleton(convertToTupleVector(MAPPER.treeToValue(at, Object.class)));
+            }
+
             Object value = MAPPER.readValue(response.getEntity()
                     .getContent(), Object.class);
             if (value == null)
