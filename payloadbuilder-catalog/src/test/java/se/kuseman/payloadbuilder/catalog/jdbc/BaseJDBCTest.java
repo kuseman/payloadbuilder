@@ -135,7 +135,7 @@ abstract class BaseJDBCTest extends Assert
     @After
     public void shutdown()
     {
-        catalog.shutdown();
+        catalog.close();
 
         // Clean up test data
         try (Connection con = datasource.getConnection())
