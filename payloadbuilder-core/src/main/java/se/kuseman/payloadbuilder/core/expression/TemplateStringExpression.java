@@ -108,9 +108,8 @@ public class TemplateStringExpression implements ITemplateStringExpression
     @Override
     public boolean equals(Object obj)
     {
-        if (obj instanceof TemplateStringExpression)
+        if (obj instanceof TemplateStringExpression that)
         {
-            TemplateStringExpression that = (TemplateStringExpression) obj;
             return expressions.equals(that.expressions);
         }
         return false;
@@ -152,7 +151,7 @@ public class TemplateStringExpression implements ITemplateStringExpression
             {
                 continue;
             }
-            strings.add(vectors[j].getString(row));
+            strings.add(UTF8String.from(vectors[j].valueAsObject(row)));
         }
         return UTF8String.concat(UTF8String.EMPTY, strings);
     }

@@ -1370,14 +1370,17 @@
           [{"key":"table","value": "agg_data"}, {"key":"name","value": "value"},   {"key":"custom","value": 5}]
         ],
         [
-          [{"key":"name","value": "testFunc"},{"key":"type","value": "SCALAR"}, {"key":"description","value": ""}]
+          [{"key":"name","value": "testFunc"},{"key":"type","value": "SCALAR"}, {"key":"description","value": ""}],
+          [{"key":"name","value": "testTVFOptions"},{"key":"type","value": "TABLE"}, {"key":"description","value": ""}]
         ],
         [],
         [
-          [{"key":"name","value": "testFunc"},{"key":"type","value": "SCALAR"}, {"key":"description","value": ""}]
+          [{"key":"name","value": "testFunc"},{"key":"type","value": "SCALAR"}, {"key":"description","value": ""}],
+          [{"key":"name","value": "testTVFOptions"},{"key":"type","value": "TABLE"}, {"key":"description","value": ""}]
         ],
         [
           [{"key":"name","value": "testFunc"},            {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "testTVFOptions"},      {"key":"type","value": "TABLE"},            {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "System functions"},    {"key":"type","value": ""},                 {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "object_array"},        {"key":"type","value": "AGGREGATE"},        {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "array"},               {"key":"type","value": "OPERATOR"},         {"key":"description","value": "###IGNORE###"}],
@@ -1486,6 +1489,35 @@
       ],
       "expectedException": "java.lang.IllegalArgumentException",
       "expectedMessageContains": "Cannot cast Int to Table"
+    },
+    {
+      "name": "Test table option expressions get resolved",
+      "query": [
+        "select * ",
+        "from range(1,3) x ",
+        "cross apply c#testTVFOptions() y with ( ",
+        "  input = x.value * 2 ",
+        ") "
+      ],
+      "expectedResultSets": [
+        [
+          [{"key":"Value","value": 1}, {"key":"input","value": 2}],
+          [{"key":"Value","value": 2}, {"key":"input","value": 4}]
+        ]
+      ]
+    },
+    {
+      "name": "Test table option expression scope",
+      "query": [
+        "select * ",
+        "from range(1,3) x ",
+        "inner join source y with ( ",
+        "  input = x.value * 2 ",
+        ") ",
+        " on y.col = x.col"
+      ],
+      "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
+      "expectedMessageContains": "x.value cannot be bound"
     }
   ]
 }
