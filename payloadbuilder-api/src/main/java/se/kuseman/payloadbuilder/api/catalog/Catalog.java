@@ -228,4 +228,9 @@ public abstract class Catalog
             throw new IllegalArgumentException("Illegal column index: " + col);
         });
     }
+
+    /** Close catalog. Is called by clients to shut down to be able to close resources etc. */
+    public void close()
+    {
+    }
 }

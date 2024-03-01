@@ -9,12 +9,23 @@ import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+
+import org.apache.commons.lang3.concurrent.BasicThreadFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.zaxxer.hikari.HikariDataSource;
 
@@ -44,6 +55,7 @@ import se.kuseman.payloadbuilder.catalog.jdbc.dialect.SqlDialect;
 /** Jdbc catalog */
 public class JdbcCatalog extends Catalog
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(JdbcCatalog.class);
     public static final String NAME = "JdbcCatalog";
     public static final String DRIVER_CLASSNAME = "driverclassname";
     public static final String URL = "url";
@@ -51,12 +63,16 @@ public class JdbcCatalog extends Catalog
     public static final String PASSWORD = "password";
     public static final String DATABASE = "database";
 
-    private final Map<String, HikariDataSource> dataSourceByURL = new ConcurrentHashMap<>();
+    private final Map<String, DatasourceHolder> dataSourceByURL = new ConcurrentHashMap<>();
+    private final ScheduledFuture<?> houseKeepingFuture;
 
     public JdbcCatalog()
     {
         super(NAME);
         registerFunction(new QueryFunction(this));
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, new BasicThreadFactory.Builder().namingPattern("JdbcCatalog-Datasource-housekeeper-%d")
+                .build());
+        houseKeepingFuture = scheduler.scheduleAtFixedRate(houseKeepingRunnable, 10, 10, TimeUnit.MINUTES);
     }
 
     @Override
@@ -248,21 +264,76 @@ public class JdbcCatalog extends Catalog
                     ds.setJdbcUrl(url);
                     ds.setUsername(username);
                     ds.setPassword(password);
-                    return ds;
+                    return new DatasourceHolder(ds);
                 }
 
                 // Set user/pass in case they have changed
-                v.setUsername(username);
-                v.setPassword(password);
+                v.ds.setUsername(username);
+                v.ds.setPassword(password);
                 return v;
             })
                     .getConnection();
+
         }
         catch (SQLException e)
         {
             throw new ConnectionException(catalogAlias, e);
         }
     }
+
+    private static class DatasourceHolder
+    {
+        final HikariDataSource ds;
+        Instant lastAccessTime;
+
+        DatasourceHolder(HikariDataSource ds)
+        {
+            this.ds = ds;
+            this.lastAccessTime = Instant.now();
+        }
+
+        Connection getConnection() throws SQLException
+        {
+            lastAccessTime = Instant.now();
+            return ds.getConnection();
+        }
+
+        void close()
+        {
+            try
+            {
+                ds.close();
+            }
+            catch (Exception e)
+            {
+                LOGGER.warn("Error closing datasource", e);
+            }
+        }
+    }
+
+    private Runnable houseKeepingRunnable = () ->
+    {
+        if (dataSourceByURL.isEmpty())
+        {
+            return;
+        }
+
+        Instant threshold = Instant.now()
+                .minus(10, ChronoUnit.MINUTES);
+
+        Iterator<Entry<String, DatasourceHolder>> it = dataSourceByURL.entrySet()
+                .iterator();
+        while (it.hasNext())
+        {
+            Entry<String, DatasourceHolder> entry = it.next();
+            if (entry.getValue().lastAccessTime.isBefore(threshold))
+            {
+                entry.getValue()
+                        .close();
+                it.remove();
+            }
+        }
+    };
 
     private String getPassword(IQuerySession session, String catalogAlias)
     {
@@ -365,8 +436,11 @@ public class JdbcCatalog extends Catalog
     }
 
     /** Shuts down catalog. Terminating pools etc. */
-    void shutdown()
+    @Override
+    public void close()
     {
+        houseKeepingFuture.cancel(true);
+
         dataSourceByURL.values()
                 .forEach(ds -> ds.close());
     }
