@@ -15,7 +15,19 @@ public interface IDatasourceOptions
     int getBatchSize(IExecutionContext context);
 
     /** Return value for provided option name. If no option found with provided name null is returned */
-    ValueVector getOption(QualifiedName name, IExecutionContext context);
+    default ValueVector getOption(QualifiedName name, IExecutionContext context)
+    {
+        for (Option option : getOptions())
+        {
+            if (option.getOption()
+                    .equalsIgnoreCase(name))
+            {
+                return option.getValueExpression()
+                        .eval(context);
+            }
+        }
+        return null;
+    }
 
     /** Return options */
     List<Option> getOptions();

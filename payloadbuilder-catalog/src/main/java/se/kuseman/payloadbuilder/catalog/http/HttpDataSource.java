@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 
 import java.io.IOException;
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -16,16 +17,9 @@ import java.util.regex.Matcher;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hc.client5.http.classic.methods.HttpGet;
-import org.apache.hc.client5.http.classic.methods.HttpPatch;
-import org.apache.hc.client5.http.classic.methods.HttpPost;
-import org.apache.hc.client5.http.classic.methods.HttpPut;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
-import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.HttpException;
@@ -36,6 +30,7 @@ import org.apache.hc.core5.util.Timeout;
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
+import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.ISeekKey;
@@ -49,29 +44,18 @@ import se.kuseman.payloadbuilder.catalog.http.HttpCatalog.Request;
 @SuppressWarnings("deprecation")
 class HttpDataSource implements IDatasource
 {
-    static final int DEFAULT_RECIEVE_TIMEOUT = 15000;
-    static final int DEFAULT_CONNECT_TIMEOUT = 1500;
-
-    static final String POST = "post";
-    static final String PUT = "put";
-    static final String PATCH = "patch";
-    static final String GET = "get";
+    static final String GET = "GET";
     private static final IResponseTransformer FALLBACK_TRANSFORMER = new FallbackResponseTransformer();
+    private final CloseableHttpClient httpClient;
     private final String catalogAlias;
     private final String endpoint;
     private final ISeekPredicate seekPredicate;
     private final Request request;
     private final List<IResponseTransformer> responseTransformers;
 
-    private static final PoolingHttpClientConnectionManager DEFAULT_MANAGER = PoolingHttpClientConnectionManagerBuilder.create()
-            .setDefaultConnectionConfig(ConnectionConfig.custom()
-                    .setConnectTimeout(Timeout.ofMilliseconds(DEFAULT_CONNECT_TIMEOUT))
-                    .setSocketTimeout(Timeout.ofMilliseconds(DEFAULT_RECIEVE_TIMEOUT))
-                    .build())
-            .build();
-
-    HttpDataSource(String catalogAlias, String endpoint, ISeekPredicate seekPredicate, Request request, List<IResponseTransformer> responseTransformers)
+    HttpDataSource(CloseableHttpClient httpClient, String catalogAlias, String endpoint, ISeekPredicate seekPredicate, Request request, List<IResponseTransformer> responseTransformers)
     {
+        this.httpClient = requireNonNull(httpClient);
         this.catalogAlias = requireNonNull(catalogAlias);
         this.endpoint = requireNonNull(endpoint);
         this.seekPredicate = seekPredicate;
@@ -94,12 +78,11 @@ class HttpDataSource implements IDatasource
             }
         }
 
-        HttpUriRequestBase request = getBaseRequest(context, endpoint);
-        addHeaders(request, context);
-        return execute(request, responseTransformers, context, options);
+        HttpUriRequestBase request = getBaseRequest(context, options, endpoint);
+        return execute(httpClient, request, responseTransformers, context, options);
     }
 
-    static TupleIterator execute(HttpUriRequestBase request, List<IResponseTransformer> responseTransformers, IExecutionContext context, IDatasourceOptions options)
+    static TupleIterator execute(CloseableHttpClient httpClient, HttpUriRequestBase request, List<IResponseTransformer> responseTransformers, IExecutionContext context, IDatasourceOptions options)
     {
         ValueVector vv = options.getOption(QualifiedName.of(HttpCatalog.FAIL_ON_NON_200), context);
         boolean failOnNon200 = vv == null
@@ -108,30 +91,24 @@ class HttpDataSource implements IDatasource
 
         vv = options.getOption(QualifiedName.of(HttpCatalog.CONNECT_TIMEOUT), context);
         int connectTimeout = vv == null
-                || vv.isNull(0) ? DEFAULT_CONNECT_TIMEOUT
+                || vv.isNull(0) ? HttpCatalog.DEFAULT_CONNECT_TIMEOUT
                         : vv.getInt(0);
 
         vv = options.getOption(QualifiedName.of(HttpCatalog.RECEIVE_TIMEOUT), context);
         int receiveTimeout = vv == null
-                || vv.isNull(0) ? DEFAULT_RECIEVE_TIMEOUT
+                || vv.isNull(0) ? HttpCatalog.DEFAULT_RECIEVE_TIMEOUT
                         : vv.getInt(0);
 
-        PoolingHttpClientConnectionManager manager = DEFAULT_MANAGER;
-
-        if (connectTimeout != DEFAULT_CONNECT_TIMEOUT
-                || receiveTimeout != DEFAULT_RECIEVE_TIMEOUT)
+        if (connectTimeout != HttpCatalog.DEFAULT_CONNECT_TIMEOUT
+                || receiveTimeout != HttpCatalog.DEFAULT_RECIEVE_TIMEOUT)
         {
-            manager = PoolingHttpClientConnectionManagerBuilder.create()
-                    .setDefaultConnectionConfig(ConnectionConfig.custom()
-                            .setConnectTimeout(Timeout.ofMilliseconds(connectTimeout))
-                            .setSocketTimeout(Timeout.ofMilliseconds(receiveTimeout))
-                            .build())
+            RequestConfig config = RequestConfig.custom()
+                    .setResponseTimeout(Timeout.ofMilliseconds(receiveTimeout))
+                    .setConnectTimeout(Timeout.ofMilliseconds(connectTimeout))
                     .build();
-        }
 
-        CloseableHttpClient client = HttpClients.custom()
-                .setConnectionManager(manager)
-                .build();
+            request.setConfig(config);
+        }
 
         Runnable abortListener = () ->
         {
@@ -149,7 +126,7 @@ class HttpDataSource implements IDatasource
 
         try
         {
-            return client.execute(request, new HttpClientResponseHandler<TupleIterator>()
+            return httpClient.execute(request, new HttpClientResponseHandler<TupleIterator>()
             {
                 @Override
                 public TupleIterator handleResponse(ClassicHttpResponse response) throws HttpException, IOException
@@ -170,11 +147,11 @@ class HttpDataSource implements IDatasource
                     {
                         if (transformer.canHandle(request, response))
                         {
-                            return transformer.transform(request, response);
+                            return transformer.transform(request, response, context, options);
                         }
                     }
 
-                    return FALLBACK_TRANSFORMER.transform(request, response);
+                    return FALLBACK_TRANSFORMER.transform(request, response, context, options);
                 }
             });
         }
@@ -194,20 +171,8 @@ class HttpDataSource implements IDatasource
         }
     }
 
-    private HttpUriRequestBase getBaseRequest(IExecutionContext context, String baseEndpoint)
+    private HttpUriRequestBase getBaseRequest(IExecutionContext context, IDatasourceOptions options, String baseEndpoint)
     {
-        String method;
-        if (request.method() == null)
-        {
-            method = GET;
-        }
-        else
-        {
-            method = Objects.toString(request.method()
-                    .eval(context)
-                    .valueAsString(0), GET);
-        }
-
         String endpoint = baseEndpoint;
 
         // Gather place holder values
@@ -286,7 +251,7 @@ class HttpDataSource implements IDatasource
             }
         }
 
-        HttpUriRequestBase httpRequest = getRequestBase(method, endpoint);
+        HttpUriRequestBase httpRequest = getRequestBase(context, options, endpoint);
 
         // Process body expression
         if (request.bodyExpression() != null)
@@ -345,28 +310,31 @@ class HttpDataSource implements IDatasource
         return httpRequest;
     }
 
-    static HttpUriRequestBase getRequestBase(String method, String endpoint)
+    static HttpUriRequestBase getRequestBase(IExecutionContext context, IDatasourceOptions options, String endpoint)
     {
-        HttpUriRequestBase httpRequest = switch (method.toLowerCase())
-        {
-            case GET -> new HttpGet(endpoint);
-            case POST -> new HttpPost(endpoint);
-            case PUT -> new HttpPut(endpoint);
-            case PATCH -> new HttpPatch(endpoint);
-            default -> throw new IllegalArgumentException("Unsupported request method '" + method + "'");
-        };
-        return httpRequest;
-    }
+        ValueVector vv = options.getOption(HttpCatalog.METHOD, context);
+        String method = vv == null
+                || vv.isNull(0) ? GET
+                        : vv.getString(0)
+                                .toString()
+                                .toUpperCase();
 
-    private void addHeaders(HttpUriRequestBase httpRequest, IExecutionContext context)
-    {
-        for (HttpCatalog.Header header : request.headers())
+        HttpUriRequestBase httpRequest = new HttpUriRequestBase(method, URI.create(endpoint));
+        for (Option option : options.getOptions())
         {
-            String value = header.expression()
-                    .eval(context)
-                    .valueAsString(0);
-            httpRequest.addHeader(header.name(), value);
+            QualifiedName name = option.getOption();
+            if (name.size() == 2
+                    && HttpCatalog.HEADER.equalsIgnoreCase(name.getFirst()))
+            {
+                String value = option.getValueExpression()
+                        .eval(context)
+                        .valueAsString(0);
+                httpRequest.addHeader(name.getParts()
+                        .get(1), value);
+            }
         }
+
+        return httpRequest;
     }
 
     private List<Object> evalPredicate(IExecutionContext context, List<IExpression> expressions)

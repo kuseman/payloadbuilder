@@ -68,9 +68,10 @@ public class HttpCatalogTest
     }
 
     @After
-    public void stopMockServer()
+    public void shutdown()
     {
         mockServer.stop();
+        catalog.close();
     }
 
     @Test
@@ -116,7 +117,7 @@ public class HttpCatalogTest
                 .respond(HttpResponse.response("{\"key\":123}")
                         .withHeader("Content-Type", "application/json"));
 
-        TupleIterator it = dataSource.execute(context, TestUtils.mockOptions(500));
+        TupleIterator it = dataSource.execute(context, TestUtils.mockOptions(500, data.getOptions()));
         int rowCount = 0;
         while (it.hasNext())
         {
@@ -139,9 +140,8 @@ public class HttpCatalogTest
     public void test_getSeekDataSource_post()
     {
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
-        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(),
-                List.of(new Option(QualifiedName.of(HttpCatalog.METHOD), ExpressionTestUtils.createStringExpression("post")),
-                        new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression("{\"keys\":[{{id}}]}"))));
+        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(), List.of(new Option(HttpCatalog.METHOD, ExpressionTestUtils.createStringExpression("post")),
+                new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression("{\"keys\":[{{id}}]}"))));
 
         QualifiedName table = QualifiedName.of("http://localhost:" + mockServer.getPort());
 
@@ -155,7 +155,47 @@ public class HttpCatalogTest
                 .respond(HttpResponse.response("{\"key\":123}")
                         .withHeader("Content-Type", "application/json"));
 
-        TupleIterator it = dataSource.execute(context, TestUtils.mockOptions(500));
+        TupleIterator it = dataSource.execute(context, TestUtils.mockOptions(500, data.getOptions()));
+        int rowCount = 0;
+        while (it.hasNext())
+        {
+            TupleVector v = it.next();
+
+            //@formatter:off
+            VectorTestUtils.assertTupleVectorsEquals(TupleVector.of(Schema.of(Column.of("key", Type.Any)), List.of(
+                    vv(Type.Any, 123)
+                    ))
+                    , v);
+            //@formatter:on
+            rowCount += v.getRowCount();
+        }
+        assertEquals(1, rowCount);
+
+        mockServer.verify(mocks[0].getId());
+    }
+
+    @Test
+    public void test_getSeekDataSource_post_with_json_response_path()
+    {
+        IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
+        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(),
+                List.of(new Option(QualifiedName.of(HttpCatalog.METHOD), ExpressionTestUtils.createStringExpression("post")),
+                        new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression("{\"keys\":[{{key}}]}")),
+                        new Option(QualifiedName.of(JsonResponseTransformer.RESPONSE_PATH), ExpressionTestUtils.createStringExpression("/ids"))));
+
+        QualifiedName table = QualifiedName.of("http://localhost:" + mockServer.getPort());
+
+        ISeekPredicate seekPrecidate = mockSeekPrecidate(context, table, asList("key"), List.<Object[]>of(new Object[] { 123, 456 }));
+
+        IDatasource dataSource = catalog.getSeekDataSource(context.getSession(), "http", seekPrecidate, data);
+
+        Expectation[] mocks = mockServer.when(HttpRequest.request("/")
+                .withMethod("post")
+                .withBody("{\"keys\":[123,456]}"))
+                .respond(HttpResponse.response("{ \"ids\":[ {\"key\":123} ]}")
+                        .withHeader("Content-Type", "application/json"));
+
+        TupleIterator it = dataSource.execute(context, TestUtils.mockOptions(500, data.getOptions()));
         int rowCount = 0;
         while (it.hasNext())
         {
@@ -178,9 +218,11 @@ public class HttpCatalogTest
     public void test_getSeekDataSource_post_strings()
     {
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
-        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(),
-                List.of(new Option(QualifiedName.of(HttpCatalog.METHOD), ExpressionTestUtils.createStringExpression("post")),
-                        new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression("{\"keys\":[{{id}}]}"))));
+        //@formatter:off
+        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(), List.of(
+                new Option(HttpCatalog.METHOD, ExpressionTestUtils.createStringExpression("post")),
+                new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression("{\"keys\":[{{id}}]}"))));
+        //@formatter:on
 
         QualifiedName table = QualifiedName.of("http://localhost:" + mockServer.getPort());
 
@@ -194,7 +236,7 @@ public class HttpCatalogTest
                 .respond(HttpResponse.response("{\"key\":123}")
                         .withHeader("Content-Type", "application/json"));
 
-        TupleIterator it = dataSource.execute(context, TestUtils.mockOptions(500));
+        TupleIterator it = dataSource.execute(context, TestUtils.mockOptions(500, data.getOptions()));
         int rowCount = 0;
         while (it.hasNext())
         {
@@ -250,7 +292,7 @@ public class HttpCatalogTest
                 .respond(HttpResponse.response("{\"key\":123}")
                         .withHeader("Content-Type", "application/json"));
 
-        TupleIterator it = dataSource.execute(context, TestUtils.mockOptions(500));
+        TupleIterator it = dataSource.execute(context, TestUtils.mockOptions(500, data.getOptions()));
         int rowCount = 0;
         while (it.hasNext())
         {
@@ -429,9 +471,7 @@ public class HttpCatalogTest
         assertEquals(Arity.ONE, function.arity());
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
-        IDatasourceOptions options = Mockito.mock(IDatasourceOptions.class);
-        Mockito.when(options.getOption(QualifiedName.of(HttpCatalog.FAIL_ON_NON_200), context))
-                .thenReturn(vv(Type.Boolean, false));
+        IDatasourceOptions options = TestUtils.mockOptions(500, asList(new Option(HttpCatalog.FAIL_ON_NON_200, ExpressionTestUtils.createStringExpression("false"))));
 
         TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort())), options);
         assertFalse(it.hasNext());
@@ -457,7 +497,55 @@ public class HttpCatalogTest
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
         IDatasourceOptions options = Mockito.mock(IDatasourceOptions.class);
         Mockito.when(options.getOption(QualifiedName.of(HttpCatalog.METHOD), context))
-                .thenReturn(vv(Type.String, HttpDataSource.POST));
+                .thenReturn(vv(Type.String, "post"));
+        Mockito.when(options.getOption(QualifiedName.of(QueryFunction.BODY), context))
+                .thenReturn(vv(Type.String, body));
+        Mockito.when(options.getOptions())
+                .thenReturn(List.of(new Option(QualifiedName.of(HttpCatalog.HEADER, "x-header"), x_header_expression)));
+
+        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort() + "/api")), options);
+
+        int rowCount = 0;
+        while (it.hasNext())
+        {
+            TupleVector v = it.next();
+
+            //@formatter:off
+            VectorTestUtils.assertTupleVectorsEquals(TupleVector.of(Schema.of(Column.of("key", Type.Any), Column.of("key2", Type.Any)), List.of(
+                    vv(Type.Any, 123, null),
+                    vv(Type.Any, null, 456)
+                    ))
+                    , v);
+            //@formatter:on
+            rowCount += v.getRowCount();
+        }
+        assertEquals(2, rowCount);
+
+        mockServer.verify(mocks[0].getId());
+    }
+
+    @Test
+    public void test_query_function_json_response_transformer_json_response_path()
+    {
+        String body = "{\"json\":\"value\"}";
+        Expectation[] mocks = mockServer.when(HttpRequest.request("/api")
+                .withMethod("post")
+                .withHeader("x-header", "custom-value")
+                .withBody(body))
+                .respond(HttpResponse.response("{\"docs\": [{ \"key\": 123 }, { \"key2\": 456 }]}")
+                        .withHeader("custom-header", "value5", "value5")
+                        .withHeader("Content-Type", "application/json"));
+
+        TableFunctionInfo function = catalog.getTableFunction("query");
+
+        ILiteralStringExpression x_header_expression = ExpressionTestUtils.createStringExpression("custom-value");
+
+        IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
+        IDatasourceOptions options = Mockito.mock(IDatasourceOptions.class);
+        Mockito.when(options.getOption(QualifiedName.of(HttpCatalog.METHOD), context))
+                .thenReturn(vv(Type.String, "post"));
+        Mockito.when(options.getOption(JsonResponseTransformer.RESPONSE_PATH, context))
+                .thenReturn(vv(Type.String, "/docs"));
         Mockito.when(options.getOption(QualifiedName.of(QueryFunction.BODY), context))
                 .thenReturn(vv(Type.String, body));
         Mockito.when(options.getOptions())
@@ -498,11 +586,11 @@ public class HttpCatalogTest
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
 
         DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(),
-                asList(new Option(QualifiedName.of(HttpCatalog.METHOD), ExpressionTestUtils.createStringExpression("put")),
+                asList(new Option(HttpCatalog.METHOD, ExpressionTestUtils.createStringExpression("put")),
                         new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression(body)),
                         new Option(QualifiedName.of(HttpCatalog.HEADER, "x-header"), ExpressionTestUtils.createStringExpression("x-value"))));
         IDatasource dataSource = catalog.getScanDataSource(context.getSession(), "http", QualifiedName.of("http://localhost:" + mockServer.getPort()), data);
-        IDatasourceOptions options = TestUtils.mockOptions(500);
+        IDatasourceOptions options = TestUtils.mockOptions(500, data.getOptions());
 
         TupleIterator it = dataSource.execute(context, options);
 
@@ -538,11 +626,11 @@ public class HttpCatalogTest
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
 
         DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(),
-                asList(new Option(QualifiedName.of(HttpCatalog.METHOD), ExpressionTestUtils.createStringExpression("patch")),
+                asList(new Option(HttpCatalog.METHOD, ExpressionTestUtils.createStringExpression("patch")),
                         new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression(body)),
                         new Option(QualifiedName.of(HttpCatalog.HEADER, "x-header"), ExpressionTestUtils.createStringExpression("x-value"))));
         IDatasource dataSource = catalog.getScanDataSource(context.getSession(), "http", QualifiedName.of("http://localhost:" + mockServer.getPort()), data);
-        IDatasourceOptions options = TestUtils.mockOptions(500);
+        IDatasourceOptions options = TestUtils.mockOptions(500, data.getOptions());
 
         try
         {
@@ -572,13 +660,12 @@ public class HttpCatalogTest
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
 
         DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(),
-                asList(new Option(QualifiedName.of(HttpCatalog.METHOD), ExpressionTestUtils.createStringExpression("patch")),
+                asList(new Option(HttpCatalog.METHOD, ExpressionTestUtils.createStringExpression("patch")),
                         new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression(body)),
-                        new Option(QualifiedName.of(HttpCatalog.HEADER, "x-header"), ExpressionTestUtils.createStringExpression("x-value"))));
+                        new Option(QualifiedName.of(HttpCatalog.HEADER, "x-header"), ExpressionTestUtils.createStringExpression("x-value")),
+                        new Option(HttpCatalog.FAIL_ON_NON_200, ExpressionTestUtils.createStringExpression("false"))));
         IDatasource dataSource = catalog.getScanDataSource(context.getSession(), "http", QualifiedName.of("http://localhost:" + mockServer.getPort()), data);
-        IDatasourceOptions options = Mockito.mock(IDatasourceOptions.class);
-        Mockito.when(options.getOption(QualifiedName.of(HttpCatalog.FAIL_ON_NON_200), context))
-                .thenReturn(vv(Type.Boolean, false));
+        IDatasourceOptions options = TestUtils.mockOptions(500, data.getOptions());
 
         TupleIterator it = dataSource.execute(context, options);
         assertFalse(it.hasNext());
@@ -593,11 +680,11 @@ public class HttpCatalogTest
         IExecutionContext context = TestUtils.mockExecutionContext("http", Map.of(), 0, null);
 
         DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(),
-                asList(new Option(QualifiedName.of(HttpCatalog.METHOD), ExpressionTestUtils.createStringExpression("put")),
+                asList(new Option(HttpCatalog.METHOD, ExpressionTestUtils.createStringExpression("put")),
                         new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression(body)),
                         new Option(QualifiedName.of(HttpCatalog.HEADER, "Content-Type"), ExpressionTestUtils.createStringExpression("text/plain"))));
         IDatasource dataSource = catalog.getScanDataSource(context.getSession(), "http", QualifiedName.of("endpoint"), data);
-        IDatasourceOptions options = TestUtils.mockOptions(500);
+        IDatasourceOptions options = TestUtils.mockOptions(500, data.getOptions());
 
         try
         {
@@ -612,39 +699,17 @@ public class HttpCatalogTest
     }
 
     @Test
-    public void test_getScanDataSource_with_no_placeholders_unsupported_method()
-    {
-        IExecutionContext context = TestUtils.mockExecutionContext("http", Map.of(), 0, null);
-
-        DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(),
-                asList(new Option(QualifiedName.of(HttpCatalog.METHOD), ExpressionTestUtils.createStringExpression("option"))));
-        IDatasource dataSource = catalog.getScanDataSource(context.getSession(), "http", QualifiedName.of("http://localhost"), data);
-        IDatasourceOptions options = TestUtils.mockOptions(500);
-
-        try
-        {
-            dataSource.execute(context, options);
-            fail("Should fail");
-        }
-        catch (IllegalArgumentException e)
-        {
-            assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Unsupported request method 'option'"));
-        }
-    }
-
-    @Test
     public void test_getScanDataSource_with_no_placeholders_unsupported_content_type()
     {
         String body = "{\"json\":\"value\"}";
         IExecutionContext context = TestUtils.mockExecutionContext("http", Map.of("endpoint", "http://localhost"), 0, null);
 
         DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(),
-                asList(new Option(QualifiedName.of(HttpCatalog.METHOD), ExpressionTestUtils.createStringExpression("put")),
+                asList(new Option(HttpCatalog.METHOD, ExpressionTestUtils.createStringExpression("put")),
                         new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression(body)),
                         new Option(QualifiedName.of(HttpCatalog.HEADER, "Content-Type"), ExpressionTestUtils.createStringExpression("text/plain"))));
         IDatasource dataSource = catalog.getScanDataSource(context.getSession(), "http", QualifiedName.of("endpoint"), data);
-        IDatasourceOptions options = TestUtils.mockOptions(500);
+        IDatasourceOptions options = TestUtils.mockOptions(500, data.getOptions());
 
         try
         {
