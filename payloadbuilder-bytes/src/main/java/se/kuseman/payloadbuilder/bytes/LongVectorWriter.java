@@ -29,7 +29,7 @@ class LongVectorWriter extends AReferenceVectorWriter
     }
 
     @Override
-    protected int getAndCachedPosition(BytesWriter writer, WriteCache cache, ValueVector vector, int row)
+    protected int getAndCachePosition(BytesWriter writer, WriteCache cache, ValueVector vector, int row)
     {
         long value = vector.getLong(row);
         Integer position = cache.getLongPosition(value);

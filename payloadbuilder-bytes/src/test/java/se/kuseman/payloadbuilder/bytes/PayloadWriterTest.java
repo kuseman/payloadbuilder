@@ -3,6 +3,8 @@ package se.kuseman.payloadbuilder.bytes;
 import static java.util.Arrays.asList;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
+import java.util.List;
+
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -52,6 +54,590 @@ public class PayloadWriterTest extends Assert
     public void test_invalid_payload_3()
     {
         PayloadReader.read(new byte[] { PayloadReader.P, PayloadReader.L, 1, 2, PayloadReader.B });
+    }
+
+    @Test
+    public void test_schema_recreation_with_more_expected_columns()
+    {
+        // @formatter:off
+        Schema schemaV1 = Schema.of(
+                Column.of("integer", Column.Type.Int),
+                Column.of("float", Column.Type.Float)
+                );
+
+        TupleVector vectorV1 = TupleVector.of(schemaV1,
+                asList(vv(Type.Int, 2, 1, 4, 3, 10),
+                        vv(Type.Float, 2.0F, 3.0F, null, 5.0F, 6.0F)));
+        // @formatter:on
+
+        byte[] bytes = PayloadWriter.write(ValueVector.literalTable(vectorV1, 1));
+
+        VectorTestUtils.assertTupleVectorsEquals(vectorV1, PayloadReader.readTupleVector(bytes, schemaV1, false));
+        VectorTestUtils.assertTupleVectorsEquals(vectorV1, PayloadReader.readTupleVector(bytes, schemaV1, true));
+
+        // @formatter:off
+        Schema schemaV2 = Schema.of(
+                Column.of("float12", Column.Type.Float),
+                Column.of("float", Column.Type.Float),
+                Column.of("boolean", Column.Type.Boolean)
+                );
+        // @formatter:on
+
+        TupleVector actual = PayloadReader.readTupleVector(bytes, schemaV2, false);
+
+        assertEquals(schemaV2, actual.getSchema());
+
+        VectorTestUtils.assertVectorsEquals(vv(Type.Int, 2, 1, 4, 3, 10), actual.getColumn(0));
+        VectorTestUtils.assertVectorsEquals(vv(Type.Float, 2.0F, 3.0F, null, 5.0F, 6.0F), actual.getColumn(1));
+        VectorTestUtils.assertVectorsEquals(vv(Type.Boolean, null, null, null, null, null), actual.getColumn(2));
+
+        actual = PayloadReader.readTupleVector(bytes, schemaV2, true);
+
+        // @formatter:off
+        schemaV2 = Schema.of(
+                Column.of("float12", Column.Type.Int),
+                Column.of("float", Column.Type.Float),
+                Column.of("boolean", Column.Type.Boolean)
+                );
+        // @formatter:on
+
+        assertEquals(actual.getSchema(), schemaV2);
+
+        VectorTestUtils.assertVectorsEquals(vv(Type.Int, 2, 1, 4, 3, 10), actual.getColumn(0));
+        VectorTestUtils.assertVectorsEquals(vv(Type.Float, 2.0F, 3.0F, null, 5.0F, 6.0F), actual.getColumn(1));
+        VectorTestUtils.assertVectorsEquals(vv(Type.Boolean, null, null, null, null, null), actual.getColumn(2));
+    }
+
+    @Test
+    public void test_schema_diff_with_nested_array()
+    {
+        // @formatter:off
+        Schema schemaV1 = Schema.of(
+                Column.of("array", ResolvedType.array(ResolvedType.array(Column.Type.Int))));
+        
+        TupleVector vectorV1 = TupleVector.of(schemaV1, List.of(
+                vv(ResolvedType.array(ResolvedType.array(Column.Type.Int)), vv(ResolvedType.array(Column.Type.Int), vv(Type.Int, 1,2,3)))
+                ));
+        // @formatter:off
+        
+        byte[] bytes = PayloadWriter.write(ValueVector.literalTable(vectorV1, 1));
+
+        VectorTestUtils.assertTupleVectorsEquals(vectorV1, PayloadReader.readTupleVector(bytes, schemaV1, false));
+        VectorTestUtils.assertTupleVectorsEquals(vectorV1, PayloadReader.readTupleVector(bytes, schemaV1, true));
+
+        // @formatter:off
+        Schema schemaV2 = Schema.of(
+                Column.of("arrayFloat", ResolvedType.array(ResolvedType.array(Column.Type.Float))));
+
+        TupleVector vectorV2 = TupleVector.of(schemaV2, List.of(
+                vv(ResolvedType.array(ResolvedType.array(Column.Type.Float)), vv(ResolvedType.array(Column.Type.Float), vv(Type.Float, 10.0F,20.F,30.F)))
+                ));
+
+        bytes = PayloadWriter.write(ValueVector.literalTable(vectorV2, 1));
+
+        TupleVector actual = PayloadReader.readTupleVector(bytes, schemaV1, false);
+
+        // Same original schema
+        assertEquals(schemaV1, actual.getSchema());
+
+        // Vectors should be payloads types
+        VectorTestUtils.assertVectorsEquals(vv(ResolvedType.array(ResolvedType.array(Column.Type.Float)),
+                        vv(ResolvedType.array(Column.Type.Float),
+                                vv(Type.Float, 10.0F,20.F,30.F))), actual.getColumn(0));
+        // @formatter:on
+    }
+
+    @Test
+    public void test_schema_diff_with_nested_array_object()
+    {
+        // @formatter:off
+        Schema innerSchema = Schema.of(Column.of("col", Column.Type.Int));
+
+        Schema schemaV1 = Schema.of(
+                Column.of("array", ResolvedType.array(ResolvedType.object(innerSchema))));
+
+        TupleVector vectorV1 = TupleVector.of(schemaV1, List.of(
+                vv(ResolvedType.array(ResolvedType.object(innerSchema)), vv(ResolvedType.object(innerSchema), ObjectVector.wrap(
+                        TupleVector.of(innerSchema, List.of(
+                                vv(Column.Type.Int, 6, null, 8)
+                                ))
+                        )))
+                ));
+        // @formatter:off
+
+        byte[] bytes = PayloadWriter.write(ValueVector.literalTable(vectorV1, 1));
+
+        VectorTestUtils.assertTupleVectorsEquals(vectorV1, PayloadReader.readTupleVector(bytes, schemaV1, false));
+        VectorTestUtils.assertTupleVectorsEquals(vectorV1, PayloadReader.readTupleVector(bytes, schemaV1, true));
+
+        // @formatter:off
+        Schema innerSchemaV2 = Schema.of(Column.of("colNew", Column.Type.Boolean));
+
+        Schema schemaV2 = Schema.of(
+                Column.of("arrayNew", ResolvedType.array(ResolvedType.object(innerSchemaV2))));
+
+        TupleVector vectorV2 = TupleVector.of(schemaV2, List.of(
+                vv(ResolvedType.array(ResolvedType.object(innerSchemaV2)), vv(ResolvedType.object(innerSchemaV2), ObjectVector.wrap(
+                        TupleVector.of(innerSchemaV2, List.of(
+                                vv(Column.Type.Boolean, false, null, true)
+                                ))
+                        )))
+                ));
+        // @formatter:off
+
+        bytes = PayloadWriter.write(ValueVector.literalTable(vectorV2, 1));
+
+        // @formatter:off
+        // Same name new type
+        Schema expectedInnerSchema = Schema.of(Column.of("col", Column.Type.Boolean));
+
+        Schema expectedSchema = Schema.of(
+                // Same name new type
+                Column.of("array", ResolvedType.array(ResolvedType.object(expectedInnerSchema))));
+
+        TupleVector expectedVector = TupleVector.of(expectedSchema, List.of(
+                vv(ResolvedType.array(ResolvedType.object(expectedInnerSchema)), vv(ResolvedType.object(expectedInnerSchema), ObjectVector.wrap(
+                        TupleVector.of(expectedInnerSchema, List.of(
+                                vv(Column.Type.Boolean, false, null, true)
+                                ))
+                        )))
+                ));
+
+        TupleVector actual = PayloadReader.readTupleVector(bytes, schemaV1, false);
+
+        assertEquals(schemaV1, actual.getSchema());
+
+        VectorTestUtils.assertVectorsEquals(expectedVector.getColumn(0), actual.getColumn(0));
+        // @formatter:on
+    }
+
+    @Test
+    public void test_schema_diff_with_nested_array_table()
+    {
+        // @formatter:off
+        Schema innerSchema = Schema.of(Column.of("col", Column.Type.Int));
+
+        Schema schemaV1 = Schema.of(
+                Column.of("array", ResolvedType.array(ResolvedType.table(innerSchema))));
+
+        TupleVector vectorV1 = TupleVector.of(schemaV1, List.of(
+                vv(ResolvedType.array(ResolvedType.table(innerSchema)), vv(ResolvedType.table(innerSchema),
+                        TupleVector.of(innerSchema, List.of(
+                                vv(Column.Type.Int, 6, null, 8)
+                                ))
+                        ))
+                ));
+        // @formatter:off
+
+        byte[] bytes = PayloadWriter.write(ValueVector.literalTable(vectorV1, 1));
+
+        VectorTestUtils.assertTupleVectorsEquals(vectorV1, PayloadReader.readTupleVector(bytes, schemaV1, false));
+        VectorTestUtils.assertTupleVectorsEquals(vectorV1, PayloadReader.readTupleVector(bytes, schemaV1, true));
+
+        // @formatter:off
+        Schema innerSchemaV2 = Schema.of(Column.of("colNew", Column.Type.Boolean));
+
+        Schema schemaV2 = Schema.of(
+                Column.of("arrayNew", ResolvedType.array(ResolvedType.table(innerSchemaV2))));
+
+        TupleVector vectorV2 = TupleVector.of(schemaV2, List.of(
+                vv(ResolvedType.array(ResolvedType.table(innerSchemaV2)), vv(ResolvedType.table(innerSchemaV2),
+                        TupleVector.of(innerSchemaV2, List.of(
+                                vv(Column.Type.Boolean, false, null, true)
+                                ))
+                        ))
+                ));
+        // @formatter:off
+
+        bytes = PayloadWriter.write(ValueVector.literalTable(vectorV2, 1));
+
+        // @formatter:off
+        // Same name new type
+        Schema expectedInnerSchema = Schema.of(Column.of("col", Column.Type.Boolean));
+
+        Schema expectedSchema = Schema.of(
+                // Same name new type
+                Column.of("array", ResolvedType.array(ResolvedType.table(expectedInnerSchema))));
+
+        TupleVector expectedVector = TupleVector.of(expectedSchema, List.of(
+                vv(ResolvedType.array(ResolvedType.table(expectedInnerSchema)), vv(ResolvedType.table(expectedInnerSchema),
+                        TupleVector.of(expectedInnerSchema, List.of(
+                                vv(Column.Type.Boolean, false, null, true)
+                                )
+                        )))
+                ));
+        
+        TupleVector actual = PayloadReader.readTupleVector(bytes, schemaV1, false);
+
+        assertEquals(schemaV1, actual.getSchema());
+
+        VectorTestUtils.assertVectorsEquals(expectedVector.getColumn(0), actual.getColumn(0));
+        // @formatter:on
+    }
+
+    @Test
+    public void test_schema_diff_with_nested_table()
+    {
+        // @formatter:off
+        Schema innerSchemaV1 = Schema.of(
+                Column.of("subBool", Column.Type.Boolean),
+                Column.of("subDouble", Column.Type.Double)
+                );
+        
+        Schema schemaV1 = Schema.of(
+                Column.of("integer", Column.Type.Int),
+                Column.of("table", ResolvedType.table(innerSchemaV1)
+                ));
+        
+        TupleVector vectorV1 = TupleVector.of(schemaV1, List.of(
+                vv(Type.Int, 1, 2, 3),
+                vv(ResolvedType.table(innerSchemaV1),
+                        TupleVector.of(innerSchemaV1, List.of(
+                                vv(Type.Boolean, true, null),
+                                vv(Type.Double, 1.0D, -10.0D)
+                                )),
+                        TupleVector.of(innerSchemaV1, List.of(
+                                vv(Type.Boolean, false),
+                                vv(Type.Double, 666.0D)
+                                )),
+                        TupleVector.of(innerSchemaV1, List.of(
+                                vv(Type.Boolean, false, null),
+                                vv(Type.Double, 7.0D, -13.0D)
+                                ))
+                )));
+        //@formatter:on
+
+        byte[] bytes = PayloadWriter.write(ValueVector.literalTable(vectorV1, 1));
+
+        VectorTestUtils.assertTupleVectorsEquals(vectorV1, PayloadReader.readTupleVector(bytes, schemaV1, false));
+
+        // Now change a column inside sub table
+
+        // @formatter:off
+        Schema innerSchemaV2 = Schema.of(
+                Column.of("subInteger", Column.Type.Int),
+                Column.of("subDouble", Column.Type.Double)
+                );
+
+        Schema schemaV2 = Schema.of(
+                Column.of("integer", Column.Type.Int),
+                Column.of("table", ResolvedType.table(innerSchemaV2)
+                ));
+
+        TupleVector vectorV2 = TupleVector.of(schemaV2, List.of(
+                vv(Type.Int, 1, 2, 3),
+                vv(ResolvedType.table(innerSchemaV2),
+                        TupleVector.of(innerSchemaV2, List.of(
+                                vv(Type.Int, 1, null),
+                                vv(Type.Double, 1.0D, -10.0D)
+                                )),
+                        TupleVector.of(innerSchemaV2, List.of(
+                                vv(Type.Int, 2),
+                                vv(Type.Double, 666.0D)
+                                )),
+                        TupleVector.of(innerSchemaV2, List.of(
+                                vv(Type.Int, -30, 1337),
+                                vv(Type.Double, 7.0D, -13.0D)
+                                ))
+                )));
+        //@formatter:on
+
+        bytes = PayloadWriter.write(ValueVector.literalTable(vectorV2, 1));
+
+        // Verify current
+        VectorTestUtils.assertTupleVectorsEquals(vectorV2, PayloadReader.readTupleVector(bytes, schemaV2, false));
+
+        // Verify old schema against new vector
+        TupleVector actual = PayloadReader.readTupleVector(bytes, schemaV1, false);
+        // @formatter:off
+        Schema expectedInnerSchema = Schema.of(
+                // Old name but new type
+                Column.of("subBool", Column.Type.Int),
+                Column.of("subDouble", Column.Type.Double)
+                );
+
+        assertEquals(schemaV1, actual.getSchema());
+
+        VectorTestUtils.assertVectorsEquals(vv(Type.Int, 1, 2, 3), actual.getColumn(0));
+        VectorTestUtils.assertVectorsEquals(vv(ResolvedType.table(expectedInnerSchema),
+                TupleVector.of(expectedInnerSchema, List.of(
+                        vv(Type.Int, 1, null),
+                        vv(Type.Double, 1.0D, -10.0D)
+                        )),
+                TupleVector.of(expectedInnerSchema, List.of(
+                        vv(Type.Int, 2),
+                        vv(Type.Double, 666.0D)
+                        )),
+                TupleVector.of(expectedInnerSchema, List.of(
+                        vv(Type.Int, -30, 1337),
+                        vv(Type.Double, 7.0D, -13.0D)
+                        ))
+        ), actual.getColumn(1));
+        //@formatter:on
+    }
+
+    @Test
+    public void test_schema_diff_with_nested_object()
+    {
+        // @formatter:off
+        Schema innerSchemaV1 = Schema.of(
+                Column.of("subBool", Column.Type.Boolean),
+                Column.of("subDouble", Column.Type.Double)
+                );
+        
+        Schema schemaV1 = Schema.of(
+                Column.of("integer", Column.Type.Int),
+                Column.of("table", ResolvedType.object(innerSchemaV1)
+                ));
+
+        TupleVector vectorV1 = TupleVector.of(schemaV1, List.of(
+                vv(Type.Int, 1, 2, 3),
+                vv(ResolvedType.object(innerSchemaV1),
+                        ObjectVector.wrap(TupleVector.of(innerSchemaV1, List.of(
+                                vv(Type.Boolean, true, null),
+                                vv(Type.Double, 1.0D, -10.0D)
+                                ))),
+                        ObjectVector.wrap(TupleVector.of(innerSchemaV1, List.of(
+                                vv(Type.Boolean, false),
+                                vv(Type.Double, 666.0D)
+                                ))),
+                        ObjectVector.wrap(TupleVector.of(innerSchemaV1, List.of(
+                                vv(Type.Boolean, false, null),
+                                vv(Type.Double, 7.0D, -13.0D)
+                                )))
+                )));
+        //@formatter:on
+
+        byte[] bytes = PayloadWriter.write(ValueVector.literalTable(vectorV1, 1));
+
+        VectorTestUtils.assertTupleVectorsEquals(vectorV1, PayloadReader.readTupleVector(bytes, schemaV1, false));
+
+        // Now change a column inside sub table
+
+        // @formatter:off
+        Schema innerSchemaV2 = Schema.of(
+                Column.of("subInteger", Column.Type.Int),
+                Column.of("subDouble", Column.Type.Double)
+                );
+
+        Schema schemaV2 = Schema.of(
+                Column.of("integer", Column.Type.Int),
+                Column.of("table", ResolvedType.object(innerSchemaV2)
+                ));
+
+        TupleVector vectorV2 = TupleVector.of(schemaV2, List.of(
+                vv(Type.Int, 1, 2, 3),
+                vv(ResolvedType.object(innerSchemaV2),
+                        ObjectVector.wrap(TupleVector.of(innerSchemaV2, List.of(
+                                vv(Type.Int, 1, null),
+                                vv(Type.Double, 1.0D, -10.0D)
+                                ))),
+                        ObjectVector.wrap(TupleVector.of(innerSchemaV2, List.of(
+                                vv(Type.Int, 2),
+                                vv(Type.Double, 666.0D)
+                                ))),
+                        ObjectVector.wrap(TupleVector.of(innerSchemaV2, List.of(
+                                vv(Type.Int, -30, 1337),
+                                vv(Type.Double, 7.0D, -13.0D)
+                                )))
+                )));
+        //@formatter:on
+
+        bytes = PayloadWriter.write(ValueVector.literalTable(vectorV2, 1));
+
+        // Verify current
+        VectorTestUtils.assertTupleVectorsEquals(vectorV2, PayloadReader.readTupleVector(bytes, schemaV2, false));
+
+        // Verify old schema against new vector
+        TupleVector actual = PayloadReader.readTupleVector(bytes, schemaV1, false);
+        // @formatter:off
+        Schema expectedInnerSchema = Schema.of(
+                // Old name but new type
+                Column.of("subBool", Column.Type.Int),
+                Column.of("subDouble", Column.Type.Double)
+                );
+        // Verify that the schema still is the same
+        assertEquals(schemaV1, actual.getSchema());
+
+        // But the vectors are of the payloads type
+        VectorTestUtils.assertVectorsEquals(vv(Type.Int, 1, 2, 3), actual.getColumn(0));
+        VectorTestUtils.assertVectorsEquals(vv(ResolvedType.object(expectedInnerSchema),
+                ObjectVector.wrap(TupleVector.of(expectedInnerSchema, List.of(
+                        vv(Type.Int, 1, null),
+                        vv(Type.Double, 1.0D, -10.0D)
+                        ))),
+                ObjectVector.wrap(TupleVector.of(expectedInnerSchema, List.of(
+                        vv(Type.Int, 2),
+                        vv(Type.Double, 666.0D)
+                        ))),
+                ObjectVector.wrap(TupleVector.of(expectedInnerSchema, List.of(
+                        vv(Type.Int, -30, 1337),
+                        vv(Type.Double, 7.0D, -13.0D)
+                        )))
+        ), actual.getColumn(1));
+    }
+
+    /** Test a migration flow where we obsolete old columns and the switches the data type */
+    @Test
+    public void test_schema_migration_flow()
+    {
+        // @formatter:off
+        Schema schemaV1 = Schema.of(
+                Column.of("integer", Column.Type.Int),
+                Column.of("float", Column.Type.Float),
+                Column.of("boolean", Column.Type.Boolean),
+                Column.of("array", ResolvedType.array(Column.Type.Float)),
+                Column.of("string1", Column.Type.String)
+                );
+
+        TupleVector vectorV1 = TupleVector.of(schemaV1,
+                asList(vv(Type.Int, 2, 1, 4, 3, 10),
+                        vv(Type.Float, 2.0F, 3.0F, null, 5.0F, 6.0F),
+                        vv(Type.Boolean, true, false, null, false, true),
+                        vv(ResolvedType.array(Column.Type.Float),
+                                vv(Type.Float, 1.0f, 2.0f),
+                                vv(Type.Float, 4.0f, 5.0f, 666.0f),
+                                vv(Type.Float, 6.0f, 7.0f),
+                                vv(Type.Float, 8.0f),
+                                vv(Type.Float, 10.0f, null)
+                                ),
+                        vv(Type.String, "one", "two", "three", null, "five")));
+        // @formatter:on
+
+        byte[] bytes = PayloadWriter.write(ValueVector.literalTable(vectorV1, 1));
+
+        VectorTestUtils.assertTupleVectorsEquals(vectorV1, PayloadReader.readTupleVector(bytes, schemaV1, false));
+        VectorTestUtils.assertTupleVectorsEquals(vectorV1, PayloadReader.readTupleVector(bytes, schemaV1, true));
+
+        // Now we want to obsolete the float array column and have a integer array instead
+        // First write new column along with old data
+
+        //@formatter:off
+        Schema schemaV2 = Schema.of(
+                Column.of("integer", Column.Type.Int),
+                Column.of("float", Column.Type.Float),
+                Column.of("boolean", Column.Type.Boolean),
+                Column.of("array", ResolvedType.array(Column.Type.Float)),
+                Column.of("string1", Column.Type.String),
+                Column.of("arrayInt", ResolvedType.array(Column.Type.Int))
+                );
+
+        TupleVector vectorV2 = TupleVector.of(schemaV2,
+                asList(vv(Type.Int, 2, 1, 4, 3, 10),
+                        vv(Type.Float, 2.0F, 3.0F, null, 5.0F, 6.0F),
+                        vv(Type.Boolean, true, false, null, false, true),
+                        vv(ResolvedType.array(Column.Type.Float),
+                                vv(Type.Float, 1.0f, 2.0f),
+                                vv(Type.Float, 4.0f, 5.0f, 666.0f),
+                                vv(Type.Float, 6.0f, 7.0f),
+                                vv(Type.Float, 8.0f),
+                                vv(Type.Float, 10.0f, null)
+                                ),
+                        vv(Type.String, "one", "two", "three", null, "five"),
+                        vv(ResolvedType.array(Column.Type.Int),
+                                vv(Type.Int, 1, 2),
+                                vv(Type.Int, 4, 5, 6),
+                                vv(Type.Int, 6, 7),
+                                vv(Type.Int, 8),
+                                vv(Type.Int, 10, null)
+                                )
+                        ));
+        //@formatter:off
+
+        // Write new payload with extra column
+        bytes = PayloadWriter.write(ValueVector.literalTable(vectorV2, 1));
+
+        // Verify that old version still works with new payload
+        VectorTestUtils.assertTupleVectorsEquals(vectorV1, PayloadReader.readTupleVector(bytes, schemaV1, false));
+
+        // Write new payload with new datatype on obsolete column
+        //@formatter:off
+        schemaV2 = Schema.of(
+                Column.of("integer", Column.Type.Int),
+                Column.of("float", Column.Type.Float),
+                Column.of("boolean", Column.Type.Boolean),
+                Column.of("string", Column.Type.String),
+                Column.of("string1", Column.Type.String),
+                Column.of("arrayInt", ResolvedType.array(Column.Type.Int))
+                );
+
+        vectorV2 = TupleVector.of(schemaV2,
+                asList(vv(Type.Int, 2, 1, 4, 3, 10),
+                        vv(Type.Float, 2.0F, 3.0F, null, 5.0F, 6.0F),
+                        vv(Type.Boolean, true, false, null, false, true),
+                        // Now we don't have an array of floats any more on this slot
+                        vv(Type.String, "hello", "world", null, "one", "two"),
+                        vv(Type.String, "one", "two", "three", null, "five"),
+                        vv(ResolvedType.array(Column.Type.Int),
+                                vv(Type.Int, 1, 2),
+                                vv(Type.Int, 4, 5, 6),
+                                vv(Type.Int, 6, 7),
+                                vv(Type.Int, 8),
+                                vv(Type.Int, 10, null)
+                                )
+                        ));
+        bytes = PayloadWriter.write(ValueVector.literalTable(vectorV2, 1));
+
+        // Verify that old version still works
+        TupleVector oldSchemaNewPayload = PayloadReader.readTupleVector(bytes, schemaV1, false);
+
+        // We should still have the input schema on the payload, this to be able to
+        // have correct schema according to a compiled query in PLB etc.
+        assertEquals(schemaV1, oldSchemaNewPayload.getSchema());
+
+        VectorTestUtils.assertVectorsEquals(vv(Type.Int, 2, 1, 4, 3, 10), oldSchemaNewPayload.getColumn(0));
+        VectorTestUtils.assertVectorsEquals(vv(Type.Float, 2.0F, 3.0F, null, 5.0F, 6.0F), oldSchemaNewPayload.getColumn(1));
+        VectorTestUtils.assertVectorsEquals(vv(Type.Boolean, true, false, null, false, true), oldSchemaNewPayload.getColumn(2));
+
+        // Now column 3 is a String vector even if the expected schema says array<int>
+        VectorTestUtils.assertVectorsEquals(vv(Type.String, "hello", "world", null, "one", "two"), oldSchemaNewPayload.getColumn(3));
+
+        // If we try to access the old schema type we will end up with an exception
+        // Hence it's important be make sure that these columns are not used in a non implicit cast way
+        try
+        {
+            oldSchemaNewPayload.getColumn(3).getArray(0);
+            fail("Should fail");
+        }
+        catch (IllegalArgumentException e)
+        {
+            assertTrue(e.getMessage(), e.getMessage().contains("Cannot cast String to Array"));
+        }
+
+        VectorTestUtils.assertVectorsEquals(vv(Type.String, "one", "two", "three", null, "five"), oldSchemaNewPayload.getColumn(4));
+
+        // Verify expansion as well
+        oldSchemaNewPayload = PayloadReader.readTupleVector(bytes, schemaV1, true);
+
+        assertEquals(Schema.of(
+                Column.of("integer", Column.Type.Int),
+                Column.of("float", Column.Type.Float),
+                Column.of("boolean", Column.Type.Boolean),
+                // This column is still called array in old schema but now the type is the payloads => String
+                Column.of("array", Column.Type.String),
+                Column.of("string1", Column.Type.String),
+                Column.of("array_5", ResolvedType.array(Column.Type.Int))
+                ), oldSchemaNewPayload.getSchema());
+
+        VectorTestUtils.assertVectorsEquals(vv(Type.Int, 2, 1, 4, 3, 10), oldSchemaNewPayload.getColumn(0));
+        VectorTestUtils.assertVectorsEquals(vv(Type.Float, 2.0F, 3.0F, null, 5.0F, 6.0F), oldSchemaNewPayload.getColumn(1));
+        VectorTestUtils.assertVectorsEquals(vv(Type.Boolean, true, false, null, false, true), oldSchemaNewPayload.getColumn(2));
+        // Now column 3 is a String vector even if the expected schema says array<int>
+        VectorTestUtils.assertVectorsEquals(vv(Type.String, "hello", "world", null, "one", "two"), oldSchemaNewPayload.getColumn(3));
+        VectorTestUtils.assertVectorsEquals(vv(Type.String, "one", "two", "three", null, "five"), oldSchemaNewPayload.getColumn(4));
+        VectorTestUtils.assertVectorsEquals(vv(ResolvedType.array(Column.Type.Int), vv(Type.Int, 1, 2),
+                vv(Type.Int, 4, 5, 6),
+                vv(Type.Int, 6, 7),
+                vv(Type.Int, 8),
+                vv(Type.Int, 10, null)), oldSchemaNewPayload.getColumn(5));
+        //@formatter:on
+
+        // Verify new schema works without any ignores
+        VectorTestUtils.assertTupleVectorsEquals(vectorV2, PayloadReader.readTupleVector(bytes, schemaV2, false));
+        VectorTestUtils.assertTupleVectorsEquals(vectorV2, PayloadReader.readTupleVector(bytes, schemaV2, true));
+
+        // Now we can undeploy old version and start using the new version fully
+        // and have now migrated data types of an existing column without any downtime
     }
 
     @Test
@@ -881,6 +1467,10 @@ public class PayloadWriterTest extends Assert
         assertEquals(80, bytes.length);
 
         actual = PayloadReader.readTupleVector(bytes, schema, false);
+
+        // Verify that the schema was not re-created
+        assertSame(schema, actual.getSchema());
+
         VectorTestUtils.assertTupleVectorsEquals(expected, actual);
 
         // Test with less columns without expand
@@ -893,6 +1483,7 @@ public class PayloadWriterTest extends Assert
         // @formatter:off
 
         actual = PayloadReader.readTupleVector(bytes, schema, false);
+        assertSame(schema, actual.getSchema());
 
         // @formatter:off
         expected = TupleVector.of(schema,

@@ -66,8 +66,70 @@ public class PayloadReader
     /**
      * Reads a tuple vector from provided payload. NOTE! Assumes the vector written are of type Table and of size 1
      *
+     * <pre>
+     * Migration strategy for reusing non used column slots.
+     * -----------------------------------------------------
+     *
+     * When doing development and re-modelling columns it's often the case that we end up with unused columns in the "middle".
+     * Ie.
+     *
+     * Table
+     *   - column1 INT
+     *   - column2 BOOL
+     *   - column3 STRING
+     *
+     * And later on column2 is wrong and we add a new column with correct data:
+     *
+     * Table
+     *   - column1 INT
+     *   - column2 BOOL  (now obsolete and unused)
+     *   - column3 STRING
+     *   - column4 INT   (corrected from column2)
+     *
+     * Now we have a correct model and everything is good, except that we have an unused column slot that is waste.
+     * In these cases we can make sure that the column in question is unused and then we are safe to change the type
+     * and payloadbuilder-bytes will transform the internal schema into the payloads type while still keeping the input schema
+     * as is. This to be consistent with resolved queries that expects a specific schema.
+     *
+     * This enables us to change a columns datatype/name as long as it's null or it's value can be implicitly cast to new type
+     *
+     * Ie.
+     *
+     * Original
+     *
+     * Table
+     *   - column1 INT
+     *   - column2 BOOL     (Unused)
+     *   - column3 STRING
+     *   - column4 INT
+     * 
+     * A new version is written that looks like this:
+     *
+     * Table
+     *   - column1       INT
+     *   - newFancyArray ARRAY[INT]  (Now used in new version of clients)
+     *   - column3       STRING
+     *   - column4       INT
+     *
+     * Old client versions uses the old schema will read payloads that results in:
+     *
+     * Table
+     *   - column1 INT
+     *   - column2 BOOL     (Unused)
+     *   - column3 STRING
+     *   - column4 INT
+     *
+     *   Internal types of the payload (this will be the actual types used)
+     *   - column1 INT
+     *   - column2 ARRAY[INT]     (Still unused but now has the type from the payload but with the old name, this is
+     *                            safe as long as we either don't use the column at all or the implicit cast will work
+     *                            ie. we changed from int to float then the query will read int and we will cast the float to an int.)
+     *   - column3 STRING
+     *   - column4 INT
+     * </pre>
+     *
      * @param bytes The payload
-     * @param schema Schema to use as a verification against the payload. If the schema's types differs from the payloads an exception is thrown.
+     * @param schema Schema to use as a verification against the payload. If the schema's types differs from the payloads then a new schema is created that matches the payloads.
      * @param expandSchema Set to true if columns that is not present in schema should be added. This is useful if one doesn't know know fully how the data looks and want to inspect.
      */
     public static TupleVector readTupleVector(byte[] bytes, Schema schema, boolean expandSchema)

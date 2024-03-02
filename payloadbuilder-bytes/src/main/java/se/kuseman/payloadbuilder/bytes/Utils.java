@@ -188,19 +188,21 @@ class Utils
     /**
      * Validates the provided resolved type against the payload's. Throwing if not equal. NOTE! On Table/Object types the schema does not need to be equal but those ordinals that exists must equal
      */
-    static int validateResolvedType(ByteBuffer buffer, int position, ResolvedType expected)
+    static int validateResolvedType(ByteBuffer buffer, int position, ResolvedType expected, BooleanReference typeMismatch)
     {
         // Read next type from buffer
         Type type = getType(buffer.get(position++));
         if (expected != null
                 && type != expected.getType())
         {
-            throw new IllegalArgumentException("Payload type was " + type + " but provided type was: " + expected);
+            // Flag that we have a mismatch to get used later on
+            typeMismatch.set(true);
         }
-        else if (type == Type.Array)
+
+        if (type == Type.Array)
         {
             position = validateResolvedType(buffer, position, expected != null ? expected.getSubType()
-                    : null);
+                    : null, typeMismatch);
         }
         else if (type == Type.Table
                 || type == Type.Object)
@@ -213,30 +215,33 @@ class Utils
             position += sizeOfVarInt(size);
             for (int i = 0; i < size; i++)
             {
-                ResolvedType expectedColumnType = i < expectedSize ? expectedSchema.getColumns()
+                Column expectedSubColumn = i < expectedSize ? expectedSchema.getColumns()
                         .get(i)
-                        .getType()
                         : null;
-                position = validateResolvedType(buffer, position, expectedColumnType);
+                ResolvedType expectedColumnType = expectedSubColumn != null ? expectedSubColumn.getType()
+                        : null;
+                position = validateResolvedType(buffer, position, expectedColumnType, typeMismatch);
             }
         }
         return position;
     }
 
     /** Validates and expands provided type against the buffers type */
-    static int expandType(ByteBuffer buffer, int position, ResolvedType expected, Reference<ResolvedType> ref)
+    static int expandType(ByteBuffer buffer, int position, ResolvedType expected, Reference<ResolvedType> ref, BooleanReference typeMismatch)
     {
         Type type = getType(buffer.get(position++));
         if (expected != null
                 && type != expected.getType())
         {
-            throw new IllegalArgumentException("Payload type was " + type + " but provided type was: " + expected);
+            // Flag that we have a mismatch to get used later on
+            typeMismatch.set(true);
         }
-        else if (type == Type.Array)
+
+        if (type == Type.Array)
         {
             Reference<ResolvedType> arrayType = new Reference<>();
             position = expandType(buffer, position, expected != null ? expected.getSubType()
-                    : null, arrayType);
+                    : null, arrayType, typeMismatch);
             ref.set(ResolvedType.array(arrayType.getValue()));
         }
         else if (type == Type.Table
@@ -269,7 +274,7 @@ class Utils
                 ResolvedType expectedColumnType = col.getType();
 
                 Reference<ResolvedType> result = new Reference<>();
-                position = expandType(buffer, position, expectedColumnType, result);
+                position = expandType(buffer, position, expectedColumnType, result, typeMismatch);
                 columns.add(Column.of(col.getName(), result.getValue()));
             }
 

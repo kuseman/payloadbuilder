@@ -31,7 +31,7 @@ class DateTimeVectorWriter extends AReferenceVectorWriter
     }
 
     @Override
-    protected int getAndCachedPosition(BytesWriter writer, WriteCache cache, ValueVector vector, int row)
+    protected int getAndCachePosition(BytesWriter writer, WriteCache cache, ValueVector vector, int row)
     {
         long value = vector.getDateTime(row)
                 .getEpoch();

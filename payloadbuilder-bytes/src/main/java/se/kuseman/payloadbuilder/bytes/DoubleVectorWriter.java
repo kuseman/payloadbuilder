@@ -29,7 +29,7 @@ class DoubleVectorWriter extends AReferenceVectorWriter
     }
 
     @Override
-    protected int getAndCachedPosition(BytesWriter writer, WriteCache cache, ValueVector vector, int row)
+    protected int getAndCachePosition(BytesWriter writer, WriteCache cache, ValueVector vector, int row)
     {
         double value = vector.getDouble(row);
         Integer position = cache.getDoublePosition(value);

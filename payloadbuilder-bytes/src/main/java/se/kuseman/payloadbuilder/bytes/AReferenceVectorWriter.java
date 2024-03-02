@@ -23,7 +23,7 @@ abstract class AReferenceVectorWriter implements VectorWriter
                 writer.position(valueOffset + AVector.REFERENCE_HEADER_SIZE);
 
                 // Get cached position
-                int position = getAndCachedPosition(writer, cache, vector, from);
+                int position = getAndCachePosition(writer, cache, vector, from);
                 writer.putInt(valueOffset, position);
                 return;
             }
@@ -53,7 +53,7 @@ abstract class AReferenceVectorWriter implements VectorWriter
                 continue;
             }
 
-            int position = getAndCachedPosition(writer, cache, vector, i);
+            int position = getAndCachePosition(writer, cache, vector, i);
             writer.putInt(headerOffset, position);
         }
     }
@@ -66,6 +66,6 @@ abstract class AReferenceVectorWriter implements VectorWriter
     /** Returns true if vector is literal */
     protected abstract boolean isLiteral(ValueVector vector, int from, int to);
 
-    /** Get and cached position of provided row */
-    protected abstract int getAndCachedPosition(BytesWriter writer, WriteCache cache, ValueVector vector, int row);
+    /** Get and cache position of provided row */
+    protected abstract int getAndCachePosition(BytesWriter writer, WriteCache cache, ValueVector vector, int row);
 }
