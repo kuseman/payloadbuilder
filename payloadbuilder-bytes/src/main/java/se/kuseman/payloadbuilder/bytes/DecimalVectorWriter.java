@@ -33,7 +33,7 @@ class DecimalVectorWriter extends AReferenceVectorWriter
     }
 
     @Override
-    protected int getAndCachedPosition(BytesWriter writer, WriteCache cache, ValueVector vector, int row)
+    protected int getAndCachePosition(BytesWriter writer, WriteCache cache, ValueVector vector, int row)
     {
         Decimal value = vector.getDecimal(row);
         Integer position = cache.getDecimalPosition(value);

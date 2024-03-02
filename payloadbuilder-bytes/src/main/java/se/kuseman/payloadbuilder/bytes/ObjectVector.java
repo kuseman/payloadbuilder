@@ -48,7 +48,7 @@ class ObjectVector implements ValueVector
     }
 
     /** Create tuple vector vector. */
-    static ValueVector getVector(ByteBuffer buffer, int position, ReadContext context, NullBuffer nullBuffer, ResolvedType type, byte version, int size)
+    static ValueVector getVector(ByteBuffer buffer, int position, ReadContext context, NullBuffer nullBuffer, ResolvedType type, ResolvedType payloadType, byte version, int size)
     {
         if (version != VERSION)
         {
@@ -63,7 +63,8 @@ class ObjectVector implements ValueVector
         int rowCount = Utils.readVarInt(buffer, position);
         position += Utils.sizeOfVarInt(rowCount);
 
-        TupleVector tupleVector = new BytesTupleVector(type.getSchema(), buffer, context, columnCount, rowCount, position);
+        TupleVector tupleVector = new BytesTupleVector(type.getSchema(), payloadType != null ? payloadType.getSchema()
+                : null, buffer, context, columnCount, rowCount, position);
 
         return new ObjectVector(nullBuffer, type, rowCount, tupleVector);
     }

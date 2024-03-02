@@ -30,7 +30,7 @@ class StringVectorWriter extends AReferenceVectorWriter
     }
 
     @Override
-    protected int getAndCachedPosition(BytesWriter writer, WriteCache cache, ValueVector vector, int row)
+    protected int getAndCachePosition(BytesWriter writer, WriteCache cache, ValueVector vector, int row)
     {
         UTF8String value = vector.getString(row);
         Integer position = cache.getStringPosition(value);

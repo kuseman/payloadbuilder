@@ -10,20 +10,22 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 class BytesTupleVector implements TupleVector
 {
     private final Schema schema;
+    private final Schema payloadSchema;
     private final ByteBuffer buffer;
     private final ReadContext context;
     private final int startPosition;
     private final int columnCount;
     private final int rowCount;
 
-    BytesTupleVector(Schema schema, ByteBuffer buffer, ReadContext context, int columnCount, int rowCount, int startPosition)
+    BytesTupleVector(Schema schema, Schema payloadSchema, ByteBuffer buffer, ReadContext context, int columnCount, int rowCount, int startPosition)
     {
+        this.schema = schema;
+        this.payloadSchema = payloadSchema;
         this.buffer = buffer;
         this.context = context;
         this.columnCount = columnCount;
         this.rowCount = rowCount;
         this.startPosition = startPosition;
-        this.schema = schema;
     }
 
     @Override
@@ -46,6 +48,12 @@ class BytesTupleVector implements TupleVector
 
         int columnOffset = startPosition + (column * AVector.REFERENCE_HEADER_SIZE);
         int columnDataPosition = buffer.getInt(columnOffset);
+
+        // Always use the payload schema if exists to be consistent with the payloads type
+        // These one can differ if the input schema doesn't match with the payloads
+        Schema schema = payloadSchema != null ? payloadSchema
+                : this.schema;
+
         return VectorFactory.getVector(buffer, columnDataPosition, context, schema.getColumns()
                 .get(column)
                 .getType());
