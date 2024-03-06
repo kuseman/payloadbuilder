@@ -2,6 +2,8 @@ package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Objects.requireNonNull;
 
+import java.nio.charset.StandardCharsets;
+
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
@@ -18,7 +20,7 @@ public class LiteralStringExpression extends LiteralExpression implements ILiter
 
     public LiteralStringExpression(String string)
     {
-        this(UTF8String.from(string));
+        this(UTF8String.utf8(string.getBytes(StandardCharsets.UTF_8)));
     }
 
     public LiteralStringExpression(UTF8String string)
