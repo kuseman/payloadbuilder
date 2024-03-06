@@ -152,79 +152,16 @@ public class OutputWriterUtils
                 writer.writeLong(vector.getLong(row));
                 break;
             case Decimal:
-                // TODO: add support for decimals in outputwriter
-                writer.writeValue(vector.getDecimal(row)
-                        .asBigDecimal());
-                break;
-            case Any:
-                // Runtime check of value
-
-                Object value = vector.getAny(row);
-                value = VectorUtils.convert(value);
-
-                // Reflectively check if the value is a vector of some sort
-                if (value instanceof ValueVector)
-                {
-                    write((ValueVector) value, writer, context);
-                }
-                else if (value instanceof ObjectVector)
-                {
-                    write((ObjectVector) value, writer, context);
-                }
-                else if (value instanceof TupleVector)
-                {
-                    write((TupleVector) value, writer, context, false);
-                }
-                else if (value instanceof Integer)
-                {
-                    writer.writeInt(((Integer) value).intValue());
-                }
-                else if (value instanceof Long)
-                {
-                    writer.writeLong(((Long) value).longValue());
-                }
-                else if (value instanceof Float)
-                {
-                    writer.writeFloat(((Float) value).floatValue());
-                }
-                else if (value instanceof Double)
-                {
-                    writer.writeDouble(((Double) value).doubleValue());
-                }
-                else if (value instanceof String
-                        || value instanceof UTF8String)
-                {
-                    writer.writeValue(String.valueOf(value));
-                }
-                else if (value instanceof Decimal)
-                {
-                    writer.writeValue(((Decimal) value).asBigDecimal());
-                }
-                else if (value instanceof EpochDateTime)
-                {
-                    writer.writeValue(((EpochDateTime) value).toString());
-                }
-                else if (value instanceof EpochDateTimeOffset)
-                {
-                    writer.writeValue(((EpochDateTimeOffset) value).toString());
-                }
-                else
-                {
-                    writer.writeValue(value);
-                }
+                writer.writeDecimal(vector.getDecimal(row));
                 break;
             case String:
-                // TODO: add support for UTF-8 bytes in outputwriter
-                writer.writeValue(vector.getString(row)
-                        .toString());
+                writer.writeString(vector.getString(row));
                 break;
             case DateTime:
-                writer.writeValue(vector.getDateTime(row)
-                        .toString());
+                writer.writeDateTime(vector.getDateTime(row));
                 break;
             case DateTimeOffset:
-                writer.writeValue(vector.getDateTimeOffset(row)
-                        .toString());
+                writer.writeDateTimeOffset(vector.getDateTimeOffset(row));
                 break;
             case Object:
                 ObjectVector object = vector.getObject(row);
@@ -237,6 +174,62 @@ public class OutputWriterUtils
             case Array:
                 ValueVector valueVector = vector.getArray(row);
                 write(valueVector, writer, context);
+                break;
+            case Any:
+                // Runtime check of value
+
+                Object value = vector.getAny(row);
+                value = VectorUtils.convert(value);
+
+                // Reflectively check if the value is a vector of some sort
+                if (value instanceof ValueVector vv)
+                {
+                    write(vv, writer, context);
+                }
+                else if (value instanceof ObjectVector ov)
+                {
+                    write(ov, writer, context);
+                }
+                else if (value instanceof TupleVector tv)
+                {
+                    write(tv, writer, context, false);
+                }
+                else if (value instanceof Integer i)
+                {
+                    writer.writeInt(i.intValue());
+                }
+                else if (value instanceof Long l)
+                {
+                    writer.writeLong(l.longValue());
+                }
+                else if (value instanceof Float f)
+                {
+                    writer.writeFloat(f.floatValue());
+                }
+                else if (value instanceof Double d)
+                {
+                    writer.writeDouble(d.doubleValue());
+                }
+                else if (value instanceof UTF8String s)
+                {
+                    writer.writeString(s);
+                }
+                else if (value instanceof Decimal dec)
+                {
+                    writer.writeDecimal(dec);
+                }
+                else if (value instanceof EpochDateTime dt)
+                {
+                    writer.writeDateTime(dt);
+                }
+                else if (value instanceof EpochDateTimeOffset dto)
+                {
+                    writer.writeDateTimeOffset(dto);
+                }
+                else
+                {
+                    writer.writeValue(value);
+                }
                 break;
             // NOTE!! No default case here
         }

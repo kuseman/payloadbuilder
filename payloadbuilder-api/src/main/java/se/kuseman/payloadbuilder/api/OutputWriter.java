@@ -1,5 +1,10 @@
 package se.kuseman.payloadbuilder.api;
 
+import se.kuseman.payloadbuilder.api.execution.Decimal;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
+
 /** Output writer that writes generated output */
 public interface OutputWriter
 {
@@ -43,6 +48,12 @@ public interface OutputWriter
     /** Write value */
     void writeValue(Object value);
 
+    /** Write null */
+    default void writeNull()
+    {
+        writeValue(null);
+    }
+
     /** Write int value */
     default void writeInt(int value)
     {
@@ -71,6 +82,30 @@ public interface OutputWriter
     default void writeBool(boolean value)
     {
         writeValue(value);
+    }
+
+    /** Write string value */
+    default void writeString(UTF8String string)
+    {
+        writeValue(string.toString());
+    }
+
+    /** Write decimal value */
+    default void writeDecimal(Decimal decimal)
+    {
+        writeValue(decimal.asBigDecimal());
+    }
+
+    /** Write datetime value */
+    default void writeDateTime(EpochDateTime datetime)
+    {
+        writeValue(datetime.toString());
+    }
+
+    /** Write datetimeoffset value */
+    default void writeDateTimeOffset(EpochDateTimeOffset datetimeOffset)
+    {
+        writeValue(datetimeOffset.toString());
     }
 
     /** Start object */
