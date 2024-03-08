@@ -20,10 +20,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
 import org.apache.hc.client5.http.config.RequestConfig;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
+import org.apache.hc.client5.http.impl.classic.RequestFailedException;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.ContentType;
-import org.apache.hc.core5.http.HttpException;
-import org.apache.hc.core5.http.io.HttpClientResponseHandler;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.util.Timeout;
 
@@ -124,40 +124,44 @@ class HttpDataSource implements IDatasource
         context.getSession()
                 .registerAbortListener(abortListener);
 
+        ClassicHttpResponse response = null;
         try
         {
-            return httpClient.execute(request, new HttpClientResponseHandler<TupleIterator>()
+            response = httpClient.execute(request);
+            if (response.getCode() != 200)
             {
-                @Override
-                public TupleIterator handleResponse(ClassicHttpResponse response) throws HttpException, IOException
+                if (!failOnNon200)
                 {
-                    if (response.getCode() != 200)
-                    {
-                        if (!failOnNon200)
-                        {
-                            return TupleIterator.EMPTY;
-                        }
-
-                        String error = IOUtils.toString(response.getEntity()
-                                .getContent(), StandardCharsets.UTF_8);
-                        throw new RuntimeException("Response was non 200. Code: " + response.getCode() + ", body: " + error);
-                    }
-
-                    for (IResponseTransformer transformer : responseTransformers)
-                    {
-                        if (transformer.canHandle(request, response))
-                        {
-                            return transformer.transform(request, response, context, options);
-                        }
-                    }
-
-                    return FALLBACK_TRANSFORMER.transform(request, response, context, options);
+                    EntityUtils.consumeQuietly(response.getEntity());
+                    return TupleIterator.EMPTY;
                 }
-            });
+
+                String error = IOUtils.toString(response.getEntity()
+                        .getContent(), StandardCharsets.UTF_8);
+                EntityUtils.consumeQuietly(response.getEntity());
+                throw new RuntimeException("Response was non 200. Code: " + response.getCode() + ", body: " + error);
+            }
+
+            for (IResponseTransformer transformer : responseTransformers)
+            {
+                if (transformer.canHandle(request, response))
+                {
+                    return transformer.transform(request, response, context, options);
+                }
+            }
+
+            return FALLBACK_TRANSFORMER.transform(request, response, context, options);
         }
         catch (IOException e)
         {
-            if (!failOnNon200)
+            if (response != null)
+            {
+                EntityUtils.consumeQuietly(response.getEntity());
+            }
+            if (!failOnNon200
+                    || (e instanceof RequestFailedException ex
+                            && ex.getMessage()
+                                    .contains("Request aborted")))
             {
                 return TupleIterator.EMPTY;
             }

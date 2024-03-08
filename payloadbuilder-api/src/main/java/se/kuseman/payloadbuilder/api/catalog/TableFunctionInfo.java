@@ -23,6 +23,14 @@ public abstract class TableFunctionInfo extends FunctionInfo
     /**
      * Return the schema for this function. NOTE! If schema cannot be resolved throw a {@link SchemaResolveException}
      */
+    public Schema getSchema(List<IExpression> arguments, List<Option> options)
+    {
+        return getSchema(arguments);
+    }
+
+    /**
+     * Return the schema for this function. NOTE! If schema cannot be resolved throw a {@link SchemaResolveException}
+     */
     public Schema getSchema(List<IExpression> arguments)
     {
         return Schema.EMPTY;

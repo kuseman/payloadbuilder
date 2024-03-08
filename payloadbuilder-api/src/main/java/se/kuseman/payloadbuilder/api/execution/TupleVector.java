@@ -66,6 +66,12 @@ public interface TupleVector
     Schema getSchema();
 
     /** Construct a {@link TupleVector} from provided columns and schema */
+    static TupleVector of(final Schema schema, final ValueVector... columns)
+    {
+        return of(schema, List.of(columns));
+    }
+
+    /** Construct a {@link TupleVector} from provided columns and schema */
     static TupleVector of(final Schema schema, final List<ValueVector> columns)
     {
         final int rowCount = columns.isEmpty() ? 0
@@ -85,7 +91,7 @@ public interface TupleVector
             if (schema.getColumns()
                     .size() != columnSize)
             {
-                throw new IllegalArgumentException("Schema column count doesn't match vector count.");
+                throw new IllegalArgumentException("Schema column count doesn't match vector count. Schema: " + schema.getSize() + ", vectors: " + columnSize);
             }
 
             for (int i = 0; i < columnSize; i++)

@@ -136,7 +136,7 @@ public class HashAggregate implements IPhysicalPlan
                                     return alias + ": " + ee.toString();
                                 })
                                 .collect(joining(", "))),
-                entry("Hash time", DurationFormatUtils.formatDurationHMS(hashTime)));
+                entry("Hash Time", DurationFormatUtils.formatDurationHMS(hashTime)));
     }
 
     @Override

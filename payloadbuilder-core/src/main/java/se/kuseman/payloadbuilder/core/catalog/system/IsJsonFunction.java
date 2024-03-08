@@ -21,7 +21,7 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 /** Checks if provided value is vaild json */
 class IsJsonFunction extends ScalarFunctionInfo
 {
-    private static ObjectMapper MAPPER = new ObjectMapper();
+    static ObjectMapper MAPPER = new ObjectMapper();
     static final ObjectReader READER = MAPPER.readerFor(Object.class);
     static final ObjectReader OBJECT_READER = MAPPER.readerFor(new TypeReference<Map<String, Object>>()
     {

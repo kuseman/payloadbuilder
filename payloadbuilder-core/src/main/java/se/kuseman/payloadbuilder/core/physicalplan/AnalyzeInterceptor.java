@@ -149,11 +149,13 @@ public class AnalyzeInterceptor implements IPhysicalPlan
         float percentageTime = 0;
         int executionCount = 0;
         long rowCount = 0;
+        long batchCount = 0;
 
         if (data != null)
         {
             executionCount = data.getExecutionCount();
             rowCount = data.getRowCount();
+            batchCount = data.getBatchCount();
             total = data.getNodeTime(TimeUnit.MILLISECONDS);
             totalAcc = total;
             // Remove the child times to get the actual time spent in this node
@@ -177,6 +179,7 @@ public class AnalyzeInterceptor implements IPhysicalPlan
         properties.put(DescribeUtils.TIME_SPENT, timeSpent);
         properties.put(DescribeUtils.EXECUTION_COUNT, executionCount);
         properties.put(DescribeUtils.PROCESSED_ROWS, rowCount);
+        properties.put(DescribeUtils.BATCH_COUNT, batchCount);
     }
 
     /** Analyze iterator */
@@ -197,6 +200,7 @@ public class AnalyzeInterceptor implements IPhysicalPlan
             TupleVector vector = it.next();
             data.suspenNodeTime();
             data.increaseRowCount(vector.getRowCount());
+            data.increaseBatchCount();
             return vector;
         }
 

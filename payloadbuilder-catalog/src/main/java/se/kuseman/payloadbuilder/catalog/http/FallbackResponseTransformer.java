@@ -8,6 +8,7 @@ import org.apache.commons.io.IOUtils;
 import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.Header;
+import org.apache.hc.core5.http.io.entity.EntityUtils;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -105,11 +106,14 @@ class FallbackResponseTransformer implements IResponseTransformer
                     };
                 }
             });
-
         }
         catch (IOException e)
         {
             throw new RuntimeException("Error extracting response body", e);
+        }
+        finally
+        {
+            EntityUtils.consumeQuietly(response.getEntity());
         }
     }
 

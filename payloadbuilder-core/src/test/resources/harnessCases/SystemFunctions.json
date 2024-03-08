@@ -131,16 +131,16 @@
       ],
       "expectedResultSets": [
         [
-          [{ "key": "Value", "value": "Lorem" }],
-          [{ "key": "Value", "value": "ipsum" }],
-          [{ "key": "Value", "value": "dolor" }],
-          [{ "key": "Value", "value": "sit"   }],
-          [{ "key": "Value", "value": "amet." }]
+          [{ "key": "Value", "value": "Lorem" }, { "key": "Ordinal", "value": 0}],
+          [{ "key": "Value", "value": "ipsum" }, { "key": "Ordinal", "value": 1}],
+          [{ "key": "Value", "value": "dolor" }, { "key": "Ordinal", "value": 2}],
+          [{ "key": "Value", "value": "sit"   }, { "key": "Ordinal", "value": 3}],
+          [{ "key": "Value", "value": "amet." }, { "key": "Ordinal", "value": 4}]
         ],
         [
-          [{ "key": "Value", "value": "Lorem ip"  }],
-          [{ "key": "Value", "value": "um dolor " }],
-          [{ "key": "Value", "value": "it amet."  }]
+          [{ "key": "Value", "value": "Lorem ip"  }, { "key": "Ordinal", "value": 0}],
+          [{ "key": "Value", "value": "um dolor " }, { "key": "Ordinal", "value": 1}],
+          [{ "key": "Value", "value": "it amet."  }, { "key": "Ordinal", "value": 2}]
         ]
       ]
     },

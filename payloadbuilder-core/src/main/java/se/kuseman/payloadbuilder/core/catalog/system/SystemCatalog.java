@@ -153,6 +153,9 @@ public class SystemCatalog extends Catalog
         // Table functions
         catalog.registerFunction(new RangeFunction());
         catalog.registerFunction(new StringSplitFunction());
+        catalog.registerFunction(new OpenJsonFunction());
+        catalog.registerFunction(new OpenCsvFunction());
+        catalog.registerFunction(new OpenXmlFunction());
 
         // Aggregate functions
         catalog.registerFunction(new AggregateAvgFunction());

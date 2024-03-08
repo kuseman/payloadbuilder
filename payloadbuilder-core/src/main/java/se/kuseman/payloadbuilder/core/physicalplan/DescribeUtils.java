@@ -24,18 +24,19 @@ import se.kuseman.payloadbuilder.core.common.DescribableNode;
 /** Utility class for building a describe result set */
 public class DescribeUtils
 {
-    public static final String LOGICAL_OPERATOR = "Logical operator";
+    public static final String LOGICAL_OPERATOR = "Logical Operator";
     public static final String POPULATING = "Populating";
-    public static final String BATCH_SIZE = "Batch size";
-    public static final String OUTER_VALUES = "Outer values";
-    public static final String INNER_VALUES = "Inner values";
-    public static final String TIME_SPENT = "Time spent";
-    public static final String TIME_SPENT_ACC = "Time spent (acc)";
-    public static final String EXECUTION_COUNT = "Execution count";
-    public static final String PROCESSED_ROWS = "Processed rows";
-    public static final String PREDICATE_TIME = "Predicate time";
-    public static final String OUTER_HASH_TIME = "Outer hash time";
-    public static final String INNER_HASH_TIME = "Inner hash time";
+    public static final String BATCH_SIZE = "Batch Size";
+    public static final String BATCH_COUNT = "Batch Count";
+    public static final String OUTER_VALUES = "Outer Values";
+    public static final String INNER_VALUES = "Inner Values";
+    public static final String TIME_SPENT = "Time Spent";
+    public static final String TIME_SPENT_ACC = "Time Spent (acc)";
+    public static final String EXECUTION_COUNT = "Execution Count";
+    public static final String PROCESSED_ROWS = "Processed Rows";
+    public static final String PREDICATE_TIME = "Predicate Time";
+    public static final String OUTER_HASH_TIME = "Outer Hash Time";
+    public static final String INNER_HASH_TIME = "Inner Hash Time";
 
     private DescribeUtils()
     {
@@ -98,7 +99,7 @@ public class DescribeUtils
         });
 
         // Insert first columns
-        describeColumns.addAll(0, asList("Node id", "Name"));
+        describeColumns.addAll(0, asList("Node Id", "Name"));
 
         final List<Object[]> rows = new ArrayList<>(describeRows.size());
         int size = describeColumns.size();

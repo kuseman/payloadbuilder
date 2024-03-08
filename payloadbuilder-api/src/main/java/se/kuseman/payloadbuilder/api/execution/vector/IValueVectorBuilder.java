@@ -16,4 +16,7 @@ public interface IValueVectorBuilder
 
     /** Put null into builder */
     void putNull();
+
+    /** Return size of builder */
+    int size();
 }

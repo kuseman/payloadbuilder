@@ -75,6 +75,12 @@ abstract class ABufferVectorBuilder implements IValueVectorBuilder
     @Override
     public abstract ValueVector build();
 
+    @Override
+    public int size()
+    {
+        return size;
+    }
+
     /** Put null is null buffer with replication count */
     protected void putNulls(boolean isNull, int replicationCount)
     {

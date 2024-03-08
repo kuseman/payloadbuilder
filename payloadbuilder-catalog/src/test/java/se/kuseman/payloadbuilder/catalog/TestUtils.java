@@ -31,6 +31,9 @@ import se.kuseman.payloadbuilder.api.execution.IStatementContext;
 import se.kuseman.payloadbuilder.api.execution.NodeData;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
+import se.kuseman.payloadbuilder.core.execution.vector.BufferAllocator;
+import se.kuseman.payloadbuilder.core.execution.vector.VectorBuilderFactory;
 
 /** Common test utils for catalog tests */
 public final class TestUtils
@@ -72,8 +75,10 @@ public final class TestUtils
         IQuerySession session = Mockito.mock(IQuerySession.class);
         IStatementContext statementContext = Mockito.mock(IStatementContext.class);
 
+        when(session.getSystemCatalog()).thenReturn(SystemCatalog.get());
         when(context.getSession()).thenReturn(session);
         when(context.getStatementContext()).thenReturn(statementContext);
+        when(context.getVectorBuilderFactory()).thenReturn(new VectorBuilderFactory(new BufferAllocator()));
         when(statementContext.getOrCreateNodeData(eq(nodeId), any(Supplier.class))).thenReturn(data);
 
         when(session.getGenericCache()).thenReturn(new GenericCache()

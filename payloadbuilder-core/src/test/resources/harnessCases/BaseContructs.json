@@ -469,10 +469,10 @@
       ],
       "expectedResultSets": [
         [
-          [{ "key": "Node id", "value": 3 }, { "key": "Name", "value": "+- Sort"                 }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash time", "value": null           }, { "key": "Order By", "value": "[d.id ASC]" }, { "key": "Predicate", "value": null              }],
-          [{ "key": "Node id", "value": 2 }, { "key": "Name", "value": "|  +- Filter"            }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": "__expr0 = 1"     }],
-          [{ "key": "Node id", "value": 1 }, { "key": "Name", "value": "|     +- Hash Aggregate" }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": "__expr0: count(1)" }, { "key": "Group By", "value": "[d.id]" }, { "key": "Hash time", "value": "00:00:00.000" }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
-          [{ "key": "Node id", "value": 0 }, { "key": "Name", "value": "|        +- Scan: data"  }, { "key": "Output", "value": "id (Any), row_id (Any), data (Any)" }, { "key": "Catalog", "value": "Test#c" }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }]
+          [{ "key": "Node Id", "value": 3 }, { "key": "Name", "value": "+- Sort"                 }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": "[d.id ASC]" }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 2 }, { "key": "Name", "value": "|  +- Filter"            }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": "__expr0 = 1"     }],
+          [{ "key": "Node Id", "value": 1 }, { "key": "Name", "value": "|     +- Hash Aggregate" }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": "__expr0: count(1)" }, { "key": "Group By", "value": "[d.id]" }, { "key": "Hash Time", "value": "00:00:00.000" }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 0 }, { "key": "Name", "value": "|        +- Scan: data"  }, { "key": "Output", "value": "id (Any), row_id (Any), data (Any)" }, { "key": "Catalog", "value": "Test#c" }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }]
         ]
       ]
     },
@@ -492,10 +492,10 @@
       ],
       "expectedResultSets": [
         [
-          [{ "key": "Node id", "value": 3 }, { "key": "Name", "value": "+- Sort"                 }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash time", "value": null           }, { "key": "Order By", "value": "[d.id ASC]" }, { "key": "Predicate", "value": null              }],
-          [{ "key": "Node id", "value": 2 }, { "key": "Name", "value": "|  +- Filter"            }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": "__expr0 = 1"     }],
-          [{ "key": "Node id", "value": 1 }, { "key": "Name", "value": "|     +- Hash Aggregate" }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": "__expr0: count(1)" }, { "key": "Group By", "value": "[d.id]" }, { "key": "Hash time", "value": "00:00:00.000" }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
-          [{ "key": "Node id", "value": 0 }, { "key": "Name", "value": "|        +- Scan: data"  }, { "key": "Output", "value": "id (Any), row_id (Any), data (Any)" }, { "key": "Catalog", "value": "Test#c" }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }]
+          [{ "key": "Node Id", "value": 3 }, { "key": "Name", "value": "+- Sort"                 }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": "[d.id ASC]" }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 2 }, { "key": "Name", "value": "|  +- Filter"            }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": "__expr0 = 1"     }],
+          [{ "key": "Node Id", "value": 1 }, { "key": "Name", "value": "|     +- Hash Aggregate" }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": "__expr0: count(1)" }, { "key": "Group By", "value": "[d.id]" }, { "key": "Hash Time", "value": "00:00:00.000" }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 0 }, { "key": "Name", "value": "|        +- Scan: data"  }, { "key": "Output", "value": "id (Any), row_id (Any), data (Any)" }, { "key": "Catalog", "value": "Test#c" }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }]
         ]
       ]
     },
@@ -513,10 +513,10 @@
       ],
       "expectedResultSets": [
         [
-          [{ "key": "Node id", "value": 3 }, { "key": "Name", "value": "+- Sort"                 }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash time", "value": null           }, { "key": "Order By", "value": "[d.id ASC]" }, { "key": "Predicate", "value": null              }],
-          [{ "key": "Node id", "value": 2 }, { "key": "Name", "value": "|  +- Filter"            }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": "__expr0 = 1"     }],
-          [{ "key": "Node id", "value": 1 }, { "key": "Name", "value": "|     +- Hash Aggregate" }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": "__expr0: count(1)" }, { "key": "Group By", "value": "[d.id]" }, { "key": "Hash time", "value": "00:00:00.000" }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
-          [{ "key": "Node id", "value": 0 }, { "key": "Name", "value": "|        +- Scan: data"  }, { "key": "Output", "value": "d (Any)"                            }, { "key": "Catalog", "value": "Test#c" }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }]
+          [{ "key": "Node Id", "value": 3 }, { "key": "Name", "value": "+- Sort"                 }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": "[d.id ASC]" }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 2 }, { "key": "Name", "value": "|  +- Filter"            }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": "__expr0 = 1"     }],
+          [{ "key": "Node Id", "value": 1 }, { "key": "Name", "value": "|     +- Hash Aggregate" }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": "__expr0: count(1)" }, { "key": "Group By", "value": "[d.id]" }, { "key": "Hash Time", "value": "00:00:00.000" }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 0 }, { "key": "Name", "value": "|        +- Scan: data"  }, { "key": "Output", "value": "d (Any)"                            }, { "key": "Catalog", "value": "Test#c" }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }]
         ]
       ]
     },
@@ -1441,6 +1441,9 @@
           [{"key":"name","value": "min"},                 {"key":"type","value": "SCALAR_AGGREGATE"}, {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "object"},              {"key":"type","value": "SCALAR_AGGREGATE"}, {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "sum"},                 {"key":"type","value": "SCALAR_AGGREGATE"}, {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "opencsv"},             {"key":"type","value": "TABLE"},            {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "openjson"},            {"key":"type","value": "TABLE"},            {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "openxml"},             {"key":"type","value": "TABLE"},            {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "range"},               {"key":"type","value": "TABLE"},            {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "string_split"},        {"key":"type","value": "TABLE"},            {"key":"description","value": "###IGNORE###"}]
         ]
@@ -1518,6 +1521,51 @@
       ],
       "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
       "expectedMessageContains": "x.value cannot be bound"
+    },
+    {
+      "name": "OpenCsv",
+      "query": [
+        "select * ",
+        "from opencsv('col1,col2,col3",
+        "1,hello world,3",
+        "4,hello world 2,6",
+        "') x "
+      ],
+      "expectedResultSets": [
+        [
+          [{"key":"col1","value": "1"}, {"key":"col2","value": "hello world"}, {"key":"col3","value": "3"}],
+          [{"key":"col1","value": "4"}, {"key":"col2","value": "hello world 2"}, {"key":"col3","value": "6"}]
+        ]
+      ]
+    },
+    {
+      "name": "OpenCsv with custom separator",
+      "query": [
+        "select * ",
+        "from opencsv('col1;col2;col3",
+        "1;hello world;3",
+        "4;\"hello ;world 2\";6",
+        "') x with (columnseparator = ';') "
+      ],
+      "expectedResultSets": [
+        [
+          [{"key":"col1","value": "1"}, {"key":"col2","value": "hello world"}, {"key":"col3","value": "3"}],
+          [{"key":"col1","value": "4"}, {"key":"col2","value": "hello ;world 2"}, {"key":"col3","value": "6"}]
+        ]
+      ]
+    },
+    {
+      "name": "OpenJson",
+      "query": [
+        "select * ",
+        "from openjson('[{\"col1\":\"1\",\"col2\":\"hello world\",\"col3\":3},{\"col1\":\"4\",\"col2\":\"hello \\\" world 2\",\"col3\":6}]') x"
+      ],
+      "expectedResultSets": [
+        [
+          [{"key":"col1","value": "1"}, {"key":"col2","value": "hello world"}, {"key":"col3","value": 3}],
+          [{"key":"col1","value": "4"}, {"key":"col2","value": "hello \" world 2"}, {"key":"col3","value": 6}]
+        ]
+      ]
     }
   ]
 }

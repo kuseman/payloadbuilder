@@ -37,6 +37,7 @@ import se.kuseman.payloadbuilder.core.cache.InMemoryGenericCache;
 import se.kuseman.payloadbuilder.core.cache.InMemoryTempTableCache;
 import se.kuseman.payloadbuilder.core.cache.TempTableCache;
 import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
+import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 import se.kuseman.payloadbuilder.core.expression.VariableExpression;
 import se.kuseman.payloadbuilder.core.utils.WeakListenerList;
 
@@ -89,6 +90,12 @@ public class QuerySession implements IQuerySession
                 .stream()
                 .collect(toMap(k -> QualifiedName.of(k.getKey()
                         .toLowerCase()), v -> ValueVector.literalAny(v.getValue())));
+    }
+
+    @Override
+    public Catalog getSystemCatalog()
+    {
+        return SystemCatalog.get();
     }
 
     /** Get default catalog for this session */

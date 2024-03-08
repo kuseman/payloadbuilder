@@ -19,7 +19,7 @@
         <junit.version>4.13.1</junit.version>
         <mockito-core.version>4.3.1</mockito-core.version>
         <spotless.version>2.39.0</spotless.version>
-        <jackson.version>2.15.2</jackson.version>
+        <jackson.version>2.16.1</jackson.version>
         <commons-io.version>2.13.0</commons-io.version>
         <commons-lang3.version>3.13.0</commons-lang3.version>
         <commons-collections4.version>4.4</commons-collections4.version>
@@ -103,6 +103,11 @@
             <dependency>
                 <groupId>com.fasterxml.jackson.core</groupId>
                 <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.dataformat</groupId>
+                <artifactId>jackson-dataformat-csv</artifactId>
                 <version>${jackson.version}</version>
             </dependency>
             <dependency>
