@@ -83,7 +83,7 @@ public class VectorTestUtils extends Assert
         for (int j = 0; j < e.getSchema()
                 .getSize(); j++)
         {
-            assertVectorsEquals(message, e.getColumn(j), a.getColumn(j));
+            assertVectorsEquals(message + " Column(" + j + ") ", e.getColumn(j), a.getColumn(j));
         }
     }
 

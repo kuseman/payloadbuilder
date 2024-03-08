@@ -5,6 +5,8 @@ import static se.kuseman.payloadbuilder.api.utils.MapUtils.entry;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
+import java.util.Map;
+
 import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
@@ -83,6 +85,22 @@ public class ToTableFunctionTest extends APhysicalPlanTest
                 null,
                 TupleVector.of(expectedSchema, asList(vv(Type.Any, 123)))
                 ), actual);
+        //@formatter:on
+    }
+
+    @Test
+    public void test_mixed_values()
+    {
+        TupleVector input = TupleVector.of(Schema.of(Column.of("col", ResolvedType.of(Type.Any))), asList(vv(Type.Any, vv(Type.Any, 1, true, null, ofEntries(entry("key", 123))))));
+
+        Schema expectedSchema = Schema.of(Column.of("Value", ResolvedType.of(Type.Any)));
+
+        ValueVector actual = function.evalScalar(context, input, "", asList(ce("col")));
+
+        //@formatter:off
+        VectorTestUtils.assertTupleVectorsEquals(TupleVector.of(expectedSchema, asList(
+                vv(Type.Any, 1, true, null, Map.of("key", 123))
+                )), actual.getTable(0));
         //@formatter:on
     }
 }

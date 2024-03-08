@@ -1,7 +1,11 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
+import static org.apache.commons.lang3.StringUtils.isBlank;
+
 import java.util.List;
 import java.util.Optional;
+
+import org.apache.commons.lang3.StringUtils;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -14,12 +18,14 @@ import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IIntVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Table valued function that splits a string and returns a table from the splitted result */
 class StringSplitFunction extends TableFunctionInfo
 {
-    private static final Schema SCHEMA = Schema.of(Column.of("Value", ResolvedType.of(Type.String)));
+    private static final Schema SCHEMA = Schema.of(Column.of("Value", ResolvedType.of(Type.String)), Column.of("Ordinal", ResolvedType.of(Type.Int)));
 
     StringSplitFunction()
     {
@@ -54,54 +60,28 @@ class StringSplitFunction extends TableFunctionInfo
 
         String strValue = value.getString(0)
                 .toString();
+
+        if (isBlank(strValue))
+        {
+            return TupleIterator.EMPTY;
+        }
+
         String strSeparator = separator.getString(0)
                 .toString();
-        final String[] parts = strValue.split(strSeparator);
+        String[] parts = StringUtils.split(strValue, strSeparator);
 
-        return TupleIterator.singleton(new TupleVector()
+        int length = parts.length;
+        IIntVectorBuilder ordinalBuilder = context.getVectorBuilderFactory()
+                .getIntVectorBuilder(length);
+        IObjectVectorBuilder valueBuilder = context.getVectorBuilderFactory()
+                .getObjectVectorBuilder(ResolvedType.of(Type.String), length);
+
+        for (int i = 0; i < length; i++)
         {
-            @Override
-            public Schema getSchema()
-            {
-                return schema.get();
-            }
+            ordinalBuilder.put(i);
+            valueBuilder.put(UTF8String.from(parts[i]));
+        }
 
-            @Override
-            public int getRowCount()
-            {
-                return parts.length;
-            }
-
-            @Override
-            public ValueVector getColumn(int column)
-            {
-                return new ValueVector()
-                {
-                    @Override
-                    public ResolvedType type()
-                    {
-                        return ResolvedType.of(Type.String);
-                    }
-
-                    @Override
-                    public int size()
-                    {
-                        return parts.length;
-                    }
-
-                    @Override
-                    public boolean isNull(int row)
-                    {
-                        return false;
-                    }
-
-                    @Override
-                    public UTF8String getString(int row)
-                    {
-                        return UTF8String.from(parts[row]);
-                    }
-                };
-            }
-        });
+        return TupleIterator.singleton(TupleVector.of(schema.get(), List.of(valueBuilder.build(), ordinalBuilder.build())));
     }
 }

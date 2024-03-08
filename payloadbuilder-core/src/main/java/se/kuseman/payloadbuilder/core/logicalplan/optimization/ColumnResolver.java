@@ -437,7 +437,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         Schema schema = Schema.EMPTY;
         try
         {
-            schema = function.getSchema(expressions);
+            schema = function.getSchema(expressions, plan.getOptions());
         }
         catch (SchemaResolveException e)
         {

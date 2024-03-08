@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.api.execution;
 import java.io.IOException;
 import java.io.Writer;
 
+import se.kuseman.payloadbuilder.api.catalog.Catalog;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -10,6 +11,9 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 /** Definition of a query session. */
 public interface IQuerySession
 {
+    /** Returns the system catalog */
+    Catalog getSystemCatalog();
+
     /** Get the current default catalog alias */
     String getDefaultCatalogAlias();
 

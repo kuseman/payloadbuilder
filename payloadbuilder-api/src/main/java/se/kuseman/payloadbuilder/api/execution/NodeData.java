@@ -13,6 +13,7 @@ public class NodeData
     private Duration nodeTimeDuration;
     private int executionCount;
     private long rowCount;
+    private long batchCount;
 
     /**
      * <pre>
@@ -98,5 +99,15 @@ public class NodeData
     public void increaseRowCount(int delta)
     {
         rowCount += delta;
+    }
+
+    public long getBatchCount()
+    {
+        return batchCount;
+    }
+
+    public void increaseBatchCount()
+    {
+        batchCount++;
     }
 }

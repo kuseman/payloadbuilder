@@ -104,7 +104,7 @@ public class HttpCatalog extends Catalog
 
     public HttpCatalog()
     {
-        this(List.of(new JsonResponseTransformer()));
+        this(List.of(new JsonResponseTransformer(), new CsvResponseTransformer(), new XmlResponseTransformer()));
     }
 
     public HttpCatalog(List<IResponseTransformer> responseTransformers)

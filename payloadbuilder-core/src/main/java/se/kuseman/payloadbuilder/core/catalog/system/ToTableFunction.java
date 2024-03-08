@@ -3,10 +3,8 @@ package se.kuseman.payloadbuilder.core.catalog.system;
 import static java.util.stream.Collectors.toList;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -14,6 +12,7 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
 import se.kuseman.payloadbuilder.api.execution.ObjectVector;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
@@ -121,96 +120,61 @@ class ToTableFunction extends ScalarFunctionInfo
         };
     }
 
+    @SuppressWarnings("unchecked")
     private TupleVector convert(ValueVector array, Object resultValue)
     {
-        // See if the vector consist of Map's or null then we can transform those into a Table
+        // If all items are maps we create a table with the union of all columns
+        // else we add all values to a single Value column
         int size = array.size();
-        List<Map<String, Object>> maps = new ArrayList<>(size);
+        List<Object> values = new ArrayList<>(size);
+        boolean allMaps = true;
         for (int j = 0; j < size; j++)
         {
             Object el = array.valueAsObject(j);
-            if (el == null)
-            {
-                continue;
-            }
-            else if (el instanceof Map)
-            {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> map = (Map<String, Object>) el;
-                maps.add(map);
-            }
-            else
-            {
-                throw new IllegalArgumentException("Cannot cast " + resultValue + " to " + Column.Type.Table);
-            }
+            values.add(el);
+            allMaps = allMaps
+                    && el instanceof Map;
         }
 
-        if (maps.isEmpty())
+        if (values.isEmpty())
         {
             return TupleVector.EMPTY;
         }
 
-        Set<String> columns = new LinkedHashSet<>();
-
-        for (Map<String, Object> map : maps)
+        final boolean maps;
+        final List<String> columns;
+        if (allMaps)
         {
-            columns.addAll(map.keySet());
+            columns = values.stream()
+                    .map(m -> (Map<String, Object>) m)
+                    .flatMap(m -> m.keySet()
+                            .stream())
+                    .distinct()
+                    .collect(toList());
+            maps = true;
+        }
+        else
+        {
+            columns = List.of("Value");
+            maps = false;
         }
 
+        final List<Object> theBatch = values;
         final Schema schema = new Schema(columns.stream()
-                .map(c -> Column.of(c, ResolvedType.of(Type.Any)))
-                .collect(toList()));
-        final int rowCount = maps.size();
+                .map(c -> new Column(c, ResolvedType.of(Type.Any)))
+                .toList());
 
-        return new TupleVector()
+        return new ObjectTupleVector(schema, values.size(), (row, col) ->
         {
-            @Override
-            public Schema getSchema()
+            Object rowValue = theBatch.get(row);
+
+            if (maps)
             {
-                return schema;
+                String columnName = columns.get(col);
+                return ((Map<String, Object>) rowValue).get(columnName);
             }
 
-            @Override
-            public int getRowCount()
-            {
-                return rowCount;
-            }
-
-            @Override
-            public ValueVector getColumn(int column)
-            {
-                final String name = schema.getColumns()
-                        .get(column)
-                        .getName();
-
-                return new ValueVector()
-                {
-                    @Override
-                    public ResolvedType type()
-                    {
-                        return ResolvedType.of(Type.Any);
-                    }
-
-                    @Override
-                    public int size()
-                    {
-                        return rowCount;
-                    }
-
-                    @Override
-                    public boolean isNull(int row)
-                    {
-                        return getAny(row) == null;
-                    }
-
-                    @Override
-                    public Object getAny(int row)
-                    {
-                        return maps.get(row)
-                                .get(name);
-                    }
-                };
-            }
-        };
+            return rowValue;
+        });
     }
 }

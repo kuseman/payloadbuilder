@@ -11,6 +11,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockserver.integration.ClientAndServer.startClientAndServer;
+import static se.kuseman.payloadbuilder.test.ExpressionTestUtils.createStringExpression;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.util.ArrayList;
@@ -49,6 +50,7 @@ import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.SeekType;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.ILiteralStringExpression;
 import se.kuseman.payloadbuilder.catalog.TestUtils;
 import se.kuseman.payloadbuilder.test.ExpressionTestUtils;
@@ -181,7 +183,7 @@ public class HttpCatalogTest
         DatasourceData data = new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(),
                 List.of(new Option(QualifiedName.of(HttpCatalog.METHOD), ExpressionTestUtils.createStringExpression("post")),
                         new Option(QualifiedName.of(HttpCatalog.BODY_PATTERN), ExpressionTestUtils.createStringExpression("{\"keys\":[{{key}}]}")),
-                        new Option(QualifiedName.of(JsonResponseTransformer.RESPONSE_PATH), ExpressionTestUtils.createStringExpression("/ids"))));
+                        new Option(QualifiedName.of("jsonpath"), ExpressionTestUtils.createStringExpression("/ids"))));
 
         QualifiedName table = QualifiedName.of("http://localhost:" + mockServer.getPort());
 
@@ -459,6 +461,40 @@ public class HttpCatalogTest
     }
 
     @Test
+    public void test_query_function_no_server()
+    {
+        TableFunctionInfo function = catalog.getTableFunction("query");
+        assertEquals(Arity.ONE, function.arity());
+
+        IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
+        IDatasourceOptions options = TestUtils.mockOptions(500);
+
+        try
+        {
+            function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:12345")), options);
+            fail("Should fail");
+        }
+        catch (RuntimeException e)
+        {
+            assertTrue(e.getMessage(), e.getMessage()
+                    .contains("Error performing HTTP request"));
+        }
+    }
+
+    @Test
+    public void test_query_function_no_server_dont_fail()
+    {
+        TableFunctionInfo function = catalog.getTableFunction("query");
+        assertEquals(Arity.ONE, function.arity());
+
+        IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
+        IDatasourceOptions options = TestUtils.mockOptions(500, asList(new Option(HttpCatalog.FAIL_ON_NON_200, ExpressionTestUtils.createStringExpression("false"))));
+
+        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:12345")), options);
+        assertFalse(it.hasNext());
+    }
+
+    @Test
     public void test_query_function_non_200_dont_fail()
     {
         Expectation[] mocks = mockServer.when(HttpRequest.request("/")
@@ -492,16 +528,23 @@ public class HttpCatalogTest
 
         TableFunctionInfo function = catalog.getTableFunction("query");
 
-        ILiteralStringExpression x_header_expression = ExpressionTestUtils.createStringExpression("custom-value");
+        ILiteralStringExpression x_headerExpression = ExpressionTestUtils.createStringExpression("custom-value");
+        ILiteralStringExpression methodExpression = ExpressionTestUtils.createStringExpression("post");
+        ILiteralStringExpression bodyExpression = ExpressionTestUtils.createStringExpression(body);
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
         IDatasourceOptions options = Mockito.mock(IDatasourceOptions.class);
-        Mockito.when(options.getOption(QualifiedName.of(HttpCatalog.METHOD), context))
-                .thenReturn(vv(Type.String, "post"));
-        Mockito.when(options.getOption(QualifiedName.of(QueryFunction.BODY), context))
-                .thenReturn(vv(Type.String, body));
+
+        //@formatter:off
         Mockito.when(options.getOptions())
-                .thenReturn(List.of(new Option(QualifiedName.of(HttpCatalog.HEADER, "x-header"), x_header_expression)));
+            .thenReturn(List.of(
+                    new Option(HttpCatalog.METHOD, methodExpression),
+                    new Option(QueryFunction.BODY, bodyExpression),
+                    new Option(QualifiedName.of(HttpCatalog.HEADER, "x-header"), x_headerExpression))
+                    );
+        Mockito.when(options.getOption(any(), any())).thenCallRealMethod();
+        Mockito.when(options.getBatchSize(any())).thenReturn(500);
+        //@formatter:on
 
         TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort() + "/api")), options);
 
@@ -538,20 +581,26 @@ public class HttpCatalogTest
 
         TableFunctionInfo function = catalog.getTableFunction("query");
 
-        ILiteralStringExpression x_header_expression = ExpressionTestUtils.createStringExpression("custom-value");
+        ILiteralStringExpression x_headerExpression = ExpressionTestUtils.createStringExpression("custom-value");
+        ILiteralStringExpression methodExpression = ExpressionTestUtils.createStringExpression("post");
+        ILiteralStringExpression bodyExpression = ExpressionTestUtils.createStringExpression(body);
+        ILiteralStringExpression jsonpathExpression = ExpressionTestUtils.createStringExpression("/docs");
 
         IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
         IDatasourceOptions options = Mockito.mock(IDatasourceOptions.class);
-        Mockito.when(options.getOption(QualifiedName.of(HttpCatalog.METHOD), context))
-                .thenReturn(vv(Type.String, "post"));
-        Mockito.when(options.getOption(JsonResponseTransformer.RESPONSE_PATH, context))
-                .thenReturn(vv(Type.String, "/docs"));
-        Mockito.when(options.getOption(QualifiedName.of(QueryFunction.BODY), context))
-                .thenReturn(vv(Type.String, body));
+        //@formatter:off
         Mockito.when(options.getOptions())
-                .thenReturn(List.of(new Option(QualifiedName.of(HttpCatalog.HEADER, "x-header"), x_header_expression)));
+            .thenReturn(List.of(
+                    new Option(HttpCatalog.METHOD, methodExpression),
+                    new Option(QualifiedName.of("jsonpath"), jsonpathExpression),
+                    new Option(QueryFunction.BODY, bodyExpression),
+                    new Option(QualifiedName.of(HttpCatalog.HEADER, "x-header"), x_headerExpression))
+                    );
+        Mockito.when(options.getOption(any(), any())).thenCallRealMethod();
+        Mockito.when(options.getBatchSize(any())).thenReturn(500);
+        //@formatter:on
 
-        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(ExpressionTestUtils.createStringExpression("http://localhost:" + mockServer.getPort() + "/api")), options);
+        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(createStringExpression("http://localhost:" + mockServer.getPort() + "/api")), options);
 
         int rowCount = 0;
         while (it.hasNext())
@@ -567,6 +616,156 @@ public class HttpCatalogTest
             //@formatter:on
             rowCount += v.getRowCount();
         }
+        it.close();
+        assertEquals(2, rowCount);
+
+        mockServer.verify(mocks[0].getId());
+    }
+
+    @Test
+    public void test_query_function_csv_response_transformer()
+    {
+        Expectation[] mocks = mockServer.when(HttpRequest.request("/csv")
+                .withMethod("get"))
+                .respond(HttpResponse.response("""
+                        key,key2
+                        123,456
+                        -120,hello world
+                        """)
+                        .withHeader("Content-Type", "text/csv"));
+
+        TableFunctionInfo function = catalog.getTableFunction("query");
+
+        IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
+        IDatasourceOptions options = Mockito.mock(IDatasourceOptions.class);
+        //@formatter:off
+        Mockito.when(options.getOptions())
+            .thenReturn(List.of());
+        Mockito.when(options.getOption(any(), any())).thenCallRealMethod();
+        Mockito.when(options.getBatchSize(any())).thenReturn(500);
+        //@formatter:on
+
+        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(createStringExpression("http://localhost:" + mockServer.getPort() + "/csv")), options);
+
+        int rowCount = 0;
+        while (it.hasNext())
+        {
+            TupleVector v = it.next();
+
+            //@formatter:off
+            VectorTestUtils.assertTupleVectorsEquals(TupleVector.of(Schema.of(Column.of("key", Type.String), Column.of("key2", Type.String)), List.of(
+                    vv(Type.String, "123", "-120"),
+                    vv(Type.String, "456", "hello world")
+                    ))
+                    , v);
+            //@formatter:on
+            rowCount += v.getRowCount();
+        }
+        it.close();
+        assertEquals(2, rowCount);
+
+        mockServer.verify(mocks[0].getId());
+    }
+
+    @Test
+    public void test_query_function_xml_response_transformer()
+    {
+        Expectation[] mocks = mockServer.when(HttpRequest.request("/xml")
+                .withMethod("get"))
+                .respond(HttpResponse.response("""
+                        <keys>
+                        <key>
+                            <key>123</key>
+                            <key2>456</key2>
+                        </key>
+                        <key>
+                            <key>-120</key>
+                            <key2>hello world</key2>
+                        </key>
+                        </keys>
+                        """)
+                        .withHeader("Content-Type", "text/xml"));
+
+        TableFunctionInfo function = catalog.getTableFunction("query");
+
+        IExpression xmlPathExpression = createStringExpression("/keys/key");
+        IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
+        IDatasourceOptions options = Mockito.mock(IDatasourceOptions.class);
+        //@formatter:off
+        Mockito.when(options.getOptions())
+            .thenReturn(List.of(
+                    new Option(QualifiedName.of("xmlpath"), xmlPathExpression)
+                    ));
+        Mockito.when(options.getOption(any(), any())).thenCallRealMethod();
+        Mockito.when(options.getBatchSize(any())).thenReturn(500);
+        //@formatter:on
+
+        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(createStringExpression("http://localhost:" + mockServer.getPort() + "/xml")), options);
+
+        int rowCount = 0;
+        while (it.hasNext())
+        {
+            TupleVector v = it.next();
+
+            //@formatter:off
+            VectorTestUtils.assertTupleVectorsEquals(TupleVector.of(Schema.of(Column.of("key", Type.Any), Column.of("key2", Type.Any)), List.of(
+                    vv(Type.Any, "123", "-120"),
+                    vv(Type.Any, "456", "hello world")
+                    ))
+                    , v);
+            //@formatter:on
+            rowCount += v.getRowCount();
+        }
+        it.close();
+        assertEquals(2, rowCount);
+
+        mockServer.verify(mocks[0].getId());
+    }
+
+    @Test
+    public void test_query_function_csv_response_transforme_columnseparator()
+    {
+        Expectation[] mocks = mockServer.when(HttpRequest.request("/csv")
+                .withMethod("get"))
+                .respond(HttpResponse.response("""
+                        key|key2
+                        123|456
+                        -120|hello world
+                        """)
+                        .withHeader("Content-Type", "text/csv"));
+
+        TableFunctionInfo function = catalog.getTableFunction("query");
+
+        IExpression columnSeparatorExpression = createStringExpression("|");
+
+        IExecutionContext context = TestUtils.mockExecutionContext("http", emptyMap(), 0, null);
+        IDatasourceOptions options = Mockito.mock(IDatasourceOptions.class);
+        //@formatter:off
+        Mockito.when(options.getOptions())
+            .thenReturn(List.of(
+                     new Option(QualifiedName.of("columnseparator"), columnSeparatorExpression)
+                    ));
+        Mockito.when(options.getOption(any(), any())).thenCallRealMethod();
+        Mockito.when(options.getBatchSize(any())).thenReturn(500);
+        //@formatter:on
+
+        TupleIterator it = function.execute(context, "http", Optional.empty(), List.of(createStringExpression("http://localhost:" + mockServer.getPort() + "/csv")), options);
+
+        int rowCount = 0;
+        while (it.hasNext())
+        {
+            TupleVector v = it.next();
+
+            //@formatter:off
+            VectorTestUtils.assertTupleVectorsEquals(TupleVector.of(Schema.of(Column.of("key", Type.String), Column.of("key2", Type.String)), List.of(
+                    vv(Type.String, "123", "-120"),
+                    vv(Type.String, "456", "hello world")
+                    ))
+                    , v);
+            //@formatter:on
+            rowCount += v.getRowCount();
+        }
+        it.close();
         assertEquals(2, rowCount);
 
         mockServer.verify(mocks[0].getId());

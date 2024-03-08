@@ -1,5 +1,7 @@
 package se.kuseman.payloadbuilder.catalog.http;
 
+import java.io.IOException;
+
 import org.apache.hc.client5.http.classic.methods.HttpUriRequestBase;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 
@@ -13,6 +15,6 @@ public interface IResponseTransformer
     /** Returns true if this transformer can handle provided request/response. */
     boolean canHandle(HttpUriRequestBase request, ClassicHttpResponse response);
 
-    /** Transform provided request/response to a {@link TupleIterator}. */
-    TupleIterator transform(HttpUriRequestBase request, ClassicHttpResponse response, IExecutionContext context, IDatasourceOptions options);
+    /** Transform provided request/response to a {@link TupleIterator}. This method is responsible of closing the stream when complete. */
+    TupleIterator transform(HttpUriRequestBase request, ClassicHttpResponse response, IExecutionContext context, IDatasourceOptions options) throws IOException;
 }

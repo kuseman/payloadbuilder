@@ -1,11 +1,9 @@
 package se.kuseman.payloadbuilder.catalog.fs;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -140,7 +138,7 @@ public class FilesystemCatalog extends Catalog
                     {
                         Path path = FileSystems.getDefault()
                                 .getPath(strPath);
-                        return new FSFileReader(path.toFile());
+                        return new FSInputStream(path.toFile());
                     }
                     catch (IOException e)
                     {
@@ -151,14 +149,13 @@ public class FilesystemCatalog extends Catalog
         }
     }
 
-    /** File reader that reads whole file to string as fallback */
-    static class FSFileReader extends BufferedReader
+    static class FSInputStream extends FileInputStream
     {
         private final File file;
 
-        FSFileReader(File file) throws FileNotFoundException
+        public FSInputStream(File file) throws FileNotFoundException
         {
-            super(new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8));
+            super(file);
             this.file = file;
         }
 
