@@ -173,7 +173,9 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
                 .map(o -> new Option(o.getOption(), ExpressionResolver.INSTANCE.visit(o.getValueExpression(), context)))
                 .collect(toList());
 
-        return new TableScan(new TableSchema(schema, indices), plan.getTableSource(), plan.getProjection(), plan.isTempTable(), options, plan.getLocation());
+        TableSchema tableSchema = new TableSchema(schema, indices);
+        context.schemaByTableSource.put(tableSource, tableSchema);
+        return new TableScan(tableSchema, plan.getTableSource(), plan.getProjection(), plan.isTempTable(), options, plan.getLocation());
     }
 
     /**

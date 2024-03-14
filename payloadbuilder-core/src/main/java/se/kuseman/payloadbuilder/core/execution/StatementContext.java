@@ -150,8 +150,14 @@ public class StatementContext implements IStatementContext
         return indexSeekTupleVector;
     }
 
+    /** Set index seek tuple into context */
     public void setIndexSeekTupleVector(TupleVector indexSeekTupleVector)
     {
+        if (indexSeekTupleVector.getRowCount() == 0)
+        {
+            throw new IllegalArgumentException("Index seek tuple must have rows");
+        }
+
         this.indexSeekTupleVector = indexSeekTupleVector;
     }
 

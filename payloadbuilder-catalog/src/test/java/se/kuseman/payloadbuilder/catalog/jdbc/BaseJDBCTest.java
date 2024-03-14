@@ -44,7 +44,6 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
-import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.SeekType;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
@@ -472,7 +471,6 @@ abstract class BaseJDBCTest extends Assert
         {
             ISeekPredicate.ISeekKey seekKey = mock(ISeekPredicate.ISeekKey.class);
             seekKeys.add(seekKey);
-            when(seekKey.getType()).thenReturn(SeekType.EQ);
             when(seekKey.getValue()).thenReturn(ValueVector.literalAny(values.get(i)));
         }
         when(seekPredicate.getSeekKeys(any(IExecutionContext.class))).thenReturn(seekKeys);

@@ -194,6 +194,18 @@ public class AnalyzeInterceptor implements IPhysicalPlan
         }
 
         @Override
+        public int estimatedBatchCount()
+        {
+            return it.estimatedBatchCount();
+        }
+
+        @Override
+        public int estimatedRowCount()
+        {
+            return it.estimatedRowCount();
+        }
+
+        @Override
         public TupleVector next()
         {
             data.resumeNodeTime();

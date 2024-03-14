@@ -103,7 +103,9 @@ abstract class ABufferVectorBuilder implements IValueVectorBuilder
         if (buffer.limit() < neededLimit)
         {
             // Create new buffer and store old positions (subtract the start position)
-            result = bufferCreator.apply(neededLimit - bufferStartPosition);
+            // Set the new limit a bit higher than needed to try to avoid future allocations
+            int newSize = (int) (neededLimit * 1.65);
+            result = bufferCreator.apply(newSize - bufferStartPosition);
             int oldPosition = buffer.position() - bufferStartPosition;
             int newStartPosition = result.position();
 

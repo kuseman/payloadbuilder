@@ -37,6 +37,7 @@ import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
 import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.Index.ColumnsType;
+import se.kuseman.payloadbuilder.api.catalog.Index.IndexType;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
@@ -46,12 +47,14 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
+import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.ComparisonExpression;
@@ -67,12 +70,14 @@ import se.kuseman.payloadbuilder.core.parser.Location;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.core.physicalplan.AnalyzeInterceptor;
 import se.kuseman.payloadbuilder.core.physicalplan.Assert;
+import se.kuseman.payloadbuilder.core.physicalplan.CachePlan;
 import se.kuseman.payloadbuilder.core.physicalplan.ConstantScan;
 import se.kuseman.payloadbuilder.core.physicalplan.DescribePlan;
 import se.kuseman.payloadbuilder.core.physicalplan.ExpressionPredicate;
 import se.kuseman.payloadbuilder.core.physicalplan.ExpressionScan;
 import se.kuseman.payloadbuilder.core.physicalplan.Filter;
 import se.kuseman.payloadbuilder.core.physicalplan.HashAggregate;
+import se.kuseman.payloadbuilder.core.physicalplan.HashMatch;
 import se.kuseman.payloadbuilder.core.physicalplan.IPhysicalPlan;
 import se.kuseman.payloadbuilder.core.physicalplan.IndexSeek;
 import se.kuseman.payloadbuilder.core.physicalplan.Limit;
@@ -98,6 +103,417 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
+    public void test_sub_query_filter_elimination()
+    {
+        // Verify that the nested filters are merged when the subquery are eliminated
+        //@formatter:off
+        String query = """
+               select *
+               from
+               (
+                 select *
+                 from tableA a
+                 where a.col1 > 10
+               ) x
+               where x.col > 20
+               """;
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap());
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
+                .get(0)).getSelect();
+
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+
+        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
+
+        Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
+
+        //@formatter:off
+        IPhysicalPlan expected = new Filter(
+                1,
+                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new ExpressionPredicate(and(gt(cre(aAst.rename("col1")), intLit(10)), gt(cre(aAst.rename("col")), intLit(20))))
+                );
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_nested_sub_query_projection_elimination()
+    {
+        // Verify that the nested projections are merged when the subquery are eliminated
+        //@formatter:off
+        String query = """
+                select z.col1, col2
+                from
+                (
+                  select *
+                  from
+                  (
+                      select *
+                      from
+                      (
+                        select *
+                        from tableA
+                      ) x
+                  ) y
+                ) z
+                """;
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap());
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
+                .get(0)).getSelect();
+
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "");
+
+        ColumnReference aAst = new ColumnReference(tableA, "", ColumnReference.Type.ASTERISK);
+
+        Schema expectedSchemaA = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), aAst));
+
+        //@formatter:off
+        IPhysicalPlan expected = new Projection(
+                1,
+                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                List.of(cre(aAst.rename("col1")), cre(aAst.rename("col2"))),
+                false
+                );
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_sub_query_projection_elimination()
+    {
+        // Verify that the nested projections are merged when the subquery are eliminated
+        //@formatter:off
+        String query = """
+                select x.col1, x.col2, x.col3 + x.col2
+                from
+                (
+                  select col1, col2, col3
+                  from tableA
+                ) x
+                """;
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap());
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
+                .get(0)).getSelect();
+
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "");
+
+        ColumnReference aAst = new ColumnReference(tableA, "", ColumnReference.Type.ASTERISK);
+
+        Schema expectedSchemaA = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), aAst));
+
+        //@formatter:off
+        IPhysicalPlan expected = new Projection(
+                2,
+                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                List.of(cre(aAst.rename("col1")), cre(aAst.rename("col2")), add(cre(aAst.rename("col3")), cre(aAst.rename("col2"))) ),
+                false
+                );
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_using_same_table_ref_different_places()
+    {
+        // t.value and f.value both refers range(1,0) without alias
+        // make sure analyzer still can see a equi
+        // test of a regression where TableSourceReference wasn't unique regarding placement in tree
+        //@formatter:off
+        String query = """
+                select *
+                from (
+                  select *
+                  from tableA
+                ) f
+                inner join
+                (
+                  select *
+                  from tableA
+                ) t
+                 on t.value = f.value
+                """;
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap());
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
+                .get(0)).getSelect();
+
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "");
+        TableSourceReference tableA1 = new TableSourceReference(1, "", QualifiedName.of("tableA"), "");
+
+        ColumnReference aAst = new ColumnReference(tableA, "", ColumnReference.Type.ASTERISK);
+        ColumnReference a1Ast = new ColumnReference(tableA1, "", ColumnReference.Type.ASTERISK);
+
+        Schema expectedSchemaA = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), aAst));
+        Schema expectedSchemaA1 = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), a1Ast));
+
+        //@formatter:off
+        IPhysicalPlan expected = new HashMatch(
+                2,
+                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new TableScan(1, expectedSchemaA1, tableA1, "test", false, t.scanDataSources.get(1), emptyList()),
+                List.of(cre(aAst.rename("value"), ResolvedType.of(Type.Any))),
+                List.of(cre(a1Ast.rename("value"), ResolvedType.of(Type.Any))),
+                new ExpressionPredicate(eq(cre(a1Ast.rename("value"), ResolvedType.of(Type.Any)), cre(aAst.rename("value"), ResolvedType.of(Type.Any)))),
+                null,
+                false,
+                false);
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_using_same_table_ref_different_places_2()
+    {
+        //@formatter:off
+        String query = """
+                select *
+                from (
+                  select *
+                  from tableA
+                ) f
+                inner join
+                (
+                  select col1 + col2 value
+                  from tableA
+                ) t
+                 on t.value = f.value
+                """;
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap());
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
+                .get(0)).getSelect();
+
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "");
+        TableSourceReference tableA1 = new TableSourceReference(1, "", QualifiedName.of("tableA"), "");
+
+        ColumnReference aAst = new ColumnReference(tableA, "", ColumnReference.Type.ASTERISK);
+        ColumnReference a1Ast = new ColumnReference(tableA1, "", ColumnReference.Type.ASTERISK);
+
+        Schema expectedSchemaA = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), aAst));
+        Schema expectedSchemaA1 = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), a1Ast));
+
+        //@formatter:off
+        IPhysicalPlan expected = new HashMatch(
+                3,
+                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new Projection(
+                  2,
+                  new TableScan(1, expectedSchemaA1, tableA1, "test", false, t.scanDataSources.get(1), emptyList()),
+                  List.of(new AliasExpression(add(cre(a1Ast.rename("col1")), cre(a1Ast.rename("col2"))), "value")),
+                  false),
+                List.of(cre(aAst.rename("value"), ResolvedType.of(Type.Any))),
+                List.of(ce("value", "t", ResolvedType.of(Type.Any))),
+                new ExpressionPredicate(eq(ce("value", "t", ResolvedType.of(Type.Any)), cre(aAst.rename("value"), ResolvedType.of(Type.Any)))),
+                null,
+                false,
+                false);
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_using_same_table_ref_different_places_3()
+    {
+        //@formatter:off
+        String query = """
+                select *
+                from (
+                  select col3 + col4 value
+                  from tableA
+                ) f
+                inner join
+                (
+                  select col1 + col2 value
+                  from tableA
+                ) t
+                 on t.value = f.value
+                """;
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap());
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
+                .get(0)).getSelect();
+
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "");
+        TableSourceReference tableA1 = new TableSourceReference(1, "", QualifiedName.of("tableA"), "");
+
+        ColumnReference aAst = new ColumnReference(tableA, "", ColumnReference.Type.ASTERISK);
+        ColumnReference a1Ast = new ColumnReference(tableA1, "", ColumnReference.Type.ASTERISK);
+
+        Schema expectedSchemaA = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), aAst));
+        Schema expectedSchemaA1 = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), a1Ast));
+
+        //@formatter:off
+        IPhysicalPlan expected = new HashMatch(
+                4,
+                new Projection(
+                    1,
+                    new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                    List.of(new AliasExpression(add(cre(aAst.rename("col3")), cre(aAst.rename("col4"))), "value")),
+                    false),
+                new Projection(
+                    3,
+                    new TableScan(2, expectedSchemaA1, tableA1, "test", false, t.scanDataSources.get(1), emptyList()),
+                    List.of(new AliasExpression(add(cre(a1Ast.rename("col1")), cre(a1Ast.rename("col2"))), "value")),
+                    false),
+                List.of(ce("value", "f", 0)),
+                List.of(ce("value", "t", 1)),
+                new ExpressionPredicate(eq(ce("value", "t", 1), ce("value", "f", 0))),
+                null,
+                false,
+                false);
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_using_same_table_ref_different_places_non_equi()
+    {
+        //@formatter:off
+        String query = """
+                select *
+                from (
+                  select *
+                  from tableA
+                ) f
+                inner join
+                (
+                  select *
+                  from tableA
+                ) t
+                 on t.value > f.value
+                """;
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap());
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
+                .get(0)).getSelect();
+
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "");
+        TableSourceReference tableA1 = new TableSourceReference(1, "", QualifiedName.of("tableA"), "");
+
+        ColumnReference aAst = new ColumnReference(tableA, "", ColumnReference.Type.ASTERISK);
+        ColumnReference a1Ast = new ColumnReference(tableA1, "", ColumnReference.Type.ASTERISK);
+
+        Schema expectedSchemaA = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), aAst));
+        Schema expectedSchemaA1 = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), a1Ast));
+
+        //@formatter:off
+        IPhysicalPlan expected = NestedLoop.innerJoin(
+                3,
+                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new CachePlan(
+                    2,
+                    new TableScan(1, expectedSchemaA1, tableA1, "test", false, t.scanDataSources.get(1), emptyList())
+                ),
+                new ExpressionPredicate(gt(cre(a1Ast.rename("value"), ResolvedType.of(Type.Any)), cre(aAst.rename("value"), ResolvedType.of(Type.Any)))),
+                null,
+                false);
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
     public void test_outer_apply_non_correlated()
     {
         //@formatter:off
@@ -119,8 +535,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
@@ -129,9 +545,12 @@ public class QueryPlannerTest extends APhysicalPlanTest
         Schema expectedSchemaB = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), bAst));
         //@formatter:off
         IPhysicalPlan expected = NestedLoop.leftJoin(
-                2,
+                3,
                 new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
-                new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
+                new CachePlan(
+                    2,
+                    new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList())
+                ),
                 null);
         //@formatter:on
 
@@ -168,8 +587,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
@@ -221,8 +640,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
@@ -283,8 +702,76 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
+
+        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
+        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
+
+        Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
+        Schema expectedSchemaB = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), bAst));
+
+        //@formatter:off
+        IPhysicalPlan expected = NestedLoop.innerJoin(
+                4,
+                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new CachePlan(
+                    3,
+                    new Filter(
+                        2,
+                        new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
+                        new ExpressionPredicate(eq(cre(bAst.rename("active")), LiteralBooleanExpression.TRUE)))
+                ),
+                null,
+                false);
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_cross_join_force_no_cache_option()
+    {
+        //@formatter:off
+        String query = ""
+                + "select * "
+                + "from tableA a "
+                + "cross join tableB b "
+                + "where b.active ";
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap())
+        {
+            @Override
+            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            {
+                if (table.toString()
+                        .equalsIgnoreCase("tableB"))
+                {
+                    return new TableSchema(Schema.EMPTY, asList(new Index(table, asList("col"), ColumnsType.ANY_IN_ORDER)));
+                }
+                return super.getTableSchema(session, catalogAlias, table, options);
+            }
+        };
+        catalogRegistry.registerCatalog("t", t);
+
+        session.setSystemProperty(QuerySession.FORCE_NO_INNER_CACHE, ValueVector.literalBoolean(true, 1));
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
+                .get(0)).getSelect();
+
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
@@ -332,7 +819,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
 
@@ -371,7 +858,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(1)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
 
         Schema schema = Schema.of(CoreColumn.of(tableA.column("col1"), ResolvedType.of(Type.Int)));
         //@formatter:off
@@ -410,7 +897,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference range = new TableSourceReference("", QualifiedName.of("range"), "a");
+        TableSourceReference range = new TableSourceReference(0, "", QualifiedName.of("range"), "a");
 
         IPhysicalPlan expected = new TableFunctionScan(0, Schema.of(CoreColumn.of(range.column("Value"), ResolvedType.of(Type.Int))), range, "sys", "System", SystemCatalog.get()
                 .getTableFunction("range"), asList(intLit(1), intLit(100)), emptyList());
@@ -445,7 +932,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
 
@@ -503,8 +990,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
@@ -513,11 +1000,14 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan expected =
                 new Sort(
-                    3,
+                    4,
                     NestedLoop.innerJoin(
-                        2,
+                        3,
                         new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
-                        new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
+                        new CachePlan(
+                            2,
+                            new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList())
+                        ),
                         null,
                         false),
                     asList(sortItem(cre(aAst.rename("col")), Order.DESC, NullOrder.UNDEFINED), sortItem(cre(bAst.rename("col2")), Order.ASC, NullOrder.UNDEFINED)));
@@ -569,8 +1059,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
@@ -579,11 +1069,14 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan expected =
                 new Sort(
-                    3,
+                    4,
                     NestedLoop.innerJoin(
-                        2,
+                        3,
                         new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
-                        new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
+                        new CachePlan(
+                            2,
+                            new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList())
+                        ),
                         null,
                         false),
                     asList(sortItem(cre(bAst.rename("col2")), Order.ASC, NullOrder.UNDEFINED)));
@@ -632,7 +1125,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
 
@@ -711,8 +1204,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
@@ -720,22 +1213,25 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         //@formatter:off
         IPhysicalPlan expected = new Projection(
-                7,
+                8,
                 NestedLoop.leftJoin(
-                    6,
+                    7,
                     NestedLoop.leftJoin(
-                        4,
+                        5,
                         new ConstantScan(0),
-                        Assert.maxRowCount(
-                            3,
-                            new Projection(
-                                2,
-                                new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(0), emptyList()),
-                                asList(new AliasExpression(cre(bAst.rename("col1")), "__expr0")),
-                                false),
-                            1),
+                        new CachePlan(
+                            4,
+                            Assert.maxRowCount(
+                                3,
+                                new Projection(
+                                    2,
+                                    new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(0), emptyList()),
+                                    asList(new AliasExpression(cre(bAst.rename("col1")), "__expr0")),
+                                    false),
+                                1)
+                            ),
                         null),
-                    new TableScan(5, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(1), emptyList()),
+                    new TableScan(6, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(1), emptyList()),
                     null),
                 asList(cre(aAst), new AliasExpression(ce("__expr0"), "values")),
                 false);
@@ -775,9 +1271,9 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
-        TableSourceReference e_b = new TableSourceReference("", QualifiedName.of("b"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
+        TableSourceReference e_b = new TableSourceReference(2, "", QualifiedName.of("b"), "b");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
@@ -798,12 +1294,15 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 7,
                 NestedLoop.leftJoin(
                     6,
-                    NestedLoop.innerJoin(
+                    new HashMatch(
                         2,
                         new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
                         new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
+                        List.of(cre(aAst.rename("col"))),
+                        List.of(cre(bAst.rename("col"))),
                         new ExpressionPredicate(eq(cre(bAst.rename("col")), cre(aAst.rename("col")))),
                         "b",
+                        false,
                         false),
                     new OperatorFunctionScan(
                         5,
@@ -872,8 +1371,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
@@ -882,7 +1381,85 @@ public class QueryPlannerTest extends APhysicalPlanTest
         Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
         Schema expectedSchemaB = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), bAst));
         
-        SeekPredicate expectedSeekPredicate = new SeekPredicate(new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), asList("col"), asList(cre(aAst.rename("col"))));
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(
+                new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), IndexType.SEEK_EQ, asList("col"), asList(cre(aAst.rename("col"))));
+        
+        IPhysicalPlan expected = new HashMatch(
+                3,
+                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new Filter(
+                    2,
+                    new IndexSeek(1, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
+                    new ExpressionPredicate(eq(cre(bAst.rename("active")), LiteralBooleanExpression.TRUE))),
+                List.of(cre(aAst.rename("col"))),
+                List.of(cre(bAst.rename("col"))),
+                new ExpressionPredicate(
+                    and(eq(cre(bAst.rename("col")), cre(aAst.rename("col"))), eq(cre(aAst.rename("active")), LiteralBooleanExpression.TRUE))
+                ),
+                null,
+                true,
+                true);
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_indexed_join_with_force_nested_loop()
+    {
+        //@formatter:off
+        String query = ""
+                + "select * "
+                + "from tableA a "
+                + "left join tableB b "
+                + "  on b.col = a.col "
+                + "  and a.active "
+                + "  and b.active ";
+               
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap())
+        {
+            @Override
+            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            {
+                if (table.toString()
+                        .equalsIgnoreCase("tableB"))
+                {
+                    return new TableSchema(Schema.EMPTY, asList(new Index(table, asList("col"), ColumnsType.ANY_IN_ORDER)));
+                }
+                return super.getTableSchema(session, catalogAlias, table, options);
+            }
+        };
+        catalogRegistry.registerCatalog("t", t);
+
+        session.setSystemProperty(QuerySession.FORCE_NESTED_LOOP, ValueVector.literalBoolean(true, 1));
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
+                .get(0)).getSelect();
+
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
+
+        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
+        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
+
+        //@formatter:off
+        Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
+        Schema expectedSchemaB = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), bAst));
+        
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(
+                new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), IndexType.SEEK_EQ, asList("col"), asList(cre(aAst.rename("col"))));
         
         IPhysicalPlan expected = NestedLoop.leftJoin(
                 3,
@@ -896,6 +1473,225 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 ),
                 null,
                 true);
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_indexed_join_with_all_type()
+    {
+        //@formatter:off
+        String query = ""
+                + "select * "
+                + "from tableA a "
+                + "inner join tableB b "
+                + "  on b.col = a.col "
+                + "  and b.active = a.active ";
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap())
+        {
+            @Override
+            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            {
+                if (table.toString()
+                        .equalsIgnoreCase("tableB"))
+                {
+                    //@formatter:off
+                    return new TableSchema(Schema.EMPTY, asList(
+                            new Index(table, asList("col2", "col3"), ColumnsType.ANY),
+                            new Index(table, asList("col4", "col5"), ColumnsType.ANY_IN_ORDER),
+                            new Index(table, asList("col", "active"), ColumnsType.ALL)));
+                    //@formatter:on
+                }
+                return super.getTableSchema(session, catalogAlias, table, options);
+            }
+        };
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
+                .get(0)).getSelect();
+
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
+
+        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
+        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
+
+        Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
+        Schema expectedSchemaB = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), bAst));
+
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(new Index(QualifiedName.of("tableB"), asList("col", "active"), ColumnsType.ALL), IndexType.SEEK_EQ, asList("col", "active"),
+                asList(cre(aAst.rename("col")), cre(aAst.rename("active"))));
+
+        //@formatter:off
+        IPhysicalPlan expected = new HashMatch(
+                2,
+                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new IndexSeek(1, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
+                List.of(cre(aAst.rename("col")), cre(aAst.rename("active"))),
+                List.of(cre(bAst.rename("col")), cre(bAst.rename("active"))),
+                new ExpressionPredicate(
+                    and(eq(cre(bAst.rename("col")), cre(aAst.rename("col"))), eq(cre(bAst.rename("active")), cre(aAst.rename("active"))))
+                ),
+                null,
+                false,
+                true);
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_indexed_join_with_wildcard_type()
+    {
+        //@formatter:off
+        String query = ""
+                + "select * "
+                + "from tableA a "
+                + "inner join tableB b "
+                + "  on b.col = a.col "
+                + "  and b.active = a.active ";
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap())
+        {
+            @Override
+            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            {
+                if (table.toString()
+                        .equalsIgnoreCase("tableB"))
+                {
+                    //@formatter:off
+                    return new TableSchema(Schema.EMPTY, asList(
+                            new Index(table, asList(), ColumnsType.WILDCARD)));
+                    //@formatter:on
+                }
+                return super.getTableSchema(session, catalogAlias, table, options);
+            }
+        };
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
+                .get(0)).getSelect();
+
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
+
+        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
+        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
+
+        Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
+        Schema expectedSchemaB = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), bAst));
+
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(new Index(QualifiedName.of("tableB"), asList(), ColumnsType.WILDCARD), IndexType.SEEK_EQ, asList("active", "col"),
+                asList(cre(aAst.rename("active")), cre(aAst.rename("col"))));
+
+        //@formatter:off
+        IPhysicalPlan expected = new HashMatch(
+                2,
+                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new IndexSeek(1, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
+                List.of(cre(aAst.rename("active")), cre(aAst.rename("col"))),
+                List.of(cre(bAst.rename("active")), cre(bAst.rename("col"))),
+                new ExpressionPredicate(
+                    and(eq(cre(bAst.rename("col")), cre(aAst.rename("col"))), eq(cre(bAst.rename("active")), cre(aAst.rename("active"))))
+                ),
+                null,
+                false,
+                true);
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_join_with_index_all_type_and_not_all_columns_present()
+    {
+        //@formatter:off
+        String query = ""
+                + "select * "
+                + "from tableA a "
+                + "left join tableB b "
+                + "  on b.col = a.col "
+                + "  and a.active "
+                + "  and b.active ";
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap())
+        {
+            @Override
+            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            {
+                if (table.toString()
+                        .equalsIgnoreCase("tableB"))
+                {
+                    return new TableSchema(Schema.EMPTY, asList(new Index(table, asList("col", "col2"), ColumnsType.ALL)));
+                }
+                return super.getTableSchema(session, catalogAlias, table, options);
+            }
+        };
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
+                .get(0)).getSelect();
+
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
+
+        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
+        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
+
+        Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
+        Schema expectedSchemaB = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), bAst));
+
+        //@formatter:off
+        IPhysicalPlan expected = new HashMatch(
+                3,
+                new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                new Filter(
+                    2,
+                    new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
+                    new ExpressionPredicate(eq(cre(bAst.rename("active")), LiteralBooleanExpression.TRUE))),
+                List.of(cre(aAst.rename("col"))),
+                List.of(cre(bAst.rename("col"))),
+                new ExpressionPredicate(
+                    and(eq(cre(bAst.rename("col")), cre(aAst.rename("col"))), eq(cre(aAst.rename("active")), LiteralBooleanExpression.TRUE))
+                ),
+                null,
+                true,
+                false);
         //@formatter:on
 
         // System.out.println(actual.print(0));
@@ -925,7 +1721,6 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 + "  on b.col = a.col "
                 + "  and a.active "
                 + "  and b.active ";
-               
         //@formatter:on
 
         TestCatalog t = new TestCatalog(emptyMap())
@@ -953,53 +1748,63 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
-        TableSourceReference tableC = new TableSourceReference("", QualifiedName.of("tableC"), "c");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableC = new TableSourceReference(2, "", QualifiedName.of("tableC"), "c");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         ColumnReference cAst = new ColumnReference(tableC, "c", ColumnReference.Type.ASTERISK);
 
-        //@formatter:off
         Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
         Schema expectedSchemaB = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), bAst));
         Schema expectedSchemaC = Schema.of(new CoreColumn("c", ResolvedType.of(Type.Any), cAst));
-        
-        SeekPredicate expectedSeekPredicateB = new SeekPredicate(new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), asList("col"), asList(cre(aAst.rename("col"))));
-        SeekPredicate expectedSeekPredicateC = new SeekPredicate(new Index(QualifiedName.of("tableC"), asList("col"), ColumnsType.ANY_IN_ORDER), asList("col"), asList(cre(bAst.rename("col"))));
-        
-        IPhysicalPlan expected = NestedLoop.leftJoin(
+
+        SeekPredicate expectedSeekPredicateB = new SeekPredicate(new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), IndexType.SEEK_EQ, asList("col"),
+                asList(cre(aAst.rename("col"))));
+        SeekPredicate expectedSeekPredicateC = new SeekPredicate(new Index(QualifiedName.of("tableC"), asList("col"), ColumnsType.ANY_IN_ORDER), IndexType.SEEK_EQ, asList("col"),
+                asList(cre(bAst.rename("col"))));
+
+        //@formatter:off
+        //CSOFF
+        IPhysicalPlan expected = new HashMatch(
                 5,
                 new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
                 new HashAggregate(
                     4,
-                    NestedLoop.innerJoin(
+                    new HashMatch(
                        3,
                        new IndexSeek(1, expectedSchemaB, tableB, "test", false, expectedSeekPredicateB, t.seekDataSources.get(0), emptyList()),
                        new IndexSeek(2, expectedSchemaC, tableC, "test", false, expectedSeekPredicateC, t.seekDataSources.get(1), emptyList()),
+                       List.of(cre(bAst.rename("col"))),
+                       List.of(cre(cAst.rename("col"))),
                        new ExpressionPredicate(
                                eq(cre(cAst.rename("col")), cre(bAst.rename("col")))
                        ),
                        null,
+                       false,
                        true),
-                    asList(cre(bAst.rename("col"))),
-                    asList(
-                        new AggregateWrapperExpression(cre(bAst.rename("col")), true, false),
-                        new AggregateWrapperExpression(new AliasExpression(
-                                new ComparisonExpression(
-                                    IComparisonExpression.Type.GREATER_THAN,
-                                    new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("count"), null, asList(intLit(1))),
-                                    intLit(0)),
-                                "active"), true, false)
-                    )
+                       asList(cre(bAst.rename("col"))),
+                       asList(
+                            new AggregateWrapperExpression(cre(bAst.rename("col")), true, false),
+                            new AggregateWrapperExpression(new AliasExpression(
+                                    new ComparisonExpression(
+                                        IComparisonExpression.Type.GREATER_THAN,
+                                        new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("count"), null, asList(intLit(1))),
+                                        intLit(0)),
+                                    "active"), true, false)
+                        )
                     ),
-                new ExpressionPredicate(
-                    and(and(eq(cre(bAst.rename("col")), cre(aAst.rename("col"))), eq(cre(aAst.rename("active")), LiteralBooleanExpression.TRUE)), eq(ce("active", ResolvedType.of(Type.Boolean)),
-                            LiteralBooleanExpression.TRUE))
+                    List.of(cre(aAst.rename("col"))),
+                    List.of(cre(bAst.rename("col"))),
+                    new ExpressionPredicate(
+                        and(and(eq(cre(bAst.rename("col")), cre(aAst.rename("col"))), eq(cre(aAst.rename("active")), LiteralBooleanExpression.TRUE)), eq(ce("active", "b", ResolvedType.of(Type.Boolean)),
+                                LiteralBooleanExpression.TRUE))
                 ),
                 null,
+                true,
                 true);
+        //CSON
         //@formatter:on
 
         // System.out.println(actual.print(0));
@@ -1047,8 +1852,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
@@ -1056,18 +1861,21 @@ public class QueryPlannerTest extends APhysicalPlanTest
         Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
         Schema expectedSchemaB = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), bAst));
 
-        SeekPredicate expectedSeekPredicate = new SeekPredicate(new Index(QualifiedName.of("tableB"), asList("col", "col2"), ColumnsType.ANY_IN_ORDER), asList("col", "col2"),
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(new Index(QualifiedName.of("tableB"), asList("col", "col2"), ColumnsType.ANY_IN_ORDER), IndexType.SEEK_EQ, asList("col", "col2"),
                 asList(cre(aAst.rename("col")), cre(aAst.rename("col2"))));
 
         //@formatter:off
-        IPhysicalPlan expected = NestedLoop.innerJoin(
+        IPhysicalPlan expected = new HashMatch(
                 2,
                 new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
                 new IndexSeek(1, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
+                List.of(cre(aAst.rename("col")), cre(aAst.rename("col2"))),
+                List.of(cre(bAst.rename("col")), cre(bAst.rename("col2"))),
                 new ExpressionPredicate(
                     and(eq(cre(bAst.rename("col")), cre(aAst.rename("col"))), eq(cre(bAst.rename("col2")), cre(aAst.rename("col2"))))
                 ),
                 null,
+                false,
                 true);
         //@formatter:on
 
@@ -1116,7 +1924,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
         ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
 
         //@formatter:off
@@ -1171,7 +1979,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
         ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
 
         Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), ast));
@@ -1212,7 +2020,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
         ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
 
         Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), ast));
@@ -1253,7 +2061,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
         ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
 
         Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), ast));
@@ -1312,7 +2120,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "t");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "t");
         ColumnReference ast = new ColumnReference(table, "t", ColumnReference.Type.ASTERISK);
 
         Schema expectedSchema = Schema.of(new CoreColumn("t", ResolvedType.of(Type.Any), ast));
@@ -1374,7 +2182,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
         ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
 
         //@formatter:off
@@ -1450,7 +2258,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
         ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
 
         //@formatter:off

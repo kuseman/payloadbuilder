@@ -278,7 +278,7 @@ public class QueryParserTest extends Assert
                         new Filter(
                             new TableScan(
                                 TableSchema.EMPTY,
-                                new TableSourceReference("", QualifiedName.of("table"), "a"),
+                                new TableSourceReference(0, "", QualifiedName.of("table"), "a"),
                                 emptyList(),
                                 false,
                                 emptyList(),
@@ -292,7 +292,7 @@ public class QueryParserTest extends Assert
                                     Schema.of(Column.of("output", Type.Any)),
                                     new Projection(
                                         new TableFunctionScan(
-                                            new TableSourceReference("", QualifiedName.of("open_table"), "a"),
+                                            new TableSourceReference(1, "", QualifiedName.of("open_table"), "a"),
                                             Schema.EMPTY,
                                             asList(e("a")),
                                             emptyList(),
@@ -574,7 +574,7 @@ public class QueryParserTest extends Assert
         assertSelect("select 1 order by 1");
         assertSelect("select top 10 1");
 
-        assertEquals(new LogicalSelectStatement(new ExpressionScan(new TableSourceReference("", QualifiedName.of("a.b"), "a"), Schema.EMPTY, e("a.b"), null), false),
+        assertEquals(new LogicalSelectStatement(new ExpressionScan(new TableSourceReference(0, "", QualifiedName.of("a.b"), "a"), Schema.EMPTY, e("a.b"), null), false),
                 assertSelect("select * from (a.b) a"));
 
         assertSelectFail(ParseException.class, "Expression scans cannot have options", "select * from (a.b) a with (a=123)");

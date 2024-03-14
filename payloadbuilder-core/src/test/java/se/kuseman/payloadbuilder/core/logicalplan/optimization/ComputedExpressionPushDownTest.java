@@ -45,10 +45,10 @@ import se.kuseman.payloadbuilder.core.parser.ParseException;
 public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
 {
     private final ComputedExpressionPushDown optimizer = new ComputedExpressionPushDown();
-    private final TableSourceReference table = new TableSourceReference("", of("table"), "t");
+    private final TableSourceReference table = new TableSourceReference(0, "", of("table"), "t");
     private final ColumnReference tAst = new ColumnReference(table, "t", ColumnReference.Type.ASTERISK);
 
-    private final TableSourceReference tableB = new TableSourceReference("", of("tableB"), "b");
+    private final TableSourceReference tableB = new TableSourceReference(1, "", of("tableB"), "b");
     private final ColumnReference tBst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
 
     @Test

@@ -34,7 +34,6 @@ import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.ISeekKey;
-import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.SeekType;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
@@ -200,11 +199,6 @@ class HttpDataSource implements IDatasource
             for (int i = 0; i < size; i++)
             {
                 ISeekKey key = keys.get(i);
-                if (key.getType() != SeekType.EQ)
-                {
-                    throw new IllegalArgumentException(HttpCatalog.NAME + " only supports EQ seek keys");
-                }
-
                 String column = seekPredicate.getIndexColumns()
                         .get(i);
                 List<Object> values = new ArrayList<>();

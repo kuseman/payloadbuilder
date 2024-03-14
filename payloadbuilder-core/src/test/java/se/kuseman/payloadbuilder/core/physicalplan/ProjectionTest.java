@@ -83,8 +83,8 @@ public class ProjectionTest extends APhysicalPlanTest
     @Test
     public void test_schema_less_with_asteirsk()
     {
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
         // Asterisk column existing on the projection expressions from planning
         // CSOFF
@@ -210,7 +210,7 @@ public class ProjectionTest extends APhysicalPlanTest
 
         IExpression col1 = ce("col1");
         IExpression col3 = ce("col3");
-        IExpression ocol4 = new ColumnExpression("col4", "col4", ResolvedType.of(Type.Any), null, 0, true, -1)
+        IExpression ocol4 = new ColumnExpression("", "col4", "col4", ResolvedType.of(Type.Any), null, 0, true, -1)
         {
             @Override
             public ValueVector eval(TupleVector input, IExecutionContext context)

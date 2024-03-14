@@ -51,7 +51,6 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
-import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.SeekType;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
@@ -1431,7 +1430,6 @@ abstract class BaseESTest extends Assert
         when(seekPredicate.getIndexColumns()).thenReturn(asList(column));
         ISeekPredicate.ISeekKey seekKey = mock(ISeekPredicate.ISeekKey.class);
         when(seekPredicate.getSeekKeys(any(IExecutionContext.class))).thenReturn(asList(seekKey));
-        when(seekKey.getType()).thenReturn(SeekType.EQ);
         when(seekKey.getValue()).thenReturn(ValueVector.literalAny(values));
 
         return seekPredicate;
