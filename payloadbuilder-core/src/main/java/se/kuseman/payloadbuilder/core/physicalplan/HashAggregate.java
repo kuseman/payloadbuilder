@@ -38,6 +38,7 @@ import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 import se.kuseman.payloadbuilder.core.execution.vector.VectorBuilderFactory;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
+import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.HasAlias;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 
@@ -55,7 +56,8 @@ public class HashAggregate implements IPhysicalPlan
     private final List<IAggregateExpression> projectionExpressions;
     private final List<IExpression> aggregateExpressions;
     private final Schema schema;
-    private final boolean hasAsteriskProjections;
+    private final boolean hasAsteriskProjection;
+    private final boolean hasAsteriskSchema;
 
     public HashAggregate(int nodeId, IPhysicalPlan input, List<IExpression> aggregateExpressions, List<IAggregateExpression> projectionExpressions)
     {
@@ -64,8 +66,12 @@ public class HashAggregate implements IPhysicalPlan
         this.projectionExpressions = requireNonNull(projectionExpressions, "projectionExpressions");
         this.aggregateExpressions = requireNonNull(aggregateExpressions, "aggregateExpressions");
         this.schema = projectionExpressions.isEmpty() ? input.getSchema()
-                : SchemaUtils.getSchema(input.getSchema(), projectionExpressions, false, true);
-        this.hasAsteriskProjections = SchemaUtils.isAsterisk(schema);
+                : SchemaUtils.getSchema(input.getSchema(), projectionExpressions, true);
+        this.hasAsteriskProjection = projectionExpressions.stream()
+                .anyMatch(e -> e instanceof AggregateWrapperExpression awe
+                        && awe.getExpression() instanceof AsteriskExpression);
+        this.hasAsteriskSchema = hasAsteriskProjection
+                || SchemaUtils.isAsterisk(schema, true);
         if ((aggregateExpressions.isEmpty()
                 && !projectionExpressions.isEmpty())
                 || (!aggregateExpressions.isEmpty()
@@ -186,6 +192,7 @@ public class HashAggregate implements IPhysicalPlan
         IAggregator[] aggregators = null;
         Schema resultSchema = null;
         int groupCounter = 0;
+        List<? extends IExpression> actualExpressions = null;
         try
         {
             while (iterator.hasNext())
@@ -201,7 +208,7 @@ public class HashAggregate implements IPhysicalPlan
                 {
                     Schema outerSchema = outerTupleVector != null ? outerTupleVector.getSchema()
                             : null;
-                    List<? extends IExpression> actualExpressions = hasAsteriskProjections ? ProjectionUtils.expandExpressions(projectionExpressions, outerSchema, vector.getSchema())
+                    actualExpressions = hasAsteriskProjection ? ProjectionUtils.expandExpressions(projectionExpressions, outerSchema, vector.getSchema())
                             : projectionExpressions;
 
                     int projectionSize = actualExpressions.size();
@@ -210,9 +217,6 @@ public class HashAggregate implements IPhysicalPlan
                     {
                         aggregators[i] = ((IAggregateExpression) actualExpressions.get(i)).createAggregator();
                     }
-
-                    resultSchema = hasAsteriskProjections ? SchemaUtils.getSchema(vector.getSchema(), actualExpressions, false, true)
-                            : schema;
                 }
 
                 int vectorSize;
@@ -351,7 +355,8 @@ public class HashAggregate implements IPhysicalPlan
             result[i] = aggregators[i].combine(context);
         }
 
-        final Schema s = resultSchema;
+        final Schema s = hasAsteriskSchema ? SchemaUtils.getSchema(actualExpressions, result, true)
+                : schema;
         final int groupSize = table.size();
         return TupleIterator.singleton(new TupleVector()
         {

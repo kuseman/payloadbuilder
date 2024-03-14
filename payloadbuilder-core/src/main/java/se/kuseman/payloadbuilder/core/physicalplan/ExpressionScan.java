@@ -113,9 +113,8 @@ public class ExpressionScan implements IPhysicalPlan
         {
             return false;
         }
-        else if (obj instanceof ExpressionScan)
+        else if (obj instanceof ExpressionScan that)
         {
-            ExpressionScan that = (ExpressionScan) obj;
             return nodeId == that.nodeId
                     && tableSource.equals(that.tableSource)
                     && schema.equals(that.schema)
@@ -128,6 +127,6 @@ public class ExpressionScan implements IPhysicalPlan
     @Override
     public String toString()
     {
-        return "Scan expression: " + expression.toString();
+        return "Scan expression: " + expression.toVerboseString() + " " + tableSource;
     }
 }

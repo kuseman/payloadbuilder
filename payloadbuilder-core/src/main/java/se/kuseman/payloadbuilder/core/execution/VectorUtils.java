@@ -4,6 +4,9 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
 import java.lang.reflect.Array;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -14,6 +17,7 @@ import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.execution.Decimal;
 import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
 import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
 import se.kuseman.payloadbuilder.api.execution.ObjectVector;
@@ -28,11 +32,75 @@ public class VectorUtils
     private static final int START = 17;
     private static final int CONSTANT = 37;
 
+    /**
+     * Tries to determine a known type of this vector if the vectors type is ANY. Picks the first non null value. NOTE! There could be mixed types in vector so it's just an estimation
+     */
+    public static Column.Type getAnyType(ValueVector v)
+    {
+        int size = v.size();
+        if (size == 0)
+        {
+            return Type.Any;
+        }
+
+        for (int i = 0; i < size; i++)
+        {
+            if (v.isNull(i))
+            {
+                continue;
+            }
+
+            Object val = v.getAny(i);
+            if (val instanceof String
+                    || val instanceof UTF8String)
+            {
+                return Column.Type.String;
+            }
+            else if (val instanceof Integer)
+            {
+                return Column.Type.Int;
+            }
+            else if (val instanceof Long)
+            {
+                return Column.Type.Long;
+            }
+            else if (val instanceof Float)
+            {
+                return Column.Type.Float;
+            }
+            else if (val instanceof Double)
+            {
+                return Column.Type.Double;
+            }
+            else if (val instanceof Boolean)
+            {
+                return Column.Type.Boolean;
+            }
+            else if (val instanceof Decimal
+                    || val instanceof BigDecimal)
+            {
+                return Column.Type.Decimal;
+            }
+            else if (val instanceof EpochDateTime
+                    || val instanceof LocalDateTime)
+            {
+                return Column.Type.DateTime;
+            }
+            else if (val instanceof EpochDateTimeOffset
+                    || val instanceof ZonedDateTime)
+            {
+                return Column.Type.DateTimeOffset;
+            }
+        }
+
+        return Column.Type.Any;
+    }
+
     /** Transforms a cartesian vector into a populated variant based on provided outer tuple vector */
     public static TupleVector populateCartesian(final TupleVector outer, final TupleVector inner, String populateAlias)
     {
         requireNonNull(populateAlias, "populateAlias");
-        final Schema schema = SchemaUtils.populate(outer.getSchema(), populateAlias, inner.getSchema());
+        final Schema schema = SchemaUtils.joinSchema(outer.getSchema(), inner.getSchema(), populateAlias);
         final int outerSize = outer.getSchema()
                 .getSize();
         final int rowCount = outer.getRowCount();
@@ -69,7 +137,7 @@ public class VectorUtils
      */
     public static TupleVector cartesian(final TupleVector outer, final TupleVector inner)
     {
-        final Schema schema = SchemaUtils.concat(outer.getSchema(), inner.getSchema());
+        final Schema schema = SchemaUtils.joinSchema(outer.getSchema(), inner.getSchema());
         final int outerSize = outer.getSchema()
                 .getSize();
         final int innerRowcount = inner.getRowCount();
@@ -121,6 +189,12 @@ public class VectorUtils
     /** Hash a row from an array of value vectors */
     public static int hash(ValueVector[] vectors, int row)
     {
+        return hash(vectors, null, row);
+    }
+
+    /** Hash a row from an array of value vectors */
+    public static int hash(ValueVector[] vectors, Column.Type[] types, int row)
+    {
         int hash = START;
         int size = vectors.length;
         for (int i = 0; i < size; i++)
@@ -133,9 +207,13 @@ public class VectorUtils
                 continue;
             }
 
+            Column.Type type = types == null ? vv.type()
+                    .getType()
+                    : types[i];
+
             // CSOFF
-            switch (vv.type()
-                    .getType()) // CSON
+            switch (type)
+            // CSON
             {
                 // Code from commons HashCodeBuilder
                 case Boolean:

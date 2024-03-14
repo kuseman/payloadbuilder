@@ -89,6 +89,18 @@ public class TableScan implements IPhysicalPlan
         return new TupleIterator()
         {
             @Override
+            public int estimatedBatchCount()
+            {
+                return iterator.estimatedBatchCount();
+            }
+
+            @Override
+            public int estimatedRowCount()
+            {
+                return iterator.estimatedRowCount();
+            }
+
+            @Override
             public TupleVector next()
             {
                 if (!iterator.hasNext())
@@ -190,7 +202,7 @@ public class TableScan implements IPhysicalPlan
         {
             Column c = schema.getColumns()
                     .get(i);
-            if (SchemaUtils.isAsterisk(c))
+            if (SchemaUtils.isAsterisk(c, false))
             {
                 throw new QueryException("Runtime tuple vectors cannot contain asterisk columns");
             }

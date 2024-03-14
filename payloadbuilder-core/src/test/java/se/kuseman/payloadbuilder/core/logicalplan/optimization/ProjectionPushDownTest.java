@@ -3,17 +3,25 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 import static java.util.Arrays.asList;
 import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
 
+import java.util.Random;
+
+import org.assertj.core.api.Assertions;
 import org.junit.Test;
 
+import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SortItem;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.Join;
 import se.kuseman.payloadbuilder.core.logicalplan.Sort;
+import se.kuseman.payloadbuilder.core.parser.Location;
 
 /** Test of {@link ProjectionPushDown} */
 public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
@@ -39,30 +47,42 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
          *
          *@formatter:on
          */
+        TableSourceReference subQueryX = new TableSourceReference(1, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
 
         //@formatter:off
-        ILogicalPlan plan = projection(
-                subQuery(
-                    projection(
-                        tableScan(schema, table),
-                        asList(e("t.col1"), e("t.col2"))),
-                    "x"),
-                asList(e("x.col1"))
+        ILogicalPlan plan = 
+                projection(
+                    subQuery(
+                        projection(
+                            tableScan(schema, table),
+                            asList(e("t.col1"), e("t.col2"))),
+                    subQueryX),
+                    asList(e("x.col1"))
                 );
         //@formatter:on
 
         ILogicalPlan actual = optimize(plan);
 
-      //@formatter:off
+        //@formatter:off
         ILogicalPlan expected = 
                 projection(
-                    tableScan(schema, table, asList("col1")),
-                asList(cre("col1", table))
-                );
+                    subQuery(
+                        projection(
+                            tableScan(schema, table, asList("col1", "col2")),
+                            asList(cre("col1", table), cre("col2", table))),
+                    subQueryX),
+                    asList(cre("col1", table, ResolvedType.of(Type.Any), CoreColumn.Type.NAMED_ASTERISK))
+                    );
         //@formatter:on
 
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(expected);
+
         assertEquals(expected, actual);
     }
 
@@ -105,7 +125,8 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
                                     null,
                                     e("a.col3 = b.col4"),
                                     asSet(),
-                                    false),
+                                    false,
+                                    Schema.EMPTY),
                             null,
                             e("a.col7 > b.col8")
                         ),
@@ -128,7 +149,8 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
                                  null,
                                  eq(cre("col3", tableA), cre("col4", tableB)),
                                  asSet(),
-                                 false),
+                                 false,
+                                 Schema.EMPTY),
                              null,
                              gt(cre("col7", tableA), cre("col8", tableB))
                          ),

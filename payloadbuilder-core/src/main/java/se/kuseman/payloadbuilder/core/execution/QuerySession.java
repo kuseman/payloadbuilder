@@ -54,6 +54,12 @@ public class QuerySession implements IQuerySession
     /* System properties */
     /** Enable to print logical and physical plans to session print writer */
     public static final QualifiedName PRINT_PLAN = QualifiedName.of("printplan");
+
+    /** Force a nested loop where default would have been a hash match */
+    public static final QualifiedName FORCE_NESTED_LOOP = QualifiedName.of("force_nested_loop");
+
+    /** Force no inner cache for non correlated nested loops */
+    public static final QualifiedName FORCE_NO_INNER_CACHE = QualifiedName.of("force_no_inner_cache");
     /* End system properties */
 
     /* Compile fields */

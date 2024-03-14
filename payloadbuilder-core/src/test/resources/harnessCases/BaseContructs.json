@@ -103,10 +103,10 @@
       "tables": [
         {
           "name": "product",
-          "columns": [ "id", "name" ],
+          "columns": [ "id", "name", "brand" ],
           "rows": [
-            [ "1", "product-1" ],
-            [ "2", "product-2" ]
+            [ "1", "product-1", "nike" ],
+            [ "2", "product-2", "adidas" ]
           ]
         },
         {
@@ -210,8 +210,17 @@
         "select p.id productNumber",
         ", p.name ",
         ", ( ",
+        "    select p.brand ",
+        "    for object ",
+        "  ) options ",
+        ", ( ",
         "    select aRow.articleId articleNumber ",
         "    , aRow.color ",
+        "    , ( ",
+        "         select count(1) as cnt ",
+        "         from (aRow.v) vRow ",
+        "         group by vRow.articleId ",
+        "      ) variantCount ",
         "    , ( ",
         "        select vRow.id variantNumber ",
         "        , vRow.size ",
@@ -221,6 +230,7 @@
         "        for object_array ",
         "      ) variants ",
         "    from (a) aRow ",
+        "    order by aRow.articleId ",
         "    for object_array ",
         "  ) articles ",
         "from product p ",
@@ -237,8 +247,8 @@
       ],
       "expectedResultSets": [
         [
-          [{ "key": "productNumber", "value": 1 },{ "key": "name", "value": "product-1" },{ "key": "articles", "value": [ { "articleNumber": "1-1", "color": "black", "variants": [{"variantNumber":"1-1-1", "size":"M", "productNumber":"1", "articleNumber":"1-1"}, {"variantNumber":"1-1-2", "size":"L",  "productNumber":"1", "articleNumber":"1-1"}] }, { "articleNumber": "1-2", "color": "green", "variants": [{"variantNumber":"1-2-1", "size":"S", "productNumber":"1", "articleNumber":"1-2"}, {"variantNumber":"1-2-2", "size":"XL",  "productNumber":"1", "articleNumber":"1-2"}] } ]}],
-          [{ "key": "productNumber", "value": 2 },{ "key": "name", "value": "product-2" },{ "key": "articles", "value": [ { "articleNumber": "2-1", "color": "white", "variants": [{"variantNumber":"2-1-1", "size":"M", "productNumber":"2", "articleNumber":"2-1"}, {"variantNumber":"2-1-2", "size":"XL", "productNumber":"2", "articleNumber":"2-1"}] }, { "articleNumber": "2-2", "color": "blue",  "variants": [{"variantNumber":"2-2-1", "size":"L", "productNumber":"2", "articleNumber":"2-2"}, {"variantNumber":"2-2-2", "size":"XXL", "productNumber":"2", "articleNumber":"2-2"}] } ]}]
+          [{ "key": "productNumber", "value": 1 },{ "key": "name", "value": "product-1" },{ "key": "options", "value": { "brand": "nike" } },{ "key": "articles", "value": [ { "articleNumber": "1-1", "color": "black", "variantCount": 2, "variants": [{"variantNumber":"1-1-1", "size":"M", "productNumber":"1", "articleNumber":"1-1"}, {"variantNumber":"1-1-2", "size":"L",  "productNumber":"1", "articleNumber":"1-1"}]}, { "articleNumber": "1-2", "color": "green" , "variantCount": 2, "variants": [{"variantNumber":"1-2-1", "size":"S", "productNumber":"1", "articleNumber":"1-2"}, {"variantNumber":"1-2-2", "size":"XL",  "productNumber":"1", "articleNumber":"1-2"}]} ]}],
+          [{ "key": "productNumber", "value": 2 },{ "key": "name", "value": "product-2" },{ "key": "options", "value": { "brand": "adidas" } },{ "key": "articles", "value": [ { "articleNumber": "2-1", "color": "white", "variantCount": 2, "variants": [{"variantNumber":"2-1-1", "size":"M", "productNumber":"2", "articleNumber":"2-1"}, {"variantNumber":"2-1-2", "size":"XL", "productNumber":"2", "articleNumber":"2-1"}]}, { "articleNumber": "2-2", "color": "blue", "variantCount": 2, "variants": [{"variantNumber":"2-2-1", "size":"L", "productNumber":"2", "articleNumber":"2-2"}, {"variantNumber":"2-2-2", "size":"XXL", "productNumber":"2", "articleNumber":"2-2"}]} ]}]
         ]
       ]
     },
@@ -709,7 +719,8 @@
 
         "from range(1, 4) r ",
         "inner populate join range(1, 11) r1 ",
-        "  on r1.Value % 3 + 1 = r.Value"
+        "  on r1.Value % 3 + 1 = r.Value ",
+        "order by r.value "
       ],
       "expectedResultSets": [
         [
@@ -732,7 +743,8 @@
 
         "from range(1, 4) r ",
         "inner populate join range(1, 11) r1 ",
-        "  on r1.Value % 3 + 1 = r.Value"
+        "  on r1.Value % 3 + 1 = r.Value ",
+        "order by r.value"
       ],
       "expectedResultSets": [
         [
@@ -830,6 +842,23 @@
           [{ "key": "data", "value": "1_1" }, { "key": "newCol", "value": 0 } ],
           [{ "key": "data", "value": "3_3" }, { "key": "newCol", "value": 0 } ],
           [{ "key": "data", "value": "1_2" }, { "key": "newCol", "value": -1 }]
+        ]
+      ]
+    },
+    {
+      "name": "Order by ordinal computed with asterisk ",
+      "query": [
+        "--set @@printplan = true ",
+        "select id - row_id, * from data order by 1 desc"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "id - row_id", "value": 2 }, { "key": "id", "value": 3 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "3_1" } ],
+          [{ "key": "id - row_id", "value": 1 }, { "key": "id", "value": 2 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "2_1" } ],
+          [{ "key": "id - row_id", "value": 1 }, { "key": "id", "value": 3 }, { "key": "row_id", "value": 2 }, { "key": "data", "value": "3_2" } ],
+          [{ "key": "id - row_id", "value": 0 }, { "key": "id", "value": 1 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "1_1" } ],
+          [{ "key": "id - row_id", "value": 0 }, { "key": "id", "value": 3 }, { "key": "row_id", "value": 3 }, { "key": "data", "value": "3_3" } ],
+          [{ "key": "id - row_id", "value": -1 }, { "key": "id", "value": 1 }, { "key": "row_id", "value": 2 }, { "key": "data", "value": "1_2" } ]
         ]
       ]
     },
@@ -1152,12 +1181,13 @@
     {
       "name": "Selects with for output",
       "query": [
+        "--set @@printplan = true",
         "select (select 1 col1, 2 col2 for object), ",
         "       (select 1, 2 for array), ",
-       "       (select 1 col1, 2 col2 for object_array), ",
-       "       (select (select 1, 2 for array), (select 3, 4 for array) for array),",
-       "       (select (select 1, 2 for array) ar1, (select 3, 4 for array) ar2 for object), ",
-       "       (select 1 col1, 2 col2 for object).col1 deref_obj "
+        "       (select 1 col1, 2 col2 for object_array), ",
+        "       (select (select 1, 2 for array), (select 3, 4 for array) for array),",
+        "       (select (select 1, 2 for array) ar1, (select 3, 4 for array) ar2 for object), ",
+        "       (select 1 col1, 2 col2 for object).col1 deref_obj "
       ],
       "expectedResultSets": [
         [
@@ -1182,13 +1212,15 @@
     {
       "name": "Selects with for output and subscript ",
       "query": [
+        "--set @@printplan = true ",
         "select d[0].data ",
         ", ( select st[0].id, d.row_id, d.data, s.col2 from (d) d for object_array ) obj",
         "from source s ",
         "inner populate join data d ",
         "  on d.id = s.col1 ",
         "inner populate join strings st ",
-        "  on st.id = s.col1 "
+        "  on st.id = s.col1 ",
+        "order by 1"
       ],
       "expectedResultSets": [
         [
@@ -1232,7 +1264,8 @@
         " (select d.* for object_array) obj",
         "from source s ",
         "inner populate join data d ",
-        "  on d.id = s.col1 "
+        "  on d.id = s.col1 ",
+        "order by s.col1"
       ],
       "expectedResultSets": [
         [
@@ -1271,8 +1304,9 @@
         "select ",
         " (select * from (d) d for object_array) obj",
         "from source s ",
-        "inner populate join data d ",   
-        "  on d.id = s.col1 "  
+        "inner populate join data d ",
+        "  on d.id = s.col1 ",
+        "order by s.col1"
       ],
       "expectedResultSets": [
         [
@@ -1287,8 +1321,9 @@
         "select ",
         " (select d.* from (d) d for object_array) obj",
         "from source s ",
-        "inner populate join data d ",   
-        "  on d.id = s.col1 "  
+        "inner populate join data d ",
+        "  on d.id = s.col1 ",
+        "order by s.col1"
       ],
       "expectedResultSets": [
         [

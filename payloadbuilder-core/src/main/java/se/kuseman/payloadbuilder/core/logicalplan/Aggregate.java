@@ -54,7 +54,7 @@ public class Aggregate implements ILogicalPlan
             return input.getSchema();
         }
 
-        return SchemaUtils.getSchema(input.getSchema(), projectionExpressions, false, true);
+        return SchemaUtils.getSchema(input.getSchema(), projectionExpressions, true);
     }
 
     @Override

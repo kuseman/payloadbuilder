@@ -609,7 +609,7 @@ public class QueryParser
                 String joinAlias = getIdentifier(joinCtx.tableSource()
                         .identifier());
                 current = new Join(current, joinTableSource, type, populate ? joinAlias
-                        : null, condition, emptySet(), false);
+                        : null, condition, emptySet(), false, Schema.EMPTY);
             }
 
             return current;
@@ -628,7 +628,7 @@ public class QueryParser
             if (ctx.tableName() != null)
             {
                 String catalogAlias = defaultIfBlank(getIdentifier(ctx.tableName().catalog), "");
-                TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, catalogAlias, getQualifiedName(ctx.tableName()
+                TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.TABLE, catalogAlias, getQualifiedName(ctx.tableName()
                         .qname()), alias);
 
                 boolean tempTable = ctx.tableName().tempHash != null;
@@ -640,7 +640,9 @@ public class QueryParser
                 insideSubQuery = true;
                 LogicalSelectStatement stm = (LogicalSelectStatement) visit(ctx.selectStatement());
                 insideSubQuery = prevInsideSubQuery;
-                return new SubQuery(stm.getSelect(), alias, Location.from(ctx.selectStatement()));
+
+                TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of(alias), alias);
+                return new SubQuery(stm.getSelect(), tableSourceRef, Location.from(ctx.selectStatement()));
             }
             else if (ctx.variable() != null)
             {
@@ -652,7 +654,7 @@ public class QueryParser
                 QualifiedName qname = getQualifiedName(ctx.variable()
                         .qname());
                 IExpression expression = new VariableExpression(qname);
-                TableSourceReference tableSource = new TableSourceReference(tableSourceCounter++, "", qname, alias);
+                TableSourceReference tableSource = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.EXPRESSION, "", qname, alias);
                 return new ExpressionScan(tableSource, Schema.EMPTY, expression, Location.from(ctx.variable()));
             }
             else if (ctx.expression() != null)
@@ -663,7 +665,7 @@ public class QueryParser
                 }
 
                 IExpression expression = getExpression(ctx.expression());
-                TableSourceReference tableSource = new TableSourceReference(tableSourceCounter++, "", QualifiedName.of(expression.toString()), alias);
+                TableSourceReference tableSource = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.EXPRESSION, "", QualifiedName.of(expression.toString()), alias);
                 return new ExpressionScan(tableSource, Schema.EMPTY, expression, Location.from(ctx.expression()));
             }
 
@@ -671,7 +673,7 @@ public class QueryParser
             String catalogAlias = defaultIfBlank(getIdentifier(functionCall.functionName().catalog), "");
             String functioName = getIdentifier(ctx.functionCall()
                     .functionName().function);
-            TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, catalogAlias, QualifiedName.of(functioName), alias);
+            TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.FUNCTION, catalogAlias, QualifiedName.of(functioName), alias);
             List<IExpression> arguments = ctx.functionCall().arguments.stream()
                     .map(this::getExpression)
                     .collect(toList());
@@ -1435,7 +1437,7 @@ public class QueryParser
                     throw new ParseException("Assignment selects are not allowed in sub query context", ctx);
                 }
 
-                plan = new Projection(plan, expressions, false);
+                plan = new Projection(plan, expressions);
             }
 
             return plan;

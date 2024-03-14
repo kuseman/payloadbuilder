@@ -13,13 +13,12 @@ import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
-import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
 
 /** An aggregate expression that wrapps a ordinary expression and turns it into an aggregate result */
-public class AggregateWrapperExpression implements IAggregateExpression, HasAlias, HasTableSourceReference
+public class AggregateWrapperExpression implements IAggregateExpression, HasAlias, HasColumnReference
 {
     private final IExpression expression;
 
@@ -63,11 +62,11 @@ public class AggregateWrapperExpression implements IAggregateExpression, HasAlia
     }
 
     @Override
-    public TableSourceReference getTableSourceReference()
+    public ColumnReference getColumnReference()
     {
-        if (expression instanceof HasTableSourceReference htsr)
+        if (expression instanceof HasColumnReference htsr)
         {
-            return htsr.getTableSourceReference();
+            return htsr.getColumnReference();
         }
         return null;
     }

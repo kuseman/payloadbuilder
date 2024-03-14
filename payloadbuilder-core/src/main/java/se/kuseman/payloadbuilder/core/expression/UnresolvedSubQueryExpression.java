@@ -66,7 +66,7 @@ public class UnresolvedSubQueryExpression implements IExpression
                     .get(0)
                     .getType();
         }
-        // else return object here, this will be resolved later on to the correct type when this sub query is eliminated from plan
+        // else return any here, this will be resolved later on to the correct type when this sub query is eliminated from plan
         return ResolvedType.of(Type.Any);
     }
 
@@ -103,9 +103,8 @@ public class UnresolvedSubQueryExpression implements IExpression
         {
             return true;
         }
-        else if (obj instanceof UnresolvedSubQueryExpression)
+        else if (obj instanceof UnresolvedSubQueryExpression that)
         {
-            UnresolvedSubQueryExpression that = (UnresolvedSubQueryExpression) obj;
             return input.equals(that.input)
                     && outerReferences.equals(that.outerReferences);
         }

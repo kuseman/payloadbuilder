@@ -41,14 +41,14 @@ public class TupleVectorBuilder
     }
 
     /** Append a populated result from provided cartesian and filter */
-    public void appendPopulate(TupleVector cartesian, ValueVector filter, TupleVector outer, TupleVector inner, String populateAlias)
+    public void appendPopulate(ValueVector filter, TupleVector outer, TupleVector inner, String populateAlias)
     {
         final int outerSize = outer.getSchema()
                 .getSize();
         int outerRowCount = outer.getRowCount();
         int innerRowCount = inner.getRowCount();
 
-        final Schema schema = SchemaUtils.populate(outer.getSchema(), populateAlias, inner.getSchema());
+        final Schema schema = SchemaUtils.joinSchema(outer.getSchema(), inner.getSchema(), populateAlias);
         for (int i = 0; i < outerRowCount; i++)
         {
             int filterStart = i * innerRowCount;
@@ -301,22 +301,19 @@ public class TupleVectorBuilder
         int newSize = vector.getSchema()
                 .getSize();
 
+        List<Column> newColumns = new ArrayList<>(vector.getSchema()
+                .getColumns());
+
         if (currentSize == 0)
         {
-            existingColumns.addAll(vector.getSchema()
-                    .getColumns());
+            existingColumns.addAll(newColumns);
             for (int i = 0; i < newSize; i++)
             {
-                builders.add(ABufferVectorBuilder.getBuilder(vector.getSchema()
-                        .getColumns()
-                        .get(i)
+                builders.add(ABufferVectorBuilder.getBuilder(existingColumns.get(i)
                         .getType(), allocator, estimatedRowCount));
             }
             return EMPTY;
         }
-
-        List<Column> newColumns = new ArrayList<>(vector.getSchema()
-                .getColumns());
 
         int currentRowCount = builders.get(0).size;
 

@@ -79,9 +79,16 @@ public class OperatorFunctionScan implements ILogicalPlan
     @Override
     public boolean equals(Object obj)
     {
-        if (obj instanceof OperatorFunctionScan)
+        if (obj == this)
         {
-            OperatorFunctionScan that = (OperatorFunctionScan) obj;
+            return true;
+        }
+        else if (obj == null)
+        {
+            return false;
+        }
+        else if (obj instanceof OperatorFunctionScan that)
+        {
             return input.equals(that.input)
                     && catalogAlias.equals(that.catalogAlias)
                     && function.equals(that.function)

@@ -64,7 +64,8 @@ public class ColumnOrdinalResolverTest extends ALogicalPlanOptimizerTest
                         null,
                         eq(cre("col3", sTableA, 2, ResolvedType.of(Type.Float)), cre("col3", sTableB, 5, ResolvedType.of(Type.Float))),
                         asSet(),
-                        false),
+                        false,
+                        Schema.EMPTY),
                     null,
                     gt(cre("col1", sTableA, 0, ResolvedType.of(Type.Int)), cre("col1", sTableB, 3, ResolvedType.of(Type.Boolean)))
                 );

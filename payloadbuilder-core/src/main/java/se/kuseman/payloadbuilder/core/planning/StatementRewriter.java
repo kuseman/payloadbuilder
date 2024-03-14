@@ -124,13 +124,6 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
         context.analyze = false;
 
         PhysicalSelectStatement physicalDescribeStatement = new PhysicalSelectStatement(new DescribePlan(context.getNextNodeId(), physicalSelectStatement.getSelect(), statement.isAnalyze()));
-
-        // if (statement.isIncludeLogicalPlan())
-        // {
-        // ILogicalPlan logicalPlan = context.currentLogicalPlan;
-        // return new StatementList(asList( ))
-        // }
-
         return physicalDescribeStatement;
     }
 
@@ -155,9 +148,10 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
                     catalog = context.context.getSession()
                             .getDefaultCatalogAlias();
 
-                    TableScan catalogFunctionsScan = new TableScan(TableSchema.EMPTY, new TableSourceReference(0, "sys", QualifiedName.of(catalog, "functions"), "fCat"), emptyList(), false,
-                            emptyList(), null);
-                    TableScan systemFunctionsScan = new TableScan(TableSchema.EMPTY, new TableSourceReference(1, "sys", QualifiedName.of("functions"), "fSys"), emptyList(), false, emptyList(), null);
+                    TableScan catalogFunctionsScan = new TableScan(TableSchema.EMPTY,
+                            new TableSourceReference(0, TableSourceReference.Type.TABLE, "sys", QualifiedName.of(catalog, "functions"), "fCat"), emptyList(), false, emptyList(), null);
+                    TableScan systemFunctionsScan = new TableScan(TableSchema.EMPTY, new TableSourceReference(1, TableSourceReference.Type.TABLE, "sys", QualifiedName.of("functions"), "fSys"),
+                            emptyList(), false, emptyList(), null);
 
                     // Order by type and name
                     List<SortItem> sortItems = asList(new SortItem(new LiteralIntegerExpression(2), Order.ASC, NullOrder.UNDEFINED, null),
@@ -170,8 +164,7 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
                                     new Projection(ConstantScan.INSTANCE,
                                             asList(new LiteralStringExpression("System functions"),
                                                    new LiteralStringExpression(UTF8String.EMPTY),
-                                                   new LiteralStringExpression(UTF8String.EMPTY)),
-                                            false),
+                                                   new LiteralStringExpression(UTF8String.EMPTY))),
                                     new Sort(systemFunctionsScan, sortItems))), false).accept(this, context);
                     //@formatter:on
 
@@ -190,7 +183,7 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
 
         QualifiedName qname = isBlank(catalog) ? QualifiedName.of(tableName)
                 : QualifiedName.of(catalog, tableName);
-        TableSourceReference tableSourceRef = new TableSourceReference(2, "sys", qname, "t");
+        TableSourceReference tableSourceRef = new TableSourceReference(2, TableSourceReference.Type.TABLE, "sys", qname, "t");
         return new LogicalSelectStatement(new TableScan(TableSchema.EMPTY, tableSourceRef, emptyList(), false, emptyList(), null), false).accept(this, context);
     }
 
@@ -310,7 +303,7 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
                 && printPlanProperty.getBoolean(0);
 
         // Optimize plan
-        plan = LogicalPlanOptimizer.optimize(context.context, plan, context.schemaByTempTable);
+        plan = LogicalPlanOptimizer.optimize(context.context, plan, context.schemaByTempTable, context.schemaByTableSource);
 
         if (printPlan)
         {

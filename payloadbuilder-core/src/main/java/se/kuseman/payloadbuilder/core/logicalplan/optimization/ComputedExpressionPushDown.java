@@ -159,10 +159,8 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
         if (planData.sortItems.isEmpty())
         {
             return new Projection(plan.getInput()
-                    .accept(this, context), projectionExpressions, plan.isAppendInputColumns());
+                    .accept(this, context), projectionExpressions);
         }
-
-        List<Pair<String, Integer>> pushDownProjections = new ArrayList<>();
 
         List<IExpression> newProjectionExpressions = new ArrayList<>(projectionExpressions);
 
@@ -201,7 +199,13 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
                 // See if the items expression is semantic equal to a projected expression
                 for (int i = 0; i < size; i++)
                 {
-                    if (itemExpression.semanticEquals(projectionExpressions.get(i)))
+                    IExpression projExpression = projectionExpressions.get(i);
+                    if (projExpression instanceof AliasExpression ae)
+                    {
+                        projExpression = ae.getExpression();
+                    }
+
+                    if (itemExpression.semanticEquals(projExpression))
                     {
                         projectionExpressionIndex = i;
                         break;
@@ -273,7 +277,7 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
                     throw new ParseException(ORDER_BY_CONSTANT_ENCOUNTERED, item.getLocation());
                 }
 
-                String alias = projectionExpression instanceof HasAlias ? ((HasAlias) projectionExpression).getAlias()
+                String alias = projectionExpression instanceof HasAlias ha ? ha.getAlias()
                         .getAlias()
                         : null;
 
@@ -287,7 +291,11 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
                 else if (isComputed(projectionExpression))
                 {
                     alias = "__expr" + context.expressionCounter++;
-                    pushDownProjections.add(Pair.of(alias, projectionExpressionIndex));
+
+                    // Replace the projection expression with an alias expression with generated name
+                    IExpression newProjectionExpression = new AliasExpression(projectionExpression, alias, projectionExpression.toString(), false);
+                    newProjectionExpressions.set(projectionExpressionIndex, newProjectionExpression);
+
                     planData.sortItems.set(j, new SortItem(new UnresolvedColumnExpression(QualifiedName.of(alias), -1, null), item.getOrder(), item.getNullOrder(), item.getLocation()));
                 }
             }
@@ -295,29 +303,8 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
 
         ILogicalPlan input = plan.getInput()
                 .accept(this, context);
-        //
-        // If no projections was pushed down return original projection with visited input
-        if (pushDownProjections.isEmpty())
-        {
-            return new Projection(input, newProjectionExpressions, plan.isAppendInputColumns());
-        }
 
-        List<IExpression> computedExpressions = new ArrayList<>(pushDownProjections.size());
-
-        // Re-create projections with the pushed down expressions and their new aliases
-        for (Pair<String, Integer> p : pushDownProjections)
-        {
-            IExpression originalExpression = projectionExpressions.get(p.getRight());
-            String name = p.getLeft();
-            String outputName = originalExpression.toString();
-            computedExpressions.add(new AliasExpression(originalExpression, p.getLeft(), true));
-
-            // Add the expression with the generated alias name
-            newProjectionExpressions.set(p.getRight(), new AliasExpression(new UnresolvedColumnExpression(QualifiedName.of(p.getLeft()), -1, null), name, outputName, false));
-        }
-        // Insert a compute operator before projection
-        input = new Projection(input, computedExpressions, true);
-        return new Projection(input, newProjectionExpressions, plan.isAppendInputColumns());
+        return new Projection(input, newProjectionExpressions);
     }
 
     @Override
@@ -424,7 +411,9 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
             List<IExpression> projections = pushDownExpressions.stream()
                     .map(p -> new AliasExpression(p.getValue(), p.getKey()))
                     .collect(toList());
-            planInput = new Projection(planInput, projections, true);
+            // We need all the input besides the compute projections
+            projections.add(new AsteriskExpression(null));
+            planInput = new Projection(planInput, projections);
         }
 
         return new Aggregate(planInput, plan.getAggregateExpressions(), planProjections);
@@ -633,14 +622,14 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
                 IExpression exp = projectionExpression;
                 HasAlias.Alias alias = null;
 
-                if (exp instanceof AggregateWrapperExpression)
+                if (exp instanceof AggregateWrapperExpression awe)
                 {
-                    exp = ((AggregateWrapperExpression) exp).getExpression();
+                    exp = awe.getExpression();
                 }
-                if (exp instanceof AliasExpression)
+                if (exp instanceof AliasExpression ae)
                 {
-                    alias = ((AliasExpression) exp).getAlias();
-                    exp = ((AliasExpression) exp).getExpression();
+                    alias = ae.getAlias();
+                    exp = ae.getExpression();
                 }
 
                 if (expression.semanticEquals(exp))
@@ -670,9 +659,9 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
 
     private static boolean isComputed(IExpression expression)
     {
-        if (expression instanceof AliasExpression)
+        if (expression instanceof AliasExpression ae)
         {
-            expression = ((AliasExpression) expression).getExpression();
+            expression = ae.getExpression();
         }
 
         return !(expression instanceof UnresolvedColumnExpression)

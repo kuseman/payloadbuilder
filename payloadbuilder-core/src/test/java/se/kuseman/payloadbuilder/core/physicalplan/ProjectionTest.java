@@ -47,7 +47,7 @@ public class ProjectionTest extends APhysicalPlanTest
 
         MutableBoolean closed = new MutableBoolean(false);
         IPhysicalPlan plan = new Projection(1, scan(schemaDS(() -> closed.setTrue(), tv), table, Schema.EMPTY),
-                asList(col1, new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN_EQUAL, col1, col3), col3), false);
+                asList(col1, new ComparisonExpression(IComparisonExpression.Type.GREATER_THAN_EQUAL, col1, col3), col3));
 
         //@formatter:off
         Schema expectedSchema = Schema.of(
@@ -86,8 +86,8 @@ public class ProjectionTest extends APhysicalPlanTest
     @Test
     public void test_schema_less_with_asteirsk()
     {
-        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
 
         //@formatter:off
         Schema runtimeSchema = Schema.of(
@@ -148,7 +148,7 @@ public class ProjectionTest extends APhysicalPlanTest
             }
         };
 
-        IPhysicalPlan plan = new Projection(1, input, asList(aastExp, bcol3Exp, calcExp), false);
+        IPhysicalPlan plan = new Projection(1, input, asList(aastExp, bcol3Exp, calcExp));
 
         // Asterisks => empty schema
         //@formatter:off
@@ -157,7 +157,7 @@ public class ProjectionTest extends APhysicalPlanTest
             .ignoringFieldsOfTypes(Location.class, Random.class)
             .isEqualTo(Schema.of(
                 new CoreColumn("", ResolvedType.of(Type.Any), "a.*", false, tableA, CoreColumn.Type.ASTERISK),
-                col("col3", ResolvedType.of(Type.Any), tableB),
+                nast("col3", ResolvedType.of(Type.Any), tableB),
                 new CoreColumn("", ResolvedType.of(Type.Boolean), "a.col2 > b.col2", false)));
         //@formatter:on
 
@@ -169,7 +169,7 @@ public class ProjectionTest extends APhysicalPlanTest
                 col("col1", Type.Any, tableA),
                 col("col2", Type.Any, tableA),
                 col("col3", Type.Any, tableA),
-                col("col3", Type.Any, tableB),
+                nast("col3", Type.Any, tableB),
                 new CoreColumn("", ResolvedType.of(Type.Boolean), "a.col2 > b.col2", false));
         //@formatter:on
 
@@ -216,7 +216,7 @@ public class ProjectionTest extends APhysicalPlanTest
         };
 
         MutableBoolean closed = new MutableBoolean(false);
-        IPhysicalPlan plan = new Projection(1, scan(schemaDS(() -> closed.setTrue(), tv), table, Schema.EMPTY), asList(col1, col3, ocol4), false);
+        IPhysicalPlan plan = new Projection(1, scan(schemaDS(() -> closed.setTrue(), tv), table, Schema.EMPTY), asList(col1, col3, ocol4));
 
         Schema outerSchema = schema("col4");
 

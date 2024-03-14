@@ -13,10 +13,9 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
-import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 
 /** An aliased expression */
-public class AliasExpression implements IExpression, HasAlias, HasTableSourceReference
+public class AliasExpression implements IExpression, HasAlias, HasColumnReference
 {
     private final IExpression expression;
     private final String alias;
@@ -63,11 +62,11 @@ public class AliasExpression implements IExpression, HasAlias, HasTableSourceRef
     }
 
     @Override
-    public TableSourceReference getTableSourceReference()
+    public ColumnReference getColumnReference()
     {
-        if (expression instanceof HasTableSourceReference htsr)
+        if (expression instanceof HasColumnReference htsr)
         {
-            return htsr.getTableSourceReference();
+            return htsr.getColumnReference();
         }
         return null;
     }

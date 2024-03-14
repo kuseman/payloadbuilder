@@ -11,10 +11,9 @@ import se.kuseman.payloadbuilder.core.expression.ARewriteExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.HasAlias;
 import se.kuseman.payloadbuilder.core.expression.HasAlias.Alias;
-import se.kuseman.payloadbuilder.core.logicalplan.Projection;
 
 /** Class that merges two projects that is nested. */
-class ProjectionMerger
+public class ProjectionMerger
 {
     private ProjectionMerger()
     {
@@ -23,23 +22,21 @@ class ProjectionMerger
     /**
      * Merges outer expressions with inner. Indexes the projection names from inner and replaces all occurrences in outer
      */
-    static List<IExpression> replace(List<IExpression> outerExpressions, Projection inner)
+    public static List<IExpression> replace(List<IExpression> outerExpressions, List<IExpression> innerExpressions)
     {
-        List<IExpression> innerExpressions = inner.getExpressions();
-
         Map<String, IExpression> innerByName = new HashMap<>(innerExpressions.size());
 
         for (IExpression e : innerExpressions)
         {
-            if (e instanceof HasAlias)
+            if (e instanceof HasAlias ha)
             {
-                String alias = ((HasAlias) e).getAlias()
+                String alias = ha.getAlias()
                         .getAlias()
                         .toLowerCase();
                 // Unwrap all alias expressions since we don't need those when replacing the outer
-                if (e instanceof AliasExpression)
+                if (e instanceof AliasExpression ae)
                 {
-                    e = ((AliasExpression) e).getExpression();
+                    e = ae.getExpression();
                 }
 
                 innerByName.put(alias, e);
@@ -55,15 +52,15 @@ class ProjectionMerger
             String alias = "";
             String outputAlias = "";
             boolean internal = false;
-            if (outer instanceof HasAlias)
+            if (outer instanceof HasAlias ha)
             {
-                Alias a = ((HasAlias) outer).getAlias();
+                Alias a = ha.getAlias();
                 alias = a.getAlias();
                 outputAlias = a.getOutputAlias();
 
-                if (outer instanceof AliasExpression)
+                if (outer instanceof AliasExpression ae)
                 {
-                    internal = ((AliasExpression) outer).isInternal();
+                    internal = ae.isInternal();
                 }
             }
             else
@@ -77,9 +74,9 @@ class ProjectionMerger
             // before replacing
             String resultAlias = "";
             // String resultOutputAlias = "";
-            if (outerResult instanceof HasAlias)
+            if (outerResult instanceof HasAlias ha)
             {
-                Alias a = ((HasAlias) outerResult).getAlias();
+                Alias a = ha.getAlias();
                 resultAlias = a.getAlias();
             }
 
@@ -122,7 +119,13 @@ class ProjectionMerger
             else if (ordinal >= 0)
             {
                 // Replace by ordinal
-                return context.inner.get(ordinal);
+                IExpression e = context.inner.get(ordinal);
+                // Unwrap alias expression if any, not needed
+                if (e instanceof AliasExpression ae)
+                {
+                    return ae.getExpression();
+                }
+                return e;
             }
 
             return expression;

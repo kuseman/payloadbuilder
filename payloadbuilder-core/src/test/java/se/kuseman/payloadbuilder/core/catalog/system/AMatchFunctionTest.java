@@ -63,7 +63,7 @@ public class AMatchFunctionTest extends APhysicalPlanTest
                         null,
                         vv(ResolvedType.of(Type.Int), null, null))));
         //@formatter:on
-        input = ce("col", ResolvedType.array(ResolvedType.of(Type.Int)), 0);
+        input = ce("col", 0, ResolvedType.array(ResolvedType.of(Type.Int)));
         lambdaExpression = new LambdaExpression(asList("x"), gt(lce("x", 0, ResolvedType.of(Type.Int)), intLit(3)), new int[] { 0 });
         actual = function.evalScalar(context, tv, "", asList(input, lambdaExpression));
 
@@ -84,7 +84,7 @@ public class AMatchFunctionTest extends APhysicalPlanTest
                 ));
         //@formatter:on
 
-        input = ce("col", ResolvedType.table(innerSchema), 0);
+        input = ce("col", 0, ResolvedType.table(innerSchema));
         lambdaExpression = new LambdaExpression(asList("x"), gt(DereferenceExpression.create(lce("x", 0, ResolvedType.object(innerSchema)), QualifiedName.of("key1"), null), intLit(4)),
                 new int[] { 0 });
         actual = function.evalScalar(context, tv, "", asList(input, lambdaExpression));
@@ -104,7 +104,7 @@ public class AMatchFunctionTest extends APhysicalPlanTest
 
         // Int output
         tv = TupleVector.of(Schema.of(col("col", Type.Int)), asList(vv(ResolvedType.of(Type.Int), 10, 20, 30, null)));
-        input = ce("col", ResolvedType.of(Type.Int), 0);
+        input = ce("col", 0, ResolvedType.of(Type.Int));
         lambdaExpression = new LambdaExpression(asList("x"), gt(lce("x", 0, ResolvedType.of(Type.Int)), intLit(10)), new int[] { 0 });
         actual = function.evalScalar(context, tv, "", asList(input, lambdaExpression));
 
@@ -122,7 +122,7 @@ public class AMatchFunctionTest extends APhysicalPlanTest
                         MapUtils.ofEntries(true, MapUtils.entry("key", 30), MapUtils.entry("key2", "value30")),
                         MapUtils.ofEntries(true, MapUtils.entry("key", 40), MapUtils.entry("key2", "value40")))));
         //@formatter:on
-        input = ce("col", ResolvedType.of(Type.Any), 0);
+        input = ce("col", 0, ResolvedType.of(Type.Any));
         lambdaExpression = new LambdaExpression(asList("x"), gt(new DereferenceExpression(lce("x", 0, ResolvedType.of(Type.Any)), "key", -1, ResolvedType.of(Type.Any)), intLit(10)), new int[] { 0 });
         actual = function.evalScalar(context, tv, "", asList(input, lambdaExpression));
 

@@ -48,13 +48,13 @@ public interface TupleIterator extends Iterator<TupleVector>
             @Override
             public int estimatedRowCount()
             {
-                return 1;
+                return vector.getRowCount();
             }
 
             @Override
             public int estimatedBatchCount()
             {
-                return vector.getRowCount();
+                return 1;
             }
 
             @Override

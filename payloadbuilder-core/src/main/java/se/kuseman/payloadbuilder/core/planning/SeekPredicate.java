@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 import se.kuseman.payloadbuilder.api.catalog.Index;
+import se.kuseman.payloadbuilder.api.catalog.Index.IndexType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
@@ -26,15 +27,17 @@ class SeekPredicate implements ISeekPredicate
 {
     /** Index used in this predicate */
     private final Index index;
+    private final IndexType indexType;
     /**
      * Columns used in this predicate. If the index is of ALL type this list will contain the found columns to use
      */
     private final List<String> indexColumns;
     private final List<IExpression> expressions;
 
-    SeekPredicate(Index index, List<String> indexColumns, List<IExpression> expressions)
+    SeekPredicate(Index index, IndexType indexType, List<String> indexColumns, List<IExpression> expressions)
     {
         this.index = requireNonNull(index, "index");
+        this.indexType = requireNonNull(indexType, "indexType");
         this.indexColumns = unmodifiableList(requireNonNull(indexColumns, "indexColumns"));
         this.expressions = requireNonNull(expressions);
 
@@ -48,6 +51,12 @@ class SeekPredicate implements ISeekPredicate
     public Index getIndex()
     {
         return index;
+    }
+
+    @Override
+    public IndexType getIndexType()
+    {
+        return indexType;
     }
 
     @Override
@@ -139,13 +148,6 @@ class SeekPredicate implements ISeekPredicate
                 public ValueVector getValue()
                 {
                     return keyVector;
-                }
-
-                @Override
-                public SeekType getType()
-                {
-                    // Only EQ supported for now
-                    return SeekType.EQ;
                 }
             });
         }

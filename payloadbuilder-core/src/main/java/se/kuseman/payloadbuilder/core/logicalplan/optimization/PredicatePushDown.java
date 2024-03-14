@@ -286,7 +286,7 @@ class PredicatePushDown extends ALogicalPlanOptimizer<PredicatePushDown.Ctx>
         AnalyzeResult analyzeResult = context.analyzeResults.remove(resultIndex)
                 .getValue();
 
-        return new Join(outer, inner, plan.getType(), plan.getPopulateAlias(), analyzeResult.getPredicate(), plan.getOuterReferences(), plan.isSwitchedInputs());
+        return new Join(outer, inner, plan.getType(), plan.getPopulateAlias(), analyzeResult.getPredicate(), plan.getOuterReferences(), plan.isSwitchedInputs(), plan.getOuterSchema());
     }
 
     /** Visitor that collects table sources from a {@link ILogicalPlan} */

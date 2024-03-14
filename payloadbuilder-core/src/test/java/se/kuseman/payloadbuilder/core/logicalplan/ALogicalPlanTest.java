@@ -26,19 +26,14 @@ public abstract class ALogicalPlanTest extends AExpressionTest
         return new TableScan(new TableSchema(schema), tableSource, projection, false, emptyList(), null);
     }
 
-    protected SubQuery subQuery(ILogicalPlan input, String alias)
+    protected SubQuery subQuery(ILogicalPlan input, TableSourceReference tableSource)
     {
-        return new SubQuery(input, alias, null);
+        return new SubQuery(input, tableSource, null);
     }
 
     protected Projection projection(ILogicalPlan input, List<IExpression> expressions)
     {
-        return new Projection(input, expressions, false);
-    }
-
-    protected Projection compute(ILogicalPlan input, List<IExpression> expressions)
-    {
-        return new Projection(input, expressions, true);
+        return new Projection(input, expressions);
     }
 
     protected SortItem sortItem(IExpression expression, Order order)

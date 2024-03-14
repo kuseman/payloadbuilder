@@ -14,6 +14,7 @@ import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.common.SortItem;
 import se.kuseman.payloadbuilder.core.expression.ARewriteExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
+import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.Aggregate;
 import se.kuseman.payloadbuilder.core.logicalplan.ExpressionScan;
@@ -63,18 +64,23 @@ class ColumnOrdinalResolver extends ALogicalPlanOptimizer<ColumnOrdinalResolver.
         ILogicalPlan input = plan.getInput()
                 .accept(this, context);
 
-        context.schema = input.getSchema();
+        // CSOFF
+        Schema prevSchema = context.schema;
         Schema prevOuterSchema = context.outerSchema;
-        context.outerSchema = SchemaUtils.concat(context.outerSchema, context.schema);
+        // CSON
+
+        context.schema = input.getSchema();
+        context.outerSchema = SchemaUtils.joinSchema(context.outerSchema, context.schema);
 
         List<IExpression> expressions = plan.getExpressions()
                 .stream()
                 .map(e -> ColumnOrdinalRewriter.INSTANCE.visit(e, context))
                 .collect(toList());
 
+        context.schema = prevSchema;
         context.outerSchema = prevOuterSchema;
 
-        return new Projection(input, expressions, plan.isAppendInputColumns());
+        return new Projection(input, expressions);
     }
 
     @Override
@@ -121,7 +127,7 @@ class ColumnOrdinalResolver extends ALogicalPlanOptimizer<ColumnOrdinalResolver.
         if (plan.getCondition() == null
                 && plan.getType() != Type.CROSS)
         {
-            context.outerSchema = SchemaUtils.concat(context.outerSchema, outer.getSchema());
+            context.outerSchema = SchemaUtils.joinSchema(context.outerSchema, outer.getSchema());
         }
         else
         {
@@ -142,7 +148,7 @@ class ColumnOrdinalResolver extends ALogicalPlanOptimizer<ColumnOrdinalResolver.
 
         context.outerSchema = prevOuterSchema;
 
-        return new Join(outer, inner, plan.getType(), plan.getPopulateAlias(), condition, plan.getOuterReferences(), plan.isSwitchedInputs());
+        return new Join(outer, inner, plan.getType(), plan.getPopulateAlias(), condition, plan.getOuterReferences(), plan.isSwitchedInputs(), plan.getOuterSchema());
     }
 
     @Override
@@ -195,7 +201,10 @@ class ColumnOrdinalResolver extends ALogicalPlanOptimizer<ColumnOrdinalResolver.
             int ordinal = ce.getOrdinal();
             if (ordinal >= 0)
             {
-                TableSourceReference tableSource = ce.getTableSourceReference();
+                ColumnReference cr = ce.getColumnReference();
+
+                TableSourceReference tableSource = cr != null ? cr.tableSourceReference()
+                        : null;
                 int tableSourceId = tableSource != null ? tableSource.getId()
                         : -1;
                 String alias = ce.getAlias()

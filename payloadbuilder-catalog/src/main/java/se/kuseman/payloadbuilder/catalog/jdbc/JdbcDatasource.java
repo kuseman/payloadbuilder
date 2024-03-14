@@ -30,7 +30,6 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.ISeekKey;
-import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.SeekType;
 import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
@@ -124,12 +123,6 @@ class JdbcDatasource implements IDatasource
                             public ValueVector getValue()
                             {
                                 return ValueVector.literalString("<index values " + c + ">", 1);
-                            }
-
-                            @Override
-                            public SeekType getType()
-                            {
-                                return SeekType.EQ;
                             }
                         })
                         .collect(toList());

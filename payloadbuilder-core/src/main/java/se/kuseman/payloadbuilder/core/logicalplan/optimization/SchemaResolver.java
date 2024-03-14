@@ -144,7 +144,7 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
             if (schema.getSize() > 0
                     && schema.getColumns()
                             .stream()
-                            .anyMatch(SchemaUtils::isAsterisk))
+                            .anyMatch(c -> SchemaUtils.isAsterisk(c, true)))
             {
                 throw new ParseException("Schema for table: " + plan.getTableSource()
                                          + " is invalid. Schema must be either empty (asterisk) or have only regular columns. Check implementation of Catalog: "
@@ -153,25 +153,26 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
             }
 
             indices = tableSchema.getIndices();
-            // No schema returned, create an asterisk
-            if (schema.getColumns()
-                    .isEmpty())
-            {
-                schema = Schema.of(new CoreColumn(plan.getAlias(), ResolvedType.of(Type.Any), "", false, plan.getTableSource(), CoreColumn.Type.ASTERISK));
-            }
         }
 
-        // Recreate schema with correct table and column references
-        TableSourceReference tableSource = plan.getTableSource();
-
-        schema = recreate(tableSource, schema);
+        // No schema returned, create an asterisk
+        if (SchemaUtils.isAsterisk(schema, true))
+        {
+            schema = Schema.of(new CoreColumn(plan.getAlias(), ResolvedType.of(Type.Any), "", false, plan.getTableSource(), CoreColumn.Type.ASTERISK));
+        }
+        else
+        {
+            schema = recreate(plan.getTableSource(), schema);
+        }
 
         List<Option> options = plan.getOptions()
                 .stream()
                 .map(o -> new Option(o.getOption(), ExpressionResolver.INSTANCE.visit(o.getValueExpression(), context)))
                 .collect(toList());
 
-        return new TableScan(new TableSchema(schema, indices), plan.getTableSource(), plan.getProjection(), plan.isTempTable(), options, plan.getLocation());
+        TableSchema tableSchema = new TableSchema(schema, indices);
+        context.schemaByTableSource.put(plan.getTableSource(), tableSchema);
+        return new TableScan(tableSchema, plan.getTableSource(), plan.getProjection(), plan.isTempTable(), options, plan.getLocation());
     }
 
     /**
@@ -215,9 +216,9 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
                 .map(c ->
                 {
                     ResolvedType type = c.getType();
-                    boolean asterisk = SchemaUtils.isAsterisk(c);
+                    boolean asterisk = SchemaUtils.isAsterisk(c, true);
                     // // Force all columns to have a column reference
-                    return new CoreColumn(c.getName(), type, "", false, tableSource, asterisk ? CoreColumn.Type.ASTERISK
+                    return new CoreColumn(c.getName(), type, "", false, tableSource, asterisk ? CoreColumn.Type.NAMED_ASTERISK
                             : CoreColumn.Type.REGULAR);
                 })
                 .collect(toList()));

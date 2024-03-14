@@ -98,6 +98,12 @@ class RangeFunction extends TableFunctionInfo
             }
 
             @Override
+            public int estimatedRowCount()
+            {
+                return rowCount;
+            }
+
+            @Override
             public TupleVector next()
             {
                 if (next == null)
