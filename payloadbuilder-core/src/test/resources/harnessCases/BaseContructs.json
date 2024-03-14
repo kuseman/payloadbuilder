@@ -298,9 +298,9 @@
       ],
       "expectedResultSets": [
         [
-          [{ "key": "row_id", "value": 1 }, { "key": "len", "value": 3 }],
           [{ "key": "row_id", "value": 3 }, { "key": "len", "value": 3 }],
-          [{ "key": "row_id", "value": 2 }, { "key": "len", "value": 3 }]
+          [{ "key": "row_id", "value": 2 }, { "key": "len", "value": 3 }],
+          [{ "key": "row_id", "value": 1 }, { "key": "len", "value": 3 }]
         ]
       ]
     },
@@ -400,8 +400,8 @@
       "expectedResultSets": [
         [
           [{ "key": "id", "value": [1,1  ] },{ "key": "row_id", "value": [1, 2]    },{ "key": "data", "value": ["1_1", "1_2"        ]}],
-          [{ "key": "id", "value": [3,3,3] },{ "key": "row_id", "value": [1, 2, 3] },{ "key": "data", "value": ["3_1", "3_2", "3_3" ]}],
-          [{ "key": "id", "value": [2    ] },{ "key": "row_id", "value": [1]       },{ "key": "data", "value": ["2_1"               ]}]
+          [{ "key": "id", "value": [2    ] },{ "key": "row_id", "value": [1]       },{ "key": "data", "value": ["2_1"               ]}],
+          [{ "key": "id", "value": [3,3,3] },{ "key": "row_id", "value": [1, 2, 3] },{ "key": "data", "value": ["3_1", "3_2", "3_3" ]}]
         ]
       ]
     },

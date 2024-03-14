@@ -917,78 +917,6 @@ public interface ValueVector
         }
     }
 
-    // /** Definition of a nested value like an object/array etc. that can be lazily written to an {@link OutputWriter} */
-    // interface OutputWritable
-    // {
-    // /** OutputWritable that emits an empty object */
-    // static final OutputWritable EMPTY_OBJECT_OUTPUT_WRITABLE = new OutputWritable()
-    // {
-    // @Override
-    // public void write(OutputWriter outputWriter, IExecutionContext context)
-    // {
-    // outputWriter.startObject();
-    // outputWriter.endObject();
-    // }
-    //
-    // @Override
-    // public int hashCode()
-    // {
-    // return 0;
-    // }
-    //
-    // @Override
-    // public boolean equals(Object obj)
-    // {
-    // if (obj == null)
-    // {
-    // return false;
-    // }
-    // else if (obj == this)
-    // {
-    // return true;
-    // }
-    // return false;
-    // }
-    // };
-    //
-    // /** OutputWritable that emits an empty array */
-    // static final OutputWritable EMPTY_ARRAY_OUTPUT_WRITABLE = new OutputWritable()
-    // {
-    // @Override
-    // public void write(OutputWriter outputWriter, IExecutionContext context)
-    // {
-    // outputWriter.startArray();
-    // outputWriter.endArray();
-    // }
-    //
-    // @Override
-    // public int hashCode()
-    // {
-    // return 0;
-    // }
-    //
-    // @Override
-    // public boolean equals(Object obj)
-    // {
-    // if (obj == null)
-    // {
-    // return false;
-    // }
-    // else if (obj == this)
-    // {
-    // return true;
-    // }
-    // return false;
-    // }
-    // };
-    //
-    // /** Write this value to provided writer */
-    // void write(OutputWriter outputWriter, IExecutionContext context);
-    //
-    // @Override
-    // String toString();
-    // }
-
     /** Cast provided value to boolean if possible else throws */
     static boolean toBoolean(ResolvedType type, Object v)
     {
@@ -1097,11 +1025,11 @@ public interface ValueVector
             value = ((UTF8String) value).toString();
         }
 
-        if (value instanceof String)
+        if (value instanceof String str)
         {
             try
             {
-                return Float.parseFloat((String) value);
+                return Float.parseFloat(str);
             }
             catch (NumberFormatException e)
             {

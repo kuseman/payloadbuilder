@@ -10,6 +10,7 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.ICastExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
@@ -63,9 +64,9 @@ public class CastExpression implements ICastExpression
     @Override
     public IExpression fold()
     {
-        if (expression.isConstant())
+        if (expression instanceof LiteralExpression le)
         {
-            ValueVector eval = eval(null);
+            ValueVector eval = le.eval(null);
 
             if (eval.isNull(0))
             {
@@ -77,7 +78,13 @@ public class CastExpression implements ICastExpression
             // CSON
             {
                 case Array:
-                    return new LiteralArrayExpression(eval.getArray(0));
+                    // Convert value to ValueVector
+                    Object obj = eval.valueAsObject(0);
+                    if (obj instanceof ValueVector vec)
+                    {
+                        return new LiteralArrayExpression(vec);
+                    }
+                    return new LiteralArrayExpression(VectorUtils.convertToValueVector(obj));
                 case Boolean:
                     return eval.getBoolean(0) ? LiteralBooleanExpression.TRUE
                             : LiteralBooleanExpression.FALSE;
@@ -118,6 +125,15 @@ public class CastExpression implements ICastExpression
                 .equals(type))
         {
             return value;
+        }
+
+        if (!type.getType()
+                .isComplex())
+        {
+            IValueVectorBuilder builder = context.getVectorBuilderFactory()
+                    .getValueVectorBuilder(type, input.getRowCount());
+            builder.copy(value);
+            return builder.build();
         }
 
         // Use implicit casts in ValueVector for simple types

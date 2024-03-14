@@ -115,10 +115,18 @@ public class Limit implements IPhysicalPlan
                 }
 
                 TupleVector vector = it.next();
-
-                int maxRows = Math.min(topCount - count, vector.getRowCount());
-                count += maxRows;
-                next = new MaxTupleVector(vector, maxRows);
+                int rowCount = vector.getRowCount();
+                if (count + rowCount < topCount)
+                {
+                    next = vector;
+                    count += rowCount;
+                }
+                else
+                {
+                    int maxRows = Math.min(topCount - count, rowCount);
+                    count += maxRows;
+                    next = new MaxTupleVector(vector, maxRows);
+                }
                 return true;
             }
         };

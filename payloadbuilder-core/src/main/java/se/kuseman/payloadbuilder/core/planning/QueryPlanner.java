@@ -40,6 +40,7 @@ import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.INullPredicateExpression;
 import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.TemporaryTable;
@@ -205,8 +206,9 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
 
         boolean hasSortItems = !sortItems.isEmpty();
 
-        Catalog catalog = context.getSession()
-                .getCatalog(plan.getCatalogAlias());
+        Catalog catalog = plan.isTempTable() ? SystemCatalog.get()
+                : context.getSession()
+                        .getCatalog(plan.getCatalogAlias());
 
         SeekPredicate seekPredicate = null;
         IDatasource dataSource;

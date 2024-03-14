@@ -1,7 +1,6 @@
 package se.kuseman.payloadbuilder.core.catalog.system;
 
 import java.util.List;
-import java.util.function.IntFunction;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -10,8 +9,13 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.IVectorBuilderFactory;
+import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
+
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 
 /** Min aggregate. Return the min value among values */
 class AggregateMinMaxFunction extends ScalarFunctionInfo
@@ -55,18 +59,15 @@ class AggregateMinMaxFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public ValueVector evalAggregate(IExecutionContext context, AggregateMode mode, ValueVector groups, String catalogAlias, List<IExpression> arguments)
+    public IAggregator createAggregator(AggregateMode mode, String catalogAlias, List<IExpression> arguments)
     {
         if (mode == AggregateMode.DISTINCT)
         {
             throw new UnsupportedOperationException(getName() + " DISTINCT is unsupported");
         }
-        final IExpression arg = arguments.get(0);
-        return aggregate(context, groups.size(), getAggregateType(arguments), group ->
-        {
-            TupleVector groupVector = groups.getTable(group);
-            return arg.eval(groupVector, context);
-        });
+        IExpression expression = arguments.get(0);
+        ResolvedType resolvedType = getAggregateType(arguments);
+        return new MinMaxAggregator(min, expression, resolvedType);
     }
 
     @Override
@@ -93,21 +94,88 @@ class AggregateMinMaxFunction extends ScalarFunctionInfo
             return value;
         }
 
-        return aggregate(context, input.getRowCount(), getType(arguments), group -> value.getArray(group));
+        int rowCount = input.getRowCount();
+        MinMaxAggregator aggregator = new MinMaxAggregator(min, arguments.get(0), getType(arguments));
+        aggregator.minMaxRow = new ObjectArrayList<>(rowCount);
+        aggregator.minMaxRow.size(rowCount);
+
+        for (int i = 0; i < rowCount; i++)
+        {
+            ValueVector vector = value.getArray(i);
+            aggregator.setMinMaxRow(vector, i, context.getVectorBuilderFactory());
+        }
+
+        return aggregator.combine(context);
     }
 
-    private ValueVector aggregate(IExecutionContext context, int size, ResolvedType type, IntFunction<ValueVector> vectorSupplier)
+    private static class MinMaxAggregator implements IAggregator
     {
-        // Result is array with row index for each group with the min/max index
-        int[] result = new int[size];
-        ValueVector[] vectors = new ValueVector[size];
+        private final boolean min;
+        private final IExpression expression;
+        private final ResolvedType resolvedType;
 
-        // Find out min/max for each group
-        for (int i = 0; i < size; i++)
+        /** List with min/max value per */
+        private ObjectList<ValueVector> minMaxRow;
+
+        private MinMaxAggregator(boolean min, IExpression expression, ResolvedType resolvedType)
         {
-            ValueVector vector = vectorSupplier.apply(i);
-            vectors[i] = vector;
+            this.min = min;
+            this.expression = expression;
+            this.resolvedType = resolvedType;
+        }
 
+        @Override
+        public void appendGroup(TupleVector groupData, IExecutionContext context)
+        {
+            ValueVector groupTables = groupData.getColumn(0);
+            ValueVector groupIds = groupData.getColumn(1);
+
+            int groupCount = groupData.getRowCount();
+
+            if (minMaxRow == null)
+            {
+                minMaxRow = new ObjectArrayList<>(groupCount + 1);
+            }
+
+            for (int i = 0; i < groupCount; i++)
+            {
+                int groupId = groupIds.getInt(i);
+                minMaxRow.size(Math.max(minMaxRow.size(), groupId + 1));
+                TupleVector vector = groupTables.getTable(i);
+                if (vector.getRowCount() == 0)
+                {
+                    continue;
+                }
+
+                ValueVector result = expression.eval(vector, context);
+                setMinMaxRow(result, groupId, context.getVectorBuilderFactory());
+            }
+        }
+
+        @Override
+        public ValueVector combine(IExecutionContext context)
+        {
+            int size = minMaxRow.size();
+            IValueVectorBuilder builder = context.getVectorBuilderFactory()
+                    .getValueVectorBuilder(resolvedType, size);
+            for (int i = 0; i < size; i++)
+            {
+                ValueVector groupResult = minMaxRow.get(i);
+                if (groupResult == null)
+                {
+                    builder.putNull();
+                }
+                else
+                {
+                    builder.put(groupResult, i);
+                }
+            }
+            return builder.build();
+        }
+
+        /** Compares provided batch and sets min/max in stage */
+        private void setMinMaxRow(ValueVector vector, int group, IVectorBuilderFactory vectorFactory)
+        {
             int groupSize = vector.size();
 
             boolean prevNull = false;
@@ -133,7 +201,7 @@ class AggregateMinMaxFunction extends ScalarFunctionInfo
                 }
 
                 prevNull = false;
-                int c = VectorUtils.compare(vector, vector, type.getType(), currentIndex, j);
+                int c = VectorUtils.compare(vector, vector, resolvedType.getType(), currentIndex, j);
 
                 // Switch index
                 if ((!min
@@ -145,25 +213,31 @@ class AggregateMinMaxFunction extends ScalarFunctionInfo
                 }
             }
 
-            result[i] = prevNull ? -1
-                    : currentIndex;
-        }
-
-        IValueVectorBuilder builder = context.getVectorBuilderFactory()
-                .getValueVectorBuilder(type, size);
-        for (int i = 0; i < size; i++)
-        {
-            if (result[i] == -1)
+            ValueVector prevRow = minMaxRow.get(group);
+            // First non null group, copy this batch min/max row
+            if (prevRow == null
+                    && !prevNull)
             {
-                builder.putNull();
+                IValueVectorBuilder vectorBuilder = vectorFactory.getValueVectorBuilder(vector.type(), 1);
+                vectorBuilder.put(vector, currentIndex);
+                minMaxRow.set(group, vectorBuilder.build());
             }
-            else
+            // Compare this batch min/mix with previous batch
+            else if (!prevNull)
             {
-                builder.put(vectors[i], result[i]);
+                int c = VectorUtils.compare(prevRow, vector, resolvedType.getType(), 0, currentIndex);
+                // Switch state min/max row
+                if ((!min
+                        && c < 0)
+                        || (min
+                                && c > 0))
+                {
+                    IValueVectorBuilder vectorBuilder = vectorFactory.getValueVectorBuilder(vector.type(), 1);
+                    vectorBuilder.put(vector, currentIndex);
+                    minMaxRow.set(group, vectorBuilder.build());
+                }
             }
         }
-
-        return builder.build();
     }
 
     @Override

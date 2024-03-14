@@ -377,7 +377,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         IPhysicalPlan expected = new Limit(
                 1,
-                new TableScan(0, schema, tableA, "test", true, new TemporaryTableDataSource(Optional.of(schema), QualifiedName.of("tablea"), null),
+                new TableScan(0, schema, tableA, "System", true, new TemporaryTableDataSource(Optional.of(schema), QualifiedName.of("tablea"), null),
                 emptyList()),
                 intLit(100));
         //@formatter:on

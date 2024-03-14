@@ -11,6 +11,7 @@ import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo.AggregateMode;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.core.parser.Location;
@@ -99,9 +100,9 @@ public class UnresolvedFunctionCallExpression implements IExpression, IAggregate
     }
 
     @Override
-    public ValueVector eval(ValueVector groups, IExecutionContext context)
+    public IAggregator createAggregator()
     {
-        throw new IllegalArgumentException("An unresolved function call expression should not be evaluated");
+        throw new IllegalArgumentException("An unresolved function call expression should not be aggregated");
     }
 
     @Override

@@ -15,6 +15,7 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.Decimal;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
@@ -52,12 +53,59 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
                 TupleVector.of(schema, asList(smallInts)),
                 TupleVector.of(schema, asList(mediumInts)),
                 TupleVector.of(schema, asList(nulls)));
+        
+        IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0, 1, 2)
+                        )), context);
         //@formatter:on
 
-        ValueVector actual = function.evalAggregate(context, AggregateMode.ALL, v, "", asList(col1));
+        ValueVector actual = aggregator.combine(context);
+
         assertEquals(ResolvedType.of(Type.Any), actual.type());
         assertEquals(3, actual.size());
         assertVectorsEquals(vv(Type.Any, 40, 40_000_000, null), actual);
+    }
+
+    @Test
+    public void test_object_multi_vector()
+    {
+        ValueVector smallInts = ValueVector.literalAny(4, 10);
+        ValueVector mediumInts = ValueVector.literalAny(4, 10_000_000);
+        ValueVector nulls = ValueVector.literalNull(ResolvedType.of(Type.Any), 4);
+
+        Schema schema = schema(new Type[] { Type.Any }, "col1");
+
+        //@formatter:off
+        ValueVector v = ValueVector.literalTable(
+                TupleVector.of(schema, asList(smallInts)),
+                TupleVector.of(schema, asList(mediumInts)),
+                TupleVector.of(schema, asList(nulls)));
+        
+        IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0, 1, 2)
+                        )), context);
+        
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 1, 2, 3)
+                        )), context);
+        //@formatter:on
+
+        ValueVector actual = aggregator.combine(context);
+
+        assertEquals(ResolvedType.of(Type.Any), actual.type());
+        assertEquals(4, actual.size());
+        assertVectorsEquals(vv(Type.Any, 40, 40_000_040, 40_000_000, null), actual);
     }
 
     @Test
@@ -74,12 +122,57 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
                 TupleVector.of(schema, asList(smallInts)),
                 TupleVector.of(schema, asList(mediumInts)),
                 TupleVector.of(schema, asList(nulls)));
+        
+        IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0, 1, 2)
+                        )), context);
         //@formatter:on
 
-        ValueVector actual = function.evalAggregate(context, AggregateMode.ALL, v, "", asList(col1));
+        ValueVector actual = aggregator.combine(context);
         assertEquals(ResolvedType.of(Type.Decimal), actual.type());
         assertEquals(3, actual.size());
         assertVectorsEquals(vv(Type.Decimal, Decimal.from(40), Decimal.from(40_000_000), null), actual);
+    }
+
+    @Test
+    public void test_decimal_multi_vectors()
+    {
+        ValueVector smallInts = ValueVector.literalDecimal(Decimal.from(10), 4);
+        ValueVector mediumInts = ValueVector.literalDecimal(Decimal.from(10_000_000), 4);
+        ValueVector nulls = ValueVector.literalNull(ResolvedType.of(Type.Decimal), 4);
+
+        Schema schema = schema(new Type[] { Type.Decimal }, "col1");
+
+        //@formatter:off
+        ValueVector v = ValueVector.literalTable(
+                TupleVector.of(schema, asList(smallInts)),
+                TupleVector.of(schema, asList(mediumInts)),
+                TupleVector.of(schema, asList(nulls)));
+        
+        IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0, 1, 2)
+                        )), context);
+
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 3, 1, 0)
+                        )), context);
+        //@formatter:on
+
+        ValueVector actual = aggregator.combine(context);
+        assertEquals(ResolvedType.of(Type.Decimal), actual.type());
+        assertEquals(4, actual.size());
+        assertVectorsEquals(vv(Type.Decimal, Decimal.from(40), Decimal.from(80_000_000), null, Decimal.from(40)), actual);
     }
 
     @Test
@@ -128,12 +221,50 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
                 TupleVector.of(schema, asList(smallInts)),
                 TupleVector.of(schema, asList(mediumInts)),
                 TupleVector.of(schema, asList(nulls)));
+
+        IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0, 1, 2)
+                        )), context);
         //@formatter:on
 
-        ValueVector actual = function.evalAggregate(context, AggregateMode.ALL, v, "", asList(col1));
+        ValueVector actual = aggregator.combine(context);
         assertEquals(ResolvedType.of(Type.Int), actual.type());
         assertEquals(3, actual.size());
         assertVectorsEquals(vv(Type.Int, 40, 40_000_000, null), actual);
+    }
+
+    @Test
+    public void test_int_all_null()
+    {
+        ValueVector smallInts = ValueVector.literalNull(ResolvedType.of(Type.Int), 4);
+        ValueVector mediumInts = ValueVector.literalNull(ResolvedType.of(Type.Int), 4);
+        ValueVector nulls = ValueVector.literalNull(ResolvedType.of(Type.Int), 4);
+
+        Schema schema = schema(new Type[] { Type.Int }, "col1");
+
+        //@formatter:off
+        ValueVector v = ValueVector.literalTable(
+                TupleVector.of(schema, asList(smallInts)),
+                TupleVector.of(schema, asList(mediumInts)),
+                TupleVector.of(schema, asList(nulls)));
+
+        IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0, 1, 2)
+                        )), context);
+        //@formatter:on
+
+        ValueVector actual = aggregator.combine(context);
+        assertEquals(ResolvedType.of(Type.Int), actual.type());
+        assertEquals(3, actual.size());
+        assertVectorsEquals(vv(Type.Int, null, null, null), actual);
     }
 
     @Test
@@ -150,9 +281,17 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
                 TupleVector.of(schema, asList(smallLongs)),
                 TupleVector.of(schema, asList(mediumLongs)),
                 TupleVector.of(schema, asList(nulls)));
+
+        IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0, 1, 2)
+                        )), context);
         //@formatter:on
 
-        ValueVector actual = function.evalAggregate(context, AggregateMode.ALL, v, "", asList(col1));
+        ValueVector actual = aggregator.combine(context);
         assertEquals(ResolvedType.of(Type.Long), actual.type());
         assertEquals(3, actual.size());
         assertVectorsEquals(vv(Type.Long, 40L, 40_000_000L, null), actual);
@@ -172,9 +311,17 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
                 TupleVector.of(schema, asList(smallInts)),
                 TupleVector.of(schema, asList(mediumInts)),
                 TupleVector.of(schema, asList(nulls)));
+
+        IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0, 1, 2)
+                        )), context);
         //@formatter:on
 
-        ValueVector actual = function.evalAggregate(context, AggregateMode.ALL, v, "", asList(col1));
+        ValueVector actual = aggregator.combine(context);
         assertEquals(ResolvedType.of(Type.Float), actual.type());
         assertEquals(3, actual.size());
         assertVectorsEquals(vv(Type.Float, 40F, 40_000_000F, null), actual);
@@ -194,9 +341,17 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
                 TupleVector.of(schema, asList(mediumInts)),
                 TupleVector.of(schema, asList(smallInts)),
                 TupleVector.of(schema, asList(nulls)));
+
+        IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0, 1, 2)
+                        )), context);
         //@formatter:on
 
-        ValueVector actual = function.evalAggregate(context, AggregateMode.ALL, v, "", asList(col1));
+        ValueVector actual = aggregator.combine(context);
         assertEquals(ResolvedType.of(Type.Double), actual.type());
         assertEquals(3, actual.size());
         assertVectorsEquals(vv(Type.Double, 40_000_000D, 40D, null), actual);
@@ -211,7 +366,15 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
         Schema schema = schema(new Type[] { Type.Long }, "col1");
 
         ValueVector v = ValueVector.literalTable(TupleVector.of(schema, asList(longs)));
-        function.evalAggregate(context, AggregateMode.ALL, v, "", asList(col1));
+        //@formatter:off
+        IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0)
+                        )), context);
+        //@formatter:on
     }
 
     @Test(
@@ -231,7 +394,14 @@ public class AggregateSumFunctionTest extends APhysicalPlanTest
                 TupleVector.of(schema, asList(largeInts)),
                 TupleVector.of(schema, asList(mediumInts)),
                 TupleVector.of(schema, asList(nulls)));
+
+        IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0, 1, 2, 3)
+                        )), context);
         //@formatter:on
-        function.evalAggregate(context, AggregateMode.ALL, v, "", asList(col1));
     }
 }

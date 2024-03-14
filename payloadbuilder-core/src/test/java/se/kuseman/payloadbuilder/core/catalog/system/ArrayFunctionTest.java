@@ -11,8 +11,10 @@ import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo.AggregateMode;
+import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.expression.FunctionCallExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralArrayExpression;
@@ -51,11 +53,23 @@ public class ArrayFunctionTest extends APhysicalPlanTest
         TupleVector input;
         ValueVector actual;
         ValueVector vv;
+        IAggregator aggregator;
 
         // No input rows
         input = TupleVector.EMPTY;
         vv = ValueVector.literalTable(input);
-        actual = scalar.evalAggregate(context, AggregateMode.ALL, vv, "", asList(col1));
+
+        //@formatter:off
+        aggregator = scalar.createAggregator(AggregateMode.ALL, "", asList(col1));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(input.getSchema())),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        vv,
+                        vv(Type.Int, 0)
+                        )), context);
+        //@formatter:on
+
+        actual = aggregator.combine(context);
         assertEquals(ResolvedType.array(Column.Type.Any), scalar.getAggregateType(asList(col1)));
         assertVectorsEquals(vv(ResolvedType.array(Type.Any), (ValueVector) null), actual);
 
@@ -77,17 +91,50 @@ public class ArrayFunctionTest extends APhysicalPlanTest
 
         input = TupleVector.of(schema("col1", "col2"), asList(vv(Type.Any, 1, 2, 3), vv(Type.Any, 4, 5, 6)));
         vv = ValueVector.literalTable(input);
-        actual = scalar.evalAggregate(context, AggregateMode.ALL, vv, "", asList(col1));
+
+        //@formatter:off
+        aggregator = scalar.createAggregator(AggregateMode.ALL, "", asList(col1));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(input.getSchema())),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        vv,
+                        vv(Type.Int, 0)
+                        )), context);
+        //@formatter:on
+
+        actual = aggregator.combine(context);
         assertVectorsEquals(vv(ResolvedType.array(Type.Any), vv(ResolvedType.of(Type.Any), 1, 2, 3)), actual);
 
         vv = ValueVector.literalTable(input);
-        actual = scalar.evalAggregate(context, AggregateMode.ALL, vv, "", asList(col1, col2));
+
+        //@formatter:off
+        aggregator = scalar.createAggregator(AggregateMode.ALL, "", asList(col1, col2));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(input.getSchema())),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        vv,
+                        vv(Type.Int, 0)
+                        )), context);
+        //@formatter:on
+
+        actual = aggregator.combine(context);
         assertVectorsEquals(vv(ResolvedType.array(Type.Any), vv(ResolvedType.of(Type.Any), 1, 4, 2, 5, 3, 6)), actual);
 
         // Mix both aggregate and scalar array call
         // array(array(col1, col2))
         vv = ValueVector.literalTable(input);
-        actual = scalar.evalAggregate(context, AggregateMode.ALL, vv, "", asList(new FunctionCallExpression("", scalar, null, asList(col1, col2))));
-        assertVectorsEquals(vv(ResolvedType.array(Type.Any), vv(ResolvedType.array(Type.Any), vv(Type.Any, 1, 4), vv(Type.Any, 2, 5), vv(Type.Any, 3, 6))), actual);
+
+        //@formatter:off
+        aggregator = scalar.createAggregator(AggregateMode.ALL, "", asList(new FunctionCallExpression("", scalar, null, asList(col1, col2))));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(input.getSchema())),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        vv,
+                        vv(Type.Int, 0)
+                        )), context);
+        //@formatter:on
+
+        actual = aggregator.combine(context);
+        assertVectorsEquals(vv(ResolvedType.array(Type.Any), vv(Type.Any, vv(Type.Any, 1, 4), vv(Type.Any, 2, 5), vv(Type.Any, 3, 6))), actual);
     }
 }
