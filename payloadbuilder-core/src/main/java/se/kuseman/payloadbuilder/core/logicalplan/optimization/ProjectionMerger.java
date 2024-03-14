@@ -119,11 +119,13 @@ class ProjectionMerger
                 // Return replacement or it self if no replacement was found
                 return context.innerByName.getOrDefault(column.toLowerCase(), expression);
             }
-            else
+            else if (ordinal >= 0)
             {
                 // Replace by ordinal
                 return context.inner.get(ordinal);
             }
+
+            return expression;
         }
     }
 }

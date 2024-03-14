@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 import static java.util.Arrays.asList;
 import static se.kuseman.payloadbuilder.api.QualifiedName.of;
 
+import java.util.List;
 import java.util.Random;
 
 import org.assertj.core.api.Assertions;
@@ -24,6 +25,7 @@ import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.FunctionCallExpression;
+import se.kuseman.payloadbuilder.core.expression.SubscriptExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedSubQueryExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.Aggregate;
@@ -43,6 +45,46 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     private final ComputedExpressionPushDown optimizer = new ComputedExpressionPushDown();
     private final TableSourceReference table = new TableSourceReference("", of("table"), "t");
     private final ColumnReference tAst = new ColumnReference(table, "t", ColumnReference.Type.ASTERISK);
+
+    @Test
+    public void test_order_by_and_projection_with_subscript()
+    {
+        //@formatter:off
+        String query = """
+                select concat(col, 1)[0]
+                from "table" t
+                order by concat(col, 1)[0]
+                """;
+        //@formatter:on
+
+        ILogicalPlan plan = getSchemaResolvedPlan(query);
+        ILogicalPlan actual = optimize(context, plan);
+
+        //@formatter:off
+        //CSOFF
+        ILogicalPlan expected = new Sort(
+                projection(
+                    new Projection(
+                        tableScan(Schema.of(CoreColumn.of(tAst, ResolvedType.of(Type.Any))), table),
+                        List.of(new AliasExpression(new SubscriptExpression(new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("concat"), null, asList(uce("col"), intLit(1))), intLit(0)), "__expr0", true)),
+                        true),
+                    List.of(new AliasExpression(uce("__expr0"), "__expr0", "concat(col, 1)[0]", false))
+                ),
+                List.of(sortItem(uce("__expr0"), Order.ASC))
+                );
+        //CSON
+        //@formatter:on
+
+        // System.out.println(expected.print(0));
+        // System.out.println(actual.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
 
     @Test
     public void test_sort_expression_with_group_by()

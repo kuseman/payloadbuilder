@@ -2,6 +2,7 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -250,18 +251,20 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
                     throw new ParseException(ORDER_BY_CONSTANT_ENCOUNTERED, item.getLocation());
                 }
 
+                String alias = projectionExpression instanceof HasAlias ? ((HasAlias) projectionExpression).getAlias()
+                        .getAlias()
+                        : null;
+
                 // Projected expression has an alias, point the sort item to the alias
-                if (projectionExpression instanceof HasAlias)
+                if (!isBlank(alias))
                 {
-                    String alias = ((HasAlias) projectionExpression).getAlias()
-                            .getAlias();
                     // Point the sort item to the projected alias
                     planData.sortItems.set(j, new SortItem(new UnresolvedColumnExpression(QualifiedName.of(alias), -1, null), item.getOrder(), item.getNullOrder(), item.getLocation()));
                 }
                 // Computed projection expression, push down
                 else if (isComputed(projectionExpression))
                 {
-                    String alias = "__expr" + context.expressionCounter++;
+                    alias = "__expr" + context.expressionCounter++;
                     pushDownProjections.add(Pair.of(alias, projectionExpressionIndex));
                     planData.sortItems.set(j, new SortItem(new UnresolvedColumnExpression(QualifiedName.of(alias), -1, null), item.getOrder(), item.getNullOrder(), item.getLocation()));
                 }
