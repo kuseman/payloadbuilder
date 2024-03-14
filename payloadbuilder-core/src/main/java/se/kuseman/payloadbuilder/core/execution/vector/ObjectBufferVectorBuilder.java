@@ -2,10 +2,13 @@ package se.kuseman.payloadbuilder.core.execution.vector;
 
 import static java.util.Objects.requireNonNull;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
 
@@ -24,6 +27,7 @@ class ObjectBufferVectorBuilder extends ABufferVectorBuilder implements IObjectV
      */
     private Object currentValue;
     private boolean first = true;
+    private boolean allStrings = true;
     private int literalSize;
 
     ObjectBufferVectorBuilder(BufferAllocator allocator, int estimatedSize, ResolvedType type, Class<?> expectedType, ValueExtractor extractor, LiteralCreator literalCreator)
@@ -85,7 +89,26 @@ class ObjectBufferVectorBuilder extends ABufferVectorBuilder implements IObjectV
         if (buffer == null)
         {
             return currentValue == null ? ValueVector.literalNull(type, size)
-                    : literalCreator.create(currentValue, type, size);
+                    : literalCreator.create(allStrings ? UTF8String.from(currentValue)
+                            : currentValue, type, size);
+        }
+
+        // Intern every value in buffer to let duplicate values be GC:ed
+        Map<Object, Object> internCache = new HashMap<>(size + 1, 1.0f);
+        for (int i = 0; i < size; i++)
+        {
+            Object value = buffer.get(i);
+            if (value != null)
+            {
+                // Convert all strings to UF8Strings, this to avoid allocations later on when java Strings
+                // would be converted to UF8Strings. This is a very common datatype so we optimize for this one
+                if (allStrings)
+                {
+                    value = UTF8String.from(buffer.get(i));
+                }
+                value = internCache.computeIfAbsent(value, v -> v);
+                buffer.set(i, value);
+            }
         }
 
         // TODO: If type = Any this can be converted into a primitive buffer
@@ -94,6 +117,14 @@ class ObjectBufferVectorBuilder extends ABufferVectorBuilder implements IObjectV
 
     private void append(Object value)
     {
+        if (allStrings)
+        {
+            allStrings = allStrings
+                    && (value == null
+                            || value instanceof String
+                            || value instanceof UTF8String);
+        }
+
         if (buffer == null)
         {
             if (first)

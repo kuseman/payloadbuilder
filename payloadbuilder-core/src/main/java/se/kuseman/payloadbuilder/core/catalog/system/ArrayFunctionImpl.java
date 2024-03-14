@@ -111,59 +111,6 @@ class ArrayFunctionImpl
         return ValueVector.literalArray(arrayBuilder.build(), 1);
     }
 
-    /** Aggregate eval */
-    static ValueVector evalAggregate(ValueVector groups, List<IExpression> expressions, IExecutionContext context)
-    {
-        int groupSize = groups.size();
-
-        IObjectVectorBuilder builder = context.getVectorBuilderFactory()
-                .getObjectVectorBuilder(ResolvedType.array(Type.Any), groupSize);
-
-        int size = expressions.size();
-        ValueVector[] valueVectors = new ValueVector[size];
-
-        for (int i = 0; i < groupSize; i++)
-        {
-            TupleVector group = groups.getTable(i);
-            int rowCount = group.getRowCount();
-            if (rowCount == 0)
-            {
-                builder.put(null);
-            }
-            else
-            {
-                for (int j = 0; j < size; j++)
-                {
-                    valueVectors[j] = expressions.get(j)
-                            .eval(group, context);
-                }
-
-                // Only one argument then we can simply add the expression result
-                // since that is our array
-                if (size == 1)
-                {
-                    builder.put(valueVectors[0]);
-                    continue;
-                }
-
-                // .. else build the resulting array from arguments
-                IObjectVectorBuilder arrayBuilder = context.getVectorBuilderFactory()
-                        .getObjectVectorBuilder(ResolvedType.of(Type.Any), rowCount * size);
-
-                for (int k = 0; k < rowCount; k++)
-                {
-                    for (int j = 0; j < size; j++)
-                    {
-                        arrayBuilder.put(valueVectors[j].valueAsObject(k));
-                    }
-                }
-
-                builder.put(arrayBuilder.build());
-            }
-        }
-        return builder.build();
-    }
-
     /** Scalar eval */
     static ValueVector evalScalar(TupleVector input, List<IExpression> arguments, IExecutionContext context)
     {

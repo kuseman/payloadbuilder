@@ -5,15 +5,18 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 
-import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
+import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 
 /** An aggregate expression that wrapps a ordinary expression and turns it into an aggregate result */
 public class AggregateWrapperExpression implements IAggregateExpression, HasAlias, HasColumnReference
@@ -120,7 +123,7 @@ public class AggregateWrapperExpression implements IAggregateExpression, HasAlia
     }
 
     @Override
-    public ValueVector eval(ValueVector groups, IExecutionContext context)
+    public IAggregator createAggregator()
     {
         IExpression e = expression;
         if (e instanceof AliasExpression)
@@ -130,62 +133,92 @@ public class AggregateWrapperExpression implements IAggregateExpression, HasAlia
         // A wrapped aggregate alias expression
         if (e instanceof IAggregateExpression)
         {
-            return ((IAggregateExpression) e).eval(groups, context);
+            return ((IAggregateExpression) e).createAggregator();
         }
 
-        if (groups.type()
-                .getType() != Type.Table)
+        return new ExpressionAggregator(singleValue, e);
+    }
+
+    private static class ExpressionAggregator implements IAggregator
+    {
+        private final boolean singleValue;
+        private final IExpression expression;
+        private final ObjectList<ValueVector> result = new ObjectArrayList<>();
+
+        ExpressionAggregator(boolean singleValue, IExpression expression)
         {
-            throw new IllegalArgumentException("Wrong type of input vector, expected tuple vector but got: " + groups.type());
+            this.singleValue = singleValue;
+            this.expression = expression;
         }
 
-        final int size = groups.size();
-        final ValueVector[] result = new ValueVector[size];
-
-        for (int i = 0; i < size; i++)
+        @Override
+        public void appendGroup(TupleVector groupData, IExecutionContext context)
         {
-            TupleVector vector = groups.getTable(i);
-            result[i] = expression.eval(vector, context);
+            ValueVector groupTables = groupData.getColumn(0);
+            ValueVector groupIds = groupData.getColumn(1);
+
+            int groupCount = groupData.getRowCount();
+
+            for (int i = 0; i < groupCount; i++)
+            {
+                int group = groupIds.getInt(i);
+                result.size(Math.max(result.size(), group + 1));
+
+                TupleVector vector = groupTables.getTable(i);
+                if (vector.getRowCount() == 0)
+                {
+                    continue;
+                }
+
+                ValueVector groupResult = expression.eval(vector, context);
+                result.set(group, groupResult);
+            }
         }
 
-        if (singleValue)
+        @Override
+        public ValueVector combine(IExecutionContext context)
         {
+            final int size = result.size();
             // Pick first row from all groups
-            IValueVectorBuilder builder = context.getVectorBuilderFactory()
-                    .getValueVectorBuilder(result[0].type(), size);
-            for (int i = 0; i < size; i++)
+            if (singleValue)
             {
-                builder.put(result[i], 0);
+                IValueVectorBuilder builder = context.getVectorBuilderFactory()
+                        .getValueVectorBuilder(result.get(0)
+                                .type(), size);
+                for (int i = 0; i < size; i++)
+                {
+                    builder.put(result.get(i), 0);
+                }
+                return builder.build();
             }
-            return builder.build();
+
+            return new ValueVector()
+            {
+                @Override
+                public ResolvedType type()
+                {
+                    return ResolvedType.array(expression.getType());
+                }
+
+                @Override
+                public boolean isNull(int row)
+                {
+                    return false;
+                }
+
+                @Override
+                public int size()
+                {
+                    return size;
+                }
+
+                @Override
+                public ValueVector getArray(int row)
+                {
+                    return result.get(row);
+                }
+            };
         }
-
-        return new ValueVector()
-        {
-            @Override
-            public ResolvedType type()
-            {
-                return ResolvedType.array(expression.getType());
-            }
-
-            @Override
-            public boolean isNull(int row)
-            {
-                return false;
-            }
-
-            @Override
-            public int size()
-            {
-                return size;
-            }
-
-            @Override
-            public ValueVector getArray(int row)
-            {
-                return result[row];
-            }
-        };
     }
 
     @Override

@@ -2,6 +2,8 @@ package se.kuseman.payloadbuilder.core.execution.vector;
 
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
+import java.math.BigDecimal;
+
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -97,6 +99,24 @@ public class ObjectBufferVectorBuilderTest extends Assert
     // }
 
     @Test
+    public void test_fail_when_storing_wrong_type()
+    {
+        BufferAllocator allocator = new BufferAllocator(new AllocatorSettings().withBitSize(1));
+        ObjectBufferVectorBuilder b = (ObjectBufferVectorBuilder) ABufferVectorBuilder.getBuilder(ResolvedType.of(Column.Type.String), allocator, 2);
+
+        try
+        {
+            b.put(123);
+            fail("Should fail");
+        }
+        catch (IllegalArgumentException e)
+        {
+            assertTrue(e.getMessage(), e.getMessage()
+                    .contains("Expected a String value but got: 123"));
+        }
+    }
+
+    @Test
     public void test_literal_creation()
     {
         BufferAllocator allocator = new BufferAllocator(new AllocatorSettings().withBitSize(1));
@@ -135,6 +155,19 @@ public class ObjectBufferVectorBuilderTest extends Assert
                 .getObjectAllocationCount());
         assertEquals(0, allocator.getStatistics()
                 .getObjectAllocationSum());
+
+        // Test values
+        b = (ObjectBufferVectorBuilder) ABufferVectorBuilder.getBuilder(ResolvedType.of(Column.Type.Any), allocator, 2);
+
+        b.put(10);
+        b.put(10);
+
+        actual = b.build();
+
+        VectorTestUtils.assertVectorsEquals(vv(Type.Any, 10, 10), actual);
+
+        // A buffer vector should not be created here
+        assertFalse(actual instanceof ABufferVector);
     }
 
     @Test
@@ -150,6 +183,65 @@ public class ObjectBufferVectorBuilderTest extends Assert
         b.putNull();
 
         VectorTestUtils.assertVectorsEquals(vv(Type.Any, 1, "hello", null, 1F, null), b.build());
+    }
+
+    @Test
+    public void test_intern_cache()
+    {
+        BufferAllocator allocator = new BufferAllocator(new AllocatorSettings().withBitSize(1));
+        ObjectBufferVectorBuilder b = (ObjectBufferVectorBuilder) ABufferVectorBuilder.getBuilder(ResolvedType.of(Column.Type.Any), allocator, 2);
+
+        b.put(new BigDecimal("10.10"));
+        b.put(new String("hello"));
+        b.put(new BigDecimal("10.10"));
+        b.put(new String("hello"));
+        b.putNull();
+
+        ValueVector actual = b.build();
+
+        VectorTestUtils.assertVectorsEquals(vv(Type.Any, new BigDecimal("10.10"), "hello", new BigDecimal("10.10"), "hello", null), actual);
+
+        assertSame(actual.getAny(0), actual.getAny(2));
+        assertSame(actual.getAny(1), actual.getAny(3));
+    }
+
+    @Test
+    public void test_strings_are_converted_to_utf8_strings()
+    {
+        BufferAllocator allocator = new BufferAllocator(new AllocatorSettings().withBitSize(1));
+        ObjectBufferVectorBuilder b = (ObjectBufferVectorBuilder) ABufferVectorBuilder.getBuilder(ResolvedType.of(Column.Type.Any), allocator, 2);
+
+        b.put(new String("hello"));
+        b.put(UTF8String.from(new String("hello")));
+        b.putNull();
+
+        ValueVector actual = b.build();
+
+        VectorTestUtils.assertVectorsEquals(vv(Type.Any, "hello", "hello", null), actual);
+
+        // Verify the intern cache has kicked in for different string types
+        assertSame(actual.getAny(0), actual.getAny(1));
+
+        assertTrue(actual.getAny(0) instanceof UTF8String);
+        assertTrue(actual.getAny(1) instanceof UTF8String);
+    }
+
+    @Test
+    public void test_strings_are_converted_to_utf8_strings_literal_mode()
+    {
+        BufferAllocator allocator = new BufferAllocator(new AllocatorSettings().withBitSize(1));
+        ObjectBufferVectorBuilder b = (ObjectBufferVectorBuilder) ABufferVectorBuilder.getBuilder(ResolvedType.of(Column.Type.Any), allocator, 2);
+
+        b.put(new String("hello"));
+        b.put(new String("hello"));
+
+        ValueVector actual = b.build();
+
+        VectorTestUtils.assertVectorsEquals(vv(Type.Any, "hello", "hello"), actual);
+
+        assertSame(actual.getAny(0), actual.getAny(1));
+        assertTrue(actual.getAny(0) instanceof UTF8String);
+        assertTrue(actual.getAny(1) instanceof UTF8String);
     }
 
     @Test

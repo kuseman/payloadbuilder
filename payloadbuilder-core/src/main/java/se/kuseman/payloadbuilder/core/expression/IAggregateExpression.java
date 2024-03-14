@@ -5,6 +5,7 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Definition of an aggregate expression */
@@ -30,13 +31,16 @@ public interface IAggregateExpression extends IExpression
      * 
      * </pre>
      */
-    ValueVector eval(ValueVector groups, IExecutionContext context);
+    // ValueVector eval(ValueVector groups, IExecutionContext context);
 
     @Override
     default ValueVector eval(TupleVector input, IExecutionContext context)
     {
         throw new IllegalArgumentException("Scalar eval not implementd on " + getClass());
     }
+
+    /** Create an aggregator for this expression */
+    IAggregator createAggregator();
 
     /** Return the aggregate result type for this expression */
     ResolvedType getAggregateType();

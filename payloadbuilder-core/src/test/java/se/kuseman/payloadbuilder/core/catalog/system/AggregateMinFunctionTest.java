@@ -10,12 +10,14 @@ import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.FunctionInfo.Arity;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo.AggregateMode;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
@@ -28,6 +30,8 @@ public class AggregateMinFunctionTest extends APhysicalPlanTest
     @Test
     public void test_object()
     {
+        assertEquals(Arity.ONE, function.arity());
+
         IExpression col1 = ce("col1", ResolvedType.of(Type.Any));
 
         ValueVector one = ValueVector.literalAny(10, 20, -20F, -200D);
@@ -45,9 +49,17 @@ public class AggregateMinFunctionTest extends APhysicalPlanTest
                 TupleVector.of(schema, asList(three)),
                 TupleVector.of(schema, asList(four)),
                 TupleVector.of(schema, asList(five)));
+
+        IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0, 1, 2, 3, 4)
+                        )), context);
         //@formatter:on
 
-        ValueVector actual = function.evalAggregate(context, AggregateMode.ALL, v, "", asList(col1));
+        ValueVector actual = aggregator.combine(context);
         assertEquals(ResolvedType.of(Type.Any), actual.type());
         assertEquals(5, actual.size());
         assertVectorsEquals(vv(Type.Any, -200D, 10_000_000, null, "one", new BigDecimal("-200.10")), actual);
@@ -71,11 +83,65 @@ public class AggregateMinFunctionTest extends APhysicalPlanTest
                 TupleVector.of(schema, asList(mediumInts)),
                 TupleVector.of(schema, asList(nulls)),
                 TupleVector.of(schema, asList(oneNull)));
+
+        IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0, 1, 2, 3)
+                        )), context);
         //@formatter:on
 
-        ValueVector actual = function.evalAggregate(context, AggregateMode.ALL, v, "", asList(col1));
+        ValueVector actual = aggregator.combine(context);
         assertEquals(ResolvedType.of(Type.Int), actual.type());
         assertVectorsEquals(vv(Type.Int, -200, 10_000_000, null, -200), actual);
+    }
+
+    @Test
+    public void test_int_multi_vectors()
+    {
+        IExpression col1 = ce("col1", ResolvedType.of(Type.Int));
+
+        ValueVector smallInts = vv(Type.Int, -10, 10, 200, -200);
+        ValueVector mediumInts = ValueVector.literalInt(10_000_000, 4);
+        ValueVector nulls = ValueVector.literalNull(ResolvedType.of(Type.Int), 4);
+        ValueVector oneNull = vv(Type.Int, null, 10, null, -200);
+
+        Schema schema = schema(new Type[] { Type.Int }, "col1");
+
+        //@formatter:off
+        ValueVector v = ValueVector.literalTable(
+                TupleVector.of(schema, asList(smallInts)),
+                TupleVector.of(schema, asList(mediumInts)),
+                TupleVector.of(schema, asList(nulls)),
+                TupleVector.of(schema, asList(oneNull)));
+
+        IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0, 1, 2, 3)
+                        )), context);
+        
+        v = ValueVector.literalTable(
+                TupleVector.of(schema, asList(smallInts)),
+                TupleVector.of(schema, asList(ValueVector.literalInt(-10_000_000, 4))),
+                TupleVector.of(schema, asList(nulls)),
+                TupleVector.of(schema, asList(oneNull)));
+
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0, 1, 2, 3)
+                        )), context);
+        //@formatter:on
+
+        ValueVector actual = aggregator.combine(context);
+        assertEquals(ResolvedType.of(Type.Int), actual.type());
+        assertVectorsEquals(vv(Type.Int, -200, -10_000_000, null, -200), actual);
     }
 
     @Test
@@ -94,9 +160,17 @@ public class AggregateMinFunctionTest extends APhysicalPlanTest
                 TupleVector.of(schema, asList(smallLongs)),
                 TupleVector.of(schema, asList(mediumLongs)),
                 TupleVector.of(schema, asList(nulls)));
+
+        IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0, 1, 2)
+                        )), context);
         //@formatter:on
 
-        ValueVector actual = function.evalAggregate(context, AggregateMode.ALL, v, "", asList(col1));
+        ValueVector actual = aggregator.combine(context);
         assertEquals(ResolvedType.of(Type.Long), actual.type());
         assertEquals(3, actual.size());
         assertVectorsEquals(vv(Type.Long, -200L, 10_000_000L, null), actual);
@@ -120,9 +194,17 @@ public class AggregateMinFunctionTest extends APhysicalPlanTest
                 TupleVector.of(schema, asList(two)),
                 TupleVector.of(schema, asList(three)),
                 TupleVector.of(schema, asList(nulls)));
+
+        IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0, 1, 2, 3)
+                        )), context);
         //@formatter:on
 
-        ValueVector actual = function.evalAggregate(context, AggregateMode.ALL, v, "", asList(col1));
+        ValueVector actual = aggregator.combine(context);
         assertEquals(ResolvedType.of(Type.Float), actual.type());
         assertEquals(4, actual.size());
         assertVectorsEquals(vv(Type.Float, -200F, 10F, 10_000_000F, null), actual);
@@ -183,9 +265,17 @@ public class AggregateMinFunctionTest extends APhysicalPlanTest
                 TupleVector.of(schema, asList(two)),
                 TupleVector.of(schema, asList(three)),
                 TupleVector.of(schema, asList(nulls)));
-      //@formatter:on
 
-        ValueVector actual = function.evalAggregate(context, AggregateMode.ALL, v, "", asList(col1));
+        IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0, 1, 2, 3)
+                        )), context);
+        //@formatter:on
+
+        ValueVector actual = aggregator.combine(context);
         assertEquals(ResolvedType.of(Type.Double), actual.type());
         assertEquals(4, actual.size());
         assertVectorsEquals(vv(Type.Double, -200D, 10D, 10_000_000D, null), actual);

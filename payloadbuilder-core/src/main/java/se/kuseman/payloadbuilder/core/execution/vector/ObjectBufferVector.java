@@ -4,6 +4,8 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 
+import com.fasterxml.jackson.core.io.doubleparser.JavaFloatParser;
+
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.Decimal;
@@ -29,6 +31,19 @@ class ObjectBufferVector extends ABufferVector
     public boolean isNull(int row)
     {
         return buffer.get(startPosition + row) == null;
+    }
+
+    @Override
+    public float getFloat(int row)
+    {
+        if (type.getType() == Column.Type.String)
+        {
+            String str = ((UTF8String) buffer.get(startPosition + row)).toString();
+            return JavaFloatParser.parseFloat(str);
+        }
+
+        // Implicit cast
+        return super.getFloat(row);
     }
 
     @Override

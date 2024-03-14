@@ -15,6 +15,7 @@ import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo.AggregateMode;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.IFunctionCallExpression;
@@ -102,11 +103,11 @@ public class FunctionCallExpression implements IFunctionCallExpression, IAggrega
     }
 
     @Override
-    public ValueVector eval(ValueVector groups, IExecutionContext context)
+    public IAggregator createAggregator()
     {
         AggregateMode mode = this.aggregateMode != null ? this.aggregateMode
                 : AggregateMode.ALL;
-        return function.evalAggregate(context, mode, groups, catalogAlias, arguments);
+        return function.createAggregator(mode, catalogAlias, arguments);
     }
 
     @Override

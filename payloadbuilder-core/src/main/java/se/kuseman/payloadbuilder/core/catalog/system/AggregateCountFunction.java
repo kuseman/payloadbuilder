@@ -8,6 +8,7 @@ import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 
@@ -82,67 +83,92 @@ class AggregateCountFunction extends ScalarFunctionInfo
     }
 
     @Override
-    public ValueVector evalAggregate(IExecutionContext context, AggregateMode mode, ValueVector groups, String catalogAlias, List<IExpression> arguments)
+    public IAggregator createAggregator(AggregateMode mode, String catalogAlias, List<IExpression> arguments)
     {
         if (mode == AggregateMode.DISTINCT)
         {
             throw new UnsupportedOperationException(getName() + " DISTINCT is unsupported");
         }
 
-        if (groups.type()
-                .getType() != Type.Table)
-        {
-            throw new IllegalArgumentException("Wrong type of input vector, expected tuple vector but got: " + groups.type());
-        }
-
-        IExpression expression = arguments.get(0);
-        int size = groups.size();
-        final IntList result = new IntArrayList();
-
-        for (int i = 0; i < size; i++)
-        {
-            // Short cut, no need to evaluate and handle nulls here, just add the input count
-            if (expression instanceof AsteriskExpression
-                    || expression.isConstant())
-            {
-                result.add(groups.getTable(i)
-                        .getRowCount());
-                continue;
-            }
-
-            ValueVector vv = expression.eval(groups.getTable(i), context);
-            result.add(count(vv));
-        }
-
-        return new ValueVector()
-        {
-            @Override
-            public ResolvedType type()
-            {
-                return ResolvedType.of(Type.Int);
-            }
-
-            @Override
-            public int size()
-            {
-                return result.size();
-            }
-
-            @Override
-            public boolean isNull(int row)
-            {
-                return false;
-            }
-
-            @Override
-            public int getInt(int row)
-            {
-                return result.getInt(row);
-            }
-        };
+        // Count only have one argument
+        return new CountAggregator(arguments.get(0));
     }
 
-    private int count(ValueVector vector)
+    private static class CountAggregator implements IAggregator
+    {
+        private final IExpression expression;
+        private final IntList result = new IntArrayList();
+
+        CountAggregator(IExpression expression)
+        {
+            this.expression = expression;
+        }
+
+        @Override
+        public void appendGroup(TupleVector groupData, IExecutionContext context)
+        {
+            ValueVector groupTables = groupData.getColumn(0);
+            ValueVector groupIds = groupData.getColumn(1);
+
+            int groupCount = groupData.getRowCount();
+
+            for (int i = 0; i < groupCount; i++)
+            {
+                int group = groupIds.getInt(i);
+
+                result.size(Math.max(result.size(), group + 1));
+
+                TupleVector groupVector = groupTables.getTable(i);
+
+                int count;
+                // Short cut, no need to evaluate and handle nulls here, just add the input count
+                if (expression instanceof AsteriskExpression
+                        || expression.isConstant())
+                {
+                    count = groupVector.getRowCount();
+                }
+                else
+                {
+                    ValueVector vv = expression.eval(groupVector, context);
+                    count = count(vv);
+                }
+                result.set(group, count + result.getInt(group));
+            }
+        }
+
+        @Override
+        public ValueVector combine(IExecutionContext context)
+        {
+            return new ValueVector()
+            {
+                @Override
+                public ResolvedType type()
+                {
+                    return ResolvedType.of(Type.Int);
+                }
+
+                @Override
+                public int size()
+                {
+                    return result.size();
+                }
+
+                @Override
+                public boolean isNull(int row)
+                {
+                    return false;
+                }
+
+                @Override
+                public int getInt(int row)
+                {
+                    return result.getInt(row);
+                }
+            };
+        }
+    }
+
+    private static int count(ValueVector vector)
     {
         int rowCount = vector.size();
         int count = 0;

@@ -71,44 +71,6 @@ class ObjectFunctionImpl
         return ValueVector.literalObject(ObjectVector.wrap(input), 1);
     }
 
-    /** Aggregate eval */
-    static ValueVector evalAggregate(ValueVector groups, List<IExpression> expressions, IExecutionContext context)
-    {
-        int groupSize = groups.size();
-
-        ResolvedType type = getAggregateType(expressions);
-        Schema schema = type.getSchema();
-
-        IObjectVectorBuilder builder = context.getVectorBuilderFactory()
-                .getObjectVectorBuilder(type, groupSize);
-
-        int size = expressions.size();
-
-        for (int i = 0; i < groupSize; i++)
-        {
-            TupleVector group = groups.getTable(i);
-            int rowCount = group.getRowCount();
-            if (rowCount == 0)
-            {
-                builder.put(null);
-            }
-            else
-            {
-                final List<ValueVector> vectors = new ArrayList<>(size / 2);
-
-                for (int j = 0; j < size; j += 2)
-                {
-                    // Values are at the odd indices
-                    vectors.add(expressions.get(j + 1)
-                            .eval(group, context));
-                }
-
-                builder.put(ObjectVector.wrap(TupleVector.of(schema, vectors)));
-            }
-        }
-        return builder.build();
-    }
-
     /** Scalar eval */
     static ValueVector evalScalar(TupleVector input, List<IExpression> arguments, IExecutionContext context)
     {

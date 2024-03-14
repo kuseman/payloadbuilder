@@ -10,13 +10,16 @@ import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.FunctionInfo.Arity;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo.AggregateMode;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link AggregateCountFunction} */
@@ -35,6 +38,8 @@ public class AggregateCountFunctionTest extends APhysicalPlanTest
     @Test
     public void test_aggregate()
     {
+        assertEquals(Arity.ONE, function.arity());
+
         ValueVector one = ValueVector.literalAny(10, 20, -20F, -200D);
         ValueVector two = ValueVector.literalAny(4, 10_000_000);
         ValueVector three = ValueVector.literalNull(ResolvedType.of(Type.Any), 4);
@@ -50,13 +55,95 @@ public class AggregateCountFunctionTest extends APhysicalPlanTest
                 TupleVector.of(schema, asList(three)),
                 TupleVector.of(schema, asList(four)),
                 TupleVector.of(schema, asList(five)));
+
+        IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0, 1, 2, 3, 4)
+                        )), context);
         //@formatter:on
 
-        ValueVector actual = function.evalAggregate(context, AggregateMode.ALL, v, "", asList(col1));
+        ValueVector actual = aggregator.combine(context);
 
         assertEquals(ResolvedType.of(Type.Int), actual.type());
         assertEquals(5, actual.size());
         assertVectorsEquals(vv(ResolvedType.of(Type.Int), 4, 4, 0, 3, 3), actual);
+    }
+
+    @Test
+    public void test_aggregate_asterisk()
+    {
+        assertEquals(Arity.ONE, function.arity());
+
+        ValueVector one = ValueVector.literalAny(10, 20, -20F, -200D);
+        ValueVector two = ValueVector.literalAny(4, 10_000_000);
+        ValueVector three = ValueVector.literalNull(ResolvedType.of(Type.Any), 4);
+        ValueVector four = ValueVector.literalAny("one", "two", "three");
+        ValueVector five = ValueVector.literalAny(new BigDecimal("100.10"), new BigDecimal("-200.10"), new BigDecimal("2000.10"));
+
+        Schema schema = schema(new Type[] { Type.Any }, "col1");
+
+        //@formatter:off
+        ValueVector v = ValueVector.literalTable(
+                TupleVector.of(schema, asList(one)),
+                TupleVector.of(schema, asList(two)),
+                TupleVector.of(schema, asList(three)),
+                TupleVector.of(schema, asList(four)),
+                TupleVector.of(schema, asList(five)));
+
+        IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(new AsteriskExpression(null)));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0, 1, 2, 3, 4)
+                        )), context);
+        //@formatter:on
+
+        ValueVector actual = aggregator.combine(context);
+
+        assertEquals(ResolvedType.of(Type.Int), actual.type());
+        assertEquals(5, actual.size());
+        assertVectorsEquals(vv(ResolvedType.of(Type.Int), 4, 4, 4, 3, 3), actual);
+    }
+
+    @Test
+    public void test_aggregate_constant()
+    {
+        assertEquals(Arity.ONE, function.arity());
+
+        ValueVector one = ValueVector.literalAny(10, 20, -20F, -200D);
+        ValueVector two = ValueVector.literalAny(4, 10_000_000);
+        ValueVector three = ValueVector.literalNull(ResolvedType.of(Type.Any), 4);
+        ValueVector four = ValueVector.literalAny("one", "two", "three");
+        ValueVector five = ValueVector.literalAny(new BigDecimal("100.10"), new BigDecimal("-200.10"), new BigDecimal("2000.10"));
+
+        Schema schema = schema(new Type[] { Type.Any }, "col1");
+
+        //@formatter:off
+        ValueVector v = ValueVector.literalTable(
+                TupleVector.of(schema, asList(one)),
+                TupleVector.of(schema, asList(two)),
+                TupleVector.of(schema, asList(three)),
+                TupleVector.of(schema, asList(four)),
+                TupleVector.of(schema, asList(five)));
+
+        IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(intLit(10)));
+        aggregator.appendGroup(TupleVector.of(Schema.of(
+                Column.of("groupTables", ResolvedType.table(schema)),
+                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
+                        v,
+                        vv(Type.Int, 0, 1, 2, 3, 4)
+                        )), context);
+        //@formatter:on
+
+        ValueVector actual = aggregator.combine(context);
+
+        assertEquals(ResolvedType.of(Type.Int), actual.type());
+        assertEquals(5, actual.size());
+        assertVectorsEquals(vv(ResolvedType.of(Type.Int), 4, 4, 4, 3, 3), actual);
     }
 
     @Test

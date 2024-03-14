@@ -7,6 +7,7 @@ import java.util.List;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Definition of a scalar function */
@@ -86,8 +87,8 @@ public abstract class ScalarFunctionInfo extends FunctionInfo
         throw new IllegalArgumentException("Scalar with aggregate mode not implemented. eval: " + getClass().getSimpleName());
     }
 
-    /** Evaluate this function in aggregate mode. Used when this function is an aggregate function */
-    public ValueVector evalAggregate(IExecutionContext context, AggregateMode mode, ValueVector groups, String catalogAlias, List<IExpression> arguments)
+    /** Create an aggregator for this function */
+    public IAggregator createAggregator(AggregateMode mode, String catalogAlias, List<IExpression> arguments)
     {
         throw new IllegalArgumentException("Aggregate not implemented. eval: " + getClass().getSimpleName());
     }

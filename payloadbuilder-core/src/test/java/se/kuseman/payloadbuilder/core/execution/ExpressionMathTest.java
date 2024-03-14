@@ -6,6 +6,8 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.execution.Decimal;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 
 /** Unit test of {@link ExpressionMath} */
@@ -288,6 +290,14 @@ public class ExpressionMathTest extends Assert
         assertEquals(1, ExpressionMath.cmp(new TestNonComparable(), new TestComparable()));
         assertFail(ClassCastException.class, "", () -> ExpressionMath.cmp(10, new TestComparable()));
         assertEquals(0, ExpressionMath.cmp(new TestComparable(), new TestComparable()));
+        assertEquals(1, ExpressionMath.cmp(true, false));
+    }
+
+    @Test
+    public void test_cmp_dates()
+    {
+        assertEquals(0, ExpressionMath.cmp(EpochDateTime.from(100000000), EpochDateTime.from(100000000)));
+        assertEquals(0, ExpressionMath.cmp(EpochDateTimeOffset.from(100000000), EpochDateTimeOffset.from(100000000)));
     }
 
     @Test
@@ -298,30 +308,42 @@ public class ExpressionMathTest extends Assert
         assertEquals(0, ExpressionMath.cmp(1D, 1L));
         assertEquals(0, ExpressionMath.cmp(1D, 1));
         assertEquals(0, ExpressionMath.cmp(1D, new BigDecimal("1.00")));
+        assertEquals(0, ExpressionMath.cmp(1D, Decimal.from(new BigDecimal("1.00"))));
 
         assertEquals(0, ExpressionMath.cmp(new BigDecimal("1.00"), 1D));
         assertEquals(0, ExpressionMath.cmp(new BigDecimal("1.00"), 1F));
         assertEquals(0, ExpressionMath.cmp(new BigDecimal("1.00"), 1L));
         assertEquals(0, ExpressionMath.cmp(new BigDecimal("1.00"), 1));
         assertEquals(0, ExpressionMath.cmp(new BigDecimal("1.00"), new BigDecimal("1.00")));
+        assertEquals(0, ExpressionMath.cmp(new BigDecimal("1.00"), Decimal.from(new BigDecimal("1.00"))));
 
         assertEquals(0, ExpressionMath.cmp(1F, 1D));
         assertEquals(0, ExpressionMath.cmp(1F, 1F));
         assertEquals(0, ExpressionMath.cmp(1F, 1L));
         assertEquals(0, ExpressionMath.cmp(1F, 1));
         assertEquals(0, ExpressionMath.cmp(1F, new BigDecimal("1.00")));
+        assertEquals(0, ExpressionMath.cmp(1F, Decimal.from(new BigDecimal("1.00"))));
 
         assertEquals(0, ExpressionMath.cmp(1L, 1D));
         assertEquals(0, ExpressionMath.cmp(1L, 1F));
         assertEquals(0, ExpressionMath.cmp(1L, 1L));
         assertEquals(0, ExpressionMath.cmp(1L, 1));
         assertEquals(0, ExpressionMath.cmp(1L, new BigDecimal("1.00")));
+        assertEquals(0, ExpressionMath.cmp(1L, Decimal.from(new BigDecimal("1.00"))));
 
         assertEquals(0, ExpressionMath.cmp(1, 1D));
         assertEquals(0, ExpressionMath.cmp(1, 1F));
         assertEquals(0, ExpressionMath.cmp(1, 1L));
         assertEquals(0, ExpressionMath.cmp(1, 1));
         assertEquals(0, ExpressionMath.cmp(1, new BigDecimal("1.00")));
+        assertEquals(0, ExpressionMath.cmp(1, Decimal.from(new BigDecimal("1.00"))));
+
+        assertEquals(0, ExpressionMath.cmp(Decimal.from(1), 1D));
+        assertEquals(0, ExpressionMath.cmp(Decimal.from(1), 1F));
+        assertEquals(0, ExpressionMath.cmp(Decimal.from(1), 1L));
+        assertEquals(0, ExpressionMath.cmp(Decimal.from(1), 1));
+        assertEquals(0, ExpressionMath.cmp(Decimal.from(1), new BigDecimal("1.00")));
+        assertEquals(0, ExpressionMath.cmp(Decimal.from(1), Decimal.from(new BigDecimal("1.00"))));
 
         assertEquals(0, ExpressionMath.cmp("hello", "hello"));
 

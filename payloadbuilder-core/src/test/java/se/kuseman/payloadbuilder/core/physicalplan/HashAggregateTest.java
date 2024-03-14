@@ -113,7 +113,8 @@ public class HashAggregateTest extends APhysicalPlanTest
                                     new FunctionCallExpression("", SystemCatalog.get().getScalarFunction("count"), null, asList(col1)),
                                     new AggregateWrapperExpression(col2, false, false),
                                     new FunctionCallExpression("", SystemCatalog.get().getScalarFunction("sum"), null, asList(col1)),
-                                    new AggregateWrapperExpression(new ArithmeticBinaryExpression(IArithmeticBinaryExpression.Type.ADD, col1, col2), false, false))),
+                                    new AggregateWrapperExpression(new ArithmeticBinaryExpression(IArithmeticBinaryExpression.Type.ADD, col1, col2), false, false))
+                                    ),
                 asList(sortItem(ce("count", 0), Order.ASC, NullOrder.UNDEFINED)));
         //@formatter:on
 
@@ -123,7 +124,8 @@ public class HashAggregateTest extends APhysicalPlanTest
                 new CoreColumn("", ResolvedType.of(Type.Int), "count(col1)", false),
                 new CoreColumn("col2", ResolvedType.array(ResolvedType.of(Type.Any)), "", false),
                 new CoreColumn("", ResolvedType.of(Type.Int), "sum(col1)", false),
-                new CoreColumn("", ResolvedType.array(ResolvedType.of(Type.Int)), "col1 + col2", false)),
+                new CoreColumn("", ResolvedType.array(ResolvedType.of(Type.Int)), "col1 + col2", false)
+                ),
                 plan.getSchema());
         //@formatter:on
 
@@ -146,7 +148,8 @@ public class HashAggregateTest extends APhysicalPlanTest
                 new CoreColumn("", ResolvedType.of(Type.Int), "count(col1)", false),
                 new CoreColumn("col2", ResolvedType.array(ResolvedType.of(Type.Any)), "", false),
                 new CoreColumn("", ResolvedType.of(Type.Int), "sum(col1)", false),
-                new CoreColumn("", ResolvedType.array(ResolvedType.of(Type.Int)), "col1 + col2", false)),
+                new CoreColumn("", ResolvedType.array(ResolvedType.of(Type.Int)), "col1 + col2", false)
+                ),
                 actual.getSchema());
         //@formatter:on
         assertEquals(4, actual.getRowCount());

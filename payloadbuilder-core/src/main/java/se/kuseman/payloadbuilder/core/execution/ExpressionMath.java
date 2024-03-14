@@ -8,6 +8,8 @@ import java.math.BigDecimal;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.execution.Decimal;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IArithmeticBinaryExpression;
@@ -31,6 +33,58 @@ public final class ExpressionMath
         if (left == right)
         {
             return 0;
+        }
+
+        // Handle known cases
+        if (left instanceof Boolean a
+                && right instanceof Boolean b)
+        {
+            return Boolean.compare(a, b);
+        }
+        else if (left instanceof UTF8String a
+                && right instanceof UTF8String b)
+        {
+            return a.compareTo(b);
+        }
+        else if (left instanceof EpochDateTime a
+                && right instanceof EpochDateTime b)
+        {
+            return a.compareTo(b);
+        }
+        else if (left instanceof EpochDateTimeOffset a
+                && right instanceof EpochDateTimeOffset b)
+        {
+            return a.compareTo(b);
+        }
+        else if (left instanceof Decimal a
+                && right instanceof Decimal b)
+        {
+            return a.compareTo(b);
+        }
+        else if (left instanceof Integer a
+                && right instanceof Integer b)
+        {
+            return a.compareTo(b);
+        }
+        else if (left instanceof Long a
+                && right instanceof Long b)
+        {
+            return a.compareTo(b);
+        }
+        else if (left instanceof Float a
+                && right instanceof Float b)
+        {
+            return a.compareTo(b);
+        }
+        else if (left instanceof Double a
+                && right instanceof Double b)
+        {
+            return a.compareTo(b);
+        }
+        else if (left instanceof BigDecimal a
+                && right instanceof BigDecimal b)
+        {
+            return a.compareTo(b);
         }
 
         ValueVector leftLiteral = getLiteral(left);
