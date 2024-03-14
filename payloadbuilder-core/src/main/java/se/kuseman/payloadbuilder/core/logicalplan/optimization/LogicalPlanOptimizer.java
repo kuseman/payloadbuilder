@@ -10,6 +10,7 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.optimization.ALogicalPlanOptimizer.Context;
 import se.kuseman.payloadbuilder.core.logicalplan.optimization.ColumnResolver.ResolveSchema;
@@ -45,15 +46,20 @@ public class LogicalPlanOptimizer
     }
 
     /** Optimize provided plan */
-    public static ILogicalPlan optimize(IExecutionContext context, ILogicalPlan plan, Map<QualifiedName, TableSchema> schemaByTempTable)
+    public static ILogicalPlan optimize(IExecutionContext context, ILogicalPlan plan, Map<QualifiedName, TableSchema> schemaByTempTable, Map<TableSourceReference, TableSchema> schemaByTableSource)
     {
         ILogicalPlan result = plan;
+        int expressionCounter = 0;
         for (ALogicalPlanOptimizer<? extends ALogicalPlanOptimizer.Context> rule : RULES)
         {
             Context ctx = rule.createContext(context);
+            ctx.expressionCounter = expressionCounter;
             ctx.schemaByTempTable = schemaByTempTable;
+            ctx.schemaByTableSource = schemaByTableSource;
 
             result = rule.optimize(ctx, result);
+
+            expressionCounter = ctx.expressionCounter;
         }
 
         return result;

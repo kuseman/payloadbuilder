@@ -29,6 +29,11 @@ public class AnalyzeInterceptor implements IPhysicalPlan
         this.input = requireNonNull(input, "input");
     }
 
+    public IPhysicalPlan getInput()
+    {
+        return input;
+    }
+
     @Override
     public List<DescribableNode> getChildNodes()
     {
@@ -120,9 +125,8 @@ public class AnalyzeInterceptor implements IPhysicalPlan
         {
             return true;
         }
-        else if (obj instanceof AnalyzeInterceptor)
+        else if (obj instanceof AnalyzeInterceptor that)
         {
-            AnalyzeInterceptor that = (AnalyzeInterceptor) obj;
             return nodeId == that.nodeId
                     && input.equals(that.input);
         }
@@ -191,6 +195,18 @@ public class AnalyzeInterceptor implements IPhysicalPlan
         AnalyzeIterator(NodeData data)
         {
             this.data = data;
+        }
+
+        @Override
+        public int estimatedBatchCount()
+        {
+            return it.estimatedBatchCount();
+        }
+
+        @Override
+        public int estimatedRowCount()
+        {
+            return it.estimatedRowCount();
         }
 
         @Override

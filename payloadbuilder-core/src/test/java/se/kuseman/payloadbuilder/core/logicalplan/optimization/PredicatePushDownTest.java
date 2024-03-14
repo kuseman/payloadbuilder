@@ -44,7 +44,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     @Test
     public void test_function_and_no_filter()
     {
-        TableSourceReference opencsv = new TableSourceReference(0, "sys", QualifiedName.of("opencsv"), "t");
+        TableSourceReference opencsv = new TableSourceReference(0, TableSourceReference.Type.FUNCTION, "sys", QualifiedName.of("opencsv"), "t");
         Schema schema = Schema.of(ast("t", Type.Any, opencsv));
 
         ILogicalPlan plan = new TableFunctionScan(opencsv, schema, asList(), asList(), null);
@@ -89,7 +89,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     @Test
     public void test_function_scan_and_surrounding_filter()
     {
-        TableSourceReference opencsv = new TableSourceReference(0, "sys", QualifiedName.of("opencsv"), "t");
+        TableSourceReference opencsv = new TableSourceReference(0, TableSourceReference.Type.FUNCTION, "sys", QualifiedName.of("opencsv"), "t");
         Schema schema = Schema.of(ast("t", Type.Any, opencsv));
 
         //@formatter:off
@@ -133,7 +133,8 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                                     null,
                                     e("a.col3 = b.col4"),
                                     asSet(),
-                                    false),
+                                    false,
+                                    Schema.EMPTY),
                             null,
                             e("a.col7 > b.col8 AND a.col4 = 'test' AND b.col5 > 100")
                         );
@@ -157,7 +158,8 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         null,
                         eq(cre("col3", tableA), cre("col4", tableB)),
                         asSet(),
-                        false),
+                        false,
+                        Schema.EMPTY),
                     null,
                     gt(cre("col7", tableA), cre("col8", tableB))
                 );
@@ -181,7 +183,8 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                                 null,
                                 e("a.col3 = b.col4"),
                                 asSet(),
-                                false),
+                                false,
+                                Schema.EMPTY),
                             null,
                             e("a.col7 > b.col8 AND a.col4 = 'test'")
                         );
@@ -202,7 +205,8 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         null,
                         eq(cre("col3", tableA), cre("col4", tableB)),
                         asSet(),
-                        false),
+                        false,
+                        Schema.EMPTY),
                     null,
                     gt(cre("col7", tableA), cre("col8", tableB))
                 );
@@ -222,11 +226,12 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                             new Join(
                                 tableScan(schemaA, tableA),
                                 tableScan(schemaB, tableB),
-                                Join.Type.INNER,
+                                Join.Type.CROSS,
                                 null,
                                 null,
                                 asSet(),
-                                false),
+                                false,
+                                Schema.EMPTY),
                             null,
                             e("b.active")
                         );
@@ -242,11 +247,12 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                             tableScan(schemaB, tableB),
                             tableB,
                             eq(cre("active", tableB), LiteralBooleanExpression.TRUE)),
-                        Join.Type.INNER,
+                        Join.Type.CROSS,
                         null,
                         null,
                         asSet(),
-                        false);
+                        false,
+                        Schema.EMPTY);
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -272,7 +278,8 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                                     null,
                                     e("a.col3 = b.col4 AND a.col10 = 'test2' AND b.col9"),
                                     asSet(),
-                                    false),
+                                    false,
+                                    Schema.EMPTY),
                             null,
                             e("a.col7 > b.col8 AND a.col4 = 'test' AND b.col5 > 100")
                         );
@@ -296,7 +303,8 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         null,
                         eq(cre("col3", tableA), cre("col4", tableB)),
                         asSet(),
-                        false),
+                        false,
+                        Schema.EMPTY),
                     null,
                     gt(cre("col7", tableA), cre("col8", tableB))
                 );
@@ -320,7 +328,8 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                                     null,
                                     e("a.col3 = b.col4 AND a.col10 = 'test2' AND b.col9"),          // a.col10 cannot be pushed down since this is left
                                     asSet(),
-                                    false),
+                                    false,
+                                    Schema.EMPTY),
                             null,
                             e("b.col4 is null and a.active")     // b.col4 is null Cannot be pushed down => LEFT
                         );
@@ -344,7 +353,8 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         null,
                         and(eq(cre("col3", tableA), cre("col4", tableB)), eq(cre("col10", tableA), new LiteralStringExpression("test2"))),
                         asSet(),
-                        false),
+                        false,
+                        Schema.EMPTY),
                     null,
                     nullP(cre("col4", tableB), false)
                 );
@@ -374,7 +384,8 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                                 null,
                                 e("a.col3 = b.col4 AND a.col10 = 'test2' AND b.col9"),
                                 asSet(),
-                                false),
+                                false,
+                                Schema.EMPTY),
                             null,
                             e("b.col4 is not null")     // Cannot be pushed down since b is a left join
                         );
@@ -395,7 +406,8 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         null,
                         and(eq(cre("col3", tableA), cre("col4", tableB)), eq(cre("col10", tableA), new LiteralStringExpression("test2"))),
                         asSet(),
-                        false),
+                        false,
+                        Schema.EMPTY),
                     null,
                     nullP(cre("col4", tableB), true));
         //@formatter:on
@@ -424,7 +436,8 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                                     null,
                                     e("a.col3 = b.col4 AND a.col10 = 'test2' AND b.col9"),          // a.col10 cannot be pushed down since left
                                     asSet(),
-                                    false),
+                                    false,
+                                    Schema.EMPTY),
                             null,
                             e("b.col4 is null")     // Cannot be pushed down => OUTER + IS NULL
                         );
@@ -445,7 +458,8 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         null,
                         and(eq(cre("col3", tableA), cre("col4", tableB)), eq(cre("col10", tableA), new LiteralStringExpression("test2"))),
                         asSet(),
-                        false),
+                        false,
+                        Schema.EMPTY),
                     null,
                     nullP(cre("col4", tableB), false)
                 );
@@ -475,7 +489,8 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                                 null,
                                 e("a.col3 = b.col4 AND a.col10 = 'test2' AND b.col9"),
                                 asSet(),
-                                false),
+                                false,
+                                Schema.EMPTY),
                             null,
                             e("b.col4 is not null")     // Cannot be pushed down since b is a left
                         );
@@ -496,7 +511,8 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         null,
                         and(eq(cre("col3", tableA), cre("col4", tableB)), eq(cre("col10", tableA), new LiteralStringExpression("test2"))),
                         asSet(),
-                        false),
+                        false,
+                        Schema.EMPTY),
                     null,
                     nullP(cre("col4", tableB), true));
         //@formatter:on

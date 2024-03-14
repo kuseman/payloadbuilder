@@ -5,6 +5,7 @@ import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.LinkedHashMap;
@@ -19,6 +20,7 @@ import java.util.function.BiFunction;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -88,19 +90,26 @@ public class NestedLoop implements IPhysicalPlan
     private final boolean emitEmptyOuterRows;
     /** Flag that indicates that inner and outer has switched places so we need to take that into consideration when generating schema and concating vectors */
     private final boolean switchedInputs;
+    /** The outer schema if this join is a correlated type */
+    private final Schema outerSchema;
+    private final boolean isAsteriskOuterSchema;
+
+    private final Schema schema;
+    private final Schema cartesianSchema;
+    private final boolean isAsteriskSchema;
 
     //@formatter:off
     private NestedLoop(
             int nodeId,
             IPhysicalPlan outer,
             IPhysicalPlan inner,
-            BiFunction<TupleVector,
-            IExecutionContext, ValueVector> condition,
+            BiFunction<TupleVector, IExecutionContext, ValueVector> condition,
             String populateAlias,
             Set<Column> outerReferences,
             boolean emitEmptyOuterRows,
             boolean switchedInputs,
-            boolean pushOuterReference)
+            boolean pushOuterReference,
+            Schema outerSchema)
     //@formatter:on
     {
         this.nodeId = nodeId;
@@ -113,6 +122,8 @@ public class NestedLoop implements IPhysicalPlan
                 || this.outerReferences.size() > 0;
         this.emitEmptyOuterRows = emitEmptyOuterRows;
         this.switchedInputs = switchedInputs;
+        this.outerSchema = requireNonNull(outerSchema, "outerSchema");
+        this.isAsteriskOuterSchema = SchemaUtils.isAsterisk(outerSchema);
 
         if (switchedInputs
                 && (condition != null
@@ -127,54 +138,58 @@ public class NestedLoop implements IPhysicalPlan
         {
             throw new UnsupportedOperationException("Push outer reference needs a condition");
         }
+
+        this.schema = getSchema();
+        this.cartesianSchema = getSchema(true);
+        this.isAsteriskSchema = SchemaUtils.isAsterisk(schema);
     }
 
     /** Create an inner join. Logical operations: INNER JOIN */
     public static NestedLoop innerJoin(int nodeId, IPhysicalPlan outer, IPhysicalPlan inner, BiFunction<TupleVector, IExecutionContext, ValueVector> condition, String populateAlias,
             boolean pushOuterReference)
     {
-        return new NestedLoop(nodeId, outer, inner, condition, populateAlias, null, false, false, pushOuterReference);
+        return new NestedLoop(nodeId, outer, inner, condition, populateAlias, null, false, false, pushOuterReference, Schema.EMPTY);
     }
 
     /** Create an inner join with no condition and no outer references. Logical operations: CROSS JOIN/CROSS APPLY */
     public static NestedLoop innerJoin(int nodeId, IPhysicalPlan outer, IPhysicalPlan inner, String populateAlias, boolean switchedInputs)
     {
-        return new NestedLoop(nodeId, outer, inner, null, populateAlias, null, false, switchedInputs, false);
+        return new NestedLoop(nodeId, outer, inner, null, populateAlias, null, false, switchedInputs, false, Schema.EMPTY);
     }
 
     /** Create an inner join with no condition with outer references. Logical operations: CROSS JOIN/CROSS APPLY */
-    public static NestedLoop innerJoin(int nodeId, IPhysicalPlan outer, IPhysicalPlan inner, Set<Column> outerReferences, String populateAlias)
+    public static NestedLoop innerJoin(int nodeId, IPhysicalPlan outer, IPhysicalPlan inner, Set<Column> outerReferences, String populateAlias, Schema outerSchema)
     {
         if (outerReferences == null
                 || outerReferences.isEmpty())
         {
             throw new IllegalArgumentException("outerReferences must be set");
         }
-        return new NestedLoop(nodeId, outer, inner, null, populateAlias, outerReferences, false, false, true);
+        return new NestedLoop(nodeId, outer, inner, null, populateAlias, outerReferences, false, false, true, outerSchema);
     }
 
     /** Create a left outer join. Logical operations: LEFT OUTER JOIN */
     public static NestedLoop leftJoin(int nodeId, IPhysicalPlan outer, IPhysicalPlan inner, BiFunction<TupleVector, IExecutionContext, ValueVector> condition, String populateAlias,
             boolean pushOuterReference)
     {
-        return new NestedLoop(nodeId, outer, inner, condition, populateAlias, null, true, false, pushOuterReference);
+        return new NestedLoop(nodeId, outer, inner, condition, populateAlias, null, true, false, pushOuterReference, Schema.EMPTY);
     }
 
     /** Create a left outer join with no condition and no outer references. Logical operations: OUTER APPLY */
-    public static NestedLoop leftJoin(int nodeId, IPhysicalPlan outer, IPhysicalPlan inner, String populateAlias)
+    public static NestedLoop leftJoin(int nodeId, IPhysicalPlan outer, IPhysicalPlan inner, String populateAlias, boolean switchedInputs)
     {
-        return new NestedLoop(nodeId, outer, inner, null, populateAlias, null, true, false, false);
+        return new NestedLoop(nodeId, outer, inner, null, populateAlias, null, true, switchedInputs, false, Schema.EMPTY);
     }
 
     /** Create an left outer join with no condition with outer references. Logical operations: OUTER APPLY */
-    public static NestedLoop leftJoin(int nodeId, IPhysicalPlan outer, IPhysicalPlan inner, Set<Column> outerReferences, String populateAlias)
+    public static NestedLoop leftJoin(int nodeId, IPhysicalPlan outer, IPhysicalPlan inner, Set<Column> outerReferences, String populateAlias, Schema outerSchema)
     {
         if (outerReferences == null
                 || outerReferences.isEmpty())
         {
             throw new IllegalArgumentException("outerReferences must be set");
         }
-        return new NestedLoop(nodeId, outer, inner, null, populateAlias, outerReferences, true, false, true);
+        return new NestedLoop(nodeId, outer, inner, null, populateAlias, outerReferences, true, false, true, outerSchema);
     }
 
     @Override
@@ -216,18 +231,19 @@ public class NestedLoop implements IPhysicalPlan
     @Override
     public Schema getSchema()
     {
+        return getSchema(false);
+    }
+
+    private Schema getSchema(boolean cartesian)
+    {
         Schema outerSchema = switchedInputs ? inner.getSchema()
                 : outer.getSchema();
 
         Schema innerSchema = switchedInputs ? outer.getSchema()
                 : inner.getSchema();
 
-        if (populateAlias != null)
-        {
-            return SchemaUtils.populate(outerSchema, populateAlias, innerSchema);
-        }
-
-        return SchemaUtils.concat(outerSchema, innerSchema);
+        return SchemaUtils.joinSchema(outerSchema, innerSchema, cartesian ? null
+                : populateAlias);
     }
 
     @Override
@@ -415,7 +431,7 @@ public class NestedLoop implements IPhysicalPlan
                     {
                         long time = System.nanoTime();
                         // First construct a cartesian tuple vector that will be the one we run the predicate against
-                        cartesian.init(currentOuter, currentInner);
+                        cartesian.init(currentOuter, currentInner, isAsteriskSchema, cartesianSchema);
                         ValueVector filter = condition.apply(cartesian, context);
 
                         int cardinality = filter.getCardinality();
@@ -496,7 +512,8 @@ public class NestedLoop implements IPhysicalPlan
                     && outerReferences.equals(that.outerReferences)
                     && pushOuterReference == that.pushOuterReference
                     && emitEmptyOuterRows == that.emitEmptyOuterRows
-                    && switchedInputs == that.switchedInputs;
+                    && switchedInputs == that.switchedInputs
+                    && outerSchema.equals(that.outerSchema);
         }
         return false;
     }
@@ -521,6 +538,8 @@ public class NestedLoop implements IPhysicalPlan
                + (switchedInputs ? " switched inputs"
                        : "")
                + (pushOuterReference ? ", pushOuterReference"
+                       : "")
+               + (outerSchema.getSize() > 0 ? ", outer schema: " + outerSchema
                        : "");
     }
 
@@ -686,7 +705,7 @@ public class NestedLoop implements IPhysicalPlan
 
                     long time = System.nanoTime();
                     // First construct a cartesian tuple vector that will be the one we run the predicate against
-                    cartesian.init(currentOuter, concatOfInner);
+                    cartesian.init(currentOuter, concatOfInner, isAsteriskSchema, cartesianSchema);
                     ValueVector filter = condition.apply(cartesian, context);
 
                     nodeData.predicateTime += TimeUnit.MILLISECONDS.convert(System.nanoTime() - time, TimeUnit.NANOSECONDS);
@@ -708,7 +727,7 @@ public class NestedLoop implements IPhysicalPlan
                     else
                     {
                         TupleVectorBuilder b = new TupleVectorBuilder(context.getBufferAllocator(), currentOuter.getRowCount());
-                        b.appendPopulate(cartesian, filter, currentOuter, concatOfInner, populateAlias);
+                        b.appendPopulate(filter, currentOuter, concatOfInner, populateAlias);
                         if (unmatched != null)
                         {
                             b.append(unmatched);
@@ -775,7 +794,7 @@ public class NestedLoop implements IPhysicalPlan
             this.iterator = iterator;
             this.nodeData = nodeData;
             this.outerTupleVector = new OuterTupleVector(context.getStatementContext()
-                    .getOuterTupleVector());
+                    .getOuterTupleVector(), outerSchema, isAsteriskOuterSchema);
         }
 
         @Override
@@ -845,7 +864,9 @@ public class NestedLoop implements IPhysicalPlan
                 {
                     outerMatches = new BitSet(rowCount);
                 }
+                // CSOFF
                 TupleVectorBuilder builder = null;
+                // CSON
 
                 rowTupleVector.sealed = false;
                 rowTupleVector.init(currentOuter);
@@ -923,7 +944,7 @@ public class NestedLoop implements IPhysicalPlan
                                     // CSON
                                     matched = true;
 
-                                    cartesian.init(rowTupleVector, inner);
+                                    cartesian.init(rowTupleVector, inner, isAsteriskSchema, cartesianSchema);
 
                                     // Special case for a one row result, then we avoid creating builders
                                     // that will turn into literals anyways
@@ -932,7 +953,7 @@ public class NestedLoop implements IPhysicalPlan
                                             && rowCount == 1
                                             && innerRowCount == 1)
                                     {
-                                        next = cartesian.copy(0);
+                                        next = copyRow(cartesian.getSchema(), currentOuter, inner, i, 0);
                                     }
                                     else
                                     {
@@ -997,6 +1018,52 @@ public class NestedLoop implements IPhysicalPlan
             return true;
         }
 
+        /** Copipes one row from each vector into a resulting tuple vector. */
+        private TupleVector copyRow(Schema resultSchema, TupleVector outer, TupleVector inner, int outerRow, int innerRow)
+        {
+            int size = resultSchema.getSize();
+            int outerSize = outer.getSchema()
+                    .getSize();
+            List<ValueVector> vectors = new ArrayList<>(size);
+            for (int i = 0; i < size; i++)
+            {
+                boolean isOuter = i < outerSize;
+                ValueVector vector = isOuter ? outer.getColumn(i)
+                        : inner.getColumn(i - outerSize);
+                int row = isOuter ? outerRow
+                        : innerRow;
+
+                Type type = vector.type()
+                        .getType();
+                ResolvedType schemaType = resultSchema.getColumns()
+                        .get(i)
+                        .getType();
+                if (vector.isNull(row))
+                {
+                    vectors.add(ValueVector.literalNull(schemaType, 1));
+                    continue;
+                }
+
+                vectors.add(switch (type)
+                {
+                    case Any -> ValueVector.literalAny(1, vector.getAny(row));
+                    case Array -> ValueVector.literalArray(vector.getArray(row), schemaType, 1);
+                    case Boolean -> ValueVector.literalBoolean(vector.getBoolean(row), 1);
+                    case DateTime -> vector.getDateTime(row);
+                    case DateTimeOffset -> vector.getDateTimeOffset(row);
+                    case Decimal -> vector.getDecimal(row);
+                    case String -> vector.getString(row);
+                    case Double -> ValueVector.literalDouble(vector.getDouble(row), 1);
+                    case Float -> ValueVector.literalFloat(vector.getFloat(row), 1);
+                    case Int -> ValueVector.literalInt(vector.getInt(row), 1);
+                    case Long -> ValueVector.literalLong(vector.getLong(row), 1);
+                    case Object -> ValueVector.literalObject(vector.getObject(row), 1);
+                    case Table -> ValueVector.literalTable(vector.getTable(row), schemaType, 1);
+                });
+            }
+
+            return TupleVector.of(resultSchema, vectors);
+        }
     }
 
     /** Creates a tuple vector with non matched outer rows. Used i left joins */
@@ -1026,21 +1093,20 @@ public class NestedLoop implements IPhysicalPlan
             unmatchedOuter = b.build();
         }
 
-        Schema schema;
-        if (populateAlias != null)
+        Schema s = this.schema;
+        if (this.isAsteriskSchema)
         {
-            schema = SchemaUtils.populate(outer.getSchema(), populateAlias, innerSchema);
-        }
-        // If the inner schema is asterisk then just return the outer vector
-        else if (SchemaUtils.isAsterisk(innerSchema))
-        {
-            return outer;
-        }
-        else
-        {
-            schema = SchemaUtils.concat(outer.getSchema(), innerSchema);
+            // If the inner schema is asterisk then just return the outer vector
+            if (populateAlias == null
+                    && SchemaUtils.isAsterisk(innerSchema))
+            {
+                return outer;
+            }
+
+            s = SchemaUtils.joinSchema(outer.getSchema(), innerSchema, populateAlias);
         }
 
+        Schema schema = s;
         final int outerSize = outer.getSchema()
                 .getSize();
         return new TupleVector()
@@ -1116,11 +1182,14 @@ public class NestedLoop implements IPhysicalPlan
         private final TupleVector prevOuter;
         private final Schema prevOuterSchema;
         private final int prevOuterSize;
+        private final Schema planOuterSchema;
+        private final boolean outerSchemaIsAsterisk;
+
         private TupleVector outer;
         private Schema outerSchema;
         private Schema schema;
 
-        OuterTupleVector(TupleVector prevOuter)
+        OuterTupleVector(TupleVector prevOuter, Schema planOuterSchema, boolean outerSchemaIsAsterisk)
         {
             this.prevOuter = prevOuter;
             this.prevOuterSchema = prevOuter != null ? prevOuter.getSchema()
@@ -1128,6 +1197,9 @@ public class NestedLoop implements IPhysicalPlan
             this.prevOuterSize = prevOuter != null ? prevOuter.getSchema()
                     .getSize()
                     : 0;
+
+            this.planOuterSchema = planOuterSchema;
+            this.outerSchemaIsAsterisk = outerSchemaIsAsterisk;
         }
 
         void init(TupleVector outer)
@@ -1139,11 +1211,19 @@ public class NestedLoop implements IPhysicalPlan
             }
 
             this.outer = outer;
-            // Re-create the resulting schema if changed since last iteration
-            if (!Objects.equals(outerSchema, outer.getSchema()))
+
+            if (outerSchemaIsAsterisk)
             {
-                this.outerSchema = outer.getSchema();
-                this.schema = SchemaUtils.concat(prevOuterSchema, outerSchema);
+                // Re-create the resulting schema if changed since last iteration
+                if (!Objects.equals(outerSchema, outer.getSchema()))
+                {
+                    this.outerSchema = outer.getSchema();
+                    this.schema = SchemaUtils.joinSchema(prevOuterSchema, outerSchema);
+                }
+            }
+            else
+            {
+                this.schema = planOuterSchema;
             }
         }
 
@@ -1189,20 +1269,29 @@ public class NestedLoop implements IPhysicalPlan
         private int innerRowCount;
 
         /** Inits this vector with new outer/inner vectors. Calculates new schemas etc. */
-        void init(TupleVector outer, TupleVector inner)
+        void init(TupleVector outer, TupleVector inner, boolean isAsteriskSchema, Schema cartesianSchema)
         {
             this.outer = outer;
             this.inner = inner;
             this.rowCount = outer.getRowCount() * inner.getRowCount();
             this.innerRowCount = inner.getRowCount();
 
-            // Recalculate resulting schema if differs
-            if (!Objects.equals(outerSchema, outer.getSchema())
-                    || !Objects.equals(innerSchema, inner.getSchema()))
+            // Only calculate resulting schema if it's an asterisk resulting schema
+            if (isAsteriskSchema)
             {
+                // Recalculate resulting schema if differs
+                if (!Objects.equals(outerSchema, outer.getSchema())
+                        || !Objects.equals(innerSchema, inner.getSchema()))
+                {
+                    this.outerSchema = outer.getSchema();
+                    this.innerSchema = inner.getSchema();
+                    this.schema = SchemaUtils.joinSchema(outerSchema, innerSchema);
+                }
+            }
+            else
+            {
+                this.schema = cartesianSchema;
                 this.outerSchema = outer.getSchema();
-                this.innerSchema = inner.getSchema();
-                this.schema = SchemaUtils.concat(outerSchema, innerSchema);
             }
             this.outerSize = outerSchema.getSize();
 
@@ -1245,7 +1334,7 @@ public class NestedLoop implements IPhysicalPlan
             }
             else
             {
-                cc.setValueVector(vector);
+                cc.setVector(vector);
             }
             cc.innerRowCount = innerRowCount;
             cc.isOuter = isOuter;
@@ -1335,7 +1424,7 @@ public class NestedLoop implements IPhysicalPlan
             }
             else
             {
-                rcv.setValueVector(wrappedColumn);
+                rcv.setVector(wrappedColumn);
             }
 
             return rcv;

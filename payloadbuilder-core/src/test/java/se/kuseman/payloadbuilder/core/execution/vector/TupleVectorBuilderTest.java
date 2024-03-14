@@ -14,7 +14,6 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
@@ -106,8 +105,6 @@ public class TupleVectorBuilderTest extends APhysicalPlanTest
                 vv(Type.String, "hello", null, "world")));
         //@formatter:on
 
-        TupleVector cartesian = VectorUtils.cartesian(outer, inner);
-
         //@formatter:off
         //                                    1        1      1      3        3     3
         //                                    4        4      4      5        5     5
@@ -116,7 +113,7 @@ public class TupleVectorBuilderTest extends APhysicalPlanTest
         ValueVector filter = vv(Type.Boolean, true,    false, true,  false,   true, false, false, false, false);
         //@formatter:on
 
-        b.appendPopulate(cartesian, filter, outer, inner, "p");
+        b.appendPopulate(filter, outer, inner, "p");
 
         TupleVector actual = b.build();
 

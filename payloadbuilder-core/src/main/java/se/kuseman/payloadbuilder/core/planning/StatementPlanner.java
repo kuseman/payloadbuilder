@@ -36,6 +36,8 @@ public class StatementPlanner
 
         Map<QualifiedName, TableSchema> schemaByTempTable = new HashMap<>();
 
+        Map<TableSourceReference, TableSchema> schemaByTableSource = new HashMap<>();
+
         /** Flag indicating that next plan to be generated is an analzye */
         boolean analyze;
 

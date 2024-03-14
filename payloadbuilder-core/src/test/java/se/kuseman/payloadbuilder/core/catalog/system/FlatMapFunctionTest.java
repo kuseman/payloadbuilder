@@ -45,7 +45,7 @@ public class FlatMapFunctionTest extends APhysicalPlanTest
         // result: [ [1,10,2,10,3,10], [4,10,null,10,6,10], [10,10] ]
 
         tv = TupleVector.of(Schema.of(col("col", Type.Any)), asList(vv(ResolvedType.of(Type.Any), asList(1, 2, 3), asList(4, null, 6), null, asList(10))));
-        input = new FunctionCallExpression("", toArrayFunction, null, asList(ce("col", ResolvedType.of(Type.Any), 0)));
+        input = new FunctionCallExpression("", toArrayFunction, null, asList(ce("col", 0, ResolvedType.of(Type.Any))));
         lambdaExpression = new LambdaExpression(asList("x"), new FunctionCallExpression("", arrayFunction, null, asList(lce("x", 0, ResolvedType.of(Type.Any)), intLit(10))), new int[] { 0 });
         actual = flatMapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
 
@@ -68,7 +68,7 @@ public class FlatMapFunctionTest extends APhysicalPlanTest
                     ));
         //@formatter:on
 
-        input = ce("col", ResolvedType.table(innerSchema), 0);
+        input = ce("col", 0, ResolvedType.table(innerSchema));
         lambdaExpression = new LambdaExpression(asList("x"),
                 new FunctionCallExpression("", arrayFunction, null, asList(DereferenceExpression.create(lce("x", 0, ResolvedType.object(innerSchema)), QualifiedName.of("key2"), null), intLit(10))),
                 new int[] { 0 });
@@ -93,7 +93,7 @@ public class FlatMapFunctionTest extends APhysicalPlanTest
                     vv(ResolvedType.of(Type.Any), 1, vv(ResolvedType.of(Type.Any), 2, 3, null, 4))
                 )));
         //@formatter:on
-        input = ce("col", ResolvedType.array(Type.Any), 0);
+        input = ce("col", 0, ResolvedType.array(Type.Any));
         lambdaExpression = new LambdaExpression(asList("x"), lce("x", 0, ResolvedType.of(Type.Any)), new int[] { 0 });
         actual = flatMapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
 
@@ -109,7 +109,7 @@ public class FlatMapFunctionTest extends APhysicalPlanTest
 
         // Mix of different values as Any
         tv = TupleVector.of(Schema.of(col("col", Type.Any)), asList(vv(ResolvedType.of(Type.Any), new Object[] { 1, 2, asList(4, 5, 6), null }, "hello", asList(10.11F, 20.22F))));
-        input = ce("col", ResolvedType.of(Type.Any), 0);
+        input = ce("col", 0, ResolvedType.of(Type.Any));
         lambdaExpression = new LambdaExpression(asList("x"), lce("x", 0, ResolvedType.of(Type.Any)), new int[] { 0 });
         actual = flatMapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
 
@@ -134,7 +134,7 @@ public class FlatMapFunctionTest extends APhysicalPlanTest
 
         // Int output, this behaves the same as map since the input is flat already
         tv = TupleVector.of(Schema.of(col("col", Type.Int)), asList(vv(ResolvedType.of(Type.Int), 1, 2, 3, null)));
-        input = ce("col", ResolvedType.of(Type.Int), 0);
+        input = ce("col", 0, ResolvedType.of(Type.Int));
         lambdaExpression = new LambdaExpression(asList("x"), new FunctionCallExpression("", arrayFunction, null, asList(lce("x", 0, ResolvedType.of(Type.Int)), intLit(10))), new int[] { 0 });
         actual = flatMapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
 

@@ -38,7 +38,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select * from sys#functions");
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableSource = new TableSourceReference(0, "sys", QualifiedName.of("functions"), "");
+        TableSourceReference tableSource = new TableSourceReference(0, TableSourceReference.Type.TABLE, "sys", QualifiedName.of("functions"), "");
 
         Schema expectedSchema = Schema.of(col("name", Type.String, tableSource), col("type", Type.String, tableSource), col("description", Type.String, tableSource));
 
@@ -60,8 +60,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select top 10 * from sys#functions");
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableSource = new TableSourceReference(0, "sys", QualifiedName.of("functions"), "");
-
+        TableSourceReference tableSource = new TableSourceReference(0, TableSourceReference.Type.TABLE, "sys", QualifiedName.of("functions"), "");
         Schema expectedSchema = Schema.of(col("name", Type.String, tableSource), col("type", Type.String, tableSource), col("description", Type.String, tableSource));
 
         //@formatter:off
@@ -149,7 +148,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select 12345, (select * from sys#tables for object_array) tables");
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableSource = new TableSourceReference(0, "sys", QualifiedName.of("tables"), "");
+        TableSourceReference tableSource = new TableSourceReference(0, TableSourceReference.Type.TABLE, "sys", QualifiedName.of("tables"), "");
         Schema expectedSchema = Schema.of(col("name", Type.String, tableSource), col("schema", Type.String, tableSource), col("rows", Type.Int, tableSource));
 
         //@formatter:off

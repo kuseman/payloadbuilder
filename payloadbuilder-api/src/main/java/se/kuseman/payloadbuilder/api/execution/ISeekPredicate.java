@@ -3,12 +3,16 @@ package se.kuseman.payloadbuilder.api.execution;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Index;
+import se.kuseman.payloadbuilder.api.catalog.Index.IndexType;
 
 /** Index seek predicate used when creating index seek scan operators from catalogs */
 public interface ISeekPredicate
 {
     /** Return the index for this predicate */
     Index getIndex();
+
+    /** Returns which type this seek predicates uses from the index */
+    IndexType getIndexType();
 
     /** Return the used columns for this predicate from {@link #getIndex()} */
     List<String> getIndexColumns();
@@ -23,27 +27,5 @@ public interface ISeekPredicate
     {
         /** Return the value vector that represents this keys values */
         ValueVector getValue();
-
-        /** Return the seek type for this key */
-        SeekType getType();
-    }
-
-    /** Definition of a seek keys type */
-    public enum SeekType
-    {
-        /** Equal. Used to seek rows equal to provided values */
-        EQ("=");
-
-        private final String sign;
-
-        private SeekType(String sign)
-        {
-            this.sign = sign;
-        }
-
-        public String getSign()
-        {
-            return sign;
-        }
     }
 }

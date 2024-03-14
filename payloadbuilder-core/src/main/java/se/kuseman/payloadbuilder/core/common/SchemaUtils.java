@@ -1,6 +1,5 @@
 package se.kuseman.payloadbuilder.core.common;
 
-import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -11,6 +10,7 @@ import org.apache.commons.lang3.StringUtils;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
@@ -18,14 +18,31 @@ import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
 import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.HasAlias;
 import se.kuseman.payloadbuilder.core.expression.HasAlias.Alias;
-import se.kuseman.payloadbuilder.core.expression.HasTableSourceReference;
+import se.kuseman.payloadbuilder.core.expression.HasColumnReference;
+import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 
 /** Utils when working with {@link Schema}' */
 public class SchemaUtils
 {
+    /** Create a join schema from two provided schemas */
+    public static Schema joinSchema(Schema outer, Schema inner)
+    {
+        return concat(outer, inner);
+    }
+
+    /** Create a join schema from two provided schemas */
+    public static Schema joinSchema(Schema outer, Schema inner, String populateAlias)
+    {
+        if (populateAlias == null)
+        {
+            return concat(outer, inner);
+        }
+        return populate(outer, populateAlias, inner);
+    }
+
     /** Populate this schema with a populated column. Returns a new schema */
-    public static Schema populate(Schema target, String name, Schema populatedSchema)
+    private static Schema populate(Schema target, String name, Schema populatedSchema)
     {
         List<Column> columns = new ArrayList<>(target.getSize() + 1);
         columns.addAll(target.getColumns());
@@ -40,52 +57,47 @@ public class SchemaUtils
         return new CoreColumn(name, ResolvedType.table(populatedSchema), "", false, tableRef, CoreColumn.Type.POPULATED);
     }
 
-    /** Return a new schema which concats to other schemas */
-    public static Schema concat(Schema schema1, Schema schema2)
+    /** Creates a new column from provide column with a new name. */
+    public static Column rename(Column column, String newName)
     {
-        if (schema1 == null)
+        if (column instanceof CoreColumn cc)
+        {
+            return new CoreColumn(cc, newName);
+        }
+
+        return new Column(newName, column.getType());
+    }
+
+    /** Return a new schema which concats to other schemas */
+    private static Schema concat(Schema schema1, Schema schema2)
+    {
+        if (schema1 == null
+                || schema1.getSize() == 0)
         {
             return schema2;
         }
-        else if (schema2 == null)
+        else if (schema2 == null
+                || schema2.getSize() == 0)
         {
             return schema1;
         }
 
         List<Column> columns1 = schema1.getColumns();
         List<Column> columns2 = schema2.getColumns();
-
-        int size1 = columns1.size();
-        int size = size1 + columns2.size();
-        List<Column> columns = new AbstractList<>()
-        {
-            @Override
-            public int size()
-            {
-                return size;
-            }
-
-            @Override
-            public Column get(int index)
-            {
-                if (index < size1)
-                {
-                    return columns1.get(index);
-                }
-                return columns2.get(index - size1);
-            }
-        };
+        List<Column> columns = new ArrayList<>(columns1.size() + columns2.size());
+        columns.addAll(columns1);
+        columns.addAll(columns2);
         return new Schema(columns);
     }
 
     /** Returns true if this schema contains asterisk columns */
     public static boolean isAsterisk(Schema schema)
     {
-        return isAsterisk(schema, false);
+        return isAsterisk(schema, true);
     }
 
     /** Returns true if this schema contains asterisk columns */
-    public static boolean isAsterisk(Schema schema, boolean currentLevelOnly)
+    public static boolean isAsterisk(Schema schema, boolean includeNamedAsterisks)
     {
         int size = schema.getSize();
         if (size == 0)
@@ -97,19 +109,18 @@ public class SchemaUtils
         {
             Column column = schema.getColumns()
                     .get(i);
-            if (isAsterisk(column))
+            if (isAsterisk(column, includeNamedAsterisks))
             {
                 return true;
             }
 
-            if (!currentLevelOnly
-                    && (column.getType()
-                            .getType() == Column.Type.Table
-                            || column.getType()
-                                    .getType() == Column.Type.Object))
+            if (column.getType()
+                    .getType() == Column.Type.Table
+                    || column.getType()
+                            .getType() == Column.Type.Object)
             {
                 if (isAsterisk(column.getType()
-                        .getSchema()))
+                        .getSchema(), includeNamedAsterisks))
                 {
                     return true;
                 }
@@ -119,10 +130,22 @@ public class SchemaUtils
     }
 
     /** Returns true if provided column is asterisk */
-    public static boolean isAsterisk(Column column)
+    public static boolean isAsterisk(Column column, boolean includeSemiAsterisks)
     {
         return column instanceof CoreColumn cc
-                && cc.getColumnType() == CoreColumn.Type.ASTERISK;
+                && (cc.getColumnType() == CoreColumn.Type.ASTERISK
+                        || (includeSemiAsterisks
+                                && cc.getColumnType() == CoreColumn.Type.NAMED_ASTERISK));
+    }
+
+    /** Return column type of provided column */
+    public static CoreColumn.Type getColumnType(Column column)
+    {
+        if (column instanceof CoreColumn cc)
+        {
+            return cc.getColumnType();
+        }
+        return CoreColumn.Type.REGULAR;
     }
 
     /** Returns true if provided column is populated */
@@ -175,46 +198,76 @@ public class SchemaUtils
     }
 
     /** Create a schema from provided expressions. */
-    public static Schema getSchema(Schema schema, List<? extends IExpression> expressions, boolean appendInputColumns, boolean aggregate)
+    public static Schema getSchema(Schema schema, List<? extends IExpression> expressions, boolean aggregate)
     {
-        List<Column> columns = new ArrayList<>(expressions.size() + (appendInputColumns ? schema.getSize()
-                : 0));
-
+        List<Column> columns = new ArrayList<>(expressions.size());
         for (IExpression expression : expressions)
         {
-            String name = "";
-            String outputName = "";
-            if (expression instanceof HasAlias a)
-            {
-                Alias alias = a.getAlias();
-                name = alias.getAlias();
-                outputName = alias.getOutputAlias();
-            }
-
-            if (StringUtils.isBlank(name))
-            {
-                outputName = expression.toString();
-            }
-
-            ResolvedType type = aggregate ? ((IAggregateExpression) expression).getAggregateType()
-                    : expression.getType();
-            TableSourceReference tableSourceReference = null;
-            boolean asterisk = expression instanceof AsteriskExpression
-                    || expression instanceof AggregateWrapperExpression awe
-                            && awe.getExpression() instanceof AsteriskExpression;
-            if (expression instanceof HasTableSourceReference htsr)
-            {
-                tableSourceReference = htsr.getTableSourceReference();
-            }
-            columns.add(new CoreColumn(name, type, outputName, expression.isInternal(), tableSourceReference, asterisk ? CoreColumn.Type.ASTERISK
-                    : CoreColumn.Type.REGULAR));
+            columns.add(getColumn(expression, aggregate, null));
         }
-
-        if (appendInputColumns)
-        {
-            columns.addAll(schema.getColumns());
-        }
-
         return new Schema(columns);
+    }
+
+    /**
+     * Create a schema from provided expression and runtime vectors. This is used during schema less queries to create a schema based on runtime values
+     */
+    public static Schema getSchema(List<? extends IExpression> expressions, ValueVector[] projectionVectors, boolean aggregate)
+    {
+        // Else we need to construct the actual schema from the actual vectors
+        List<Column> columns = new ArrayList<>(projectionVectors.length);
+
+        // First add projection types
+        int size = projectionVectors.length;
+        for (int i = 0; i < size; i++)
+        {
+            columns.add(getColumn(expressions.get(i), aggregate, projectionVectors[i].type()));
+        }
+        return new Schema(columns);
+    }
+
+    /** Create a column from provided expression and optional type */
+    public static Column getColumn(IExpression expression, boolean aggregate, ResolvedType type)
+    {
+        String name = "";
+        String outputName = "";
+        if (expression instanceof HasAlias a)
+        {
+            Alias alias = a.getAlias();
+            name = alias.getAlias();
+            outputName = alias.getOutputAlias();
+        }
+
+        if (StringUtils.isBlank(name))
+        {
+            outputName = expression.toString();
+        }
+
+        // No type provided then use the type from the expression
+        if (type == null)
+        {
+            type = aggregate ? ((IAggregateExpression) expression).getAggregateType()
+                    : expression.getType();
+        }
+        TableSourceReference tableSourceReference = null;
+        CoreColumn.Type columnType = isAsteriskExpression(expression) ? CoreColumn.Type.ASTERISK
+                : CoreColumn.Type.REGULAR;
+        if (expression instanceof HasColumnReference hcr)
+        {
+            ColumnReference cr = hcr.getColumnReference();
+            if (cr != null)
+            {
+                tableSourceReference = cr.tableSourceReference();
+                columnType = cr.columnType();
+            }
+        }
+
+        return new CoreColumn(name, type, outputName, expression.isInternal(), tableSourceReference, columnType);
+    }
+
+    private static boolean isAsteriskExpression(IExpression expression)
+    {
+        return expression instanceof AsteriskExpression
+                || expression instanceof AggregateWrapperExpression awe
+                        && awe.getExpression() instanceof AsteriskExpression;
     }
 }

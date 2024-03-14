@@ -36,7 +36,6 @@ import se.kuseman.payloadbuilder.core.logicalplan.Join;
 import se.kuseman.payloadbuilder.core.logicalplan.OperatorFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Projection;
 import se.kuseman.payloadbuilder.core.logicalplan.Sort;
-import se.kuseman.payloadbuilder.core.logicalplan.SubQuery;
 import se.kuseman.payloadbuilder.core.parser.Location;
 import se.kuseman.payloadbuilder.core.parser.ParseException;
 
@@ -44,8 +43,8 @@ import se.kuseman.payloadbuilder.core.parser.ParseException;
 public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
 {
     private final ComputedExpressionPushDown optimizer = new ComputedExpressionPushDown();
-    private final TableSourceReference table = new TableSourceReference(0, "", of("table"), "t");
-    private final TableSourceReference tableB = new TableSourceReference(1, "", of("tableB"), "b");
+    private final TableSourceReference table = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", of("table"), "t");
+    private final TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", of("tableB"), "b");
 
     @Test
     public void test_order_by_column_not_projected()
@@ -78,9 +77,9 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             null,
                             e("b.col = t.col"),
                             emptySet(),
-                            false),
-                        List.of(e("b.col1"), new AliasExpression(e("t.col1"), "col1", true)),
-                        false),
+                            false,
+                            Schema.EMPTY),
+                        List.of(e("b.col1"), new AliasExpression(e("t.col1"), "col1", true))),
                 List.of(sortItem(e("t.col1"), Order.ASC))
                 );
         //CSON
@@ -114,13 +113,10 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
         //@formatter:off
         //CSOFF
         ILogicalPlan expected = new Sort(
-                projection(
                     new Projection(
                         tableScan(Schema.of(ast("t", table)), table),
-                        List.of(new AliasExpression(new SubscriptExpression(new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("concat"), null, asList(uce("col"), intLit(1))), intLit(0)), "__expr0", true)),
-                        true),
-                    List.of(new AliasExpression(uce("__expr0"), "__expr0", "concat(col, 1)[0]", false))
-                ),
+                        List.of(new AliasExpression(new SubscriptExpression(new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("concat"), null,
+                                asList(uce("col"), intLit(1))), intLit(0)), "__expr0", "concat(col, 1)[0]", false))),
                 List.of(sortItem(uce("__expr0"), Order.ASC))
                 );
         //CSON
@@ -188,9 +184,10 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
         //@formatter:off
         ILogicalPlan expected = new Sort(
                 new Aggregate(
-                        compute(
+                        projection(
                             tableScan(Schema.of(ast("t", table)), table),
-                            asList(new AliasExpression(add(e("col1"), e("col2")), "__expr0"))),
+                            asList(new AliasExpression(add(e("col1"), e("col2")), "__expr0"),
+                                    new AsteriskExpression(null))),
                         asList(e("col1"), e("col3")),
                         asList(
                             new AggregateWrapperExpression(e("col1"), false, false),
@@ -202,9 +199,9 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 );
         
         assertEquals(Schema.of(
-                new CoreColumn("col1", ResolvedType.array(Type.Any), "", false),
-                new CoreColumn("", ResolvedType.of(Type.Any), "max(col2)", false),
-                new CoreColumn("__expr1", ResolvedType.of(Type.Any), "", true)        // Internal
+                new CoreColumn("col1", ResolvedType.array(Type.Any), "", false, CoreColumn.Type.REGULAR),
+                new CoreColumn("", ResolvedType.of(Type.Any), "max(col2)", false, CoreColumn.Type.REGULAR),
+                new CoreColumn("__expr1", ResolvedType.of(Type.Any), "", true, CoreColumn.Type.REGULAR)        // Internal
                 ), actual.getSchema());
         
         //@formatter:on
@@ -242,9 +239,9 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                         asList(new AliasExpression(new UnresolvedSubQueryExpression(
                             new Sort(
                                 new Aggregate(
-                                    compute(
+                                    projection(
                                         tableScan(Schema.of(ast("t", table)), table),
-                                        asList(new AliasExpression(add(e("col1"), e("col2")), "__expr0"))),
+                                        asList(new AliasExpression(add(e("col1"), e("col2")), "__expr0"), new AsteriskExpression(null))),
                                     asList(e("col1"), e("col3")),
                                     asList(
                                         new AggregateWrapperExpression(e("col1"), false, false),
@@ -253,8 +250,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                                 new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("min"), null, asList(uce("__expr0"))), "__expr1"), false, true)
                                     )),
                             asList(sortItem(uce("__expr1"), Order.ASC))),
-                            null), "x")),
-                        false);
+                            null), "x")));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -320,24 +316,21 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                                         new Projection(
                                                             tableScan(resolvedSchemaSTableB, sTableB),
                                                             asList(uce("b", "col1"),
-                                                            new AliasExpression(uce("b", "col2"), "col2", true)),           // Internal column added for sorting
-                                                            false),
+                                                            new AliasExpression(uce("b", "col2"), "col2", true))),            // Internal column added for sorting
                                                         asList(sortItem(uce("b", "col2"), Order.ASC))),
                                                     "",
                                                     "object",
                                                     null),
                                                 null),
                                                 "obj1"),
-                                                new AliasExpression(uce("a", "col2"), "col2", true)),                       // Internal column added for sorting
-                                            false),
+                                                new AliasExpression(uce("a", "col2"), "col2", true))),                       // Internal column added for sorting
                                         asList(sortItem(uce("a", "col2"), Order.ASC))),
                                     "",
                                     "object_array",
                                     null),
                                 null
                                 ),
-                            "values")),
-                        false);
+                            "values")));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -383,12 +376,14 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 asList(sortItem(uce("__expr0"), Order.ASC))
                 );
         
-        assertEquals(Schema.of(
-                new CoreColumn("col1", ResolvedType.array(Type.Any), "", false),
-                new CoreColumn("", ResolvedType.of(Type.Any), "max(col2)", false),
-                new CoreColumn("__expr0", ResolvedType.of(Type.Any), "min(COL1 + col2)", false)
-                ), actual.getSchema());
-        
+        Assertions.assertThat(actual.getSchema())
+            .usingRecursiveComparison()
+            .ignoringFieldsOfTypes(Location.class, Random.class)
+            .isEqualTo(Schema.of(
+                new CoreColumn("col1", ResolvedType.array(Type.Any), "", false, CoreColumn.Type.REGULAR),
+                new CoreColumn("", ResolvedType.of(Type.Any), "max(col2)", false, CoreColumn.Type.REGULAR),
+                new CoreColumn("__expr0", ResolvedType.of(Type.Any), "min(COL1 + col2)", false, CoreColumn.Type.REGULAR)
+                ));
         //@formatter:on
         //
         // System.out.println(expected.print(0));
@@ -433,9 +428,9 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 );
         
         assertEquals(Schema.of(
-                new CoreColumn("col1", ResolvedType.array(Type.Any), "", false),
-                new CoreColumn("", ResolvedType.of(Type.Any), "max(col2)", false),
-                new CoreColumn("compute", ResolvedType.of(Type.Any), "", false)
+                new CoreColumn("col1", ResolvedType.array(Type.Any), "", false, CoreColumn.Type.REGULAR),
+                new CoreColumn("", ResolvedType.of(Type.Any), "max(col2)", false, CoreColumn.Type.REGULAR),
+                new CoreColumn("compute", ResolvedType.of(Type.Any), "", false, CoreColumn.Type.REGULAR)
                 ), actual.getSchema());
         
         //@formatter:on
@@ -476,9 +471,9 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
         Assertions.assertThat(actual.getSchema())
             .usingRecursiveComparison()
             .isEqualTo(Schema.of(
-                new CoreColumn("col1", ResolvedType.array(Type.Any), "", false),
-                new CoreColumn("", ResolvedType.of(Type.Any), "max(col2)", false),
-                new CoreColumn("col2", ResolvedType.array(Type.Any), "", true)
+                new CoreColumn("col1", ResolvedType.array(Type.Any), "", false, CoreColumn.Type.REGULAR),
+                new CoreColumn("", ResolvedType.of(Type.Any), "max(col2)", false, CoreColumn.Type.REGULAR),
+                new CoreColumn("col2", ResolvedType.array(Type.Any), "", true, CoreColumn.Type.REGULAR)
                 ));
         //@formatter:on
 
@@ -601,15 +596,16 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
+        TableSourceReference subQueryX = new TableSourceReference(1, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
+
         // Will be any push downs here since we have an asterisk and will have to resolve ordinal runtime
         //@formatter:off
         ILogicalPlan expected = 
-                new SubQuery(
+                subQuery(
                     new Sort(
                         tableScan(Schema.of(ast("t", table)), table),
                         asList(sortItem(intLit(1), Order.ASC))),
-                    "x",
-                    null);
+                    subQueryX);
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -700,17 +696,18 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
+        TableSourceReference subQueryX = new TableSourceReference(1, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
+
         // Expression on ordinal 1 will be used
         //@formatter:off
         ILogicalPlan expected = 
-                new SubQuery(
+                subQuery(
                     new Sort(
                         projection(
                             tableScan(Schema.of(ast("t", table)), table),
                             asList(e("col"))),
                         asList(sortItem(new UnresolvedColumnExpression(QualifiedName.of("col"), -1, null), Order.ASC))),
-                    "x",
-                    null);
+                    subQueryX);
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -736,17 +733,45 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        // Expression on ordinal 1 will be used
         //@formatter:off
-        ILogicalPlan expected = 
+        ILogicalPlan expected =
                 new Sort(
                     projection(
-                        compute(
-                            tableScan(Schema.of(ast("t", table)), table),
-                            asList(new AliasExpression(add(e("col"), intLit(10)) , "__expr0", true))),
-                        asList(new AliasExpression(
-                                new UnresolvedColumnExpression(QualifiedName.of("__expr0"), -1, null), "__expr0", "col + 10", false))),
+                        tableScan(Schema.of(ast("t", table)), table),
+                        asList(new AliasExpression(add(e("col"), intLit(10)), "__expr0", "col + 10", false))),
                     asList(sortItem(new UnresolvedColumnExpression(QualifiedName.of("__expr0"), -1, null), Order.ASC)));
+        //@formatter:on
+
+        // System.out.println(expected.print(0));
+        // System.out.println(actual.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_sort_by_ordinal_on_computed_alias_expression_with_non_asterisk()
+    {
+        //@formatter:off
+        String query = "select col + 10 calc "
+                + "from \"table\" t "
+                + "order by col + 10 ";
+        //@formatter:on
+
+        ILogicalPlan plan = getSchemaResolvedPlan(query);
+        ILogicalPlan actual = optimize(context, plan);
+
+        //@formatter:off
+        ILogicalPlan expected =
+                new Sort(
+                    projection(
+                        tableScan(Schema.of(ast("t", table)), table),
+                        asList(new AliasExpression(add(e("col"), intLit(10)), "calc", false))),
+                    asList(sortItem(new UnresolvedColumnExpression(QualifiedName.of("calc"), -1, null), Order.ASC)));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -772,16 +797,12 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        // Expression on ordinal 1 will be used
         //@formatter:off
-        ILogicalPlan expected = 
+        ILogicalPlan expected =
                 new Sort(
                     projection(
-                        compute(
-                            tableScan(Schema.of(ast("t", table)), table),
-                            asList(new AliasExpression(add(e("col"), intLit(10)) , "__expr0", true))),
-                        asList(new AliasExpression(
-                                new UnresolvedColumnExpression(QualifiedName.of("__expr0"), -1, null), "__expr0", "col + 10", false), new AsteriskExpression(null))),
+                        tableScan(Schema.of(ast("t", table)), table),
+                        asList(new AliasExpression(add(e("col"), intLit(10)), "__expr0", "col + 10", false), new AsteriskExpression(null))),
                     asList(sortItem(new UnresolvedColumnExpression(QualifiedName.of("__expr0"), -1, null), Order.ASC)));
         
         //@formatter:on
@@ -936,11 +957,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan expected = 
                 new Sort(
                     projection(
-                        compute(
-                            tableScan(Schema.of(ast("t", table)), table),
-                            asList(new AliasExpression(add(e("col1"), e("col2")), "__expr0", true))),
-                        asList(new AliasExpression(
-                                new UnresolvedColumnExpression(QualifiedName.of("__expr0"), -1, null), "__expr0", "col1 + col2", false))),
+                        tableScan(Schema.of(ast("t", table)), table),
+                        asList(new AliasExpression(add(e("col1"), e("col2")), "__expr0", "col1 + col2", false))),
                     asList(sortItem(new UnresolvedColumnExpression(QualifiedName.of("__expr0"), -1, null), Order.ASC)));
         //@formatter:on
 
@@ -1205,8 +1223,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                            ));
         
         assertEquals(Schema.of(
-                new CoreColumn("", ResolvedType.of(Type.Int), "count(1)", false),
-                new CoreColumn("", ResolvedType.array(Type.Any), "t.col + max(col1)", false)),          // Valuevector now but will be corrected later on when single value
+                new CoreColumn("", ResolvedType.of(Type.Int), "count(1)", false, CoreColumn.Type.REGULAR),
+                new CoreColumn("", ResolvedType.array(Type.Any), "t.col + max(col1)", false, CoreColumn.Type.REGULAR)),          // Valuevector now but will be corrected later on when single value
                 actual.getSchema());
         
         
@@ -1276,8 +1294,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                     e("__expr0 > 10"));
         
         assertEquals(Schema.of(
-                new CoreColumn("", ResolvedType.of(Type.Int), "count(1)", false),
-                new CoreColumn("__expr0", ResolvedType.of(Type.Any), "", true)),
+                new CoreColumn("", ResolvedType.of(Type.Int), "count(1)", false, CoreColumn.Type.REGULAR),
+                new CoreColumn("__expr0", ResolvedType.of(Type.Any), "", true, CoreColumn.Type.REGULAR)),
                 actual.getSchema());
         
         //@formatter:on
@@ -1320,8 +1338,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                     e("__expr0 > 10"));
         
         assertEquals(Schema.of(
-                new CoreColumn("", ResolvedType.of(Type.Int), "count(1)", false),
-                new CoreColumn("__expr0", ResolvedType.of(Type.Any), "", true)),
+                new CoreColumn("", ResolvedType.of(Type.Int), "count(1)", false, CoreColumn.Type.REGULAR),
+                new CoreColumn("__expr0", ResolvedType.of(Type.Any), "", true, CoreColumn.Type.REGULAR)),
                 actual.getSchema());
         
         //@formatter:on
@@ -1351,9 +1369,9 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 new Sort(
                     new Filter(
                         new Aggregate(
-                            compute(
+                            projection(
                                 tableScan(Schema.of(ast("t", table)), table),
-                                asList(new AliasExpression(e("2 * col3"), "__expr0"))),
+                                asList(new AliasExpression(e("2 * col3"), "__expr0"), new AsteriskExpression(null))),
                             asList(e("col")),
                             asList(new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("count"), null, asList(intLit(1))),
                                     new AggregateWrapperExpression(
@@ -1368,15 +1386,20 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                     asList(sortItem(e("__expr1"), Order.ASC)));
         
         assertEquals(Schema.of(
-                new CoreColumn("", ResolvedType.of(Type.Int), "count(1)", false),
-                new CoreColumn("__expr1", ResolvedType.of(Type.Any), "", true),
-                new CoreColumn("__expr2", ResolvedType.of(Type.Any), "", true)),
+                new CoreColumn("", ResolvedType.of(Type.Int), "count(1)", false, CoreColumn.Type.REGULAR),
+                new CoreColumn("__expr1", ResolvedType.of(Type.Any), "", true, CoreColumn.Type.REGULAR),
+                new CoreColumn("__expr2", ResolvedType.of(Type.Any), "", true, CoreColumn.Type.REGULAR)),
                 actual.getSchema());
         
         //@formatter:on
 
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));
+
+        // Assertions.assertThat(actual)
+        // .usingRecursiveComparison()
+        // .ignoringFieldsOfTypes(Location.class, Random.class)
+        // .isEqualTo(expected);
 
         assertEquals(expected, actual);
     }
@@ -1416,9 +1439,9 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                     asList(sortItem(e("__expr0"), Order.ASC)));
         
         assertEquals(Schema.of(
-                new CoreColumn("", ResolvedType.of(Type.Int), "count(1)", false),
-                new CoreColumn("__expr0", ResolvedType.of(Type.Int), "min(col3 * 2)", false),
-                new CoreColumn("__expr1", ResolvedType.of(Type.Any), "", true)),
+                new CoreColumn("", ResolvedType.of(Type.Int), "count(1)", false, CoreColumn.Type.REGULAR),
+                new CoreColumn("__expr0", ResolvedType.of(Type.Int), "min(col3 * 2)", false, CoreColumn.Type.REGULAR),
+                new CoreColumn("__expr1", ResolvedType.of(Type.Any), "", true, CoreColumn.Type.REGULAR)),
                 actual.getSchema());
         
         //@formatter:on
@@ -1457,7 +1480,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                     e("__expr0 > 10"));
         
         assertEquals(Schema.of(
-                new CoreColumn("__expr0", ResolvedType.of(Type.Int), "count(1)", false)),
+                new CoreColumn("__expr0", ResolvedType.of(Type.Int), "count(1)", false, CoreColumn.Type.REGULAR)),
                 actual.getSchema());
         
         //@formatter:on
@@ -1499,7 +1522,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                     asList(sortItem(e("__expr0"), Order.DESC)));
         
         assertEquals(Schema.of(
-                new CoreColumn("__expr0", ResolvedType.of(Type.Int), "count(1)", false)),
+                new CoreColumn("__expr0", ResolvedType.of(Type.Int), "count(1)", false, CoreColumn.Type.REGULAR)),
                 actual.getSchema());
         //@formatter:on
 
@@ -1540,7 +1563,7 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                     asList(sortItem(e("numberOfRecords"), Order.DESC)));
         
         assertEquals(Schema.of(
-                new CoreColumn("numberOfRecords", ResolvedType.of(Type.Int), "", false)),
+                new CoreColumn("numberOfRecords", ResolvedType.of(Type.Int), "", false, CoreColumn.Type.REGULAR)),
                 actual.getSchema());
         //@formatter:on
 
@@ -1580,8 +1603,8 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 .usingRecursiveComparison()
                 .ignoringFieldsOfTypes(Location.class, Random.class)
                 .isEqualTo(Schema.of(
-                        CoreColumn.of("cnt", ResolvedType.of(Type.Int), null),
-                        new CoreColumn("col", ResolvedType.array(Type.Any), "", false)));
+                        new CoreColumn("cnt", ResolvedType.of(Type.Int), "", false, CoreColumn.Type.REGULAR),
+                        new CoreColumn("col", ResolvedType.array(Type.Any), "", false, CoreColumn.Type.REGULAR)));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -1654,9 +1677,9 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
 
         //@formatter:off
         assertEquals(Schema.of(
-                new CoreColumn("cnt", ResolvedType.of(Type.Int), "", false), 
-                new CoreColumn("col", ResolvedType.array(Type.Any), "", true),      // col internal
-                new CoreColumn("col2", ResolvedType.array(Type.Any), "", true)),     // col2 internsl
+                new CoreColumn("cnt", ResolvedType.of(Type.Int), "", false, CoreColumn.Type.REGULAR), 
+                new CoreColumn("col", ResolvedType.array(Type.Any), "", true, CoreColumn.Type.REGULAR),      // col internal
+                new CoreColumn("col2", ResolvedType.array(Type.Any), "", true, CoreColumn.Type.REGULAR)),     // col2 internsl
                 expected.getSchema());
         //@formatter:on
 

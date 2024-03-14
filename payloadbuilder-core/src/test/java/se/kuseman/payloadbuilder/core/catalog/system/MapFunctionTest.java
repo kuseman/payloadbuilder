@@ -51,7 +51,7 @@ public class MapFunctionTest extends APhysicalPlanTest
 
         tv = TupleVector.of(Schema.of(new Column("col", ResolvedType.array(ResolvedType.of(Type.Int)))),
                 asList(vv(ResolvedType.array(ResolvedType.of(Type.Int)), vv(ResolvedType.of(Type.Int), 1, 2, 3), vv(ResolvedType.of(Type.Int), 4, 5))));
-        input = ce("col", ResolvedType.array(ResolvedType.of(Type.Int)), 0);
+        input = ce("col", 0, ResolvedType.array(ResolvedType.of(Type.Int)));
         lambdaExpression1 = new LambdaExpression(asList("y"), add(lce("y", 1, ResolvedType.of(Type.Int)), intLit(10)), new int[] { 1 });
         lambdaExpression2 = new LambdaExpression(asList("x"), new FunctionCallExpression("", mapFunction, null, asList(lce("x", 0, ResolvedType.of(Type.Int)), lambdaExpression1)), new int[] { 0 });
 
@@ -90,7 +90,7 @@ public class MapFunctionTest extends APhysicalPlanTest
                 ));
         //@formatter:on
 
-        input = ce("col", ResolvedType.table(innerSchema), 0);
+        input = ce("col", 0, ResolvedType.table(innerSchema));
         lambdaExpression = new LambdaExpression(asList("x"), DereferenceExpression.create(lce("x", 0, ResolvedType.object(innerSchema)), QualifiedName.of("key2"), null), new int[] { 0 });
         actual = mapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
 
@@ -123,7 +123,7 @@ public class MapFunctionTest extends APhysicalPlanTest
         //
 
         tv = TupleVector.of(Schema.of(col("col", Type.Any)), asList(vv(ResolvedType.of(Type.Any), asList(1, 2, 3), asList(4, null, 6))));
-        input = new FunctionCallExpression("", toArrayFunction, null, asList(ce("col", ResolvedType.of(Type.Any), 0)));
+        input = new FunctionCallExpression("", toArrayFunction, null, asList(ce("col", 0, ResolvedType.of(Type.Any))));
         lambdaExpression = new LambdaExpression(asList("x"), add(lce("x", 0, ResolvedType.of(Type.Any)), intLit(10)), new int[] { 0 });
         actual = mapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
 
@@ -135,7 +135,7 @@ public class MapFunctionTest extends APhysicalPlanTest
 
         // Collection (set)
         tv = TupleVector.of(Schema.of(col("col", Type.Any)), asList(vv(ResolvedType.of(Type.Any), CollectionUtils.asOrderedSet(1, 2, 3, 4, 5, 6, null))));
-        input = new FunctionCallExpression("", toArrayFunction, null, asList(ce("col", ResolvedType.of(Type.Any), 0)));
+        input = new FunctionCallExpression("", toArrayFunction, null, asList(ce("col", 0, ResolvedType.of(Type.Any))));
         lambdaExpression = new LambdaExpression(asList("x"), add(lce("x", 0, ResolvedType.of(Type.Any)), intLit(10)), new int[] { 0 });
         actual = mapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
 
@@ -146,7 +146,7 @@ public class MapFunctionTest extends APhysicalPlanTest
 
         // Array
         tv = TupleVector.of(Schema.of(col("col", Type.Any)), asList(vv(ResolvedType.of(Type.Any), new int[] { 1, 2, 3, 4, 5, 6 })));
-        input = new FunctionCallExpression("", toArrayFunction, null, asList(ce("col", ResolvedType.of(Type.Any), 0)));
+        input = new FunctionCallExpression("", toArrayFunction, null, asList(ce("col", 0, ResolvedType.of(Type.Any))));
         lambdaExpression = new LambdaExpression(asList("x"), add(lce("x", 0, ResolvedType.of(Type.Any)), intLit(10)), new int[] { 0 });
         actual = mapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
 
@@ -157,7 +157,7 @@ public class MapFunctionTest extends APhysicalPlanTest
 
         // Mix of different values wrapped in Array
         tv = TupleVector.of(Schema.of(col("col", Type.Any)), asList(vv(ResolvedType.of(Type.Any), new int[] { 1, 2, 3, 4, 5, 6 }, "hello", asList(10.11F, 20.22F))));
-        input = new FunctionCallExpression("", toArrayFunction, null, asList(ce("col", ResolvedType.of(Type.Any), 0)));
+        input = new FunctionCallExpression("", toArrayFunction, null, asList(ce("col", 0, ResolvedType.of(Type.Any))));
         lambdaExpression = new LambdaExpression(asList("x"), new FunctionCallExpression("", concatFunction, null, asList(lce("x", 0, ResolvedType.of(Type.Any)), intLit(10))), new int[] { 0 });
         actual = mapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
 
@@ -170,7 +170,7 @@ public class MapFunctionTest extends APhysicalPlanTest
 
         // Mix of different values as Any
         tv = TupleVector.of(Schema.of(col("col", Type.Any)), asList(vv(ResolvedType.of(Type.Any), new int[] { 1, 2, 3, 4, 5, 6 }, "hello", asList(10.11F, 20.22F))));
-        input = ce("col", ResolvedType.of(Type.Any), 0);
+        input = ce("col", 0, ResolvedType.of(Type.Any));
         lambdaExpression = new LambdaExpression(asList("x"), new FunctionCallExpression("", concatFunction, null, asList(lce("x", 0, ResolvedType.of(Type.Any)), intLit(10))), new int[] { 0 });
         actual = mapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
 
@@ -187,7 +187,7 @@ public class MapFunctionTest extends APhysicalPlanTest
         // ValueVector
         tv = TupleVector.of(Schema.of(Column.of("col", ResolvedType.array(ResolvedType.of(Type.Int)))),
                 asList(vv(ResolvedType.array(ResolvedType.of(Type.Int)), vv(ResolvedType.of(Type.Int), 1, 2, 3, 4, 5, 6), null)));
-        input = ce("col", ResolvedType.array(ResolvedType.of(Type.Int)), 0);
+        input = ce("col", 0, ResolvedType.array(ResolvedType.of(Type.Int)));
         lambdaExpression = new LambdaExpression(asList("x"), add(lce("x", 0, ResolvedType.of(Type.Int)), intLit(10)), new int[] { 0 });
         actual = mapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
 
@@ -208,7 +208,7 @@ public class MapFunctionTest extends APhysicalPlanTest
                 ));
         //@formatter:on
 
-        input = ce("col", ResolvedType.table(innerSchema), 0);
+        input = ce("col", 0, ResolvedType.table(innerSchema));
         lambdaExpression = new LambdaExpression(asList("x"),
                 new FunctionCallExpression("", concatFunction, null, asList(DereferenceExpression.create(lce("x", 0, ResolvedType.object(innerSchema)), QualifiedName.of("key2"), null), intLit(10))),
                 new int[] { 0 });
@@ -258,7 +258,7 @@ public class MapFunctionTest extends APhysicalPlanTest
 
         // Int output
         tv = TupleVector.of(Schema.of(col("col", Type.Int)), asList(vv(ResolvedType.of(Type.Int), 1, 2, 3, null)));
-        input = ce("col", ResolvedType.of(Type.Int), 0);
+        input = ce("col", 0, ResolvedType.of(Type.Int));
         lambdaExpression = new LambdaExpression(asList("x"), add(lce("x", 0, ResolvedType.of(Type.Int)), intLit(10)), new int[] { 0 });
         actual = mapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
 
@@ -269,7 +269,7 @@ public class MapFunctionTest extends APhysicalPlanTest
 
         // Long output
         tv = TupleVector.of(Schema.of(col("col", Type.Long)), asList(vv(ResolvedType.of(Type.Long), 1L, 5L, null, 6L)));
-        input = ce("col", ResolvedType.of(Type.Long), 0);
+        input = ce("col", 0, ResolvedType.of(Type.Long));
         lambdaExpression = new LambdaExpression(asList("x"), add(lce("x", 0, ResolvedType.of(Type.Long)), intLit(10)), new int[] { 0 });
         actual = mapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
 
@@ -280,7 +280,7 @@ public class MapFunctionTest extends APhysicalPlanTest
 
         // Float output
         tv = TupleVector.of(Schema.of(col("col", Type.Float)), asList(vv(ResolvedType.of(Type.Float), 1.1F, null, 2.2F, 3.3F)));
-        input = ce("col", ResolvedType.of(Type.Float), 0);
+        input = ce("col", 0, ResolvedType.of(Type.Float));
         lambdaExpression = new LambdaExpression(asList("x"), add(lce("x", 0, ResolvedType.of(Type.Float)), intLit(10)), new int[] { 0 });
         actual = mapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
 
@@ -291,7 +291,7 @@ public class MapFunctionTest extends APhysicalPlanTest
 
         // Double output
         tv = TupleVector.of(Schema.of(col("col", Type.Double)), asList(vv(ResolvedType.of(Type.Double), -1.1D, -2.2D, null, -3.3D)));
-        input = ce("col", ResolvedType.of(Type.Double), 0);
+        input = ce("col", 0, ResolvedType.of(Type.Double));
         lambdaExpression = new LambdaExpression(asList("x"), add(lce("x", 0, ResolvedType.of(Type.Double)), intLit(-10)), new int[] { 0 });
         actual = mapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
 
@@ -302,7 +302,7 @@ public class MapFunctionTest extends APhysicalPlanTest
 
         // Boolean output
         tv = TupleVector.of(Schema.of(col("col", Type.Boolean)), asList(vv(ResolvedType.of(Type.Boolean), true, false, null)));
-        input = ce("col", ResolvedType.of(Type.Boolean), 0);
+        input = ce("col", 0, ResolvedType.of(Type.Boolean));
         lambdaExpression = new LambdaExpression(asList("x"), and(lce("x", 0, ResolvedType.of(Type.Boolean)), LiteralBooleanExpression.TRUE), new int[] { 0 });
         actual = mapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
 
@@ -313,7 +313,7 @@ public class MapFunctionTest extends APhysicalPlanTest
 
         // String output
         tv = TupleVector.of(Schema.of(col("col", Type.String)), asList(vv(ResolvedType.of(Type.String), "hello", "world", null)));
-        input = ce("col", ResolvedType.of(Type.String), 0);
+        input = ce("col", 0, ResolvedType.of(Type.String));
         lambdaExpression = new LambdaExpression(asList("x"), new FunctionCallExpression("", SystemCatalog.get()
                 .getScalarFunction("concat"), null, asList(lce("x", 0, ResolvedType.of(Type.String)), new LiteralStringExpression("hello"))), new int[] { 0 });
         actual = mapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
@@ -325,7 +325,7 @@ public class MapFunctionTest extends APhysicalPlanTest
 
         // Object output
         tv = TupleVector.of(Schema.of(col("col", Type.Any)), asList(vv(ResolvedType.of(Type.Any), "hello", "world", null)));
-        input = ce("col", ResolvedType.of(Type.Any), 0);
+        input = ce("col", 0, ResolvedType.of(Type.Any));
         lambdaExpression = new LambdaExpression(asList("x"), new FunctionCallExpression("", SystemCatalog.get()
                 .getScalarFunction("concat"), null, asList(lce("x", 0, ResolvedType.of(Type.Any)), new LiteralStringExpression("hello"))), new int[] { 0 });
         actual = mapFunction.evalScalar(context, tv, "", asList(input, lambdaExpression));
@@ -340,7 +340,7 @@ public class MapFunctionTest extends APhysicalPlanTest
                 asList(vv(ResolvedType.of(Type.Any), MapUtils.ofEntries(true, MapUtils.entry("key", "value"), MapUtils.entry("key2", "value2")),
                         MapUtils.ofEntries(true, MapUtils.entry("key", "value2"), MapUtils.entry("key2", "value3")),
                         MapUtils.ofEntries(true, MapUtils.entry("key3", "value2"), MapUtils.entry("key2", "value3")))));
-        input = ce("col", ResolvedType.of(Type.Any), 0);
+        input = ce("col", 0, ResolvedType.of(Type.Any));
         lambdaExpression = new LambdaExpression(asList("x"),
                 new FunctionCallExpression("", concatFunction, null, asList(new DereferenceExpression(lce("x", 0, ResolvedType.of(Type.Any)), "key", -1, ResolvedType.of(Type.Any)), intLit(10))),
                 new int[] { 0 });

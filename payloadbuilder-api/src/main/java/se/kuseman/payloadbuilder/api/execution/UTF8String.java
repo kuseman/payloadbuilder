@@ -131,11 +131,11 @@ public class UTF8String implements Comparable<UTF8String>, ValueVector
     @Override
     public int hashCode()
     {
-        if (string != null)
-        {
-            return string.hashCode();
-        }
+        // NOTE! We must always use hash code from bytes, we cannot mix
+        // hash code from string and bytes since then hash match don't work
+        getBytesInternal();
 
+        // TODO: cache
         int result = START;
         final int end = offset + length;
         for (int i = offset; i < end; i++)
@@ -156,9 +156,8 @@ public class UTF8String implements Comparable<UTF8String>, ValueVector
         {
             return true;
         }
-        else if (obj instanceof UTF8String)
+        else if (obj instanceof UTF8String that)
         {
-            UTF8String that = (UTF8String) obj;
             if (string != null
                     && that.string != null)
             {

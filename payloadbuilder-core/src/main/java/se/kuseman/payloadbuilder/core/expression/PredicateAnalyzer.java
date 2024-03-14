@@ -23,6 +23,7 @@ import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
 
 /**
  * Analyzes a join predicate
@@ -337,7 +338,7 @@ public class PredicateAnalyzer
                 return Pair.of(right.expression, left.expression);
             }
 
-            throw new IllegalArgumentException("No expressions could be found in this pair for table source " + tableSource);
+            throw new IllegalArgumentException("No expressions could be found in this pair for table source " + tableSource.getName());
         }
 
         /**
@@ -389,7 +390,7 @@ public class PredicateAnalyzer
          *
          * </pre>
          */
-        boolean isPushdown(TableSourceReference tableSource)
+        public boolean isPushdown(TableSourceReference tableSource)
         {
             boolean presentOnLeft = left.isSingleTableSource(tableSource, false);
 
@@ -596,7 +597,7 @@ public class PredicateAnalyzer
     public static class AnalyzeItem
     {
         /** Marker table source used to when an ambiguous column is encoutered. This to avoid faulty pushdowns of predicates etc. */
-        static final TableSourceReference UNKNOWN_TABLE_SOURCE = new TableSourceReference(-1, "", QualifiedName.of("unkown"), "#");
+        static final TableSourceReference UNKNOWN_TABLE_SOURCE = new TableSourceReference(-1, TableSourceReference.Type.TABLE, "", QualifiedName.of("unkown"), "#");
 
         /** Expression representing this item */
         private final IExpression expression;
@@ -716,9 +717,12 @@ public class PredicateAnalyzer
             }
 
             TableSourceReference tableSource = AnalyzeItem.UNKNOWN_TABLE_SOURCE;
-            if (expression instanceof HasTableSourceReference htsr)
+            if (expression instanceof HasColumnReference htsr)
             {
-                tableSource = ObjectUtils.defaultIfNull(htsr.getTableSourceReference(), tableSource);
+                ColumnReference cr = htsr.getColumnReference();
+                TableSourceReference columnTableSource = cr != null ? cr.tableSourceReference()
+                        : null;
+                tableSource = ObjectUtils.defaultIfNull(columnTableSource, tableSource);
             }
             context.result.add(tableSource);
             return null;

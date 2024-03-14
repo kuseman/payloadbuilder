@@ -68,8 +68,8 @@ public class TableFunctionScan implements IPhysicalPlan
     {
         Map<String, Object> properties = new LinkedHashMap<>();
         properties.put(IDatasource.CATALOG, catalogName);
-
         properties.put(IDatasource.OUTPUT, DescribeUtils.getOutputColumns(getSchema()));
+        properties.putAll(functionInfo.getDescribeProperties(context));
         return properties;
     }
 
@@ -85,9 +85,21 @@ public class TableFunctionScan implements IPhysicalPlan
                 : Optional.of(this.schema);
         final IDatasourceOptions datasourceOptions = new DatasourceOptions(options);
         final int batchSize = datasourceOptions.getBatchSize(context);
-        final TupleIterator iterator = functionInfo.execute(context, catalogAlias, schema, arguments, datasourceOptions);
+        final TupleIterator iterator = functionInfo.execute(context, catalogAlias, schema, arguments, datasourceOptions, nodeId);
         return new TupleIterator()
         {
+            @Override
+            public int estimatedBatchCount()
+            {
+                return iterator.estimatedBatchCount();
+            }
+
+            @Override
+            public int estimatedRowCount()
+            {
+                return iterator.estimatedRowCount();
+            }
+
             @Override
             public TupleVector next()
             {

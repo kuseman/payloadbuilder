@@ -6,6 +6,8 @@ import static java.util.Objects.requireNonNull;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference.Type;
 import se.kuseman.payloadbuilder.core.parser.Location;
 
 /**
@@ -27,11 +29,15 @@ public class SubQuery extends TableSource
     private final ILogicalPlan input;
     private final Location location;
 
-    public SubQuery(ILogicalPlan input, String alias, Location location)
+    public SubQuery(ILogicalPlan input, TableSourceReference tableSource, Location location)
     {
-        super("", alias);
+        super(tableSource);
         this.input = requireNonNull(input, "input");
         this.location = location;
+        if (tableSource.getType() != Type.SUBQUERY)
+        {
+            throw new IllegalArgumentException("Wrong table source type");
+        }
     }
 
     public ILogicalPlan getInput()
@@ -72,9 +78,16 @@ public class SubQuery extends TableSource
     @Override
     public boolean equals(Object obj)
     {
-        if (obj instanceof SubQuery)
+        if (obj == this)
         {
-            SubQuery that = (SubQuery) obj;
+            return true;
+        }
+        else if (obj == null)
+        {
+            return false;
+        }
+        else if (obj instanceof SubQuery that)
+        {
             return super.equals(that)
                     && input.equals(that.input);
         }

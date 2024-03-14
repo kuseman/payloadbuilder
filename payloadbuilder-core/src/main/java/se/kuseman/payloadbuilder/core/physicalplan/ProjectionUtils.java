@@ -7,12 +7,14 @@ import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
 import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.DereferenceExpression;
+import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 
 /** Utility class for projections that handles asterisks in projection expressions. */
@@ -85,8 +87,10 @@ public class ProjectionUtils
             // Matching table source, return expression
             if (tableSource.getId() == columnTableSource.getId())
             {
+                CoreColumn.Type columnType = SchemaUtils.getColumnType(column);
+
                 IExpression columnExpression = ColumnExpression.Builder.of(column.getName(), column.getType())
-                        .withTableSourceReference(columnTableSource)
+                        .withColumnReference(new ColumnReference(columnTableSource, columnType))
                         .withOuterReference(outer)
                         .withOrdinal(i)
                         .build();

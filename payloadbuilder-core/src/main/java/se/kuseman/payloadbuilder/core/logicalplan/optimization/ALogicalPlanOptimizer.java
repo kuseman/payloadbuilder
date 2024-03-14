@@ -57,6 +57,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
     {
         final IExecutionContext context;
         Map<QualifiedName, TableSchema> schemaByTempTable = emptyMap();
+        Map<TableSourceReference, TableSchema> schemaByTableSource = new HashMap<>();
         // Counter used to generate unique expression column names for each pushed down sub expression
         int expressionCounter;
 
@@ -378,7 +379,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
             expressions = visit(plan, plan.getExpressions(), context);
         }
         return new Projection(plan.getInput()
-                .accept(this, context), expressions, plan.isAppendInputColumns());
+                .accept(this, context), expressions);
     }
 
     protected ILogicalPlan create(Aggregate plan, C context)
@@ -426,7 +427,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
                 .accept(this, context),
                 plan.getInner()
                         .accept(this, context),
-                plan.getType(), plan.getPopulateAlias(), condition, plan.getOuterReferences(), plan.isSwitchedInputs());
+                plan.getType(), plan.getPopulateAlias(), condition, plan.getOuterReferences(), plan.isSwitchedInputs(), plan.getOuterSchema());
     }
 
     protected ILogicalPlan create(Sort plan, C context)
@@ -470,7 +471,7 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
     protected ILogicalPlan create(SubQuery plan, C context)
     {
         return new SubQuery(plan.getInput()
-                .accept(this, context), plan.getAlias(), plan.getLocation());
+                .accept(this, context), plan.getTableSource(), plan.getLocation());
     }
 
     protected ILogicalPlan create(Limit plan, C context)
@@ -539,7 +540,8 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         public Void visit(IColumnExpression expression, Map<TableSourceReference, Set<String>> context)
         {
             ColumnExpression ce = (ColumnExpression) expression;
-            TableSourceReference tableRef = ce.getTableSourceReference();
+            TableSourceReference tableRef = ce.getColumnReference()
+                    .tableSourceReference();
             if (tableRef != null)
             {
                 context.computeIfAbsent(tableRef, k -> new HashSet<>())

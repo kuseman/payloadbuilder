@@ -82,7 +82,7 @@ public class VectorUtilsTest extends APhysicalPlanTest
         assertEquals(1072693877, VectorUtils.hash(new ValueVector[] { vv(Type.Double, 1.0D) }, 0));
         assertEquals(629, VectorUtils.hash(new ValueVector[] { vv(Type.Boolean, true) }, 0));
         assertEquals(630, VectorUtils.hash(new ValueVector[] { vv(Type.Boolean, false) }, 0));
-        assertEquals(99162951, VectorUtils.hash(new ValueVector[] { vv(Type.String, "hello") }, 0));
+        assertEquals(1379028554, VectorUtils.hash(new ValueVector[] { vv(Type.String, "hello") }, 0));
         assertEquals(1379028554, VectorUtils.hash(new ValueVector[] { vv(Type.String, UTF8String.utf8("hello".getBytes(StandardCharsets.UTF_8))) }, 0));
         assertEquals(99162951, VectorUtils.hash(new ValueVector[] { vv(Type.Any, "hello") }, 0));
         assertEquals(1086210677, VectorUtils.hash(new ValueVector[] { vv(Type.DateTime, EpochDateTime.from(160_000_000_000L)) }, 0));

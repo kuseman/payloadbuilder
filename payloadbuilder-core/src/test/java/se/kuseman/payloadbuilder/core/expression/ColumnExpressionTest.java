@@ -17,6 +17,7 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link ColumnExpression} */
@@ -26,9 +27,9 @@ public class ColumnExpressionTest extends APhysicalPlanTest
             expected = IllegalArgumentException.class)
     public void test_illegal_args_no_ordinal_no_path_no_asterisk()
     {
-        TableSourceReference tableSource = new TableSourceReference(0, "", QualifiedName.of("table"), "t");
+        TableSourceReference tableSource = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "t");
         ColumnExpression.Builder.of("col", ResolvedType.of(Type.Any))
-                .withTableSourceReference(tableSource)
+                .withColumnReference(new ColumnReference(tableSource, CoreColumn.Type.REGULAR))
                 .build();
     }
 
@@ -41,7 +42,7 @@ public class ColumnExpressionTest extends APhysicalPlanTest
         TupleVector tv;
         // CSON
 
-        e = ce("col", ResolvedType.of(Type.Int), 0);
+        e = ce("col", 0, ResolvedType.of(Type.Int));
         tv = TupleVector.of(Schema.of(col("a", Type.Int)), asList(vv(Type.Int, 0, 0)));
 
         assertEquals(QualifiedName.of("col"), e.getQualifiedColumn());
@@ -54,7 +55,7 @@ public class ColumnExpressionTest extends APhysicalPlanTest
         Schema schema = Schema.of(new Column("a", ResolvedType.table(innerSchema)));
 
         // Test nested tuple vector, this will return a vector of value vectors
-        e = ce("a", ResolvedType.of(Type.Int), 0);
+        e = ce("a", 0, ResolvedType.of(Type.Int));
         //@formatter:off
         tv = TupleVector.of(schema, asList(
                 vv(ResolvedType.table(innerSchema),
@@ -174,8 +175,8 @@ public class ColumnExpressionTest extends APhysicalPlanTest
         TupleVector tv;
         // CSON
 
-        TableSourceReference tableSource = new TableSourceReference(0, "", QualifiedName.of("table"), "a");
-        TableSourceReference tableSourceB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableSource = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "a");
+        TableSourceReference tableSourceB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
         e = cre("col", tableSourceB, ResolvedType.of(Type.Int));
         tv = TupleVector.of(Schema.of(CoreColumn.of("col", ResolvedType.of(Type.Int), tableSource)), asList(vv(Type.Int, 0, 0)));
 

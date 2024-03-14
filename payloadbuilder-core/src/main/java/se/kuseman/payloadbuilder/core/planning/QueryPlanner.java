@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
 
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
@@ -21,7 +22,6 @@ import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
-import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.OperatorFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
@@ -42,9 +42,11 @@ import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.execution.TemporaryTable;
 import se.kuseman.payloadbuilder.core.expression.AExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
+import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
 import se.kuseman.payloadbuilder.core.expression.LogicalBinaryExpression;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzePair;
@@ -66,11 +68,16 @@ import se.kuseman.payloadbuilder.core.logicalplan.Sort;
 import se.kuseman.payloadbuilder.core.logicalplan.SubQuery;
 import se.kuseman.payloadbuilder.core.logicalplan.TableFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
+import se.kuseman.payloadbuilder.core.logicalplan.TableSource;
+import se.kuseman.payloadbuilder.core.logicalplan.optimization.ProjectionMerger;
 import se.kuseman.payloadbuilder.core.physicalplan.AnalyzeInterceptor;
+import se.kuseman.payloadbuilder.core.physicalplan.CachePlan;
 import se.kuseman.payloadbuilder.core.physicalplan.ExpressionPredicate;
 import se.kuseman.payloadbuilder.core.physicalplan.HashAggregate;
+import se.kuseman.payloadbuilder.core.physicalplan.HashMatch;
 import se.kuseman.payloadbuilder.core.physicalplan.IPhysicalPlan;
 import se.kuseman.payloadbuilder.core.physicalplan.NestedLoop;
+import se.kuseman.payloadbuilder.core.planning.ConditionAnalyzer.Result;
 import se.kuseman.payloadbuilder.core.planning.StatementPlanner.Context;
 import se.kuseman.payloadbuilder.core.planning.StatementPlanner.TableSourcePushDown;
 
@@ -83,7 +90,20 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         IPhysicalPlan input = plan.getInput()
                 .accept(this, context);
 
-        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Projection(context.getNextNodeId(), input, plan.getExpressions(), plan.isAppendInputColumns()));
+        List<IExpression> expressions = plan.getExpressions();
+        if (input instanceof se.kuseman.payloadbuilder.core.physicalplan.Projection p)
+        {
+            expressions = ProjectionMerger.replace(plan.getExpressions(), p.getExpressions());
+            input = p.getInput();
+        }
+        else if (input instanceof AnalyzeInterceptor ai
+                && ai.getInput() instanceof se.kuseman.payloadbuilder.core.physicalplan.Projection p)
+        {
+            expressions = ProjectionMerger.replace(plan.getExpressions(), p.getExpressions());
+            input = p.getInput();
+        }
+
+        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.Projection(context.getNextNodeId(), input, expressions));
     }
 
     @Override
@@ -208,7 +228,8 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
 
         Catalog catalog = plan.isTempTable() ? SystemCatalog.get()
                 : context.getSession()
-                        .getCatalog(plan.getCatalogAlias());
+                        .getCatalog(plan.getTableSource()
+                                .getCatalogAlias());
 
         SeekPredicate seekPredicate = null;
         IDatasource dataSource;
@@ -235,8 +256,10 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         else
         {
             int sortItemCount = sortItems.size();
-            String catalogAlias = defaultIfBlank(plan.getCatalogAlias(), context.getSession()
-                    .getDefaultCatalogAlias());
+            String catalogAlias = defaultIfBlank(plan.getTableSource()
+                    .getCatalogAlias(),
+                    context.getSession()
+                            .getDefaultCatalogAlias());
 
             DatasourceData data = new DatasourceData(nodeId, schema, predicatePairs, sortItems, plan.getProjection(), plan.getOptions());
 
@@ -288,9 +311,11 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
     public IPhysicalPlan visit(TableFunctionScan plan, Context context)
     {
         Pair<String, TableFunctionInfo> pair = context.getSession()
-                .resolveTableFunctionInfo(plan.getCatalogAlias(), plan.getTableSource()
-                        .getName()
-                        .getFirst());
+                .resolveTableFunctionInfo(plan.getTableSource()
+                        .getCatalogAlias(),
+                        plan.getTableSource()
+                                .getName()
+                                .getFirst());
 
         String catalogAlias = pair.getKey();
 
@@ -311,7 +336,9 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
     @Override
     public IPhysicalPlan visit(SubQuery plan, Context context)
     {
-        throw new IllegalArgumentException("Sub queries cannot be planned");
+        /* Eliminate the subquery, should not exist in the final result */
+        return plan.getInput()
+                .accept(this, context);
     }
 
     @Override
@@ -395,26 +422,29 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         SeekPredicate seekPredicate = null;
 
         /* Outer and inner equi expressions found. Used if a hash join should be used as physical join */
-        // List<IExpression> outerEquiExpressions = emptyList();
-        // List<IExpression> innerEquiExpressions = emptyList();
+        List<IExpression> outerEquiExpressions = emptyList();
+        List<IExpression> innerEquiExpressions = emptyList();
 
         if (condition != null)
         {
-            // For now we only use the available indices on the first following table scan
-            // in the inner input. In the future this needs to be changed to a more dynamic
-            // form by analyzing the predicate and what table source we are actual joining on
-            // and apply join ordering etc.
-            TableScan innerTableScan = getTopTableScan(plan.getInner());
-            if (innerTableScan != null)
+            List<TableSourceReference> tableSources;
+            TableSource tableSource = getTopTableSource(plan.getInner(), false);
+            // We need both the subquery TS and it's childs TS
+            if (tableSource instanceof SubQuery s)
             {
-                List<Index> indices = innerTableScan.getTableSchema()
-                        .getIndices();
-
-                IndexFoundation indexFoundation = new IndexFoundation(innerTableScan.getTableSource(), indices, condition);
-                seekPredicate = indexFoundation.seekPredicate;
-                // outerEquiExpressions = indexFoundation.outerValueExpressions;
-                // innerEquiExpressions = indexFoundation.innerValueExpressions;
+                TableSource child = getTopTableSource(s.getInput(), true);
+                tableSources = child != null ? List.of(tableSource.getTableSource(), child.getTableSource())
+                        : List.of(tableSource.getTableSource());
             }
+            else
+            {
+                tableSources = List.of(tableSource.getTableSource());
+            }
+
+            Result analyzeResult = ConditionAnalyzer.analyze(tableSources, condition, context.schemaByTableSource);
+            seekPredicate = analyzeResult.seekPredicate();
+            outerEquiExpressions = analyzeResult.outerValueExpressions();
+            innerEquiExpressions = analyzeResult.innerValueExpressions();
         }
         // TODO: if we have a non correlated join with no condition (cross join/cross apply/outer apply)
         // then it's much better to switch the inputs so that we only query the inner plan ONCE
@@ -431,15 +461,41 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         IPhysicalPlan inner = plan.getInner()
                 .accept(this, context);
 
-        // boolean preserveOuterOrder = context.joinPreserveOuterOrder;
-
         ExpressionPredicate predicate = plan.getCondition() != null ? new ExpressionPredicate(condition)
                 : null;
 
-        // TODO: hash join etc.
-        // preserveOuterOrder => force nested loop
-        // outerEquiExpressions not empty => hash join
-        IPhysicalPlan join = createNestedLoop(plan, context.getNextNodeId(), outer, inner, predicate, pushOuterReference);
+        ValueVector forceNestedLoopProperty = context.context.getSession()
+                .getSystemProperty(QuerySession.FORCE_NESTED_LOOP);
+        boolean forceNestedLoop = !forceNestedLoopProperty.isNull(0)
+                && forceNestedLoopProperty.getBoolean(0);
+
+        IPhysicalPlan join = null;
+
+        if (!outerEquiExpressions.isEmpty()
+                && !forceNestedLoop
+                && !context.joinPreserveOuterOrder)
+        {
+            join = new HashMatch(context.getNextNodeId(), outer, inner, outerEquiExpressions, innerEquiExpressions, predicate, plan.getPopulateAlias(), plan.getType() == Type.LEFT,
+                    seekPredicate != null);
+        }
+        else
+        {
+            ValueVector forceNoInnerCacheProperty = context.context.getSession()
+                    .getSystemProperty(QuerySession.FORCE_NO_INNER_CACHE);
+            boolean forceNoInnerCache = !forceNoInnerCacheProperty.isNull(0)
+                    && forceNoInnerCacheProperty.getBoolean(0);
+
+            // We can cache the inner plan if we have a non correlated plain nested loop
+            if (!pushOuterReference
+                    && !forceNoInnerCache
+                    && CollectionUtils.isEmpty(plan.getOuterReferences())
+                    && !plan.isSwitchedInputs())
+            {
+                inner = wrapWithAnalyze(context, new CachePlan(context.getNextNodeId(), inner));
+            }
+
+            join = createNestedLoop(plan, context.getNextNodeId(), outer, inner, predicate, pushOuterReference);
+        }
 
         return wrapWithAnalyze(context, join);
     }
@@ -501,7 +557,7 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             {
                 return plan.getOuterReferences()
                         .isEmpty() ? NestedLoop.innerJoin(nodeId, outer, inner, plan.getPopulateAlias(), plan.isSwitchedInputs()) // Non correlated
-                                : NestedLoop.innerJoin(nodeId, outer, inner, plan.getOuterReferences(), plan.getPopulateAlias()); // Correlated
+                                : NestedLoop.innerJoin(nodeId, outer, inner, plan.getOuterReferences(), plan.getPopulateAlias(), plan.getOuterSchema()); // Correlated
             }
             // INNER JOIN
             return NestedLoop.innerJoin(nodeId, outer, inner, condition, plan.getPopulateAlias(), pushOuterReference);
@@ -512,8 +568,8 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             if (condition == null)
             {
                 return plan.getOuterReferences()
-                        .isEmpty() ? NestedLoop.leftJoin(nodeId, outer, inner, plan.getPopulateAlias()) // Non correlated
-                                : NestedLoop.leftJoin(nodeId, outer, inner, plan.getOuterReferences(), plan.getPopulateAlias()); // Correlated
+                        .isEmpty() ? NestedLoop.leftJoin(nodeId, outer, inner, plan.getPopulateAlias(), plan.isSwitchedInputs()) // Non correlated
+                                : NestedLoop.leftJoin(nodeId, outer, inner, plan.getOuterReferences(), plan.getPopulateAlias(), plan.getOuterSchema()); // Correlated
             }
             // LEFT JOIN
             return NestedLoop.leftJoin(nodeId, outer, inner, condition, plan.getPopulateAlias(), pushOuterReference);
@@ -522,8 +578,8 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         throw new IllegalArgumentException("Cannot create a nested loop from: " + plan);
     }
 
-    /** Returns the first occurrence of a table scan from provided plan. */
-    private TableScan getTopTableScan(ILogicalPlan plan)
+    /** Returns the first occurrence of a table source from provided plan. */
+    private TableSource getTopTableSource(ILogicalPlan plan, boolean skipSubQuery)
     {
         List<ILogicalPlan> queue = new ArrayList<>();
         queue.add(plan);
@@ -532,9 +588,13 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         {
             ILogicalPlan current = queue.remove(0);
 
-            if (current instanceof TableScan)
+            if (current instanceof TableSource tableSource)
             {
-                return (TableScan) current;
+                if (!skipSubQuery
+                        || !(tableSource instanceof SubQuery))
+                {
+                    return tableSource;
+                }
             }
 
             List<ILogicalPlan> children = current.getChildren();
@@ -545,11 +605,11 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             }
             else
             {
-                if (current instanceof Join)
+                if (current instanceof Join join)
                 {
                     // We use the outer table source of joins to check for a table source
                     // Should be changed later on when a more complex analyze is made with join ordering etc.
-                    queue.add(((Join) current).getOuter());
+                    queue.add(join.getOuter());
                 }
             }
         }
@@ -574,7 +634,9 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         @Override
         public Void visit(IColumnExpression expression, Set<TableSourceReference> context)
         {
-            TableSourceReference tableRef = ((ColumnExpression) expression).getTableSourceReference();
+            ColumnReference cr = ((ColumnExpression) expression).getColumnReference();
+            TableSourceReference tableRef = cr != null ? cr.tableSourceReference()
+                    : null;
             if (tableRef != null)
             {
                 context.add(tableRef);

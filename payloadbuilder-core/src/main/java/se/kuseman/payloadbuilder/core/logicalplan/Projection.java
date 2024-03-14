@@ -17,12 +17,9 @@ public class Projection implements ILogicalPlan
     private final ILogicalPlan input;
     /** Projection expressions */
     private final List<IExpression> expressions;
-    /** True if input column should be appended to output. Used if thie projection is used to computed new values to input */
-    private final boolean appendInputColumns;
 
-    public Projection(ILogicalPlan input, List<IExpression> expressions, boolean appendInputColumns)
+    public Projection(ILogicalPlan input, List<IExpression> expressions)
     {
-        this.appendInputColumns = appendInputColumns;
         this.input = requireNonNull(input, "input");
         this.expressions = requireNonNull(expressions, "expressions");
     }
@@ -37,15 +34,10 @@ public class Projection implements ILogicalPlan
         return input;
     }
 
-    public boolean isAppendInputColumns()
-    {
-        return appendInputColumns;
-    }
-
     @Override
     public Schema getSchema()
     {
-        return SchemaUtils.getSchema(input.getSchema(), expressions, appendInputColumns, false);
+        return SchemaUtils.getSchema(input.getSchema(), expressions, false);
     }
 
     @Override
@@ -77,12 +69,10 @@ public class Projection implements ILogicalPlan
         {
             return true;
         }
-        else if (obj instanceof Projection)
+        else if (obj instanceof Projection that)
         {
-            Projection that = (Projection) obj;
             return input.equals(that.input)
-                    && expressions.equals(that.expressions)
-                    && appendInputColumns == that.appendInputColumns;
+                    && expressions.equals(that.expressions);
         }
         return false;
     }
@@ -91,9 +81,8 @@ public class Projection implements ILogicalPlan
     public String toString()
     {
         // Use verbose string in plan printing
-        return (appendInputColumns ? "Compute: "
-                : "Projection: ") + expressions.stream()
-                        .map(i -> i.toVerboseString())
-                        .collect(joining(", "));
+        return "Projection: " + expressions.stream()
+                .map(i -> i.toVerboseString())
+                .collect(joining(", "));
     }
 }

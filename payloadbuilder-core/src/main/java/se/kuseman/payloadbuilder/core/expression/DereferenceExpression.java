@@ -20,14 +20,13 @@ import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IDereferenceExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
-import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 import se.kuseman.payloadbuilder.core.parser.Location;
 import se.kuseman.payloadbuilder.core.parser.ParseException;
 
 /** Dereference expression. expression.column reference */
-public class DereferenceExpression implements IDereferenceExpression, HasAlias, HasTableSourceReference
+public class DereferenceExpression implements IDereferenceExpression, HasAlias, HasColumnReference
 {
     private final IExpression left;
     private final String right;
@@ -81,11 +80,11 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
     }
 
     @Override
-    public TableSourceReference getTableSourceReference()
+    public ColumnReference getColumnReference()
     {
-        if (left instanceof HasTableSourceReference htsr)
+        if (left instanceof HasColumnReference htsr)
         {
-            return htsr.getTableSourceReference();
+            return htsr.getColumnReference();
         }
         return null;
     }
@@ -140,10 +139,10 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
                 {
                     TupleVector vector = leftResult.getTable(i);
 
-                    int ordinal = DereferenceExpression.this.ordinal;
+                    int ordinal = this.ordinal;
                     if (ordinal < 0)
                     {
-                        ordinal = getOrdinalInternal(vector.getSchema(), right, null, false).getValue();
+                        ordinal = getOrdinalInternal(vector.getSchema(), right, null, false, false).getValue();
                         if (ordinal < 0)
                         {
                             builder.put(ValueVector.literalNull(ResolvedType.of(Type.Any), 0));
@@ -177,7 +176,7 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
                     if (ordinal < 0)
                     {
                         // Asterisk schema, resolve
-                        Pair<Column, Integer> pair = getOrdinalInternal(schema, right, null, false);
+                        Pair<Column, Integer> pair = getOrdinalInternal(schema, right, null, false, false);
                         if (pair.getKey() == null)
                         {
                             builder.putNull();
@@ -209,7 +208,7 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
                 if (value instanceof ObjectVector)
                 {
                     ObjectVector object = (ObjectVector) value;
-                    Pair<Column, Integer> pair = getOrdinalInternal(object.getSchema(), right, null, false);
+                    Pair<Column, Integer> pair = getOrdinalInternal(object.getSchema(), right, null, false, false);
                     if (pair.getKey() == null)
                     {
                         builder.putNull();
@@ -236,7 +235,7 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
         return visitor.visit(this, context);
     }
 
-    private static Pair<Column, Integer> getOrdinalInternal(Schema schema, String right, Location location, boolean throwIfNotFound)
+    private static Pair<Column, Integer> getOrdinalInternal(Schema schema, String right, Location location, boolean throwIfNotFound, boolean checkAsterisk)
     {
         boolean asteriskInSchema = false;
         int size = schema.getSize();
@@ -248,7 +247,7 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
                     .get(i);
 
             asteriskInSchema = asteriskInSchema
-                    || SchemaUtils.isAsterisk(column);
+                    || SchemaUtils.isAsterisk(column, true);
 
             if (right.equalsIgnoreCase(column.getName()))
             {
@@ -265,8 +264,9 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
             throw new ParseException("No column found in object named: " + right + ", expected one of: " + schema.getColumns(), location);
         }
 
-        return Pair.of(match, asteriskInSchema ? -1
-                : ordinal);
+        return Pair.of(match, checkAsterisk
+                && asteriskInSchema ? -1
+                        : ordinal);
     }
 
     @Override
@@ -337,7 +337,7 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
             ResolvedType type = result.getType();
             if (type.getType() == Type.Table)
             {
-                Pair<Column, Integer> pair = getOrdinalInternal(type.getSchema(), part, location, true);
+                Pair<Column, Integer> pair = getOrdinalInternal(type.getSchema(), part, location, true, true);
                 ordinal = pair.getValue();
                 if (pair.getKey() != null)
                 {
@@ -351,7 +351,7 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
             }
             else if (type.getType() == Type.Object)
             {
-                Pair<Column, Integer> pair = getOrdinalInternal(type.getSchema(), part, location, true);
+                Pair<Column, Integer> pair = getOrdinalInternal(type.getSchema(), part, location, true, true);
                 ordinal = pair.getValue();
                 if (pair.getKey() != null)
                 {

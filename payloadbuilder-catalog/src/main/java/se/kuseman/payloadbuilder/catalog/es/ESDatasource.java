@@ -68,7 +68,6 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.ISeekKey;
-import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.SeekType;
 import se.kuseman.payloadbuilder.api.execution.NodeData;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
@@ -244,9 +243,7 @@ class ESDatasource implements IDatasource
         }
 
         List<ISeekKey> seekKeys = indexPredicate.getSeekKeys(context);
-        if (seekKeys.size() != 1
-                || seekKeys.get(0)
-                        .getType() != SeekType.EQ)
+        if (seekKeys.size() != 1)
         {
             throw new IllegalArgumentException("Elastic catalog only supports single EQUAL seek keys");
         }

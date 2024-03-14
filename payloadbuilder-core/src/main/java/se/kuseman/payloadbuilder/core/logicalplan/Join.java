@@ -29,8 +29,11 @@ public class Join implements ILogicalPlan
     /** Flag that indicates that inner and outer has switched places so we need to take that into consideration when generating schema */
     private final boolean switchedInputs;
 
+    /** The outer schema if this join is a correlated type */
+    private final Schema outerSchema;
+
     /** Constructor used during column resolving */
-    public Join(ILogicalPlan outer, ILogicalPlan inner, Type type, String populateAlias, IExpression condition, Set<Column> outerReferences, boolean switchedInputs)
+    public Join(ILogicalPlan outer, ILogicalPlan inner, Type type, String populateAlias, IExpression condition, Set<Column> outerReferences, boolean switchedInputs, Schema outerSchema)
     {
         this.outer = requireNonNull(outer, "outer");
         this.inner = requireNonNull(inner, "inner");
@@ -39,6 +42,7 @@ public class Join implements ILogicalPlan
         this.condition = condition;
         this.outerReferences = ObjectUtils.defaultIfNull(outerReferences, emptySet());
         this.switchedInputs = switchedInputs;
+        this.outerSchema = ObjectUtils.defaultIfNull(outerSchema, Schema.EMPTY);
     }
 
     public ILogicalPlan getOuter()
@@ -76,6 +80,11 @@ public class Join implements ILogicalPlan
         return switchedInputs;
     }
 
+    public Schema getOuterSchema()
+    {
+        return outerSchema;
+    }
+
     @Override
     public Schema getSchema()
     {
@@ -85,12 +94,7 @@ public class Join implements ILogicalPlan
         Schema innerSchema = switchedInputs ? outer.getSchema()
                 : inner.getSchema();
 
-        if (populateAlias != null)
-        {
-            return SchemaUtils.populate(outerSchema, populateAlias, innerSchema);
-        }
-
-        return SchemaUtils.concat(outerSchema, innerSchema);
+        return SchemaUtils.joinSchema(outerSchema, innerSchema, populateAlias);
     }
 
     @Override
@@ -130,7 +134,8 @@ public class Join implements ILogicalPlan
                     && Objects.equals(condition, that.condition)
                     && outerReferences.equals(that.outerReferences)
                     && switchedInputs == that.switchedInputs
-                    && Objects.equals(populateAlias, that.populateAlias);
+                    && Objects.equals(populateAlias, that.populateAlias)
+                    && outerSchema.equals(that.outerSchema);
         }
         return false;
     }
@@ -147,6 +152,8 @@ public class Join implements ILogicalPlan
                + (switchedInputs ? ", switched inputs"
                        : "")
                + (populateAlias != null ? ", populate (" + populateAlias + ")"
+                       : "")
+               + (outerSchema.getSize() > 0 ? ", outer schema: " + outerSchema
                        : "");
     }
 

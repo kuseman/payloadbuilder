@@ -25,34 +25,46 @@ import se.kuseman.payloadbuilder.core.statement.LogicalSelectStatement;
 /** Base class for logicla plan optimization tests */
 public abstract class ALogicalPlanOptimizerTest extends ALogicalPlanTest
 {
-    static final String TEST = "test";
-    static final String STABLE_E_ID = "stableEId";
+    protected static final String TEST = "test";
+    protected static final String STABLE_D_ID = "stableDId";
+    protected static final String STABLE_E_ID = "stableEId";
 
     private final SchemaResolver schemaResolver = new SchemaResolver();
     private final ColumnResolver columnResolver = new ColumnResolver();
 
-    protected TableSourceReference table = new TableSourceReference(0, "es", of("table"), "t");
-    protected TableSourceReference tableA = new TableSourceReference(1, "es", of("tableA"), "a");
-    protected TableSourceReference tableB = new TableSourceReference(2, "es", of("tableB"), "b");
+    protected TableSourceReference table = new TableSourceReference(0, TableSourceReference.Type.TABLE, "es", of("table"), "t");
+    protected TableSourceReference tableA = new TableSourceReference(1, TableSourceReference.Type.TABLE, "es", of("tableA"), "a");
+    protected TableSourceReference tableB = new TableSourceReference(2, TableSourceReference.Type.TABLE, "es", of("tableB"), "b");
 
     // CSOFF
-    protected TableSourceReference sTableA = new TableSourceReference(0, "", of("stableA"), "a");
-    protected TableSourceReference sTableB = new TableSourceReference(1, "", of("stableB"), "b");
-    protected TableSourceReference sTableC = new TableSourceReference(2, "", of("stableC"), "c");
-    protected TableSourceReference sTableD = new TableSourceReference(3, "", of("stableD"), "d");
+    protected TableSourceReference sTableA = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", of("stableA"), "a");
+    protected TableSourceReference sTableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", of("stableB"), "b");
+    protected TableSourceReference sTableC = new TableSourceReference(2, TableSourceReference.Type.TABLE, "", of("stableC"), "c");
 
     // CSON
-    protected TableSourceReference sTableE(int id)
+    protected TableSourceReference sTableD(int id)
     {
-        return new TableSourceReference(id, "", of("stableE"), "e");
+        return new TableSourceReference(id, TableSourceReference.Type.TABLE, "", of("stableD"), "d");
     }
 
-    protected Schema schemaSTableA = Schema.of(col("col1", Type.Int), col("col2", Type.String), col("col3", Type.Float));
-    protected Schema schemaSTableB = Schema.of(col("col1", Type.Boolean), col("col2", Type.String), col("col3", Type.Float));
-    protected Schema schemaSTableC = Schema.of(col("col1", Type.Double), col("col2", Type.Boolean), col("col3", Type.Long));
-    protected Schema schemaSTableD = Schema.of(CoreColumn.of("col1", ResolvedType.of(Type.Double), sTableD), CoreColumn.of("col6", ResolvedType.of(Type.String), sTableD));
+    protected TableSourceReference sTableE(int id)
+    {
+        return new TableSourceReference(id, TableSourceReference.Type.TABLE, "", of("stableE"), "e");
+    }
+
+    protected Schema schemaSTableA = Schema.of(col("col1", Type.Int, sTableA), col("col2", Type.String, sTableA), col("col3", Type.Float, sTableA));
+    protected Schema schemaSTableB = Schema.of(col("col1", Type.Boolean, sTableB), col("col2", Type.String, sTableB), col("col3", Type.Float, sTableB));
+    protected Schema schemaSTableC = Schema.of(col("col1", Type.Double, sTableC), col("col2", Type.Boolean, sTableC), col("col3", Type.Long, sTableC));
 
     //@formatter:off
+    protected Schema schemaSTableD(int id)
+    {
+        TableSourceReference sTableD = sTableD(id);
+        return Schema.of(
+              CoreColumn.of("col1", ResolvedType.of(Type.Double), sTableD),
+              CoreColumn.of("col6", ResolvedType.of(Type.String), sTableD));
+    }
+    
     protected Schema schemaSTableE(int id)
     {
         TableSourceReference sTableE = sTableE(id);
@@ -74,7 +86,9 @@ public abstract class ALogicalPlanOptimizerTest extends ALogicalPlanTest
         @Override
         public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
         {
-            Integer stablEId = (Integer) session.getCatalogProperty(catalogAlias, STABLE_E_ID)
+            Integer stableDId = (Integer) session.getCatalogProperty(catalogAlias, STABLE_D_ID)
+                    .valueAsObject(0);
+            Integer stableEId = (Integer) session.getCatalogProperty(catalogAlias, STABLE_E_ID)
                     .valueAsObject(0);
 
             String t = table.toString()
@@ -93,11 +107,11 @@ public abstract class ALogicalPlanOptimizerTest extends ALogicalPlanTest
             }
             else if (t.equalsIgnoreCase("stableD"))
             {
-                return new TableSchema(schemaSTableD);
+                return new TableSchema(schemaSTableD(stableDId));
             }
             else if (t.equalsIgnoreCase("stableE"))
             {
-                return new TableSchema(schemaSTableE(stablEId));
+                return new TableSchema(schemaSTableE(stableEId));
             }
             return TableSchema.EMPTY;
         };

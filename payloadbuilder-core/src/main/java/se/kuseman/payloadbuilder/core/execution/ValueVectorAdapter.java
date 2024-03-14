@@ -20,15 +20,15 @@ public class ValueVectorAdapter implements ValueVector
 
     public ValueVectorAdapter(ValueVector wrapped)
     {
-        this.wrapped = requireNonNull(wrapped, "wrapped");
-        this.size = wrapped.size();
-        this.type = wrapped.type();
+        setVector(wrapped);
     }
 
-    /** Set the underlying vector. Use with care since this mutates the state. */
-    public void setValueVector(ValueVector vector)
+    /**
+     * Change wrapped vector on this adapter. NOTE! Use with care when mutating state
+     */
+    public void setVector(ValueVector wrapped)
     {
-        this.wrapped = requireNonNull(vector, "vector");
+        this.wrapped = requireNonNull(wrapped, "wrapped");
         this.size = wrapped.size();
         this.type = wrapped.type();
     }

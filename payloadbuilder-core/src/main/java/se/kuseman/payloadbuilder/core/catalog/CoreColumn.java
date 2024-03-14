@@ -51,6 +51,12 @@ public class CoreColumn extends Column
         this(name, type, outputName, internal, null, columnType);
     }
 
+    /** Copy ctor. New name of column */
+    public CoreColumn(CoreColumn source, String newName)
+    {
+        this(newName, source.getType(), source.outputName, source.internal, source.tableSourceReference, source.columnType);
+    }
+
     public CoreColumn(String name, ResolvedType type, String outputName, boolean internal, TableSourceReference tableSourceReference, Type columnType)
     {
         super(name, type);
@@ -146,10 +152,15 @@ public class CoreColumn extends Column
          */
         ASTERISK,
 
+        /**
+         * A column that origins from an {@link #ASTERISK} column. This is a marker to know if a schema is in it's whole asterisk but otherwise this column is counted as a regular, resolve wise.
+         */
+        NAMED_ASTERISK,
+
         /** A regular column. */
         REGULAR,
 
         /** A populated column. */
-        POPULATED;
+        POPULATED,
     }
 }

@@ -37,13 +37,13 @@ import se.kuseman.payloadbuilder.core.execution.StatementContext;
  * outerReference:        Is set if this column is resolved to the outer schema and then the outer tuple vector is used in context instead of input
  * </pre>
  */
-public class ColumnExpression implements IColumnExpression, HasAlias, HasTableSourceReference
+public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnReference
 {
     /** Alias for this expression. This is the column name (only used for presentation) */
     private final String alias;
 
-    /** Table source reference if this expression is bound to an asterisk schema. */
-    private final TableSourceReference tableSourceReference;
+    /** Column reference of expression. */
+    private final ColumnReference columnReference;
     /**
      * Flag that indicates that this expression should resolve it's value from the outer reference in context and not by the input. This is a column in a correlated sub query.
      */
@@ -62,12 +62,12 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasTableSo
     private final int lambdaId;
 
     /** Create a column reference expression. */
-    public ColumnExpression(String alias, String column, ResolvedType type, TableSourceReference tableSourceReference, int ordinal, boolean outerReference, int lambdaId)
+    public ColumnExpression(String alias, String column, ResolvedType type, ColumnReference columnReference, int ordinal, boolean outerReference, int lambdaId)
     {
         this.alias = requireNonNull(alias, "alias");
         this.column = column;
         this.resolvedType = requireNonNull(type, "type");
-        this.tableSourceReference = tableSourceReference;
+        this.columnReference = columnReference;
         this.outerReference = outerReference;
         this.ordinal = ordinal;
         this.lambdaId = lambdaId;
@@ -88,7 +88,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasTableSo
     /** Copy column expression but change the ordinal */
     public ColumnExpression(ColumnExpression source, int ordinal)
     {
-        this(source.alias, source.column, source.resolvedType, source.tableSourceReference, ordinal, source.outerReference, source.lambdaId);
+        this(source.alias, source.column, source.resolvedType, source.columnReference, ordinal, source.outerReference, source.lambdaId);
     }
 
     @Override
@@ -115,9 +115,9 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasTableSo
     }
 
     @Override
-    public TableSourceReference getTableSourceReference()
+    public ColumnReference getColumnReference()
     {
-        return tableSourceReference;
+        return columnReference;
     }
 
     @Override
@@ -191,9 +191,13 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasTableSo
             // Filter on table source if exists
             // This happens when having an asterisk schema and we only know which table source
             // this columns belongs to and we don't have an ordinal
-            if (tableSourceReference != null
+            if (columnReference != null
+                    // Sub query table sources are only a marker during planning and should not be compared
+                    && columnReference.tableSourceReference()
+                            .getType() != TableSourceReference.Type.SUBQUERY
                     && (columnTableSourceReference == null
-                            || tableSourceReference.getId() != columnTableSourceReference.getId()))
+                            || columnReference.tableSourceReference()
+                                    .getId() != columnTableSourceReference.getId()))
             {
                 continue;
             }
@@ -248,7 +252,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasTableSo
         {
             return alias.equals(that.alias)
                     && Objects.equals(column, that.column)
-                    && Objects.equals(tableSourceReference, that.tableSourceReference)
+                    && Objects.equals(columnReference, that.columnReference)
                     && ordinal == that.ordinal
                     && outerReference == that.outerReference
                     && lambdaId == that.lambdaId
@@ -260,7 +264,8 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasTableSo
     @Override
     public String toString()
     {
-        String tableSourceAlias = tableSourceReference != null ? tableSourceReference.getAlias()
+        String tableSourceAlias = columnReference != null ? columnReference.tableSourceReference()
+                .getAlias()
                 : "";
 
         return (!"".equals(tableSourceAlias) ? (tableSourceAlias + ".")
@@ -272,16 +277,48 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasTableSo
     @Override
     public String toVerboseString()
     {
-        return (column == null ? alias
-                : column)
-                + (ordinal >= 0 ? " (" + ordinal + ")"
-                        : "")
-                + (outerReference ? " (O)"
-                        : "")
-                + (tableSourceReference != null ? (" (" + tableSourceReference + ")")
-                        : "")
-                + (lambdaId >= 0 ? " (L: " + lambdaId + ")"
-                        : "");
+        // column (ordinal=X, outer=true, table=Y, lambda=Z)
+
+        StringBuilder sb = new StringBuilder();
+        sb.append((column == null ? alias
+                : column));
+
+        boolean hasOptions = ordinal >= 0
+                || lambdaId >= 0
+                || outerReference
+                || columnReference != null;
+        if (hasOptions)
+        {
+            sb.append(" (");
+        }
+
+        if (ordinal >= 0)
+        {
+            sb.append("ordinal=")
+                    .append(ordinal);
+        }
+        if (lambdaId >= 0)
+        {
+            sb.append(" lambda=")
+                    .append(lambdaId);
+        }
+        if (outerReference)
+        {
+            sb.append(" outer=true");
+        }
+        if (columnReference != null)
+        {
+            sb.append(" table=")
+                    .append(columnReference.tableSourceReference())
+                    .append(", columnType=")
+                    .append(columnReference.columnType());
+        }
+
+        if (hasOptions)
+        {
+            sb.append(")");
+        }
+        return sb.toString();
     }
 
     /** Column expression builder */
@@ -290,7 +327,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasTableSo
         private final String alias;
         private final ResolvedType resolvedType;
         private String column;
-        private TableSourceReference tableSourceReference;
+        private ColumnReference columnReference;
         private boolean outerReference;
         private int ordinal = -1;
         private int lambdaId = -1;
@@ -324,9 +361,9 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasTableSo
             return this;
         }
 
-        public Builder withTableSourceReference(TableSourceReference tableSourceReference)
+        public Builder withColumnReference(ColumnReference columnReference)
         {
-            this.tableSourceReference = tableSourceReference;
+            this.columnReference = columnReference;
             return this;
         }
 
@@ -338,7 +375,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasTableSo
 
         public ColumnExpression build()
         {
-            return new ColumnExpression(alias, column, resolvedType, tableSourceReference, ordinal, outerReference, lambdaId);
+            return new ColumnExpression(alias, column, resolvedType, columnReference, ordinal, outerReference, lambdaId);
         }
     }
 }

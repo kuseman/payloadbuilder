@@ -4,52 +4,94 @@ import static java.util.Collections.emptyList;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.lang3.tuple.Pair;
 
 import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.Index.ColumnsType;
+import se.kuseman.payloadbuilder.api.catalog.Index.IndexType;
+import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.core.expression.HasColumnReference;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzePair;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzeResult;
 
-/** Class containing information needed to build a indexed join */
-class IndexFoundation
+/**
+ * Analyzer that analyses a join condition to see which type of join operator that can be used. Also finds available indices to apply
+ */
+class ConditionAnalyzer
 {
-    /** The outer expressions found that matched an index and/or is part of equi pair */
-    List<IExpression> outerValueExpressions = emptyList();
-    /** The inner expressions found that matched an index and/or is part of equi pair */
-    List<IExpression> innerValueExpressions = emptyList();
-    /** Resulting seek predicate that matched one index */
-    SeekPredicate seekPredicate;
-
-    boolean isEqui()
+    private ConditionAnalyzer()
     {
-        return !outerValueExpressions.isEmpty();
     }
 
-    IndexFoundation(TableSourceReference tableSource, List<Index> indices, IExpression predicate)
+    private static final Result EMPTY = new Result(List.of(), List.of(), null);
+
+    /** Result of analysis */
+    // CSOFF
+    //@formatter:off
+    record Result(
+            /** The outer expressions found that matched an index and/or is part of equi pair */
+            List<IExpression> outerValueExpressions,
+            /** The inner expressions found that matched an index and/or is part of equi pair */
+            List<IExpression> innerValueExpressions,
+            /** Resulting seek predicate that matched one index */
+            SeekPredicate seekPredicate)
+    //@formatter:on
+    // CSON
+    {
+    }
+
+    /** Analyze condition */
+    static Result analyze(List<TableSourceReference> innerTableSource, IExpression predicate, Map<TableSourceReference, TableSchema> schemaByTableSource)
     {
         AnalyzeResult analyzeResult = PredicateAnalyzer.analyze(predicate);
-
-        int size = analyzeResult.getPairs()
-                .size();
-        List<AnalyzePair> equiItems = new ArrayList<>(size);
-        for (int i = 0; i < size; i++)
+        TableSourceReference tableSource = null;
+        List<AnalyzePair> equiPairs = emptyList();
+        for (TableSourceReference ts : innerTableSource)
         {
-            AnalyzePair pair = analyzeResult.getPairs()
-                    .get(i);
-            if (pair.isEqui(tableSource))
+            equiPairs = analyzeResult.getEquiPairs(ts);
+            // Skip all pushdowns
+            equiPairs.removeIf(p -> p.isPushdown(ts));
+            if (!equiPairs.isEmpty())
             {
-                equiItems.add(pair);
+                tableSource = ts;
+                break;
             }
         }
 
-        if (equiItems.size() == 0)
+        // No equis, then we cannot do anything else than a nested loop atm.
+        if (equiPairs.isEmpty())
         {
-            return;
+            return EMPTY;
+        }
+
+        // See if there is any index present on the inner equi pairs
+        List<Index> indices = emptyList();
+        for (AnalyzePair pair : equiPairs)
+        {
+            Pair<IExpression, IExpression> expressionPair = pair.getExpressionPair(tableSource);
+            IExpression innerExpression = expressionPair.getLeft();
+
+            if (innerExpression instanceof HasColumnReference tsr)
+            {
+                TableSourceReference tableRef = tsr.getColumnReference()
+                        .tableSourceReference();
+                if (tableRef != null)
+                {
+                    // Pick the first table schema we find, later on we might want
+                    // to optimize and try to find the best candidate
+                    TableSchema tableSchema = schemaByTableSource.get(tableRef);
+                    if (tableSchema != null)
+                    {
+                        indices = tableSchema.getIndices();
+                        break;
+                    }
+                }
+            }
         }
 
         /*
@@ -68,12 +110,13 @@ class IndexFoundation
          * @formatter:on
          */
 
-        SplitResult splitResult = splitEquiPairs(equiItems, tableSource, indices);
+        SplitResult splitResult = splitEquiPairs(equiPairs, tableSource, indices);
         List<AnalyzePair> valueExpressionsPairs = splitResult.index != null ? splitResult.indexPairs
                 : splitResult.conditionPairs;
 
-        outerValueExpressions = new ArrayList<>(valueExpressionsPairs.size());
-        innerValueExpressions = new ArrayList<>(valueExpressionsPairs.size());
+        List<IExpression> outerValueExpressions = new ArrayList<>(valueExpressionsPairs.size());
+        List<IExpression> innerValueExpressions = new ArrayList<>(valueExpressionsPairs.size());
+        SeekPredicate seekPredicate = null;
 
         for (AnalyzePair pair : valueExpressionsPairs)
         {
@@ -82,13 +125,16 @@ class IndexFoundation
             innerValueExpressions.add(p.getLeft());
         }
 
-        seekPredicate = splitResult.index != null ? new SeekPredicate(splitResult.index, splitResult.indexColumns, outerValueExpressions)
-                : null;
+        if (splitResult.index != null)
+        {
+            seekPredicate = new SeekPredicate(splitResult.index, IndexType.SEEK_EQ, splitResult.indexColumns, outerValueExpressions);
+        }
+        return new Result(outerValueExpressions, innerValueExpressions, seekPredicate);
     }
 
     /** Split provided equi pairs */
     // CSOFF
-    private SplitResult splitEquiPairs(List<AnalyzePair> equiPairs, TableSourceReference tableSource, List<Index> indices)
+    private static SplitResult splitEquiPairs(List<AnalyzePair> equiPairs, TableSourceReference tableSource, List<Index> indices)
     // CSON
     {
         List<AnalyzePair> indexPairs = new ArrayList<>();
@@ -96,6 +142,12 @@ class IndexFoundation
         List<String> indexColumns = new ArrayList<>();
         for (Index index : indices)
         {
+            // Only EQ seek indices are supported atm.
+            if (!index.supports(IndexType.SEEK_EQ))
+            {
+                continue;
+            }
+
             // Wildcard index that means we simply pick all conditions
             if (index.getColumnsType() == Index.ColumnsType.WILDCARD)
             {
@@ -152,23 +204,17 @@ class IndexFoundation
             }
 
             // At least one condition => index match
-            if (conditionCount > 0)
+            if (conditionCount > 0
+                    && (index.getColumnsType() != ColumnsType.ALL
+                            || indexColumns.size() == index.getColumns()
+                                    .size()))
             {
-                if (index.getColumnsType() == ColumnsType.ALL
-                        && indexColumns.size() == index.getColumns()
-                                .size())
-                {
-                    return new SplitResult(index, indexColumns, indexPairs, equiPairs/* , tempPushDown */);
-                }
-                else
-                {
-                    return new SplitResult(index, indexColumns, indexPairs, equiPairs/* , pushDownPairs */);
-                }
+                return new SplitResult(index, indexColumns, indexPairs, equiPairs);
             }
         }
 
         // No index found
-        return new SplitResult(null, emptyList(), emptyList(), equiPairs/* , pushDownPairs */);
+        return new SplitResult(null, emptyList(), emptyList(), equiPairs);
     }
 
     /**

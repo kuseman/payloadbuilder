@@ -58,9 +58,8 @@ public class IndexSeek extends TableScan
         {
             return true;
         }
-        else if (obj instanceof IndexSeek)
+        else if (obj instanceof IndexSeek that)
         {
-            IndexSeek that = (IndexSeek) obj;
             return super.equals(obj)
                     && seekPredicate.equals(that.seekPredicate);
         }
