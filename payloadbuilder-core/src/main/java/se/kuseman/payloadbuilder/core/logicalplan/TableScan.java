@@ -16,7 +16,6 @@ import se.kuseman.payloadbuilder.core.parser.Location;
 /** A table component in the logical plan */
 public class TableScan extends TableSource
 {
-    private final TableSourceReference tableSource;
     /** List of projected columns */
     private final List<String> projection;
     private final TableSchema tableSchema;
@@ -26,18 +25,12 @@ public class TableScan extends TableSource
 
     public TableScan(TableSchema tableSchema, TableSourceReference tableSource, List<String> projection, boolean tempTable, List<Option> options, Location location)
     {
-        super(requireNonNull(tableSource, "tableSource").getCatalogAlias(), tableSource.getAlias());
+        super(tableSource);
         this.tableSchema = requireNonNull(tableSchema, "tableSchema");
-        this.tableSource = tableSource;
         this.projection = ObjectUtils.defaultIfNull(projection, emptyList());
         this.tempTable = tempTable;
         this.options = requireNonNull(options, "options");
         this.location = location;
-    }
-
-    public TableSourceReference getTableSource()
-    {
-        return tableSource;
     }
 
     public List<String> getProjection()
@@ -100,12 +93,10 @@ public class TableScan extends TableSource
         {
             return false;
         }
-        else if (obj instanceof TableScan)
+        else if (obj instanceof TableScan that)
         {
-            TableScan that = (TableScan) obj;
             return super.equals(that)
                     && tableSchema.equals(that.tableSchema)
-                    && tableSource.equals(that.tableSource)
                     && projection.equals(that.projection)
                     && tempTable == that.tempTable
                     && options.equals(that.options);

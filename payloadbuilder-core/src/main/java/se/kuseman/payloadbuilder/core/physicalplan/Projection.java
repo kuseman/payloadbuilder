@@ -43,6 +43,16 @@ public class Projection implements IPhysicalPlan
         this.asteriskSchema = SchemaUtils.isAsterisk(schema);
     }
 
+    public IPhysicalPlan getInput()
+    {
+        return input;
+    }
+
+    public List<IExpression> getExpressions()
+    {
+        return expressions;
+    }
+
     @Override
     public int getNodeId()
     {

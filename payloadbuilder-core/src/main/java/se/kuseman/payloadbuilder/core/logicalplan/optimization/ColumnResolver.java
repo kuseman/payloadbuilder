@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.equalsAnyIgnoreCase;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -30,7 +31,6 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IDereferenceExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IFunctionCallExpression;
-import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
 import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.LambdaFunction;
@@ -47,7 +47,6 @@ import se.kuseman.payloadbuilder.core.expression.FunctionCallExpression;
 import se.kuseman.payloadbuilder.core.expression.HasColumnReference;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 import se.kuseman.payloadbuilder.core.expression.LambdaExpression;
-import se.kuseman.payloadbuilder.core.expression.LogicalBinaryExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedFunctionCallExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedSubQueryExpression;
@@ -175,10 +174,12 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         // Expand all asterisks, they should not be left for execution
         expressions = expandAsterisks(expressions, context.outerReferences, context.outerSchema, schema);
 
-        if (input instanceof Projection)
+        // Nested projections. Replace the inner projection with the columns projected from the outer
+        if (input instanceof SubQuery s
+                && s.getInput() instanceof Projection p)
         {
-            expressions = ProjectionMerger.replace(expressions, (Projection) input);
-            input = ((Projection) input).getInput();
+            List<IExpression> e = ProjectionMerger.replace(expressions, p.getExpressions());
+            input = new SubQuery(new Projection(p.getInput(), e, p.isAppendInputColumns()), s.getAlias(), s.getLocation());
         }
 
         context.outerSchema = prevOuterSchema;
@@ -200,14 +201,6 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         // Rewrite predicate according to input plan schema
         context.schema = schema;
         IExpression predicate = ColumnResolverVisitor.rewrite(context, plan.getPredicate());
-
-        // Nested filters => AND the predicates and return plans input
-        if (input instanceof Filter)
-        {
-            IExpression inputPredicate = ((Filter) input).getPredicate();
-            predicate = new LogicalBinaryExpression(ILogicalBinaryExpression.Type.AND, inputPredicate, predicate);
-            input = ((Filter) input).getInput();
-        }
 
         ILogicalPlan result = new Filter(input, plan.getTableSource(), predicate);
 
@@ -408,7 +401,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         }
         context.planSchema.push(new ResolveSchema(schema, plan.getAlias()));
         context.insideSubQuery = prevInsideSubQuery;
-        return result;
+        return new SubQuery(result, plan.getAlias(), plan.getLocation());
     }
 
     @Override
@@ -428,9 +421,11 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         context.outerSchema = prevOuterSchema;
 
         TableFunctionInfo function = context.getSession()
-                .resolveTableFunctionInfo(plan.getCatalogAlias(), plan.getTableSource()
-                        .getName()
-                        .getFirst())
+                .resolveTableFunctionInfo(plan.getTableSource()
+                        .getCatalogAlias(),
+                        plan.getTableSource()
+                                .getName()
+                                .getFirst())
                 .getValue();
 
         // Resolve the table function schema from it's resolved arguments
@@ -446,7 +441,8 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         if (schema.getColumns()
                 .isEmpty())
         {
-            ColumnReference ast = new ColumnReference(plan.getTableSource(), plan.getAlias(), ColumnReference.Type.ASTERISK);
+            ColumnReference ast = new ColumnReference(plan.getTableSource(), plan.getTableSource()
+                    .getAlias(), ColumnReference.Type.ASTERISK);
             schema = Schema.of(CoreColumn.of(ast, ResolvedType.of(Type.Any)));
         }
         else
@@ -455,8 +451,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             schema = SchemaResolver.recreate(plan.getTableSource(), schema);
         }
 
-        context.planSchema.push(new ResolveSchema(schema, plan.getTableSource()
-                .getAlias()));
+        context.planSchema.push(new ResolveSchema(schema, plan.getAlias()));
 
         List<Option> options = plan.getOptions()
                 .stream()
@@ -474,8 +469,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 .map(o -> new Option(o.getOption(), ColumnResolverVisitor.rewrite(context, o.getValueExpression())))
                 .toList();
 
-        context.planSchema.push(new ResolveSchema(plan.getSchema(), plan.getTableSource()
-                .getAlias()));
+        context.planSchema.push(new ResolveSchema(plan.getSchema(), plan.getAlias()));
 
         return new TableScan(plan.getTableSchema(), plan.getTableSource(), plan.getProjection(), plan.isTempTable(), options, plan.getLocation());
     }
@@ -507,7 +501,8 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         if (SchemaUtils.isAsterisk(schema, true))
         {
             // Set an asterisk schema with expression scans table source
-            ColumnReference ast = new ColumnReference(plan.getTableSource(), plan.getAlias(), ColumnReference.Type.ASTERISK);
+            ColumnReference ast = new ColumnReference(plan.getTableSource(), plan.getTableSource()
+                    .getAlias(), ColumnReference.Type.ASTERISK);
             schema = Schema.of(CoreColumn.of(ast, ResolvedType.of(Type.Any)));
         }
         else
@@ -518,8 +513,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
 
         context.schema = prevSchema;
 
-        context.planSchema.push(new ResolveSchema(schema, plan.getTableSource()
-                .getAlias()));
+        context.planSchema.push(new ResolveSchema(schema, plan.getAlias()));
 
         return new ExpressionScan(plan.getTableSource(), schema, expression, plan.getLocation());
     }
@@ -1227,6 +1221,10 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 }
                 match = CoreColumn.of(colRef.getName(), match.getType(), colRef);
                 builder.withColumnReference(colRef);
+            }
+            else if (!isBlank(alias))
+            {
+                builder.withTableSourceAlias(alias);
             }
 
             // Add column to outer references and set outer reference to column builder

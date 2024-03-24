@@ -10,12 +10,15 @@ import se.kuseman.payloadbuilder.core.catalog.ColumnReference.Type;
 /** A reference to a table source (table or table-function) */
 public class TableSourceReference
 {
+    /** Id of table source to make it unique in cases where the same ref is used on different places in query tree */
+    private final int id;
     private final String catalogAlias;
     private final QualifiedName name;
     private final String alias;
 
-    public TableSourceReference(String catalogAlias, QualifiedName name, String alias)
+    public TableSourceReference(int id, String catalogAlias, QualifiedName name, String alias)
     {
+        this.id = id;
         this.catalogAlias = requireNonNull(catalogAlias, "catalogAlias");
         this.name = requireNonNull(name, "name");
         this.alias = Objects.toString(alias, "");
@@ -55,10 +58,14 @@ public class TableSourceReference
         {
             return true;
         }
-        if (obj instanceof TableSourceReference)
+        else if (obj == null)
         {
-            TableSourceReference that = (TableSourceReference) obj;
-            return catalogAlias.equals(that.catalogAlias)
+            return false;
+        }
+        else if (obj instanceof TableSourceReference that)
+        {
+            return id == that.id
+                    && catalogAlias.equals(that.catalogAlias)
                     && alias.equals(that.alias)
                     && name.equals(that.name);
         }
@@ -70,6 +77,10 @@ public class TableSourceReference
     {
         // es#table
         return ("".equals(catalogAlias) ? ""
-                : catalogAlias + "#") + name;
+                : catalogAlias + "#")
+               + name
+               + "("
+               + id
+               + ")";
     }
 }

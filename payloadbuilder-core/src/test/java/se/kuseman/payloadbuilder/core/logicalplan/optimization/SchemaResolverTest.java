@@ -39,7 +39,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select * from sys#functions");
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableSource = new TableSourceReference("sys", QualifiedName.of("functions"), "");
+        TableSourceReference tableSource = new TableSourceReference(0, "sys", QualifiedName.of("functions"), "");
         ColumnReference name = tableSource.column("name");
         ColumnReference type = tableSource.column("type");
         ColumnReference description = tableSource.column("description");
@@ -60,7 +60,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select top 10 * from sys#functions");
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableSource = new TableSourceReference("sys", QualifiedName.of("functions"), "");
+        TableSourceReference tableSource = new TableSourceReference(0, "sys", QualifiedName.of("functions"), "");
         ColumnReference name = tableSource.column("name");
         ColumnReference type = tableSource.column("type");
         ColumnReference description = tableSource.column("description");
@@ -148,7 +148,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select 12345, (select * from sys#tables for object_array) tables");
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableSource = new TableSourceReference("sys", QualifiedName.of("tables"), "");
+        TableSourceReference tableSource = new TableSourceReference(0, "sys", QualifiedName.of("tables"), "");
         ColumnReference name = tableSource.column("name");
         ColumnReference schema = tableSource.column("schema");
         ColumnReference rows = tableSource.column("rows");

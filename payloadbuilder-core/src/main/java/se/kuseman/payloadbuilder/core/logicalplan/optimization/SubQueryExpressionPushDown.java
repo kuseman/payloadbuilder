@@ -165,21 +165,20 @@ public class SubQueryExpressionPushDown extends ALogicalPlanOptimizer<SubQueryEx
         }
 
         // We have nested projections, combine these
-        if (context.current instanceof Projection)
+        if (context.current instanceof Projection p)
         {
             // Rewrite this projection expressions with the inner
-            expressions = ProjectionMerger.replace(expressions, (Projection) context.current);
+            expressions = ProjectionMerger.replace(expressions, p.getExpressions());
             // ... and remove the inner projection
-            context.current = ((Projection) context.current).getInput();
+            context.current = p.getInput();
         }
-        else if (context.current instanceof OperatorFunctionScan)
+        else if (context.current instanceof OperatorFunctionScan ofs)
         {
             // Remove this projection since the child is a operator function which already has correct schema
             // just change it's name
             if (alias != null
                     && size == 1)
             {
-                OperatorFunctionScan ofs = (OperatorFunctionScan) context.current;
                 Schema schema = Schema.of(Column.of(alias, ofs.getSchema()
                         .getColumns()
                         .get(0)

@@ -5,7 +5,9 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 
+import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.parser.Location;
 
 /**
@@ -29,7 +31,7 @@ public class SubQuery extends TableSource
 
     public SubQuery(ILogicalPlan input, String alias, Location location)
     {
-        super("", alias);
+        super(new TableSourceReference(-1, "", QualifiedName.of(alias), alias));
         this.input = requireNonNull(input, "input");
         this.location = location;
     }
@@ -72,9 +74,16 @@ public class SubQuery extends TableSource
     @Override
     public boolean equals(Object obj)
     {
-        if (obj instanceof SubQuery)
+        if (obj == this)
         {
-            SubQuery that = (SubQuery) obj;
+            return true;
+        }
+        else if (obj == null)
+        {
+            return false;
+        }
+        else if (obj instanceof SubQuery that)
+        {
             return super.equals(that)
                     && input.equals(that.input);
         }

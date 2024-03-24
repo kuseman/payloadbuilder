@@ -97,8 +97,7 @@ public class NestedLoop implements IPhysicalPlan
             int nodeId,
             IPhysicalPlan outer,
             IPhysicalPlan inner,
-            BiFunction<TupleVector,
-            IExecutionContext, ValueVector> condition,
+            BiFunction<TupleVector, IExecutionContext, ValueVector> condition,
             String populateAlias,
             Set<Column> outerReferences,
             boolean emitEmptyOuterRows,
@@ -713,7 +712,7 @@ public class NestedLoop implements IPhysicalPlan
                         else
                         {
                             TupleVectorBuilder b = new TupleVectorBuilder(context.getBufferAllocator(), currentOuter.getRowCount());
-                            b.appendPopulate(cartesian, filter, currentOuter, concatOfInner, populateAlias);
+                            b.appendPopulate(filter, currentOuter, concatOfInner, populateAlias);
                             if (unmatched != null)
                             {
                                 b.append(unmatched);

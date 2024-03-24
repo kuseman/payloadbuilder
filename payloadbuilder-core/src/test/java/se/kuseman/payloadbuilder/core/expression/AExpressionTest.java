@@ -58,6 +58,15 @@ public abstract class AExpressionTest extends Assert
                 .build();
     }
 
+    /** Return a simple reflective column expression that resolve values runtime by name with type */
+    protected ColumnExpression ce(String col, String tableSourceAlias, ResolvedType type)
+    {
+        return ColumnExpression.Builder.of(col, type)
+                .withColumn(col)
+                .withTableSourceAlias(tableSourceAlias)
+                .build();
+    }
+
     /** Return a simple column expression that resolves values by ordinal */
     protected ColumnExpression ce(String alias, int ordinal)
     {
@@ -67,6 +76,19 @@ public abstract class AExpressionTest extends Assert
         }
         return ColumnExpression.Builder.of(alias, ResolvedType.of(Type.Any))
                 .withOrdinal(ordinal)
+                .build();
+    }
+
+    /** Return a simple column expression that resolves values by ordinal */
+    protected ColumnExpression ce(String alias, String tableSourceAlias, int ordinal)
+    {
+        if (ordinal < 0)
+        {
+            throw new IllegalArgumentException("Ordinal must be grater of equal to zero");
+        }
+        return ColumnExpression.Builder.of(alias, ResolvedType.of(Type.Any))
+                .withOrdinal(ordinal)
+                .withTableSourceAlias(tableSourceAlias)
                 .build();
     }
 
@@ -91,6 +113,20 @@ public abstract class AExpressionTest extends Assert
         }
         return ColumnExpression.Builder.of(alias, ResolvedType.of(Type.Any))
                 .withOrdinal(ordinal)
+                .withOuterReference(true)
+                .build();
+    }
+
+    /** Return a simple column expression that resolves values by ordinal in outer tuple */
+    protected ColumnExpression oce(String alias, String tableSourceAlias, int ordinal)
+    {
+        if (ordinal < 0)
+        {
+            throw new IllegalArgumentException("Ordinal must be grater of equal to zero");
+        }
+        return ColumnExpression.Builder.of(alias, ResolvedType.of(Type.Any))
+                .withOrdinal(ordinal)
+                .withTableSourceAlias(tableSourceAlias)
                 .withOuterReference(true)
                 .build();
     }

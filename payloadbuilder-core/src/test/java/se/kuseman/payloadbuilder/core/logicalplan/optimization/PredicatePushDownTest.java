@@ -52,7 +52,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     @Test
     public void test_function_and_no_filter()
     {
-        TableSourceReference opencsv = new TableSourceReference("sys", QualifiedName.of("opencsv"), "t");
+        TableSourceReference opencsv = new TableSourceReference(0, "sys", QualifiedName.of("opencsv"), "t");
         ColumnReference opencsvAst = new ColumnReference(opencsv, "t", ColumnReference.Type.ASTERISK);
         Schema schema = Schema.of(col(opencsvAst, Type.Any));
 
@@ -98,7 +98,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     @Test
     public void test_function_scan_and_surrounding_filter()
     {
-        TableSourceReference opencsv = new TableSourceReference("sys", QualifiedName.of("opencsv"), "t");
+        TableSourceReference opencsv = new TableSourceReference(0, "sys", QualifiedName.of("opencsv"), "t");
         ColumnReference opencsvAst = new ColumnReference(opencsv, "t", ColumnReference.Type.ASTERISK);
         Schema schema = Schema.of(col(opencsvAst, Type.Any));
 

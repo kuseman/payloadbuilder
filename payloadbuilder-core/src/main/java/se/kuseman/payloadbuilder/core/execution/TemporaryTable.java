@@ -75,7 +75,15 @@ public class TemporaryTable
                     .getValue();
         }
 
+        int tmp = 0;
+        for (IntList l : table.values())
+        {
+            tmp += l != null ? l.size()
+                    : 0;
+        }
+
         final int valuesSzie = vectors[0].size();
+        final int totalRowCount = tmp;
 
         return new TupleIterator()
         {
@@ -86,6 +94,12 @@ public class TemporaryTable
             public int estimatedBatchCount()
             {
                 return valuesSzie;
+            }
+
+            @Override
+            public int estimatedRowCount()
+            {
+                return totalRowCount;
             }
 
             @Override

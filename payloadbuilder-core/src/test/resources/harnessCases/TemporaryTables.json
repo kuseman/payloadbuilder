@@ -84,7 +84,7 @@
           [{ "key": "newCol1", "value": 10 }, { "key": "newCol2", "value": 60 } ]
         ],
         [
-          [{ "key": "Node Id", "value": 2 }, { "key": "Name", "value": "+- Nested Loop" }                          ],
+          [{ "key": "Node Id", "value": 2 }, { "key": "Name", "value": "+- Hash Match" }                           ],
           [{ "key": "Node Id", "value": 0 }, { "key": "Name", "value": "|  +- Scan: data" }                        ],
           [{ "key": "Node Id", "value": 1 }, { "key": "Name", "value": "|  +- Index Seek: #temp [newCol1] (ALL)" } ]
         ],
@@ -118,7 +118,7 @@
       "expectedResultSets": [
         [],
         [
-          [{ "key": "Node Id", "value": 2 }, { "key": "Name", "value": "+- Nested Loop" }                          ],
+          [{ "key": "Node Id", "value": 2 }, { "key": "Name", "value": "+- Hash Match" }                           ],
           [{ "key": "Node Id", "value": 0 }, { "key": "Name", "value": "|  +- Scan: data" }                        ],
           [{ "key": "Node Id", "value": 1 }, { "key": "Name", "value": "|  +- Index Seek: #temp [newCol1] (ALL)" } ]
         ],

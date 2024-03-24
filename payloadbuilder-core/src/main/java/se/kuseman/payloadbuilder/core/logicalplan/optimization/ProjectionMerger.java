@@ -11,10 +11,9 @@ import se.kuseman.payloadbuilder.core.expression.ARewriteExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.HasAlias;
 import se.kuseman.payloadbuilder.core.expression.HasAlias.Alias;
-import se.kuseman.payloadbuilder.core.logicalplan.Projection;
 
 /** Class that merges two projects that is nested. */
-class ProjectionMerger
+public class ProjectionMerger
 {
     private ProjectionMerger()
     {
@@ -23,10 +22,8 @@ class ProjectionMerger
     /**
      * Merges outer expressions with inner. Indexes the projection names from inner and replaces all occurrences in outer
      */
-    static List<IExpression> replace(List<IExpression> outerExpressions, Projection inner)
+    public static List<IExpression> replace(List<IExpression> outerExpressions, List<IExpression> innerExpressions)
     {
-        List<IExpression> innerExpressions = inner.getExpressions();
-
         Map<String, IExpression> innerByName = new HashMap<>(innerExpressions.size());
 
         for (IExpression e : innerExpressions)

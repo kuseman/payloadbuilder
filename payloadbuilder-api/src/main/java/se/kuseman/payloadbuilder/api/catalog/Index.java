@@ -1,9 +1,11 @@
 package se.kuseman.payloadbuilder.api.catalog;
 
 import static java.util.Collections.unmodifiableList;
+import static java.util.Collections.unmodifiableSet;
 import static java.util.Objects.requireNonNull;
 
 import java.util.List;
+import java.util.Set;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 
@@ -15,12 +17,23 @@ public class Index
     private final QualifiedName table;
     private final List<String> columns;
     private final ColumnsType columnsType;
+    private final Set<IndexType> indexTypes;
 
     public Index(QualifiedName table, List<String> columns, ColumnsType columnsType)
+    {
+        this(table, columns, columnsType, Set.of(IndexType.SEEK_EQ));
+    }
+
+    public Index(QualifiedName table, List<String> columns, ColumnsType columnsType, Set<IndexType> indexTypes)
     {
         this.table = requireNonNull(table, "table");
         this.columns = unmodifiableList(requireNonNull(columns, "columns"));
         this.columnsType = requireNonNull(columnsType, "columnsType");
+        this.indexTypes = unmodifiableSet(requireNonNull(indexTypes, "indexTypes"));
+        if (indexTypes.isEmpty())
+        {
+            throw new IllegalArgumentException("Index types cannot be empty");
+        }
     }
 
     public QualifiedName getTable()
@@ -36,6 +49,11 @@ public class Index
     public ColumnsType getColumnsType()
     {
         return columnsType;
+    }
+
+    public boolean supports(IndexType type)
+    {
+        return indexTypes.contains(type);
     }
 
     @Override
@@ -68,6 +86,13 @@ public class Index
     public String toString()
     {
         return table + " " + columns.toString() + " (" + columnsType + ")";
+    }
+
+    /** Index type. */
+    public enum IndexType
+    {
+        /** Specifies that seek with EQ is supported. */
+        SEEK_EQ
     }
 
     /** Type of columns this index supports. */

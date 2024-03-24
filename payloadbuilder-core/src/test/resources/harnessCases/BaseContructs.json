@@ -221,6 +221,7 @@
         "        for object_array ",
         "      ) variants ",
         "    from (a) aRow ",
+        "    order by aRow.articleId ",
         "    for object_array ",
         "  ) articles ",
         "from product p ",
@@ -709,7 +710,8 @@
 
         "from range(1, 4) r ",
         "inner populate join range(1, 11) r1 ",
-        "  on r1.Value % 3 + 1 = r.Value"
+        "  on r1.Value % 3 + 1 = r.Value ",
+        "order by r.value "
       ],
       "expectedResultSets": [
         [
@@ -732,7 +734,8 @@
 
         "from range(1, 4) r ",
         "inner populate join range(1, 11) r1 ",
-        "  on r1.Value % 3 + 1 = r.Value"
+        "  on r1.Value % 3 + 1 = r.Value ",
+        "order by r.value"
       ],
       "expectedResultSets": [
         [
@@ -1188,7 +1191,8 @@
         "inner populate join data d ",
         "  on d.id = s.col1 ",
         "inner populate join strings st ",
-        "  on st.id = s.col1 "
+        "  on st.id = s.col1 ",
+        "order by 1"
       ],
       "expectedResultSets": [
         [
@@ -1232,7 +1236,8 @@
         " (select d.* for object_array) obj",
         "from source s ",
         "inner populate join data d ",
-        "  on d.id = s.col1 "
+        "  on d.id = s.col1 ",
+        "order by s.col1"
       ],
       "expectedResultSets": [
         [
@@ -1271,8 +1276,9 @@
         "select ",
         " (select * from (d) d for object_array) obj",
         "from source s ",
-        "inner populate join data d ",   
-        "  on d.id = s.col1 "  
+        "inner populate join data d ",
+        "  on d.id = s.col1 ",
+        "order by s.col1"
       ],
       "expectedResultSets": [
         [
@@ -1287,8 +1293,9 @@
         "select ",
         " (select d.* from (d) d for object_array) obj",
         "from source s ",
-        "inner populate join data d ",   
-        "  on d.id = s.col1 "  
+        "inner populate join data d ",
+        "  on d.id = s.col1 ",
+        "order by s.col1"
       ],
       "expectedResultSets": [
         [

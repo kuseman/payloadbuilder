@@ -218,7 +218,8 @@
         "  select * ",
         "  from \"table\" t ",
         ") t ",
-        "  on t.col1 = s.col1"
+        "  on t.col1 = s.col1 ",
+        "order by s.col1"
       ],
       "expectedResultSets": [
         [
@@ -331,7 +332,8 @@
         "  left join article a  ",
         "    on a.col1 = t.row_id ",
         ") x ",
-        "  on x.t_col1 = s.col1"
+        "  on x.t_col1 = s.col1 ",
+        "order by 1"
       ],
       "expectedResultSets": [
         [
@@ -344,7 +346,7 @@
     {
       "name": "Inner join, with 2 sub queries",
       "query": [
-        "select s.col1, x.col1, x.col3, x1.col1, x1.col3 ",
+        "select s.col1 scol1, x.col1, x.col3, x1.col1, x1.col3 ",
         "from source s ",
         "inner populate join ",
         "(",
@@ -361,13 +363,14 @@
         "  left join article a ",
         "    on a.col1 = t.row_id ",
         ") x1 ",
-        "  on x1.col1 = s.col1"
+        "  on x1.col1 = s.col1 ",
+        "order by scol1"
       ],
       "expectedResultSets": [
         [
-          [{ "key": "col1", "value": 1 }, { "key": "col1", "value": [ 1, 1 ] },    { "key": "col3", "value": [ "row1", null ] },       { "key": "col1", "value": [ 1, 1 ] },    { "key": "col3", "value": [ "row1", null ] }],
-          [{ "key": "col1", "value": 3 }, { "key": "col1", "value": [ 3, 3, 3 ] }, { "key": "col3", "value": [ "row2", null, null ] }, { "key": "col1", "value": [ 3, 3, 3 ] }, { "key": "col3", "value": [ "row2", null, null ] }],
-          [{ "key": "col1", "value": 5 }, { "key": "col1", "value": [ 5 ] },       { "key": "col3", "value": [ "row4" ] },             { "key": "col1", "value": [ 5 ] },       { "key": "col3", "value": [ "row4" ] }]
+          [{ "key": "scol1", "value": 1 }, { "key": "col1", "value": [ 1, 1 ] },    { "key": "col3", "value": [ "row1", null ] },       { "key": "col1", "value": [ 1, 1 ] },    { "key": "col3", "value": [ "row1", null ] }],
+          [{ "key": "scol1", "value": 3 }, { "key": "col1", "value": [ 3, 3, 3 ] }, { "key": "col3", "value": [ "row2", null, null ] }, { "key": "col1", "value": [ 3, 3, 3 ] }, { "key": "col3", "value": [ "row2", null, null ] }],
+          [{ "key": "scol1", "value": 5 }, { "key": "col1", "value": [ 5 ] },       { "key": "col3", "value": [ "row4" ] },             { "key": "col1", "value": [ 5 ] },       { "key": "col3", "value": [ "row4" ] }]
         ]
       ]
     },
@@ -391,7 +394,8 @@
         "  left join article a ",
         "    on a.col1 = t.row_id ",
         ") x1 ",
-        "  on x1.col1 = s.col1"
+        "  on x1.col1 = s.col1 ",
+        "order by s.col1"
       ],
       "expectedResultSets": [
         [

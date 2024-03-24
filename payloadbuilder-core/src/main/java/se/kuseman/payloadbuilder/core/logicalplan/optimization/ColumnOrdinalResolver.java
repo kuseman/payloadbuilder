@@ -212,6 +212,11 @@ class ColumnOrdinalResolver extends ALogicalPlanOptimizer<ColumnOrdinalResolver.
                     Column schemaColumn = schema.getColumns()
                             .get(i);
                     ColumnReference schemaColRef = SchemaUtils.getColumnReference(schemaColumn);
+                    // Only fix columns if there is a colref
+                    if (schemaColRef == null)
+                    {
+                        continue;
+                    }
                     if (Objects.equals(colRef, schemaColRef)
                             && schemaColumn.getName()
                                     .equalsIgnoreCase(alias)

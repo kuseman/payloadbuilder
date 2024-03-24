@@ -30,8 +30,6 @@ import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
-import se.kuseman.payloadbuilder.core.execution.StatementContext;
-import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
 import se.kuseman.payloadbuilder.core.execution.vector.BufferAllocator;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.ArithmeticBinaryExpression;
@@ -46,7 +44,7 @@ public class NestedLoopTest extends AJoinTest
      * Outer references set that is used to trigger outer nested loop. This isn't actually used in the operator only triggers the function and is used then analyzing operator
      */
     private Set<Column> outerReferences = asSet(
-            CoreColumn.of(new ColumnReference(new TableSourceReference("", QualifiedName.of("table"), "t"), "col", ColumnReference.Type.REGULAR), ResolvedType.of(Type.Any)));
+            CoreColumn.of(new ColumnReference(new TableSourceReference(0, "", QualifiedName.of("table"), "t"), "col", ColumnReference.Type.REGULAR), ResolvedType.of(Type.Any)));
 
     @Ignore
     @Test
@@ -144,6 +142,18 @@ public class NestedLoopTest extends AJoinTest
         return NestedLoop.leftJoin(2, outer, inner, predicate, populateAlias, false);
     }
 
+    @Override
+    protected IPhysicalPlan createIndexInnerJoin(IPhysicalPlan outer, IPhysicalPlan inner, BiFunction<TupleVector, IExecutionContext, ValueVector> predicate, String populateAlias)
+    {
+        return NestedLoop.innerJoin(2, outer, inner, predicate, populateAlias, true);
+    }
+
+    @Override
+    protected IPhysicalPlan createIndexLeftJoin(IPhysicalPlan outer, IPhysicalPlan inner, BiFunction<TupleVector, IExecutionContext, ValueVector> predicate, String populateAlias)
+    {
+        return NestedLoop.leftJoin(2, outer, inner, predicate, populateAlias, true);
+    }
+
     @Test
     public void test_inner_join_constant_scan()
     {
@@ -159,69 +169,6 @@ public class NestedLoopTest extends AJoinTest
 
         assertVectorsEquals(vv(Type.Any, 0, 2, 1), actual.getColumn(0));
         assertVectorsEquals(vv(Type.Any, 4, 5, 6), actual.getColumn(1));
-
-        assertEquals(3, actual.getRowCount());
-        assertEquals(1, innerClosed.get());
-    }
-
-    @Test
-    public void test_inner_join_with_push_outer_reference()
-    {
-        AtomicInteger innerClosed = new AtomicInteger();
-        AtomicInteger outerClosed = new AtomicInteger();
-
-        IDatasource dsOuter = schemaLessDS(() -> outerClosed.incrementAndGet(), TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 2, 1), vv(Type.Any, 4, 5, 6))));
-        IDatasource dsInner = schemaLessDS(() -> innerClosed.incrementAndGet(), ctx ->
-        {
-            // Return values based on outer
-            final TupleVector outerTupleVector = ((StatementContext) ctx.getStatementContext()).getIndexSeekTupleVector();
-            return new TupleVector[] { new TupleVector()
-            {
-                @Override
-                public int getRowCount()
-                {
-                    return outerTupleVector.getRowCount();
-                }
-
-                @Override
-                public ValueVector getColumn(int column)
-                {
-                    final ValueVector col = outerTupleVector.getColumn(column);
-                    // Leave join column as is
-                    if (column == 0)
-                    {
-                        return col;
-                    }
-
-                    return new ValueVectorAdapter(col)
-                    {
-                        @Override
-                        public Object getAny(int row)
-                        {
-                            return (((Integer) col.getAny(row)) + 1) * 10;
-                        }
-                    };
-                }
-
-                @Override
-                public Schema getSchema()
-                {
-                    return innerSchema;
-                }
-            } };
-        });
-
-        IPhysicalPlan plan = NestedLoop.innerJoin(2, scan(dsOuter, table, outerSchemaLess), scan(dsInner, tableB, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), null, true);
-
-        TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
-
-        assertEquals(SchemaUtils.concat(outerSchemaLess, innerSchemaLess), plan.getSchema());
-
-        assertVectorsEquals(vv(Type.Any, 0, 2, 1), actual.getColumn(0));
-        assertVectorsEquals(vv(Type.Any, 4, 5, 6), actual.getColumn(1));
-        assertVectorsEquals(vv(Type.Any, 0, 2, 1), actual.getColumn(2));
-        assertVectorsEquals(vv(Type.Any, 50, 60, 70), actual.getColumn(3));
 
         assertEquals(3, actual.getRowCount());
         assertEquals(1, innerClosed.get());
@@ -244,183 +191,6 @@ public class NestedLoopTest extends AJoinTest
         VectorTestUtils.assertTupleVectorsEquals(TupleVector.EMPTY, actual);
 
         assertEquals(1, innerClosed.get());
-    }
-
-    @Test
-    public void test_inner_join_with_populate_and_push_outer_reference_no_outer_rows()
-    {
-        AtomicInteger innerClosed = new AtomicInteger();
-        AtomicInteger outerClosed = new AtomicInteger();
-
-        IDatasource dsOuter = schemaLessDS(() -> outerClosed.incrementAndGet(), TupleVector.EMPTY);
-        IDatasource dsInner = schemaLessDS(() -> innerClosed.incrementAndGet(), ctx ->
-        {
-            // Return values based on outer
-            final TupleVector outerTupleVector = ((StatementContext) ctx.getStatementContext()).getOuterTupleVector();
-            return new TupleVector[] { new TupleVector()
-            {
-                @Override
-                public int getRowCount()
-                {
-                    return outerTupleVector.getRowCount();
-                }
-
-                @Override
-                public ValueVector getColumn(int column)
-                {
-                    final ValueVector col = outerTupleVector.getColumn(column);
-                    // Leave join column as is
-                    if (column == 0)
-                    {
-                        return col;
-                    }
-
-                    return new ValueVectorAdapter(col)
-                    {
-                        @Override
-                        public Object getAny(int row)
-                        {
-                            return (((Integer) col.getAny(row)) + 1) * 10;
-                        }
-                    };
-                }
-
-                @Override
-                public Schema getSchema()
-                {
-                    return innerSchema;
-                }
-            } };
-        });
-
-        IPhysicalPlan plan = NestedLoop.innerJoin(2, scan(dsOuter, table, outerSchemaLess), scan(dsInner, tableB, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), "p", true);
-
-        TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
-
-        VectorTestUtils.assertTupleVectorsEquals(TupleVector.EMPTY, actual);
-
-        assertEquals(1, outerClosed.get());
-        // Inner should not be touched
-        assertEquals(0, innerClosed.get());
-    }
-
-    @Test
-    public void test_inner_join_with_populate_and_push_outer_reference_no_inner_rows()
-    {
-        AtomicInteger innerClosed = new AtomicInteger();
-        AtomicInteger outerClosed = new AtomicInteger();
-
-        IDatasource dsOuter = schemaLessDS(() -> outerClosed.incrementAndGet(), TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 2, 1), vv(Type.Any, 4, 5, 6))));
-        IDatasource dsInner = schemaLessDS(() -> innerClosed.incrementAndGet(), TupleVector.EMPTY);
-
-        IPhysicalPlan plan = NestedLoop.innerJoin(2, scan(dsOuter, table, outerSchemaLess), scan(dsInner, tableB, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), "p", true);
-
-        TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
-
-        VectorTestUtils.assertTupleVectorsEquals(TupleVector.EMPTY, actual);
-
-        assertEquals(1, innerClosed.get());
-    }
-
-    @Test
-    public void test_left_join_with_populate_and_push_outer_reference_no_inner_rows()
-    {
-        AtomicInteger innerClosed = new AtomicInteger();
-        AtomicInteger outerClosed = new AtomicInteger();
-
-        IDatasource dsOuter = schemaLessDS(() -> outerClosed.incrementAndGet(), TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 2, 1), vv(Type.Any, 4, 5, 6))));
-        IDatasource dsInner = schemaLessDS(() -> innerClosed.incrementAndGet(), TupleVector.EMPTY);
-
-        IPhysicalPlan plan = NestedLoop.leftJoin(2, scan(dsOuter, table, outerSchemaLess), scan(dsInner, tableB, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), "p", true);
-
-        TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
-
-        VectorTestUtils.assertTupleVectorsEquals(TupleVector.of(SchemaUtils.populate(outerSchema, "p", innerSchemaLess),
-                asList(vv(Type.Any, 0, 2, 1), vv(Type.Any, 4, 5, 6), vv(ResolvedType.table(innerSchemaLess), null, null, null))), actual);
-
-        assertEquals(1, innerClosed.get());
-    }
-
-    @Test
-    public void test_inner_join_with_populate_and_push_outer_reference()
-    {
-        AtomicInteger innerClosed = new AtomicInteger();
-        AtomicInteger outerClosed = new AtomicInteger();
-
-        IDatasource dsOuter = schemaLessDS(() -> outerClosed.incrementAndGet(), TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 2), vv(Type.Any, 4, 5))),
-                TupleVector.of(outerSchema, asList(vv(Type.Any, 1), vv(Type.Any, 6))));
-        IDatasource dsInner = schemaLessDS(() -> innerClosed.incrementAndGet(), ctx ->
-        {
-            // Return values based on outer
-            final TupleVector outerTupleVector = ((StatementContext) ctx.getStatementContext()).getIndexSeekTupleVector();
-            return new TupleVector[] { new TupleVector()
-            {
-                @Override
-                public int getRowCount()
-                {
-                    return outerTupleVector.getRowCount();
-                }
-
-                @Override
-                public ValueVector getColumn(int column)
-                {
-                    final ValueVector col = outerTupleVector.getColumn(column);
-                    // Leave join column as is
-                    if (column == 0)
-                    {
-                        return col;
-                    }
-
-                    return new ValueVectorAdapter(col)
-                    {
-                        @Override
-                        public Object getAny(int row)
-                        {
-                            return (((Integer) col.getAny(row)) + 1) * 10;
-                        }
-                    };
-                }
-
-                @Override
-                public Schema getSchema()
-                {
-                    return innerSchema;
-                }
-            } };
-        });
-
-        IPhysicalPlan plan = NestedLoop.innerJoin(2, scan(dsOuter, table, outerSchemaLess, 1), scan(dsInner, tableB, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), "p", true);
-
-        TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
-
-        assertEquals(SchemaUtils.populate(outerSchemaLess, "p", innerSchemaLess), plan.getSchema());
-
-        assertVectorsEquals(vv(Type.Any, 0, 2, 1), actual.getColumn(0));
-        assertVectorsEquals(vv(Type.Any, 4, 5, 6), actual.getColumn(1));
-
-        //@formatter:off
-        assertVectorsEquals(vv(ResolvedType.table(innerSchema),
-                TupleVector.of(innerSchema, asList(
-                        vv(Type.Any, 0),
-                        vv(Type.Any, 50)
-                        )),
-                TupleVector.of(innerSchema, asList(
-                        vv(Type.Any, 2),
-                        vv(Type.Any, 60)
-                        )),
-                TupleVector.of(innerSchema, asList(
-                        vv(Type.Any, 1),
-                        vv(Type.Any, 70)
-                        ))
-                ), actual.getColumn(2));
-        //@formatter:on
-
-        assertEquals(3, actual.getRowCount());
-        assertEquals(2, innerClosed.get());
     }
 
     @Test
@@ -632,10 +402,10 @@ public class NestedLoopTest extends AJoinTest
         IDatasource dsOuter = schemaLessDS(() -> outerClosed.incrementAndGet(), TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 2, 1), vv(Type.Any, 4, 5, 6))));
         IDatasource dsInner = schemaLessDS(() -> innerClosed.incrementAndGet(), TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 0, 1), vv(Type.Any, 1, 2, 3))));
 
-        IExpression col1 = new ColumnExpression("col1", "col1", ResolvedType.of(Type.Any), null, 0, true, -1);
-        IExpression col2 = new ColumnExpression("col2", "col2", ResolvedType.of(Type.Any), null, 1, true, -1);
-        IExpression col3 = new ColumnExpression("col3", "col3", ResolvedType.of(Type.Any), null, 0, false, -1);
-        IExpression col4 = new ColumnExpression("col4", "col4", ResolvedType.of(Type.Any), null, 1, false, -1);
+        IExpression col1 = new ColumnExpression("", "col1", "col1", ResolvedType.of(Type.Any), null, 0, true, -1);
+        IExpression col2 = new ColumnExpression("", "col2", "col2", ResolvedType.of(Type.Any), null, 1, true, -1);
+        IExpression col3 = new ColumnExpression("", "col3", "col3", ResolvedType.of(Type.Any), null, 0, false, -1);
+        IExpression col4 = new ColumnExpression("", "col4", "col4", ResolvedType.of(Type.Any), null, 1, false, -1);
 
         //@formatter:off
         IPhysicalPlan plan = NestedLoop.leftJoin(

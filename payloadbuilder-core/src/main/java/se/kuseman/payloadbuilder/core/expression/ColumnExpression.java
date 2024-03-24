@@ -39,6 +39,9 @@ import se.kuseman.payloadbuilder.core.execution.StatementContext;
  */
 public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnReference
 {
+    /** The table source alias for this expression if not pointing to a {@link ColumnReference}. Ie. a pointer to a sub query */
+    private final String tableSourceAlias;
+
     /** Alias for this expression. This is the column name (only used for presentation) */
     private final String alias;
 
@@ -62,8 +65,9 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
     private final int lambdaId;
 
     /** Create a column reference expression. */
-    public ColumnExpression(String alias, String column, ResolvedType type, ColumnReference columnReference, int ordinal, boolean outerReference, int lambdaId)
+    public ColumnExpression(String tableSourceAlias, String alias, String column, ResolvedType type, ColumnReference columnReference, int ordinal, boolean outerReference, int lambdaId)
     {
+        this.tableSourceAlias = tableSourceAlias;
         this.alias = requireNonNull(alias, "alias");
         this.column = column;
         this.resolvedType = requireNonNull(type, "type");
@@ -85,7 +89,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
     /** Copy column expression but change the ordinal */
     public ColumnExpression(ColumnExpression source, int ordinal)
     {
-        this(source.alias, source.column, source.resolvedType, source.columnReference, ordinal, source.outerReference, source.lambdaId);
+        this(source.tableSourceAlias, source.alias, source.column, source.resolvedType, source.columnReference, ordinal, source.outerReference, source.lambdaId);
     }
 
     @Override
@@ -115,6 +119,11 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
     public ColumnReference getColumnReference()
     {
         return columnReference;
+    }
+
+    public String getTableSourceAlias()
+    {
+        return tableSourceAlias;
     }
 
     @Override
@@ -246,6 +255,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
         {
             ColumnExpression that = (ColumnExpression) obj;
             return alias.equals(that.alias)
+                    && Objects.equals(tableSourceAlias, that.tableSourceAlias)
                     && Objects.equals(column, that.column)
                     && Objects.equals(columnReference, that.columnReference)
                     && ordinal == that.ordinal
@@ -307,7 +317,8 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
     /** Column expression builder */
     public static class Builder
     {
-        private final String alias;
+        private String tableSourceAlias;
+        private String alias;
         private final ResolvedType resolvedType;
         private String column;
         private ColumnReference columnReference;
@@ -329,6 +340,12 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
         public Builder withColumn(String column)
         {
             this.column = column;
+            return this;
+        }
+
+        public Builder withTableSourceAlias(String alias)
+        {
+            this.tableSourceAlias = alias;
             return this;
         }
 
@@ -358,7 +375,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
 
         public ColumnExpression build()
         {
-            return new ColumnExpression(alias, column, resolvedType, columnReference, ordinal, outerReference, lambdaId);
+            return new ColumnExpression(tableSourceAlias, alias, column, resolvedType, columnReference, ordinal, outerReference, lambdaId);
         }
     }
 }

@@ -1,32 +1,35 @@
 package se.kuseman.payloadbuilder.core.logicalplan;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 
 import java.util.List;
-import java.util.Objects;
+
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 
 /** Base class for table sources */
 public abstract class TableSource implements ILogicalPlan
 {
-    /** Specified catalog alias */
-    private final String catalogAlias;
-    /** Table source alias */
-    private final String alias;
+    protected final TableSourceReference tableSource;
 
-    TableSource(String catalogAlias, String alias)
+    TableSource(TableSourceReference tableSource)
     {
-        this.catalogAlias = Objects.toString(catalogAlias, "");
-        this.alias = Objects.toString(alias, "");
+        this.tableSource = requireNonNull(tableSource, "tableSource");
     }
 
     public String getCatalogAlias()
     {
-        return catalogAlias;
+        return tableSource.getCatalogAlias();
     }
 
     public String getAlias()
     {
-        return alias;
+        return tableSource.getAlias();
+    }
+
+    public TableSourceReference getTableSource()
+    {
+        return tableSource;
     }
 
     @Override
@@ -49,11 +52,9 @@ public abstract class TableSource implements ILogicalPlan
         {
             return true;
         }
-        else if (obj instanceof TableSource)
+        else if (obj instanceof TableSource that)
         {
-            TableSource that = (TableSource) obj;
-            return catalogAlias.equals(that.catalogAlias)
-                    && alias.equals(that.alias);
+            return tableSource.equals(that.tableSource);
         }
         return false;
     }

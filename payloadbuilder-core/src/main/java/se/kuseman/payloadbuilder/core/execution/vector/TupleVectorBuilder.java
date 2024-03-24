@@ -41,7 +41,7 @@ public class TupleVectorBuilder
     }
 
     /** Append a populated result from provided cartesian and filter */
-    public void appendPopulate(TupleVector cartesian, ValueVector filter, TupleVector outer, TupleVector inner, String populateAlias)
+    public void appendPopulate(ValueVector filter, TupleVector outer, TupleVector inner, String populateAlias)
     {
         final int outerSize = outer.getSchema()
                 .getSize();

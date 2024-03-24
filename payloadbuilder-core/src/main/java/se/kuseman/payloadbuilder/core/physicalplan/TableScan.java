@@ -90,6 +90,18 @@ public class TableScan implements IPhysicalPlan
         return new TupleIterator()
         {
             @Override
+            public int estimatedBatchCount()
+            {
+                return iterator.estimatedBatchCount();
+            }
+
+            @Override
+            public int estimatedRowCount()
+            {
+                return iterator.estimatedRowCount();
+            }
+
+            @Override
             public TupleVector next()
             {
                 if (!iterator.hasNext())

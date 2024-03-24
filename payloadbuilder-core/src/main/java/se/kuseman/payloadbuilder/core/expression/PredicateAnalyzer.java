@@ -382,7 +382,7 @@ public class PredicateAnalyzer
          *
          * </pre>
          */
-        boolean isPushdown(TableSourceReference tableSource)
+        public boolean isPushdown(TableSourceReference tableSource)
         {
             boolean presentOnLeft = left.isSingleTableSource(tableSource, false);
 
@@ -594,7 +594,7 @@ public class PredicateAnalyzer
     public static class AnalyzeItem
     {
         /** Marker table source used to when an ambiguous column is encoutered. This to avoid faulty pushdowns of predicates etc. */
-        static final TableSourceReference UNKNOWN_TABLE_SOURCE = new TableSourceReference("", QualifiedName.of("unkown"), "#");
+        static final TableSourceReference UNKNOWN_TABLE_SOURCE = new TableSourceReference(-1, "", QualifiedName.of("unkown"), "#");
 
         /** Expression representing this item */
         private final IExpression expression;
@@ -721,6 +721,12 @@ public class PredicateAnalyzer
                 if (colRef != null)
                 {
                     tableSource = colRef.getTableSource();
+                }
+                else if (ce.getTableSourceAlias() != null)
+                {
+                    // Column without a ref. A computed expression
+                    // Create a table source based on alias of expression
+                    tableSource = new TableSourceReference(-1, "", QualifiedName.of(ce.getTableSourceAlias()), ce.getTableSourceAlias());
                 }
             }
             context.result.add(tableSource);
