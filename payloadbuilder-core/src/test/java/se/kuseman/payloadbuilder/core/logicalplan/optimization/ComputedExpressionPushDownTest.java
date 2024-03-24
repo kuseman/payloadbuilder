@@ -1,6 +1,7 @@
 package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptySet;
 import static se.kuseman.payloadbuilder.api.QualifiedName.of;
 
 import java.util.List;
@@ -32,6 +33,7 @@ import se.kuseman.payloadbuilder.core.logicalplan.Aggregate;
 import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
+import se.kuseman.payloadbuilder.core.logicalplan.Join;
 import se.kuseman.payloadbuilder.core.logicalplan.OperatorFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Projection;
 import se.kuseman.payloadbuilder.core.logicalplan.Sort;
@@ -45,6 +47,59 @@ public class ComputedExpressionPushDownTest extends ALogicalPlanOptimizerTest
     private final ComputedExpressionPushDown optimizer = new ComputedExpressionPushDown();
     private final TableSourceReference table = new TableSourceReference("", of("table"), "t");
     private final ColumnReference tAst = new ColumnReference(table, "t", ColumnReference.Type.ASTERISK);
+
+    private final TableSourceReference tableB = new TableSourceReference("", of("tableB"), "b");
+    private final ColumnReference tBst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
+
+    @Test
+    public void test_order_by_column_not_projected()
+    {
+        // SQL standard specifies that an order by column reference points either to
+        // a projected column or a table source. Normally the col2 is not present in the projections input
+        // so we need to adapt for that
+
+        //@formatter:off
+        String query = """
+                select b.col1
+                from "table" t
+                inner join "tableB" b
+                  on b.col = t.col
+                order by t.col1
+                """;
+        //@formatter:on
+
+        ILogicalPlan plan = getSchemaResolvedPlan(query);
+        ILogicalPlan actual = optimize(context, plan);
+
+        //@formatter:off
+        //CSOFF
+        ILogicalPlan expected = new Sort(
+                new Projection(
+                        new Join(
+                            tableScan(Schema.of(CoreColumn.of(tAst, ResolvedType.of(Type.Any))), table),
+                            tableScan(Schema.of(CoreColumn.of(tBst, ResolvedType.of(Type.Any))), tableB),
+                            Join.Type.INNER,
+                            null,
+                            e("b.col = t.col"),
+                            emptySet(),
+                            false),
+                        List.of(e("b.col1"), new AliasExpression(e("t.col1"), "col1", true)),
+                        false),
+                List.of(sortItem(e("t.col1"), Order.ASC))
+                );
+        //CSON
+        //@formatter:on
+
+        // System.out.println(expected.print(0));
+        // System.out.println(actual.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
 
     @Test
     public void test_order_by_and_projection_with_subscript()
