@@ -20,6 +20,7 @@ import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.Join;
 import se.kuseman.payloadbuilder.core.logicalplan.Join.Type;
+import se.kuseman.payloadbuilder.core.logicalplan.TableFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
 
 /** Plan rewriter that pushes predicates down to scan operators */
@@ -233,6 +234,22 @@ class PredicatePushDown extends ALogicalPlanOptimizer<PredicatePushDown.Ctx>
     }
 
     @Override
+    public ILogicalPlan visit(TableFunctionScan plan, Ctx context)
+    {
+        TableSourceReference tableSource = plan.getTableSource();
+        // Push down the predicate to here, creating a filter above the table function
+        List<AnalyzePair> pairs = context.extractPushDownPredicate(tableSource);
+        if (pairs != null)
+        {
+            IExpression predicate = AnalyzeResult.getPredicate(pairs);
+            return new Filter(plan, plan.getTableSource(), predicate);
+        }
+
+        // No predicates was found, just return the input plan since it won't be altered
+        return plan;
+    }
+
+    @Override
     public ILogicalPlan visit(Join plan, Ctx context)
     {
         boolean isLeft = plan.getType() == Type.LEFT;
@@ -279,6 +296,13 @@ class PredicatePushDown extends ALogicalPlanOptimizer<PredicatePushDown.Ctx>
 
         @Override
         public Void visit(TableScan plan, Set<TableSourceReference> context)
+        {
+            context.add(plan.getTableSource());
+            return super.visit(plan, context);
+        }
+
+        @Override
+        public Void visit(TableFunctionScan plan, Set<TableSourceReference> context)
         {
             context.add(plan.getTableSource());
             return super.visit(plan, context);
