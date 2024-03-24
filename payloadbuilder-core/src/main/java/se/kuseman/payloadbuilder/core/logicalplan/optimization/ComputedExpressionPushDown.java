@@ -120,7 +120,7 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
     {
         PlanData planData = context.planDatas.peek();
 
-        Map<String, Integer> projectionExpressionByName = new HashMap<>();
+        Map<String, Pair<Integer, QualifiedName>> projectionExpressionByName = new HashMap<>();
 
         int size = plan.getExpressions()
                 .size();
@@ -138,11 +138,17 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
             }
 
             // Index all named projections, this to be able to find out if we need to add a projection that is sorted on and is not projected
-            if (e instanceof HasAlias)
+            if (e instanceof UnresolvedColumnExpression ce)
             {
-                HasAlias.Alias alias = ((HasAlias) e).getAlias();
+                projectionExpressionByName.put(ce.getAlias()
+                        .getAlias()
+                        .toLowerCase(), Pair.of(i, ce.getColumn()));
+            }
+            else if (e instanceof HasAlias alias)
+            {
                 projectionExpressionByName.put(alias.getAlias()
-                        .toLowerCase(), i);
+                        .getAlias()
+                        .toLowerCase(), Pair.of(i, null));
             }
 
             // Traverse projection expression and compute any sub queries
@@ -214,10 +220,12 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
 
                 for (UnresolvedColumnExpression colExpression : columnExpressions)
                 {
+                    String alias = colExpression.getColumn()
+                            .getAlias();
                     String column = colExpression.getAlias()
                             .getAlias();
 
-                    Integer projectionIndex = projectionExpressionByName.get(column.toLowerCase());
+                    Pair<Integer, QualifiedName> pair = projectionExpressionByName.get(column.toLowerCase());
 
                     /* @formatter:off
                      *
@@ -228,12 +236,26 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
                      * @formatter:on
                      */
                     // Add an interal projection for missing column
-                    if (projectionIndex == null)
+                    if (pair == null)
                     {
                         newProjectionExpressions.add(new AliasExpression(colExpression, column, true));
+                        continue;
                     }
+
+                    // If we found a match then make sure they references the same alias, if not add an internal projection
+                    // order by: d.col
+                    // projection: b.col
+                    QualifiedName qname = pair.getValue();
+                    if (qname != null
+                            && alias != null
+                            && !alias.equalsIgnoreCase(qname.getAlias()))
+                    {
+                        newProjectionExpressions.add(new AliasExpression(colExpression, column, true));
+                        continue;
+                    }
+
                     // Verify constant sort
-                    else if (projectionExpressions.get(projectionIndex)
+                    if (projectionExpressions.get(pair.getKey())
                             .isConstant())
                     {
                         throw new ParseException(ORDER_BY_CONSTANT_ENCOUNTERED, item.getLocation());
