@@ -1,18 +1,22 @@
 package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
+import static java.util.Arrays.asList;
 import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
 
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
 
+import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.expression.LiteralBooleanExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.Join;
+import se.kuseman.payloadbuilder.core.logicalplan.TableFunctionScan;
 import se.kuseman.payloadbuilder.core.parser.Location;
 
 /** Test of {@link PredicatePushDown} */
@@ -46,6 +50,24 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
+    public void test_function_and_no_filter()
+    {
+        TableSourceReference opencsv = new TableSourceReference("sys", QualifiedName.of("opencsv"), "t");
+        ColumnReference opencsvAst = new ColumnReference(opencsv, "t", ColumnReference.Type.ASTERISK);
+        Schema schema = Schema.of(col(opencsvAst, Type.Any));
+
+        ILogicalPlan plan = new TableFunctionScan(opencsv, schema, asList(), asList(), null);
+
+        ILogicalPlan actual = optimize(plan);
+
+        ILogicalPlan expected = new TableFunctionScan(opencsv, schema, asList(), asList(), null);
+
+        // System.out.println(expected.print(0));
+        // System.out.println(actual.print(0));
+        assertEquals(expected, actual);
+    }
+
+    @Test
     public void test_table_and_surrounding_filter()
     {
         //@formatter:off
@@ -70,6 +92,41 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
         // System.out.println(actual.print(0));
         // Assert that we actual got any paris populated
         // assertTrue(actual.getPredicatePairs().size() > 0);
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_function_scan_and_surrounding_filter()
+    {
+        TableSourceReference opencsv = new TableSourceReference("sys", QualifiedName.of("opencsv"), "t");
+        ColumnReference opencsvAst = new ColumnReference(opencsv, "t", ColumnReference.Type.ASTERISK);
+        Schema schema = Schema.of(col(opencsvAst, Type.Any));
+
+        //@formatter:off
+        ILogicalPlan plan = new Filter(
+                new TableFunctionScan(opencsv, schema, asList(), asList(), null),
+                null,
+                e("t.col1")
+                );
+        //@formatter:on
+
+        ILogicalPlan actual = optimize(plan);
+
+        //@formatter:off
+        ILogicalPlan expected = new Filter(
+                new TableFunctionScan(opencsv, schema, asList(), asList(), null),
+                opencsv,
+                eq(cre(opencsvAst.rename("col1")), LiteralBooleanExpression.TRUE)      // Predicate analyzer rewrites this to an equal
+                );
+        //@formatter:on
+
+        // System.out.println(expected.print(0));
+        // System.out.println(actual.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
         assertEquals(expected, actual);
     }
 
