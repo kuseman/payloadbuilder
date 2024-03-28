@@ -169,36 +169,40 @@ public class EpochDateTimeOffset implements Comparable<EpochDateTimeOffset>
         throw new IllegalArgumentException("Cannot cast '" + source + "' to " + Type.DateTimeOffset);
     }
 
-    /** Try to convert provided object to a epoch date time */
+    /** Reflective convert. Try to convert provided object to a epoch date time */
     public static EpochDateTimeOffset from(Object object)
     {
-        if (object instanceof EpochDateTimeOffset)
+        if (object instanceof EpochDateTimeOffset dto)
         {
-            return (EpochDateTimeOffset) object;
+            return dto;
         }
-        else if (object instanceof EpochDateTime)
+        else if (object instanceof EpochDateTime dt)
         {
-            return new EpochDateTimeOffset(((EpochDateTime) object).getEpoch(), UTC);
+            return new EpochDateTimeOffset(dt.getEpoch(), UTC);
         }
-        else if (object instanceof Long)
+        else if (object instanceof Long l)
         {
-            return new EpochDateTimeOffset((Long) object, UTC);
+            return new EpochDateTimeOffset(l, UTC);
         }
-        else if (object instanceof String)
+        else if (object instanceof String s)
         {
-            return from((String) object);
+            return from(s);
         }
-        else if (object instanceof ZonedDateTime)
+        else if (object instanceof UTF8String s)
         {
-            return new EpochDateTimeOffset((ZonedDateTime) object);
+            return from(s.toString());
         }
-        else if (object instanceof LocalDateTime)
+        else if (object instanceof ZonedDateTime zdt)
         {
-            return new EpochDateTimeOffset(((LocalDateTime) object).atZone(UTC));
+            return new EpochDateTimeOffset(zdt);
         }
-        else if (object instanceof LocalDate)
+        else if (object instanceof LocalDateTime ldt)
         {
-            return new EpochDateTimeOffset(((LocalDate) object).atStartOfDay()
+            return new EpochDateTimeOffset(ldt.atZone(UTC));
+        }
+        else if (object instanceof LocalDate ld)
+        {
+            return new EpochDateTimeOffset(ld.atStartOfDay()
                     .atZone(UTC));
         }
 

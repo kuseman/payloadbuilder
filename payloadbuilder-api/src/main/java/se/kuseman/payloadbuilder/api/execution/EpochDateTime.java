@@ -167,40 +167,41 @@ public class EpochDateTime implements Comparable<EpochDateTime>
     /** Try to convert provided object to a epoch date time */
     public static EpochDateTime from(Object object)
     {
-        if (object instanceof EpochDateTime)
+        if (object instanceof EpochDateTime dt)
         {
-            return (EpochDateTime) object;
+            return dt;
         }
-        else if (object instanceof EpochDateTimeOffset)
+        else if (object instanceof EpochDateTimeOffset dto)
         {
             // Strip offset
             // Strip zone information
-            EpochDateTimeOffset of = (EpochDateTimeOffset) object;
-            ZonedDateTime zdt = of.getZonedDateTime();
+            ZonedDateTime zdt = dto.getZonedDateTime();
             return new EpochDateTime(zdt.toLocalDateTime());
         }
-        else if (object instanceof Long)
+        else if (object instanceof Long l)
         {
-            return new EpochDateTime((Long) object);
+            return new EpochDateTime(l);
         }
-        else if (object instanceof String)
+        else if (object instanceof String s)
         {
-            return from((String) object);
+            return from(s);
         }
-        else if (object instanceof ZonedDateTime)
+        else if (object instanceof UTF8String s)
+        {
+            return from(s.toString());
+        }
+        else if (object instanceof ZonedDateTime zdt)
         {
             // Strip zone information
-            ZonedDateTime zdt = (ZonedDateTime) object;
             return new EpochDateTime(zdt.toLocalDateTime());
         }
-        else if (object instanceof LocalDateTime)
+        else if (object instanceof LocalDateTime ldt)
         {
-            LocalDateTime ldt = (LocalDateTime) object;
             return new EpochDateTime(ldt);
         }
-        else if (object instanceof LocalDate)
+        else if (object instanceof LocalDate ld)
         {
-            return new EpochDateTime(((LocalDate) object).atStartOfDay());
+            return new EpochDateTime(ld.atStartOfDay());
         }
 
         throw new IllegalArgumentException("Cannot cast '" + object

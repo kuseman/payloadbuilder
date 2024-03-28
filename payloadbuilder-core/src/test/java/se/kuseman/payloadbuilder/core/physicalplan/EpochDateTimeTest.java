@@ -13,6 +13,7 @@ import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
 import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
 
 /** Test of {@link EpochDateTime} */
 public class EpochDateTimeTest extends Assert
@@ -125,6 +126,37 @@ public class EpochDateTimeTest extends Assert
         try
         {
             EpochDateTime.from("ohhh no");
+            fail("Should fail");
+        }
+        catch (IllegalArgumentException e)
+        {
+            assertTrue(e.getMessage(), e.getMessage()
+                    .contains("Cannot cast 'ohhh no' to DateTime"));
+        }
+    }
+
+    @Test
+    public void test_from_uf8_string()
+    {
+        assertEquals(EpochDateTime.from(LocalDateTime.of(2010, 10, 10, 0, 0, 0)), EpochDateTime.from(UTF8String.from("2010-10-10")));
+        // Space separator
+        assertEquals(EpochDateTime.from(LocalDateTime.of(2010, 10, 10, 10, 10, 10)), EpochDateTime.from(UTF8String.from("2010-10-10 10:10:10")));
+        // ISO T separator
+        assertEquals(EpochDateTime.from(LocalDateTime.of(2020, 10, 10, 10, 20, 10)), EpochDateTime.from(UTF8String.from("2020-10-10T10:20:10")));
+        // UTC marker
+        assertEquals(EpochDateTime.from(LocalDateTime.of(2010, 10, 10, 00, 10, 10)), EpochDateTime.from(UTF8String.from("2010-10-10T00:10:10Z")));
+        // UTC marker with nanos
+        assertEquals(EpochDateTime.from(LocalDateTime.of(2023, 07, 04, 11, 55, 07, 600000000)), EpochDateTime.from(UTF8String.from("2023-07-04T11:55:07.600000000Z")));
+        // UTC marker with second fraction (3 digit)
+        assertEquals(EpochDateTime.from(LocalDateTime.of(2023, 07, 04, 11, 55, 07, 600000000)), EpochDateTime.from(UTF8String.from("2023-07-04T11:55:07.600Z")));
+        // UTC marker with second fraction (2 digit)
+        assertEquals(EpochDateTime.from(LocalDateTime.of(2023, 07, 04, 11, 55, 07, 600000000)), EpochDateTime.from(UTF8String.from("2023-07-04T11:55:07.60Z")));
+        // UTC marker with second fraction (1 digit)
+        assertEquals(EpochDateTime.from(LocalDateTime.of(2023, 07, 04, 11, 55, 07, 600000000)), EpochDateTime.from(UTF8String.from("2023-07-04T11:55:07.6Z")));
+
+        try
+        {
+            EpochDateTime.from(UTF8String.from("ohhh no"));
             fail("Should fail");
         }
         catch (IllegalArgumentException e)

@@ -1,6 +1,7 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -13,6 +14,7 @@ import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
 import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
 
 /** Test of {@link EpochDateTimeOffset} */
 public class EpochDateTimeOffsetTest extends Assert
@@ -55,6 +57,8 @@ public class EpochDateTimeOffsetTest extends Assert
             assertTrue(e.getMessage(), e.getMessage()
                     .contains("Cannot cast '10.0 (Float)' to DateTimeOffset"));
         }
+
+        assertEquals(EpochDateTimeOffset.from("2010-10-10T00:00:00Z"), EpochDateTimeOffset.from(LocalDate.parse("2010-10-10")));
     }
 
     @Test
@@ -128,6 +132,41 @@ public class EpochDateTimeOffsetTest extends Assert
         try
         {
             EpochDateTimeOffset.from("ohhh no");
+            fail("Should fail");
+        }
+        catch (IllegalArgumentException e)
+        {
+            assertTrue(e.getMessage(), e.getMessage()
+                    .contains("Cannot cast 'ohhh no' to DateTime"));
+        }
+    }
+
+    @Test
+    public void test_from_uft8_string()
+    {
+        assertEquals(EpochDateTimeOffset.from(LocalDateTime.of(2010, 10, 10, 0, 0, 0)), EpochDateTimeOffset.from(UTF8String.from("2010-10-10")));
+        // Space separator
+        assertEquals(EpochDateTimeOffset.from(LocalDateTime.of(2010, 10, 10, 10, 10, 10)), EpochDateTimeOffset.from(UTF8String.from("2010-10-10 10:10:10")));
+        // ISO T separator
+        assertEquals(EpochDateTimeOffset.from(LocalDateTime.of(2020, 10, 10, 10, 20, 10)), EpochDateTimeOffset.from(UTF8String.from("2020-10-10T10:20:10")));
+        // UTC marker
+        assertEquals(EpochDateTimeOffset.from(LocalDateTime.of(2010, 10, 10, 00, 10, 10)), EpochDateTimeOffset.from(UTF8String.from("2010-10-10T00:10:10Z")));
+        // UTC marker with nanos
+        assertEquals(EpochDateTimeOffset.from(LocalDateTime.of(2023, 07, 04, 11, 55, 07, 600000000)), EpochDateTimeOffset.from(UTF8String.from("2023-07-04T11:55:07.600000000Z")));
+        // UTC marker with second fraction (3 digit)
+        assertEquals(EpochDateTimeOffset.from(LocalDateTime.of(2023, 07, 04, 11, 55, 07, 600000000)), EpochDateTimeOffset.from(UTF8String.from("2023-07-04T11:55:07.600Z")));
+        // UTC marker with second fraction (2 digit)
+        assertEquals(EpochDateTimeOffset.from(LocalDateTime.of(2023, 07, 04, 11, 55, 07, 600000000)), EpochDateTimeOffset.from(UTF8String.from("2023-07-04T11:55:07.60Z")));
+        // UTC marker with second fraction (1 digit)
+        assertEquals(EpochDateTimeOffset.from(LocalDateTime.of(2023, 07, 04, 11, 55, 07, 600000000)), EpochDateTimeOffset.from(UTF8String.from("2023-07-04T11:55:07.6Z")));
+
+        // With offset
+        assertEquals(EpochDateTimeOffset.from(ZonedDateTime.of(LocalDateTime.of(2023, 07, 04, 11, 55, 07, 600000000), ZoneOffset.of("+03:00"))),
+                EpochDateTimeOffset.from(UTF8String.from("2023-07-04T11:55:07.6+03:00")));
+
+        try
+        {
+            EpochDateTimeOffset.from(UTF8String.from("ohhh no"));
             fail("Should fail");
         }
         catch (IllegalArgumentException e)
