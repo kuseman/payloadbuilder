@@ -1,5 +1,6 @@
 package se.kuseman.payloadbuilder.catalog.fs;
 
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -149,13 +150,13 @@ public class FilesystemCatalog extends Catalog
         }
     }
 
-    static class FSInputStream extends FileInputStream
+    static class FSInputStream extends BufferedInputStream
     {
         private final File file;
 
         public FSInputStream(File file) throws FileNotFoundException
         {
-            super(file);
+            super(new FileInputStream(file));
             this.file = file;
         }
 
