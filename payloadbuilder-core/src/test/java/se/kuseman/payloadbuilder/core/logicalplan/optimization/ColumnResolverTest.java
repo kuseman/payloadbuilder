@@ -4,6 +4,7 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
 
+import java.util.List;
 import java.util.Random;
 
 import org.assertj.core.api.Assertions;
@@ -17,6 +18,8 @@ import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
@@ -31,6 +34,7 @@ import se.kuseman.payloadbuilder.core.expression.FunctionCallExpression;
 import se.kuseman.payloadbuilder.core.expression.LambdaExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedSubQueryExpression;
+import se.kuseman.payloadbuilder.core.expression.VariableExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.Aggregate;
 import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
 import se.kuseman.payloadbuilder.core.logicalplan.ExpressionScan;
@@ -220,6 +224,52 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                         col(e_col3.column("nCol1"), Type.Int),
                         col(e_col3.column("nCol2"), Type.String)
                         ));
+        //@formatter:on
+
+        // System.out.println(expected.print(0));
+        // System.out.println(actual.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_expression_scan_table_variable_with_provided_schema()
+    {
+        //@formatter:off
+        String query = " "
+                + "select * "
+                + "from @tbl e ";
+        //@formatter:on
+
+        //@formatter:off
+        context.setVariable(QualifiedName.of("tbl"), ValueVector.literalTable(TupleVector.of(Schema.of(
+                Column.of("col1", Type.Int),
+                Column.of("col2", Type.Boolean)
+                ), List.of(
+                ValueVector.empty(ResolvedType.of(Type.Int)),
+                ValueVector.empty(ResolvedType.of(Type.Boolean))
+                ))));
+        //@formatter:on
+
+        ILogicalPlan plan = getSchemaResolvedPlan(query);
+        ILogicalPlan actual = optimize(context, plan);
+
+        TableSourceReference expectedTable = new TableSourceReference("", QualifiedName.of("tbl"), "e");
+
+        Schema expectedSchema = Schema.of(CoreColumn.of(expectedTable.column("col1"), ResolvedType.of(Type.Int)), CoreColumn.of(expectedTable.column("col2"), ResolvedType.of(Type.Boolean)));
+
+        ILogicalPlan expected = new ExpressionScan(expectedTable, expectedSchema, new VariableExpression(QualifiedName.of("tbl")), null);
+
+        //@formatter:off
+        Assertions.assertThat(actual.getSchema())
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(expectedSchema);
         //@formatter:on
 
         // System.out.println(expected.print(0));

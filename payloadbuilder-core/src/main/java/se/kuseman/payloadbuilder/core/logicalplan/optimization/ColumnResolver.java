@@ -27,6 +27,8 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo.SchemaResolveException;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IDereferenceExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IFunctionCallExpression;
@@ -37,6 +39,7 @@ import se.kuseman.payloadbuilder.core.catalog.LambdaFunction;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.common.SortItem;
+import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.expression.AExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.ARewriteExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
@@ -51,6 +54,7 @@ import se.kuseman.payloadbuilder.core.expression.LogicalBinaryExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedFunctionCallExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedSubQueryExpression;
+import se.kuseman.payloadbuilder.core.expression.VariableExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.Aggregate;
 import se.kuseman.payloadbuilder.core.logicalplan.ExpressionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
@@ -501,7 +505,30 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         Schema schema = type.getSchema();
         if (schema == null)
         {
-            schema = Schema.EMPTY;
+            // If this is a table variable (@table) see if there is an empty vector with the schema
+            // in context and use that schema if present
+            // TODO: add compiler info message if missing
+            if (expression instanceof VariableExpression ve)
+            {
+                ValueVector value = ((ExecutionContext) context.context).getVariableValue(ve.getName());
+                Object obj = value != null ? value.valueAsObject(0)
+                        : null;
+
+                if (obj != null
+                        && !(obj instanceof TupleVector))
+                {
+                    throw new ParseException("Table variable expression must be of type: " + Type.Table, plan.getLocation());
+                }
+                else if (obj instanceof TupleVector tv)
+                {
+                    schema = tv.getSchema();
+                }
+            }
+
+            if (schema == null)
+            {
+                schema = Schema.EMPTY;
+            }
         }
 
         if (SchemaUtils.isAsterisk(schema, true))
