@@ -4,6 +4,7 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.StringUtils.isEmpty;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
 import java.math.BigDecimal;
@@ -18,25 +19,43 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import se.kuseman.payloadbuilder.api.OutputWriter;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
 
 /** Json output writer */
 public class JsonOutputWriter implements OutputWriter
 {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private final JsonGenerator generator;
+    private final boolean outputStream;
     private final JsonSettings settings;
     private String currentField;
     private boolean firstResultSet = true;
+    private byte[] stringBuffer;
 
     private String rowSeparator;
     private String resultSetSeparator;
 
     public JsonOutputWriter(Writer writer)
     {
-        this(writer, new JsonSettings());
+        this(null, writer, new JsonSettings());
     }
 
     public JsonOutputWriter(Writer writer, JsonSettings settings)
+    {
+        this(null, writer, settings);
+    }
+
+    public JsonOutputWriter(OutputStream outputStream)
+    {
+        this(outputStream, null, new JsonSettings());
+    }
+
+    public JsonOutputWriter(OutputStream outputStream, JsonSettings settings)
+    {
+        this(outputStream, null, settings);
+    }
+
+    private JsonOutputWriter(OutputStream outputStream, Writer writer, JsonSettings settings)
     {
         if (settings.allResultSetsAsOneArray
                 && settings.resultSetsAsArrays)
@@ -56,18 +75,16 @@ public class JsonOutputWriter implements OutputWriter
         }
 
         this.settings = settings;
+        this.outputStream = outputStream != null;
         try
         {
+            JsonGenerator generator = this.outputStream ? MAPPER.createGenerator(requireNonNull(outputStream, "outputStream"))
+                    : MAPPER.createGenerator(requireNonNull(writer, "writer"));
             if (settings.prettyPrint)
             {
-                this.generator = MAPPER.createGenerator(requireNonNull(writer, "writer"))
-                        .useDefaultPrettyPrinter();
+                generator = generator.useDefaultPrettyPrinter();
             }
-            else
-            {
-                this.generator = MAPPER.getFactory()
-                        .createGenerator(requireNonNull(writer, "writer"));
-            }
+            this.generator = generator;
         }
         catch (IOException e)
         {
@@ -173,6 +190,39 @@ public class JsonOutputWriter implements OutputWriter
     public void writeFieldName(String name)
     {
         currentField = name;
+    }
+
+    @Override
+    public void writeString(UTF8String string)
+    {
+        if (!outputStream
+                || string.hasString())
+        {
+            writeValue(string.toString());
+            return;
+        }
+
+        // In outputstream mode we can write the raw uf8 bytes
+        // this is more performant since we don't have to create a String first
+        int length = string.getByteLength();
+
+        // Extend buffer if needed
+        if (stringBuffer == null
+                || stringBuffer.length < length)
+        {
+            stringBuffer = new byte[length];
+        }
+
+        string.getBytes(stringBuffer);
+        try
+        {
+            writeFieldNameInternal();
+            generator.writeUTF8String(stringBuffer, 0, length);
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("Error writing JSON String", e);
+        }
     }
 
     @Override

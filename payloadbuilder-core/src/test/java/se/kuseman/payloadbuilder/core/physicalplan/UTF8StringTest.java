@@ -26,6 +26,23 @@ public class UTF8StringTest extends Assert
     }
 
     @Test
+    public void test_get_bytes_supplied_array()
+    {
+        byte[] bytes = "hello world".getBytes(StandardCharsets.UTF_8);
+        UTF8String str = UTF8String.utf8(bytes, 0, 5);
+
+        assertFalse(str.hasString());
+        assertTrue(UTF8String.from("hello")
+                .hasString());
+
+        assertEquals(UTF8String.from("hello"), str);
+
+        byte[] slice = new byte[10];
+        str.getBytes(slice);
+        assertEquals("hello", new String(slice, 0, str.getByteLength(), StandardCharsets.UTF_8));
+    }
+
+    @Test
     public void test_concat_builder()
     {
         List<UTF8String> strings = new ArrayList<>();
