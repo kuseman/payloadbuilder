@@ -1,6 +1,11 @@
 package se.kuseman.payloadbuilder.api.execution;
 
+import static java.util.Collections.unmodifiableMap;
 import static java.util.Objects.requireNonNull;
+
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -715,8 +720,36 @@ public interface ValueVector
         };
     }
 
+    //@formatter:off
+    static final Map<Type, ValueVector> ONE_SIZE_NULL_VECTOR_BY_TYPE = unmodifiableMap(new EnumMap<>(
+            Map.of(
+                    Type.Boolean, literalNullInternal(ResolvedType.of(Type.Boolean), 1),
+                    Type.Int, literalNullInternal(ResolvedType.of(Type.Int), 1),
+                    Type.Long, literalNullInternal(ResolvedType.of(Type.Long), 1),
+                    Type.Float, literalNullInternal(ResolvedType.of(Type.Float), 1),
+                    Type.Double, literalNullInternal(ResolvedType.of(Type.Double), 1),
+                    Type.String, literalNullInternal(ResolvedType.of(Type.String), 1),
+                    Type.Decimal, literalNullInternal(ResolvedType.of(Type.Decimal), 1),
+                    Type.DateTime, literalNullInternal(ResolvedType.of(Type.DateTime), 1),
+                    Type.DateTimeOffset, literalNullInternal(ResolvedType.of(Type.DateTimeOffset), 1)
+                    )));
+    //@formatter:on
+
     /** Create a literal null of provided value and size */
     static ValueVector literalNull(ResolvedType type, int size)
+    {
+        if (size == 1)
+        {
+            ValueVector v = ONE_SIZE_NULL_VECTOR_BY_TYPE.get(type.getType());
+            if (v != null)
+            {
+                return v;
+            }
+        }
+        return literalNullInternal(type, size);
+    }
+
+    private static ValueVector literalNullInternal(ResolvedType type, int size)
     {
         return new LiteralValueVector(type, size)
         {
@@ -804,8 +837,64 @@ public interface ValueVector
         };
     }
 
+    //@formatter:off
+    static final List<ValueVector> TRUE_VECTORS = List.of(
+            literalBooleanInternal(true, 1),
+            literalBooleanInternal(true, 2),
+            literalBooleanInternal(true, 3),
+            literalBooleanInternal(true, 4),
+            literalBooleanInternal(true, 5),
+            literalBooleanInternal(true, 6),
+            literalBooleanInternal(true, 7),
+            literalBooleanInternal(true, 8),
+            literalBooleanInternal(true, 9),
+            literalBooleanInternal(true, 10)
+    );
+    static final List<ValueVector> FALSE_VECTORS = List.of(
+            literalBooleanInternal(false, 1),
+            literalBooleanInternal(false, 2),
+            literalBooleanInternal(false, 3),
+            literalBooleanInternal(false, 4),
+            literalBooleanInternal(false, 5),
+            literalBooleanInternal(false, 6),
+            literalBooleanInternal(false, 7),
+            literalBooleanInternal(false, 8),
+            literalBooleanInternal(false, 9),
+            literalBooleanInternal(false, 10)
+    );
+    //@formatter:on
+
     /** Create a literal boolean of provided value and size */
     static ValueVector literalBoolean(boolean value, int size)
+    {
+        if (size == 0)
+        {
+            return empty(ResolvedType.of(Type.Boolean));
+        }
+
+        if (size <= 10)
+        {
+            return value ? TRUE_VECTORS.get(size - 1)
+                    : FALSE_VECTORS.get(size - 1);
+        }
+
+        return new LiteralValueVector(ResolvedType.of(Type.Boolean), size)
+        {
+            @Override
+            public boolean isNull(int row)
+            {
+                return false;
+            }
+
+            @Override
+            public boolean getBoolean(int row)
+            {
+                return value;
+            }
+        };
+    }
+
+    private static ValueVector literalBooleanInternal(boolean value, int size)
     {
         return new LiteralValueVector(ResolvedType.of(Type.Boolean), size)
         {
@@ -867,8 +956,33 @@ public interface ValueVector
         };
     }
 
+    //@formatter:off
+    static final Map<Type, ValueVector> EMPTY_VECTOR_BY_TYPE = unmodifiableMap(new EnumMap<>(
+            Map.of(
+                    Type.Boolean, emptyInternal(ResolvedType.of(Type.Boolean)),
+                    Type.Int, emptyInternal(ResolvedType.of(Type.Int)),
+                    Type.Long, emptyInternal(ResolvedType.of(Type.Long)),
+                    Type.Float, emptyInternal(ResolvedType.of(Type.Float)),
+                    Type.Double, emptyInternal(ResolvedType.of(Type.Double)),
+                    Type.String, emptyInternal(ResolvedType.of(Type.String)),
+                    Type.Decimal, emptyInternal(ResolvedType.of(Type.Decimal)),
+                    Type.DateTime, emptyInternal(ResolvedType.of(Type.DateTime)),
+                    Type.DateTimeOffset, emptyInternal(ResolvedType.of(Type.DateTimeOffset))
+                    )));
+    //@formatter:on
+
     /** Constructs an empty {@link ValueVector} with provided type */
     static ValueVector empty(ResolvedType type)
+    {
+        ValueVector v = EMPTY_VECTOR_BY_TYPE.get(type.getType());
+        if (v != null)
+        {
+            return v;
+        }
+        return emptyInternal(type);
+    }
+
+    private static ValueVector emptyInternal(ResolvedType type)
     {
         return new ValueVector()
         {

@@ -14,7 +14,7 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 /** Decorator for {@link ValueVector} used to remove boiler plate */
 public class ValueVectorAdapter implements ValueVector
 {
-    protected final ValueVector wrapped;
+    protected ValueVector wrapped;
     private final int size;
     private final ResolvedType type;
 
@@ -23,6 +23,12 @@ public class ValueVectorAdapter implements ValueVector
         this.wrapped = requireNonNull(wrapped, "wrapped");
         this.size = wrapped.size();
         this.type = wrapped.type();
+    }
+
+    /** Set the underlying vector. Use with care since this mutates the state. */
+    public void setValueVector(ValueVector vector)
+    {
+        this.wrapped = vector;
     }
 
     @Override

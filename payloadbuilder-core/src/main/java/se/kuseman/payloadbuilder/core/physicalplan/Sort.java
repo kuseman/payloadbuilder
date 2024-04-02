@@ -160,6 +160,21 @@ public class Sort implements IPhysicalPlan
             return 0;
         });
 
+        int columnCount = all.getSchema()
+                .getSize();
+        final ValueVector[] columns = new ValueVector[columnCount];
+        for (int i = 0; i < columnCount; i++)
+        {
+            columns[i] = new ValueVectorAdapter(all.getColumn(i))
+            {
+                @Override
+                protected int getRow(int row)
+                {
+                    return sortIndices[row];
+                }
+            };
+        }
+
         return TupleIterator.singleton(new TupleVector()
         {
             @Override
@@ -177,14 +192,7 @@ public class Sort implements IPhysicalPlan
             @Override
             public ValueVector getColumn(int column)
             {
-                return new ValueVectorAdapter(all.getColumn(column))
-                {
-                    @Override
-                    protected int getRow(int row)
-                    {
-                        return sortIndices[row];
-                    }
-                };
+                return columns[column];
             }
         });
     }

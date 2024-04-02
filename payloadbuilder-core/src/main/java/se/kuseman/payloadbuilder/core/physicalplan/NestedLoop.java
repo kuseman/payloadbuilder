@@ -6,6 +6,7 @@ import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,7 +33,6 @@ import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
-import se.kuseman.payloadbuilder.core.execution.StatementContext;
 import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 import se.kuseman.payloadbuilder.core.execution.vector.TupleVectorBuilder;
@@ -262,11 +262,11 @@ public class NestedLoop implements IPhysicalPlan
         if (condition == null
                 && !outerReferences.isEmpty())
         {
-            return loopIterator((ExecutionContext) context, outerIt, nodeData);
+            return new LoopTupleIterator((ExecutionContext) context, outerIt, nodeData);
         }
         else if (populateAlias != null)
         {
-            return populatingIterator((ExecutionContext) context, outerIt, nodeData);
+            return new PopulatingTupleIterator((ExecutionContext) context, outerIt, nodeData);
         }
 
         /* @formatter:off
@@ -290,6 +290,7 @@ public class NestedLoop implements IPhysicalPlan
             private TupleVector next;
             /** Bit set to keep track of outer matches. Used in left joins to know what outer indices to return */
             private BitSet outerMatches;
+            private CartesianTupleVector cartesian = new CartesianTupleVector();
 
             // The inner schema used when emitting empty outer row, will be the plan schema from start
             // but if there are inner matches before the un matched ones we switch
@@ -429,7 +430,7 @@ public class NestedLoop implements IPhysicalPlan
                     {
                         long time = System.nanoTime();
                         // First construct a cartesian tuple vector that will be the one we run the predicate against
-                        TupleVector cartesian = VectorUtils.cartesian(currentOuter, currentInner);
+                        cartesian.init(currentOuter, currentInner);
                         ValueVector filter = condition.apply(cartesian, context);
 
                         int cardinality = filter.getCardinality();
@@ -553,184 +554,194 @@ public class NestedLoop implements IPhysicalPlan
      * 
      * </pre>
      */
-    private TupleIterator populatingIterator(final ExecutionContext context, final TupleIterator iterator, final LoopNodeData nodeData)
+    private class PopulatingTupleIterator implements TupleIterator
     {
-        return new TupleIterator()
+        private final ExecutionContext context;
+        private final TupleIterator iterator;
+        private final LoopNodeData nodeData;
+
+        private TupleVector concatOfInner;
+        private TupleVector currentOuter;
+        private TupleVector next;
+        /** Bit set to keep track of outer matches. Used in left joins to know what outer indices to return */
+        private BitSet outerMatches;
+        private CartesianTupleVector cartesian = new CartesianTupleVector();
+
+        // The inner schema used when emitting empty outer row, will be the plan schema from start
+        // but if there are inner matches before the un matched ones we switch
+        private Schema innerSchema = inner.getSchema();
+        private boolean innerSchemaAsterisk = SchemaUtils.isAsterisk(innerSchema);
+
+        PopulatingTupleIterator(ExecutionContext context, TupleIterator iterator, LoopNodeData nodeData)
         {
-            private TupleVector concatOfInner;
-            private TupleVector currentOuter;
-            private TupleVector next;
-            /** Bit set to keep track of outer matches. Used in left joins to know what outer indices to return */
-            private BitSet outerMatches;
+            this.context = context;
+            this.iterator = iterator;
+            this.nodeData = nodeData;
+        }
 
-            // The inner schema used when emitting empty outer row, will be the plan schema from start
-            // but if there are inner matches before the un matched ones we switch
-            private Schema innerSchema = inner.getSchema();
-            private boolean innerSchemaAsterisk = SchemaUtils.isAsterisk(innerSchema);
-
-            @Override
-            public TupleVector next()
+        @Override
+        public TupleVector next()
+        {
+            if (next == null)
             {
-                if (next == null)
+                throw new NoSuchElementException();
+            }
+            TupleVector result = next;
+            next = null;
+            return result;
+        }
+
+        @Override
+        public boolean hasNext()
+        {
+            // Concat all inner tuples once if we don't need to push outer reference
+            if (concatOfInner == null
+                    && !pushOuterReference)
+            {
+                concatOfInner = PlanUtils.concat(context.getBufferAllocator(), inner.execute(context));
+                int rowCount = concatOfInner.getRowCount();
+                if (rowCount == 0
+                        && !emitEmptyOuterRows)
                 {
-                    throw new NoSuchElementException();
+                    return false;
                 }
-                TupleVector result = next;
-                next = null;
-                return result;
+                else if (innerSchemaAsterisk
+                        && rowCount > 0)
+                {
+                    // We have an inner schema, switch the plan schema to the runtime one
+                    innerSchema = concatOfInner.getSchema();
+                }
             }
 
-            @Override
-            public boolean hasNext()
+            return setNext();
+        }
+
+        @Override
+        public void close()
+        {
+            iterator.close();
+        }
+
+        private boolean setNext()
+        {
+            while (next == null)
             {
-                // Concat all inner tuples once if we don't need to push outer reference
-                if (concatOfInner == null
-                        && !pushOuterReference)
+                if (context.getSession()
+                        .abortQuery())
                 {
-                    concatOfInner = PlanUtils.concat(context.getBufferAllocator(), inner.execute(context));
-                    int rowCount = concatOfInner.getRowCount();
-                    if (rowCount == 0
-                            && !emitEmptyOuterRows)
+                    return false;
+                }
+
+                if (!iterator.hasNext())
+                {
+                    return false;
+                }
+                else if (currentOuter == null)
+                {
+                    currentOuter = iterator.next();
+
+                    if (currentOuter.getRowCount() <= 0)
                     {
-                        return false;
+                        currentOuter = null;
+                        continue;
                     }
-                    else if (innerSchemaAsterisk
-                            && rowCount > 0)
+
+                    if (emitEmptyOuterRows)
                     {
-                        // We have an inner schema, switch the plan schema to the runtime one
-                        innerSchema = concatOfInner.getSchema();
+                        outerMatches = new BitSet(currentOuter.getRowCount());
+                    }
+                    if (currentOuter.getRowCount() == 0
+                            || (concatOfInner != null
+                                    && concatOfInner.getRowCount() == 0))
+                    {
+                        next = emitEmptyOuterRows ? createUnmatchedOuterTuple(context, innerSchema, outerMatches, currentOuter)
+                                : null;
+                        currentOuter = null;
+                        continue;
                     }
                 }
 
-                return setNext();
-            }
-
-            @Override
-            public void close()
-            {
-                iterator.close();
-            }
-
-            private boolean setNext()
-            {
-                while (next == null)
+                if (condition == null)
                 {
-                    if (context.getSession()
-                            .abortQuery())
+                    // NOTE! No need to mark any unmatched outer rows here since when condition is null emitEmptyOuterRows is never true
+                    // NOTE! Push outer reference is never true here
+                    next = VectorUtils.populateCartesian(currentOuter, concatOfInner, populateAlias);
+                }
+                else
+                {
+                    TupleVector concatOfInner = this.concatOfInner;
+                    if (pushOuterReference)
                     {
-                        return false;
-                    }
+                        ExecutionContext ctx = context;
+                        // Make a copy of the execution context here because we mutable the outer tuple vector
+                        // and we risk evaluating against wrong tuple otherwise if expressions are lazy etc.
+                        ctx = ctx.copy();
+                        // INNER/LEFT joins cannot have outer references, clear
+                        ctx.getStatementContext()
+                                .setOuterTupleVector(null);
+                        ctx.getStatementContext()
+                                .setIndexSeekTupleVector(currentOuter);
 
-                    if (!iterator.hasNext())
-                    {
-                        return false;
-                    }
-                    else if (currentOuter == null)
-                    {
-                        currentOuter = iterator.next();
+                        concatOfInner = PlanUtils.concat(context.getBufferAllocator(), inner.execute(ctx));
 
-                        if (currentOuter.getRowCount() <= 0)
-                        {
-                            currentOuter = null;
-                            continue;
-                        }
-
-                        if (emitEmptyOuterRows)
-                        {
-                            outerMatches = new BitSet(currentOuter.getRowCount());
-                        }
-                        if (currentOuter.getRowCount() == 0
-                                || (concatOfInner != null
-                                        && concatOfInner.getRowCount() == 0))
+                        int rowCount = concatOfInner.getRowCount();
+                        if (rowCount == 0)
                         {
                             next = emitEmptyOuterRows ? createUnmatchedOuterTuple(context, innerSchema, outerMatches, currentOuter)
                                     : null;
                             currentOuter = null;
                             continue;
                         }
+                        else if (innerSchemaAsterisk
+                                && rowCount > 0)
+                        {
+                            // We have an inner schema, switch the plan schema to the runtime one
+                            innerSchema = concatOfInner.getSchema();
+                        }
                     }
 
-                    if (condition == null)
+                    long time = System.nanoTime();
+                    // First construct a cartesian tuple vector that will be the one we run the predicate against
+                    cartesian.init(currentOuter, concatOfInner);
+                    ValueVector filter = condition.apply(cartesian, context);
+
+                    nodeData.predicateTime += TimeUnit.MILLISECONDS.convert(System.nanoTime() - time, TimeUnit.NANOSECONDS);
+
+                    time = System.nanoTime();
+
+                    if (emitEmptyOuterRows)
                     {
-                        // NOTE! No need to mark any unmatched outer rows here since when condition is null emitEmptyOuterRows is never true
-                        // NOTE! Push outer reference is never true here
-                        next = VectorUtils.populateCartesian(currentOuter, concatOfInner, populateAlias);
+                        markMatchedRows(outerMatches, filter, concatOfInner);
+                    }
+
+                    TupleVector unmatched = emitEmptyOuterRows ? createUnmatchedOuterTuple(context, innerSchema, outerMatches, currentOuter)
+                            : null;
+
+                    if (filter.getCardinality() == 0)
+                    {
+                        next = unmatched;
                     }
                     else
                     {
-                        TupleVector concatOfInner = this.concatOfInner;
-                        if (pushOuterReference)
+                        TupleVectorBuilder b = new TupleVectorBuilder(context.getBufferAllocator(), currentOuter.getRowCount());
+                        b.appendPopulate(cartesian, filter, currentOuter, concatOfInner, populateAlias);
+                        if (unmatched != null)
                         {
-                            ExecutionContext ctx = context;
-                            // Make a copy of the execution context here because we mutable the outer tuple vector
-                            // and we risk evaluating against wrong tuple otherwise if expressions are lazy etc.
-                            ctx = ctx.copy();
-                            // INNER/LEFT joins cannot have outer references, clear
-                            ctx.getStatementContext()
-                                    .setOuterTupleVector(null);
-                            ctx.getStatementContext()
-                                    .setIndexSeekTupleVector(currentOuter);
-
-                            concatOfInner = PlanUtils.concat(context.getBufferAllocator(), inner.execute(ctx));
-
-                            int rowCount = concatOfInner.getRowCount();
-                            if (rowCount == 0)
-                            {
-                                next = emitEmptyOuterRows ? createUnmatchedOuterTuple(context, innerSchema, outerMatches, currentOuter)
-                                        : null;
-                                currentOuter = null;
-                                continue;
-                            }
-                            else if (innerSchemaAsterisk
-                                    && rowCount > 0)
-                            {
-                                // We have an inner schema, switch the plan schema to the runtime one
-                                innerSchema = concatOfInner.getSchema();
-                            }
+                            b.append(unmatched);
                         }
 
-                        long time = System.nanoTime();
-                        // First construct a cartesian tuple vector that will be the one we run the predicate against
-                        TupleVector cartesian = VectorUtils.cartesian(currentOuter, concatOfInner);
-                        ValueVector filter = condition.apply(cartesian, context);
-
-                        nodeData.predicateTime += TimeUnit.MILLISECONDS.convert(System.nanoTime() - time, TimeUnit.NANOSECONDS);
-
-                        time = System.nanoTime();
-
-                        if (emitEmptyOuterRows)
-                        {
-                            markMatchedRows(outerMatches, filter, concatOfInner);
-                        }
-
-                        TupleVector unmatched = emitEmptyOuterRows ? createUnmatchedOuterTuple(context, innerSchema, outerMatches, currentOuter)
-                                : null;
-
-                        if (filter.getCardinality() == 0)
-                        {
-                            next = unmatched;
-                        }
-                        else
-                        {
-                            TupleVectorBuilder b = new TupleVectorBuilder(context.getBufferAllocator(), currentOuter.getRowCount());
-                            b.appendPopulate(cartesian, filter, currentOuter, concatOfInner, populateAlias);
-                            if (unmatched != null)
-                            {
-                                b.append(unmatched);
-                            }
-
-                            next = b.build();
-                        }
-
-                        nodeData.tupleBuildTime += TimeUnit.MILLISECONDS.convert(System.nanoTime() - time, TimeUnit.NANOSECONDS);
+                        next = b.build();
                     }
-                    currentOuter = null;
-                }
 
-                return true;
+                    nodeData.tupleBuildTime += TimeUnit.MILLISECONDS.convert(System.nanoTime() - time, TimeUnit.NANOSECONDS);
+                }
+                currentOuter = null;
             }
-        };
+
+            return true;
+        }
     }
+    // }
 
     /**
      * Create an loop iterator where inner is executed row by row and not vector by vector.
@@ -744,65 +755,113 @@ public class NestedLoop implements IPhysicalPlan
      * are the matched ones
      * </pre>
      */
-    private TupleIterator loopIterator(final ExecutionContext context, final TupleIterator iterator, final LoopNodeData nodeData)
+
+    private class LoopTupleIterator implements TupleIterator
     {
-        final StatementContext statementContext = context.getStatementContext();
-        final TupleVector prevOuter = statementContext.getOuterTupleVector();
+        private final ExecutionContext context;
+        private final TupleIterator iterator;
+        private final LoopNodeData nodeData;
 
-        return new TupleIterator()
+        /**
+         * <pre>
+         * We use mutable vectors here during joins this to lower the amount of allocations.
+         * This is a risk but there are safe guards
+         *  - We seal the vectors when we return resulting vectors which means that wrongly implemented
+         *    functions/expressions will crash and we catch this early
+         *  - In each iteration we copy the result vectors values and hence we are safe to modify the state
+         *    between iterations
+         * </pre>
+         */
+        private final OuterTupleVector outerTupleVector;
+        private final RowTupleVector rowTupleVector = new RowTupleVector();
+
+        private final CartesianTupleVector cartesian = new CartesianTupleVector();
+        private TupleVector currentOuter;
+        private TupleVector next;
+        // The inner schema used when emitting empty outer row, will be the plan schema from start
+        // but if there are inner matches before the un matched ones we switch
+        private Schema innerSchema = inner.getSchema();
+        private boolean innerSchemaAsterisk = SchemaUtils.isAsterisk(innerSchema);
+
+        LoopTupleIterator(ExecutionContext context, TupleIterator iterator, LoopNodeData nodeData)
         {
-            private TupleVector currentOuter;
-            private TupleVector next;
-            // The inner schema used when emitting empty outer row, will be the plan schema from start
-            // but if there are inner matches before the un matched ones we switch
-            private Schema innerSchema = inner.getSchema();
-            private boolean innerSchemaAsterisk = SchemaUtils.isAsterisk(innerSchema);
+            this.context = context;
+            this.iterator = iterator;
+            this.nodeData = nodeData;
+            this.outerTupleVector = new OuterTupleVector(context.getStatementContext()
+                    .getOuterTupleVector());
+        }
 
-            @Override
-            public TupleVector next()
+        @Override
+        public TupleVector next()
+        {
+            if (next == null)
             {
-                if (next == null)
+                throw new NoSuchElementException();
+            }
+            // We seal the mutable vectors when we return the result, this to catch
+            // wrongly implemented function/expressions
+            rowTupleVector.sealed = true;
+            outerTupleVector.sealed = true;
+            TupleVector result = next;
+            next = null;
+            return result;
+        }
+
+        @Override
+        public boolean hasNext()
+        {
+            return setNext();
+        }
+
+        @Override
+        public void close()
+        {
+            rowTupleVector.sealed = true;
+            outerTupleVector.sealed = true;
+            iterator.close();
+        }
+
+        private boolean setNext()
+        {
+            while (next == null)
+            {
+                if (context.getSession()
+                        .abortQuery())
                 {
-                    throw new NoSuchElementException();
+                    return false;
                 }
-                TupleVector result = next;
-                next = null;
-                return result;
-            }
 
-            @Override
-            public boolean hasNext()
-            {
-                return setNext();
-            }
-
-            @Override
-            public void close()
-            {
-                iterator.close();
-            }
-
-            private Schema getOuterSchema(TupleVector outer)
-            {
-                if (prevOuter == null)
+                if (!iterator.hasNext())
                 {
-                    return outer.getSchema();
+                    return false;
+                }
+                else if (currentOuter == null)
+                {
+                    currentOuter = iterator.next();
                 }
 
-                List<Column> columns = new ArrayList<>(prevOuter.getSchema()
-                        .getSize()
-                        + outer.getSchema()
-                                .getSize());
-                columns.addAll(prevOuter.getSchema()
-                        .getColumns());
-                columns.addAll(outer.getSchema()
-                        .getColumns());
-                return new Schema(columns);
-            }
+                int rowCount = currentOuter.getRowCount();
 
-            private boolean setNext()
-            {
-                while (next == null)
+                if (rowCount <= 0)
+                {
+                    currentOuter = null;
+                    continue;
+                }
+
+                BitSet outerMatches = null;
+                if (emitEmptyOuterRows)
+                {
+                    outerMatches = new BitSet(rowCount);
+                }
+                TupleVectorBuilder builder = null;
+
+                rowTupleVector.sealed = false;
+                outerTupleVector.sealed = false;
+                rowTupleVector.init(currentOuter);
+                outerTupleVector.init(rowTupleVector);
+
+                for (int i = 0; i < rowCount; i++)
                 {
                     if (context.getSession()
                             .abortQuery())
@@ -810,150 +869,119 @@ public class NestedLoop implements IPhysicalPlan
                         return false;
                     }
 
-                    if (!iterator.hasNext())
-                    {
-                        return false;
-                    }
-                    else if (currentOuter == null)
-                    {
-                        currentOuter = iterator.next();
-                    }
+                    rowTupleVector.row = i;
 
-                    int rowCount = currentOuter.getRowCount();
-
-                    if (rowCount <= 0)
+                    // Make a copy of the execution context here because we mutate the outer tuple vector
+                    // and we risk evaluating against wrong outer tuple otherwise
+                    ExecutionContext executionContext = context;
+                    if (pushOuterReference)
                     {
-                        currentOuter = null;
-                        continue;
+                        executionContext = executionContext.copy();
+                        executionContext.getStatementContext()
+                                .setOuterTupleVector(outerTupleVector);
                     }
 
-                    BitSet outerMatches = null;
-                    if (emitEmptyOuterRows)
-                    {
-                        outerMatches = new BitSet(rowCount);
-                    }
-                    TupleVectorBuilder builder = null;
+                    TupleIterator innerIt = inner.execute(executionContext);
+                    boolean matched = false;
 
-                    Schema outerSchema = getOuterSchema(currentOuter);
-
-                    for (int i = 0; i < rowCount; i++)
+                    if (populateAlias != null)
                     {
-                        if (context.getSession()
-                                .abortQuery())
+                        TupleVector concatOfInner = PlanUtils.concat(executionContext.getBufferAllocator(), innerIt);
+                        if (concatOfInner.getRowCount() > 0)
                         {
-                            return false;
-                        }
-
-                        TupleVector outer = new RowTupleVector(currentOuter, i);
-                        // Make a copy of the execution context here because we mutate the outer tuple vector
-                        // and we risk evaluating against wrong outer tuple otherwise
-                        ExecutionContext executionContext = context;
-                        if (pushOuterReference)
-                        {
-                            executionContext = executionContext.copy();
-                            executionContext.getStatementContext()
-                                    .setOuterTupleVector(concatOuter(prevOuter, outer, outerSchema));
-                        }
-
-                        TupleIterator innerIt = inner.execute(executionContext);
-                        boolean matched = false;
-
-                        if (populateAlias != null)
-                        {
-                            TupleVector concatOfInner = PlanUtils.concat(executionContext.getBufferAllocator(), innerIt);
-                            if (concatOfInner.getRowCount() > 0)
+                            // Use the first vectors schema as inner
+                            if (innerSchemaAsterisk)
                             {
-                                // Use the first vectors schema as inner
-                                if (innerSchemaAsterisk)
-                                {
-                                    innerSchema = concatOfInner.getSchema();
-                                    innerSchemaAsterisk = false;
-                                }
-
-                                // CSOFF
-                                long time = System.nanoTime();
-                                // CSON
-
-                                matched = true;
-                                if (builder == null)
-                                {
-                                    builder = new TupleVectorBuilder(executionContext.getBufferAllocator(), rowCount);
-                                }
-
-                                builder.append(VectorUtils.populateCartesian(outer, concatOfInner, populateAlias));
-
-                                nodeData.tupleBuildTime += TimeUnit.MILLISECONDS.convert(System.nanoTime() - time, TimeUnit.NANOSECONDS);
+                                innerSchema = concatOfInner.getSchema();
+                                innerSchemaAsterisk = false;
                             }
-                        }
-                        else
-                        {
-                            try
+
+                            // CSOFF
+                            long time = System.nanoTime();
+                            // CSON
+
+                            matched = true;
+                            if (builder == null)
                             {
-                                while (innerIt.hasNext())
-                                {
-                                    TupleVector inner = innerIt.next();
-                                    if (inner.getRowCount() > 0)
-                                    {
-                                        // Use the first vectors schema as inner
-                                        if (innerSchemaAsterisk)
-                                        {
-                                            innerSchema = inner.getSchema();
-                                            innerSchemaAsterisk = false;
-                                        }
-
-                                        // CSOFF
-                                        long time = System.nanoTime();
-                                        // CSON
-                                        matched = true;
-
-                                        if (builder == null)
-                                        {
-                                            builder = new TupleVectorBuilder(executionContext.getBufferAllocator(), (int) (rowCount * inner.getRowCount() * 1.1));
-                                        }
-
-                                        builder.append(VectorUtils.cartesian(outer, inner));
-
-                                        nodeData.tupleBuildTime += TimeUnit.MILLISECONDS.convert(System.nanoTime() - time, TimeUnit.NANOSECONDS);
-                                    }
-                                }
+                                builder = new TupleVectorBuilder(executionContext.getBufferAllocator(), rowCount);
                             }
-                            finally
-                            {
-                                innerIt.close();
-                            }
+
+                            builder.append(VectorUtils.populateCartesian(rowTupleVector, concatOfInner, populateAlias));
+
+                            nodeData.tupleBuildTime += TimeUnit.MILLISECONDS.convert(System.nanoTime() - time, TimeUnit.NANOSECONDS);
                         }
-
-                        if (emitEmptyOuterRows)
-                        {
-                            outerMatches.set(i, matched);
-                        }
-                    }
-
-                    long time = System.nanoTime();
-
-                    TupleVector unmatchedOuter = emitEmptyOuterRows ? createUnmatchedOuterTuple(context, innerSchema, outerMatches, currentOuter)
-                            : null;
-
-                    if (builder == null)
-                    {
-                        next = unmatchedOuter;
                     }
                     else
                     {
-                        if (unmatchedOuter != null)
+                        try
                         {
-                            builder.append(unmatchedOuter);
-                        }
-                        next = builder.build();
-                    }
-                    currentOuter = null;
+                            while (innerIt.hasNext())
+                            {
+                                TupleVector inner = innerIt.next();
+                                if (inner.getRowCount() > 0)
+                                {
+                                    // Use the first vectors schema as inner
+                                    if (innerSchemaAsterisk)
+                                    {
+                                        innerSchema = inner.getSchema();
+                                        innerSchemaAsterisk = false;
+                                    }
 
-                    nodeData.tupleBuildTime += TimeUnit.MILLISECONDS.convert(System.nanoTime() - time, TimeUnit.NANOSECONDS);
+                                    // CSOFF
+                                    long time = System.nanoTime();
+                                    // CSON
+                                    matched = true;
+
+                                    if (builder == null)
+                                    {
+                                        builder = new TupleVectorBuilder(executionContext.getBufferAllocator(), (int) (rowCount * inner.getRowCount() * 1.1));
+                                    }
+
+                                    cartesian.init(rowTupleVector, inner);
+
+                                    builder.append(cartesian);
+
+                                    nodeData.tupleBuildTime += TimeUnit.MILLISECONDS.convert(System.nanoTime() - time, TimeUnit.NANOSECONDS);
+                                }
+                            }
+                        }
+                        finally
+                        {
+                            innerIt.close();
+                        }
+                    }
+
+                    if (emitEmptyOuterRows)
+                    {
+                        outerMatches.set(i, matched);
+                    }
                 }
 
-                return true;
+                long time = System.nanoTime();
+
+                TupleVector unmatchedOuter = emitEmptyOuterRows ? createUnmatchedOuterTuple(context, innerSchema, outerMatches, currentOuter)
+                        : null;
+
+                if (builder == null)
+                {
+                    next = unmatchedOuter;
+                }
+                else
+                {
+                    if (unmatchedOuter != null)
+                    {
+                        builder.append(unmatchedOuter);
+                    }
+                    next = builder.build();
+                }
+                currentOuter = null;
+
+                nodeData.tupleBuildTime += TimeUnit.MILLISECONDS.convert(System.nanoTime() - time, TimeUnit.NANOSECONDS);
             }
-        };
+
+            return true;
+        }
+
     }
 
     /** Creates a tuple vector with non matched outer rows. Used i left joins */
@@ -1067,16 +1095,275 @@ public class NestedLoop implements IPhysicalPlan
         long tupleBuildTime;
     }
 
+    /** Vector implementation used when having outer references chain in loop */
+    private static class OuterTupleVector implements TupleVector
+    {
+        private final TupleVector prevOuter;
+        private final Schema prevOuterSchema;
+        private final int prevOuterSize;
+        private TupleVector outer;
+        private Schema outerSchema;
+        private Schema schema;
+        private OuterColumnVector[] columns;
+        private boolean sealed;
+
+        OuterTupleVector(TupleVector prevOuter)
+        {
+            this.prevOuter = prevOuter;
+            this.prevOuterSchema = prevOuter != null ? prevOuter.getSchema()
+                    : null;
+            this.prevOuterSize = prevOuter != null ? prevOuter.getSchema()
+                    .getSize()
+                    : 0;
+        }
+
+        void init(TupleVector outer)
+        {
+            if (prevOuter != null
+                    && outer.getRowCount() != prevOuter.getRowCount())
+            {
+                throw new IllegalArgumentException("Vectors must have equal row counts");
+            }
+
+            this.outer = outer;
+            // Re-create the resulting schema if changed since last iteration
+            if (!Objects.equals(outerSchema, outer.getSchema()))
+            {
+                this.outerSchema = outer.getSchema();
+                this.schema = SchemaUtils.concat(prevOuterSchema, outerSchema);
+            }
+
+            int columnCount = schema.getSize();
+            if (columns == null)
+            {
+                columns = new OuterColumnVector[columnCount];
+            }
+            else if (columns.length < columnCount)
+            {
+                columns = Arrays.copyOf(columns, columnCount);
+            }
+
+            for (int i = 0; i < columnCount; i++)
+            {
+                ValueVector vector;
+
+                if (i < prevOuterSize)
+                {
+                    vector = prevOuter.getColumn(i);
+                }
+                else
+                {
+                    vector = outer.getColumn(i - prevOuterSize);
+                }
+
+                OuterColumnVector ocv = columns[i];
+                if (ocv == null)
+                {
+                    ocv = new OuterColumnVector(vector);
+                    columns[i] = ocv;
+                }
+                else
+                {
+                    ocv.setValueVector(vector);
+                }
+            }
+        }
+
+        @Override
+        public int getRowCount()
+        {
+            return outer.getRowCount();
+        }
+
+        @Override
+        public Schema getSchema()
+        {
+            return schema;
+        }
+
+        @Override
+        public ValueVector getColumn(int column)
+        {
+            return columns[column];
+        }
+
+        private class OuterColumnVector extends ValueVectorAdapter
+        {
+            OuterColumnVector(ValueVector vector)
+            {
+                super(vector);
+            }
+
+            @Override
+            public int size()
+            {
+                return outer.getRowCount();
+            }
+
+            @Override
+            protected int getRow(int row)
+            {
+                if (sealed)
+                {
+                    throw new IllegalArgumentException("This vector is sealed and should not be used, check implementation of eval and make sure to copy values and not create lazy constructs.");
+                }
+
+                return super.getRow(row);
+            }
+        }
+    }
+
+    /**
+     * Implementation of TupleVector that makes a cartesian product between to vectors. This by not copying the contents but instead replicates the columns.
+     */
+    private static class CartesianTupleVector implements TupleVector
+    {
+        private Schema outerSchema;
+        private Schema innerSchema;
+
+        /** Resulting schema of the joined vectors */
+        private Schema schema;
+        private CartesianColumn[] columns;
+        private int rowCount;
+
+        /** Inits this vector with new outer/inner vectors. Calculates new schemas etc. */
+        void init(TupleVector outer, TupleVector inner)
+        {
+            this.rowCount = outer.getRowCount() * inner.getRowCount();
+
+            // Recalculate resulting schema if differs
+            if (!Objects.equals(outerSchema, outer.getSchema())
+                    || !Objects.equals(innerSchema, inner.getSchema()))
+            {
+                this.outerSchema = outer.getSchema();
+                this.innerSchema = inner.getSchema();
+                this.schema = SchemaUtils.concat(outerSchema, innerSchema);
+            }
+
+            int columnCount = schema.getSize();
+            if (columns == null)
+            {
+                columns = new CartesianColumn[columnCount];
+            }
+            else if (columns.length < columnCount)
+            {
+                columns = Arrays.copyOf(columns, columnCount);
+            }
+
+            // Initalize the columns
+            int innerRowCount = inner.getRowCount();
+            int outerSize = outerSchema.getSize();
+            for (int i = 0; i < columnCount; i++)
+            {
+                boolean isOuter = i < outerSize;
+                ValueVector vector;
+                if (isOuter)
+                {
+                    vector = outer.getColumn(i);
+                }
+                else
+                {
+                    vector = inner.getColumn(i - outerSize);
+                }
+
+                CartesianColumn cc = columns[i];
+                if (cc == null)
+                {
+                    cc = new CartesianColumn(vector);
+                    columns[i] = cc;
+                }
+                else
+                {
+                    cc.setValueVector(vector);
+                }
+                cc.innerRowCount = innerRowCount;
+                cc.isOuter = isOuter;
+            }
+        }
+
+        @Override
+        public int getRowCount()
+        {
+            return rowCount;
+        }
+
+        @Override
+        public ValueVector getColumn(int column)
+        {
+            return columns[column];
+        }
+
+        @Override
+        public Schema getSchema()
+        {
+            return schema;
+        }
+
+        static class CartesianColumn extends ValueVectorAdapter
+        {
+            private int rowCount;
+            private boolean isOuter;
+            private int innerRowCount;
+
+            CartesianColumn(ValueVector vector)
+            {
+                super(vector);
+            }
+
+            @Override
+            public int size()
+            {
+                return rowCount;
+            }
+
+            @Override
+            protected int getRow(int row)
+            {
+                if (isOuter)
+                {
+                    return row / innerRowCount;
+                }
+                return row % innerRowCount;
+            }
+        }
+    }
+
     /** Tuple vector that wraps another tuple vector for a single row */
     private static class RowTupleVector implements TupleVector
     {
-        private final TupleVector wrapped;
-        private final int row;
+        private TupleVector wrapped;
+        private int row;
+        private RowColumnVector[] columns;
+        private boolean sealed = false;
 
-        RowTupleVector(TupleVector wrapped, int row)
+        void init(TupleVector wrapped)
         {
             this.wrapped = wrapped;
-            this.row = row;
+
+            int columnCount = wrapped.getSchema()
+                    .getSize();
+            if (columns == null)
+            {
+                columns = new RowColumnVector[columnCount];
+            }
+            else if (columns.length < columnCount)
+            {
+                columns = Arrays.copyOf(columns, columnCount);
+            }
+
+            for (int i = 0; i < columnCount; i++)
+            {
+                RowColumnVector rcv = columns[i];
+                if (rcv == null)
+                {
+                    rcv = new RowColumnVector(wrapped.getColumn(i));
+                    columns[i] = rcv;
+                }
+                else
+                {
+                    rcv.setValueVector(wrapped.getColumn(i));
+                }
+            }
         }
 
         @Override
@@ -1094,66 +1381,33 @@ public class NestedLoop implements IPhysicalPlan
         @Override
         public ValueVector getColumn(int column)
         {
-            return new ValueVectorAdapter(wrapped.getColumn(column))
-            {
-                @Override
-                public int size()
-                {
-                    return 1;
-                }
+            return columns[column];
+        }
 
-                @Override
-                protected int getRow(int row)
-                {
-                    // We always return the single wrapped index
-                    return RowTupleVector.this.row;
-                }
-            };
-        }
-    }
-
-    /**
-     * Concats two vectors into one. Takes all columns from the first one and appends to the second one. Requires that both vectors has the same row counts
-     */
-    private static TupleVector concatOuter(final TupleVector vector1, final TupleVector vector2, final Schema schema)
-    {
-        if (vector2 == null)
+        private class RowColumnVector extends ValueVectorAdapter
         {
-            return vector1;
-        }
-        else if (vector1 == null)
-        {
-            return vector2;
-        }
-        if (vector1.getRowCount() != vector2.getRowCount())
-        {
-            throw new IllegalArgumentException("Vectors must have equal row counts");
-        }
-        final int size1 = vector1.getSchema()
-                .getSize();
-        return new TupleVector()
-        {
-            @Override
-            public Schema getSchema()
+            RowColumnVector(ValueVector vector)
             {
-                return schema;
+                super(vector);
             }
 
             @Override
-            public int getRowCount()
+            public int size()
             {
-                return vector1.getRowCount();
+                return 1;
             }
 
             @Override
-            public ValueVector getColumn(int column)
+            protected int getRow(int row)
             {
-                if (column < size1)
+                if (sealed)
                 {
-                    return vector1.getColumn(column);
+                    throw new IllegalArgumentException("This vector is sealed and should not be used, check implementation of eval and make sure to copy values and not create lazy constructs.");
                 }
-                return vector2.getColumn(column - size1);
+
+                // We always return the single wrapped index
+                return RowTupleVector.this.row;
             }
-        };
+        }
     }
 }

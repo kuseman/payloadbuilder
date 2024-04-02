@@ -306,6 +306,11 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         long queryTime = sw.getTime(TimeUnit.MILLISECONDS);
         session.setLastQueryExecutionTime(queryTime);
         session.setLastQueryRowCount(rowCount);
+
+        // TODO: Reuse buffer allocator
+        // Build a buffer allocator that keeps all allocated buffers in internal lists
+        // When we have written the result we can clear the buffer allocator and make it
+        // reused for next query
     }
 
     /* Non executable statements */
