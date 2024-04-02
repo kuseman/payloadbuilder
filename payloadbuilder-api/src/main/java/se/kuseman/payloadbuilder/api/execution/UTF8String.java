@@ -45,11 +45,18 @@ public class UTF8String implements Comparable<UTF8String>
         this.length = length;
     }
 
-    /** Return the underlying utf8 bytes for this string */
+    /** Return a copy of the underlying utf8 bytes for this string */
     public byte[] getBytes()
     {
         getBytesInternal();
         return Arrays.copyOfRange(bytes, offset, offset + length);
+    }
+
+    /** Return the bytes of this instance into destination byte array. Caller is responsible for correct length */
+    public void getBytes(byte[] destination)
+    {
+        getBytesInternal();
+        System.arraycopy(this.bytes, offset, destination, 0, length);
     }
 
     /** Compare this reference to another bytes reference */
@@ -146,8 +153,14 @@ public class UTF8String implements Comparable<UTF8String>
         return false;
     }
 
+    /** Returns true if this instance has a {@link java.lang.String} instance. */
+    public boolean hasString()
+    {
+        return string != null;
+    }
+
     /** Return the byte length of this instance. */
-    private int getByteLength()
+    public int getByteLength()
     {
         getBytesInternal();
         return length;
