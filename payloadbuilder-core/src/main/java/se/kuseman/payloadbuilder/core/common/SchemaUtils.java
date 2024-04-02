@@ -1,5 +1,6 @@
 package se.kuseman.payloadbuilder.core.common;
 
+import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,9 +40,30 @@ public class SchemaUtils
         {
             return schema1;
         }
-        List<Column> columns = new ArrayList<>(schema1.getSize() + schema2.getSize());
-        columns.addAll(schema1.getColumns());
-        columns.addAll(schema2.getColumns());
+
+        List<Column> columns1 = schema1.getColumns();
+        List<Column> columns2 = schema2.getColumns();
+
+        int size1 = columns1.size();
+        int size = size1 + columns2.size();
+        List<Column> columns = new AbstractList<>()
+        {
+            @Override
+            public int size()
+            {
+                return size;
+            }
+
+            @Override
+            public Column get(int index)
+            {
+                if (index < size1)
+                {
+                    return columns1.get(index);
+                }
+                return columns2.get(index - size1);
+            }
+        };
         return new Schema(columns);
     }
 

@@ -109,6 +109,12 @@ public class TupleVectorBuilder
         append(vector, 0, vector.getRowCount());
     }
 
+    /** Append a single row from vector to builder. */
+    public void append(TupleVector vector, int row)
+    {
+        append(vector, row, row + 1);
+    }
+
     /** Append a vector appending it's vectors to buffers using provided filter */
     public void append(TupleVector vector, ValueVector filter)
     {
