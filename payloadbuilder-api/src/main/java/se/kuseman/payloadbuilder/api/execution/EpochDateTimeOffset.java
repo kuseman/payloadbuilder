@@ -16,11 +16,12 @@ import java.time.temporal.TemporalUnit;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 
 /**
  * Data type class for {@link Column.Type#DateTimeOffset}. Extends {@link EpochDateTime} with a timezone
  */
-public class EpochDateTimeOffset implements Comparable<EpochDateTimeOffset>
+public class EpochDateTimeOffset implements Comparable<EpochDateTimeOffset>, ValueVector
 {
     private static final DateTimeFormatter ISO_DATE_OPTIONAL_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd['T'HH:mm[:ss][.nnnnnnnnn][.[SSS][SS][S]][xxx][X]]");
 
@@ -42,6 +43,34 @@ public class EpochDateTimeOffset implements Comparable<EpochDateTimeOffset>
                 .toEpochMilli();
         this.zoneId = dateTime.getZone();
     }
+
+    // ValueVector
+
+    @Override
+    public int size()
+    {
+        return 1;
+    }
+
+    @Override
+    public ResolvedType type()
+    {
+        return ResolvedType.of(Type.DateTimeOffset);
+    }
+
+    @Override
+    public boolean isNull(int row)
+    {
+        return false;
+    }
+
+    @Override
+    public EpochDateTimeOffset getDateTimeOffset(int row)
+    {
+        return this;
+    }
+
+    // End ValueVector
 
     public long getEpoch()
     {

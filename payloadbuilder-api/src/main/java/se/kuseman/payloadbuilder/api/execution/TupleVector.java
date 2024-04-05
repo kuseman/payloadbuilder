@@ -1,14 +1,70 @@
 package se.kuseman.payloadbuilder.api.execution;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.utils.StringUtils;
 
 /** Definition of a TupleVector. Consists of a {@link Schema} and a list of {@link ValueVector}'s */
 public interface TupleVector
 {
+    int getRowCount();
+
+    /**
+     * Return vector for provided column. NOTE! Returned value might not be thread safe.
+     */
+    ValueVector getColumn(int column);
+
+    /**
+     * Return the actual schema from the vector. If this tuple vector resides from a schema less query then this is the actual columns resolved runtime else this schema should match the compile time
+     * schema that the data source had
+     */
+    Schema getSchema();
+
+    /** Copy one row from this instance into a new tuple vector. */
+    default TupleVector copy(int row)
+    {
+        Schema schema = getSchema();
+        int size = schema.getSize();
+        List<ValueVector> vectors = new ArrayList<>(size);
+        for (int i = 0; i < size; i++)
+        {
+            ValueVector vector = getColumn(i);
+            Type type = vector.type()
+                    .getType();
+            ResolvedType schemaType = schema.getColumns()
+                    .get(i)
+                    .getType();
+            if (vector.isNull(row))
+            {
+                vectors.add(ValueVector.literalNull(schemaType, 1));
+                continue;
+            }
+
+            vectors.add(switch (type)
+            {
+                case Any -> ValueVector.literalAny(1, vector.getAny(row));
+                case Array -> ValueVector.literalArray(vector.getArray(row), schemaType, 1);
+                case Boolean -> ValueVector.literalBoolean(vector.getBoolean(row), 1);
+                case DateTime -> vector.getDateTime(row);
+                case DateTimeOffset -> vector.getDateTimeOffset(row);
+                case Decimal -> vector.getDecimal(row);
+                case String -> vector.getString(row);
+                case Double -> ValueVector.literalDouble(vector.getDouble(row), 1);
+                case Float -> ValueVector.literalFloat(vector.getFloat(row), 1);
+                case Int -> ValueVector.literalInt(vector.getInt(row), 1);
+                case Long -> ValueVector.literalLong(vector.getLong(row), 1);
+                case Object -> ValueVector.literalObject(vector.getObject(row), 1);
+                case Table -> ValueVector.literalTable(vector.getTable(row), schemaType, 1);
+            });
+        }
+        return of(schema, vectors);
+    }
+
     static final TupleVector EMPTY = new TupleVector()
     {
         @Override
@@ -51,19 +107,6 @@ public interface TupleVector
             throw new IllegalArgumentException("Constant has no columns");
         }
     };
-
-    int getRowCount();
-
-    /**
-     * Return vector for provided column. NOTE! Returned value might not be thread safe.
-     */
-    ValueVector getColumn(int column);
-
-    /**
-     * Return the actual schema from the vector. If this tuple vector resides from a schema less query then this is the actual columns resolved runtime else this schema should match the compile time
-     * schema that the data source had
-     */
-    Schema getSchema();
 
     /** Construct a {@link TupleVector} from provided columns and schema */
     static TupleVector of(final Schema schema, final ValueVector... columns)

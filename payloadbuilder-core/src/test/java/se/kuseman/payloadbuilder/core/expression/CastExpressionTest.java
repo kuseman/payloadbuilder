@@ -97,12 +97,12 @@ public class CastExpressionTest extends APhysicalPlanTest
         // Cast to array
         ce = new CastExpression(ce("stringInt"), ResolvedType.array(Type.Any));
         actual = ce.eval(input, context);
-        assertVectorsEquals(vv(ResolvedType.array(Type.Any), vv(ResolvedType.of(Type.Any), "1"), vv(ResolvedType.of(Type.Any), "2"), null, vv(ResolvedType.of(Type.Any), "4")), actual);
+        assertVectorsEquals(vv(ResolvedType.array(Type.Any), vv(ResolvedType.of(Type.String), "1"), vv(ResolvedType.of(Type.String), "2"), null, vv(ResolvedType.of(Type.String), "4")), actual);
 
         // Cast to value vector
         ce = new CastExpression(ce("stringInt"), ResolvedType.array(Type.Any));
         actual = ce.eval(input, context);
-        assertVectorsEquals(vv(ResolvedType.array(Type.Any), vv(ResolvedType.of(Type.Any), "1"), vv(ResolvedType.of(Type.Any), "2"), null, vv(ResolvedType.of(Type.Any), "4")), actual);
+        assertVectorsEquals(vv(ResolvedType.array(Type.Any), vv(ResolvedType.of(Type.String), "1"), vv(ResolvedType.of(Type.String), "2"), null, vv(ResolvedType.of(Type.String), "4")), actual);
 
         // Cast to value vector
         ce = new CastExpression(ce("anyValueVector"), ResolvedType.array(Type.Any));

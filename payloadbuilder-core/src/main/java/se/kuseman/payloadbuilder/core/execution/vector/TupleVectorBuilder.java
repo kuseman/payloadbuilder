@@ -106,6 +106,12 @@ public class TupleVectorBuilder
     /** Append a vector to builder, appending it's vectors to buffers */
     public void append(TupleVector vector)
     {
+        if (vector.getRowCount() == 0
+                && vector.getSchema()
+                        .getSize() == 0)
+        {
+            return;
+        }
         append(vector, 0, vector.getRowCount());
     }
 

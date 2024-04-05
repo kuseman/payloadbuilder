@@ -93,8 +93,16 @@ class ObjectBufferVectorBuilder extends ABufferVectorBuilder implements IObjectV
                             : currentValue, type, size);
         }
 
+        Map<Object, Object> internCache = null;
+
         // Intern every value in buffer to let duplicate values be GC:ed
-        Map<Object, Object> internCache = new HashMap<>(size + 1, 1.0f);
+        // We only do this for non complex values since, arrays/objects/tables don't implement hashcode/equals anyways
+        if (!type.getType()
+                .isComplex())
+        {
+            internCache = new HashMap<>(size + 1, 1.0f);
+        }
+
         for (int i = 0; i < size; i++)
         {
             Object value = buffer.get(i);
@@ -106,7 +114,11 @@ class ObjectBufferVectorBuilder extends ABufferVectorBuilder implements IObjectV
                 {
                     value = UTF8String.from(buffer.get(i));
                 }
-                value = internCache.computeIfAbsent(value, v -> v);
+
+                if (internCache != null)
+                {
+                    value = internCache.computeIfAbsent(value, v -> v);
+                }
                 buffer.set(i, value);
             }
         }

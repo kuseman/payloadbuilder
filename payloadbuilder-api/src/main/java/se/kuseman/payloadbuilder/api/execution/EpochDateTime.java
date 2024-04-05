@@ -16,11 +16,12 @@ import java.time.temporal.TemporalUnit;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 
 /**
  * Data type class for {@link Column.Type#DateTime}. Uses a long UTC epoch for internal storage/comparison.
  */
-public class EpochDateTime implements Comparable<EpochDateTime>
+public class EpochDateTime implements Comparable<EpochDateTime>, ValueVector
 {
     static final ZoneId UTC = ZoneId.of("UTC");
     private static final DateTimeFormatter ISO_DATE_OPTIONAL_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd['T'HH:mm[:ss][.nnnnnnnnn][[.SSS][.SS][.S]][X]]");
@@ -45,6 +46,34 @@ public class EpochDateTime implements Comparable<EpochDateTime>
                 .toInstant()
                 .toEpochMilli();
     }
+
+    // ValueVector
+
+    @Override
+    public int size()
+    {
+        return 1;
+    }
+
+    @Override
+    public ResolvedType type()
+    {
+        return ResolvedType.of(Type.DateTime);
+    }
+
+    @Override
+    public boolean isNull(int row)
+    {
+        return false;
+    }
+
+    @Override
+    public EpochDateTime getDateTime(int row)
+    {
+        return this;
+    }
+
+    // End ValueVector
 
     public long getEpoch()
     {

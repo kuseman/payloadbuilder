@@ -8,10 +8,14 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
+
 /**
- * A bytes reference used for data types that supports operations directly on under laying byte structures like Strings etc.
+ * A bytes reference used for data types that supports operations directly on under laying byte structures like Strings etc. NOTE! {@link ValueVector} is implemented here to let a single string become
+ * a literal value vector of it self to avoid creating a literal
  */
-public class UTF8String implements Comparable<UTF8String>
+public class UTF8String implements Comparable<UTF8String>, ValueVector
 {
     private static final ThreadLocal<StringBuilder> BUILDER = new ThreadLocal<>();
 
@@ -58,6 +62,34 @@ public class UTF8String implements Comparable<UTF8String>
         getBytesInternal();
         System.arraycopy(this.bytes, offset, destination, 0, length);
     }
+
+    // ValueVector
+
+    @Override
+    public int size()
+    {
+        return 1;
+    }
+
+    @Override
+    public ResolvedType type()
+    {
+        return ResolvedType.of(Type.String);
+    }
+
+    @Override
+    public boolean isNull(int row)
+    {
+        return false;
+    }
+
+    @Override
+    public UTF8String getString(int row)
+    {
+        return this;
+    }
+
+    // End ValueVector
 
     /** Compare this reference to another bytes reference */
     @Override

@@ -136,7 +136,6 @@ public class CastExpression implements ICastExpression
             return builder.build();
         }
 
-        // Use implicit casts in ValueVector for simple types
         return new ValueVectorAdapter(value)
         {
             @Override

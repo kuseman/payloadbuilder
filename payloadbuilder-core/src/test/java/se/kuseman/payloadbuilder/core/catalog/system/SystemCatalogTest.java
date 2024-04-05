@@ -61,7 +61,6 @@ public class SystemCatalogTest extends AExpressionTest
     @Test
     public void test_abs() throws Exception
     {
-
         assertExpression(null, null, "abs(null)");
         assertExpression(1, null, "abs(-1)");
         assertExpression(1L, null, "abs(-1L)");

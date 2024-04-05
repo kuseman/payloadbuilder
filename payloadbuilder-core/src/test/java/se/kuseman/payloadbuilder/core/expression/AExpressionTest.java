@@ -12,7 +12,11 @@ import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.execution.Decimal;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IArithmeticBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
@@ -423,7 +427,11 @@ public abstract class AExpressionTest extends Assert
             {
                 actual = String.valueOf(actual);
             }
-            else if (actual instanceof ValueVector)
+            else if (actual instanceof ValueVector
+                    && !(actual instanceof UTF8String
+                            || actual instanceof Decimal
+                            || actual instanceof EpochDateTime
+                            || actual instanceof EpochDateTimeOffset))
             {
                 ValueVector v = (ValueVector) actual;
                 List<Object> list = new ArrayList<>(v.size());
