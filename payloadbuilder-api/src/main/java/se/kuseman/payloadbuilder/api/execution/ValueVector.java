@@ -560,7 +560,7 @@ public interface ValueVector
      * Create a literal vector of type {@link Column.Type#Table} with provided value, type and size NOTE! This can create a table with a different type as the vector. This is used when having asterisk
      * schemas and one is the planned type and the other is the runtime type.
      */
-    static ValueVector literalTable(TupleVector value, ResolvedType type, int size)
+    static ValueVector literalTable(final TupleVector value, ResolvedType type, int size)
     {
         if (type.getType() != Type.Table)
         {
@@ -606,6 +606,11 @@ public interface ValueVector
     static ValueVector literalDateTime(EpochDateTime value, int size)
     {
         requireNonNull(value);
+        if (size == 1)
+        {
+            return value;
+        }
+
         return new LiteralValueVector(ResolvedType.of(Type.DateTime), size)
         {
             @Override
@@ -626,6 +631,11 @@ public interface ValueVector
     static ValueVector literalDateTimeOffset(EpochDateTimeOffset value, int size)
     {
         requireNonNull(value);
+        if (size == 1)
+        {
+            return value;
+        }
+
         return new LiteralValueVector(ResolvedType.of(Type.DateTimeOffset), size)
         {
             @Override
@@ -646,6 +656,11 @@ public interface ValueVector
     static ValueVector literalDecimal(Decimal value, int size)
     {
         requireNonNull(value);
+        if (size == 1)
+        {
+            return value;
+        }
+
         return new LiteralValueVector(ResolvedType.of(Type.Decimal), size)
         {
             @Override
@@ -940,6 +955,12 @@ public interface ValueVector
     /** Create a literal string of provided value and size */
     static ValueVector literalString(UTF8String value, int size)
     {
+        requireNonNull(value);
+        if (size == 1)
+        {
+            return value;
+        }
+
         return new LiteralValueVector(ResolvedType.of(Type.String), size)
         {
             @Override
@@ -1010,7 +1031,7 @@ public interface ValueVector
     abstract static class LiteralValueVector implements ValueVector
     {
         private final ResolvedType type;
-        private int size;
+        private final int size;
 
         LiteralValueVector(ResolvedType type, int size)
         {
@@ -1219,13 +1240,13 @@ public interface ValueVector
                         break;
                     default:
                         value = valueAsObject(i);
-                        if (value instanceof ValueVector)
+                        if (value instanceof ValueVector vv)
                         {
-                            value = ((ValueVector) value).toCsv(indent);
+                            value = vv.toCsv(indent);
                         }
-                        else if (value instanceof TupleVector)
+                        else if (value instanceof TupleVector tv)
                         {
-                            value = ((TupleVector) value).toCsv(indent + 1);
+                            value = tv.toCsv(indent + 1);
                         }
                         break;
                 }

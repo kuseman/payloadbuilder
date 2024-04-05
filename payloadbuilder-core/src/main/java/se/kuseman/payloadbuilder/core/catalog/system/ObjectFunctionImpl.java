@@ -13,8 +13,6 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.ILiteralStringExpression;
-import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
-import se.kuseman.payloadbuilder.core.execution.vector.TupleVectorBuilder;
 
 /**
  * Implementation of function object. Creates an object from provided arguments.
@@ -69,11 +67,8 @@ class ObjectFunctionImpl
             return ValueVector.literalNull(getOperatorType(input.getSchema()), 1);
         }
 
-        TupleVectorBuilder builder = new TupleVectorBuilder(((ExecutionContext) context).getBufferAllocator(), 1);
-        builder.append(input, 0);
-
         // Wrap the input as a single row
-        return ValueVector.literalObject(ObjectVector.wrap(builder.build()), 1);
+        return ValueVector.literalObject(ObjectVector.wrap(input.copy(0)), 1);
     }
 
     /** Scalar eval */

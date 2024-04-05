@@ -7,10 +7,11 @@ import java.math.RoundingMode;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.expression.IArithmeticBinaryExpression;
 
 /** Wrapper class for data type {@link Column.Type#Decimal}. */
-public class Decimal extends Number implements Comparable<Decimal>
+public class Decimal extends Number implements Comparable<Decimal>, ValueVector
 {
     /** NOTE! PLB doesn't have support for specifying scaling of decimals (unless created with String/BigDecinal), scale is set to this in factory methods */
     private static final int SCALE = 6;
@@ -21,6 +22,34 @@ public class Decimal extends Number implements Comparable<Decimal>
     {
         this.value = requireNonNull(value, "value");
     }
+
+    // ValueVector
+
+    @Override
+    public int size()
+    {
+        return 1;
+    }
+
+    @Override
+    public ResolvedType type()
+    {
+        return ResolvedType.of(Type.Decimal);
+    }
+
+    @Override
+    public boolean isNull(int row)
+    {
+        return false;
+    }
+
+    @Override
+    public Decimal getDecimal(int row)
+    {
+        return this;
+    }
+
+    // End ValueVector
 
     /** Process provided deicmal to this instance with provided arithmetic type. Returns a new {@link Decimal} */
     public Decimal processArithmetic(Decimal other, IArithmeticBinaryExpression.Type type)

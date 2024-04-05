@@ -179,22 +179,9 @@ public class OutputWriterUtils
                 // Runtime check of value
 
                 Object value = vector.getAny(row);
-                value = VectorUtils.convert(value);
 
-                // Reflectively check if the value is a vector of some sort
-                if (value instanceof ValueVector vv)
-                {
-                    write(vv, writer, context);
-                }
-                else if (value instanceof ObjectVector ov)
-                {
-                    write(ov, writer, context);
-                }
-                else if (value instanceof TupleVector tv)
-                {
-                    write(tv, writer, context, false);
-                }
-                else if (value instanceof Integer i)
+                // First check non complex types
+                if (value instanceof Integer i)
                 {
                     writer.writeInt(i.intValue());
                 }
@@ -228,7 +215,26 @@ public class OutputWriterUtils
                 }
                 else
                 {
-                    writer.writeValue(value);
+                    // Then try to convert to complex type
+                    value = VectorUtils.convert(value);
+
+                    // Reflectively check if the value is a vector of some sort
+                    if (value instanceof ValueVector vv)
+                    {
+                        write(vv, writer, context);
+                    }
+                    else if (value instanceof ObjectVector ov)
+                    {
+                        write(ov, writer, context);
+                    }
+                    else if (value instanceof TupleVector tv)
+                    {
+                        write(tv, writer, context, false);
+                    }
+                    else
+                    {
+                        writer.writeValue(value);
+                    }
                 }
                 break;
             // NOTE!! No default case here

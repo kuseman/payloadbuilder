@@ -774,10 +774,12 @@ public class NestedLoop implements IPhysicalPlan
          */
         private final OuterTupleVector outerTupleVector;
         private final RowTupleVector rowTupleVector = new RowTupleVector();
-
         private final CartesianTupleVector cartesian = new CartesianTupleVector();
+
         private TupleVector currentOuter;
         private TupleVector next;
+        private TupleVector nextUnmatchedOuter;
+
         // The inner schema used when emitting empty outer row, will be the plan schema from start
         // but if there are inner matches before the un matched ones we switch
         private Schema innerSchema = inner.getSchema();
@@ -802,7 +804,6 @@ public class NestedLoop implements IPhysicalPlan
             // We seal the mutable vectors when we return the result, this to catch
             // wrongly implemented function/expressions
             rowTupleVector.sealed = true;
-            outerTupleVector.sealed = true;
             TupleVector result = next;
             next = null;
             return result;
@@ -818,7 +819,6 @@ public class NestedLoop implements IPhysicalPlan
         public void close()
         {
             rowTupleVector.sealed = true;
-            outerTupleVector.sealed = true;
             iterator.close();
         }
 
@@ -830,6 +830,13 @@ public class NestedLoop implements IPhysicalPlan
                         .abortQuery())
                 {
                     return false;
+                }
+
+                if (nextUnmatchedOuter != null)
+                {
+                    next = nextUnmatchedOuter;
+                    nextUnmatchedOuter = null;
+                    continue;
                 }
 
                 if (!iterator.hasNext())
@@ -857,7 +864,6 @@ public class NestedLoop implements IPhysicalPlan
                 TupleVectorBuilder builder = null;
 
                 rowTupleVector.sealed = false;
-                outerTupleVector.sealed = false;
                 rowTupleVector.init(currentOuter);
                 outerTupleVector.init(rowTupleVector);
 
@@ -918,7 +924,8 @@ public class NestedLoop implements IPhysicalPlan
                             while (innerIt.hasNext())
                             {
                                 TupleVector inner = innerIt.next();
-                                if (inner.getRowCount() > 0)
+                                int innerRowCount = inner.getRowCount();
+                                if (innerRowCount > 0)
                                 {
                                     // Use the first vectors schema as inner
                                     if (innerSchemaAsterisk)
@@ -932,15 +939,32 @@ public class NestedLoop implements IPhysicalPlan
                                     // CSON
                                     matched = true;
 
-                                    if (builder == null)
-                                    {
-                                        builder = new TupleVectorBuilder(executionContext.getBufferAllocator(), (int) (rowCount * inner.getRowCount() * 1.1));
-                                    }
-
                                     cartesian.init(rowTupleVector, inner);
 
-                                    builder.append(cartesian);
+                                    // Special case for a one row result, then we avoid creating builders
+                                    // that will turn into literals anyways
+                                    if (next == null
+                                            && builder == null
+                                            && rowCount == 1
+                                            && innerRowCount == 1)
+                                    {
+                                        next = cartesian.copy(0);
+                                    }
+                                    else
+                                    {
+                                        if (builder == null)
+                                        {
+                                            builder = new TupleVectorBuilder(executionContext.getBufferAllocator(), (int) (rowCount * inner.getRowCount() * 1.1));
+                                        }
 
+                                        if (next != null)
+                                        {
+                                            builder.append(next);
+                                            next = null;
+                                        }
+
+                                        builder.append(cartesian);
+                                    }
                                     nodeData.tupleBuildTime += TimeUnit.MILLISECONDS.convert(System.nanoTime() - time, TimeUnit.NANOSECONDS);
                                 }
                             }
@@ -962,17 +986,24 @@ public class NestedLoop implements IPhysicalPlan
                 TupleVector unmatchedOuter = emitEmptyOuterRows ? createUnmatchedOuterTuple(context, innerSchema, outerMatches, currentOuter)
                         : null;
 
-                if (builder == null)
+                if (next != null)
                 {
-                    next = unmatchedOuter;
+                    nextUnmatchedOuter = unmatchedOuter;
                 }
                 else
                 {
-                    if (unmatchedOuter != null)
+                    if (builder == null)
                     {
-                        builder.append(unmatchedOuter);
+                        next = unmatchedOuter;
                     }
-                    next = builder.build();
+                    else
+                    {
+                        if (unmatchedOuter != null)
+                        {
+                            builder.append(unmatchedOuter);
+                        }
+                        next = builder.build();
+                    }
                 }
                 currentOuter = null;
 
@@ -1104,8 +1135,6 @@ public class NestedLoop implements IPhysicalPlan
         private TupleVector outer;
         private Schema outerSchema;
         private Schema schema;
-        private OuterColumnVector[] columns;
-        private boolean sealed;
 
         OuterTupleVector(TupleVector prevOuter)
         {
@@ -1132,41 +1161,6 @@ public class NestedLoop implements IPhysicalPlan
                 this.outerSchema = outer.getSchema();
                 this.schema = SchemaUtils.concat(prevOuterSchema, outerSchema);
             }
-
-            int columnCount = schema.getSize();
-            if (columns == null)
-            {
-                columns = new OuterColumnVector[columnCount];
-            }
-            else if (columns.length < columnCount)
-            {
-                columns = Arrays.copyOf(columns, columnCount);
-            }
-
-            for (int i = 0; i < columnCount; i++)
-            {
-                ValueVector vector;
-
-                if (i < prevOuterSize)
-                {
-                    vector = prevOuter.getColumn(i);
-                }
-                else
-                {
-                    vector = outer.getColumn(i - prevOuterSize);
-                }
-
-                OuterColumnVector ocv = columns[i];
-                if (ocv == null)
-                {
-                    ocv = new OuterColumnVector(vector);
-                    columns[i] = ocv;
-                }
-                else
-                {
-                    ocv.setValueVector(vector);
-                }
-            }
         }
 
         @Override
@@ -1184,32 +1178,12 @@ public class NestedLoop implements IPhysicalPlan
         @Override
         public ValueVector getColumn(int column)
         {
-            return columns[column];
-        }
-
-        private class OuterColumnVector extends ValueVectorAdapter
-        {
-            OuterColumnVector(ValueVector vector)
+            if (column < prevOuterSize)
             {
-                super(vector);
+                return prevOuter.getColumn(column);
             }
 
-            @Override
-            public int size()
-            {
-                return outer.getRowCount();
-            }
-
-            @Override
-            protected int getRow(int row)
-            {
-                if (sealed)
-                {
-                    throw new IllegalArgumentException("This vector is sealed and should not be used, check implementation of eval and make sure to copy values and not create lazy constructs.");
-                }
-
-                return super.getRow(row);
-            }
+            return outer.getColumn(column - prevOuterSize);
         }
     }
 
@@ -1218,6 +1192,8 @@ public class NestedLoop implements IPhysicalPlan
      */
     private static class CartesianTupleVector implements TupleVector
     {
+        private TupleVector outer;
+        private TupleVector inner;
         private Schema outerSchema;
         private Schema innerSchema;
 
@@ -1225,11 +1201,16 @@ public class NestedLoop implements IPhysicalPlan
         private Schema schema;
         private CartesianColumn[] columns;
         private int rowCount;
+        private int outerSize;
+        private int innerRowCount;
 
         /** Inits this vector with new outer/inner vectors. Calculates new schemas etc. */
         void init(TupleVector outer, TupleVector inner)
         {
+            this.outer = outer;
+            this.inner = inner;
             this.rowCount = outer.getRowCount() * inner.getRowCount();
+            this.innerRowCount = inner.getRowCount();
 
             // Recalculate resulting schema if differs
             if (!Objects.equals(outerSchema, outer.getSchema())
@@ -1239,45 +1220,16 @@ public class NestedLoop implements IPhysicalPlan
                 this.innerSchema = inner.getSchema();
                 this.schema = SchemaUtils.concat(outerSchema, innerSchema);
             }
+            this.outerSize = outerSchema.getSize();
 
-            int columnCount = schema.getSize();
+            int size = schema.getSize();
             if (columns == null)
             {
-                columns = new CartesianColumn[columnCount];
+                columns = new CartesianColumn[size];
             }
-            else if (columns.length < columnCount)
+            else if (columns.length < size)
             {
-                columns = Arrays.copyOf(columns, columnCount);
-            }
-
-            // Initalize the columns
-            int innerRowCount = inner.getRowCount();
-            int outerSize = outerSchema.getSize();
-            for (int i = 0; i < columnCount; i++)
-            {
-                boolean isOuter = i < outerSize;
-                ValueVector vector;
-                if (isOuter)
-                {
-                    vector = outer.getColumn(i);
-                }
-                else
-                {
-                    vector = inner.getColumn(i - outerSize);
-                }
-
-                CartesianColumn cc = columns[i];
-                if (cc == null)
-                {
-                    cc = new CartesianColumn(vector);
-                    columns[i] = cc;
-                }
-                else
-                {
-                    cc.setValueVector(vector);
-                }
-                cc.innerRowCount = innerRowCount;
-                cc.isOuter = isOuter;
+                columns = Arrays.copyOf(columns, size);
             }
         }
 
@@ -1290,7 +1242,31 @@ public class NestedLoop implements IPhysicalPlan
         @Override
         public ValueVector getColumn(int column)
         {
-            return columns[column];
+            boolean isOuter = column < outerSize;
+            ValueVector vector;
+            if (isOuter)
+            {
+                vector = outer.getColumn(column);
+            }
+            else
+            {
+                vector = inner.getColumn(column - outerSize);
+            }
+
+            CartesianColumn cc = columns[column];
+            if (cc == null)
+            {
+                cc = new CartesianColumn(vector);
+                columns[column] = cc;
+            }
+            else
+            {
+                cc.setValueVector(vector);
+            }
+            cc.innerRowCount = innerRowCount;
+            cc.isOuter = isOuter;
+
+            return cc;
         }
 
         @Override
@@ -1339,30 +1315,15 @@ public class NestedLoop implements IPhysicalPlan
         void init(TupleVector wrapped)
         {
             this.wrapped = wrapped;
-
-            int columnCount = wrapped.getSchema()
+            int size = wrapped.getSchema()
                     .getSize();
             if (columns == null)
             {
-                columns = new RowColumnVector[columnCount];
+                columns = new RowColumnVector[size];
             }
-            else if (columns.length < columnCount)
+            else if (columns.length < size)
             {
-                columns = Arrays.copyOf(columns, columnCount);
-            }
-
-            for (int i = 0; i < columnCount; i++)
-            {
-                RowColumnVector rcv = columns[i];
-                if (rcv == null)
-                {
-                    rcv = new RowColumnVector(wrapped.getColumn(i));
-                    columns[i] = rcv;
-                }
-                else
-                {
-                    rcv.setValueVector(wrapped.getColumn(i));
-                }
+                columns = Arrays.copyOf(columns, size);
             }
         }
 
@@ -1381,7 +1342,19 @@ public class NestedLoop implements IPhysicalPlan
         @Override
         public ValueVector getColumn(int column)
         {
-            return columns[column];
+            ValueVector wrappedColumn = wrapped.getColumn(column);
+            RowColumnVector rcv = columns[column];
+            if (rcv == null)
+            {
+                rcv = new RowColumnVector(wrappedColumn);
+                columns[column] = rcv;
+            }
+            else
+            {
+                rcv.setValueVector(wrappedColumn);
+            }
+
+            return rcv;
         }
 
         private class RowColumnVector extends ValueVectorAdapter

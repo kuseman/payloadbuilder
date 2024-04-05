@@ -1855,7 +1855,6 @@ public class NestedLoopTest extends AJoinTest
                 assertVectorsEquals(vv(Type.Any, 1, 1, 1), next.getColumn(1));
                 assertVectorsEquals(vv(Type.Any, 0, 0, 1), next.getColumn(2));
                 assertVectorsEquals(vv(Type.Any, 1, 2, 3), next.getColumn(3));
-
             }
             else
             {
@@ -1863,6 +1862,57 @@ public class NestedLoopTest extends AJoinTest
                 assertVectorsEquals(vv(Type.Any, 2, 2, 2), next.getColumn(1));
                 assertVectorsEquals(vv(Type.Any, 0, 0, 1), next.getColumn(2));
                 assertVectorsEquals(vv(Type.Any, 1, 2, 3), next.getColumn(3));
+            }
+
+            count += next.getRowCount();
+            iterations++;
+        }
+        it.close();
+
+        // Even though we are splitting by row we only want one vector back, this to avoid excessive method calling
+        assertEquals(iterations, 2);
+        assertEquals(6, count);
+        assertEquals(1, outerClosed.get());
+        assertEquals(2, innerClosed.get());
+    }
+
+    @Test
+    public void test_cross_join_no_populate_with_outer_multiple_inner_and_outer_vectors_2()
+    {
+        AtomicInteger outerClosed = new AtomicInteger();
+        AtomicInteger innerClosed = new AtomicInteger();
+
+        IDatasource dsOuter = schemaDS(() -> outerClosed.incrementAndGet(), TupleVector.of(outerSchema, asList(vv(Type.Any, 0), vv(Type.Any, 1))),
+                TupleVector.of(outerSchema, asList(vv(Type.Any, 1), vv(Type.Any, 2))));
+        IDatasource dsInner = schemaDS(() -> innerClosed.incrementAndGet(), TupleVector.of(innerSchema, asList(vv(Type.Any, 1), vv(Type.Any, 3))),
+                TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 0), vv(Type.Any, 1, 2))));
+
+        IPhysicalPlan plan = NestedLoop.innerJoin(1, scan(dsOuter, table, outerSchema, 1), scan(dsInner, tableB, innerSchema, 1), outerReferences, null);
+
+        TupleIterator it = plan.execute(context);
+
+        int iterations = 0;
+        int count = 0;
+        while (it.hasNext())
+        {
+            TupleVector next = it.next();
+
+            assertEquals(4, next.getSchema()
+                    .getSize());
+
+            if (iterations == 0)
+            {
+                assertVectorsEquals(vv(Type.Any, 0, 0, 0), next.getColumn(0));
+                assertVectorsEquals(vv(Type.Any, 1, 1, 1), next.getColumn(1));
+                assertVectorsEquals(vv(Type.Any, 1, 0, 0), next.getColumn(2));
+                assertVectorsEquals(vv(Type.Any, 3, 1, 2), next.getColumn(3));
+            }
+            else
+            {
+                assertVectorsEquals(vv(Type.Any, 1, 1, 1), next.getColumn(0));
+                assertVectorsEquals(vv(Type.Any, 2, 2, 2), next.getColumn(1));
+                assertVectorsEquals(vv(Type.Any, 1, 0, 0), next.getColumn(2));
+                assertVectorsEquals(vv(Type.Any, 3, 1, 2), next.getColumn(3));
             }
 
             count += next.getRowCount();
