@@ -245,7 +245,7 @@ abstract class BaseJDBCTest extends Assert
     {
         IExecutionContext context = mockExecutionContext();
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
-                new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), asList("col2"), emptyList()));
+                new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Optional.of(asList("col2")), emptyList()));
         TupleIterator it = ds.execute(context, mockOptions(500));
 
         List<String> col2Expected = asList("one", "two", "three", "four", "five");
@@ -277,11 +277,31 @@ abstract class BaseJDBCTest extends Assert
     }
 
     @Test
+    public void test_datasource_table_scan_empty_projection()
+    {
+        IExecutionContext context = mockExecutionContext();
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
+                new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Optional.of(List.of()), emptyList()));
+        TupleIterator it = ds.execute(context, mockOptions(500));
+
+        int rowCount = 0;
+        while (it.hasNext())
+        {
+            TupleVector v = it.next();
+            assertEquals(Schema.EMPTY, v.getSchema());
+            rowCount += v.getRowCount();
+        }
+        it.close();
+
+        assertEquals(5, rowCount);
+    }
+
+    @Test
     public void test_datasource_table_scan_asterisk()
     {
         IExecutionContext context = mockExecutionContext();
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
-                new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(), emptyList()));
+                new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), Optional.empty(), emptyList()));
         TupleIterator it = ds.execute(context, mockOptions(500));
 
         List<Integer> col1Expected = asList(1, 2, 3, 4, 5);
@@ -322,7 +342,7 @@ abstract class BaseJDBCTest extends Assert
         IExecutionContext context = mockExecutionContext();
         List<ISortItem> sortItems = new ArrayList<>(asList(TestUtils.mockSortItem(QualifiedName.of("col1"), Order.DESC)));
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
-                new DatasourceData(0, Optional.empty(), emptyList(), sortItems, emptyList(), emptyList()));
+                new DatasourceData(0, Optional.empty(), emptyList(), sortItems, Optional.empty(), emptyList()));
 
         // Verify sort items consumed
         assertTrue(sortItems.isEmpty());
@@ -346,13 +366,60 @@ abstract class BaseJDBCTest extends Assert
     }
 
     @Test
+    public void test_datasource_table_scan_asterisk_with_sortitems_batch_size()
+    {
+        IExecutionContext context = mockExecutionContext();
+        List<ISortItem> sortItems = new ArrayList<>(asList(TestUtils.mockSortItem(QualifiedName.of("col1"), Order.DESC)));
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
+                new DatasourceData(0, Optional.empty(), emptyList(), sortItems, Optional.empty(), emptyList()));
+
+        // Verify sort items consumed
+        assertTrue(sortItems.isEmpty());
+
+        TupleIterator it = ds.execute(context, mockOptions(2));
+
+        int batchCount = 0;
+        int rowCount = 0;
+        while (it.hasNext())
+        {
+            TupleVector v = it.next();
+
+            if (batchCount == 0)
+            {
+                assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Any)), Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
+                assertVectorsEquals(VectorTestUtils.vv(Type.Any, 5, 4), integer(v.getColumn(0)));
+                assertVectorsEquals(VectorTestUtils.vv(Type.Any, "five", "four"), v.getColumn(1));
+            }
+            else if (batchCount == 1)
+            {
+                assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Any)), Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
+                assertVectorsEquals(VectorTestUtils.vv(Type.Any, 3, 2), integer(v.getColumn(0)));
+                assertVectorsEquals(VectorTestUtils.vv(Type.Any, "three", "two"), v.getColumn(1));
+            }
+            else
+            {
+                assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Any)), Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
+                assertVectorsEquals(VectorTestUtils.vv(Type.Any, 1), integer(v.getColumn(0)));
+                assertVectorsEquals(VectorTestUtils.vv(Type.Any, "one"), v.getColumn(1));
+            }
+
+            rowCount += v.getRowCount();
+            batchCount++;
+        }
+        it.close();
+
+        assertEquals(3, batchCount);
+        assertEquals(5, rowCount);
+    }
+
+    @Test
     public void test_datasource_table_scan_asterisk_with_sortitems_with_predicates()
     {
         IExecutionContext context = mockExecutionContext();
         List<ISortItem> sortItems = new ArrayList<>(asList(mockSortItem(QualifiedName.of("col1"), Order.DESC)));
         List<IPredicate> predicates = new ArrayList<>(asList(IPredicateMock.in("col2", asList("one", "four"))));
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
-                new DatasourceData(0, Optional.empty(), predicates, sortItems, emptyList(), emptyList()));
+                new DatasourceData(0, Optional.empty(), predicates, sortItems, Optional.empty(), emptyList()));
 
         // Verify sort items consumed
         assertTrue(sortItems.isEmpty());
@@ -382,7 +449,7 @@ abstract class BaseJDBCTest extends Assert
         IExecutionContext context = mockExecutionContext();
         ISeekPredicate seekPredicate = mockSeekPrecidate(context, asList("col1"), Arrays.<Object[]>asList(new Object[] { 1, 3, 5 }));
         List<ISortItem> sortItems = new ArrayList<>(asList(TestUtils.mockSortItem(QualifiedName.of("col1"), Order.DESC)));
-        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, Optional.empty(), emptyList(), sortItems, emptyList(), emptyList()));
+        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, Optional.empty(), emptyList(), sortItems, Optional.empty(), emptyList()));
 
         // Verify sort items consumed
         assertTrue(sortItems.isEmpty());
@@ -411,7 +478,7 @@ abstract class BaseJDBCTest extends Assert
         IExecutionContext context = mockExecutionContext();
         ISeekPredicate seekPredicate = mockSeekPrecidate(context, asList("col1", "col2"), Arrays.<Object[]>asList(new Object[] { 1, 3, 5 }, new Object[] { "one", "five", "three" }));
         List<ISortItem> sortItems = new ArrayList<>(asList(TestUtils.mockSortItem(QualifiedName.of("col1"), Order.DESC)));
-        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, Optional.empty(), emptyList(), sortItems, emptyList(), emptyList()));
+        IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, Optional.empty(), emptyList(), sortItems, Optional.empty(), emptyList()));
 
         // Verify sort items consumed
         assertTrue(sortItems.isEmpty());

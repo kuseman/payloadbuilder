@@ -456,7 +456,23 @@ public class TestHarnessRunner
                     }
 
                     ObjectTupleVector tupleVector = new ObjectTupleVector(data.getSchema()
-                            .orElse(schema), rowCount, (row, col) -> rows.get(row)[col]);
+                            .orElse(schema), rowCount, (row, col) ->
+                            {
+                                Column column = schema.getColumns()
+                                        .get(col);
+
+                                // Verify projection by nulling non projected columns
+                                if (!data.getProjection()
+                                        .isEmpty()
+                                        && !data.getProjection()
+                                                .get()
+                                                .contains(column.getName()))
+                                {
+                                    return null;
+                                }
+
+                                return rows.get(row)[col];
+                            });
                     return TupleIterator.singleton(tupleVector);
                 }
             };

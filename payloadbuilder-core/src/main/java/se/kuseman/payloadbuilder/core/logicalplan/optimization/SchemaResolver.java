@@ -5,12 +5,14 @@ import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang3.StringUtils.defaultIfBlank;
 import static org.apache.commons.lang3.StringUtils.lowerCase;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang3.tuple.Pair;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Catalog;
+import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.FunctionInfo.Arity;
@@ -210,30 +212,31 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
         return new TableFunctionScan(plan.getTableSource(), plan.getSchema(), arguments, options, plan.getLocation());
     }
 
-    static Schema recreate(final TableSourceReference tableSource, Schema schema)
+    static Schema recreate(TableSourceReference tableSource, Schema schema)
     {
-        return new Schema(schema.getColumns()
-                .stream()
-                .map(c ->
-                {
-                    ResolvedType type = c.getType();
-                    // Force all columns to have a column reference
-                    ColumnReference colRef = SchemaUtils.getColumnReference(c);
-                    if (colRef == null)
-                    {
-                        colRef = tableSource.column(c.getName());
-                    }
-                    else
-                    {
-                        // If we have a column reference, then switch it's table source
-                        // For example if we have a temp table then we need to set a unique table source
-                        // for this plan and not copy the original columns reference
-                        colRef = new ColumnReference(tableSource, colRef.getName(), colRef.getType());
-                    }
+        List<Column> columns = new ArrayList<>(schema.getSize());
 
-                    return CoreColumn.of(c.getName(), type, colRef);
-                })
-                .collect(toList()));
+        for (Column column : schema.getColumns())
+        {
+            ResolvedType type = column.getType();
+            // Force all columns to have a column reference
+            ColumnReference colRef = SchemaUtils.getColumnReference(column);
+            if (colRef == null)
+            {
+                colRef = tableSource.column(column.getName());
+            }
+            else if (!tableSource.equals(colRef.getTableSource()))
+            {
+                // If we have a column reference, then switch it's table source
+                // For example if we have a temp table then we need to set a unique table source
+                // for this plan and not copy the original columns reference
+                colRef = new ColumnReference(colRef, tableSource, colRef.getName(), colRef.getType());
+            }
+
+            columns.add(CoreColumn.of(column.getName(), type, colRef));
+        }
+
+        return new Schema(columns);
     }
 
     /** Resolver for expressions. Sub query plans, function calls (scalar, aggregate) */

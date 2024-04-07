@@ -6,6 +6,7 @@ import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
 
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
@@ -28,6 +29,7 @@ import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.common.SortItem;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
+import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.DereferenceExpression;
 import se.kuseman.payloadbuilder.core.expression.FunctionCallExpression;
@@ -73,13 +75,13 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableA = of("", "tableA", "a");
-        TableSourceReference tableB = of("", "tableB", "b");
-        TableSourceReference a_table = of("", "a.table", "t");
+        TableSourceReference tableA = of(0, "", "tableA", "a");
+        TableSourceReference tableB = of(2, "", "tableB", "b");
+        TableSourceReference a_table = of(1, "", "a.table", "t");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-        ColumnReference a_tableAst = new ColumnReference(a_table, "t", ColumnReference.Type.ASTERISK);
+        ColumnReference a_tableAst = new ColumnReference(aAst.rename("table"), a_table, "t", ColumnReference.Type.ASTERISK);
 
         Schema schemaA = Schema.of(col("a", Type.Any, aAst));
         Schema schemaB = Schema.of(col("b", Type.Any, bAst));
@@ -87,6 +89,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
 
         //@formatter:off
         ILogicalPlan expected =
+                new Projection(
                     new Join(
                         tableScan(schemaA, tableA),
                         projection(
@@ -103,7 +106,9 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                         "t",
                         null,
                         asSet(col(aAst.rename("table"), Type.Any)),
-                        false);
+                        false),
+                    List.of(new AsteriskExpression(QualifiedName.of(), null, Set.of(tableA))),
+                    false);
 
         Assertions.assertThat(actual.getSchema())
                 .usingRecursiveComparison()
@@ -139,11 +144,11 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableA = of("", "tableA", "a");
-        TableSourceReference a_b = of("", "a.b", "x");
+        TableSourceReference tableA = of(0, "", "tableA", "a");
+        TableSourceReference a_b = of(1, "", "a.b", "x");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
-        ColumnReference a_bAst = new ColumnReference(a_b, "x", ColumnReference.Type.ASTERISK);
+        ColumnReference a_bAst = new ColumnReference(aAst.rename("b"), a_b, "x", ColumnReference.Type.ASTERISK);
 
         Schema schemaA = Schema.of(col("a", Type.Any, aAst));
         Schema schemaA_b = Schema.of(col("x", Type.Any, a_bAst));
@@ -188,28 +193,36 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 + "cross apply (e.col3) x ";
         //@formatter:on
 
+        session.setCatalogProperty(TEST, STABLE_E_ID, 0);
+
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference e_col3 = of("", "e.col3", "x");
+        TableSourceReference e_col3 = of(1, "", "e.col3", "x");
 
-        ColumnReference sTableE_col3 = new ColumnReference(sTableE, "col3", ColumnReference.Type.REGULAR);
+        TableSourceReference sTableE = sTableE(0);
+
+        ColumnReference sTableE_col3 = new ColumnReference(sTableE(0), "col3", ColumnReference.Type.REGULAR);
 
         ColumnReference e_col3_nCol1 = new ColumnReference(e_col3, "nCol1", ColumnReference.Type.REGULAR);
         ColumnReference e_col3_nCol2 = new ColumnReference(e_col3, "nCol2", ColumnReference.Type.REGULAR);
 
         Schema schemae_sTableE = Schema.of(col("nCol1", Type.Int), col("nCol2", Type.String));
         Schema schemae_col3 = Schema.of(col("nCol1", Type.Int, e_col3_nCol1), col("nCol2", Type.String, e_col3_nCol2));
+        Schema schemaSTableE = schemaSTableE(0);
 
         //@formatter:off
         ILogicalPlan expected =
-                new Join(
-                    tableScan(schemaSTableE, sTableE),
-                    new ExpressionScan(e_col3, schemae_col3, ocre("col3", sTableE_col3, 1, ResolvedType.table(schemaSTableE.getColumns().get(1).getType().getSchema())), null),
-                    Join.Type.INNER,
-                    null,
-                    null,
-                    asSet(CoreColumn.of(sTableE_col3, ResolvedType.table(schemaSTableE.getColumns().get(1).getType().getSchema()))),
+                new Projection(
+                    new Join(
+                        tableScan(schemaSTableE, sTableE),
+                        new ExpressionScan(e_col3, schemae_col3, ocre("col3", sTableE_col3, 1, ResolvedType.table(schemaSTableE.getColumns().get(1).getType().getSchema())), null),
+                        Join.Type.INNER,
+                        null,
+                        null,
+                        asSet(CoreColumn.of(sTableE_col3, ResolvedType.table(schemaSTableE.getColumns().get(1).getType().getSchema()))),
+                        false),
+                    List.of(new AsteriskExpression(QualifiedName.of(), null, Set.of(sTableE, e_col3))),
                     false);
         //@formatter:on
 
@@ -259,13 +272,21 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference expectedTable = new TableSourceReference("", QualifiedName.of("tbl"), "e");
+        TableSourceReference expectedTable = new TableSourceReference(0, "", QualifiedName.of("tbl"), "e");
 
         Schema expectedSchema = Schema.of(CoreColumn.of(expectedTable.column("col1"), ResolvedType.of(Type.Int)), CoreColumn.of(expectedTable.column("col2"), ResolvedType.of(Type.Boolean)));
 
-        ILogicalPlan expected = new ExpressionScan(expectedTable, expectedSchema, new VariableExpression(QualifiedName.of("tbl")), null);
-
         //@formatter:off
+        ILogicalPlan expected =
+                new Projection(
+                    new ExpressionScan(
+                        expectedTable,
+                        expectedSchema,
+                        new VariableExpression(QualifiedName.of("tbl")),
+                        null),
+                    List.of(new AsteriskExpression(QualifiedName.of(), null, Set.of(expectedTable))),
+                    false);
+
         Assertions.assertThat(actual.getSchema())
                 .usingRecursiveComparison()
                 .ignoringFieldsOfTypes(Location.class, Random.class)
@@ -292,6 +313,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 + "from stableE e "
                 + "cross apply (e.col1) x ";
         //@formatter:on
+
+        session.setCatalogProperty(TEST, STABLE_E_ID, 0);
 
         ILogicalPlan plan = getSchemaResolvedPlan(query);
 
@@ -423,7 +446,10 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         //@formatter:off
         ILogicalPlan expected =
                 new Aggregate(
-                    tableScan(schemaA, tableA),
+                    new Projection(
+                        tableScan(schemaA, tableA),
+                        List.of(new AsteriskExpression(QualifiedName.of(), null, Set.of(tableA))),
+                        false),
                     emptyList(),
                     emptyList());
         //@formatter:on
@@ -503,8 +529,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableA = of("", "tableA", "a");
-        TableSourceReference tableB = of("", "tableB", "b");
+        TableSourceReference tableA = of(0, "", "tableA", "a");
+        TableSourceReference tableB = of(1, "", "tableB", "b");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
@@ -534,7 +560,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                             "",
                             "object_array",
                             null),
-                        asSet(CoreColumn.of(bAst.rename("b"), ResolvedType.table(schemaB))), null), "obj")),
+                        asSet(CoreColumn.of(bAst.populate("b"), ResolvedType.table(schemaB))), null), "obj")),
                 false);
         //@formatter:on
 
@@ -714,8 +740,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableA = of("", "tableA", "a");
-        TableSourceReference tableB = of("", "tableB", "b");
+        TableSourceReference tableA = of(0, "", "tableA", "a");
+        TableSourceReference tableB = of(1, "", "tableB", "b");
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         Schema schemaA = Schema.of(col("a", Type.Any, aAst));
@@ -737,7 +763,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                             SystemCatalog.get().getScalarFunction("map"),
                             null,
                             asList(
-                               cre(bAst.rename("b"), ResolvedType.table(schemaB)),
+                               cre(bAst.populate("b"), ResolvedType.table(schemaB)),
                                new LambdaExpression(asList("x"),
                                        lce("x", 0, ResolvedType.object(schemaB)),
                                        new int[] {0})
@@ -747,7 +773,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                 SystemCatalog.get().getScalarFunction("map"),
                                 null,
                                 asList(
-                                   cre(bAst.rename("b"), ResolvedType.table(schemaB)),
+                                   cre(bAst.populate("b"), ResolvedType.table(schemaB)),
                                    new LambdaExpression(asList("x"),
                                            DereferenceExpression.create(lce("x", 0, ResolvedType.object(schemaB)), QualifiedName.of("col"), null),
                                            new int[] {0})
@@ -757,7 +783,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                 SystemCatalog.get().getScalarFunction("map"),
                                 null,
                                 asList(
-                                    cre(bAst.rename("b"), ResolvedType.table(schemaB)),
+                                    cre(bAst.populate("b"), ResolvedType.table(schemaB)),
                                    new LambdaExpression(asList("z"),
                                            DereferenceExpression.create(lce("z", 0, ResolvedType.object(schemaB)), QualifiedName.of("column"), null),
                                            new int[] {0})
@@ -767,7 +793,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                 SystemCatalog.get().getScalarFunction("map"),
                                 null,
                                 asList(
-                                   cre(bAst.rename("b"), ResolvedType.table(schemaB)),
+                                   cre(bAst.populate("b"), ResolvedType.table(schemaB)),
                                    new LambdaExpression(asList("zz"),
                                            add(
                                                DereferenceExpression.create(lce("zz", 0, ResolvedType.object(schemaB)), QualifiedName.of("col2"), null),
@@ -842,28 +868,43 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableA = of("", "tableA", "a");
-        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
-        Schema schemaA = Schema.of(col("a", Type.Any, aAst));
+        TableSourceReference tableA0 = of(0, "", "tableA", "a");
+        ColumnReference aAst0 = new ColumnReference(tableA0, "a", ColumnReference.Type.ASTERISK);
+        Schema schemaA0 = Schema.of(col("a", Type.Any, aAst0));
+
+        TableSourceReference tableA1 = of(1, "", "tableA", "a");
+        ColumnReference aAst1 = new ColumnReference(tableA1, "a", ColumnReference.Type.ASTERISK);
+        Schema schemaA1 = Schema.of(col("a", Type.Any, aAst1));
 
         //@formatter:off
         ILogicalPlan expected = 
-                new Join(
-                    projection(
-                            tableScan(schemaA, tableA),
-                            asList(new AliasExpression(add(cre(aAst.rename("col")), cre(aAst.rename("col2"))), "col"))),
-                    new Filter(
-                            tableScan(schemaA, tableA),
-                            null,
-                            gt(oce("col", 0), cre(aAst.rename("col")))),
-                    Join.Type.INNER,
-                    null,
-                    (IExpression) null,
-                    asSet(col("col", Type.Any)),
+                new Projection(
+                    new Join(
+                        projection(
+                            tableScan(schemaA0, tableA0),
+                            asList(new AliasExpression(add(cre(aAst0.rename("col")), cre(aAst0.rename("col2"))), "col"))),
+                        new Projection(
+                            new Filter(
+                                tableScan(schemaA1, tableA1),
+                                null,
+                                gt(oce("col", 0), cre(aAst1.rename("col")))),
+                            List.of(new AsteriskExpression(QualifiedName.of(), null, Set.of(tableA1))),
+                            false),
+                        Join.Type.INNER,
+                        null,
+                        (IExpression) null,
+                        asSet(col("col", Type.Any)),
+                        false),
+                    List.of(new AsteriskExpression(QualifiedName.of(), null, Set.of())),
                     false);
         //@formatter:on
 
-        assertEquals(Schema.of(col("col", Type.Any), col(aAst, Type.Any)), actual.getSchema());
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class)
+                .isEqualTo(expected);
+
+        assertEquals(Schema.of(col("col", Type.Any), col(aAst1, Type.Any)), actual.getSchema());
 
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));
@@ -878,7 +919,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         String query = ""
         + "select (select col2,"                        // Unqualified => b
         + "               c.col3,"                      // Outer scope to populated join
-        + "               b.col4,"                      // Qualified to over alias (b)
+        + "               b.col4,"                      // Qualified to expression scan alias (b)
         + "               a.col3, "                     // Outer scope to non populated join
         + "               col6, "                       // Non asterisk outer column (d)
         + "               c "                           // Here we should have a match on a populated column (c) in outer scope
@@ -895,32 +936,35 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         + "";
         //@formatter:on
 
+        session.setCatalogProperty(TEST, STABLE_D_ID, 3);
+
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableA = of("", "tableA", "a");
-        TableSourceReference tableB = of("", "tableB", "b");
-        TableSourceReference tableC = of("", "tableC", "c");
-
-        TableSourceReference e_b = of("", "b", "b");
+        TableSourceReference tableA = of(0, "", "tableA", "a");
+        TableSourceReference tableB = of(1, "", "tableB", "b");
+        TableSourceReference tableC = of(2, "", "tableC", "c");
+        TableSourceReference e_b = of(4, "", "b", "b");
+        TableSourceReference sTableD = sTableD(3);
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         ColumnReference cAst = new ColumnReference(tableC, "c", ColumnReference.Type.ASTERISK);
-        ColumnReference e_bAst = new ColumnReference(e_b, "b", ColumnReference.Type.ASTERISK);
+        ColumnReference e_bAst = new ColumnReference(bAst.populate("b"), e_b, "b", ColumnReference.Type.ASTERISK);
 
         Schema schemaA = Schema.of(col("a", Type.Any, aAst));
         Schema schemaB = Schema.of(col("b", Type.Any, bAst));
         Schema schemaC = Schema.of(col("c", Type.Any, cAst));
+        Schema schemaSTableD = schemaSTableD(3);
 
         //@formatter:off
         Schema objectArraySchema = Schema.of(
             CoreColumn.of(e_bAst.rename("col2"), ResolvedType.of(Type.Any)),
-            CoreColumn.of(cAst.rename("col3"), ResolvedType.array(Type.Any)),
+            CoreColumn.of(cAst.populate("col3"), ResolvedType.array(Type.Any)),
             CoreColumn.of(e_bAst.rename("col4"), ResolvedType.of(Type.Any)),
             CoreColumn.of(aAst.rename("col3"), ResolvedType.of(Type.Any)),
             CoreColumn.of(sTableD.column("col6"), ResolvedType.of(Type.String)),
-            CoreColumn.of(cAst.rename("c"), ResolvedType.table(schemaC))
+            CoreColumn.of(cAst.populate("c"), ResolvedType.table(schemaC))
         );
         
         ILogicalPlan expected = 
@@ -954,25 +998,25 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                         new ExpressionScan(
                                             e_b,
                                             Schema.of(CoreColumn.of(e_bAst, ResolvedType.of(Type.Any))),
-                                            ocre(bAst.rename("b"), ResolvedType.table(schemaB)),
+                                            ocre(bAst.populate("b"), ResolvedType.table(schemaB)),
                                             null),
                                         asList(
                                             cre(e_bAst.rename("col2")),
-                                            new DereferenceExpression(ocre("c", cAst.rename("col3"), "c", ResolvedType.table(schemaC)), "col3", -1, ResolvedType.array(Type.Any)),
+                                            new DereferenceExpression(ocre("c", cAst.populate("col3"), "c", ResolvedType.table(schemaC)), "col3", -1, ResolvedType.array(Type.Any)),
                                             cre(e_bAst.rename("col4")),
                                             ocre(aAst.rename("col3")),
                                             ocre("col6", sTableD.column("col6"), "col6", ResolvedType.of(Type.String)),
-                                            ocre("c", cAst.rename("c"), "c", ResolvedType.table(schemaC))
+                                            ocre("c", cAst.populate("c"), "c", ResolvedType.table(schemaC))
                                         )),
                                     "",
                                     "object_array",
                                     null),
                                     asSet(
-                                        CoreColumn.of(bAst.rename("b"), ResolvedType.table(schemaB)),
-                                        CoreColumn.of(cAst.rename("col3"), ResolvedType.table(schemaC)),
+                                        CoreColumn.of(bAst.populate("b"), ResolvedType.table(schemaB)),
+                                        CoreColumn.of(cAst.populate("col3"), ResolvedType.table(schemaC)),
                                         CoreColumn.of(aAst.rename("col3"), ResolvedType.of(Type.Any)),
                                         CoreColumn.of(sTableD.column("col6"), ResolvedType.of(Type.String)),     // static schema col6 was chosen instead of asterisk
-                                        CoreColumn.of(cAst.rename("c"), ResolvedType.table(schemaC))
+                                        CoreColumn.of(cAst.populate("c"), ResolvedType.table(schemaC))
                                         ),
                                     null),
                              "values")));
@@ -1006,8 +1050,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableA = of("", "tableA", "a");
-        TableSourceReference range = of("", "range", "r");
+        TableSourceReference tableA = of(0, "", "tableA", "a");
+        TableSourceReference range = of(1, "", "range", "r");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
 
@@ -1055,8 +1099,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableA = of("", "tableA", "a");
-        TableSourceReference range = of("", "range", "r");
+        TableSourceReference tableA = of(0, "", "tableA", "a");
+        TableSourceReference range = of(1, "", "range", "r");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
 
@@ -1125,9 +1169,9 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference rangeA = new TableSourceReference("", QualifiedName.of("range"), "a");
-        TableSourceReference rangeR1 = new TableSourceReference("", QualifiedName.of("range"), "r1");
-        TableSourceReference rangeR2 = new TableSourceReference("", QualifiedName.of("range"), "r2");
+        TableSourceReference rangeA = new TableSourceReference(0, "", QualifiedName.of("range"), "a");
+        TableSourceReference rangeR1 = new TableSourceReference(1, "", QualifiedName.of("range"), "r1");
+        TableSourceReference rangeR2 = new TableSourceReference(2, "", QualifiedName.of("range"), "r2");
 
         ColumnReference colValueA = rangeA.column("Value");
         ColumnReference colValueR1 = rangeR1.column("Value");
@@ -1139,7 +1183,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
 
         //@formatter:off
         ILogicalPlan expected = 
-                new Join(
+                new Projection(
+                    new Join(
                         new Join(
                             new TableFunctionScan(rangeA, schemaRangeA, asList(intLit(1), intLit(10)), emptyList(), null),
                             new TableFunctionScan(rangeR1, schemaRangeR1, asList(intLit(1), ocre(colValueA, 0, ResolvedType.of(Type.Int))), emptyList(), null),
@@ -1149,10 +1194,12 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                             asSet(col(colValueA, Type.Int)),
                             false),
                         new TableFunctionScan(rangeR2, schemaRangeR2, asList(intLit(1), ocre(colValueR1, 1, ResolvedType.of(Type.Int))), emptyList(), null),
-                    Join.Type.INNER,
-                    null,
-                    (IExpression) null,
-                    asSet(col(colValueR1, Type.Int)),
+                        Join.Type.INNER,
+                        null,
+                        (IExpression) null,
+                        asSet(col(colValueR1, Type.Int)),
+                        false),
+                    List.of(new AsteriskExpression(QualifiedName.of(), null, Set.of(rangeA, rangeR1, rangeR2))),
                     false);
         //@formatter:on
 
@@ -1183,9 +1230,9 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference rangeA = new TableSourceReference("", QualifiedName.of("range"), "a");
-        TableSourceReference rangeR1 = new TableSourceReference("", QualifiedName.of("range"), "r1");
-        TableSourceReference rangeR2 = new TableSourceReference("", QualifiedName.of("range"), "r2");
+        TableSourceReference rangeA = new TableSourceReference(0, "", QualifiedName.of("range"), "a");
+        TableSourceReference rangeR1 = new TableSourceReference(1, "", QualifiedName.of("range"), "r1");
+        TableSourceReference rangeR2 = new TableSourceReference(2, "", QualifiedName.of("range"), "r2");
 
         ColumnReference colValueA = rangeA.column("Value");
         ColumnReference colValueR1 = rangeR1.column("Value");
@@ -1253,9 +1300,9 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference rangeA = new TableSourceReference("", QualifiedName.of("range"), "a");
-        TableSourceReference rangeR1 = new TableSourceReference("", QualifiedName.of("range"), "r1");
-        TableSourceReference rangeR2 = new TableSourceReference("", QualifiedName.of("range"), "r2");
+        TableSourceReference rangeA = new TableSourceReference(0, "", QualifiedName.of("range"), "a");
+        TableSourceReference rangeR1 = new TableSourceReference(1, "", QualifiedName.of("range"), "r1");
+        TableSourceReference rangeR2 = new TableSourceReference(2, "", QualifiedName.of("range"), "r2");
 
         ColumnReference colValueA = rangeA.column("Value");
         ColumnReference colValueR1 = rangeR1.column("Value");
@@ -1279,12 +1326,13 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                 false),
                             new TableFunctionScan(rangeR2, schemaRangeR2, asList(
                                     intLit(1),
-                                    new DereferenceExpression(ocre("r1", colValueR1, 1, ResolvedType.table(schemaRangeR1)), "Value", 0, ResolvedType.array(ResolvedType.of(Type.Int)))),
+                                    new DereferenceExpression(ocre("r1", colValueR1.populate("Value"), 1, ResolvedType.table(schemaRangeR1)), "Value", 0,
+                                            ResolvedType.array(ResolvedType.of(Type.Int)))),
                                     emptyList(), null),
                         Join.Type.INNER,
                         null,
                         (IExpression) null,
-                        asSet(new CoreColumn("Value", ResolvedType.table(schemaRangeR1), colValueR1)),
+                        asSet(new CoreColumn("Value", ResolvedType.table(schemaRangeR1), colValueR1.populate("Value"))),
                         false),
                     asList(new DereferenceExpression(cre("r1", colValueR1, 1, ResolvedType.table(schemaRangeR1)), "Value", 0, ResolvedType.array(ResolvedType.of(Type.Int)))));
 
@@ -1319,9 +1367,9 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference rangeA = new TableSourceReference("", QualifiedName.of("range"), "a");
-        TableSourceReference rangeR1 = new TableSourceReference("", QualifiedName.of("range"), "r1");
-        TableSourceReference rangeR2 = new TableSourceReference("", QualifiedName.of("range"), "r2");
+        TableSourceReference rangeA = new TableSourceReference(0, "", QualifiedName.of("range"), "a");
+        TableSourceReference rangeR1 = new TableSourceReference(1, "", QualifiedName.of("range"), "r1");
+        TableSourceReference rangeR2 = new TableSourceReference(2, "", QualifiedName.of("range"), "r2");
 
         ColumnReference colValueA = rangeA.column("Value");
         ColumnReference colValueR1 = rangeR1.column("Value");
@@ -1332,8 +1380,9 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         Schema schemaRangeR2 = Schema.of(col("Value", Type.Int, colValueR2));
 
         //@formatter:off
-        ILogicalPlan expected = 
-                new Join(
+        ILogicalPlan expected =
+                new Projection(
+                    new Join(
                         new Join(
                             new TableFunctionScan(rangeA, schemaRangeA, asList(intLit(1), intLit(10)), emptyList(), null),
                             new TableFunctionScan(rangeR1, schemaRangeR1, asList(intLit(1), ocre(colValueA, 0, ResolvedType.of(Type.Int))), emptyList(), null),
@@ -1344,13 +1393,15 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                             false),
                         new TableFunctionScan(rangeR2, schemaRangeR2, asList(
                                 intLit(1),
-                                new DereferenceExpression(ocre("r1", colValueR1, 1, ResolvedType.table(schemaRangeR1)), "Value", 0, ResolvedType.array(ResolvedType.of(Type.Int)))),
+                                new DereferenceExpression(ocre("r1", colValueR1.populate("Value"), 1, ResolvedType.table(schemaRangeR1)), "Value", 0, ResolvedType.array(ResolvedType.of(Type.Int)))),
                                 emptyList(), null),
-                    Join.Type.INNER,
-                    null,
-                    (IExpression) null,
-                    asSet(new CoreColumn("Value", ResolvedType.table(schemaRangeR1), colValueR1)),
-                    false);
+                        Join.Type.INNER,
+                        null,
+                        (IExpression) null,
+                        asSet(new CoreColumn("Value", ResolvedType.table(schemaRangeR1), colValueR1.populate("Value"))),
+                        false),
+                List.of(new AsteriskExpression(QualifiedName.of(), null, Set.of(rangeA, rangeR2))),
+                false);
         //@formatter:on
 
         //@formatter:off
@@ -1389,9 +1440,9 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference rangeA = new TableSourceReference("", QualifiedName.of("range"), "a");
-        TableSourceReference rangeR1 = new TableSourceReference("", QualifiedName.of("range"), "r1");
-        TableSourceReference rangeR2 = new TableSourceReference("", QualifiedName.of("range"), "r2");
+        TableSourceReference rangeA = new TableSourceReference(0, "", QualifiedName.of("range"), "a");
+        TableSourceReference rangeR1 = new TableSourceReference(1, "", QualifiedName.of("range"), "r1");
+        TableSourceReference rangeR2 = new TableSourceReference(2, "", QualifiedName.of("range"), "r2");
 
         ColumnReference colValueA = rangeA.column("Value");
         ColumnReference colValueR1 = rangeR1.column("Value");
@@ -1402,36 +1453,43 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         Schema schemaRangeR2 = Schema.of(col("Value", Type.Int, colValueR2));
 
         //@formatter:off
-        ILogicalPlan expected = 
-                new Join(
-                        new Join(
-                            new TableFunctionScan(rangeA, schemaRangeA, asList(intLit(1), intLit(10)), emptyList(), null),
-                            new TableFunctionScan(rangeR1, schemaRangeR1, asList(intLit(1), ocre(colValueA, 0, ResolvedType.of(Type.Int))), emptyList(), null),
-                            Join.Type.INNER,
-                            "r1",
-                            (IExpression) null,
-                            asSet(col(colValueA, Type.Int)),
-                            false),
-                        new TableFunctionScan(rangeR2, schemaRangeR2, asList(
-                                intLit(1),
-                                new DereferenceExpression(ocre("r1", colValueR1, 1, ResolvedType.table(schemaRangeR1)), "Value", 0, ResolvedType.array(ResolvedType.of(Type.Int)))),
-                                emptyList(), null),
-                    Join.Type.INNER,
-                    "r2",
-                    (IExpression) null,
-                    asSet(new CoreColumn("Value", ResolvedType.table(schemaRangeR1), colValueR1)),
+        ILogicalPlan expected =
+                new Projection(
+                    new Join(
+                            new Join(
+                                new TableFunctionScan(rangeA, schemaRangeA, asList(intLit(1), intLit(10)), emptyList(), null),
+                                new TableFunctionScan(rangeR1, schemaRangeR1, asList(intLit(1), ocre(colValueA, 0, ResolvedType.of(Type.Int))), emptyList(), null),
+                                Join.Type.INNER,
+                                "r1",
+                                (IExpression) null,
+                                asSet(col(colValueA, Type.Int)),
+                                false),
+                            new TableFunctionScan(rangeR2, schemaRangeR2, asList(
+                                    intLit(1),
+                                    new DereferenceExpression(ocre("r1", colValueR1.populate("Value"), 1, ResolvedType.table(schemaRangeR1)), "Value", 0,
+                                            ResolvedType.array(ResolvedType.of(Type.Int)))),
+                                    emptyList(), null),
+                        Join.Type.INNER,
+                        "r2",
+                        (IExpression) null,
+                        asSet(new CoreColumn("Value", ResolvedType.table(schemaRangeR1), colValueR1.populate("Value"))),
+                        false),
+                    List.of(new AsteriskExpression(QualifiedName.of(), null, Set.of(rangeA))),
                     false);
         //@formatter:on
 
         //@formatter:off
-        assertEquals(Schema.of(
+        Assertions.assertThat(actual.getSchema())
+            .usingRecursiveComparison()
+            .ignoringFieldsOfTypes(Location.class)
+            .isEqualTo(Schema.of(
                 // All a
                 schemaRangeA.getColumns().get(0),
                 // Populate r1
                 new CoreColumn("r1", ResolvedType.table(schemaRangeR1), rangeR1.column("r1")),
                 // Populate r2
                 new CoreColumn("r2", ResolvedType.table(schemaRangeR2), rangeR2.column("r2"))
-                ), actual.getSchema());
+                ));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -1461,8 +1519,9 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableA = of("", "tableA", "a");
-        TableSourceReference tableB = of("", "tableB", "b");
+        TableSourceReference tableA = of(0, "", "tableA", "a");
+        TableSourceReference tableB = of(1, "", "tableB", "b");
+
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         Schema schemaA = Schema.of(col("a", Type.Any, aAst));
@@ -1478,15 +1537,17 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                     eq(cre(bAst.rename("col2")), cre(aAst.rename("col2"))),
                     asSet(),
                     false),
-                asList(cre(aAst.rename("col")), new DereferenceExpression(cre("b", bAst.rename("col"), "b", ResolvedType.table(schemaB)), "col", -1, ResolvedType.array(Type.Any)))
+                asList(cre(aAst.rename("col")), new DereferenceExpression(cre("b", bAst.populate("col"), "b", ResolvedType.table(schemaB)), "col", -1, ResolvedType.array(Type.Any)))
                 );
         //@formatter:on
 
         //@formatter:off
-        assertEquals(Schema.of(
-                col(aAst.rename("col"), Type.Any), 
-                new CoreColumn("col", ResolvedType.array(ResolvedType.of(Type.Any)), bAst.rename("col"))),
-                actual.getSchema());
+        Assertions.assertThat(actual.getSchema())
+            .usingRecursiveComparison()
+            .ignoringFieldsOfTypes(Location.class)
+            .isEqualTo(Schema.of(
+                    col(aAst.rename("col"), Type.Any),
+                    new CoreColumn("col", ResolvedType.array(ResolvedType.of(Type.Any)), bAst.populate("col"))));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -1514,8 +1575,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableA = of("", "tableA", "a");
-        TableSourceReference tableB = of("", "tableB", "b");
+        TableSourceReference tableA = of(0, "", "tableA", "a");
+        TableSourceReference tableB = of(1, "", "tableB", "b");
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         Schema schemaA = Schema.of(col("a", Type.Any, aAst));
@@ -1531,11 +1592,14 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                     eq(cre(bAst.rename("col2")), cre(aAst.rename("col2"))),
                     asSet(),
                     false),
-                asList(cre(aAst.rename("col")), cre(bAst.rename("b"), ResolvedType.table(schemaB)))
+                asList(cre(aAst.rename("col")), cre(bAst.populate("b"), ResolvedType.table(schemaB)))
                 );
         //@formatter:on
 
-        assertEquals(Schema.of(col(aAst.rename("col"), Type.Any), new CoreColumn("b", ResolvedType.table(schemaB), bAst.rename("b"))), actual.getSchema());
+        Assertions.assertThat(actual.getSchema())
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(Schema.of(col(aAst.rename("col"), Type.Any), new CoreColumn("b", ResolvedType.table(schemaB), bAst.populate("b"))));
 
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));
@@ -1563,8 +1627,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableA = of("", "tableA", "a");
-        TableSourceReference tableB = of("", "tableB", "b");
+        TableSourceReference tableA = of(0, "", "tableA", "a");
+        TableSourceReference tableB = of(1, "", "tableB", "b");
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         Schema schemaA = Schema.of(col("a", Type.Any, aAst));
@@ -1584,7 +1648,10 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 );
         //@formatter:on
 
-        assertEquals(Schema.of(new CoreColumn("b", ResolvedType.table(schemaB), bAst)), actual.getSchema());
+        Assertions.assertThat(actual.getSchema())
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(Schema.of(new CoreColumn("b", ResolvedType.table(schemaB), bAst)));
 
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));
@@ -1632,13 +1699,13 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableA = of("", "tableA", "a");
-        TableSourceReference tableB = of("", "tableB", "b");
-        TableSourceReference e_b = of("", "b", "b");
+        TableSourceReference tableA = of(0, "", "tableA", "a");
+        TableSourceReference tableB = of(1, "", "tableB", "b");
+        TableSourceReference e_b = of(2, "", "b", "b");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-        ColumnReference open_tableAst = new ColumnReference(e_b, "b", ColumnReference.Type.ASTERISK);
+        ColumnReference open_tableAst = new ColumnReference(bAst.populate("b"), e_b, "b", ColumnReference.Type.ASTERISK);
 
         Schema schemaA = Schema.of(col("a", Type.Any, aAst));
         Schema schemaB = Schema.of(col("b", Type.Any, bAst));
@@ -1660,7 +1727,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                     asSet(),
                     false),
                 asList(cre(aAst.rename("col")), new AliasExpression(
-                        new DereferenceExpression(cre("b", bAst.rename("col"), "b", ResolvedType.table(schemaB)), "col", -1, ResolvedType.array(Type.Any)), "bOuterCol"),
+                        new DereferenceExpression(cre("b", bAst.populate("col"), "b", ResolvedType.table(schemaB)), "col", -1, ResolvedType.array(Type.Any)), "bOuterCol"),
                             new UnresolvedSubQueryExpression(
                                 new OperatorFunctionScan(
                                     Schema.of(Column.of("output", ResolvedType.table(objectArraySchema))),
@@ -1668,7 +1735,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                             new ExpressionScan(
                                                 e_b,
                                                 Schema.of(CoreColumn.of(open_tableAst, ResolvedType.of(Type.Any))),
-                                                ocre(bAst.rename("b"), ResolvedType.table(schemaB)),
+                                                ocre(bAst.populate("b"), ResolvedType.table(schemaB)),
                                                 null),
                                             asList(
                                                 cre(open_tableAst.rename("col")),
@@ -1678,7 +1745,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                     "",
                                     "object_array",
                                     null),
-                            asSet(new CoreColumn("b", ResolvedType.table(Schema.of(col(bAst, Type.Any))), bAst.rename("b")), col(aAst.rename("col3"), Type.Any)),
+                            asSet(new CoreColumn("b", ResolvedType.table(Schema.of(col(bAst, Type.Any))), bAst.populate("b")), col(aAst.rename("col3"), Type.Any)),
                         null)));
         //@formatter:on
 
@@ -1716,8 +1783,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ColumnReference bCol = new ColumnReference(tableB, "col", ColumnReference.Type.REGULAR);
         ColumnReference bCol2 = new ColumnReference(tableB, "col2", ColumnReference.Type.REGULAR);
 
-        ColumnReference obCol = new ColumnReference(e_b, "col", ColumnReference.Type.REGULAR);
-        ColumnReference obCol2 = new ColumnReference(e_b, "col2", ColumnReference.Type.REGULAR);
+        ColumnReference obCol = new ColumnReference(bCol, e_b, "col", ColumnReference.Type.REGULAR);
+        ColumnReference obCol2 = new ColumnReference(bCol2, e_b, "col2", ColumnReference.Type.REGULAR);
 
         Schema schemaA = Schema.of(col(aCol, Type.Int), col(aCol2, Type.String), col(aCol3, Type.Float));
         Schema schemaB = Schema.of(col(bCol, Type.Boolean), col(bCol2, Type.Int));
@@ -1773,7 +1840,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                         asSet(),
                         false),
                 asList(cre(aCol, 0, ResolvedType.of(Type.Int)),
-                       new AliasExpression(new DereferenceExpression(cre("b", bCol, 3, ResolvedType.table(schemaB)), "col", 0, ResolvedType.array(ResolvedType.of(Type.Boolean))),
+                       new AliasExpression(new DereferenceExpression(cre("b", bCol.populate("col"), 3, ResolvedType.table(schemaB)), "col", 0, ResolvedType.array(ResolvedType.of(Type.Boolean))),
                             "bOuterCol"),
                        new UnresolvedSubQueryExpression(
                            new OperatorFunctionScan(
@@ -1782,7 +1849,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                         new ExpressionScan(
                                             e_b,
                                             Schema.of(CoreColumn.of(obCol, ResolvedType.of(Type.Boolean)), CoreColumn.of(obCol2, ResolvedType.of(Type.Int))),
-                                            ocre("b", b, 3, ResolvedType.table(schemaB)),
+                                            ocre("b", b.populate("b"), 3, ResolvedType.table(schemaB)),
                                             null),
                                         asList(
                                             cre(obCol, 0, ResolvedType.of(Type.Boolean)),
@@ -1792,7 +1859,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                 "",
                                 "object_array",
                                 null),
-                        asSet(new CoreColumn("b", ResolvedType.table(schemaB), tableB.column("b")), col(aCol3, Type.Float)),
+                        asSet(new CoreColumn("b", ResolvedType.table(schemaB), tableB.column("b").populate("b")), col(aCol3, Type.Float)),
                         null)));
         //@formatter:on
 
@@ -1812,6 +1879,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     {
         TableSourceReference tableA = of("", "tableA", "a");
         TableSourceReference tableB = of("", "tableB", "b");
+
         ColumnReference aCol = new ColumnReference(tableA, "col", ColumnReference.Type.REGULAR);
         ColumnReference aCol2 = new ColumnReference(tableA, "col2", ColumnReference.Type.REGULAR);
         ColumnReference bCol = new ColumnReference(tableB, "col", ColumnReference.Type.REGULAR);
@@ -1846,11 +1914,14 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                     false),
                 asList(
                         cre(aCol, 0, ResolvedType.of(Type.Int)),
-                        new DereferenceExpression(cre("b", bCol, 2, ResolvedType.table(schemaB)), "col", 0, ResolvedType.array(ResolvedType.of(Type.String))))
+                        new DereferenceExpression(cre("b", bCol.populate("col"), 2, ResolvedType.table(schemaB)), "col", 0, ResolvedType.array(ResolvedType.of(Type.String))))
                 );
         //@formatter:on
 
-        assertEquals(Schema.of(col(aCol, Type.Int), new CoreColumn("col", ResolvedType.array(ResolvedType.of(Type.String)), bCol)), actual.getSchema());
+        Assertions.assertThat(actual.getSchema())
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(Schema.of(col(aCol, Type.Int), new CoreColumn("col", ResolvedType.array(ResolvedType.of(Type.String)), bCol.populate("col"))));
 
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));
@@ -1981,8 +2052,8 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableA = of("", "tableA", "a");
-        TableSourceReference tableB = of("", "tableB", "b");
+        TableSourceReference tableA = of(0, "", "tableA", "a");
+        TableSourceReference tableB = of(1, "", "tableB", "b");
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         Schema schemaA = Schema.of(col("a", Type.Any, aAst));
@@ -2028,9 +2099,9 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableA = of("", "tableA", "a");
-        TableSourceReference tableB = of("", "tableB", "b");
-        TableSourceReference tableC = of("", "tableC", "c");
+        TableSourceReference tableA = of(0, "", "tableA", "a");
+        TableSourceReference tableB = of(1, "", "tableB", "b");
+        TableSourceReference tableC = of(2, "", "tableC", "c");
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         ColumnReference cAst = new ColumnReference(tableC, "c", ColumnReference.Type.ASTERISK);
@@ -2730,9 +2801,9 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableA = of("", "tableA", "a");
-        TableSourceReference tableB = of("", "tableB", "b");
-        TableSourceReference tableC = of("", "tableC", "c");
+        TableSourceReference tableA = of(0, "", "tableA", "a");
+        TableSourceReference tableB = of(1, "", "tableB", "b");
+        TableSourceReference tableC = of(2, "", "tableC", "c");
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         ColumnReference cAst = new ColumnReference(tableC, "c", ColumnReference.Type.ASTERISK);
@@ -2741,34 +2812,37 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         Schema schemaC = Schema.of(col("c", Type.Any, cAst));
         //@formatter:off
         ILogicalPlan expected = 
-                new Filter(
-                    new Join(
-                        tableScan(schemaA, tableA),
-                        projection(
-                            new Filter(
-                                new Join(
-                                    tableScan(schemaB, tableB),
-                                    projection(
-                                        new Filter(
-                                            tableScan(schemaC, tableC),
-                                            null,
-                                            and(eq(cre(cAst.rename("col")), ocre(bAst.rename("col"))), eq(cre(cAst.rename("col2")), ocre(aAst.rename("col2"))))),
-                                        asList(cre(cAst.rename("col3")), cre(cAst))),
-                                    Join.Type.INNER,
+                new Projection(
+                    new Filter(
+                        new Join(
+                            tableScan(schemaA, tableA),
+                            projection(
+                                new Filter(
+                                    new Join(
+                                        tableScan(schemaB, tableB),
+                                        projection(
+                                            new Filter(
+                                                tableScan(schemaC, tableC),
+                                                null,
+                                                and(eq(cre(cAst.rename("col")), ocre(bAst.rename("col"))), eq(cre(cAst.rename("col2")), ocre(aAst.rename("col2"))))),
+                                            asList(cre(cAst.rename("col3")), cre(cAst))),
+                                        Join.Type.INNER,
+                                        null,
+                                        (IExpression) null,
+                                        asSet(col(bAst.rename("col"), Type.Any), col(aAst.rename("col2"), Type.Any)),
+                                        false),
                                     null,
-                                    (IExpression) null,
-                                    asSet(col(bAst.rename("col"), Type.Any), col(aAst.rename("col2"), Type.Any)),
-                                    false),
-                                null,
-                                and(eq(cre(bAst.rename("col")), ocre(aAst.rename("col"))), eq(cre(cAst.rename("col3")), cre(bAst.rename("col3"))))),
-                        asList(cre(bAst.rename("col2")), cre(bAst), cre(cAst.rename("col3")), cre(cAst))),
-                        Join.Type.INNER,
+                                    and(eq(cre(bAst.rename("col")), ocre(aAst.rename("col"))), eq(cre(cAst.rename("col3")), cre(bAst.rename("col3"))))),
+                            asList(cre(bAst.rename("col2")), cre(bAst), cre(cAst.rename("col3")), cre(cAst))),
+                            Join.Type.INNER,
+                            null,
+                            (IExpression) null,
+                            asSet(col(bAst.rename("col"), Type.Any), col(aAst.rename("col2"), Type.Any), col(aAst.rename("col"), Type.Any)),
+                            false),
                         null,
-                        (IExpression) null,
-                        asSet(col(bAst.rename("col"), Type.Any), col(aAst.rename("col2"), Type.Any), col(aAst.rename("col"), Type.Any)),
-                        false),
-                    null,
-                    eq(cre(bAst.rename("col2")), cre(aAst.rename("col2"))));
+                        eq(cre(bAst.rename("col2")), cre(aAst.rename("col2")))),
+                    List.of(new AsteriskExpression(QualifiedName.of(), null, Set.of(tableA))),
+                    false);
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -2782,6 +2856,12 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 col(cAst.rename("col3"), Type.Any),
                 col(cAst, Type.Any)), actual.getSchema());
         //@formatter:on
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(expected);
+
         assertEquals(expected, actual);
     }
 
@@ -3722,14 +3802,17 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select * from range(1, 10) x");
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableSource = new TableSourceReference("", QualifiedName.of("range"), "x");
+        TableSourceReference tableSource = new TableSourceReference(0, "", QualifiedName.of("range"), "x");
         ColumnReference value = tableSource.column("Value");
 
         Schema expectedSchema = Schema.of(CoreColumn.of("Value", ResolvedType.of(Type.Int), "", false, value));
 
         //@formatter:off
         ILogicalPlan expected =
-                        new TableFunctionScan(tableSource, expectedSchema, asList(intLit(1), intLit(10)), emptyList(), null);
+                new Projection(
+                    new TableFunctionScan(tableSource, expectedSchema, asList(intLit(1), intLit(10)), emptyList(), null),
+                    List.of(new AsteriskExpression(QualifiedName.of(), null, Set.of(tableSource))),
+                    false);
         //@formatter:on
 
         assertEquals(expectedSchema, actual.getSchema());
@@ -3813,6 +3896,11 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
 
     public static TableSourceReference of(String catalogAlias, String name, String alias)
     {
-        return new TableSourceReference(catalogAlias, QualifiedName.of(name), alias);
+        return new TableSourceReference(0, catalogAlias, QualifiedName.of(name), alias);
+    }
+
+    public static TableSourceReference of(int id, String catalogAlias, String name, String alias)
+    {
+        return new TableSourceReference(id, catalogAlias, QualifiedName.of(name), alias);
     }
 }

@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
 
 import org.antlr.v4.runtime.BaseErrorListener;
@@ -278,6 +279,7 @@ public class QueryParser
         private boolean insideSubQuery;
         private boolean assignmentSelect = false;
         private List<Warning> warnings;
+        private int tableSourceCounter = 0;
 
         private AstBuilder(List<CompiledQuery.Warning> warnings)
         {
@@ -606,6 +608,7 @@ public class QueryParser
 
                 String joinAlias = getIdentifier(joinCtx.tableSource()
                         .identifier());
+
                 current = new Join(current, joinTableSource, type, populate ? joinAlias
                         : null, condition, emptySet(), false);
             }
@@ -626,11 +629,11 @@ public class QueryParser
             if (ctx.tableName() != null)
             {
                 String catalogAlias = defaultIfBlank(getIdentifier(ctx.tableName().catalog), "");
-                TableSourceReference tableSourceRef = new TableSourceReference(catalogAlias, getQualifiedName(ctx.tableName()
+                TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, catalogAlias, getQualifiedName(ctx.tableName()
                         .qname()), alias);
 
                 boolean tempTable = ctx.tableName().tempHash != null;
-                return new TableScan(TableSchema.EMPTY, tableSourceRef, emptyList(), tempTable, options, Location.from(ctx.tableName()));
+                return new TableScan(TableSchema.EMPTY, tableSourceRef, Optional.empty(), tempTable, options, Location.from(ctx.tableName()));
             }
             else if (ctx.selectStatement() != null)
             {
@@ -650,7 +653,7 @@ public class QueryParser
                 QualifiedName qname = getQualifiedName(ctx.variable()
                         .qname());
                 IExpression expression = new VariableExpression(qname);
-                TableSourceReference tableSource = new TableSourceReference("", qname, alias);
+                TableSourceReference tableSource = new TableSourceReference(tableSourceCounter++, "", qname, alias);
                 return new ExpressionScan(tableSource, Schema.EMPTY, expression, Location.from(ctx.variable()));
             }
             else if (ctx.expression() != null)
@@ -661,7 +664,7 @@ public class QueryParser
                 }
 
                 IExpression expression = getExpression(ctx.expression());
-                TableSourceReference tableSource = new TableSourceReference("", QualifiedName.of(expression.toString()), alias);
+                TableSourceReference tableSource = new TableSourceReference(tableSourceCounter++, "", QualifiedName.of(expression.toString()), alias);
                 return new ExpressionScan(tableSource, Schema.EMPTY, expression, Location.from(ctx.expression()));
             }
 
@@ -669,7 +672,7 @@ public class QueryParser
             String catalogAlias = defaultIfBlank(getIdentifier(functionCall.functionName().catalog), "");
             String functioName = getIdentifier(ctx.functionCall()
                     .functionName().function);
-            TableSourceReference tableSourceRef = new TableSourceReference(catalogAlias, QualifiedName.of(functioName), alias);
+            TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, catalogAlias, QualifiedName.of(functioName), alias);
             List<IExpression> arguments = ctx.functionCall().arguments.stream()
                     .map(this::getExpression)
                     .collect(toList());
@@ -1394,49 +1397,35 @@ public class QueryParser
                 throw new ParseException("Cannot have asterisk select with GROUP BY's", ctx);
             }
 
-            // One select item that is an asterisk one
-            boolean isSelectAll = ctx.selectItem()
-                    .size() == 1
-                    && ctx.selectItem()
-                            .get(0)
-                            .ASTERISK() != null
-                    && ctx.selectItem()
-                            .get(0).alias == null;
+            boolean prevInsideProjection = insideProjection;
+            insideProjection = true;
+            List<IExpression> expressions = ctx.selectItem()
+                    .stream()
+                    .map(i -> (IExpression) visitSelectItem(i))
+                    .collect(toList());
+            insideProjection = prevInsideProjection;
 
-            if (!isSelectAll)
+            long assignmentItems = expressions.stream()
+                    .filter(e -> e instanceof AssignmentExpression)
+                    .count();
+            assignmentSelect = assignmentItems > 0;
+            if (assignmentSelect
+                    && assignmentItems != expressions.size())
             {
-                boolean prevInsideProjection = insideProjection;
-                insideProjection = true;
-                List<IExpression> expressions = ctx.selectItem()
-                        .stream()
-                        .map(i -> (IExpression) visitSelectItem(i))
-                        .collect(toList());
-                insideProjection = prevInsideProjection;
-
-                long assignmentItems = expressions.stream()
-                        .filter(e -> e instanceof AssignmentExpression)
-                        .count();
-                assignmentSelect = assignmentItems > 0;
-                if (assignmentSelect
-                        && assignmentItems != expressions.size())
-                {
-                    throw new ParseException("Cannot combine variable assignment items with data retrieval items", ctx.selectItem(0));
-                }
-                else if (assignmentSelect
-                        && ctx.into != null)
-                {
-                    throw new ParseException("Cannot have assignments in a SELECT INTO statement", ctx);
-                }
-                else if (assignmentSelect
-                        && insideSubQuery)
-                {
-                    throw new ParseException("Assignment selects are not allowed in sub query context", ctx);
-                }
-
-                plan = new Projection(plan, expressions, false);
+                throw new ParseException("Cannot combine variable assignment items with data retrieval items", ctx.selectItem(0));
+            }
+            else if (assignmentSelect
+                    && ctx.into != null)
+            {
+                throw new ParseException("Cannot have assignments in a SELECT INTO statement", ctx);
+            }
+            else if (assignmentSelect
+                    && insideSubQuery)
+            {
+                throw new ParseException("Assignment selects are not allowed in sub query context", ctx);
             }
 
-            return plan;
+            return new Projection(plan, expressions, false);
         }
 
         private ILogicalPlan wrapSort(ILogicalPlan plan, SelectStatementContext ctx)

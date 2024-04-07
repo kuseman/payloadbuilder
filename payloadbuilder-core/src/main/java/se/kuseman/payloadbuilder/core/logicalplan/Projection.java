@@ -15,6 +15,7 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
+import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.HasAlias;
 import se.kuseman.payloadbuilder.core.expression.HasColumnReference;
 
@@ -50,10 +51,26 @@ public class Projection implements ILogicalPlan
         return appendInputColumns;
     }
 
+    /** Returns true if this projection is a single non qualified asterisk projection. */
+    public boolean isAsteriskProjection()
+    {
+        return expressions.size() == 1
+                && expressions.get(0) instanceof AsteriskExpression ae
+                && ae.getQname()
+                        .size() == 0;
+    }
+
     @Override
     public Schema getSchema()
     {
         Schema schema = input.getSchema();
+
+        /* Asterisk select => return input schema */
+        if (isAsteriskProjection())
+        {
+            return schema;
+        }
+
         List<Column> columns = new ArrayList<>(expressions.size() + (appendInputColumns ? schema.getSize()
                 : 0));
         for (IExpression expression : expressions)

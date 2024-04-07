@@ -27,7 +27,7 @@ public class ColumnExpressionTest extends APhysicalPlanTest
             expected = IllegalArgumentException.class)
     public void test_illegal_args_no_ordinal_no_path_no_asterisk()
     {
-        TableSourceReference tableSource = new TableSourceReference("", QualifiedName.of("table"), "t");
+        TableSourceReference tableSource = new TableSourceReference(0, "", QualifiedName.of("table"), "t");
         ColumnReference colRef = new ColumnReference(tableSource, "col", ColumnReference.Type.REGULAR);
 
         new ColumnExpression("col", null, ResolvedType.of(Type.Any), colRef, -1, false, -1);
@@ -175,8 +175,8 @@ public class ColumnExpressionTest extends APhysicalPlanTest
         TupleVector tv;
         // CSON
 
-        TableSourceReference tableSource = new TableSourceReference("", QualifiedName.of("table"), "a");
-        TableSourceReference tableSourceB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableSource = new TableSourceReference(0, "", QualifiedName.of("table"), "a");
+        TableSourceReference tableSourceB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
         ColumnReference colRef = tableSource.column("col");
         ColumnReference colRefB = tableSourceB.column("col");

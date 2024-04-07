@@ -1,8 +1,10 @@
 package se.kuseman.payloadbuilder.core.expression;
 
+import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
 
 import java.util.Objects;
+import java.util.Set;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -11,6 +13,7 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.parser.Location;
 
 /**
@@ -31,6 +34,7 @@ public class AsteriskExpression implements IExpression
     /** Qualifier before the asterisk */
     private final QualifiedName qname;
     private final Location location;
+    private final Set<TableSourceReference> tableSources;
 
     /** Create a unqualified asterisk */
     public AsteriskExpression(Location location)
@@ -41,8 +45,15 @@ public class AsteriskExpression implements IExpression
     /** Create a qualified asterisk */
     public AsteriskExpression(QualifiedName qname, Location location)
     {
+        this(qname, location, emptySet());
+    }
+
+    /** Create a qualified asterisk with resolved table sources */
+    public AsteriskExpression(QualifiedName qname, Location location, Set<TableSourceReference> tableSources)
+    {
         this.qname = requireNonNull(qname, "qname");
         this.location = location;
+        this.tableSources = requireNonNull(tableSources, "tableSources");
     }
 
     public QualifiedName getQname()
@@ -53,6 +64,11 @@ public class AsteriskExpression implements IExpression
     public Location getLocation()
     {
         return location;
+    }
+
+    public Set<TableSourceReference> getTableSources()
+    {
+        return tableSources;
     }
 
     @Override
@@ -94,9 +110,8 @@ public class AsteriskExpression implements IExpression
         {
             return true;
         }
-        else if (obj instanceof AsteriskExpression)
+        else if (obj instanceof AsteriskExpression that)
         {
-            AsteriskExpression that = (AsteriskExpression) obj;
             return Objects.equals(qname, that.qname);
         }
         return false;

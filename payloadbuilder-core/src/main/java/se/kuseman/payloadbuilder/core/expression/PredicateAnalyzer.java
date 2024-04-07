@@ -594,7 +594,7 @@ public class PredicateAnalyzer
     public static class AnalyzeItem
     {
         /** Marker table source used to when an ambiguous column is encoutered. This to avoid faulty pushdowns of predicates etc. */
-        static final TableSourceReference UNKNOWN_TABLE_SOURCE = new TableSourceReference("", QualifiedName.of("unkown"), "#");
+        static final TableSourceReference UNKNOWN_TABLE_SOURCE = new TableSourceReference(0, "", QualifiedName.of("unkown"), "#");
 
         /** Expression representing this item */
         private final IExpression expression;

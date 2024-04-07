@@ -17,6 +17,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+
+import org.apache.commons.lang3.ArrayUtils;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -48,12 +51,13 @@ class JdbcDatasource implements IDatasource
     private final JdbcCatalog catalog;
     private final String catalogAlias;
     private final QualifiedName table;
-    private final List<String> projection;
+    private final Optional<List<String>> projection;
     private final List<IPredicate> predicates;
     private final List<ISortItem> sortItems;
     private final ISeekPredicate indexPredicate;
 
-    JdbcDatasource(JdbcCatalog catalog, String catalogAlias, QualifiedName table, ISeekPredicate indexPredicate, List<String> projection, List<IPredicate> predicates, List<ISortItem> sortItems)
+    JdbcDatasource(JdbcCatalog catalog, String catalogAlias, QualifiedName table, ISeekPredicate indexPredicate, Optional<List<String>> projection, List<IPredicate> predicates,
+            List<ISortItem> sortItems)
     {
         this.catalog = catalog;
         this.catalogAlias = catalogAlias;
@@ -94,7 +98,9 @@ class JdbcDatasource implements IDatasource
     {
         SqlDialect dialect = DialectProvider.getDialect(context.getSession(), catalogAlias);
         String sql = buildSql(dialect, context, false);
-        return getIterator(dialect, catalog, context, catalogAlias, sql, null, options.getBatchSize(context));
+        return getIterator(dialect, catalog, context, catalogAlias, sql, null, options.getBatchSize(context), projection.isPresent()
+                && projection.get()
+                        .isEmpty());
     }
 
     // CSOFF
@@ -103,9 +109,12 @@ class JdbcDatasource implements IDatasource
     {
         StringBuilder sb = new StringBuilder("SELECT ");
         sb.append(projection.isEmpty() ? "y.*"
-                : projection.stream()
-                        .map(c -> "y." + c)
-                        .collect(joining(",")));
+                : projection.get()
+                        .isEmpty() ? "1"
+                                : projection.get()
+                                        .stream()
+                                        .map(c -> "y." + c)
+                                        .collect(joining(",")));
         sb.append(" FROM ");
         sb.append(table.toString())
                 .append(" y");
@@ -290,7 +299,8 @@ class JdbcDatasource implements IDatasource
     }
 
     /** Returns a row iterator with provided query and parameters */
-    static TupleIterator getIterator(SqlDialect dialect, JdbcCatalog catalog, IExecutionContext context, String catalogAlias, String query, List<Object> parameters, int batchSize)
+    static TupleIterator getIterator(SqlDialect dialect, JdbcCatalog catalog, IExecutionContext context, String catalogAlias, String query, List<Object> parameters, int batchSize,
+            boolean emptyProjection)
     {
         final String database = context.getSession()
                 .getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE)
@@ -304,7 +314,8 @@ class JdbcDatasource implements IDatasource
             private Connection connection;
             private volatile Statement statement;
             private ResultSet rs;
-            private String[] columns;
+            private String[] columns = emptyProjection ? ArrayUtils.EMPTY_STRING_ARRAY
+                    : null;
             private int[] jdbcTypes;
             private boolean resultSetEnded = false;
             private volatile boolean abort = false;
@@ -334,11 +345,14 @@ class JdbcDatasource implements IDatasource
                         populateMeta();
                     }
 
-                    List<Object[]> batch = new ArrayList<>(batchSize);
+                    int currentBatchSize = 0;
+                    List<Object[]> batch = emptyProjection ? null
+                            : new ArrayList<>(batchSize);
                     int length = columns.length;
                     do
                     {
-                        Object[] values = new Object[length];
+                        Object[] values = emptyProjection ? null
+                                : new Object[length];
                         for (int i = 0; i < length; i++)
                         {
                             if (abort)
@@ -353,11 +367,15 @@ class JdbcDatasource implements IDatasource
                             break;
                         }
 
-                        batch.add(values);
+                        currentBatchSize++;
+                        if (batch != null)
+                        {
+                            batch.add(values);
+                        }
 
                         resultSetEnded = !rs.next();
 
-                        if (batch.size() >= batchSize)
+                        if (currentBatchSize >= batchSize)
                         {
                             break;
                         }
@@ -373,7 +391,7 @@ class JdbcDatasource implements IDatasource
                     Schema schema = new Schema(Arrays.stream(columns)
                             .map(c -> Column.of(c, Type.Any))
                             .collect(toList()));
-                    return new ObjectTupleVector(schema, batch.size(), (row, col) -> batch.get(row)[col]);
+                    return new ObjectTupleVector(schema, currentBatchSize, (row, col) -> batch.get(row)[col]);
                 }
                 catch (Exception e)
                 {

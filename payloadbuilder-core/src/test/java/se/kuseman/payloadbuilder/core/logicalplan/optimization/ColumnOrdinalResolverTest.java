@@ -3,19 +3,24 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 import static java.util.stream.Collectors.toList;
 import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
 
+import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
 
+import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
+import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.Join;
+import se.kuseman.payloadbuilder.core.logicalplan.Projection;
 import se.kuseman.payloadbuilder.core.parser.Location;
 
 /** Test of {@link ColumnOrdinalResolver} */
@@ -51,24 +56,27 @@ public class ColumnOrdinalResolverTest extends ALogicalPlanOptimizerTest
 
         //@formatter:off
         ILogicalPlan expected =
-                new Filter(
-                    new Join(
-                        new Filter(
-                            tableScan(resolvedSchemaStableA, sTableA),
-                            sTableA,
-                            eq(cre(stACol2, 1, ResolvedType.of(Type.String)), new LiteralStringExpression("test"))),
-                        new Filter(
-                            tableScan(resolvedSchemaStableB, sTableB),
-                            sTableB,
-                            gt(cre(stBCol2, 1 /*4*/, ResolvedType.of(Type.String)), intLit(100))),        // This has ordinal 4 before running rule
-                        Join.Type.INNER,
+                new Projection(
+                    new Filter(
+                        new Join(
+                            new Filter(
+                                tableScan(resolvedSchemaStableA, sTableA),
+                                sTableA,
+                                eq(cre(stACol2, 1, ResolvedType.of(Type.String)), new LiteralStringExpression("test"))),
+                            new Filter(
+                                tableScan(resolvedSchemaStableB, sTableB),
+                                sTableB,
+                                gt(cre(stBCol2, 1 /*4*/, ResolvedType.of(Type.String)), intLit(100))),        // This has ordinal 4 before running rule
+                            Join.Type.INNER,
+                            null,
+                            eq(cre(stACol3, 2, ResolvedType.of(Type.Float)), cre(stBCol3, 5, ResolvedType.of(Type.Float))),
+                            asSet(),
+                            false),
                         null,
-                        eq(cre(stACol3, 2, ResolvedType.of(Type.Float)), cre(stBCol3, 5, ResolvedType.of(Type.Float))),
-                        asSet(),
-                        false),
-                    null,
-                    gt(cre(stACol1, 0, ResolvedType.of(Type.Int)), cre(stBCol1, 3, ResolvedType.of(Type.Boolean)))
-                );
+                        gt(cre(stACol1, 0, ResolvedType.of(Type.Int)), cre(stBCol1, 3, ResolvedType.of(Type.Boolean)))
+                    ),
+                    List.of(new AsteriskExpression(QualifiedName.of(), null, Set.of(sTableA, sTableB))),
+                    false);
         //@formatter:on
 
         // System.out.println(expected.print(0));

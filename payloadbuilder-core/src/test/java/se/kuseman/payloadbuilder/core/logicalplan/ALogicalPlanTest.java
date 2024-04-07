@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.core.logicalplan;
 import static java.util.Collections.emptyList;
 
 import java.util.List;
+import java.util.Optional;
 
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
@@ -18,12 +19,12 @@ public abstract class ALogicalPlanTest extends AExpressionTest
 {
     protected TableScan tableScan(Schema schema, TableSourceReference tableSource)
     {
-        return new TableScan(new TableSchema(schema), tableSource, emptyList(), false, emptyList(), null);
+        return new TableScan(new TableSchema(schema), tableSource, Optional.empty(), false, emptyList(), null);
     }
 
     protected TableScan tableScan(Schema schema, TableSourceReference tableSource, List<String> projection)
     {
-        return new TableScan(new TableSchema(schema), tableSource, projection, false, emptyList(), null);
+        return new TableScan(new TableSchema(schema), tableSource, Optional.of(projection), false, emptyList(), null);
     }
 
     protected SubQuery subQuery(ILogicalPlan input, String alias)

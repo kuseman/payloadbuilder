@@ -19,10 +19,10 @@ public class DatasourceData
     private final Optional<Schema> schema;
     private final List<IPredicate> predicates;
     private final List<? extends ISortItem> sortItems;
-    private final List<String> projection;
+    private final Optional<List<String>> projection;
     private final List<Option> options;
 
-    public DatasourceData(int nodeId, Optional<Schema> schema, List<IPredicate> predicates, List<? extends ISortItem> sortItems, List<String> projection, List<Option> options)
+    public DatasourceData(int nodeId, Optional<Schema> schema, List<IPredicate> predicates, List<? extends ISortItem> sortItems, Optional<List<String>> projection, List<Option> options)
     {
         this.nodeId = nodeId;
         this.schema = requireNonNull(schema, "schema");
@@ -63,9 +63,9 @@ public class DatasourceData
 
     /**
      * Return the projected columns needed for this data source. This is a optimization hint that can be used for catalogs that supports fetching of specific columns only like RDMBS:es. If empty then
-     * all column should be returned
+     * all column should be returned. Special case is when non empty with an empty list this means that all rows should be returned but no data is wanted for this data source.
      */
-    public List<String> getProjection()
+    public Optional<List<String>> getProjection()
     {
         return projection;
     }

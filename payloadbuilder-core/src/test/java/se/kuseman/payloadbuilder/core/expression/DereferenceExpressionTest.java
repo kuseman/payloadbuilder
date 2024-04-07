@@ -149,7 +149,7 @@ public class DereferenceExpressionTest extends APhysicalPlanTest
         IExpression e;
         ValueVector actual;
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("table"), "");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("table"), "");
 
         Schema runtimeInnerSchema = Schema.of(col("b", Type.Int));
         Schema planInnerSchema = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Int), new ColumnReference(tableA, "b", ColumnReference.Type.ASTERISK)));
@@ -179,7 +179,7 @@ public class DereferenceExpressionTest extends APhysicalPlanTest
         IExpression e;
         ValueVector actual;
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("table"), "");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("table"), "");
 
         Schema runtimeInnerSchema = Schema.of(col("b", Type.Int));
         Schema planInnerSchema = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Int), new ColumnReference(tableA, "b", ColumnReference.Type.ASTERISK)));
