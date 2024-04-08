@@ -1056,14 +1056,21 @@ public interface ValueVector
     static boolean toBoolean(ResolvedType type, Object v)
     {
         Object value = v;
-        if (value instanceof UTF8String)
+        if (value instanceof UTF8String str)
         {
-            value = ((UTF8String) value).toString();
+            value = str.toString();
+        }
+        else if (value instanceof Integer i)
+        {
+            return i.intValue() != 0;
+        }
+        else if (value instanceof Long l)
+        {
+            return l.longValue() != 0;
         }
 
-        if (value instanceof String)
+        if (value instanceof String str)
         {
-            String str = (String) value;
             // Allowed boolean strings
             // y, n
             // yes, no
@@ -1087,9 +1094,9 @@ public interface ValueVector
 
             throw new IllegalArgumentException("Cannot cast '" + str + "' to " + Type.Boolean);
         }
-        else if (v instanceof Boolean)
+        else if (v instanceof Boolean b)
         {
-            return ((Boolean) v).booleanValue();
+            return b.booleanValue();
         }
 
         throw new IllegalArgumentException("Cannot cast " + type + " to " + Type.Boolean);
