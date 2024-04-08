@@ -644,6 +644,17 @@ public class ValueVectorTest extends APhysicalPlanTest
         vv = ValueVector.literalLong(0, 1);
         assertFalse(vv.getBoolean(0));
 
+        // Int (Any)
+        vv = ValueVector.literalAny(1, 10);
+        assertTrue(vv.getBoolean(0));
+        vv = ValueVector.literalAny(1, 0);
+        assertFalse(vv.getBoolean(0));
+        // Long (Any)
+        vv = ValueVector.literalAny(1, 10L);
+        assertTrue(vv.getBoolean(0));
+        vv = ValueVector.literalAny(1, 0L);
+        assertFalse(vv.getBoolean(0));
+
         // Non supported
         vv = ValueVector.literalFloat(2F, 1);
         try
