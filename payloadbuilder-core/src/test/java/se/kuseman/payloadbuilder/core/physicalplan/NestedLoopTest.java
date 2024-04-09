@@ -46,7 +46,7 @@ public class NestedLoopTest extends AJoinTest
      * Outer references set that is used to trigger outer nested loop. This isn't actually used in the operator only triggers the function and is used then analyzing operator
      */
     private Set<Column> outerReferences = asSet(
-            CoreColumn.of(new ColumnReference(new TableSourceReference("", QualifiedName.of("table"), "t"), "col", ColumnReference.Type.REGULAR), ResolvedType.of(Type.Any)));
+            CoreColumn.of(new ColumnReference(new TableSourceReference(0, "", QualifiedName.of("table"), "t"), "col", ColumnReference.Type.REGULAR), ResolvedType.of(Type.Any)));
 
     @Ignore
     @Test

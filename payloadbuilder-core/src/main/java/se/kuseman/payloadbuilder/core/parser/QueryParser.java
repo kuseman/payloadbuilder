@@ -278,6 +278,7 @@ public class QueryParser
         private boolean insideSubQuery;
         private boolean assignmentSelect = false;
         private List<Warning> warnings;
+        private int tableSourceCounter;
 
         private AstBuilder(List<CompiledQuery.Warning> warnings)
         {
@@ -287,6 +288,7 @@ public class QueryParser
         @Override
         public Object visitStatement(PayloadBuilderQueryParser.StatementContext ctx)
         {
+            tableSourceCounter = 0;
             assignmentSelect = false;
             return super.visitStatement(ctx);
         }
@@ -626,7 +628,7 @@ public class QueryParser
             if (ctx.tableName() != null)
             {
                 String catalogAlias = defaultIfBlank(getIdentifier(ctx.tableName().catalog), "");
-                TableSourceReference tableSourceRef = new TableSourceReference(catalogAlias, getQualifiedName(ctx.tableName()
+                TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, catalogAlias, getQualifiedName(ctx.tableName()
                         .qname()), alias);
 
                 boolean tempTable = ctx.tableName().tempHash != null;
@@ -650,7 +652,7 @@ public class QueryParser
                 QualifiedName qname = getQualifiedName(ctx.variable()
                         .qname());
                 IExpression expression = new VariableExpression(qname);
-                TableSourceReference tableSource = new TableSourceReference("", qname, alias);
+                TableSourceReference tableSource = new TableSourceReference(tableSourceCounter++, "", qname, alias);
                 return new ExpressionScan(tableSource, Schema.EMPTY, expression, Location.from(ctx.variable()));
             }
             else if (ctx.expression() != null)
@@ -661,7 +663,7 @@ public class QueryParser
                 }
 
                 IExpression expression = getExpression(ctx.expression());
-                TableSourceReference tableSource = new TableSourceReference("", QualifiedName.of(expression.toString()), alias);
+                TableSourceReference tableSource = new TableSourceReference(tableSourceCounter++, "", QualifiedName.of(expression.toString()), alias);
                 return new ExpressionScan(tableSource, Schema.EMPTY, expression, Location.from(ctx.expression()));
             }
 
@@ -669,7 +671,7 @@ public class QueryParser
             String catalogAlias = defaultIfBlank(getIdentifier(functionCall.functionName().catalog), "");
             String functioName = getIdentifier(ctx.functionCall()
                     .functionName().function);
-            TableSourceReference tableSourceRef = new TableSourceReference(catalogAlias, QualifiedName.of(functioName), alias);
+            TableSourceReference tableSourceRef = new TableSourceReference(tableSourceCounter++, catalogAlias, QualifiedName.of(functioName), alias);
             List<IExpression> arguments = ctx.functionCall().arguments.stream()
                     .map(this::getExpression)
                     .collect(toList());

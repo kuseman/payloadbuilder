@@ -10,15 +10,22 @@ import se.kuseman.payloadbuilder.core.catalog.ColumnReference.Type;
 /** A reference to a table source (table or table-function) */
 public class TableSourceReference
 {
+    private final int id;
     private final String catalogAlias;
     private final QualifiedName name;
     private final String alias;
 
-    public TableSourceReference(String catalogAlias, QualifiedName name, String alias)
+    public TableSourceReference(int id, String catalogAlias, QualifiedName name, String alias)
     {
+        this.id = id;
         this.catalogAlias = requireNonNull(catalogAlias, "catalogAlias");
         this.name = requireNonNull(name, "name");
         this.alias = Objects.toString(alias, "");
+    }
+
+    public int getId()
+    {
+        return id;
     }
 
     public String getCatalogAlias()
@@ -55,10 +62,14 @@ public class TableSourceReference
         {
             return true;
         }
-        if (obj instanceof TableSourceReference)
+        else if (obj == null)
         {
-            TableSourceReference that = (TableSourceReference) obj;
-            return catalogAlias.equals(that.catalogAlias)
+            return false;
+        }
+        else if (obj instanceof TableSourceReference that)
+        {
+            return id == that.id
+                    && catalogAlias.equals(that.catalogAlias)
                     && alias.equals(that.alias)
                     && name.equals(that.name);
         }

@@ -30,9 +30,9 @@ import se.kuseman.payloadbuilder.core.expression.AExpressionTest;
 public abstract class APhysicalPlanTest extends AExpressionTest
 {
     /** Table source reference used in {@link #scan(IDatasource)} */
-    protected final TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "t");
+    protected final TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "t");
     /** Table source reference used in {@link #scan(IDatasource)} */
-    protected final TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+    protected final TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
     protected final CatalogRegistry catalogRegistry = new CatalogRegistry();
     protected final QuerySession session = new QuerySession(catalogRegistry);

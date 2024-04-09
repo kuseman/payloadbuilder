@@ -65,8 +65,8 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         plan = LogicalPlanOptimizer.optimize(context, plan, new HashMap<>());
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference pdArticle = new TableSourceReference("", QualifiedName.of("PDArticle"), "a");
-        TableSourceReference a_resource = new TableSourceReference("", QualifiedName.of("a.resource"), "ar");
+        TableSourceReference pdArticle = new TableSourceReference(0, "", QualifiedName.of("PDArticle"), "a");
+        TableSourceReference a_resource = new TableSourceReference(1, "", QualifiedName.of("a.resource"), "ar");
 
         ColumnReference pdArticleAst = new ColumnReference(pdArticle, "a", ColumnReference.Type.ASTERISK);
         ColumnReference a_resourceAst = new ColumnReference(a_resource, "ar", ColumnReference.Type.ASTERISK);
@@ -162,12 +162,12 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
 
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableProductArticle = new TableSourceReference("", QualifiedName.of("PDProduct_Article"), "a");
-        TableSourceReference tableArticle = new TableSourceReference("", QualifiedName.of("PDArticle"), "a");
-        TableSourceReference tableProduct = new TableSourceReference("", QualifiedName.of("PDProduct"), "p");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "bb");
+        TableSourceReference tableProductArticle = new TableSourceReference(0, "", QualifiedName.of("PDProduct_Article"), "a");
+        TableSourceReference tableArticle = new TableSourceReference(3, "", QualifiedName.of("PDArticle"), "a");
+        TableSourceReference tableProduct = new TableSourceReference(4, "", QualifiedName.of("PDProduct"), "p");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "bb");
 
-        TableSourceReference e_bb = new TableSourceReference("", QualifiedName.of("bb"), "bb");
+        TableSourceReference e_bb = new TableSourceReference(2, "", QualifiedName.of("bb"), "bb");
 
         ColumnReference paAst = new ColumnReference(tableProductArticle, "a", ColumnReference.Type.ASTERISK);
         ColumnReference aAst = new ColumnReference(tableArticle, "a", ColumnReference.Type.ASTERISK);
@@ -274,8 +274,8 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
 
         ILogicalPlan actual = optimize(context, plan);
         
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
         ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         Schema schema = Schema.of(col(ast, Type.Any));
@@ -341,9 +341,9 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
 
         ILogicalPlan actual = optimize(context, plan);
         
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
-        TableSourceReference tableC = new TableSourceReference("", QualifiedName.of("tableC"), "c");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableC = new TableSourceReference(2, "", QualifiedName.of("tableC"), "c");
         ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         ColumnReference cAst = new ColumnReference(tableC, "c", ColumnReference.Type.ASTERISK);
@@ -432,9 +432,9 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
 
         ILogicalPlan actual = optimize(context, plan);
         
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
-        TableSourceReference tableC = new TableSourceReference("", QualifiedName.of("tableC"), "c");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableC = new TableSourceReference(2, "", QualifiedName.of("tableC"), "c");
         ColumnReference ast = new ColumnReference(table, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         ColumnReference cAst = new ColumnReference(tableC, "c", ColumnReference.Type.ASTERISK);
@@ -521,9 +521,9 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
 
         ILogicalPlan actual = optimize(context, plan);
         
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
-        TableSourceReference tableC = new TableSourceReference("", QualifiedName.of("tableC"), "c");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "a");
+        TableSourceReference tableB = new TableSourceReference(2, "", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableC = new TableSourceReference(1, "", QualifiedName.of("tableC"), "c");
         ColumnReference ast = new ColumnReference(table, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         ColumnReference cAst = new ColumnReference(tableC, "c", ColumnReference.Type.ASTERISK);
@@ -573,6 +573,11 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));
 
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(expected);
+
         assertEquals(expected, actual);
     }
 
@@ -598,9 +603,9 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
 
         ILogicalPlan actual = optimize(context, plan);
         
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
-        TableSourceReference tableC = new TableSourceReference("", QualifiedName.of("tableC"), "c");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "a");
+        TableSourceReference tableB = new TableSourceReference(2, "", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableC = new TableSourceReference(1, "", QualifiedName.of("tableC"), "c");
         ColumnReference ast = new ColumnReference(table, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         ColumnReference cAst = new ColumnReference(tableC, "c", ColumnReference.Type.ASTERISK);
@@ -645,6 +650,10 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
 
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(expected);
 
         assertEquals(expected, actual);
     }
@@ -665,8 +674,8 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getColumnResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
         
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
         ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         Schema schema = Schema.of(col(ast, Type.Any));
@@ -721,8 +730,8 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getColumnResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
         
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
         ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         Schema schema = Schema.of(col(ast, Type.Any));
@@ -780,8 +789,8 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getColumnResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
         
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
         ColumnReference ast = new ColumnReference(table, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         Schema schema = Schema.of(col(ast, Type.Any));
@@ -834,9 +843,9 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = getColumnResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
         
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
-        TableSourceReference tableC = new TableSourceReference("", QualifiedName.of("tableC"), "c");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableC = new TableSourceReference(2, "", QualifiedName.of("tableC"), "c");
         ColumnReference ast = new ColumnReference(table, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         ColumnReference cAst = new ColumnReference(tableC, "c", ColumnReference.Type.ASTERISK);

@@ -15,8 +15,8 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 public class ValueVectorAdapter implements ValueVector
 {
     protected ValueVector wrapped;
-    private final int size;
-    private final ResolvedType type;
+    private int size;
+    private ResolvedType type;
 
     public ValueVectorAdapter(ValueVector wrapped)
     {
@@ -28,7 +28,9 @@ public class ValueVectorAdapter implements ValueVector
     /** Set the underlying vector. Use with care since this mutates the state. */
     public void setValueVector(ValueVector vector)
     {
-        this.wrapped = vector;
+        this.wrapped = requireNonNull(vector, "vector");
+        this.size = wrapped.size();
+        this.type = wrapped.type();
     }
 
     @Override

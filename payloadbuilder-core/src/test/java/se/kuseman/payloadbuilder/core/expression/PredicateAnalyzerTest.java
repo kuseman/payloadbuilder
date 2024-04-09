@@ -28,9 +28,9 @@ import se.kuseman.payloadbuilder.test.VectorTestUtils;
 /** Test of {@link PredicateAnalyzer} */
 public class PredicateAnalyzerTest extends APhysicalPlanTest
 {
-    private TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-    private TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
-    private TableSourceReference tableC = new TableSourceReference("", QualifiedName.of("tableC"), "c");
+    private TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+    private TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
+    private TableSourceReference tableC = new TableSourceReference(2, "", QualifiedName.of("tableC"), "c");
     private ColumnReference aCol1 = tableA.column("col1");
     private ColumnReference aFlag = tableA.column("flag");
     private ColumnReference bCol2 = tableB.column("col2");
