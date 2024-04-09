@@ -14,6 +14,7 @@ import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IColumnExpression;
+import se.kuseman.payloadbuilder.api.expression.IDereferenceExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.common.SortItem;
@@ -21,6 +22,7 @@ import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.expression.AExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.ARewriteExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
+import se.kuseman.payloadbuilder.core.expression.DereferenceExpression;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedColumnExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.ALogicalPlanVisitor;
@@ -538,6 +540,17 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         public Void visit(IColumnExpression expression, Set<ColumnReference> context)
         {
             ColumnReference colRef = ((ColumnExpression) expression).getColumnReference();
+            if (colRef != null)
+            {
+                context.add(colRef);
+            }
+            return null;
+        }
+
+        @Override
+        public Void visit(IDereferenceExpression expression, Set<ColumnReference> context)
+        {
+            ColumnReference colRef = ((DereferenceExpression) expression).getColumnReference();
             if (colRef != null)
             {
                 context.add(colRef);

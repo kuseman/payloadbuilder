@@ -118,6 +118,12 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
     @Override
     public ILogicalPlan visit(Projection plan, Ctx context)
     {
+        // Skip asterisk projections
+        if (plan.isAsteriskProjection())
+        {
+            return super.visit(plan, context);
+        }
+
         PlanData planData = context.planDatas.peek();
 
         Map<String, Pair<Integer, QualifiedName>> projectionExpressionByName = new HashMap<>();

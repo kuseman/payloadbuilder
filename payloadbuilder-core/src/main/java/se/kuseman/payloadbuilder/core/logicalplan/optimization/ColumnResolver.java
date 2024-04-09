@@ -176,13 +176,18 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         context.schema = schema;
         List<IExpression> expressions = ColumnResolverVisitor.rewrite(context, plan.getExpressions());
 
-        // Expand all asterisks, they should not be left for execution
-        expressions = expandAsterisks(expressions, context.outerReferences, context.outerSchema, schema);
-
-        if (input instanceof Projection)
+        // Asterisk projection => nothing to expand
+        if (!plan.isAsteriskProjection())
         {
-            expressions = ProjectionMerger.replace(expressions, (Projection) input);
-            input = ((Projection) input).getInput();
+            // Expand all asterisks, they should not be left for execution
+            expressions = expandAsterisks(expressions, context.outerReferences, context.outerSchema, schema);
+
+            if (input instanceof Projection proj
+                    && !proj.isAsteriskProjection())
+            {
+                expressions = ProjectionMerger.replace(expressions, proj);
+                input = proj.getInput();
+            }
         }
 
         context.outerSchema = prevOuterSchema;
@@ -286,14 +291,16 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         if (plan.getPopulateAlias() != null)
         {
             Schema populateSchema = rightSchema.getSchema();
+
             ColumnReference colRef = SchemaUtils.getColumnReference(populateSchema.getColumns()
                     .get(0));
+
             if (colRef != null)
             {
-                colRef = colRef.rename(plan.getPopulateAlias());
+                colRef = colRef.populate(plan.getPopulateAlias());
             }
 
-            resultSchema.add(new AliasSchema(Schema.of(CoreColumn.of(plan.getPopulateAlias(), ResolvedType.table(populateSchema), colRef)), plan.getPopulateAlias()), null);
+            resultSchema.add(new AliasSchema(Schema.of(CoreColumn.of(plan.getPopulateAlias(), ResolvedType.table(populateSchema), colRef)), plan.getPopulateAlias(), null), null);
         }
         else
         {
@@ -460,7 +467,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         }
 
         context.planSchema.push(new ResolveSchema(schema, plan.getTableSource()
-                .getAlias()));
+                .getAlias(), singletonList(plan.getTableSource())));
 
         List<Option> options = plan.getOptions()
                 .stream()
@@ -479,7 +486,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 .toList();
 
         context.planSchema.push(new ResolveSchema(plan.getSchema(), plan.getTableSource()
-                .getAlias()));
+                .getAlias(), singletonList(plan.getTableSource())));
 
         return new TableScan(plan.getTableSchema(), plan.getTableSource(), plan.getProjection(), plan.isTempTable(), options, plan.getLocation());
     }
@@ -531,10 +538,27 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             }
         }
 
+        List<TableSourceReference> tableSources = new ArrayList<>();
+        tableSources.add(plan.getTableSource());
+        ColumnReference colRef = null;
+        if (expression instanceof HasColumnReference hcr)
+        {
+            colRef = hcr.getColumnReference();
+
+            // Add all linked table sources to alias schema
+            ColumnReference cr = colRef;
+            while (cr != null)
+            {
+                tableSources.add(cr.getTableSource());
+                cr = cr.getLinkedColumnReference();
+            }
+
+        }
+
         if (SchemaUtils.isAsterisk(schema, true))
         {
             // Set an asterisk schema with expression scans table source
-            ColumnReference ast = new ColumnReference(plan.getTableSource(), plan.getAlias(), ColumnReference.Type.ASTERISK);
+            ColumnReference ast = new ColumnReference(colRef, plan.getTableSource(), plan.getAlias(), ColumnReference.Type.ASTERISK);
             schema = Schema.of(CoreColumn.of(ast, ResolvedType.of(Type.Any)));
         }
         else
@@ -546,7 +570,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         context.schema = prevSchema;
 
         context.planSchema.push(new ResolveSchema(schema, plan.getTableSource()
-                .getAlias()));
+                .getAlias(), tableSources));
 
         return new ExpressionScan(plan.getTableSource(), schema, expression, plan.getLocation());
     }
@@ -583,7 +607,8 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
 
                 int startIndex = 0;
                 int populateIndex = -1;
-                ColumnReference populatedColRef = null;
+                boolean useColumnReference = true;
+                TableSourceReference populatedTableSource = null;
                 String populateAlias = null;
                 ResolveSchema schema = null;
                 boolean outerReference = false;
@@ -640,17 +665,39 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                     populateIndex = startIndex;
                     populateAlias = qname.getFirst()
                             .toLowerCase();
+
+                    ColumnReference colRef = SchemaUtils.getColumnReference(schema.getColumn(0)
+                            .getValue());
+                    if (colRef != null)
+                    {
+                        populatedTableSource = colRef.getTableSource();
+                    }
+
                     schema = new ResolveSchema(schema.getColumn(0)
                             .getValue()
                             .getType()
                             .getSchema());
 
-                    // The column of a populated join uses the first columns column reference of the populated schema
-                    // and we need to set that column reference on all expanded column expressions
-                    // to properly make ColumnExpression#eval work
-                    populatedColRef = SchemaUtils.getColumnReference(schema.getColumn(0)
-                            .getValue());
                     size = schema.getSize();
+                    Set<TableSourceReference> populatedReferences = new HashSet<>();
+
+                    for (int i = 0; i < size; i++)
+                    {
+                        Column column = schema.getColumn(i)
+                                .getValue();
+                        colRef = SchemaUtils.getColumnReference(column);
+                        if (colRef != null)
+                        {
+                            populatedReferences.add(colRef.getTableSource());
+                        }
+                    }
+
+                    // If we reference multi table source for the populated alias columns
+                    // we cannot use column reference, need to fallback to column/ordinal
+                    if (populatedReferences.size() > 1)
+                    {
+                        useColumnReference = false;
+                    }
                 }
 
                 for (int i = 0; i < size; i++)
@@ -665,9 +712,25 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                         continue;
                     }
 
-                    // We use the first columns colref if it's a populated schema
-                    ColumnReference colRef = populatedColRef != null ? populatedColRef
-                            : SchemaUtils.getColumnReference(column);
+                    ColumnReference colRef = SchemaUtils.getColumnReference(column);
+                    // If we targeting a sub query with multiple table references
+                    // we resolve with either ordinal or column and no column reference
+                    if (!useColumnReference)
+                    {
+                        colRef = null;
+                    }
+                    else if (populatedTableSource != null
+                            && colRef != null)
+                    {
+                        // Don't link to our selves
+                        ColumnReference linked = colRef;
+                        if (populatedTableSource.equals(colRef.getTableSource()))
+                        {
+                            linked = null;
+                        }
+
+                        colRef = new ColumnReference(linked, populatedTableSource, colRef.getName(), colRef.getType());
+                    }
 
                     int index;
                     QualifiedName path;
@@ -778,6 +841,63 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 context.outerSchema = outerSchema;
             }
             return result;
+        }
+
+        @Override
+        public IExpression visit(AsteriskExpression expression, Ctx context)
+        {
+            Set<TableSourceReference> tableSources = new HashSet<>();
+            String alias = expression.getQname()
+                    .size() > 0 ? expression.getQname()
+                            .getAlias()
+                            : null;
+            // No qualifier => add all available table sources from schemas
+            if (alias == null)
+            {
+                // Use current schema if any (this means we have a projection targeting a table source of some kind)
+                if (context.schema != null)
+                {
+                    for (AliasSchema schema : context.schema.schemas)
+                    {
+                        if (schema.tableSources != null)
+                        {
+                            tableSources.addAll(schema.tableSources);
+                        }
+                    }
+                }
+                // .. else use outer schema if any
+                else if (context.outerSchema != null)
+                {
+                    for (AliasSchema schema : context.outerSchema.schemas)
+                    {
+                        if (schema.tableSources != null)
+                        {
+                            tableSources.addAll(schema.tableSources);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                Pair<Integer, ResolveSchema> resolveSchema = context.schema.getResolveSchema(alias);
+                if (resolveSchema == null
+                        && context.outerSchema != null)
+                {
+                    resolveSchema = context.outerSchema.getResolveSchema(alias);
+                }
+                if (resolveSchema != null)
+                {
+                    for (AliasSchema schema : resolveSchema.getValue().schemas)
+                    {
+                        if (schema.tableSources != null)
+                        {
+                            tableSources.addAll(schema.tableSources);
+                        }
+                    }
+                }
+            }
+
+            return new AsteriskExpression(expression.getQname(), expression.getLocation(), tableSources);
         }
 
         @Override
@@ -966,9 +1086,11 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 // Applying lambda to a table yields an object with the same schema
                 if (type == Column.Type.Table)
                 {
-                    return DereferenceExpression.create(ColumnExpression.Builder.of(alias, ResolvedType.object(lambdaType.getSchema()))
+                    ColumnExpression ce = ColumnExpression.Builder.of(alias, ResolvedType.object(lambdaType.getSchema()))
                             .withLambdaId(lambdaId)
-                            .build(), path, expression.getLocation());
+                            .build();
+
+                    return DereferenceExpression.create(ce, path, expression.getLocation());
                 }
                 // Applying a lambda to an array then we will get the sub type
                 else if (type == Column.Type.Array)
@@ -998,10 +1120,14 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 result = resolve(expression.getColumn(), schema, alias, column, null, lambdaId, expression.getLocation());
             }
 
+            boolean aliasMatch = result != null
+                    && !"".equals(alias);
+
             // Search in outer scope
             // NOTE! Schema is the same as the outer schema when resolving a projection with subexpressions
             if (outerSchema != null
-                    && schema != outerSchema)
+                    && schema != outerSchema
+                    && !aliasMatch)
             {
                 IExpression maybeResult = result;
                 ColumnReference colRef = null;
@@ -1252,6 +1378,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 {
                     colRef = colRef.rename(column);
                 }
+
                 match = CoreColumn.of(colRef.getName(), match.getType(), colRef);
                 builder.withColumnReference(colRef);
             }
@@ -1285,13 +1412,13 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         /** Construct a resolve schema from a single regular schema */
         ResolveSchema(Schema schema)
         {
-            this(schema, "");
+            this(schema, "", null);
         }
 
         /** Construct a resolve schema from a single regular schema */
-        ResolveSchema(Schema schema, String alias)
+        ResolveSchema(Schema schema, String alias, List<TableSourceReference> tableSources)
         {
-            schemas.add(new AliasSchema(schema, alias));
+            schemas.add(new AliasSchema(schema, alias, tableSources));
         }
 
         /** Copy a resolve schema but change it's alias */
@@ -1312,7 +1439,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 }
             }
 
-            schemas.add(new AliasSchema(result, alias));
+            schemas.add(new AliasSchema(result, alias, null));
         }
 
         boolean isEmpty()
@@ -1446,11 +1573,13 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
     {
         final Schema schema;
         final String alias;
+        final List<TableSourceReference> tableSources;
 
-        AliasSchema(Schema schema, String alias)
+        AliasSchema(Schema schema, String alias, List<TableSourceReference> tableSources)
         {
             this.schema = schema;
             this.alias = alias;
+            this.tableSources = tableSources;
         }
     }
 }

@@ -18,11 +18,12 @@ import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.ISubscriptExpression;
+import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 
 /** Subscript. index acces etc. ie "array[0]" */
-public class SubscriptExpression implements ISubscriptExpression, HasAlias
+public class SubscriptExpression implements ISubscriptExpression, HasAlias, HasColumnReference
 {
     private final IExpression value;
     private final IExpression subscript;
@@ -49,6 +50,16 @@ public class SubscriptExpression implements ISubscriptExpression, HasAlias
     public List<IExpression> getChildren()
     {
         return asList(value, subscript);
+    }
+
+    @Override
+    public ColumnReference getColumnReference()
+    {
+        if (value instanceof HasColumnReference hcr)
+        {
+            return hcr.getColumnReference();
+        }
+        return null;
     }
 
     @Override

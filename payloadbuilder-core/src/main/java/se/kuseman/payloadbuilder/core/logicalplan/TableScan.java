@@ -4,8 +4,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 import java.util.List;
-
-import org.apache.commons.lang3.ObjectUtils;
+import java.util.Optional;
 
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -18,18 +17,18 @@ public class TableScan extends TableSource
 {
     private final TableSourceReference tableSource;
     /** List of projected columns */
-    private final List<String> projection;
+    private final Optional<List<String>> projection;
     private final TableSchema tableSchema;
     private final boolean tempTable;
     private final List<Option> options;
     private final Location location;
 
-    public TableScan(TableSchema tableSchema, TableSourceReference tableSource, List<String> projection, boolean tempTable, List<Option> options, Location location)
+    public TableScan(TableSchema tableSchema, TableSourceReference tableSource, Optional<List<String>> projection, boolean tempTable, List<Option> options, Location location)
     {
         super(requireNonNull(tableSource, "tableSource").getCatalogAlias(), tableSource.getAlias());
         this.tableSchema = requireNonNull(tableSchema, "tableSchema");
         this.tableSource = tableSource;
-        this.projection = ObjectUtils.defaultIfNull(projection, emptyList());
+        this.projection = requireNonNull(projection, "projection");
         this.tempTable = tempTable;
         this.options = requireNonNull(options, "options");
         this.location = location;
@@ -40,7 +39,7 @@ public class TableScan extends TableSource
         return tableSource;
     }
 
-    public List<String> getProjection()
+    public Optional<List<String>> getProjection()
     {
         return projection;
     }
@@ -100,9 +99,8 @@ public class TableScan extends TableSource
         {
             return false;
         }
-        else if (obj instanceof TableScan)
+        else if (obj instanceof TableScan that)
         {
-            TableScan that = (TableScan) obj;
             return super.equals(that)
                     && tableSchema.equals(that.tableSchema)
                     && tableSource.equals(that.tableSource)

@@ -8,6 +8,7 @@ import static se.kuseman.payloadbuilder.core.logicalplan.optimization.LogicalPla
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -155,9 +156,10 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
                     catalog = context.context.getSession()
                             .getDefaultCatalogAlias();
 
-                    TableScan catalogFunctionsScan = new TableScan(TableSchema.EMPTY, new TableSourceReference("sys", QualifiedName.of(catalog, "functions"), "fCat"), emptyList(), false, emptyList(),
+                    TableScan catalogFunctionsScan = new TableScan(TableSchema.EMPTY, new TableSourceReference(0, "sys", QualifiedName.of(catalog, "functions"), "fCat"), Optional.empty(), false,
+                            emptyList(), null);
+                    TableScan systemFunctionsScan = new TableScan(TableSchema.EMPTY, new TableSourceReference(1, "sys", QualifiedName.of("functions"), "fSys"), Optional.empty(), false, emptyList(),
                             null);
-                    TableScan systemFunctionsScan = new TableScan(TableSchema.EMPTY, new TableSourceReference("sys", QualifiedName.of("functions"), "fSys"), emptyList(), false, emptyList(), null);
 
                     // Order by type and name
                     List<SortItem> sortItems = asList(new SortItem(new LiteralIntegerExpression(2), Order.ASC, NullOrder.UNDEFINED, null),
@@ -190,8 +192,8 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
 
         QualifiedName qname = isBlank(catalog) ? QualifiedName.of(tableName)
                 : QualifiedName.of(catalog, tableName);
-        TableSourceReference tableSourceRef = new TableSourceReference("sys", qname, "t");
-        return new LogicalSelectStatement(new TableScan(TableSchema.EMPTY, tableSourceRef, emptyList(), false, emptyList(), null), false).accept(this, context);
+        TableSourceReference tableSourceRef = new TableSourceReference(0, "sys", qname, "t");
+        return new LogicalSelectStatement(new TableScan(TableSchema.EMPTY, tableSourceRef, Optional.empty(), false, emptyList(), null), false).accept(this, context);
     }
 
     @Override

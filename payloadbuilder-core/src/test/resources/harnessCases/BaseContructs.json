@@ -1247,7 +1247,7 @@
         "select ",
         " (select c.* for object_array) obj",
         "from source s ",
-        "inner populate join data d ",   
+        "inner populate join data d ",
         "  on d.id = s.col1 "  
       ],
       "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
@@ -1259,20 +1259,21 @@
         "select ",
         " (select * for object_array) obj",
         "from source s ",
-        "inner populate join data d ",   
-        "  on d.id = s.col1 "  
+        "inner populate join data d ",
+        "  on d.id = s.col1 "
       ],
       "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
       "expectedMessageContains": "Must specify table source"
     },
     {
-      "name": "Selects with for output and asterisk projection with open_table",
+      "name": "Selects with for output and asterisk projection with expression scan",
       "query": [
+        "--set @@printplan = true ",
         "select ",
         " (select * from (d) d for object_array) obj",
         "from source s ",
-        "inner populate join data d ",   
-        "  on d.id = s.col1 "  
+        "inner populate join data d ",
+        "  on d.id = s.col1 "
       ],
       "expectedResultSets": [
         [

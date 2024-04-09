@@ -1,24 +1,31 @@
 package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
+import static java.util.Collections.unmodifiableList;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
 
 /** Gathers projection columns and pushes them down to scan operators */
 class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
 {
+    private static final Set<String> ASTERISK_PROJECTION = emptySet();
+
     ProjectionPushDown()
     {
         // No expression rewrite here
@@ -32,6 +39,8 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
             super(context);
         }
 
+        /** Collect phase, first run we collect columns only and don't re-create table scans */
+        boolean collect = true;
         Map<TableSourceReference, Set<String>> columnsByAlias = new HashMap<>();
     }
 
@@ -44,7 +53,15 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
     @Override
     ILogicalPlan optimize(Context context, ILogicalPlan plan)
     {
-        return plan.accept(this, (Ctx) context);
+        Ctx ctx = (Ctx) context;
+
+        // First we only traverse and collect columns
+        plan.accept(this, ctx);
+
+        ctx.collect = false;
+
+        return plan.accept(this, ctx);
+
     }
 
     /*
@@ -85,6 +102,11 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
     @Override
     protected IExpression visit(ILogicalPlan plan, IExpression expression, Ctx context)
     {
+        if (!context.collect)
+        {
+            return expression;
+        }
+
         visit(plan, singletonList(expression), context);
         return expression;
     }
@@ -92,18 +114,59 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
     @Override
     protected List<IExpression> visit(ILogicalPlan plan, List<IExpression> expressions, Ctx context)
     {
-        Set<ColumnReference> columns = collectColumns(expressions);
+        if (!context.collect)
+        {
+            return expressions;
+        }
 
+        for (IExpression expression : expressions)
+        {
+            // Asterisk projection, mark table sources
+            if (expression instanceof AsteriskExpression ae
+                    && ae.getQname()
+                            .size() == 0)
+            {
+                for (TableSourceReference tsr : ae.getTableSources())
+                {
+                    context.columnsByAlias.put(tsr, ASTERISK_PROJECTION);
+                }
+            }
+        }
+
+        Set<ColumnReference> columns = collectColumns(expressions);
+        List<ColumnReference> colRefs = new ArrayList<>();
         for (ColumnReference extractedColumn : columns)
         {
-            if (extractedColumn.isAsterisk())
+            colRefs.clear();
+            ColumnReference cr = extractedColumn;
+            while (cr != null)
             {
-                continue;
+                colRefs.add(cr);
+                cr = cr.getLinkedColumnReference();
             }
 
-            TableSourceReference tableSource = extractedColumn.getTableSource();
-            context.columnsByAlias.computeIfAbsent(tableSource, k -> new HashSet<>())
-                    .add(extractedColumn.getName());
+            for (ColumnReference colRef : colRefs)
+            {
+                TableSourceReference tableSource = colRef.getTableSource();
+                Set<String> projectionColumns = context.columnsByAlias.computeIfAbsent(tableSource, k -> new HashSet<>());
+                if (projectionColumns == ASTERISK_PROJECTION)
+                {
+                    continue;
+                }
+
+                // Mark that current table source is asterisk and we cannot project any columns
+                if (extractedColumn.isAsterisk())
+                {
+                    context.columnsByAlias.put(tableSource, ASTERISK_PROJECTION);
+                    continue;
+                }
+
+                // Populated columns aren't real columns so skip those
+                if (!extractedColumn.isPopulated())
+                {
+                    projectionColumns.add(extractedColumn.getName());
+                }
+            }
         }
 
         return expressions;
@@ -112,13 +175,41 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
     @Override
     protected TableScan create(TableScan plan, Ctx context)
     {
+        // Wrong phase
+        if (context.collect)
+        {
+            return plan;
+        }
+
+        Optional<List<String>> projection;
         Set<String> columns = context.columnsByAlias.get(plan.getTableSource());
-        if (columns != null)
+
+        // Nothing touched this table source => no projected columns
+        // This happens when this table scan is present in tree but nothing is used ie.
+        // select b.*
+        // from tableA
+        // cross apply (
+        // select 123 col
+        // ) b
+        //
+        //
+        if (columns == null)
+        {
+            projection = Optional.of(emptyList());
+        }
+        // This table source has been referenced by an asterisk projection => no specific projection ie. all columns wanted
+        else if (columns == ASTERISK_PROJECTION)
+        {
+            projection = Optional.empty();
+        }
+        // Only a subset of columns wanted
+        else
         {
             List<String> tableColumns = new ArrayList<>(columns);
             tableColumns.sort(String::compareTo);
-            return new TableScan(plan.getTableSchema(), plan.getTableSource(), tableColumns, plan.isTempTable(), plan.getOptions(), plan.getLocation());
+            projection = Optional.of(unmodifiableList(tableColumns));
         }
-        return plan;
+
+        return new TableScan(plan.getTableSchema(), plan.getTableSource(), projection, plan.isTempTable(), plan.getOptions(), plan.getLocation());
     }
 }

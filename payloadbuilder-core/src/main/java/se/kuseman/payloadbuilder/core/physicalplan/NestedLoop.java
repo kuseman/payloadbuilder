@@ -234,7 +234,6 @@ public class NestedLoop implements IPhysicalPlan
                     .get(0));
             colRef = colRef != null ? colRef.rename(populateAlias)
                     : null;
-
             columns.add(CoreColumn.of(populateAlias, ResolvedType.table(innerSchema), colRef));
         }
         else
@@ -501,9 +500,8 @@ public class NestedLoop implements IPhysicalPlan
         {
             return true;
         }
-        else if (obj instanceof NestedLoop)
+        else if (obj instanceof NestedLoop that)
         {
-            NestedLoop that = (NestedLoop) obj;
             return nodeId == that.nodeId
                     && inner.equals(that.inner)
                     && outer.equals(that.outer)

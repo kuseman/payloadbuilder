@@ -5,20 +5,38 @@ import static java.util.Objects.requireNonNull;
 import java.util.Objects;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference.Type;
 
 /** A reference to a table source (table or table-function) */
 public class TableSourceReference
 {
+    private final int id;
     private final String catalogAlias;
     private final QualifiedName name;
     private final String alias;
+    private final Type type;
 
-    public TableSourceReference(String catalogAlias, QualifiedName name, String alias)
+    public TableSourceReference(int id, String catalogAlias, QualifiedName name, String alias)
     {
+        this(id, Type.REGULAR, catalogAlias, name, alias);
+    }
+
+    public TableSourceReference(int id, Type type, String catalogAlias, QualifiedName name, String alias)
+    {
+        this.id = id;
         this.catalogAlias = requireNonNull(catalogAlias, "catalogAlias");
         this.name = requireNonNull(name, "name");
         this.alias = Objects.toString(alias, "");
+        this.type = type;
+    }
+
+    public int getId()
+    {
+        return id;
+    }
+
+    public Type getType()
+    {
+        return type;
     }
 
     public String getCatalogAlias()
@@ -39,7 +57,7 @@ public class TableSourceReference
     /** Construct a regular column reference from this table source */
     public ColumnReference column(String column)
     {
-        return new ColumnReference(this, column, Type.REGULAR);
+        return new ColumnReference(this, column, ColumnReference.Type.REGULAR);
     }
 
     @Override
@@ -55,10 +73,14 @@ public class TableSourceReference
         {
             return true;
         }
-        if (obj instanceof TableSourceReference)
+        else if (obj == null)
         {
-            TableSourceReference that = (TableSourceReference) obj;
-            return catalogAlias.equals(that.catalogAlias)
+            return false;
+        }
+        else if (obj instanceof TableSourceReference that)
+        {
+            return id == that.id
+                    && catalogAlias.equals(that.catalogAlias)
                     && alias.equals(that.alias)
                     && name.equals(that.name);
         }
@@ -71,5 +93,12 @@ public class TableSourceReference
         // es#table
         return ("".equals(catalogAlias) ? ""
                 : catalogAlias + "#") + name;
+    }
+
+    /** Type of table source. */
+    public enum Type
+    {
+        POPULATED,
+        REGULAR
     }
 }

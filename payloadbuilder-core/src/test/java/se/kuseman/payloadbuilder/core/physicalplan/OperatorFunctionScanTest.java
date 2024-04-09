@@ -28,7 +28,7 @@ import se.kuseman.payloadbuilder.core.execution.OutputWriterUtils;
 /** Test of {@link OperatorFunctionScan} */
 public class OperatorFunctionScanTest extends APhysicalPlanTest
 {
-    private final TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "a");
+    private final TableSourceReference table = new TableSourceReference(-1, "", QualifiedName.of("table"), "a");
     private final Schema schema = Schema.of(CoreColumn.of(table.column("col1"), ResolvedType.of(Type.Any)), CoreColumn.of(table.column("col2"), ResolvedType.of(Type.Any)));
 
     @Test

@@ -14,17 +14,17 @@ import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 public class SchemaUtils
 {
     /** Populate this schema with a populated column. Returns a new schema */
-    public static Schema populate(Schema target, String name, Schema populatedSchema)
+    public static Schema populate(Schema target, String populateAlias, Schema populatedSchema)
     {
         List<Column> columns = new ArrayList<>(target.getSize() + 1);
         columns.addAll(target.getColumns());
         ColumnReference colRef = populatedSchema.getSize() > 0 ? getColumnReference(populatedSchema.getColumns()
                 .get(0))
                 : null;
-        colRef = colRef != null ? colRef.rename(name)
+        colRef = colRef != null ? colRef.rename(populateAlias)
                 : null;
 
-        Column populatedColumn = CoreColumn.of(name, ResolvedType.table(populatedSchema), colRef);
+        Column populatedColumn = CoreColumn.of(populateAlias, ResolvedType.table(populatedSchema), colRef);
         columns.add(populatedColumn);
         return new Schema(columns);
     }

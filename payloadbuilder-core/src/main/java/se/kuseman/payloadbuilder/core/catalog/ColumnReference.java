@@ -7,15 +7,35 @@ import java.util.Objects;
 /** Meta data about a column reference in an expression and schema */
 public class ColumnReference
 {
+    /** If this reference is recreated from another reference this is the link back to the source */
+    private final ColumnReference linkedColumnReference;
     private final TableSourceReference tableSource;
     private final String name;
     private final Type type;
+    private final boolean populated;
 
     public ColumnReference(TableSourceReference tableSource, String name, Type type)
     {
+        this(null, tableSource, name, type);
+    }
+
+    public ColumnReference(ColumnReference linkedColumnReference, TableSourceReference tableSource, String name, Type type)
+    {
+        this(linkedColumnReference, tableSource, name, type, false);
+    }
+
+    public ColumnReference(ColumnReference linkedColumnReference, TableSourceReference tableSource, String name, Type type, boolean populated)
+    {
+        this.linkedColumnReference = linkedColumnReference;
         this.tableSource = requireNonNull(tableSource, "tableSource");
         this.name = requireNonNull(name, "name");
         this.type = type;
+        this.populated = populated;
+    }
+
+    public ColumnReference getLinkedColumnReference()
+    {
+        return linkedColumnReference;
     }
 
     public TableSourceReference getTableSource()
@@ -33,6 +53,11 @@ public class ColumnReference
         return type;
     }
 
+    public boolean isPopulated()
+    {
+        return populated;
+    }
+
     public boolean isAsterisk()
     {
         return type == Type.ASTERISK;
@@ -43,8 +68,14 @@ public class ColumnReference
      */
     public ColumnReference rename(String column)
     {
-        return new ColumnReference(tableSource, column, type == Type.ASTERISK ? Type.NAMED_ASTERISK
-                : type);
+        return new ColumnReference(linkedColumnReference, tableSource, column, type == Type.ASTERISK ? Type.NAMED_ASTERISK
+                : type, populated);
+    }
+
+    public ColumnReference populate(String populateAlias)
+    {
+        return new ColumnReference(linkedColumnReference, tableSource, populateAlias, type == Type.ASTERISK ? Type.NAMED_ASTERISK
+                : type, true);
     }
 
     @Override
@@ -60,12 +91,17 @@ public class ColumnReference
         {
             return true;
         }
-        if (obj instanceof ColumnReference)
+        else if (obj == null)
         {
-            ColumnReference that = (ColumnReference) obj;
-            return tableSource.equals(that.tableSource)
+            return false;
+        }
+        else if (obj instanceof ColumnReference that)
+        {
+            return Objects.equals(linkedColumnReference, that.linkedColumnReference)
+                    && tableSource.equals(that.tableSource)
                     && name.equals(that.name)
-                    && type == that.type;
+                    && type == that.type
+                    && populated == that.populated;
         }
         return false;
     }

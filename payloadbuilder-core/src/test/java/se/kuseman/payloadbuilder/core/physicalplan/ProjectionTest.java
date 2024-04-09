@@ -83,8 +83,8 @@ public class ProjectionTest extends APhysicalPlanTest
     @Test
     public void test_schema_less_with_asteirsk()
     {
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
         // Asterisk column existing on the projection expressions from planning
         // CSOFF

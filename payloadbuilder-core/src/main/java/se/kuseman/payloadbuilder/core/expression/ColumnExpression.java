@@ -190,8 +190,9 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
             // this columns belongs to and we don't have an ordinal
             if (columnReference != null
                     && (schemaColRef == null
-                            || !columnReference.getTableSource()
-                                    .equals(schemaColRef.getTableSource())))
+                            || columnReference.getTableSource()
+                                    .getId() != schemaColRef.getTableSource()
+                                            .getId()))
             {
                 continue;
             }

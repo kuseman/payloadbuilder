@@ -3,6 +3,8 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 
+import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 
 import org.assertj.core.api.Assertions;
@@ -19,11 +21,13 @@ import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
+import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.UnresolvedSubQueryExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.Limit;
 import se.kuseman.payloadbuilder.core.logicalplan.OperatorFunctionScan;
+import se.kuseman.payloadbuilder.core.logicalplan.Projection;
 import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
 import se.kuseman.payloadbuilder.core.parser.Location;
 import se.kuseman.payloadbuilder.core.parser.ParseException;
@@ -39,7 +43,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select * from sys#functions");
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableSource = new TableSourceReference("sys", QualifiedName.of("functions"), "");
+        TableSourceReference tableSource = new TableSourceReference(0, "sys", QualifiedName.of("functions"), "");
         ColumnReference name = tableSource.column("name");
         ColumnReference type = tableSource.column("type");
         ColumnReference description = tableSource.column("description");
@@ -47,7 +51,10 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         Schema expectedSchema = Schema.of(col(name, Type.String), col(type, Type.String), col(description, Type.String));
 
         //@formatter:off
-        ILogicalPlan expected = new TableScan(new TableSchema(expectedSchema), tableSource, emptyList(), false, emptyList(), null);
+        ILogicalPlan expected = new Projection(
+                new TableScan(new TableSchema(expectedSchema), tableSource, Optional.empty(), false, emptyList(), null),
+                asList(new AsteriskExpression(null)),
+                false);
         //@formatter:on
 
         assertEquals(expectedSchema, actual.getSchema());
@@ -60,7 +67,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select top 10 * from sys#functions");
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableSource = new TableSourceReference("sys", QualifiedName.of("functions"), "");
+        TableSourceReference tableSource = new TableSourceReference(0, "sys", QualifiedName.of("functions"), "");
         ColumnReference name = tableSource.column("name");
         ColumnReference type = tableSource.column("type");
         ColumnReference description = tableSource.column("description");
@@ -70,8 +77,11 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         //@formatter:off
         ILogicalPlan expected =
                 new Limit(
-                        new TableScan(new TableSchema(expectedSchema), tableSource, emptyList(), false, emptyList(), null),
-                        e("10"));
+                    new Projection(
+                        new TableScan(new TableSchema(expectedSchema), tableSource, Optional.empty(), false, emptyList(), null),
+                        List.of(new AsteriskExpression(null)),
+                        false),
+                e("10"));
         //@formatter:on
 
         assertEquals(expectedSchema, actual.getSchema());
@@ -148,7 +158,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select 12345, (select * from sys#tables for object_array) tables");
         ILogicalPlan actual = optimize(context, plan);
 
-        TableSourceReference tableSource = new TableSourceReference("sys", QualifiedName.of("tables"), "");
+        TableSourceReference tableSource = new TableSourceReference(0, "sys", QualifiedName.of("tables"), "");
         ColumnReference name = tableSource.column("name");
         ColumnReference schema = tableSource.column("schema");
         ColumnReference rows = tableSource.column("rows");
@@ -164,7 +174,10 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
                             new UnresolvedSubQueryExpression(
                                 new OperatorFunctionScan(
                                    Schema.of(Column.of("output", Type.Any)),
-                                   new TableScan(new TableSchema(expectedSchema), tableSource, asList(), false, emptyList(), null),
+                                   new Projection(
+                                       new TableScan(new TableSchema(expectedSchema), tableSource, Optional.empty(), false, emptyList(), null),
+                                       List.of(new AsteriskExpression(null)),
+                                       false),
                                    "",
                                    "object_array",
                                    null

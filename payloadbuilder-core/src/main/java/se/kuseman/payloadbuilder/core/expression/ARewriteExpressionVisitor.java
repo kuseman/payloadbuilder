@@ -233,7 +233,8 @@ public abstract class ARewriteExpressionVisitor<C> extends AExpressionVisitor<IE
     {
         if (((DereferenceExpression) expression).isResolved())
         {
-            return new DereferenceExpression(visit(expression.getExpression(), context), expression.getRight(), ((DereferenceExpression) expression).getOrdinal(), expression.getType());
+            return new DereferenceExpression(visit(expression.getExpression(), context), expression.getRight(), ((DereferenceExpression) expression).getOrdinal(), expression.getType(),
+                    ((DereferenceExpression) expression).getColumnReference());
         }
         return new DereferenceExpression(visit(expression.getExpression(), context), expression.getRight());
     };

@@ -25,7 +25,7 @@ public class Join implements ILogicalPlan
     private final ILogicalPlan outer;
     private final ILogicalPlan inner;
     private final Type type;
-    /** Populate alias if this is populate join else null */
+    /** Populate table source if this is populate join else null */
     private final String populateAlias;
     private final IExpression condition;
     private final Set<Column> outerReferences;
@@ -99,7 +99,6 @@ public class Join implements ILogicalPlan
             ColumnReference colRef = SchemaUtils.getColumnReference(column);
             colRef = colRef != null ? colRef.rename(populateAlias)
                     : null;
-
             columns.add(CoreColumn.of(populateAlias, ResolvedType.table(innerSchema), colRef));
         }
         else
@@ -131,9 +130,16 @@ public class Join implements ILogicalPlan
     @Override
     public boolean equals(Object obj)
     {
-        if (obj instanceof Join)
+        if (obj == this)
         {
-            Join that = (Join) obj;
+            return true;
+        }
+        else if (obj == null)
+        {
+            return false;
+        }
+        else if (obj instanceof Join that)
+        {
             return outer.equals(that.outer)
                     && inner.equals(that.inner)
                     && type == that.type

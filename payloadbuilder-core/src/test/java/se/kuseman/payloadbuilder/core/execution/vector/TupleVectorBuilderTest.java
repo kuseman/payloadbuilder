@@ -4,7 +4,9 @@ import static java.util.Arrays.asList;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.util.BitSet;
+import java.util.Random;
 
+import org.assertj.core.api.Assertions;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -16,6 +18,7 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
+import se.kuseman.payloadbuilder.core.parser.Location;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link TupleVectorBuilder} */
@@ -126,6 +129,11 @@ public class TupleVectorBuilderTest extends Assert
                 Column.of("col2", Type.Long),
                 CoreColumn.of("p", ResolvedType.table(innerSchema))
         );
+
+        Assertions.assertThat(actual.getSchema())
+            .usingRecursiveComparison()
+            .ignoringFieldsOfTypes(Location.class, Random.class)
+            .isEqualTo(expectedSchema);
 
         assertEquals(expectedSchema, actual.getSchema());
 

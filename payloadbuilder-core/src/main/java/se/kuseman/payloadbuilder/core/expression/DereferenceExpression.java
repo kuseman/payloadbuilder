@@ -33,6 +33,7 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
     private final String right;
     private final int ordinal;
     private final ResolvedType resolvedType;
+    private final ColumnReference columnReference;
 
     /** Unresolved ctor */
     public DereferenceExpression(IExpression left, String right)
@@ -41,15 +42,23 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
         this.right = requireNonNull(right, "right");
         this.ordinal = -1;
         this.resolvedType = null;
+        this.columnReference = null;
     }
 
     /** Resolved ctor */
     public DereferenceExpression(IExpression left, String right, int ordinal, ResolvedType resolvedType)
     {
+        this(left, right, ordinal, resolvedType, null);
+    }
+
+    /** Resolved ctor */
+    public DereferenceExpression(IExpression left, String right, int ordinal, ResolvedType resolvedType, ColumnReference columnReference)
+    {
         this.left = requireNonNull(left, "left");
         this.right = requireNonNull(right, "right");
         this.ordinal = ordinal;
         this.resolvedType = requireNonNull(resolvedType);
+        this.columnReference = columnReference;
     }
 
     @Override
@@ -83,6 +92,11 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
     @Override
     public ColumnReference getColumnReference()
     {
+        if (columnReference != null)
+        {
+            return columnReference;
+        }
+
         if (left instanceof HasColumnReference)
         {
             return ((HasColumnReference) left).getColumnReference();
@@ -322,7 +336,17 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
     /** Create a resolved dereference expression. NOTE! Requires that expression is resolved */
     public static IExpression create(IExpression expression, QualifiedName qname, Location location)
     {
+        boolean columnReferenceSet = false;
+        // If we are dereferencing a column expression with a column reference that means
+        // we are targeting a nested property like a map etc. and then we should not add another column reference
+        // on resulting deref.
+        if (expression instanceof ColumnExpression ce
+                && ce.getColumnReference() != null)
+        {
+            columnReferenceSet = true;
+        }
         IExpression result = expression;
+
         // Create nested dereference for all parts in qname
         int size = qname.size();
         for (int i = 0; i < size; i++)
@@ -332,6 +356,7 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
 
             int ordinal = -1;
             ResolvedType resolvedType = ResolvedType.of(Type.Any);
+            ColumnReference colRef = null;
 
             // Resolve this de-reference ordinal and type
             ResolvedType type = result.getType();
@@ -343,10 +368,20 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
                 {
                     resolvedType = ResolvedType.array(pair.getKey()
                             .getType());
+                    colRef = SchemaUtils.getColumnReference(pair.getKey());
                 }
                 else
                 {
                     resolvedType = ResolvedType.array(resolvedType);
+                    // Asterisk schema, pick the column reference from the first column
+                    if (type.getSchema()
+                            .getSize() == 1
+                            && SchemaUtils.isAsterisk(type.getSchema()))
+                    {
+                        colRef = SchemaUtils.getColumnReference(type.getSchema()
+                                .getColumns()
+                                .get(0));
+                    }
                 }
             }
             else if (type.getType() == Type.Object)
@@ -357,10 +392,34 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
                 {
                     resolvedType = pair.getKey()
                             .getType();
+                    colRef = SchemaUtils.getColumnReference(pair.getKey());
+                }
+                else
+                {
+                    // Asterisk schema, pick the column reference from the first column
+                    if (type.getSchema()
+                            .getSize() == 1
+                            && SchemaUtils.isAsterisk(type.getSchema()))
+                    {
+                        colRef = SchemaUtils.getColumnReference(type.getSchema()
+                                .getColumns()
+                                .get(0));
+                    }
                 }
             }
 
-            result = new DereferenceExpression(result, part, ordinal, resolvedType);
+            // We only set column reference once for each dereference chain
+            if (columnReferenceSet)
+            {
+                colRef = null;
+            }
+            else if (colRef != null)
+            {
+                colRef = colRef.rename(part);
+                columnReferenceSet = true;
+            }
+
+            result = new DereferenceExpression(result, part, ordinal, resolvedType, colRef);
         }
 
         return result;
