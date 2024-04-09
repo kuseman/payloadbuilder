@@ -119,8 +119,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
@@ -168,8 +168,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
@@ -221,8 +221,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
@@ -283,8 +283,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
@@ -332,7 +332,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
 
@@ -371,7 +371,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(1)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
 
         Schema schema = Schema.of(CoreColumn.of(tableA.column("col1"), ResolvedType.of(Type.Int)));
         //@formatter:off
@@ -410,7 +410,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference range = new TableSourceReference("", QualifiedName.of("range"), "a");
+        TableSourceReference range = new TableSourceReference(0, "", QualifiedName.of("range"), "a");
 
         IPhysicalPlan expected = new TableFunctionScan(0, Schema.of(CoreColumn.of(range.column("Value"), ResolvedType.of(Type.Int))), range, "sys", "System", SystemCatalog.get()
                 .getTableFunction("range"), asList(intLit(1), intLit(100)), emptyList());
@@ -445,7 +445,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
 
@@ -503,8 +503,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
@@ -569,8 +569,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
@@ -632,7 +632,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
 
@@ -711,8 +711,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
         Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
@@ -775,9 +775,9 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
-        TableSourceReference e_b = new TableSourceReference("", QualifiedName.of("b"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
+        TableSourceReference e_b = new TableSourceReference(2, "", QualifiedName.of("b"), "b");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
@@ -872,8 +872,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
@@ -953,9 +953,9 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
-        TableSourceReference tableC = new TableSourceReference("", QualifiedName.of("tableC"), "c");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableC = new TableSourceReference(2, "", QualifiedName.of("tableC"), "c");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
@@ -1047,8 +1047,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference tableA = new TableSourceReference("", QualifiedName.of("tableA"), "a");
-        TableSourceReference tableB = new TableSourceReference("", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
+        TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
         ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
         ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
@@ -1116,7 +1116,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
         ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
 
         //@formatter:off
@@ -1171,7 +1171,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
         ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
 
         Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), ast));
@@ -1212,7 +1212,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
         ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
 
         Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), ast));
@@ -1253,7 +1253,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
         ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
 
         Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), ast));
@@ -1312,7 +1312,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "t");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "t");
         ColumnReference ast = new ColumnReference(table, "t", ColumnReference.Type.ASTERISK);
 
         Schema expectedSchema = Schema.of(new CoreColumn("t", ResolvedType.of(Type.Any), ast));
@@ -1374,7 +1374,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
         ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
 
         //@formatter:off
@@ -1450,7 +1450,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
                 .get(0)).getSelect();
 
-        TableSourceReference table = new TableSourceReference("", QualifiedName.of("table"), "");
+        TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
         ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
 
         //@formatter:off
