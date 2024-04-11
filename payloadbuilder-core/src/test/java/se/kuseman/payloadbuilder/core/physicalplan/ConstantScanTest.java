@@ -11,7 +11,6 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 
 /** Test of {@link ConstantScan} */
@@ -21,7 +20,7 @@ public class ConstantScanTest extends APhysicalPlanTest
     public void test()
     {
         IPhysicalPlan plan = new Projection(1, new ConstantScan(0), asList(new AliasExpression(e("10"), "TEN"), new AliasExpression(e("'hello'"), "HELLO")), false);
-        Schema expectedSchema = Schema.of(CoreColumn.of("TEN", ResolvedType.of(Type.Int)), CoreColumn.of("HELLO", ResolvedType.of(Type.String)));
+        Schema expectedSchema = Schema.of(col("TEN", ResolvedType.of(Type.Int), null), col("HELLO", ResolvedType.of(Type.String), null));
 
         assertEquals(expectedSchema, plan.getSchema());
 

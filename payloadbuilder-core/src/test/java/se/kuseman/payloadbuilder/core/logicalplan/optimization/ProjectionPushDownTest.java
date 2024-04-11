@@ -9,7 +9,6 @@ import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.common.SortItem;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
@@ -21,16 +20,9 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
 {
     private final ColumnResolver columnOptimizer = new ColumnResolver();
     private final ProjectionPushDown projectionPushDown = new ProjectionPushDown();
-
-    // CSOFF
-    private final ColumnReference tCol = new ColumnReference(table, "t", ColumnReference.Type.ASTERISK);
-    private final ColumnReference aCol = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
-    private final ColumnReference bCol = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-    // CSON
-
-    private final Schema schema = Schema.of(col(tCol, Type.Any));
-    private final Schema schemaA = Schema.of(col(aCol, Type.Any));
-    private final Schema schemaB = Schema.of(col(bCol, Type.Any));
+    private final Schema schema = Schema.of(ast("t", Type.Any, table));
+    private final Schema schemaA = Schema.of(ast("a", Type.Any, tableA));
+    private final Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
 
     @Test
     public void test_nested_projections()
@@ -65,7 +57,7 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan expected = 
                 projection(
                     tableScan(schema, table, asList("col1")),
-                asList(cre(tCol.rename("col1")))
+                asList(cre("col1", table))
                 );
         //@formatter:on
 
@@ -89,7 +81,7 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
         //@formatter:off
         ILogicalPlan expected = projection(
                 tableScan(schema, table, asList("col1")),
-                asList(cre(tCol.rename("col1")))
+                asList(cre("col1", table))
                 );
         //@formatter:on
 
@@ -134,14 +126,14 @@ public class ProjectionPushDownTest extends ALogicalPlanOptimizerTest
                                  tableScan(schemaB, tableB, asList("col2", "col4", "col6", "col8")),
                                  Join.Type.INNER,
                                  null,
-                                 eq(cre(aCol.rename("col3")), cre(bCol.rename("col4"))),
+                                 eq(cre("col3", tableA), cre("col4", tableB)),
                                  asSet(),
                                  false),
                              null,
-                             gt(cre(aCol.rename("col7")), cre(bCol.rename("col8")))
+                             gt(cre("col7", tableA), cre("col8", tableB))
                          ),
-                         asList(new SortItem(cre(aCol.rename("col5")), Order.ASC, NullOrder.UNDEFINED, null), new SortItem(cre(bCol.rename("col6")), Order.ASC, NullOrder.UNDEFINED, null))),
-                     asList(cre(aCol.rename("col1")), cre(bCol.rename("col2"))));
+                         asList(new SortItem(cre("col5", tableA), Order.ASC, NullOrder.UNDEFINED, null), new SortItem(cre("col6", tableB), Order.ASC, NullOrder.UNDEFINED, null))),
+                     asList(cre("col1", tableA), cre("col2", tableB)));
         //@formatter:on
 
         // System.out.println(expected.print(0));

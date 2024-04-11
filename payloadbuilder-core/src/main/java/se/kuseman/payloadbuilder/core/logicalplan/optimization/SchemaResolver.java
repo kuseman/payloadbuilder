@@ -24,7 +24,6 @@ import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.QueryException;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
@@ -158,8 +157,7 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
             if (schema.getColumns()
                     .isEmpty())
             {
-                ColumnReference ast = new ColumnReference(plan.getTableSource(), plan.getAlias(), ColumnReference.Type.ASTERISK);
-                schema = Schema.of(CoreColumn.of(ast, ResolvedType.of(Type.Any)));
+                schema = Schema.of(new CoreColumn(plan.getAlias(), ResolvedType.of(Type.Any), "", false, plan.getTableSource(), CoreColumn.Type.ASTERISK));
             }
         }
 
@@ -217,21 +215,10 @@ public class SchemaResolver extends ALogicalPlanOptimizer<SchemaResolver.Ctx>
                 .map(c ->
                 {
                     ResolvedType type = c.getType();
-                    // Force all columns to have a column reference
-                    ColumnReference colRef = SchemaUtils.getColumnReference(c);
-                    if (colRef == null)
-                    {
-                        colRef = tableSource.column(c.getName());
-                    }
-                    else
-                    {
-                        // If we have a column reference, then switch it's table source
-                        // For example if we have a temp table then we need to set a unique table source
-                        // for this plan and not copy the original columns reference
-                        colRef = new ColumnReference(tableSource, colRef.getName(), colRef.getType());
-                    }
-
-                    return CoreColumn.of(c.getName(), type, colRef);
+                    boolean asterisk = SchemaUtils.isAsterisk(c);
+                    // // Force all columns to have a column reference
+                    return new CoreColumn(c.getName(), type, "", false, tableSource, asterisk ? CoreColumn.Type.ASTERISK
+                            : CoreColumn.Type.REGULAR);
                 })
                 .collect(toList()));
     }

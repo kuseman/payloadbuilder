@@ -4,6 +4,7 @@ import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -15,7 +16,7 @@ import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IColumnExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SortItem;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.expression.AExpressionVisitor;
@@ -513,9 +514,9 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
     }
 
     /** Extract columns from provided expressions */
-    protected static Set<ColumnReference> collectColumns(List<IExpression> expressions)
+    protected static Map<TableSourceReference, Set<String>> collectColumns(List<IExpression> expressions)
     {
-        Set<ColumnReference> columns = new HashSet<>();
+        Map<TableSourceReference, Set<String>> columns = new HashMap<>();
         for (IExpression expression : expressions)
         {
             expression.accept(ColumnReferenceExtractor.INSTANCE, columns);
@@ -523,24 +524,27 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
         return columns;
     }
 
-    /** Visitor that collects {@link ColumnReference}'s from an expression */
-    static class ColumnReferenceExtractor extends AExpressionVisitor<Void, Set<ColumnReference>>
+    /** Visitor that collects columns from an expression */
+    static class ColumnReferenceExtractor extends AExpressionVisitor<Void, Map<TableSourceReference, Set<String>>>
     {
         static final ColumnReferenceExtractor INSTANCE = new ColumnReferenceExtractor();
 
         @Override
-        public Void visit(UnresolvedColumnExpression expression, Set<ColumnReference> columns)
+        public Void visit(UnresolvedColumnExpression expression, Map<TableSourceReference, Set<String>> columns)
         {
             throw new IllegalArgumentException("Unresolved column expression should not be visited");
         }
 
         @Override
-        public Void visit(IColumnExpression expression, Set<ColumnReference> context)
+        public Void visit(IColumnExpression expression, Map<TableSourceReference, Set<String>> context)
         {
-            ColumnReference colRef = ((ColumnExpression) expression).getColumnReference();
-            if (colRef != null)
+            ColumnExpression ce = (ColumnExpression) expression;
+            TableSourceReference tableRef = ce.getTableSourceReference();
+            if (tableRef != null)
             {
-                context.add(colRef);
+                context.computeIfAbsent(tableRef, k -> new HashSet<>())
+                        .add(ce.getAlias()
+                                .getAlias());
             }
             return null;
         }

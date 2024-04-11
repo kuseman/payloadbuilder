@@ -1361,7 +1361,7 @@ public class QueryParser
             }
 
             // Non qualified asterisk selects must have either a table source
-            // or a for clause with an over clause
+            // or a for clause
 
             boolean containsNonQualifiedAsterisks = ctx.selectItem()
                     .stream()

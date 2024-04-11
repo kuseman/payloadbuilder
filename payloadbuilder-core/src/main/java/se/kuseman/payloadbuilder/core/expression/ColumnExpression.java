@@ -18,8 +18,8 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IColumnExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.core.QueryException;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.StatementContext;
 
@@ -37,13 +37,13 @@ import se.kuseman.payloadbuilder.core.execution.StatementContext;
  * outerReference:        Is set if this column is resolved to the outer schema and then the outer tuple vector is used in context instead of input
  * </pre>
  */
-public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnReference
+public class ColumnExpression implements IColumnExpression, HasAlias, HasTableSourceReference
 {
     /** Alias for this expression. This is the column name (only used for presentation) */
     private final String alias;
 
-    /** Column reference if this expression is pointing to a column */
-    private final ColumnReference columnReference;
+    /** Table source reference if this expression is bound to an asterisk schema. */
+    private final TableSourceReference tableSourceReference;
     /**
      * Flag that indicates that this expression should resolve it's value from the outer reference in context and not by the input. This is a column in a correlated sub query.
      */
@@ -62,21 +62,24 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
     private final int lambdaId;
 
     /** Create a column reference expression. */
-    public ColumnExpression(String alias, String column, ResolvedType type, ColumnReference columnReference, int ordinal, boolean outerReference, int lambdaId)
+    public ColumnExpression(String alias, String column, ResolvedType type, TableSourceReference tableSourceReference, int ordinal, boolean outerReference, int lambdaId)
     {
         this.alias = requireNonNull(alias, "alias");
         this.column = column;
         this.resolvedType = requireNonNull(type, "type");
-        this.columnReference = columnReference;
+        this.tableSourceReference = tableSourceReference;
         this.outerReference = outerReference;
         this.ordinal = ordinal;
         this.lambdaId = lambdaId;
 
+        // Allowed states:
+        // - lambdaId
+        // - ordinal
+        // - column (with or without tableSource)
+
         if (ordinal < 0
-                && column == null
                 && lambdaId < 0
-                && (columnReference == null
-                        || !columnReference.isAsterisk()))
+                && column == null)
         {
             throw new IllegalArgumentException("Cannot construct a column expression without either ordinal nor column");
         }
@@ -85,7 +88,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
     /** Copy column expression but change the ordinal */
     public ColumnExpression(ColumnExpression source, int ordinal)
     {
-        this(source.alias, source.column, source.resolvedType, source.columnReference, ordinal, source.outerReference, source.lambdaId);
+        this(source.alias, source.column, source.resolvedType, source.tableSourceReference, ordinal, source.outerReference, source.lambdaId);
     }
 
     @Override
@@ -112,9 +115,9 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
     }
 
     @Override
-    public ColumnReference getColumnReference()
+    public TableSourceReference getTableSourceReference()
     {
-        return columnReference;
+        return tableSourceReference;
     }
 
     @Override
@@ -183,15 +186,14 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
         for (int i = 0; i < size; i++)
         {
             Column schemaColumn = columns.get(i);
-            ColumnReference schemaColRef = SchemaUtils.getColumnReference(schemaColumn);
+            TableSourceReference columnTableSourceReference = SchemaUtils.getTableSource(schemaColumn);
 
-            // Filter on column references table source if exists
+            // Filter on table source if exists
             // This happens when having an asterisk schema and we only know which table source
             // this columns belongs to and we don't have an ordinal
-            if (columnReference != null
-                    && (schemaColRef == null
-                            || !columnReference.getTableSource()
-                                    .equals(schemaColRef.getTableSource())))
+            if (tableSourceReference != null
+                    && (columnTableSourceReference == null
+                            || tableSourceReference.getId() != columnTableSourceReference.getId()))
             {
                 continue;
             }
@@ -242,12 +244,11 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
         {
             return true;
         }
-        else if (obj instanceof ColumnExpression)
+        else if (obj instanceof ColumnExpression that)
         {
-            ColumnExpression that = (ColumnExpression) obj;
             return alias.equals(that.alias)
                     && Objects.equals(column, that.column)
-                    && Objects.equals(columnReference, that.columnReference)
+                    && Objects.equals(tableSourceReference, that.tableSourceReference)
                     && ordinal == that.ordinal
                     && outerReference == that.outerReference
                     && lambdaId == that.lambdaId
@@ -259,18 +260,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
     @Override
     public String toString()
     {
-        // Asterisk column, write out name.*
-        if (columnReference != null
-                && columnReference.isAsterisk())
-        {
-            return StringUtils.defaultIfBlank(columnReference.getName(), columnReference.getTableSource()
-                    .getName()
-                    .toString())
-                   + ".*";
-        }
-
-        String tableSourceAlias = columnReference != null ? columnReference.getTableSource()
-                .getAlias()
+        String tableSourceAlias = tableSourceReference != null ? tableSourceReference.getAlias()
                 : "";
 
         return (!"".equals(tableSourceAlias) ? (tableSourceAlias + ".")
@@ -282,23 +272,13 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
     @Override
     public String toVerboseString()
     {
-        if (columnReference != null
-                && columnReference.isAsterisk())
-        {
-            return columnReference.getTableSource() + ".*";
-        }
-
         return (column == null ? alias
                 : column)
                 + (ordinal >= 0 ? " (" + ordinal + ")"
                         : "")
                 + (outerReference ? " (O)"
                         : "")
-                + (columnReference != null ? (" (" + columnReference.getTableSource()
-                                              + "."
-                                              + columnReference.getTableSource()
-                                                      .getAlias()
-                                              + ")")
+                + (tableSourceReference != null ? (" (" + tableSourceReference + ")")
                         : "")
                 + (lambdaId >= 0 ? " (L: " + lambdaId + ")"
                         : "");
@@ -310,7 +290,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
         private final String alias;
         private final ResolvedType resolvedType;
         private String column;
-        private ColumnReference columnReference;
+        private TableSourceReference tableSourceReference;
         private boolean outerReference;
         private int ordinal = -1;
         private int lambdaId = -1;
@@ -344,9 +324,9 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
             return this;
         }
 
-        public Builder withColumnReference(ColumnReference columnReference)
+        public Builder withTableSourceReference(TableSourceReference tableSourceReference)
         {
-            this.columnReference = columnReference;
+            this.tableSourceReference = tableSourceReference;
             return this;
         }
 
@@ -358,7 +338,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
 
         public ColumnExpression build()
         {
-            return new ColumnExpression(alias, column, resolvedType, columnReference, ordinal, outerReference, lambdaId);
+            return new ColumnExpression(alias, column, resolvedType, tableSourceReference, ordinal, outerReference, lambdaId);
         }
     }
 }

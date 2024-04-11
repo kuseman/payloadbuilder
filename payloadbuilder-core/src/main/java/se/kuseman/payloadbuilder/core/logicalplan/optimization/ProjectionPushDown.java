@@ -7,11 +7,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
@@ -92,18 +92,12 @@ class ProjectionPushDown extends ALogicalPlanOptimizer<ProjectionPushDown.Ctx>
     @Override
     protected List<IExpression> visit(ILogicalPlan plan, List<IExpression> expressions, Ctx context)
     {
-        Set<ColumnReference> columns = collectColumns(expressions);
+        Map<TableSourceReference, Set<String>> columns = collectColumns(expressions);
 
-        for (ColumnReference extractedColumn : columns)
+        for (Entry<TableSourceReference, Set<String>> e : columns.entrySet())
         {
-            if (extractedColumn.isAsterisk())
-            {
-                continue;
-            }
-
-            TableSourceReference tableSource = extractedColumn.getTableSource();
-            context.columnsByAlias.computeIfAbsent(tableSource, k -> new HashSet<>())
-                    .add(extractedColumn.getName());
+            context.columnsByAlias.computeIfAbsent(e.getKey(), k -> new HashSet<>())
+                    .addAll(e.getValue());
         }
 
         return expressions;

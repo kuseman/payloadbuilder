@@ -38,7 +38,6 @@ import se.kuseman.payloadbuilder.api.expression.IInExpression;
 import se.kuseman.payloadbuilder.api.expression.ILikeExpression;
 import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.INullPredicateExpression;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
@@ -179,6 +178,7 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
     {
         IPhysicalPlan input = plan.getInput()
                 .accept(this, context);
+
         return wrapWithAnalyze(context, new HashAggregate(context.getNextNodeId(), input, plan.getAggregateExpressions(), plan.getProjectionExpressions()));
     }
 
@@ -574,10 +574,10 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         @Override
         public Void visit(IColumnExpression expression, Set<TableSourceReference> context)
         {
-            ColumnReference colRef = ((ColumnExpression) expression).getColumnReference();
-            if (colRef != null)
+            TableSourceReference tableRef = ((ColumnExpression) expression).getTableSourceReference();
+            if (tableRef != null)
             {
-                context.add(colRef.getTableSource());
+                context.add(tableRef);
             }
             return null;
         }

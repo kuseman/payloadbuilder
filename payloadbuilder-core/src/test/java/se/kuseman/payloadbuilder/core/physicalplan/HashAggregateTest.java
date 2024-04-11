@@ -83,8 +83,8 @@ public class HashAggregateTest extends APhysicalPlanTest
         // Runtime schema
         //@formatter:off
         assertEquals(Schema.of(
-                new CoreColumn("col1", ResolvedType.of(Type.Int), table.column("col1")),
-                new CoreColumn("col2", ResolvedType.of(Type.Any), table.column("col2"))), actual.getSchema());
+                col("col1", ResolvedType.of(Type.Int), table),
+                col("col2", ResolvedType.of(Type.Any), table)), actual.getSchema());
         //@formatter:on
 
         //@formatter:off

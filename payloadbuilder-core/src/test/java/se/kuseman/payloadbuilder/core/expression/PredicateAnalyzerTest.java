@@ -16,7 +16,6 @@ import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzeItem;
@@ -31,10 +30,6 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     private TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
     private TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
     private TableSourceReference tableC = new TableSourceReference(2, "", QualifiedName.of("tableC"), "c");
-    private ColumnReference aCol1 = tableA.column("col1");
-    private ColumnReference aFlag = tableA.column("flag");
-    private ColumnReference bCol2 = tableB.column("col2");
-    private ColumnReference bCol3 = tableB.column("col3");
 
     @Test
     public void test_outerreference_column_expressions()
@@ -44,11 +39,11 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         Pair<List<AnalyzePair>, AnalyzeResult> actualPairs;
         AnalyzePair actualPair;
 
-        actual = PredicateAnalyzer.analyze(eq(cre(aCol1), ocre(bCol2)));
-        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.EQUAL, cre(aCol1), asSet(tableA), "col1", ocre(bCol2), emptySet(), "col2"));
+        actual = PredicateAnalyzer.analyze(eq(cre("col1", tableA), ocre("col2", tableB)));
+        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.EQUAL, cre("col1", tableA), asSet(tableA), "col1", ocre("col2", tableB), emptySet(), "col2"));
 
         assertEquals(expected, actual);
-        assertEquals(eq(cre(aCol1), ocre(bCol2)), actual.getPredicate());
+        assertEquals(eq(cre("col1", tableA), ocre("col2", tableB)), actual.getPredicate());
         actualPairs = actual.extractPushdownPairs(tableA);
         assertEquals(expected.getPairs(), actualPairs.getLeft());
         assertEquals(AnalyzeResult.EMPTY, actualPairs.getValue());
@@ -81,11 +76,11 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         assertEquals(emptyList(), actualPairs.getLeft());
         assertEquals(AnalyzeResult.EMPTY, actualPairs.getValue());
 
-        actual = PredicateAnalyzer.analyze(cre(aFlag));
-        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.EQUAL, cre(aFlag), asSet(tableA), "flag", LiteralBooleanExpression.TRUE, emptySet(), null));
+        actual = PredicateAnalyzer.analyze(cre("flag", tableA));
+        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.EQUAL, cre("flag", tableA), asSet(tableA), "flag", LiteralBooleanExpression.TRUE, emptySet(), null));
 
         assertEquals(expected, actual);
-        assertEquals(eq(cre(aFlag), LiteralBooleanExpression.TRUE), actual.getPredicate());
+        assertEquals(eq(cre("flag", tableA), LiteralBooleanExpression.TRUE), actual.getPredicate());
 
         assertEquals(asList(actual.getPairs()
                 .get(0)), actual.getEquiPairs(tableA));
@@ -117,7 +112,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
             assertTrue(e.getMessage(), e.getMessage()
                     .contains("No expressions could be found in this pair for table source tableB"));
         }
-        assertEquals(cre(aFlag), actualPair.getExpressionPair(tableA)
+        assertEquals(cre("flag", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
         assertEquals(LiteralBooleanExpression.TRUE, actualPair.getExpressionPair(tableA)
                 .getRight());
@@ -128,11 +123,11 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         // Now make the column reference appear on the right side
         /////////////////////////////////////////////////////////
 
-        actual = PredicateAnalyzer.analyze(eq(LiteralBooleanExpression.TRUE, cre(aFlag)));
-        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.EQUAL, LiteralBooleanExpression.TRUE, emptySet(), null, cre(aFlag), asSet(tableA), "flag"));
+        actual = PredicateAnalyzer.analyze(eq(LiteralBooleanExpression.TRUE, cre("flag", tableA)));
+        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.EQUAL, LiteralBooleanExpression.TRUE, emptySet(), null, cre("flag", tableA), asSet(tableA), "flag"));
 
         assertEquals(expected, actual);
-        assertEquals(eq(LiteralBooleanExpression.TRUE, cre(aFlag)), actual.getPredicate());
+        assertEquals(eq(LiteralBooleanExpression.TRUE, cre("flag", tableA)), actual.getPredicate());
 
         // No matches for tableB and hence we will get the original expression back when extracting
         assertEquals(actual.getPredicate(), actual.extractPushdownPairs(tableB)
@@ -159,7 +154,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
             assertTrue(e.getMessage(), e.getMessage()
                     .contains("No expressions could be found in this pair for table source tableB"));
         }
-        assertEquals(cre(aFlag), actualPair.getExpressionPair(tableA)
+        assertEquals(cre("flag", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
         assertEquals(LiteralBooleanExpression.TRUE, actualPair.getExpressionPair(tableA)
                 .getRight());
@@ -175,11 +170,11 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         Pair<List<AnalyzePair>, AnalyzeResult> actualPairs;
         AnalyzePair actualPair;
 
-        actual = PredicateAnalyzer.analyze(gt(cre(aFlag), new LiteralIntegerExpression(100)));
-        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.GREATER_THAN, cre(aFlag), asSet(tableA), "flag", new LiteralIntegerExpression(100), emptySet(), null));
+        actual = PredicateAnalyzer.analyze(gt(cre("flag", tableA), new LiteralIntegerExpression(100)));
+        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.GREATER_THAN, cre("flag", tableA), asSet(tableA), "flag", new LiteralIntegerExpression(100), emptySet(), null));
 
         assertEquals(expected, actual);
-        assertEquals(gt(cre(aFlag), new LiteralIntegerExpression(100)), actual.getPredicate());
+        assertEquals(gt(cre("flag", tableA), new LiteralIntegerExpression(100)), actual.getPredicate());
 
         // No equi
         assertEquals(emptyList(), actual.getEquiPairs(tableA));
@@ -211,7 +206,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
             assertTrue(e.getMessage(), e.getMessage()
                     .contains("No expressions could be found in this pair for table source tableB"));
         }
-        assertEquals(cre(aFlag), actualPair.getExpressionPair(tableA)
+        assertEquals(cre("flag", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
         assertEquals(new LiteralIntegerExpression(100), actualPair.getExpressionPair(tableA)
                 .getRight());
@@ -222,11 +217,11 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         // Now make the column reference appear on the right side
         /////////////////////////////////////////////////////////
 
-        actual = PredicateAnalyzer.analyze(gt(new LiteralIntegerExpression(100), cre(aFlag)));
-        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.GREATER_THAN, new LiteralIntegerExpression(100), emptySet(), null, cre(aFlag), asSet(tableA), "flag"));
+        actual = PredicateAnalyzer.analyze(gt(new LiteralIntegerExpression(100), cre("flag", tableA)));
+        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.GREATER_THAN, new LiteralIntegerExpression(100), emptySet(), null, cre("flag", tableA), asSet(tableA), "flag"));
 
         assertEquals(expected, actual);
-        assertEquals(gt(new LiteralIntegerExpression(100), cre(aFlag)), actual.getPredicate());
+        assertEquals(gt(new LiteralIntegerExpression(100), cre("flag", tableA)), actual.getPredicate());
 
         // No equi
         assertEquals(emptyList(), actual.getEquiPairs(tableA));
@@ -258,7 +253,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
             assertTrue(e.getMessage(), e.getMessage()
                     .contains("No expressions could be found in this pair for table source tableB"));
         }
-        assertEquals(cre(aFlag), actualPair.getExpressionPair(tableA)
+        assertEquals(cre("flag", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
         assertEquals(new LiteralIntegerExpression(100), actualPair.getExpressionPair(tableA)
                 .getRight());
@@ -273,11 +268,11 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         AnalyzeResult expected;
         AnalyzePair actualPair;
 
-        actual = PredicateAnalyzer.analyze(eq(cre(aCol1), cre(bCol2)));
-        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.EQUAL, cre(aCol1), asSet(tableA), "col1", cre(bCol2), asSet(tableB), "col2"));
+        actual = PredicateAnalyzer.analyze(eq(cre("col1", tableA), cre("col2", tableB)));
+        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.EQUAL, cre("col1", tableA), asSet(tableA), "col1", cre("col2", tableB), asSet(tableB), "col2"));
 
         assertEquals(expected, actual);
-        assertEquals(eq(cre(aCol1), cre(bCol2)), actual.getPredicate());
+        assertEquals(eq(cre("col1", tableA), cre("col2", tableB)), actual.getPredicate());
 
         assertEquals(asList(actual.getPairs()
                 .get(0)), actual.getEquiPairs(tableA));
@@ -318,13 +313,13 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
             assertTrue(e.getMessage(), e.getMessage()
                     .contains("No expressions could be found in this pair for table source tableC"));
         }
-        assertEquals(cre(aCol1), actualPair.getExpressionPair(tableA)
+        assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
-        assertEquals(cre(bCol2), actualPair.getExpressionPair(tableA)
+        assertEquals(cre("col2", tableB), actualPair.getExpressionPair(tableA)
                 .getRight());
-        assertEquals(cre(bCol2), actualPair.getExpressionPair(tableB)
+        assertEquals(cre("col2", tableB), actualPair.getExpressionPair(tableB)
                 .getLeft());
-        assertEquals(cre(aCol1), actualPair.getExpressionPair(tableB)
+        assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableB)
                 .getRight());
         assertTrue(actualPair.isEqui(tableA));
         assertTrue(actualPair.isEqui(tableB));
@@ -338,11 +333,11 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         AnalyzeResult expected;
         AnalyzePair actualPair;
 
-        actual = PredicateAnalyzer.analyze(gt(cre(aCol1), cre(bCol2)));
-        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.GREATER_THAN, cre(aCol1), asSet(tableA), "col1", cre(bCol2), asSet(tableB), "col2"));
+        actual = PredicateAnalyzer.analyze(gt(cre("col1", tableA), cre("col2", tableB)));
+        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.GREATER_THAN, cre("col1", tableA), asSet(tableA), "col1", cre("col2", tableB), asSet(tableB), "col2"));
 
         assertEquals(expected, actual);
-        assertEquals(gt(cre(aCol1), cre(bCol2)), actual.getPredicate());
+        assertEquals(gt(cre("col1", tableA), cre("col2", tableB)), actual.getPredicate());
 
         // Not an equi
         assertEquals(emptyList(), actual.getEquiPairs(tableA));
@@ -382,13 +377,13 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
             assertTrue(e.getMessage(), e.getMessage()
                     .contains("No expressions could be found in this pair for table source tableC"));
         }
-        assertEquals(cre(aCol1), actualPair.getExpressionPair(tableA)
+        assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
-        assertEquals(cre(bCol2), actualPair.getExpressionPair(tableA)
+        assertEquals(cre("col2", tableB), actualPair.getExpressionPair(tableA)
                 .getRight());
-        assertEquals(cre(bCol2), actualPair.getExpressionPair(tableB)
+        assertEquals(cre("col2", tableB), actualPair.getExpressionPair(tableB)
                 .getLeft());
-        assertEquals(cre(aCol1), actualPair.getExpressionPair(tableB)
+        assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableB)
                 .getRight());
         assertFalse(actualPair.isEqui(tableA));
         assertFalse(actualPair.isEqui(tableB));
@@ -402,11 +397,11 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         AnalyzeResult expected;
         AnalyzePair actualPair;
 
-        actual = PredicateAnalyzer.analyze(eq(ce("col1"), cre(bCol2)));
-        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.EQUAL, ce("col1"), asSet(AnalyzeItem.UNKNOWN_TABLE_SOURCE), null, cre(bCol2), asSet(tableB), "col2"));
+        actual = PredicateAnalyzer.analyze(eq(ce("col1"), cre("col2", tableB)));
+        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.EQUAL, ce("col1"), asSet(AnalyzeItem.UNKNOWN_TABLE_SOURCE), "col1", cre("col2", tableB), asSet(tableB), "col2"));
 
         assertEquals(expected, actual);
-        assertEquals(eq(ce("col1"), cre(bCol2)), actual.getPredicate());
+        assertEquals(eq(ce("col1"), cre("col2", tableB)), actual.getPredicate());
 
         assertEquals(emptyList(), actual.getEquiPairs(tableA));
         assertEquals(asList(actual.getPairs()
@@ -449,7 +444,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
             assertTrue(e.getMessage(), e.getMessage()
                     .contains("No expressions could be found in this pair for table source tableC"));
         }
-        assertEquals(cre(bCol2), actualPair.getExpressionPair(tableB)
+        assertEquals(cre("col2", tableB), actualPair.getExpressionPair(tableB)
                 .getLeft());
         assertEquals(ce("col1"), actualPair.getExpressionPair(tableB)
                 .getRight());
@@ -466,11 +461,11 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         Pair<List<AnalyzePair>, AnalyzeResult> actualPairs;
         AnalyzePair actualPair;
 
-        actual = PredicateAnalyzer.analyze(not(cre(aCol1)));
-        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.EQUAL, cre(aCol1), asSet(tableA), "col1", LiteralBooleanExpression.FALSE, emptySet(), null));
+        actual = PredicateAnalyzer.analyze(not(cre("col1", tableA)));
+        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.EQUAL, cre("col1", tableA), asSet(tableA), "col1", LiteralBooleanExpression.FALSE, emptySet(), null));
 
         assertEquals(expected, actual);
-        assertEquals(eq(cre(aCol1), LiteralBooleanExpression.FALSE), actual.getPredicate());
+        assertEquals(eq(cre("col1", tableA), LiteralBooleanExpression.FALSE), actual.getPredicate());
 
         assertEquals(asList(actual.getPairs()
                 .get(0)), actual.getEquiPairs(tableA));
@@ -502,7 +497,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
             assertTrue(e.getMessage(), e.getMessage()
                     .contains("No expressions could be found in this pair for table source tableC"));
         }
-        assertEquals(cre(aCol1), actualPair.getExpressionPair(tableA)
+        assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
         assertEquals(LiteralBooleanExpression.FALSE, actualPair.getExpressionPair(tableA)
                 .getRight());
@@ -518,11 +513,11 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         Pair<List<AnalyzePair>, AnalyzeResult> actualPairs;
         AnalyzePair actualPair;
 
-        actual = PredicateAnalyzer.analyze(nullP(cre(aCol1), false));
-        expected = result(pair(IPredicate.Type.NULL, null, cre(aCol1), asSet(tableA), "col1", nullP(cre(aCol1), false), emptySet(), null));
+        actual = PredicateAnalyzer.analyze(nullP(cre("col1", tableA), false));
+        expected = result(pair(IPredicate.Type.NULL, null, cre("col1", tableA), asSet(tableA), "col1", nullP(cre("col1", tableA), false), emptySet(), null));
 
         assertEquals(expected, actual);
-        assertEquals(nullP(cre(aCol1), false), actual.getPredicate());
+        assertEquals(nullP(cre("col1", tableA), false), actual.getPredicate());
 
         // No equi
         assertEquals(emptyList(), actual.getEquiPairs(tableA));
@@ -561,9 +556,9 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
             assertTrue(e.getMessage(), e.getMessage()
                     .contains("No expressions could be found in this pair for table source tableC"));
         }
-        assertEquals(cre(aCol1), actualPair.getExpressionPair(tableA)
+        assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
-        assertEquals(nullP(cre(aCol1), false), actualPair.getExpressionPair(tableA)
+        assertEquals(nullP(cre("col1", tableA), false), actualPair.getExpressionPair(tableA)
                 .getRight());
         assertFalse(actualPair.isEqui(tableA));
         assertFalse(actualPair.isEqui(tableC));
@@ -577,11 +572,11 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         Pair<List<AnalyzePair>, AnalyzeResult> actualPairs;
         AnalyzePair actualPair;
 
-        actual = PredicateAnalyzer.analyze(nullP(cre(aCol1), true));
-        expected = result(pair(IPredicate.Type.NULL, null, cre(aCol1), asSet(tableA), "col1", nullP(cre(aCol1), true), emptySet(), null));
+        actual = PredicateAnalyzer.analyze(nullP(cre("col1", tableA), true));
+        expected = result(pair(IPredicate.Type.NULL, null, cre("col1", tableA), asSet(tableA), "col1", nullP(cre("col1", tableA), true), emptySet(), null));
 
         assertEquals(expected, actual);
-        assertEquals(nullP(cre(aCol1), true), actual.getPredicate());
+        assertEquals(nullP(cre("col1", tableA), true), actual.getPredicate());
 
         // No equi
         assertEquals(emptyList(), actual.getEquiPairs(tableA));
@@ -622,9 +617,9 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
             assertTrue(e.getMessage(), e.getMessage()
                     .contains("No expressions could be found in this pair for table source tableC"));
         }
-        assertEquals(cre(aCol1), actualPair.getExpressionPair(tableA)
+        assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
-        assertEquals(nullP(cre(aCol1), true), actualPair.getExpressionPair(tableA)
+        assertEquals(nullP(cre("col1", tableA), true), actualPair.getExpressionPair(tableA)
                 .getRight());
         assertFalse(actualPair.isEqui(tableA));
         assertFalse(actualPair.isEqui(tableC));
@@ -638,11 +633,11 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         Pair<List<AnalyzePair>, AnalyzeResult> actualPairs;
         AnalyzePair actualPair;
 
-        actual = PredicateAnalyzer.analyze(in(cre(aCol1), asList(new LiteralFloatExpression(10f)), false));
-        expected = result(pair(IPredicate.Type.IN, null, cre(aCol1), asSet(tableA), "col1", in(cre(aCol1), asList(new LiteralFloatExpression(10f)), false), emptySet(), null));
+        actual = PredicateAnalyzer.analyze(in(cre("col1", tableA), asList(new LiteralFloatExpression(10f)), false));
+        expected = result(pair(IPredicate.Type.IN, null, cre("col1", tableA), asSet(tableA), "col1", in(cre("col1", tableA), asList(new LiteralFloatExpression(10f)), false), emptySet(), null));
 
         assertEquals(expected, actual);
-        assertEquals(in(cre(aCol1), asList(new LiteralFloatExpression(10f)), false), actual.getPredicate());
+        assertEquals(in(cre("col1", tableA), asList(new LiteralFloatExpression(10f)), false), actual.getPredicate());
 
         // No equi
         assertEquals(emptyList(), actual.getEquiPairs(tableA));
@@ -679,9 +674,9 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
             assertTrue(e.getMessage(), e.getMessage()
                     .contains("No expressions could be found in this pair for table source tableC"));
         }
-        assertEquals(cre(aCol1), actualPair.getExpressionPair(tableA)
+        assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
-        assertEquals(in(cre(aCol1), asList(new LiteralFloatExpression(10f)), false), actualPair.getExpressionPair(tableA)
+        assertEquals(in(cre("col1", tableA), asList(new LiteralFloatExpression(10f)), false), actualPair.getExpressionPair(tableA)
                 .getRight());
         assertFalse(actualPair.isEqui(tableA));
         assertFalse(actualPair.isEqui(tableC));
@@ -695,11 +690,11 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         Pair<List<AnalyzePair>, AnalyzeResult> actualPairs;
         AnalyzePair actualPair;
 
-        actual = PredicateAnalyzer.analyze(in(cre(aCol1), asList(new LiteralFloatExpression(10f)), true));
-        expected = result(pair(IPredicate.Type.IN, null, cre(aCol1), asSet(tableA), "col1", in(cre(aCol1), asList(new LiteralFloatExpression(10f)), true), emptySet(), null));
+        actual = PredicateAnalyzer.analyze(in(cre("col1", tableA), asList(new LiteralFloatExpression(10f)), true));
+        expected = result(pair(IPredicate.Type.IN, null, cre("col1", tableA), asSet(tableA), "col1", in(cre("col1", tableA), asList(new LiteralFloatExpression(10f)), true), emptySet(), null));
 
         assertEquals(expected, actual);
-        assertEquals(in(cre(aCol1), asList(new LiteralFloatExpression(10f)), true), actual.getPredicate());
+        assertEquals(in(cre("col1", tableA), asList(new LiteralFloatExpression(10f)), true), actual.getPredicate());
 
         // No equi
         assertEquals(emptyList(), actual.getEquiPairs(tableA));
@@ -736,9 +731,9 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
             assertTrue(e.getMessage(), e.getMessage()
                     .contains("No expressions could be found in this pair for table source tableC"));
         }
-        assertEquals(cre(aCol1), actualPair.getExpressionPair(tableA)
+        assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
-        assertEquals(in(cre(aCol1), asList(new LiteralFloatExpression(10f)), true), actualPair.getExpressionPair(tableA)
+        assertEquals(in(cre("col1", tableA), asList(new LiteralFloatExpression(10f)), true), actualPair.getExpressionPair(tableA)
                 .getRight());
         assertFalse(actualPair.isEqui(tableA));
         assertFalse(actualPair.isEqui(tableC));
@@ -752,11 +747,11 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         Pair<List<AnalyzePair>, AnalyzeResult> actualPairs;
         AnalyzePair actualPair;
 
-        actual = PredicateAnalyzer.analyze(in(cre(aCol1), asList(cre(bCol2)), false));
-        expected = result(pair(IPredicate.Type.IN, null, cre(aCol1), asSet(tableA), "col1", in(cre(aCol1), asList(cre(bCol2)), false), asSet(tableB), null));
+        actual = PredicateAnalyzer.analyze(in(cre("col1", tableA), asList(cre("col2", tableB)), false));
+        expected = result(pair(IPredicate.Type.IN, null, cre("col1", tableA), asSet(tableA), "col1", in(cre("col1", tableA), asList(cre("col2", tableB)), false), asSet(tableB), null));
 
         assertEquals(expected, actual);
-        assertEquals(in(cre(aCol1), asList(cre(bCol2)), false), actual.getPredicate());
+        assertEquals(in(cre("col1", tableA), asList(cre("col2", tableB)), false), actual.getPredicate());
 
         // No equi
         assertEquals(emptyList(), actual.getEquiPairs(tableA));
@@ -793,9 +788,9 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
             assertTrue(e.getMessage(), e.getMessage()
                     .contains("No expressions could be found in this pair for table source tableC"));
         }
-        assertEquals(cre(aCol1), actualPair.getExpressionPair(tableA)
+        assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
-        assertEquals(in(cre(aCol1), asList(cre(bCol2)), false), actualPair.getExpressionPair(tableA)
+        assertEquals(in(cre("col1", tableA), asList(cre("col2", tableB)), false), actualPair.getExpressionPair(tableA)
                 .getRight());
         assertFalse(actualPair.isEqui(tableA));
         assertFalse(actualPair.isEqui(tableC));
@@ -809,12 +804,12 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         Pair<List<AnalyzePair>, AnalyzeResult> actualPairs;
         AnalyzePair actualPair;
 
-        actual = PredicateAnalyzer.analyze(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10f, 20f)), asList(cre(aCol1)), false));
-        expected = result(
-                pair(IPredicate.Type.UNDEFINED, null, in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10f, 20f)), asList(cre(aCol1)), false), asSet(tableA), null, null, null, null));
+        actual = PredicateAnalyzer.analyze(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10f, 20f)), asList(cre("col1", tableA)), false));
+        expected = result(pair(IPredicate.Type.UNDEFINED, null, in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10f, 20f)), asList(cre("col1", tableA)), false), asSet(tableA), null, null,
+                null, null));
 
         assertEquals(expected, actual);
-        assertEquals(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10f, 20f)), asList(cre(aCol1)), false), actual.getPredicate());
+        assertEquals(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10f, 20f)), asList(cre("col1", tableA)), false), actual.getPredicate());
 
         // No equi
         assertEquals(emptyList(), actual.getEquiPairs(tableA));
@@ -852,7 +847,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
             assertTrue(e.getMessage(), e.getMessage()
                     .contains("No expressions could be found in this pair for table source tableC"));
         }
-        assertEquals(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10f, 20f)), asList(cre(aCol1)), false), actualPair.getExpressionPair(tableA)
+        assertEquals(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10f, 20f)), asList(cre("col1", tableA)), false), actualPair.getExpressionPair(tableA)
                 .getLeft());
         assertNull(actualPair.getExpressionPair(tableA)
                 .getRight());
@@ -868,11 +863,11 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         Pair<List<AnalyzePair>, AnalyzeResult> actualPairs;
         AnalyzePair actualPair;
 
-        actual = PredicateAnalyzer.analyze(like(cre(aCol1), new LiteralStringExpression("%val%"), false));
-        expected = result(pair(IPredicate.Type.LIKE, null, cre(aCol1), asSet(tableA), "col1", like(cre(aCol1), new LiteralStringExpression("%val%"), false), emptySet(), null));
+        actual = PredicateAnalyzer.analyze(like(cre("col1", tableA), new LiteralStringExpression("%val%"), false));
+        expected = result(pair(IPredicate.Type.LIKE, null, cre("col1", tableA), asSet(tableA), "col1", like(cre("col1", tableA), new LiteralStringExpression("%val%"), false), emptySet(), null));
 
         assertEquals(expected, actual);
-        assertEquals(like(cre(aCol1), new LiteralStringExpression("%val%"), false), actual.getPredicate());
+        assertEquals(like(cre("col1", tableA), new LiteralStringExpression("%val%"), false), actual.getPredicate());
 
         // No equi
         assertEquals(emptyList(), actual.getEquiPairs(tableA));
@@ -909,9 +904,9 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
             assertTrue(e.getMessage(), e.getMessage()
                     .contains("No expressions could be found in this pair for table source tableC"));
         }
-        assertEquals(cre(aCol1), actualPair.getExpressionPair(tableA)
+        assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
-        assertEquals(like(cre(aCol1), new LiteralStringExpression("%val%"), false), actualPair.getExpressionPair(tableA)
+        assertEquals(like(cre("col1", tableA), new LiteralStringExpression("%val%"), false), actualPair.getExpressionPair(tableA)
                 .getRight());
         assertFalse(actualPair.isEqui(tableA));
         assertFalse(actualPair.isEqui(tableC));
@@ -925,11 +920,11 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         Pair<List<AnalyzePair>, AnalyzeResult> actualPairs;
         AnalyzePair actualPair;
 
-        actual = PredicateAnalyzer.analyze(like(cre(aCol1), new LiteralStringExpression("%val%"), true));
-        expected = result(pair(IPredicate.Type.LIKE, null, cre(aCol1), asSet(tableA), "col1", like(cre(aCol1), new LiteralStringExpression("%val%"), true), emptySet(), null));
+        actual = PredicateAnalyzer.analyze(like(cre("col1", tableA), new LiteralStringExpression("%val%"), true));
+        expected = result(pair(IPredicate.Type.LIKE, null, cre("col1", tableA), asSet(tableA), "col1", like(cre("col1", tableA), new LiteralStringExpression("%val%"), true), emptySet(), null));
 
         assertEquals(expected, actual);
-        assertEquals(like(cre(aCol1), new LiteralStringExpression("%val%"), true), actual.getPredicate());
+        assertEquals(like(cre("col1", tableA), new LiteralStringExpression("%val%"), true), actual.getPredicate());
 
         // No equi
         assertEquals(emptyList(), actual.getEquiPairs(tableA));
@@ -966,9 +961,9 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
             assertTrue(e.getMessage(), e.getMessage()
                     .contains("No expressions could be found in this pair for table source tableC"));
         }
-        assertEquals(cre(aCol1), actualPair.getExpressionPair(tableA)
+        assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
-        assertEquals(like(cre(aCol1), new LiteralStringExpression("%val%"), true), actualPair.getExpressionPair(tableA)
+        assertEquals(like(cre("col1", tableA), new LiteralStringExpression("%val%"), true), actualPair.getExpressionPair(tableA)
                 .getRight());
         assertFalse(actualPair.isEqui(tableA));
         assertFalse(actualPair.isEqui(tableC));
@@ -983,7 +978,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         AnalyzePair actualPair;
 
         FunctionCallExpression fce = new FunctionCallExpression("", SystemCatalog.get()
-                .getScalarFunction("isnull"), null, asList(cre(aFlag), cre(aCol1)));
+                .getScalarFunction("isnull"), null, asList(cre("flag", tableA), cre("col1", tableA)));
 
         actual = PredicateAnalyzer.analyze(fce);
         //@formatter:off
@@ -1107,16 +1102,16 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
         Pair<List<AnalyzePair>, AnalyzeResult> actualPairs;
         AnalyzePair actualPair;
 
-        actual = PredicateAnalyzer.analyze(and(eq(cre(aCol1), cre(bCol2)), gt(cre(aFlag), cre(bCol3))));
+        actual = PredicateAnalyzer.analyze(and(eq(cre("col1", tableA), cre("col2", tableB)), gt(cre("flag", tableA), cre("col3", tableB))));
         //@formatter:off
         expected = result(
-                pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.GREATER_THAN, cre(aFlag), asSet(tableA), "flag", cre(bCol3), asSet(tableB), "col3"),
-                pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.EQUAL, cre(aCol1), asSet(tableA), "col1", cre(bCol2), asSet(tableB), "col2")
+                pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.GREATER_THAN, cre("flag", tableA), asSet(tableA), "flag", cre("col3", tableB), asSet(tableB), "col3"),
+                pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.EQUAL, cre("col1", tableA), asSet(tableA), "col1", cre("col2", tableB), asSet(tableB), "col2")
                 );
         //@formatter:on
 
         assertEquals(expected, actual);
-        assertEquals(and(eq(cre(aCol1), cre(bCol2)), gt(cre(aFlag), cre(bCol3))), actual.getPredicate());
+        assertEquals(and(eq(cre("col1", tableA), cre("col2", tableB)), gt(cre("flag", tableA), cre("col3", tableB))), actual.getPredicate());
 
         assertEquals(asList(expected.getPairs()
                 .get(1)), actual.getEquiPairs(tableA));
@@ -1161,13 +1156,13 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
             assertTrue(e.getMessage(), e.getMessage()
                     .contains("No expressions could be found in this pair for table source tableC"));
         }
-        assertEquals(cre(aFlag), actualPair.getExpressionPair(tableA)
+        assertEquals(cre("flag", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
-        assertEquals(cre(bCol3), actualPair.getExpressionPair(tableA)
+        assertEquals(cre("col3", tableB), actualPair.getExpressionPair(tableA)
                 .getRight());
-        assertEquals(cre(bCol3), actualPair.getExpressionPair(tableB)
+        assertEquals(cre("col3", tableB), actualPair.getExpressionPair(tableB)
                 .getLeft());
-        assertEquals(cre(aFlag), actualPair.getExpressionPair(tableB)
+        assertEquals(cre("flag", tableA), actualPair.getExpressionPair(tableB)
                 .getRight());
 
         assertFalse(actualPair.isEqui(tableA));
@@ -1192,13 +1187,13 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
             assertTrue(e.getMessage(), e.getMessage()
                     .contains("No expressions could be found in this pair for table source tableC"));
         }
-        assertEquals(cre(aCol1), actualPair.getExpressionPair(tableA)
+        assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableA)
                 .getLeft());
-        assertEquals(cre(bCol2), actualPair.getExpressionPair(tableA)
+        assertEquals(cre("col2", tableB), actualPair.getExpressionPair(tableA)
                 .getRight());
-        assertEquals(cre(bCol2), actualPair.getExpressionPair(tableB)
+        assertEquals(cre("col2", tableB), actualPair.getExpressionPair(tableB)
                 .getLeft());
-        assertEquals(cre(aCol1), actualPair.getExpressionPair(tableB)
+        assertEquals(cre("col1", tableA), actualPair.getExpressionPair(tableB)
                 .getRight());
         assertTrue(actualPair.isEqui(tableA));
         assertTrue(actualPair.isEqui(tableB));

@@ -5,7 +5,6 @@ import static java.util.Objects.requireNonNull;
 import java.util.Objects;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference.Type;
 
 /** A reference to a table source (table or table-function) */
 public class TableSourceReference
@@ -43,16 +42,10 @@ public class TableSourceReference
         return name;
     }
 
-    /** Construct a regular column reference from this table source */
-    public ColumnReference column(String column)
-    {
-        return new ColumnReference(this, column, Type.REGULAR);
-    }
-
     @Override
     public int hashCode()
     {
-        return name.hashCode();
+        return id;
     }
 
     @Override

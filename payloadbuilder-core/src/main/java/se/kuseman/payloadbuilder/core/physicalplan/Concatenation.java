@@ -155,9 +155,8 @@ public class Concatenation implements IPhysicalPlan
         {
             return true;
         }
-        else if (obj instanceof Concatenation)
+        else if (obj instanceof Concatenation that)
         {
-            Concatenation that = (Concatenation) obj;
             return inputs.equals(that.inputs);
         }
         return false;

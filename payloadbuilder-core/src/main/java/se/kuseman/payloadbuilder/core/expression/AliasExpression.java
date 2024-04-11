@@ -13,10 +13,10 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 
 /** An aliased expression */
-public class AliasExpression implements IExpression, HasAlias, HasColumnReference
+public class AliasExpression implements IExpression, HasAlias, HasTableSourceReference
 {
     private final IExpression expression;
     private final String alias;
@@ -63,11 +63,11 @@ public class AliasExpression implements IExpression, HasAlias, HasColumnReferenc
     }
 
     @Override
-    public ColumnReference getColumnReference()
+    public TableSourceReference getTableSourceReference()
     {
-        if (expression instanceof HasColumnReference)
+        if (expression instanceof HasTableSourceReference htsr)
         {
-            return ((HasColumnReference) expression).getColumnReference();
+            return htsr.getTableSourceReference();
         }
         return null;
     }

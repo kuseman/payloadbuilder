@@ -8,8 +8,11 @@ import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Random;
+import java.util.Set;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
+import org.assertj.core.api.Assertions;
 import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
@@ -22,11 +25,12 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
+import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.ComparisonExpression;
+import se.kuseman.payloadbuilder.core.parser.Location;
 
 /** Test of {@link Projection} */
 public class ProjectionTest extends APhysicalPlanTest
@@ -77,7 +81,6 @@ public class ProjectionTest extends APhysicalPlanTest
         assertVectorsEquals(vv(ResolvedType.of(Type.Any), 3, 4), actual.getColumn(0));
         assertVectorsEquals(vv(ResolvedType.of(Type.Boolean), false, true), actual.getColumn(1));
         assertTrue(closed.booleanValue());
-
     }
 
     @Test
@@ -86,28 +89,14 @@ public class ProjectionTest extends APhysicalPlanTest
         TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
-        // Asterisk column existing on the projection expressions from planning
-        // CSOFF
-        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
-
-        // Actual columns received runtime
-        ColumnReference aCol1 = new ColumnReference(tableA, "col1", ColumnReference.Type.REGULAR);
-        ColumnReference aCol2 = new ColumnReference(tableA, "col2", ColumnReference.Type.REGULAR);
-        ColumnReference aCol3 = new ColumnReference(tableA, "col3", ColumnReference.Type.REGULAR);
-
-        ColumnReference bCol1 = new ColumnReference(tableB, "col1", ColumnReference.Type.REGULAR);
-        ColumnReference bCol2 = new ColumnReference(tableB, "col2", ColumnReference.Type.REGULAR);
-        ColumnReference bCol3 = new ColumnReference(tableB, "col3", ColumnReference.Type.REGULAR);
-        // CSON
-
         //@formatter:off
         Schema runtimeSchema = Schema.of(
-                col(aCol1, Type.Any),
-                col(aCol2, Type.Any),
-                col(aCol3, Type.Any),
-                col(bCol1, Type.Any),
-                col(bCol2, Type.Any),
-                col(bCol3, Type.Any));
+                col("col1", Type.Any, tableA),
+                col("col2", Type.Any, tableA),
+                col("col3", Type.Any, tableA),
+                col("col1", Type.Any, tableB),
+                col("col2", Type.Any, tableB),
+                col("col3", Type.Any, tableB));
         
         TupleVector tv = TupleVector.of(runtimeSchema, asList(
                 // table a cols
@@ -122,13 +111,13 @@ public class ProjectionTest extends APhysicalPlanTest
         //@formatter:on
 
         // All columns from table a
-        IExpression aastExp = cre(aAst);
+        IExpression aastExp = new AsteriskExpression(QualifiedName.of("a"), null, Set.of(tableA));
 
         // Single column from table b
-        IExpression bcol3Exp = cre(bCol3);
+        IExpression bcol3Exp = cre("col3", tableB);
 
         // Computed values from both
-        IExpression calcExp = gt(cre(aCol2), cre(bCol2));
+        IExpression calcExp = gt(cre("col2", tableA), cre("col2", tableB));
 
         MutableBoolean closed = new MutableBoolean(false);
 
@@ -163,11 +152,13 @@ public class ProjectionTest extends APhysicalPlanTest
 
         // Asterisks => empty schema
         //@formatter:off
-        assertEquals(Schema.of(
-                CoreColumn.of(aAst, ResolvedType.of(Type.Any)),
-                CoreColumn.of(bCol3, ResolvedType.of(Type.Any)),
-                new CoreColumn("", ResolvedType.of(Type.Boolean), "a.col2 > b.col2", false)
-                ), plan.getSchema());
+        Assertions.assertThat(plan.getSchema())
+            .usingRecursiveComparison()
+            .ignoringFieldsOfTypes(Location.class, Random.class)
+            .isEqualTo(Schema.of(
+                new CoreColumn("", ResolvedType.of(Type.Any), "a.*", false, tableA, CoreColumn.Type.ASTERISK),
+                col("col3", ResolvedType.of(Type.Any), tableB),
+                new CoreColumn("", ResolvedType.of(Type.Boolean), "a.col2 > b.col2", false)));
         //@formatter:on
 
         TupleIterator it = plan.execute(context);
@@ -175,14 +166,17 @@ public class ProjectionTest extends APhysicalPlanTest
 
         //@formatter:off
         Schema expectedSchema = Schema.of(
-                col(aCol1, Type.Any), 
-                col(aCol2, Type.Any), 
-                col(aCol3, Type.Any), 
-                col(bCol3, Type.Any), 
+                col("col1", Type.Any, tableA),
+                col("col2", Type.Any, tableA),
+                col("col3", Type.Any, tableA),
+                col("col3", Type.Any, tableB),
                 new CoreColumn("", ResolvedType.of(Type.Boolean), "a.col2 > b.col2", false));
         //@formatter:on
 
-        assertEquals(expectedSchema, actual.getSchema());
+        Assertions.assertThat(actual.getSchema())
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(expectedSchema);
         assertEquals(2, actual.getRowCount());
 
         // aCol1

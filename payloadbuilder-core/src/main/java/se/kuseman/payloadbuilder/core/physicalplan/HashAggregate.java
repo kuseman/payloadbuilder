@@ -29,8 +29,8 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.StatementContext;
 import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
@@ -39,7 +39,6 @@ import se.kuseman.payloadbuilder.core.execution.vector.VectorBuilderFactory;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.HasAlias;
-import se.kuseman.payloadbuilder.core.expression.HasColumnReference;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 
 import it.unimi.dsi.fastutil.Hash;
@@ -55,6 +54,7 @@ public class HashAggregate implements IPhysicalPlan
     private final IPhysicalPlan input;
     private final List<IAggregateExpression> projectionExpressions;
     private final List<IExpression> aggregateExpressions;
+    private final Schema schema;
     private final boolean hasAsteriskProjections;
 
     public HashAggregate(int nodeId, IPhysicalPlan input, List<IExpression> aggregateExpressions, List<IAggregateExpression> projectionExpressions)
@@ -63,22 +63,9 @@ public class HashAggregate implements IPhysicalPlan
         this.input = requireNonNull(input, "input");
         this.projectionExpressions = requireNonNull(projectionExpressions, "projectionExpressions");
         this.aggregateExpressions = requireNonNull(aggregateExpressions, "aggregateExpressions");
-        this.hasAsteriskProjections = projectionExpressions.stream()
-                .anyMatch(e ->
-                {
-                    if (e instanceof HasColumnReference)
-                    {
-                        ColumnReference colRef = ((HasColumnReference) e).getColumnReference();
-                        if (colRef != null
-                                && colRef.isAsterisk())
-                        {
-                            return true;
-                        }
-                    }
-
-                    return false;
-                });
-
+        this.schema = projectionExpressions.isEmpty() ? input.getSchema()
+                : SchemaUtils.getSchema(input.getSchema(), projectionExpressions, false, true);
+        this.hasAsteriskProjections = SchemaUtils.isAsterisk(schema);
         if ((aggregateExpressions.isEmpty()
                 && !projectionExpressions.isEmpty())
                 || (!aggregateExpressions.isEmpty()
@@ -149,11 +136,7 @@ public class HashAggregate implements IPhysicalPlan
     @Override
     public Schema getSchema()
     {
-        if (projectionExpressions.isEmpty())
-        {
-            return input.getSchema();
-        }
-        return ProjectionUtils.createSchema(Schema.EMPTY, projectionExpressions, false, true);
+        return schema;
     }
 
     @Override
@@ -228,9 +211,8 @@ public class HashAggregate implements IPhysicalPlan
                         aggregators[i] = ((IAggregateExpression) actualExpressions.get(i)).createAggregator();
                     }
 
-                    // Create the actual schema from the expressions
-                    // TODO: this should done only once in planning if the input schema is static
-                    resultSchema = ProjectionUtils.createSchema(vector.getSchema(), actualExpressions, false, true);
+                    resultSchema = hasAsteriskProjections ? SchemaUtils.getSchema(vector.getSchema(), actualExpressions, false, true)
+                            : schema;
                 }
 
                 int vectorSize;

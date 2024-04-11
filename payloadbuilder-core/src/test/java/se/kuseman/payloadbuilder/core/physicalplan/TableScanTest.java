@@ -12,8 +12,6 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.QueryException;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 
 /** Test {@link TableScan} */
 public class TableScanTest extends APhysicalPlanTest
@@ -31,7 +29,7 @@ public class TableScanTest extends APhysicalPlanTest
 
         TupleVector vector = PlanUtils.concat(context.getBufferAllocator(), plan.execute(context));
 
-        assertEquals(Schema.of(CoreColumn.of(table.column("col"), ResolvedType.of(Type.Int))), vector.getSchema());
+        assertEquals(Schema.of(col("col", ResolvedType.of(Type.Int), table)), vector.getSchema());
     }
 
     @Test
@@ -39,7 +37,7 @@ public class TableScanTest extends APhysicalPlanTest
     {
         MutableBoolean closed = new MutableBoolean(false);
         // Asterisk schema
-        Schema schema = Schema.of(CoreColumn.of(new ColumnReference(table, "t", ColumnReference.Type.ASTERISK), ResolvedType.of(Type.Int)));
+        Schema schema = Schema.of(ast("t", ResolvedType.of(Type.Int), table));
         IPhysicalPlan plan = scan(
                 schemaLessDS(() -> closed.setTrue(), TupleVector.of(schema, asList(ValueVector.literalInt(100, 100))), TupleVector.of(schema, asList(ValueVector.literalInt(100, 100)))), table,
                 schema);

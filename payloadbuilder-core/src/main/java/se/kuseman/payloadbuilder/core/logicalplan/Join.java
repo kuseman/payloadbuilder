@@ -4,7 +4,6 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -12,11 +11,8 @@ import java.util.Set;
 import org.apache.commons.lang3.ObjectUtils;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
-import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 
 /** Logical definition of a join */
@@ -86,28 +82,15 @@ public class Join implements ILogicalPlan
         Schema outerSchema = switchedInputs ? inner.getSchema()
                 : outer.getSchema();
 
-        List<Column> columns = new ArrayList<>(outerSchema.getColumns());
-
         Schema innerSchema = switchedInputs ? outer.getSchema()
                 : inner.getSchema();
 
         if (populateAlias != null)
         {
-            Column column = innerSchema.getColumns()
-                    .get(0);
-            // Copy table source from inner schema if any exists
-            ColumnReference colRef = SchemaUtils.getColumnReference(column);
-            colRef = colRef != null ? colRef.rename(populateAlias)
-                    : null;
-
-            columns.add(CoreColumn.of(populateAlias, ResolvedType.table(innerSchema), colRef));
-        }
-        else
-        {
-            columns.addAll(innerSchema.getColumns());
+            return SchemaUtils.populate(outerSchema, populateAlias, innerSchema);
         }
 
-        return new Schema(columns);
+        return SchemaUtils.concat(outerSchema, innerSchema);
     }
 
     @Override
@@ -131,9 +114,16 @@ public class Join implements ILogicalPlan
     @Override
     public boolean equals(Object obj)
     {
-        if (obj instanceof Join)
+        if (obj == this)
         {
-            Join that = (Join) obj;
+            return true;
+        }
+        else if (obj == null)
+        {
+            return false;
+        }
+        else if (obj instanceof Join that)
+        {
             return outer.equals(that.outer)
                     && inner.equals(that.inner)
                     && type == that.type

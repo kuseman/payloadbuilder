@@ -20,7 +20,6 @@ import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.QueryException;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
@@ -191,19 +190,11 @@ public class TableScan implements IPhysicalPlan
         {
             Column c = schema.getColumns()
                     .get(i);
-            ColumnReference colRef = SchemaUtils.getColumnReference(c);
-
-            if (colRef != null
-                    && colRef.isAsterisk())
+            if (SchemaUtils.isAsterisk(c))
             {
                 throw new QueryException("Runtime tuple vectors cannot contain asterisk columns");
             }
-
-            colRef = new ColumnReference(tableSource, colRef != null ? colRef.getName()
-                    : c.getName(),
-                    colRef != null ? colRef.getType()
-                            : ColumnReference.Type.REGULAR);
-            columns.add(CoreColumn.of(c.getName(), c.getType(), colRef));
+            columns.add(new CoreColumn(c.getName(), c.getType(), "", false, tableSource, CoreColumn.Type.REGULAR));
         }
 
         return new Schema(columns);

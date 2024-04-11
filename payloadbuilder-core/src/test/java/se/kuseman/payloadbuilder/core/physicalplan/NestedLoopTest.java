@@ -5,11 +5,13 @@ import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 
+import org.assertj.core.api.Assertions;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -26,8 +28,6 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IArithmeticBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.StatementContext;
@@ -37,6 +37,7 @@ import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.ArithmeticBinaryExpression;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.ComparisonExpression;
+import se.kuseman.payloadbuilder.core.parser.Location;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link NestedLoop} */
@@ -45,8 +46,7 @@ public class NestedLoopTest extends AJoinTest
     /**
      * Outer references set that is used to trigger outer nested loop. This isn't actually used in the operator only triggers the function and is used then analyzing operator
      */
-    private Set<Column> outerReferences = asSet(
-            CoreColumn.of(new ColumnReference(new TableSourceReference(0, "", QualifiedName.of("table"), "t"), "col", ColumnReference.Type.REGULAR), ResolvedType.of(Type.Any)));
+    private Set<Column> outerReferences = asSet(col("col", ResolvedType.of(Type.Any), new TableSourceReference(0, "", QualifiedName.of("table"), "t")));
 
     @Ignore
     @Test
@@ -660,21 +660,23 @@ public class NestedLoopTest extends AJoinTest
         TupleIterator it = plan.execute(context);
         TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
 
-        // System.out.println(actual.toCsv());
-
         //@formatter:off
-        Schema exptectedSchema = Schema.of(
-                CoreColumn.of(table.column("col1"), ResolvedType.of(Type.Any)),
-                CoreColumn.of(table.column("col2"), ResolvedType.of(Type.Any)),
-                CoreColumn.of("oCol1", ResolvedType.of(Type.Any)),
-                CoreColumn.of("oCol2", ResolvedType.of(Type.Any)),
-                CoreColumn.of("col3", ResolvedType.of(Type.Any)),
-                CoreColumn.of("col4", ResolvedType.of(Type.Any)),
-                CoreColumn.of("oCalc", ResolvedType.of(Type.Any))
+        Schema expectedSchema = Schema.of(
+                col("col1", ResolvedType.of(Type.Any), table),
+                col("col2", ResolvedType.of(Type.Any), table),
+                col("oCol1", ResolvedType.of(Type.Any), null),
+                col("oCol2", ResolvedType.of(Type.Any), null),
+                col("col3", ResolvedType.of(Type.Any), null),
+                col("col4", ResolvedType.of(Type.Any), null),
+                col("oCalc", ResolvedType.of(Type.Any), null)
                 );
         //@formatter:on
 
-        assertEquals(exptectedSchema, actual.getSchema());
+        Assertions.assertThat(actual.getSchema())
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(expectedSchema);
+
         //
         assertVectorsEquals(vv(Type.Any, 0, 0, 0, 2, 2, 2, 1, 1, 1), actual.getColumn(0));
         assertVectorsEquals(vv(Type.Any, 4, 4, 4, 5, 5, 5, 6, 6, 6), actual.getColumn(1));
@@ -767,11 +769,15 @@ public class NestedLoopTest extends AJoinTest
 
         //@formatter:off
         Schema actualSchema = Schema.of(
-                CoreColumn.of(table.column("col1"), ResolvedType.of(Type.Any)),
-                CoreColumn.of(table.column("col2"), ResolvedType.of(Type.Any)),
-                CoreColumn.of(tableB.column("p"), ResolvedType.table(innerSchema)));
-        assertEquals(actualSchema, actual.getSchema());
-        
+                col("col1", ResolvedType.of(Type.Any), table),
+                col("col2", ResolvedType.of(Type.Any), table),
+                pop("p", ResolvedType.table(innerSchema), tableB));
+
+        Assertions.assertThat(actual.getSchema())
+            .usingRecursiveComparison()
+            .ignoringFieldsOfTypes(Location.class, Random.class)
+            .isEqualTo(actualSchema);
+
         VectorTestUtils.assertTupleVectorsEquals(TupleVector.of(actualSchema, asList(
                 vv(Type.Any, 0, 1, 2),
                 vv(Type.Any, 4, 6, 5),
@@ -869,10 +875,14 @@ public class NestedLoopTest extends AJoinTest
 
         //@formatter:off
         Schema actualSchema = Schema.of(
-                CoreColumn.of(table.column("col1"), ResolvedType.of(Type.Any)),
-                CoreColumn.of(table.column("col2"), ResolvedType.of(Type.Any)),
-                CoreColumn.of(tableB.column("p"), ResolvedType.table(innerSchema)));
-        assertEquals(actualSchema, actual.getSchema());
+                col("col1", ResolvedType.of(Type.Any), table),
+                col("col2", ResolvedType.of(Type.Any), table),
+                pop("p", ResolvedType.table(innerSchema), tableB));
+
+        Assertions.assertThat(actual.getSchema())
+            .usingRecursiveComparison()
+            .ignoringFieldsOfTypes(Location.class, Random.class)
+            .isEqualTo(actualSchema);
         
         VectorTestUtils.assertTupleVectorsEquals(TupleVector.of(actualSchema, asList(
                 vv(Type.Any, 0, 1, 2),
