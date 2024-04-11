@@ -9,7 +9,6 @@ import org.junit.Test;
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.expression.LiteralBooleanExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
@@ -24,16 +23,9 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
 {
     private final ColumnResolver columnOptimizer = new ColumnResolver();
     private final PredicatePushDown predicatePushDown = new PredicatePushDown();
-
-    // CSOFF
-    private final ColumnReference tCol = new ColumnReference(table, "t", ColumnReference.Type.ASTERISK);
-    private final ColumnReference aCol = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
-    private final ColumnReference bCol = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-    // CSON
-
-    private final Schema schema = Schema.of(col(tCol, Type.Any));
-    private final Schema schemaA = Schema.of(col(aCol, Type.Any));
-    private final Schema schemaB = Schema.of(col(bCol, Type.Any));
+    private final Schema schema = Schema.of(ast("t", Type.Any, table));
+    private final Schema schemaA = Schema.of(ast("a", Type.Any, tableA));
+    private final Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
 
     @Test
     public void test_table_and_no_filter()
@@ -53,8 +45,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     public void test_function_and_no_filter()
     {
         TableSourceReference opencsv = new TableSourceReference(0, "sys", QualifiedName.of("opencsv"), "t");
-        ColumnReference opencsvAst = new ColumnReference(opencsv, "t", ColumnReference.Type.ASTERISK);
-        Schema schema = Schema.of(col(opencsvAst, Type.Any));
+        Schema schema = Schema.of(ast("t", Type.Any, opencsv));
 
         ILogicalPlan plan = new TableFunctionScan(opencsv, schema, asList(), asList(), null);
 
@@ -84,7 +75,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan expected = new Filter(
                 tableScan(schema, table),
                 table,
-                eq(cre(tCol.rename("col1")), LiteralBooleanExpression.TRUE)      // Predicate analyzer rewrites this to an equal
+                eq(cre("col1", table), LiteralBooleanExpression.TRUE)      // Predicate analyzer rewrites this to an equal
                 );
         //@formatter:on
 
@@ -99,8 +90,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
     public void test_function_scan_and_surrounding_filter()
     {
         TableSourceReference opencsv = new TableSourceReference(0, "sys", QualifiedName.of("opencsv"), "t");
-        ColumnReference opencsvAst = new ColumnReference(opencsv, "t", ColumnReference.Type.ASTERISK);
-        Schema schema = Schema.of(col(opencsvAst, Type.Any));
+        Schema schema = Schema.of(ast("t", Type.Any, opencsv));
 
         //@formatter:off
         ILogicalPlan plan = new Filter(
@@ -116,7 +106,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan expected = new Filter(
                 new TableFunctionScan(opencsv, schema, asList(), asList(), null),
                 opencsv,
-                eq(cre(opencsvAst.rename("col1")), LiteralBooleanExpression.TRUE)      // Predicate analyzer rewrites this to an equal
+                eq(cre("col1", opencsv), LiteralBooleanExpression.TRUE)      // Predicate analyzer rewrites this to an equal
                 );
         //@formatter:on
 
@@ -158,18 +148,18 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         new Filter(
                             tableScan(schemaA, tableA),
                             tableA,
-                            eq(cre(aCol.rename("col4")), new LiteralStringExpression("test"))),
+                            eq(cre("col4", tableA), new LiteralStringExpression("test"))),
                         new Filter(
                             tableScan(schemaB, tableB),
                             tableB,
-                            gt(cre(bCol.rename("col5")), intLit(100))),
+                            gt(cre("col5", tableB), intLit(100))),
                         Join.Type.INNER,
                         null,
-                        eq(cre(aCol.rename("col3")), cre(bCol.rename("col4"))),
+                        eq(cre("col3", tableA), cre("col4", tableB)),
                         asSet(),
                         false),
                     null,
-                    gt(cre(aCol.rename("col7")), cre(bCol.rename("col8")))
+                    gt(cre("col7", tableA), cre("col8", tableB))
                 );
         //@formatter:on
 
@@ -206,15 +196,15 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         new Filter(
                             tableScan(schemaA, tableA),
                             tableA,
-                            eq(cre(aCol.rename("col4")), new LiteralStringExpression("test"))),
+                            eq(cre("col4", tableA), new LiteralStringExpression("test"))),
                         tableScan(schemaB, tableB),
                         Join.Type.INNER,
                         null,
-                        eq(cre(aCol.rename("col3")), cre(bCol.rename("col4"))),
+                        eq(cre("col3", tableA), cre("col4", tableB)),
                         asSet(),
                         false),
                     null,
-                    gt(cre(aCol.rename("col7")), cre(bCol.rename("col8")))
+                    gt(cre("col7", tableA), cre("col8", tableB))
                 );
         //@formatter:on
 
@@ -251,7 +241,7 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         new Filter(
                             tableScan(schemaB, tableB),
                             tableB,
-                            eq(cre(bCol.rename("active")), LiteralBooleanExpression.TRUE)),
+                            eq(cre("active", tableB), LiteralBooleanExpression.TRUE)),
                         Join.Type.INNER,
                         null,
                         null,
@@ -297,18 +287,18 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         new Filter(
                             tableScan(schemaA, tableA),
                             tableA,
-                            and(eq(cre(aCol.rename("col10")), new LiteralStringExpression("test2")), eq(cre(aCol.rename("col4")), new LiteralStringExpression("test")))),
+                            and(eq(cre("col10", tableA), new LiteralStringExpression("test2")), eq(cre("col4", tableA), new LiteralStringExpression("test")))),
                         new Filter(
                             tableScan(schemaB, tableB),
                             tableB,
-                            and(eq(cre(bCol.rename("col9")), LiteralBooleanExpression.TRUE), gt(cre(bCol.rename("col5")), intLit(100)))),
+                            and(eq(cre("col9", tableB), LiteralBooleanExpression.TRUE), gt(cre("col5", tableB), intLit(100)))),
                         Join.Type.INNER,
                         null,
-                        eq(cre(aCol.rename("col3")), cre(bCol.rename("col4"))),
+                        eq(cre("col3", tableA), cre("col4", tableB)),
                         asSet(),
                         false),
                     null,
-                    gt(cre(aCol.rename("col7")), cre(bCol.rename("col8")))
+                    gt(cre("col7", tableA), cre("col8", tableB))
                 );
         //@formatter:on
 
@@ -345,18 +335,18 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         new Filter(
                             tableScan(schemaA, tableA),
                             tableA,
-                            eq(cre(aCol.rename("active")), LiteralBooleanExpression.TRUE)),
+                            eq(cre("active", tableA), LiteralBooleanExpression.TRUE)),
                         new Filter(
                             tableScan(schemaB, tableB),
                             tableB,
-                            eq(cre(bCol.rename("col9")), LiteralBooleanExpression.TRUE)),
+                            eq(cre("col9", tableB), LiteralBooleanExpression.TRUE)),
                         Join.Type.LEFT,
                         null,
-                        and(eq(cre(aCol.rename("col3")), cre(bCol.rename("col4"))), eq(cre(aCol.rename("col10")), new LiteralStringExpression("test2"))),
+                        and(eq(cre("col3", tableA), cre("col4", tableB)), eq(cre("col10", tableA), new LiteralStringExpression("test2"))),
                         asSet(),
                         false),
                     null,
-                    nullP(cre(bCol.rename("col4")), false)
+                    nullP(cre("col4", tableB), false)
                 );
         //@formatter:on
 
@@ -400,14 +390,14 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         new Filter(
                             tableScan(schemaB, tableB),
                             tableB,
-                            eq(cre(bCol.rename("col9")), LiteralBooleanExpression.TRUE)),
+                            eq(cre("col9", tableB), LiteralBooleanExpression.TRUE)),
                         Join.Type.LEFT,
                         null,
-                        and(eq(cre(aCol.rename("col3")), cre(bCol.rename("col4"))), eq(cre(aCol.rename("col10")), new LiteralStringExpression("test2"))),
+                        and(eq(cre("col3", tableA), cre("col4", tableB)), eq(cre("col10", tableA), new LiteralStringExpression("test2"))),
                         asSet(),
                         false),
                     null,
-                    nullP(cre(bCol.rename("col4")), true));
+                    nullP(cre("col4", tableB), true));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -450,14 +440,14 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         new Filter(
                             tableScan(schemaB, tableB),
                             tableB,
-                            eq(cre(bCol.rename("col9")), LiteralBooleanExpression.TRUE)),
+                            eq(cre("col9", tableB), LiteralBooleanExpression.TRUE)),
                         Join.Type.LEFT,
                         null,
-                        and(eq(cre(aCol.rename("col3")), cre(bCol.rename("col4"))), eq(cre(aCol.rename("col10")), new LiteralStringExpression("test2"))),
+                        and(eq(cre("col3", tableA), cre("col4", tableB)), eq(cre("col10", tableA), new LiteralStringExpression("test2"))),
                         asSet(),
                         false),
                     null,
-                    nullP(cre(bCol.rename("col4")), false)
+                    nullP(cre("col4", tableB), false)
                 );
         //@formatter:on
 
@@ -501,14 +491,14 @@ public class PredicatePushDownTest extends ALogicalPlanOptimizerTest
                         new Filter(
                             tableScan(schemaB, tableB),
                             tableB,
-                            eq(cre(bCol.rename("col9")), LiteralBooleanExpression.TRUE)),
+                            eq(cre("col9", tableB), LiteralBooleanExpression.TRUE)),
                         Join.Type.LEFT,
                         null,
-                        and(eq(cre(aCol.rename("col3")), cre(bCol.rename("col4"))), eq(cre(aCol.rename("col10")), new LiteralStringExpression("test2"))),
+                        and(eq(cre("col3", tableA), cre("col4", tableB)), eq(cre("col10", tableA), new LiteralStringExpression("test2"))),
                         asSet(),
                         false),
                     null,
-                    nullP(cre(bCol.rename("col4")), true));
+                    nullP(cre("col4", tableB), true));
         //@formatter:on
 
         // System.out.println(expected.print(0));

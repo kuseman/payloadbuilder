@@ -15,7 +15,6 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
@@ -40,17 +39,18 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableSource = new TableSourceReference(0, "sys", QualifiedName.of("functions"), "");
-        ColumnReference name = tableSource.column("name");
-        ColumnReference type = tableSource.column("type");
-        ColumnReference description = tableSource.column("description");
 
-        Schema expectedSchema = Schema.of(col(name, Type.String), col(type, Type.String), col(description, Type.String));
+        Schema expectedSchema = Schema.of(col("name", Type.String, tableSource), col("type", Type.String, tableSource), col("description", Type.String, tableSource));
 
         //@formatter:off
         ILogicalPlan expected = new TableScan(new TableSchema(expectedSchema), tableSource, emptyList(), false, emptyList(), null);
         //@formatter:on
 
-        assertEquals(expectedSchema, actual.getSchema());
+        Assertions.assertThat(actual.getSchema())
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(expectedSchema);
+
         assertEquals(expected, actual);
     }
 
@@ -61,11 +61,8 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableSource = new TableSourceReference(0, "sys", QualifiedName.of("functions"), "");
-        ColumnReference name = tableSource.column("name");
-        ColumnReference type = tableSource.column("type");
-        ColumnReference description = tableSource.column("description");
 
-        Schema expectedSchema = Schema.of(col(name, Type.String), col(type, Type.String), col(description, Type.String));
+        Schema expectedSchema = Schema.of(col("name", Type.String, tableSource), col("type", Type.String, tableSource), col("description", Type.String, tableSource));
 
         //@formatter:off
         ILogicalPlan expected =
@@ -74,7 +71,11 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
                         e("10"));
         //@formatter:on
 
-        assertEquals(expectedSchema, actual.getSchema());
+        Assertions.assertThat(actual.getSchema())
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(expectedSchema);
+
         assertEquals(expected, actual);
     }
 
@@ -84,7 +85,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select concat('hello', 123)");
         ILogicalPlan actual = optimize(context, plan);
 
-        Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.String), "'hello123'", false));
+        Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.String), "'hello123'", false, null, CoreColumn.Type.REGULAR));
         assertEquals(expectedSchema, actual.getSchema());
     }
 
@@ -94,7 +95,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select sum(col2) from \"table\" group by col");
         ILogicalPlan actual = optimize(context, plan);
 
-        Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), "sum(col2)", false));
+        Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), "sum(col2)", false, null, CoreColumn.Type.REGULAR));
         assertEquals(expectedSchema, actual.getSchema());
     }
 
@@ -104,7 +105,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select sum(sum(col2)) from \"table\" group by col");
         ILogicalPlan actual = optimize(context, plan);
 
-        Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), "sum(sum(col2))", false));
+        Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), "sum(sum(col2))", false, null, CoreColumn.Type.REGULAR));
         assertEquals(expectedSchema, actual.getSchema());
     }
 
@@ -149,11 +150,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableSource = new TableSourceReference(0, "sys", QualifiedName.of("tables"), "");
-        ColumnReference name = tableSource.column("name");
-        ColumnReference schema = tableSource.column("schema");
-        ColumnReference rows = tableSource.column("rows");
-
-        Schema expectedSchema = Schema.of(col(name, Type.String), col(schema, Type.String), col(rows, Type.Int));
+        Schema expectedSchema = Schema.of(col("name", Type.String, tableSource), col("schema", Type.String, tableSource), col("rows", Type.Int, tableSource));
 
         //@formatter:off
         ILogicalPlan expected = projection(

@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.builder.ReflectionToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import org.apache.commons.lang3.tuple.Pair;
@@ -21,7 +22,6 @@ import se.kuseman.payloadbuilder.api.expression.IColumnExpression;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 
 /**
@@ -211,9 +211,16 @@ public class PredicateAnalyzer
         @Override
         public boolean equals(Object obj)
         {
-            if (obj instanceof AnalyzeResult)
+            if (obj == this)
             {
-                AnalyzeResult that = (AnalyzeResult) obj;
+                return true;
+            }
+            else if (obj == null)
+            {
+                return false;
+            }
+            if (obj instanceof AnalyzeResult that)
+            {
                 return pairs.equals(that.pairs);
             }
             return false;
@@ -461,9 +468,8 @@ public class PredicateAnalyzer
             {
                 return true;
             }
-            else if (obj instanceof AnalyzePair)
+            else if (obj instanceof AnalyzePair that)
             {
-                AnalyzePair that = (AnalyzePair) obj;
                 return type == that.type
                         && comparisonType == that.comparisonType
                         && left.equals(that.left)
@@ -575,14 +581,10 @@ public class PredicateAnalyzer
             ColumnExpressionVisitor.getTableSources(expression, tableSources);
 
             String column = null;
-            ColumnReference colRef = null;
-            if (expression instanceof HasColumnReference)
+            if (expression instanceof HasAlias a)
             {
-                colRef = ((HasColumnReference) expression).getColumnReference();
-            }
-            if (colRef != null)
-            {
-                column = colRef.getName();
+                column = a.getAlias()
+                        .getAlias();
             }
 
             return new AnalyzeItem(expression, tableSources, column);
@@ -643,9 +645,8 @@ public class PredicateAnalyzer
             {
                 return true;
             }
-            else if (obj instanceof AnalyzeItem)
+            else if (obj instanceof AnalyzeItem that)
             {
-                AnalyzeItem that = (AnalyzeItem) obj;
                 return Objects.equals(expression, that.expression)
                         && Objects.equals(tableSources, that.tableSources)
                         && Objects.equals(column, that.column);
@@ -715,13 +716,9 @@ public class PredicateAnalyzer
             }
 
             TableSourceReference tableSource = AnalyzeItem.UNKNOWN_TABLE_SOURCE;
-            if (expression instanceof HasColumnReference)
+            if (expression instanceof HasTableSourceReference htsr)
             {
-                ColumnReference colRef = ((HasColumnReference) expression).getColumnReference();
-                if (colRef != null)
-                {
-                    tableSource = colRef.getTableSource();
-                }
+                tableSource = ObjectUtils.defaultIfNull(htsr.getTableSourceReference(), tableSource);
             }
             context.result.add(tableSource);
             return null;

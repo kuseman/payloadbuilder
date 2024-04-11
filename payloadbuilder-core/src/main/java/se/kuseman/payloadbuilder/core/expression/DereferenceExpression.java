@@ -20,14 +20,14 @@ import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.IDereferenceExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 import se.kuseman.payloadbuilder.core.parser.Location;
 import se.kuseman.payloadbuilder.core.parser.ParseException;
 
 /** Dereference expression. expression.column reference */
-public class DereferenceExpression implements IDereferenceExpression, HasAlias, HasColumnReference
+public class DereferenceExpression implements IDereferenceExpression, HasAlias, HasTableSourceReference
 {
     private final IExpression left;
     private final String right;
@@ -81,11 +81,11 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
     }
 
     @Override
-    public ColumnReference getColumnReference()
+    public TableSourceReference getTableSourceReference()
     {
-        if (left instanceof HasColumnReference)
+        if (left instanceof HasTableSourceReference htsr)
         {
-            return ((HasColumnReference) left).getColumnReference();
+            return htsr.getTableSourceReference();
         }
         return null;
     }

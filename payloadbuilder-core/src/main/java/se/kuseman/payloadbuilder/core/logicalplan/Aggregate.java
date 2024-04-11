@@ -5,20 +5,13 @@ import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.lang3.ObjectUtils;
-import org.apache.commons.lang3.StringUtils;
 
-import se.kuseman.payloadbuilder.api.catalog.Column;
-import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
-import se.kuseman.payloadbuilder.core.expression.HasAlias;
-import se.kuseman.payloadbuilder.core.expression.HasColumnReference;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 
 /** An aggregate either implicit or explicit */
@@ -61,34 +54,7 @@ public class Aggregate implements ILogicalPlan
             return input.getSchema();
         }
 
-        List<Column> columns = new ArrayList<>(projectionExpressions.size());
-        for (IAggregateExpression expression : projectionExpressions)
-        {
-            String name = "";
-            String outputName;
-            if (expression instanceof HasAlias)
-            {
-                HasAlias.Alias alias = ((HasAlias) expression).getAlias();
-                name = alias.getAlias();
-                outputName = alias.getOutputAlias();
-                if (StringUtils.isBlank(name))
-                {
-                    outputName = expression.toString();
-                }
-            }
-            else
-            {
-                outputName = expression.toString();
-            }
-            ResolvedType type = expression.getAggregateType();
-            ColumnReference columnReference = null;
-            if (expression instanceof HasColumnReference)
-            {
-                columnReference = ((HasColumnReference) expression).getColumnReference();
-            }
-            columns.add(CoreColumn.of(name, type, outputName, expression.isInternal(), columnReference));
-        }
-        return new Schema(columns);
+        return SchemaUtils.getSchema(input.getSchema(), projectionExpressions, false, true);
     }
 
     @Override

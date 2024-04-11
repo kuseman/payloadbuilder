@@ -13,7 +13,6 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 
 /** Test of {@link Limit} */
 public class LimitTest extends APhysicalPlanTest
@@ -41,8 +40,8 @@ public class LimitTest extends APhysicalPlanTest
 
             Assertions.assertThat(vector.getSchema())
                     .usingRecursiveComparison()
-                    .isEqualTo(Schema.of(CoreColumn.of(table.column("col"), ResolvedType.of(Type.Int))));
-            assertEquals(Schema.of(CoreColumn.of(table.column("col"), ResolvedType.of(Type.Int))), vector.getSchema());
+                    .isEqualTo(Schema.of(col("col", ResolvedType.of(Type.Int), table)));
+            assertEquals(Schema.of(col("col", ResolvedType.of(Type.Int), table)), vector.getSchema());
             assertEquals(ResolvedType.of(Type.Int), vector.getColumn(0)
                     .type());
 

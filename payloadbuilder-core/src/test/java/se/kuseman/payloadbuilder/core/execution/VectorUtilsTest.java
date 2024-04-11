@@ -5,7 +5,6 @@ import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.nio.charset.StandardCharsets;
 
-import org.junit.Assert;
 import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -18,11 +17,11 @@ import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
+import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link VectorUtils} */
-public class VectorUtilsTest extends Assert
+public class VectorUtilsTest extends APhysicalPlanTest
 {
     @Test
     public void test_populate_cartesian()
@@ -38,7 +37,7 @@ public class VectorUtilsTest extends Assert
                 vv(Type.Boolean, true, false, null),
                 vv(Type.String, "hello", null, "world")
                 ));
-        TupleVector expected = TupleVector.of(Schema.of(Column.of("col1", Type.Int), Column.of("col2", Type.Float), CoreColumn.of("p", ResolvedType.table(innerSchema))), asList(
+        TupleVector expected = TupleVector.of(Schema.of(Column.of("col1", Type.Int), Column.of("col2", Type.Float), pop("p", ResolvedType.table(innerSchema), null)), asList(
                 vv(Type.Int, 1, 2, 3, 4),
                 vv(Type.Float, 4F, 5F, 6F, 7F),
                 vv(ResolvedType.table(innerSchema), vector2, vector2, vector2, vector2)

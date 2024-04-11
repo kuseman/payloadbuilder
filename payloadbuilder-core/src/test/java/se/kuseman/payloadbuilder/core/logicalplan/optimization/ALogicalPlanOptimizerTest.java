@@ -14,7 +14,6 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
@@ -48,30 +47,23 @@ public abstract class ALogicalPlanOptimizerTest extends ALogicalPlanTest
         return new TableSourceReference(id, "", of("stableE"), "e");
     }
 
-    protected ColumnReference stACol1 = new ColumnReference(sTableA, "col1", ColumnReference.Type.REGULAR);
-    protected ColumnReference stACol2 = new ColumnReference(sTableA, "col2", ColumnReference.Type.REGULAR);
-    protected ColumnReference stACol3 = new ColumnReference(sTableA, "col3", ColumnReference.Type.REGULAR);
-    protected ColumnReference stBCol1 = new ColumnReference(sTableB, "col1", ColumnReference.Type.REGULAR);
-    protected ColumnReference stBCol2 = new ColumnReference(sTableB, "col2", ColumnReference.Type.REGULAR);
-    protected ColumnReference stBCol3 = new ColumnReference(sTableB, "col3", ColumnReference.Type.REGULAR);
-
     protected Schema schemaSTableA = Schema.of(col("col1", Type.Int), col("col2", Type.String), col("col3", Type.Float));
     protected Schema schemaSTableB = Schema.of(col("col1", Type.Boolean), col("col2", Type.String), col("col3", Type.Float));
     protected Schema schemaSTableC = Schema.of(col("col1", Type.Double), col("col2", Type.Boolean), col("col3", Type.Long));
-    protected Schema schemaSTableD = Schema.of(CoreColumn.of(sTableD.column("col1"), ResolvedType.of(Type.Double)), CoreColumn.of(sTableD.column("col6"), ResolvedType.of(Type.String)));
+    protected Schema schemaSTableD = Schema.of(CoreColumn.of("col1", ResolvedType.of(Type.Double), sTableD), CoreColumn.of("col6", ResolvedType.of(Type.String), sTableD));
 
     //@formatter:off
     protected Schema schemaSTableE(int id)
     {
         TableSourceReference sTableE = sTableE(id);
         return Schema.of(
-              CoreColumn.of(sTableE.column("col1"), ResolvedType.of(Type.Double)),
-              CoreColumn.of(sTableE.column("col3"), ResolvedType.table(
+              CoreColumn.of("col1", ResolvedType.of(Type.Double), sTableE),
+              CoreColumn.of("col3", ResolvedType.table(
                       Schema.of(
                               Column.of("nCol1", Type.Int),
                               Column.of("nCol2", Type.String)
-                              ))),
-              CoreColumn.of(sTableE.column("col6"), ResolvedType.of(Type.String)));
+                              )), sTableE),
+              CoreColumn.of("col6", ResolvedType.of(Type.String), sTableE));
     }
     //@formatter:on
 

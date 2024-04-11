@@ -11,7 +11,6 @@ import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 
 /** Test of {@link Concatenation} */
 public class ConcatenationTest extends APhysicalPlanTest
@@ -40,7 +39,7 @@ public class ConcatenationTest extends APhysicalPlanTest
 
         TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), plan.execute(context));
 
-        assertEquals(Schema.of(CoreColumn.of(table.column("col1"), ResolvedType.of(Type.Any)), CoreColumn.of(table.column("col2"), ResolvedType.of(Type.Any))), actual.getSchema());
+        assertEquals(Schema.of(col("col1", ResolvedType.of(Type.Any), table), col("col2", ResolvedType.of(Type.Any), table)), actual.getSchema());
 
         assertVectorsEquals(vv(Type.Any, 1, 2, 3, 10, 20, 30, 100, 200, 300), actual.getColumn(0));
         assertVectorsEquals(vv(Type.Any, 4, 5, 6, 40, 50, 60, 400, 500, 600), actual.getColumn(1));

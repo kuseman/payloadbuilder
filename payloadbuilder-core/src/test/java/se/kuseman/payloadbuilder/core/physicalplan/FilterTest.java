@@ -75,7 +75,7 @@ public class FilterTest extends APhysicalPlanTest
 
         TupleIterator it = plan.execute(context);
         TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
-        assertEquals(Schema.of(CoreColumn.of(table.column("col1"), ResolvedType.of(Type.Any)), CoreColumn.of(table.column("col2"), ResolvedType.of(Type.Any))), actual.getSchema());
+        assertEquals(Schema.of(col("col1", ResolvedType.of(Type.Any), table), CoreColumn.of("col2", ResolvedType.of(Type.Any), table)), actual.getSchema());
 
         assertEquals(3, actual.getRowCount());
         assertVectorsEquals(vv(Type.Any, 3, 4, 5), actual.getColumn(0));

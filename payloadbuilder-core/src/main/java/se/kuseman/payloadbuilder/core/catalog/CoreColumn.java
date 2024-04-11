@@ -1,5 +1,7 @@
 package se.kuseman.payloadbuilder.core.catalog;
 
+import static java.util.Objects.requireNonNull;
+
 import java.util.Objects;
 
 import org.apache.commons.lang3.StringUtils;
@@ -10,8 +12,13 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 /** Extension of {@link Column} that attaches different properties used during planning and execution */
 public class CoreColumn extends Column
 {
-    /** Column reference if column is a direct reference to a column. */
-    private final ColumnReference columnReference;
+    /**
+     * Set if this column references a table source. Used when resolving asterisk schemas etc. To connect a column to a specific table source.
+     */
+    private final TableSourceReference tableSourceReference;
+
+    /** Type of column */
+    private final Type columnType;
 
     /**
      * Name of the column when written to output. Some columns are generated during planning and have a auto generated schema name ({@link #name} but a different name when written to output.
@@ -36,32 +43,31 @@ public class CoreColumn extends Column
 
     public CoreColumn(String name, ResolvedType type, String outputName, boolean internal)
     {
-        this(name, type, outputName, internal, null);
+        this(name, type, outputName, internal, null, Type.REGULAR);
     }
 
-    public CoreColumn(String name, ResolvedType type, String outputName, boolean internal, ColumnReference columnReference)
+    public CoreColumn(String name, ResolvedType type, String outputName, boolean internal, Type columnType)
+    {
+        this(name, type, outputName, internal, null, columnType);
+    }
+
+    public CoreColumn(String name, ResolvedType type, String outputName, boolean internal, TableSourceReference tableSourceReference, Type columnType)
     {
         super(name, type);
         this.outputName = outputName;
         this.internal = internal;
-        this.columnReference = columnReference;
+        this.tableSourceReference = tableSourceReference;
+        this.columnType = requireNonNull(columnType, "columnType");
     }
 
-    /** Recreate column and attach a table source to it resulting in a column reference */
-    public CoreColumn(Column column, TableSourceReference tableSource)
+    public TableSourceReference getTableSourceReference()
     {
-        this(column.getName(), column.getType(), "", false, tableSource.column(column.getName()));
+        return tableSourceReference;
     }
 
-    /** Construct a column with a type and column reference */
-    public CoreColumn(String name, ResolvedType type, ColumnReference columnReference)
+    public Type getColumnType()
     {
-        this(name, type, "", false, columnReference);
-    }
-
-    public ColumnReference getColumnReference()
-    {
-        return columnReference;
+        return columnType;
     }
 
     /** Return the output name of this column */
@@ -93,13 +99,13 @@ public class CoreColumn extends Column
         {
             return false;
         }
-        else if (obj instanceof CoreColumn)
+        else if (obj instanceof CoreColumn that)
         {
-            CoreColumn that = (CoreColumn) obj;
             return super.equals(that)
                     && Objects.equals(outputName, that.outputName)
                     && internal == that.internal
-                    && Objects.equals(columnReference, that.columnReference);
+                    && Objects.equals(tableSourceReference, that.tableSourceReference)
+                    && columnType == that.columnType;
         }
         return false;
     }
@@ -117,30 +123,33 @@ public class CoreColumn extends Column
     /** Construct a {@link CoreColumn} from name and type */
     public static CoreColumn of(String name, ResolvedType type)
     {
-        return new CoreColumn(name, type, null);
-    }
-
-    /** Construct a {@link CoreColumn} from name and type */
-    public static CoreColumn of(String name, Type type)
-    {
-        return new CoreColumn(name, ResolvedType.of(type), null);
-    }
-
-    /** Construct a {@link CoreColumn} from a reference and a type */
-    public static CoreColumn of(ColumnReference reference, ResolvedType type)
-    {
-        return new CoreColumn(reference.getName(), type, reference);
+        return new CoreColumn(name, type, "", false, null, Type.REGULAR);
     }
 
     /** Return a {@link CoreColumn} with provided name and type and reference */
-    public static CoreColumn of(String name, ResolvedType type, ColumnReference colRef)
+    public static CoreColumn of(String name, ResolvedType type, TableSourceReference tableSource)
     {
-        return new CoreColumn(name, type, "", false, colRef);
+        return new CoreColumn(name, type, "", false, tableSource, Type.REGULAR);
     }
 
-    /** Return a {@link CoreColumn} */
-    public static CoreColumn of(String name, ResolvedType type, String outputName, boolean internal, ColumnReference colRef)
+    /** Return a {@link CoreColumn} with provided name and type and reference */
+    public static CoreColumn of(String name, TableSourceReference tableSource)
     {
-        return new CoreColumn(name, type, outputName, internal, colRef);
+        return of(name, ResolvedType.of(Column.Type.Any), tableSource);
+    }
+
+    /** Reference column type */
+    public enum Type
+    {
+        /**
+         * An asterisk column which is used in a schema less query for catalogs that doesn't have schemas. This acts as a place holder during planning where the actual columns will come runtime.
+         */
+        ASTERISK,
+
+        /** A regular column. */
+        REGULAR,
+
+        /** A populated column. */
+        POPULATED;
     }
 }

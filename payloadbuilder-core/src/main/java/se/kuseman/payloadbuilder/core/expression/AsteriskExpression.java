@@ -1,16 +1,20 @@
 package se.kuseman.payloadbuilder.core.expression;
 
+import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
 
 import java.util.Objects;
+import java.util.Set;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.parser.Location;
 
 /**
@@ -26,11 +30,12 @@ import se.kuseman.payloadbuilder.core.parser.Location;
  *  - SELECT a.map.* FROM table                   &lt;-- qualified in select that expands a nested typ (Not implementd yet)
  * </pre>
  */
-public class AsteriskExpression implements IExpression
+public class AsteriskExpression implements IExpression, HasTableSourceReference
 {
     /** Qualifier before the asterisk */
     private final QualifiedName qname;
     private final Location location;
+    private final Set<TableSourceReference> tableSourceReferences;
 
     /** Create a unqualified asterisk */
     public AsteriskExpression(Location location)
@@ -41,8 +46,15 @@ public class AsteriskExpression implements IExpression
     /** Create a qualified asterisk */
     public AsteriskExpression(QualifiedName qname, Location location)
     {
+        this(qname, location, emptySet());
+    }
+
+    /** Create a qualified asterisk */
+    public AsteriskExpression(QualifiedName qname, Location location, Set<TableSourceReference> tableSourceReferences)
+    {
         this.qname = requireNonNull(qname, "qname");
         this.location = location;
+        this.tableSourceReferences = requireNonNull(tableSourceReferences, "tableSourceReferences");
     }
 
     public QualifiedName getQname()
@@ -55,10 +67,26 @@ public class AsteriskExpression implements IExpression
         return location;
     }
 
+    public Set<TableSourceReference> getTableSourceReferences()
+    {
+        return tableSourceReferences;
+    }
+
+    @Override
+    public TableSourceReference getTableSourceReference()
+    {
+        if (tableSourceReferences.size() == 1)
+        {
+            return tableSourceReferences.iterator()
+                    .next();
+        }
+        return null;
+    }
+
     @Override
     public ResolvedType getType()
     {
-        throw new RuntimeException("An asterisk expression has no type");
+        return ResolvedType.of(Type.Any);
     }
 
     @Override
@@ -94,10 +122,10 @@ public class AsteriskExpression implements IExpression
         {
             return true;
         }
-        else if (obj instanceof AsteriskExpression)
+        else if (obj instanceof AsteriskExpression that)
         {
-            AsteriskExpression that = (AsteriskExpression) obj;
-            return Objects.equals(qname, that.qname);
+            return Objects.equals(qname, that.qname)
+                    && tableSourceReferences.equals(that.tableSourceReferences);
         }
         return false;
     }
@@ -105,8 +133,9 @@ public class AsteriskExpression implements IExpression
     @Override
     public String toString()
     {
-        return (qname != null ? qname + "."
-                : "")
+        return (qname != null
+                && qname.size() > 0 ? qname + "."
+                        : "")
                + "*";
     }
 }

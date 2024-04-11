@@ -39,7 +39,7 @@ public class Projection implements IPhysicalPlan
         this.appendInputColumns = appendInputColumns;
         this.input = requireNonNull(input, "input");
         this.expressions = requireNonNull(expressions, "expressions");
-        this.schema = ProjectionUtils.createSchema(input.getSchema(), expressions, appendInputColumns, false);
+        this.schema = SchemaUtils.getSchema(input.getSchema(), expressions, appendInputColumns, false);
         this.asteriskSchema = SchemaUtils.isAsterisk(schema);
     }
 
@@ -98,7 +98,7 @@ public class Projection implements IPhysicalPlan
                 List<IExpression> actualExpressions = asteriskSchema ? ProjectionUtils.expandExpressions(expressions, outerSchema, vector.getSchema())
                         : expressions;
                 // Create the actual schema from the expressions
-                final Schema schema = asteriskSchema ? ProjectionUtils.createSchema(vector.getSchema(), actualExpressions, appendInputColumns, false)
+                final Schema schema = asteriskSchema ? SchemaUtils.getSchema(vector.getSchema(), actualExpressions, appendInputColumns, false)
                         : Projection.this.schema;
                 final int expressionSize = actualExpressions.size();
                 final ValueVector[] vectors = new ValueVector[expressionSize];
@@ -179,9 +179,8 @@ public class Projection implements IPhysicalPlan
         {
             return true;
         }
-        else if (obj instanceof Projection)
+        else if (obj instanceof Projection that)
         {
-            Projection that = (Projection) obj;
             return nodeId == that.nodeId
                     && input.equals(that.input)
                     && expressions.equals(that.expressions)

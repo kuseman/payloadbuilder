@@ -25,7 +25,6 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.QueryException;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 
 /** Test of {@link Sort} */
 public class SortTest extends APhysicalPlanTest
@@ -96,7 +95,7 @@ public class SortTest extends APhysicalPlanTest
         assertFalse(it.hasNext());
         it.close();
 
-        assertEquals(Schema.of(CoreColumn.of(table.column("col1"), ResolvedType.of(Type.Long)), CoreColumn.of(table.column("col2"), ResolvedType.of(Type.Any))), actual.getSchema());
+        assertEquals(Schema.of(col("col1", ResolvedType.of(Type.Long), table), col("col2", ResolvedType.of(Type.Any), table)), actual.getSchema());
 
         assertVectorsEquals(vv(Type.Long, null, null, 10L, 20L, 20L, 30L), actual.getColumn(0));
         assertVectorsEquals(vv(Type.Any, 4, -1, 1, 3, 0, 2), actual.getColumn(1));

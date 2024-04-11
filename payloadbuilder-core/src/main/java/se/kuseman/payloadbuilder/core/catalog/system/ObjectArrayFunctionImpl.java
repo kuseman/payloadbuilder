@@ -8,9 +8,9 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.vector.TupleVectorBuilder;
-import se.kuseman.payloadbuilder.core.physicalplan.ProjectionUtils;
 
 /**
  * Implementation of function object_array. Creates an array of objects from provided arguments.
@@ -20,7 +20,7 @@ class ObjectArrayFunctionImpl
     static ResolvedType getAggregateType(List<IExpression> arguments)
     {
         // This is the aggregate but the arguments are considered non aggregate for the schema
-        Schema schema = ProjectionUtils.createSchema(Schema.EMPTY, arguments, false, false);
+        Schema schema = SchemaUtils.getSchema(Schema.EMPTY, arguments, false, false);
         return ResolvedType.table(schema);
     }
 

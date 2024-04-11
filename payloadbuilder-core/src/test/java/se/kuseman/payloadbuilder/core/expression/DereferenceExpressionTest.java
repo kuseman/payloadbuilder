@@ -17,7 +17,6 @@ import se.kuseman.payloadbuilder.api.execution.ObjectVector;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.parser.ParseException;
@@ -152,7 +151,7 @@ public class DereferenceExpressionTest extends APhysicalPlanTest
         TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("table"), "");
 
         Schema runtimeInnerSchema = Schema.of(col("b", Type.Int));
-        Schema planInnerSchema = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Int), new ColumnReference(tableA, "b", ColumnReference.Type.ASTERISK)));
+        Schema planInnerSchema = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Int), "", false, tableA, CoreColumn.Type.ASTERISK));
         Schema schema = Schema.of(new Column("a", ResolvedType.table(runtimeInnerSchema)));
 
         // Test nested tuple vector, this will return a vector of value vectors
@@ -182,7 +181,7 @@ public class DereferenceExpressionTest extends APhysicalPlanTest
         TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("table"), "");
 
         Schema runtimeInnerSchema = Schema.of(col("b", Type.Int));
-        Schema planInnerSchema = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Int), new ColumnReference(tableA, "b", ColumnReference.Type.ASTERISK)));
+        Schema planInnerSchema = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Int), "", false, tableA, CoreColumn.Type.ASTERISK));
         Schema schema = Schema.of(new Column("a", ResolvedType.table(runtimeInnerSchema)));
 
         // Test nested tuple vector, this will return a vector of value vectors

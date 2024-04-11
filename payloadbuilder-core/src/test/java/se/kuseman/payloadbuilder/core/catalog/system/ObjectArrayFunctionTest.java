@@ -17,7 +17,6 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 
 /** Test of {@link AggregateObjectArrayFunction} and {@link OperatorObjectArrayFunction} */
@@ -53,7 +52,7 @@ public class ObjectArrayFunctionTest extends APhysicalPlanTest
         //@formatter:on
 
         actual = aggregator.combine(context);
-        schema = Schema.of(CoreColumn.of("col1", Column.Type.Any));
+        schema = Schema.of(col("col1", Column.Type.Any, null));
         assertEquals(ResolvedType.table(schema), scalar.getAggregateType(asList(col1)));
         assertVectorsEquals(vv(ResolvedType.table(schema), (TupleVector) null), actual);
 
@@ -86,7 +85,7 @@ public class ObjectArrayFunctionTest extends APhysicalPlanTest
         //@formatter:on
 
         actual = aggregator.combine(context);
-        schema = Schema.of(CoreColumn.of("col1", Column.Type.Any), CoreColumn.of("col2", Column.Type.Any));
+        schema = Schema.of(col("col1", Column.Type.Any, null), col("col2", Column.Type.Any, null));
         assertVectorsEquals(vv(ResolvedType.table(schema), TupleVector.of(schema, asList(vv(Type.Any, 1, 2, 3), vv(Type.Any, 4, 5, 6)))), actual);
 
         // Multi vector
@@ -108,7 +107,7 @@ public class ObjectArrayFunctionTest extends APhysicalPlanTest
         //@formatter:on
 
         actual = aggregator.combine(context);
-        schema = Schema.of(CoreColumn.of("col1", Column.Type.Any), CoreColumn.of("col2", Column.Type.Any));
+        schema = Schema.of(col("col1", Column.Type.Any, null), col("col2", Column.Type.Any, null));
         assertVectorsEquals(vv(ResolvedType.table(schema), TupleVector.of(schema, asList(vv(Type.Any, 1, 2, 3, 1, 2, 3), vv(Type.Any, 4, 5, 6, 4, 5, 6)))), actual);
     }
 

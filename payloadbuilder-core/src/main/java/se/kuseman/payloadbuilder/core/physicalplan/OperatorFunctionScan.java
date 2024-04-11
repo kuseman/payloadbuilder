@@ -113,9 +113,8 @@ public class OperatorFunctionScan implements IPhysicalPlan
         {
             return true;
         }
-        else if (obj instanceof OperatorFunctionScan)
+        else if (obj instanceof OperatorFunctionScan that)
         {
-            OperatorFunctionScan that = (OperatorFunctionScan) obj;
             return input.equals(that.input)
                     && nodeId == that.nodeId
                     && catalogAlias.equals(that.catalogAlias)

@@ -48,12 +48,11 @@ import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
+import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.ComparisonExpression;
 import se.kuseman.payloadbuilder.core.expression.FunctionCallExpression;
 import se.kuseman.payloadbuilder.core.expression.InExpression;
@@ -122,11 +121,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
-        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
-        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-
-        Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
-        Schema expectedSchemaB = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), bAst));
+        Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
+        Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
         //@formatter:off
         IPhysicalPlan expected = NestedLoop.leftJoin(
                 2,
@@ -171,11 +167,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
-        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
-        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-
-        Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
-        Schema expectedSchemaB = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), bAst));
+        Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
+        Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
         //@formatter:off
         IPhysicalPlan expected = NestedLoop.leftJoin(
                 3,
@@ -183,8 +176,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new Filter(
                     2,
                     new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
-                    new ExpressionPredicate(eq(cre(bAst.rename("id")), ocre(aAst.rename("id"))))),
-                asSet(CoreColumn.of(aAst.rename("id"), ResolvedType.of(Type.Any))),
+                    new ExpressionPredicate(eq(cre("id", tableB), ocre("id", tableA)))),
+                asSet(ast("id", ResolvedType.of(Type.Any), tableA)),
                 null);
         //@formatter:on
 
@@ -224,11 +217,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
-        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
-        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-
-        Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
-        Schema expectedSchemaB = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), bAst));
+        Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
+        Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
         //@formatter:off
         IPhysicalPlan expected = NestedLoop.innerJoin(
                 3,
@@ -236,8 +226,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new Filter(
                     2,
                     new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
-                    new ExpressionPredicate(eq(cre(bAst.rename("id")), ocre(aAst.rename("id"))))),
-                asSet(CoreColumn.of(aAst.rename("id"), ResolvedType.of(Type.Any))),
+                    new ExpressionPredicate(eq(cre("id", tableB), ocre("id", tableA)))),
+                asSet(ast("id", ResolvedType.of(Type.Any), tableA)),
                 null);
         //@formatter:on
 
@@ -286,12 +276,9 @@ public class QueryPlannerTest extends APhysicalPlanTest
         TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
-        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
-        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-
         //@formatter:off
-        Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
-        Schema expectedSchemaB = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), bAst));
+        Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
+        Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
         
         IPhysicalPlan expected = NestedLoop.innerJoin(
                 3,
@@ -299,7 +286,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new Filter(
                     2,
                     new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
-                    new ExpressionPredicate(eq(cre(bAst.rename("active")), LiteralBooleanExpression.TRUE))),
+                    new ExpressionPredicate(eq(cre("active", tableB), LiteralBooleanExpression.TRUE))),
                 null,
                 false);
         //@formatter:on
@@ -333,8 +320,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 .get(0)).getSelect();
 
         TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
-        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
-        Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
+        Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
 
         //@formatter:off
         IPhysicalPlan expected = new Limit(
@@ -373,7 +359,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
 
-        Schema schema = Schema.of(CoreColumn.of(tableA.column("col1"), ResolvedType.of(Type.Int)));
+        Schema schema = Schema.of(col("col1", ResolvedType.of(Type.Int), tableA));
         //@formatter:off
         IPhysicalPlan expected = new Limit(
                 1,
@@ -412,7 +398,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         TableSourceReference range = new TableSourceReference(0, "", QualifiedName.of("range"), "a");
 
-        IPhysicalPlan expected = new TableFunctionScan(0, Schema.of(CoreColumn.of(range.column("Value"), ResolvedType.of(Type.Int))), range, "sys", "System", SystemCatalog.get()
+        IPhysicalPlan expected = new TableFunctionScan(0, Schema.of(col("Value", ResolvedType.of(Type.Int), range)), range, "sys", "System", SystemCatalog.get()
                 .getTableFunction("range"), asList(intLit(1), intLit(100)), emptyList());
 
         // System.out.println(actual.print(0));
@@ -446,15 +432,14 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 .get(0)).getSelect();
 
         TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
-        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
-        Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
+        Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
 
         //@formatter:off
         IPhysicalPlan expected = 
                 new Sort(
                     1,
                     new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
-                    asList(sortItem(cre(aAst.rename("col")), Order.DESC, NullOrder.UNDEFINED)));
+                    asList(sortItem(cre("col", tableA), Order.DESC, NullOrder.UNDEFINED)));
         //@formatter:on
 
         // System.out.println(actual.print(0));
@@ -505,10 +490,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
-        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
-        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-        Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
-        Schema expectedSchemaB = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), bAst));
+        Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
+        Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
 
         //@formatter:off
         IPhysicalPlan expected =
@@ -520,7 +503,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                         new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
                         null,
                         false),
-                    asList(sortItem(cre(aAst.rename("col")), Order.DESC, NullOrder.UNDEFINED), sortItem(cre(bAst.rename("col2")), Order.ASC, NullOrder.UNDEFINED)));
+                    asList(sortItem(cre("col", tableA), Order.DESC, NullOrder.UNDEFINED), sortItem(cre("col2", tableB), Order.ASC, NullOrder.UNDEFINED)));
         //@formatter:on
 
         // System.out.println(actual.print(0));
@@ -571,10 +554,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
-        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
-        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-        Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
-        Schema expectedSchemaB = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), bAst));
+        Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
+        Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
 
         //@formatter:off
         IPhysicalPlan expected =
@@ -586,7 +567,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                         new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
                         null,
                         false),
-                    asList(sortItem(cre(bAst.rename("col2")), Order.ASC, NullOrder.UNDEFINED)));
+                    asList(sortItem(cre("col2", tableB), Order.ASC, NullOrder.UNDEFINED)));
         //@formatter:on
 
         // System.out.println(actual.print(0));
@@ -633,8 +614,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 .get(0)).getSelect();
 
         TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
-        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
-        Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
+        Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
 
         //@formatter:off
         IPhysicalPlan expected = new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList());
@@ -713,10 +693,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
-        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
-        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-        Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
-        Schema expectedSchemaB = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), bAst));
+        Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
+        Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
 
         //@formatter:off
         IPhysicalPlan expected = new Projection(
@@ -731,13 +709,13 @@ public class QueryPlannerTest extends APhysicalPlanTest
                             new Projection(
                                 2,
                                 new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(0), emptyList()),
-                                asList(new AliasExpression(cre(bAst.rename("col1")), "__expr0")),
+                                asList(new AliasExpression(cre("col1", tableB), "__expr0")),
                                 false),
                             1),
                         null),
                     new TableScan(5, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(1), emptyList()),
                     null),
-                asList(cre(aAst), new AliasExpression(ce("__expr0"), "values")),
+                asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(tableA)), new AliasExpression(ce("__expr0"), "values")),
                 false);
         //@formatter:on
 
@@ -746,6 +724,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
                 .isEqualTo(expected);
 
         assertEquals(expected, actual);
@@ -779,19 +758,14 @@ public class QueryPlannerTest extends APhysicalPlanTest
         TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
         TableSourceReference e_b = new TableSourceReference(2, "", QualifiedName.of("b"), "b");
 
-        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
-        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-        ColumnReference e_bAst = new ColumnReference(e_b, "b", ColumnReference.Type.ASTERISK);
-
-        Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
-        Schema expectedSchemaB = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), bAst));
-
-        Schema e_bExpectedSchema = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), e_bAst));
+        Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
+        Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
+        Schema e_bExpectedSchema = Schema.of(ast("b", ResolvedType.of(Type.Any), e_b));
 
         //@formatter:off
         Schema objectArraySchema = Schema.of(
-            CoreColumn.of(e_bAst.rename("col1"), ResolvedType.of(Type.Any)),
-            CoreColumn.of(e_bAst.rename("col2"), ResolvedType.of(Type.Any))
+            col("col1", ResolvedType.of(Type.Any), e_b),
+            col("col2", ResolvedType.of(Type.Any), e_b)
         );
 
         IPhysicalPlan expected = new Projection(
@@ -802,7 +776,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                         2,
                         new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
                         new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
-                        new ExpressionPredicate(eq(cre(bAst.rename("col")), cre(aAst.rename("col")))),
+                        new ExpressionPredicate(eq(cre("col", tableB), cre("col", tableA))),
                         "b",
                         false),
                     new OperatorFunctionScan(
@@ -813,15 +787,15 @@ public class QueryPlannerTest extends APhysicalPlanTest
                                 3,
                                 e_b,
                                 e_bExpectedSchema,
-                                ocre(bAst.rename("b"), ResolvedType.table(expectedSchemaB))),
-                            asList(cre(e_bAst.rename("col1")), cre(e_bAst.rename("col2"))),
+                                ocre("b", tableB, ResolvedType.table(expectedSchemaB))),
+                            asList(cre("col1", e_b), cre("col2", e_b)),
                             false),
                         SystemCatalog.get().getOperatorFunction("object_array"),
                         "sys",
                         Schema.of(Column.of("__expr0", ResolvedType.table(objectArraySchema)))),
-                    asSet(CoreColumn.of(bAst.rename("b"), ResolvedType.table(expectedSchemaB))),
+                    asSet(col("b", ResolvedType.table(expectedSchemaB), tableB)),
                     null),
-                asList(cre(aAst), cre("b", bAst.rename("b"), "b", ResolvedType.table(expectedSchemaB)), new AliasExpression(ce("__expr0", ResolvedType.table(objectArraySchema)), "values")),
+                asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(tableA, tableB)), new AliasExpression(ce("__expr0", ResolvedType.table(objectArraySchema)), "values")),
                 false);
         //@formatter:on
 
@@ -875,14 +849,11 @@ public class QueryPlannerTest extends APhysicalPlanTest
         TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
 
-        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
-        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-
         //@formatter:off
-        Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
-        Schema expectedSchemaB = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), bAst));
+        Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
+        Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
         
-        SeekPredicate expectedSeekPredicate = new SeekPredicate(new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), asList("col"), asList(cre(aAst.rename("col"))));
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), asList("col"), asList(cre("col", tableA)));
         
         IPhysicalPlan expected = NestedLoop.leftJoin(
                 3,
@@ -890,9 +861,9 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new Filter(
                     2,
                     new IndexSeek(1, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
-                    new ExpressionPredicate(eq(cre(bAst.rename("active")), LiteralBooleanExpression.TRUE))),
+                    new ExpressionPredicate(eq(cre("active", tableB), LiteralBooleanExpression.TRUE))),
                 new ExpressionPredicate(
-                    and(eq(cre(bAst.rename("col")), cre(aAst.rename("col"))), eq(cre(aAst.rename("active")), LiteralBooleanExpression.TRUE))
+                    and(eq(cre("col", tableB), cre("col", tableA)), eq(cre("active", tableA), LiteralBooleanExpression.TRUE))
                 ),
                 null,
                 true);
@@ -957,17 +928,13 @@ public class QueryPlannerTest extends APhysicalPlanTest
         TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
         TableSourceReference tableC = new TableSourceReference(2, "", QualifiedName.of("tableC"), "c");
 
-        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
-        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-        ColumnReference cAst = new ColumnReference(tableC, "c", ColumnReference.Type.ASTERISK);
-
         //@formatter:off
-        Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
-        Schema expectedSchemaB = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), bAst));
-        Schema expectedSchemaC = Schema.of(new CoreColumn("c", ResolvedType.of(Type.Any), cAst));
+        Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
+        Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
+        Schema expectedSchemaC = Schema.of(ast("c", ResolvedType.of(Type.Any), tableC));
         
-        SeekPredicate expectedSeekPredicateB = new SeekPredicate(new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), asList("col"), asList(cre(aAst.rename("col"))));
-        SeekPredicate expectedSeekPredicateC = new SeekPredicate(new Index(QualifiedName.of("tableC"), asList("col"), ColumnsType.ANY_IN_ORDER), asList("col"), asList(cre(bAst.rename("col"))));
+        SeekPredicate expectedSeekPredicateB = new SeekPredicate(new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), asList("col"), asList(cre("col", tableA)));
+        SeekPredicate expectedSeekPredicateC = new SeekPredicate(new Index(QualifiedName.of("tableC"), asList("col"), ColumnsType.ANY_IN_ORDER), asList("col"), asList(cre("col", tableB)));
         
         IPhysicalPlan expected = NestedLoop.leftJoin(
                 5,
@@ -979,13 +946,13 @@ public class QueryPlannerTest extends APhysicalPlanTest
                        new IndexSeek(1, expectedSchemaB, tableB, "test", false, expectedSeekPredicateB, t.seekDataSources.get(0), emptyList()),
                        new IndexSeek(2, expectedSchemaC, tableC, "test", false, expectedSeekPredicateC, t.seekDataSources.get(1), emptyList()),
                        new ExpressionPredicate(
-                               eq(cre(cAst.rename("col")), cre(bAst.rename("col")))
+                               eq(cre("col", tableC), cre("col", tableB))
                        ),
                        null,
                        true),
-                    asList(cre(bAst.rename("col"))),
+                    asList(cre("col", tableB)),
                     asList(
-                        new AggregateWrapperExpression(cre(bAst.rename("col")), true, false),
+                        new AggregateWrapperExpression(cre("col", tableB), true, false),
                         new AggregateWrapperExpression(new AliasExpression(
                                 new ComparisonExpression(
                                     IComparisonExpression.Type.GREATER_THAN,
@@ -995,8 +962,11 @@ public class QueryPlannerTest extends APhysicalPlanTest
                     )
                     ),
                 new ExpressionPredicate(
-                    and(and(eq(cre(bAst.rename("col")), cre(aAst.rename("col"))), eq(cre(aAst.rename("active")), LiteralBooleanExpression.TRUE)), eq(ce("active", ResolvedType.of(Type.Boolean)),
-                            LiteralBooleanExpression.TRUE))
+                    and(
+                        and(
+                            eq(cre("col", tableB), cre("col", tableA)),
+                            eq(cre("active", tableA), LiteralBooleanExpression.TRUE)),
+                        eq(ce("active", ResolvedType.of(Type.Boolean)), LiteralBooleanExpression.TRUE))
                 ),
                 null,
                 true);
@@ -1049,15 +1019,11 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         TableSourceReference tableA = new TableSourceReference(0, "", QualifiedName.of("tableA"), "a");
         TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
-
-        ColumnReference aAst = new ColumnReference(tableA, "a", ColumnReference.Type.ASTERISK);
-        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-
-        Schema expectedSchemaA = Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), aAst));
-        Schema expectedSchemaB = Schema.of(new CoreColumn("b", ResolvedType.of(Type.Any), bAst));
+        Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
+        Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
 
         SeekPredicate expectedSeekPredicate = new SeekPredicate(new Index(QualifiedName.of("tableB"), asList("col", "col2"), ColumnsType.ANY_IN_ORDER), asList("col", "col2"),
-                asList(cre(aAst.rename("col")), cre(aAst.rename("col2"))));
+                asList(cre("col", tableA), cre("col2", tableA)));
 
         //@formatter:off
         IPhysicalPlan expected = NestedLoop.innerJoin(
@@ -1065,7 +1031,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
                 new IndexSeek(1, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList()),
                 new ExpressionPredicate(
-                    and(eq(cre(bAst.rename("col")), cre(aAst.rename("col"))), eq(cre(bAst.rename("col2")), cre(aAst.rename("col2"))))
+                    and(eq(cre("col", tableB), cre("col", tableA)), eq(cre("col2", tableB), cre("col2", tableA)))
                 ),
                 null,
                 true);
@@ -1117,10 +1083,9 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 .get(0)).getSelect();
 
         TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
-        ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
 
         //@formatter:off
-        Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), ast));
+        Schema expectedSchema = Schema.of(ast("", ResolvedType.of(Type.Any), table));
         
         IPhysicalPlan expected = new Filter(
                 1,
@@ -1128,10 +1093,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 new ExpressionPredicate(
                     and(
                         and(
-                            new InExpression(cre(ast.rename("col2")), asList(intLit(10), intLit(20)), false),
-                            new LikeExpression(cre(ast.rename("col3")), new LiteralStringExpression("string"), false, null)
+                            new InExpression(cre("col2", table), asList(intLit(10), intLit(20)), false),
+                            new LikeExpression(cre("col3", table), new LiteralStringExpression("string"), false, null)
                         ),
-                        new NullPredicateExpression(cre(ast.rename("col4")), false)))
+                        new NullPredicateExpression(cre("col4", table), false)))
                 );
         //@formatter:on
 
@@ -1141,7 +1106,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 Triple.of(QualifiedName.of("col5"), IPredicate.Type.FUNCTION_CALL, asList(
                         new FunctionCallExpression(Catalog.SYSTEM_CATALOG_ALIAS, SystemCatalog.get().getScalarFunction("contains"), null, asList(
                                 new VariableExpression(QualifiedName.of("var")),
-                                cre(ast.rename("col5")))))),
+                                cre("col5", table))))),
                 Triple.of(null, IPredicate.Type.FUNCTION_CALL, asList(new FunctionCallExpression("t", someFunc, null, asList()))),
                 Triple.of(QualifiedName.of("col"), IPredicate.Type.COMPARISION, asList(intLit(10)))
                 ), catalog.consumedPredicate.get(QualifiedName.of("table")));
@@ -1172,15 +1137,14 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 .get(0)).getSelect();
 
         TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
-        ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
 
-        Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), ast));
+        Schema expectedSchema = Schema.of(ast("", ResolvedType.of(Type.Any), table));
         IPhysicalPlan expected = new TableScan(0, expectedSchema, table, "test", false, catalog.scanDataSources.get(0), emptyList());
 
         //@formatter:off
         assertEquals(1, catalog.consumedPredicate.size());
         assertEquals(asList(
-                Triple.of(null, IPredicate.Type.UNDEFINED, asList(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10, 20)), asList(cre(ast.rename("col2"))), false)))
+                Triple.of(null, IPredicate.Type.UNDEFINED, asList(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10, 20)), asList(cre("col2", table)), false)))
                 ), catalog.consumedPredicate.get(QualifiedName.of("table")));
         //@formatter:on
 
@@ -1213,15 +1177,14 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 .get(0)).getSelect();
 
         TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
-        ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
 
-        Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), ast));
+        Schema expectedSchema = Schema.of(ast("", ResolvedType.of(Type.Any), table));
         IPhysicalPlan expected = new TableScan(0, expectedSchema, table, "test", false, catalog.scanDataSources.get(0), emptyList());
 
         //@formatter:off
         assertEquals(1, catalog.consumedPredicate.size());
         assertEquals(asList(
-                Triple.of(null, IPredicate.Type.UNDEFINED, asList(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10, 20)), asList(cre(ast.rename("col2")), intLit(10)), false)))
+                Triple.of(null, IPredicate.Type.UNDEFINED, asList(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10, 20)), asList(cre("col2", table), intLit(10)), false)))
                 ), catalog.consumedPredicate.get(QualifiedName.of("table")));
         //@formatter:on
 
@@ -1254,15 +1217,14 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 .get(0)).getSelect();
 
         TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
-        ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
 
-        Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), ast));
+        Schema expectedSchema = Schema.of(ast("", ResolvedType.of(Type.Any), table));
         IPhysicalPlan expected = new TableScan(0, expectedSchema, table, "test", false, catalog.scanDataSources.get(0), emptyList());
 
         //@formatter:off
         assertEquals(1, catalog.consumedPredicate.size());
         assertEquals(asList(
-                Triple.of(null, IPredicate.Type.UNDEFINED, asList(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10, 20)), asList(cre(ast.rename("col2"))), true)))
+                Triple.of(null, IPredicate.Type.UNDEFINED, asList(in(new LiteralArrayExpression(VectorTestUtils.vv(Type.Int, 10, 20)), asList(cre("col2", table)), true)))
                 ), catalog.consumedPredicate.get(QualifiedName.of("table")));
         //@formatter:on
 
@@ -1313,16 +1275,15 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 .get(0)).getSelect();
 
         TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "t");
-        ColumnReference ast = new ColumnReference(table, "t", ColumnReference.Type.ASTERISK);
 
-        Schema expectedSchema = Schema.of(new CoreColumn("t", ResolvedType.of(Type.Any), ast));
+        Schema expectedSchema = Schema.of(ast("t", ResolvedType.of(Type.Any), table));
         IPhysicalPlan expected = new TableScan(0, expectedSchema, table, "test", false, catalog.scanDataSources.get(0), emptyList());
 
         //@formatter:off
         assertEquals(1, catalog.consumedPredicate.size());
         assertEquals(asList(
                 Triple.of(null, IPredicate.Type.FUNCTION_CALL, asList(new FunctionCallExpression("t", someFunc, null, asList()))),
-                Triple.of(null, IPredicate.Type.UNDEFINED, asList(or(gt(cre(ast.rename("col8")), intLit(10)), lt(cre(ast.rename("col9")), intLit(20))))),
+                Triple.of(null, IPredicate.Type.UNDEFINED, asList(or(gt(cre("col8", table), intLit(10)), lt(cre("col9", table), intLit(20))))),
                 Triple.of(QualifiedName.of("map", "col7"), IPredicate.Type.NULL, asList(new LiteralStringExpression("NOT NULL"))),
                 Triple.of(QualifiedName.of("map", "col6"), IPredicate.Type.NULL, asList(new LiteralStringExpression("NULL"))),
                 Triple.of(QualifiedName.of("map", "col5"), IPredicate.Type.LIKE, asList(new LiteralStringExpression("NOT"), new LiteralStringExpression("string"))),
@@ -1375,10 +1336,9 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 .get(0)).getSelect();
 
         TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
-        ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
 
         //@formatter:off
-        Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), ast));
+        Schema expectedSchema = Schema.of(ast("", ResolvedType.of(Type.Any), table));
         
         IPhysicalPlan expected = new DescribePlan(
                 4,
@@ -1393,10 +1353,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
                         new ExpressionPredicate(
                             and(
                                 and(
-                                    new InExpression(cre(ast.rename("col2")), asList(intLit(10), intLit(20)), false),
-                                    new LikeExpression(cre(ast.rename("col3")), new LiteralStringExpression("string"), false, null)
+                                    new InExpression(cre("col2", table), asList(intLit(10), intLit(20)), false),
+                                    new LikeExpression(cre("col3", table), new LiteralStringExpression("string"), false, null)
                                 ),
-                                new NullPredicateExpression(cre(ast.rename("col4")), false)))
+                                new NullPredicateExpression(cre("col4", table), false)))
                         )),
                 true);
         //@formatter:on
@@ -1451,10 +1411,9 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 .get(0)).getSelect();
 
         TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
-        ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
 
         //@formatter:off
-        Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), ast));
+        Schema expectedSchema = Schema.of(ast("", ResolvedType.of(Type.Any), table));
         
         IPhysicalPlan expected = new TableScan(0, expectedSchema, table, "test", false, catalog.scanDataSources.get(0), emptyList());
         //@formatter:on

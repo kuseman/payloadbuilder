@@ -11,7 +11,6 @@ import org.junit.Test;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
@@ -42,11 +41,11 @@ public class ColumnOrdinalResolverTest extends ALogicalPlanOptimizerTest
 
         Schema resolvedSchemaStableA = new Schema(schemaSTableA.getColumns()
                 .stream()
-                .map(c -> new CoreColumn(c, sTableA))
+                .map(c -> col(c.getName(), c.getType(), sTableA))
                 .collect(toList()));
         Schema resolvedSchemaStableB = new Schema(schemaSTableB.getColumns()
                 .stream()
-                .map(c -> new CoreColumn(c, sTableB))
+                .map(c -> col(c.getName(), c.getType(), sTableB))
                 .collect(toList()));
 
         //@formatter:off
@@ -56,18 +55,18 @@ public class ColumnOrdinalResolverTest extends ALogicalPlanOptimizerTest
                         new Filter(
                             tableScan(resolvedSchemaStableA, sTableA),
                             sTableA,
-                            eq(cre(stACol2, 1, ResolvedType.of(Type.String)), new LiteralStringExpression("test"))),
+                            eq(cre("col2", sTableA, 1, ResolvedType.of(Type.String)), new LiteralStringExpression("test"))),
                         new Filter(
                             tableScan(resolvedSchemaStableB, sTableB),
                             sTableB,
-                            gt(cre(stBCol2, 1 /*4*/, ResolvedType.of(Type.String)), intLit(100))),        // This has ordinal 4 before running rule
+                            gt(cre("col2", sTableB, 1 /*4*/, ResolvedType.of(Type.String)), intLit(100))),        // This has ordinal 4 before running rule
                         Join.Type.INNER,
                         null,
-                        eq(cre(stACol3, 2, ResolvedType.of(Type.Float)), cre(stBCol3, 5, ResolvedType.of(Type.Float))),
+                        eq(cre("col3", sTableA, 2, ResolvedType.of(Type.Float)), cre("col3", sTableB, 5, ResolvedType.of(Type.Float))),
                         asSet(),
                         false),
                     null,
-                    gt(cre(stACol1, 0, ResolvedType.of(Type.Int)), cre(stBCol1, 3, ResolvedType.of(Type.Boolean)))
+                    gt(cre("col1", sTableA, 0, ResolvedType.of(Type.Int)), cre("col1", sTableB, 3, ResolvedType.of(Type.Boolean)))
                 );
         //@formatter:on
 

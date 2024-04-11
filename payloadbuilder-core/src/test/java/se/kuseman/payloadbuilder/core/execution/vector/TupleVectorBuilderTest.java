@@ -5,7 +5,7 @@ import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.util.BitSet;
 
-import org.junit.Assert;
+import org.assertj.core.api.Assertions;
 import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -14,12 +14,12 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
+import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link TupleVectorBuilder} */
-public class TupleVectorBuilderTest extends Assert
+public class TupleVectorBuilderTest extends APhysicalPlanTest
 {
     @Test
     public void test_append_with_constant_scan_input()
@@ -124,10 +124,12 @@ public class TupleVectorBuilderTest extends Assert
         Schema expectedSchema = Schema.of(
                 Column.of("col1", Type.Int),
                 Column.of("col2", Type.Long),
-                CoreColumn.of("p", ResolvedType.table(innerSchema))
+                pop("p", ResolvedType.table(innerSchema), null)
         );
 
-        assertEquals(expectedSchema, actual.getSchema());
+        Assertions.assertThat(actual.getSchema())
+            .usingRecursiveComparison()
+            .isEqualTo(expectedSchema);
 
         VectorTestUtils.assertTupleVectorsEquals(TupleVector.of(expectedSchema, asList(
                 vv(Type.Int, 1, 3),

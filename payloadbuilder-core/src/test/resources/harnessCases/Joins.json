@@ -495,9 +495,9 @@
       "name": "Group by without subquery",
       "query": [
         "select rs.index, rs.id, sh.wareh_id ",
-        "  from reservation rs ",
-        "  cross apply (totable(rs.stockhouses)) sh",
-        "  group by rs.index, rs.id, sh.wareh_id "
+        "from reservation rs ",
+        "cross apply (totable(rs.stockhouses)) sh",
+        "group by rs.index, rs.id, sh.wareh_id "
       ],
       "expectedResultSets": [
         [

@@ -22,7 +22,6 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.expression.ComparisonExpression;
@@ -36,11 +35,11 @@ public abstract class AJoinTest extends APhysicalPlanTest
     /** Create a physical plan to test for left join implementations */
     abstract IPhysicalPlan createLeftJoin(IPhysicalPlan outer, IPhysicalPlan inner, BiFunction<TupleVector, IExecutionContext, ValueVector> predicate, String populateAlias);
 
-    protected Schema outerSchema = Schema.of(CoreColumn.of(table.column("col1"), ResolvedType.of(Type.Any)), CoreColumn.of(table.column("col2"), ResolvedType.of(Type.Any)));
-    protected Schema innerSchema = Schema.of(CoreColumn.of(tableB.column("col3"), ResolvedType.of(Type.Any)), CoreColumn.of(tableB.column("col4"), ResolvedType.of(Type.Any)));
+    protected Schema outerSchema = Schema.of(col("col1", ResolvedType.of(Type.Any), table), CoreColumn.of("col2", ResolvedType.of(Type.Any), table));
+    protected Schema innerSchema = Schema.of(col("col3", ResolvedType.of(Type.Any), tableB), CoreColumn.of("col4", ResolvedType.of(Type.Any), tableB));
 
-    protected Schema outerSchemaLess = Schema.of(CoreColumn.of(new ColumnReference(table, "t", ColumnReference.Type.ASTERISK), ResolvedType.of(Type.Any)));
-    protected Schema innerSchemaLess = Schema.of(CoreColumn.of(new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK), ResolvedType.of(Type.Any)));
+    protected Schema outerSchemaLess = Schema.of(ast("t", ResolvedType.of(Type.Any), table));
+    protected Schema innerSchemaLess = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
 
     // outer.col1 = inner.col1
     protected IExpression predicate = new ComparisonExpression(IComparisonExpression.Type.EQUAL, ce("col1"), ce("col3"));

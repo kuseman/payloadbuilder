@@ -10,6 +10,7 @@ import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
 import com.fasterxml.jackson.core.JsonToken;
@@ -111,7 +112,7 @@ class OpenCsvFunction extends TableFunctionInfo
             }
             else
             {
-                String[] columns = columnHeaders.split(String.valueOf(columnSeparator));
+                String[] columns = StringUtils.split(columnHeaders, String.valueOf(columnSeparator));
                 Builder builder = CsvSchema.builder()
                         .setColumnSeparator(columnSeparator);
                 for (String column : columns)

@@ -3,14 +3,13 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 import static java.util.stream.Collectors.toList;
 
 import java.util.List;
-import java.util.Objects;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IColumnExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.common.SortItem;
 import se.kuseman.payloadbuilder.core.expression.ARewriteExpressionVisitor;
@@ -196,7 +195,9 @@ class ColumnOrdinalResolver extends ALogicalPlanOptimizer<ColumnOrdinalResolver.
             int ordinal = ce.getOrdinal();
             if (ordinal >= 0)
             {
-                ColumnReference colRef = ce.getColumnReference();
+                TableSourceReference tableSource = ce.getTableSourceReference();
+                int tableSourceId = tableSource != null ? tableSource.getId()
+                        : -1;
                 String alias = ce.getAlias()
                         .getAlias();
 
@@ -211,8 +212,10 @@ class ColumnOrdinalResolver extends ALogicalPlanOptimizer<ColumnOrdinalResolver.
                 {
                     Column schemaColumn = schema.getColumns()
                             .get(i);
-                    ColumnReference schemaColRef = SchemaUtils.getColumnReference(schemaColumn);
-                    if (Objects.equals(colRef, schemaColRef)
+                    TableSourceReference schemaTableSource = SchemaUtils.getTableSource(schemaColumn);
+                    int schemaTableSourceId = schemaTableSource != null ? schemaTableSource.getId()
+                            : -1;
+                    if (tableSourceId == schemaTableSourceId
                             && schemaColumn.getName()
                                     .equalsIgnoreCase(alias)
                             && ordinal != i)

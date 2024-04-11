@@ -10,6 +10,7 @@ import java.util.Optional;
 import org.junit.Test;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
+import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -18,7 +19,6 @@ import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.expression.VariableExpression;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.core.physicalplan.DatasourceOptions;
@@ -32,7 +32,7 @@ public class RangeFunctionTest extends APhysicalPlanTest
     @Test
     public void test()
     {
-        Schema schema = Schema.of(CoreColumn.of(table.column("Value"), ResolvedType.of(Type.Int)));
+        Schema schema = Schema.of(Column.of("Value", ResolvedType.of(Type.Int)));
         TupleIterator it = f.execute(context, "", Optional.of(schema), asList(intLit(1), intLit(10)), new DatasourceOptions(emptyList()));
 
         int count = 0;
@@ -51,7 +51,7 @@ public class RangeFunctionTest extends APhysicalPlanTest
     @Test
     public void test_batch_size()
     {
-        Schema schema = Schema.of(CoreColumn.of(table.column("Value"), ResolvedType.of(Type.Int)));
+        Schema schema = Schema.of(Column.of("Value", ResolvedType.of(Type.Int)));
         context.setVariable(QualifiedName.of("batch"), ValueVector.literalInt(3, 1));
         TupleIterator it = f.execute(context, "", Optional.of(schema), asList(intLit(1), intLit(11)),
                 new DatasourceOptions(asList(new Option(QualifiedName.of("batch_size"), new VariableExpression(QualifiedName.of("batch"))))));

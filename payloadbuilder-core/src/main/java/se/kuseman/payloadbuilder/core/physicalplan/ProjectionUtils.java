@@ -3,22 +3,16 @@ package se.kuseman.payloadbuilder.core.physicalplan;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.lang3.StringUtils;
-
 import se.kuseman.payloadbuilder.api.catalog.Column;
-import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
+import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.DereferenceExpression;
-import se.kuseman.payloadbuilder.core.expression.HasAlias;
-import se.kuseman.payloadbuilder.core.expression.HasColumnReference;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
 
 /** Utility class for projections that handles asterisks in projection expressions. */
@@ -32,32 +26,36 @@ public class ProjectionUtils
 
         for (IExpression e : expressions)
         {
-            ColumnReference colRef = null;
-            if (e instanceof HasColumnReference)
+            boolean aggregate = e instanceof IAggregateExpression;
+            boolean aggregateSingleValue = false;
+
+            if (e instanceof AggregateWrapperExpression awe)
             {
-                colRef = ((HasColumnReference) e).getColumnReference();
-            }
+                aggregateSingleValue = awe.isSingleValue();
 
-            // This is an asterisk select for a table in a schema less query
-            // Then expand the expressions to match the input tuple vector for that table source
-            if (colRef != null
-                    && colRef.isAsterisk())
-            {
-                boolean aggregate = e instanceof IAggregateExpression;
-                boolean aggregateSingleValue = e instanceof AggregateWrapperExpression ? ((AggregateWrapperExpression) e).isSingleValue()
-                        : false;
-
-                TableSourceReference tableSource = colRef.getTableSource();
-
-                if (!findColumns(schema, false, tableSource, result, aggregate, aggregateSingleValue)
-                        && outerSchema != null)
+                if (!(awe.getExpression() instanceof AsteriskExpression))
                 {
-                    findColumns(outerSchema, true, tableSource, result, aggregate, aggregateSingleValue);
+                    result.add(e);
+                    continue;
                 }
+
+                e = awe.getExpression();
             }
-            else
+
+            if (!(e instanceof AsteriskExpression))
             {
                 result.add(e);
+                continue;
+            }
+
+            AsteriskExpression ae = (AsteriskExpression) e;
+            for (TableSourceReference tableRef : ae.getTableSourceReferences())
+            {
+                if (!findColumns(schema, false, tableRef, result, aggregate, aggregateSingleValue)
+                        && outerSchema != null)
+                {
+                    findColumns(outerSchema, true, tableRef, result, aggregate, aggregateSingleValue);
+                }
             }
         }
 
@@ -78,22 +76,23 @@ public class ProjectionUtils
         {
             Column column = schema.getColumns()
                     .get(i);
-            ColumnReference columnColRef = SchemaUtils.getColumnReference(column);
-            TableSourceReference columnTableSource = columnColRef != null ? columnColRef.getTableSource()
-                    : null;
+            TableSourceReference columnTableSource = SchemaUtils.getTableSource(column);
+            if (columnTableSource == null)
+            {
+                continue;
+            }
 
             // Matching table source, return expression
-            if (tableSource.equals(columnTableSource))
+            if (tableSource.getId() == columnTableSource.getId())
             {
-                IExpression columnExpression = ColumnExpression.Builder.of(columnColRef.getName(), column.getType())
-                        .withColumnReference(columnColRef)
+                IExpression columnExpression = ColumnExpression.Builder.of(column.getName(), column.getType())
+                        .withTableSourceReference(columnTableSource)
                         .withOuterReference(outer)
                         .withOrdinal(i)
                         .build();
 
                 // Populated column, add a dereference for all of the inner schema columns
-                if (column.getType()
-                        .getType() == Type.Table)
+                if (SchemaUtils.isPopulated(column))
                 {
                     Schema innerSchema = column.getType()
                             .getSchema();
@@ -117,52 +116,5 @@ public class ProjectionUtils
             }
         }
         return added;
-    }
-
-    /** Create a schema from provided expressions */
-    public static Schema createSchema(Schema input, List<? extends IExpression> expressions, boolean appendInputColumns, boolean aggregate)
-    {
-        int inputSize = input.getSize();
-        List<Column> columns = new ArrayList<>(expressions.size() + (appendInputColumns ? inputSize
-                : 0));
-        for (IExpression expression : expressions)
-        {
-            String name = "";
-            String outputName = "";
-            if (expression instanceof HasAlias)
-            {
-                HasAlias.Alias alias = ((HasAlias) expression).getAlias();
-                name = alias.getAlias();
-                outputName = alias.getOutputAlias();
-            }
-
-            if (StringUtils.isBlank(name))
-            {
-                outputName = expression.toString();
-            }
-
-            ResolvedType type;
-            if (aggregate)
-            {
-                type = ((IAggregateExpression) expression).getAggregateType();
-            }
-            else
-            {
-                type = expression.getType();
-            }
-            ColumnReference columnReference = null;
-            if (expression instanceof HasColumnReference)
-            {
-                columnReference = ((HasColumnReference) expression).getColumnReference();
-            }
-            columns.add(CoreColumn.of(name, type, outputName, expression.isInternal(), columnReference));
-        }
-
-        if (appendInputColumns)
-        {
-            columns.addAll(input.getColumns());
-        }
-
-        return new Schema(columns);
     }
 }

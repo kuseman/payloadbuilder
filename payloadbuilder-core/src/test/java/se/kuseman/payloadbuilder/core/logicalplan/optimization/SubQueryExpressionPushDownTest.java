@@ -6,6 +6,7 @@ import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Random;
+import java.util.Set;
 
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
@@ -18,11 +19,11 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
+import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.FunctionCallExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
@@ -68,46 +69,43 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         TableSourceReference pdArticle = new TableSourceReference(0, "", QualifiedName.of("PDArticle"), "a");
         TableSourceReference a_resource = new TableSourceReference(1, "", QualifiedName.of("a.resource"), "ar");
 
-        ColumnReference pdArticleAst = new ColumnReference(pdArticle, "a", ColumnReference.Type.ASTERISK);
-        ColumnReference a_resourceAst = new ColumnReference(a_resource, "ar", ColumnReference.Type.ASTERISK);
-
-        Schema schemaPDArticle = Schema.of(CoreColumn.of("a", ResolvedType.of(Type.Any), pdArticleAst));
-        Schema schemaa_resource = Schema.of(CoreColumn.of("ar", ResolvedType.of(Type.Any), a_resourceAst));
+        Schema schemaPDArticle = Schema.of(ast("a", ResolvedType.of(Type.Any), pdArticle));
+        Schema schemaa_resource = Schema.of(ast("ar", ResolvedType.of(Type.Any), a_resource));
 
         //@formatter:off
         ILogicalPlan expected =
                 projection(
                     new Join(
                         tableScan(schemaPDArticle, pdArticle),
-                            new Limit(
-                                new Sort(
-                                    projection(
-                                        new Filter(
-                                            new ExpressionScan(
-                                                a_resource,
-                                                schemaa_resource,
-                                                ocre(pdArticleAst.rename("resource"), ResolvedType.of(Type.Any)),
-                                                null),
-                                            null,
-                                            or(
-                                                eq(cre(a_resourceAst.rename("typeid"), ResolvedType.of(Type.Any)), new LiteralStringExpression("Fs")),
-                                                eq(new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("isnull"), null,
-                                                        asList(cre(a_resourceAst.rename("defaultfront")), intLit(0))), intLit(1))
-                                            )
-                                        ),
-                                        asList(
-                                            new AliasExpression(cre(a_resourceAst.rename("filename")), "__expr0"),
-                                            new AliasExpression(cre(a_resourceAst.rename("defaultfront")), "defaultfront", true)
+                        new Limit(
+                            new Sort(
+                                projection(
+                                    new Filter(
+                                        new ExpressionScan(
+                                            a_resource,
+                                            schemaa_resource,
+                                            ocre("resource", pdArticle, ResolvedType.of(Type.Any)),
+                                            null),
+                                        null,
+                                        or(
+                                            eq(cre("typeid", a_resource, ResolvedType.of(Type.Any)), new LiteralStringExpression("Fs")),
+                                            eq(new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("isnull"), null,
+                                                    asList(cre("defaultfront", a_resource), intLit(0))), intLit(1))
                                         )
                                     ),
-                                    asList(sortItem(new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("isnull"), null,
-                                                        asList(cre(a_resourceAst.rename("defaultfront")), intLit(0))), ISortItem.Order.ASC))
+                                    asList(
+                                        new AliasExpression(cre("filename", a_resource), "__expr0"),
+                                        new AliasExpression(cre("defaultfront", a_resource), "defaultfront", true)
+                                    )
                                 ),
+                                asList(sortItem(new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("isnull"), null,
+                                                    asList(cre("defaultfront", a_resource, 1, ResolvedType.of(Type.Any)), intLit(0))), ISortItem.Order.ASC))
+                            ),
                             intLit(1)),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
-                        asSet(CoreColumn.of(pdArticleAst.rename("resource"), ResolvedType.of(Type.Any))),
+                        asSet(ast("resource", ResolvedType.of(Type.Any), pdArticle)),
                         false),
                     asList(new AliasExpression(ce("__expr0"), "images")));
         //@formatter:on
@@ -117,7 +115,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
             .usingRecursiveComparison()
             .ignoringFieldsOfTypes(Location.class, Random.class)
             .isEqualTo(Schema.of(
-                    CoreColumn.of("images", ResolvedType.of(Type.Any), "", false, null)));
+                    col("images", ResolvedType.of(Type.Any), null)));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -135,28 +133,29 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
     @Test
     public void test_operator_function_mixed_with_sub_query_scalar_and_correlation()
     {
-        String q = "" + "select a.column,             "
-                   + "   (                  "
-                   + "     select"
-                   + "     ("
-                   + "       select"
-                   + "       ("
-                   + "         select a.col    "
-                   + "         from PDArticle a    "
-                   + "       ) val "
-                   + ","
-                   + "       ("
-                   + "         select p.col2 "
-                   + "         from PDProduct p "
-                   + "         where a.col = p.col4 "
-                   + "       ) val1, a.col5 "
-                   + "       from (bb) bb "
-                   + "       for object_array "
-                   + "     )"
-                   + "   ) values           "
-                   + "   from PDProduct_Article a        "
-                   + "   cross populate apply tableB bb "
-                   + "";
+        String q = """
+                   select a.column,
+                   (
+                     select
+                     (
+                       select
+                       (
+                         select a.col
+                         from PDArticle a
+                       ) val,
+                       (
+                         select p.col2
+                         from PDProduct p
+                         where a.col = p.col4
+                       ) val1,
+                       a.col5
+                       from (bb) bb
+                       for object_array
+                     )
+                   ) values
+                   from PDProduct_Article a
+                   cross populate apply tableB bb
+                """;
 
         ILogicalPlan plan = getColumnResolvedPlan(q);
 
@@ -166,24 +165,19 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         TableSourceReference tableArticle = new TableSourceReference(3, "", QualifiedName.of("PDArticle"), "a");
         TableSourceReference tableProduct = new TableSourceReference(4, "", QualifiedName.of("PDProduct"), "p");
         TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "bb");
-
         TableSourceReference e_bb = new TableSourceReference(2, "", QualifiedName.of("bb"), "bb");
 
-        ColumnReference paAst = new ColumnReference(tableProductArticle, "a", ColumnReference.Type.ASTERISK);
-        ColumnReference aAst = new ColumnReference(tableArticle, "a", ColumnReference.Type.ASTERISK);
-        ColumnReference pAst = new ColumnReference(tableProduct, "p", ColumnReference.Type.ASTERISK);
-        ColumnReference bbAst = new ColumnReference(tableB, "bb", ColumnReference.Type.ASTERISK);
-        ColumnReference e_bbAst = new ColumnReference(e_bb, "bb", ColumnReference.Type.ASTERISK);
-
-        Schema schemaProductArticle = Schema.of(col(paAst, Type.Any));
-        Schema schemaArticle = Schema.of(col(aAst, Type.Any));
-        Schema schemaProduct = Schema.of(col(pAst, Type.Any));
-        Schema schemaTableB = Schema.of(col(bbAst, Type.Any));
-
-        Schema objectArraySchema = Schema.of(CoreColumn.of("val", ResolvedType.of(Type.Any)), CoreColumn.of("val1", ResolvedType.of(Type.Any)),
-                CoreColumn.of(paAst.rename("col5"), ResolvedType.of(Type.Any)));
+        Schema schemaProductArticle = Schema.of(ast("a", Type.Any, tableProductArticle));
+        Schema schemaArticle = Schema.of(ast("a", Type.Any, tableArticle));
+        Schema schemaProduct = Schema.of(ast("p", Type.Any, tableProduct));
+        Schema schemaTableB = Schema.of(ast("bb", Type.Any, tableB));
 
         //@formatter:off
+        Schema objectArraySchema = Schema.of(
+                col("val", ResolvedType.of(Type.Any), null),
+                col("val1", ResolvedType.of(Type.Any), null),
+                col("col5", ResolvedType.of(Type.Any), tableProductArticle));
+
         ILogicalPlan expected = 
                 projection(
                     new Join(
@@ -204,7 +198,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                            new MaxRowCountAssert(
                                                    projection(
                                                        tableScan(schemaArticle, tableArticle),
-                                                       asList(new AliasExpression(cre(aAst.rename("col")), "__expr2"))),
+                                                       asList(new AliasExpression(cre("col", tableArticle), "__expr2"))),
                                                1),
                                            Join.Type.LEFT,
                                            null,
@@ -213,8 +207,8 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                            false),
                                        new ExpressionScan(
                                            e_bb,
-                                           Schema.of(CoreColumn.of(e_bbAst, ResolvedType.of(Type.Any))),
-                                           ocre(bbAst.rename("bb"), ResolvedType.table(schemaTableB)),
+                                           Schema.of(ast("bb", ResolvedType.of(Type.Any), e_bb)),
+                                           ocre("bb", tableB, ResolvedType.table(schemaTableB)),
                                            null),
                                        Join.Type.LEFT,
                                        null,
@@ -226,15 +220,15 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                            new Filter(
                                                tableScan(schemaProduct, tableProduct),
                                                null,
-                                               eq(ocre(paAst.rename("col")), cre(pAst.rename("col4")))),
-                                           asList(new AliasExpression(cre(pAst.rename("col2")), "__expr3"))), 
+                                               eq(ocre("col", tableProductArticle), cre("col4", tableProduct))),
+                                           asList(new AliasExpression(cre("col2", tableProduct), "__expr3"))),
                                        1),
                                    Join.Type.LEFT,
                                    null,
                                    (IExpression) null,
-                                   asSet(col(paAst.rename("col"), Type.Any)),
+                                   asSet(ast("col", Type.Any, tableProductArticle)),
                                    false),
-                               asList(new AliasExpression(ce("__expr2"), "val"), new AliasExpression(ce("__expr3"), "val1"), ocre(paAst.rename("col5")))
+                               asList(new AliasExpression(ce("__expr2"), "val"), new AliasExpression(ce("__expr3"), "val1"), ocre("col5", tableProductArticle))
                             ),
                             "",
                             "object_array",
@@ -242,18 +236,18 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
-                        asSet(new CoreColumn("bb", ResolvedType.table(schemaTableB), bbAst.rename("bb")), col(paAst.rename("col"), Type.Any), col(paAst.rename("col5"), Type.Any)),
+                        asSet(col("bb", ResolvedType.table(schemaTableB), tableB), ast("col", Type.Any, tableProductArticle), ast("col5", Type.Any, tableProductArticle)),
                         false),
-                    asList(cre(paAst.rename("column")), new AliasExpression(ce("__expr0", ResolvedType.table(objectArraySchema)), "values")));
+                    asList(cre("column", tableProductArticle), new AliasExpression(ce("__expr0", ResolvedType.table(objectArraySchema)), "values")));
         //@formatter:on
+
+        // System.out.println(expected.print(0));
+        // System.out.println(actual.print(0));
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
                 .ignoringFieldsOfTypes(Location.class, Random.class)
                 .isEqualTo(expected);
-
-        // System.out.println(expected.print(0));
-        // System.out.println(actual.print(0));
 
         assertEquals(expected, actual);
     }
@@ -276,10 +270,8 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         
         TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
         TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
-        ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
-        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-        Schema schema = Schema.of(col(ast, Type.Any));
-        Schema schemaB = Schema.of(col(bAst, Type.Any));
+        Schema schema = Schema.of(ast("", Type.Any, table));
+        Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
 
         //@formatter:off
         ILogicalPlan expected = 
@@ -290,7 +282,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             new MaxRowCountAssert(
                                 projection(
                                     tableScan(schemaB, tableB),
-                                asList(new AliasExpression(cre(bAst.rename("col1")), "__expr0"))),
+                                asList(new AliasExpression(cre("col1", tableB), "__expr0"))),
                             1),
                             Join.Type.LEFT,
                             null,
@@ -303,20 +295,34 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                         (IExpression) null,
                         asSet(),
                         true),
-                    asList(cre(ast), new AliasExpression(ce("__expr0"), "values")));
+                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(table)), new AliasExpression(ce("__expr0"), "values")));
         //@formatter:on
 
-        //@formatter:off
-        assertEquals(Schema.of(
-                CoreColumn.of("", ResolvedType.of(Type.Any), "table.*", false, ast),
-                CoreColumn.of("values", ResolvedType.of(Type.Any), "", false, null)), actual.getSchema());
-        //@formatter:on
-
-        // Validate the schema below the projection. The schema must stay consistent even if we switch outer/inner
-        assertEquals(Schema.of(col(ast, Type.Any), col("__expr0", Type.Any, bAst.rename("col1"))), ((Projection) actual).getInput()
-                .getSchema());
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));
+
+        //@formatter:off
+        Assertions.assertThat(actual.getSchema())
+            .usingRecursiveComparison()
+            .ignoringFieldsOfTypes(Location.class, Random.class)
+            .isEqualTo(Schema.of(
+                new CoreColumn("", ResolvedType.of(Type.Any), "*", false, table, CoreColumn.Type.ASTERISK),
+                new CoreColumn("values", ResolvedType.of(Type.Any), "", false, null, CoreColumn.Type.REGULAR)));
+
+        // Validate the schema below the projection. The schema must stay consistent even if we switch outer/inner
+        Assertions.assertThat(((Projection) actual).getInput()
+                .getSchema())
+            .usingRecursiveComparison()
+            .ignoringFieldsOfTypes(Location.class, Random.class)
+            .isEqualTo(Schema.of(
+                    new CoreColumn("", ResolvedType.of(Type.Any), "", false, table, CoreColumn.Type.ASTERISK),
+                    col("__expr0", Type.Any, tableB)));
+        //@formatter:on
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(expected);
 
         assertEquals(expected, actual);
     }
@@ -344,12 +350,9 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
         TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
         TableSourceReference tableC = new TableSourceReference(2, "", QualifiedName.of("tableC"), "c");
-        ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
-        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-        ColumnReference cAst = new ColumnReference(tableC, "c", ColumnReference.Type.ASTERISK);
-        Schema schema = Schema.of(col(ast, Type.Any));
-        Schema schemaB = Schema.of(col(bAst, Type.Any));
-        Schema schemaC = Schema.of(col(cAst, Type.Any));
+        Schema schema = Schema.of(ast("", Type.Any, table));
+        Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
+        Schema schemaC = Schema.of(ast("c", Type.Any, tableC));
 
         //@formatter:off
         ILogicalPlan expected = 
@@ -360,7 +363,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             new MaxRowCountAssert(
                                 projection(
                                     tableScan(schemaC, tableC),
-                                    asList(new AliasExpression(cre(cAst.rename("col2")), "__expr1"))),
+                                    asList(new AliasExpression(cre("col2", tableC), "__expr1"))),
                             1),
                             Join.Type.LEFT,
                             null,
@@ -373,7 +376,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                 new MaxRowCountAssert(
                                     projection(
                                         tableScan(schemaB, tableB),
-                                        asList(new AliasExpression(cre(bAst.rename("col1")), "__expr0"))),
+                                        asList(new AliasExpression(cre("col1", tableB), "__expr0"))),
                                 1),
                                 Join.Type.LEFT,
                                 null,
@@ -391,22 +394,36 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                         (IExpression) null,
                         asSet(),
                         true),
-                    asList(cre(ast), new AliasExpression(ce("__expr0"), "values"), new AliasExpression(ce("__expr1"), "otherValues") ) );
+                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(table)), new AliasExpression(ce("__expr0"), "values"), new AliasExpression(ce("__expr1"), "otherValues") ) );
         //@formatter:on
 
         //@formatter:off
-        assertEquals(Schema.of(
-                CoreColumn.of("", ResolvedType.of(Type.Any), "table.*", false, ast),
-                CoreColumn.of("values", Type.Any),
-                CoreColumn.of("otherValues", Type.Any)), actual.getSchema());
-        //@formatter:on
+        Assertions.assertThat(actual.getSchema())
+            .usingRecursiveComparison()
+            .ignoringFieldsOfTypes(Location.class, Random.class)
+            .isEqualTo(Schema.of(
+                new CoreColumn("", ResolvedType.of(Type.Any), "*", false, table, CoreColumn.Type.ASTERISK),
+                col("values", Type.Any, null),
+                col("otherValues", Type.Any, null)));
 
         // Validate the schema below the projection
-        assertEquals(Schema.of(col(ast, Type.Any), col("__expr0", Type.Any, bAst.rename("col1")), col("__expr1", Type.Any, cAst.rename("col2"))), ((Projection) actual).getInput()
-                .getSchema());
+        Assertions.assertThat( ((Projection) actual).getInput()
+                .getSchema())
+        .usingRecursiveComparison()
+        .ignoringFieldsOfTypes(Location.class, Random.class)
+        .isEqualTo(Schema.of(
+                new CoreColumn("", ResolvedType.of(Type.Any), "", false, table, CoreColumn.Type.ASTERISK),
+                col("__expr0", Type.Any, tableB),
+                col("__expr1", Type.Any, tableC)));
+        //@formatter:on
 
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(expected);
 
         assertEquals(expected, actual);
     }
@@ -435,12 +452,9 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "a");
         TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
         TableSourceReference tableC = new TableSourceReference(2, "", QualifiedName.of("tableC"), "c");
-        ColumnReference ast = new ColumnReference(table, "a", ColumnReference.Type.ASTERISK);
-        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-        ColumnReference cAst = new ColumnReference(tableC, "c", ColumnReference.Type.ASTERISK);
-        Schema schema = Schema.of(col(ast, Type.Any));
-        Schema schemaB = Schema.of(col(bAst, Type.Any));
-        Schema schemaC = Schema.of(col(cAst, Type.Any));
+        Schema schema = Schema.of(ast("a", Type.Any, table));
+        Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
+        Schema schemaC = Schema.of(ast("c", Type.Any, tableC));
 
         //@formatter:off
         ILogicalPlan expected = 
@@ -451,7 +465,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             new MaxRowCountAssert(
                                 projection(
                                     tableScan(schemaC, tableC),
-                                    asList(new AliasExpression(cre(cAst.rename("col2")), "__expr1"))),
+                                    asList(new AliasExpression(cre("col2", tableC), "__expr1"))),
                             1),
                             Join.Type.LEFT,
                             null,
@@ -465,37 +479,48 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                     new Filter(
                                         tableScan(schemaB, tableB),
                                         null,
-                                        eq(cre(bAst.rename("col2")), ocre(ast.rename("col2")))),
-                                    asList(new AliasExpression(cre(bAst.rename("col1")), "__expr0"))),
+                                        eq(cre("col2", tableB), ocre("col2", table))),
+                                    asList(new AliasExpression(cre("col1", tableB), "__expr0"))),
                             1),
                             Join.Type.LEFT,
                             null,
                             (IExpression) null,
-                            asSet(col(ast.rename("col2"), Type.Any)),
+                            asSet(ast("col2", Type.Any, table)),
                             false),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
                         asSet(),
                         true),
-                    asList(cre(ast), new AliasExpression(ce("__expr0"), "values"), new AliasExpression(ce("__expr1"), "otherValues") ) );
+                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(table)), new AliasExpression(ce("__expr0"), "values"), new AliasExpression(ce("__expr1"), "otherValues") ) );
 
-        assertEquals(Schema.of(
-                col(ast, Type.Any),
-                col("values", Type.Any),
-                col("otherValues", Type.Any)),
-                actual.getSchema());
+        //@formatter:off
+        Assertions.assertThat(actual.getSchema())
+            .usingRecursiveComparison()
+            .ignoringFieldsOfTypes(Location.class, Random.class)
+            .isEqualTo(Schema.of(
+                new CoreColumn("", ResolvedType.of(Type.Any), "*", false, table, CoreColumn.Type.ASTERISK),
+                col("values", Type.Any, null),
+                col("otherValues", Type.Any, null)));
 
         // Validate the schema below the projection. The schema must stay consistent even if we switch outer/inner
-        assertEquals(Schema.of(
-                col(ast, Type.Any),
-                col("__expr0", Type.Any, bAst.rename("col1")),
-                col("__expr1", Type.Any, cAst.rename("col2"))), 
-                ((Projection) actual).getInput().getSchema());
+        Assertions.assertThat( ((Projection) actual).getInput()
+                .getSchema())
+        .usingRecursiveComparison()
+        .ignoringFieldsOfTypes(Location.class, Random.class)
+        .isEqualTo(Schema.of(
+                new CoreColumn("a", ResolvedType.of(Type.Any), "a", false, table, CoreColumn.Type.ASTERISK),
+                col("__expr0", Type.Any, tableB),
+                col("__expr1", Type.Any, tableC)));
         //@formatter:on
 
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(expected);
 
         assertEquals(expected, actual);
     }
@@ -524,12 +549,9 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "a");
         TableSourceReference tableB = new TableSourceReference(2, "", QualifiedName.of("tableB"), "b");
         TableSourceReference tableC = new TableSourceReference(1, "", QualifiedName.of("tableC"), "c");
-        ColumnReference ast = new ColumnReference(table, "a", ColumnReference.Type.ASTERISK);
-        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-        ColumnReference cAst = new ColumnReference(tableC, "c", ColumnReference.Type.ASTERISK);
-        Schema schema = Schema.of(col(ast, Type.Any));
-        Schema schemaB = Schema.of(col(bAst, Type.Any));
-        Schema schemaC = Schema.of(col(cAst, Type.Any));
+        Schema schema = Schema.of(ast("a", Type.Any, table));
+        Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
+        Schema schemaC = Schema.of(ast("c", Type.Any, tableC));
 
         //@formatter:off
         ILogicalPlan expected = 
@@ -541,7 +563,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                 new MaxRowCountAssert(
                                     projection(
                                         tableScan(schemaC, tableC),
-                                        asList(new AliasExpression(cre(cAst.rename("col2")), "__expr0"))),
+                                        asList(new AliasExpression(cre("col2", tableC), "__expr0"))),
                                 1),
                                 Join.Type.LEFT,
                                 null,
@@ -559,15 +581,15 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                 new Filter(
                                     tableScan(schemaB, tableB),
                                     null,
-                                    eq(cre(bAst.rename("col2")), ocre(ast.rename("col2")))),
-                                asList(new AliasExpression(cre(bAst.rename("col1")), "__expr1"))),
+                                    eq(cre("col2", tableB), ocre("col2", table))),
+                                asList(new AliasExpression(cre("col1", tableB), "__expr1"))),
                         1),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
-                        asSet(col(ast.rename("col2"), Type.Any)),
+                        asSet(ast("col2", Type.Any, table)),
                         false),
-                    asList(cre(ast), new AliasExpression(ce("__expr0"), "otherValues"), new AliasExpression(ce("__expr1"), "values")));
+                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(table)), new AliasExpression(ce("__expr0"), "otherValues"), new AliasExpression(ce("__expr1"), "values")));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -606,12 +628,9 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "a");
         TableSourceReference tableB = new TableSourceReference(2, "", QualifiedName.of("tableB"), "b");
         TableSourceReference tableC = new TableSourceReference(1, "", QualifiedName.of("tableC"), "c");
-        ColumnReference ast = new ColumnReference(table, "a", ColumnReference.Type.ASTERISK);
-        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-        ColumnReference cAst = new ColumnReference(tableC, "c", ColumnReference.Type.ASTERISK);
-        Schema schema = Schema.of(col(ast, Type.Any));
-        Schema schemaB = Schema.of(col(bAst, Type.Any));
-        Schema schemaC = Schema.of(col(cAst, Type.Any));
+        Schema schema = Schema.of(ast("a", Type.Any, table));
+        Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
+        Schema schemaC = Schema.of(ast("c", Type.Any, tableC));
 
         //@formatter:off
         ILogicalPlan expected = 
@@ -624,28 +643,28 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                     new Filter(
                                         tableScan(schemaC, tableC),
                                         null,
-                                        eq(cre(cAst.rename("col3")), ocre(ast.rename("col3")))),
-                                    asList(new AliasExpression(cre(cAst.rename("col2")), "__expr0"))),
+                                        eq(cre("col3", tableC), ocre("col3", table))),
+                                    asList(new AliasExpression(cre("col2", tableC), "__expr0"))),
                             1),
                             Join.Type.LEFT,
                             null,
                             (IExpression) null,
-                            asSet(col(ast.rename("col3"), Type.Any)),
+                            asSet(ast("col3", Type.Any, table)),
                             false),
                         new MaxRowCountAssert(
                             projection(
                                 new Filter(
                                     tableScan(schemaB, tableB),
                                     null,
-                                    eq(cre(bAst.rename("col2")), ocre(ast.rename("col2")))),
-                                asList(new AliasExpression(cre(bAst.rename("col1")), "__expr1"))),
+                                    eq(cre("col2", tableB), ocre("col2", table))),
+                                asList(new AliasExpression(cre("col1", tableB), "__expr1"))),
                         1),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
-                        asSet(col(ast.rename("col2"), Type.Any)),
+                        asSet(ast("col2", Type.Any, table)),
                         false),
-                    asList(cre(ast), new AliasExpression(ce("__expr0"), "otherValues"), new AliasExpression(ce("__expr1"), "values")));
+                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(table)), new AliasExpression(ce("__expr0"), "otherValues"), new AliasExpression(ce("__expr1"), "values")));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -676,10 +695,8 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         
         TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
         TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
-        ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
-        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-        Schema schema = Schema.of(col(ast, Type.Any));
-        Schema schemaB = Schema.of(col(bAst, Type.Any));
+        Schema schema = Schema.of(ast("", Type.Any, table));
+        Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
         
         //@formatter:off
         ILogicalPlan expected = 
@@ -690,7 +707,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             new MaxRowCountAssert(
                                 projection(
                                     tableScan(schemaB, tableB),
-                                    asList(new AliasExpression(cre(bAst.rename("col1")), "__expr0"))),
+                                    asList(new AliasExpression(cre("col1", tableB), "__expr0"))),
                             1),
                             Join.Type.LEFT,
                             null,
@@ -703,7 +720,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                         (IExpression) null,
                         asSet(),
                         true),
-                    asList(cre(ast), new AliasExpression(add(ce("__expr0"), intLit(1)), "values")));
+                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(table)), new AliasExpression(add(ce("__expr0"), intLit(1)), "values")));
         //@formatter:on
 
         // System.out.println(actual.print(0));
@@ -732,10 +749,8 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         
         TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "");
         TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
-        ColumnReference ast = new ColumnReference(table, "", ColumnReference.Type.ASTERISK);
-        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-        Schema schema = Schema.of(col(ast, Type.Any));
-        Schema schemaB = Schema.of(col(bAst, Type.Any));
+        Schema schema = Schema.of(ast("", Type.Any, table));
+        Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
         
         //@formatter:off
         ILogicalPlan expected = 
@@ -746,7 +761,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             new MaxRowCountAssert(
                                 projection(
                                         tableScan(schemaB, tableB),
-                                    asList(new AliasExpression(add(cre(bAst.rename("col1")), intLit(1)), "__expr0"))),
+                                    asList(new AliasExpression(add(cre("col1", tableB), intLit(1)), "__expr0"))),
                             1),
                             Join.Type.LEFT,
                             null,
@@ -759,7 +774,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                         (IExpression) null,
                         asSet(),
                         true),
-                    asList(cre(ast), new AliasExpression(ce("__expr0", ResolvedType.of(Type.Int)), "values")));
+                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(table)), new AliasExpression(ce("__expr0", ResolvedType.of(Type.Int)), "values")));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -791,10 +806,8 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         
         TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "a");
         TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
-        ColumnReference ast = new ColumnReference(table, "a", ColumnReference.Type.ASTERISK);
-        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-        Schema schema = Schema.of(col(ast, Type.Any));
-        Schema schemaB = Schema.of(col(bAst, Type.Any));
+        Schema schema = Schema.of(ast("a", Type.Any, table));
+        Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
         
         //@formatter:off
         ILogicalPlan expected = 
@@ -806,15 +819,15 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                 new Filter(
                                     tableScan(schemaB, tableB),
                                     null,
-                                    gt(cre(bAst.rename("col2")), ocre(ast.rename("col2")))),
-                                asList(new AliasExpression(cre(bAst.rename("col1")), "__expr0"))),
+                                    gt(cre("col2", tableB), ocre("col2", table))),
+                                asList(new AliasExpression(cre("col1", tableB), "__expr0"))),
                         1),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
-                        asSet(col(ast.rename("col2"), Type.Any)),
+                        asSet(ast("col2", Type.Any, table)),
                         false),
-                    asList(cre(ast), new AliasExpression(ce("__expr0"), "values")));
+                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(table)), new AliasExpression(ce("__expr0"), "values")));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -846,12 +859,9 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         TableSourceReference table = new TableSourceReference(0, "", QualifiedName.of("table"), "a");
         TableSourceReference tableB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
         TableSourceReference tableC = new TableSourceReference(2, "", QualifiedName.of("tableC"), "c");
-        ColumnReference ast = new ColumnReference(table, "a", ColumnReference.Type.ASTERISK);
-        ColumnReference bAst = new ColumnReference(tableB, "b", ColumnReference.Type.ASTERISK);
-        ColumnReference cAst = new ColumnReference(tableC, "c", ColumnReference.Type.ASTERISK);
-        Schema schema = Schema.of(col(ast, Type.Any));
-        Schema schemaB = Schema.of(col(bAst, Type.Any));
-        Schema schemaC = Schema.of(col(cAst, Type.Any));
+        Schema schema = Schema.of(ast("a", Type.Any, table));
+        Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
+        Schema schemaC = Schema.of(ast("c", Type.Any, tableC));
         
         //@formatter:off
         ILogicalPlan expected = 
@@ -862,7 +872,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             new MaxRowCountAssert(
                                 projection(                                 // Non correlated sub query is placed outer
                                     tableScan(schemaC, tableC), 
-                                    asList(new AliasExpression(cre(cAst.rename("col2")), "__expr1"))),
+                                    asList(new AliasExpression(cre("col2", tableC), "__expr1"))),
                             1),
                             Join.Type.LEFT,
                             null,
@@ -876,20 +886,20 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                     new Filter(
                                         tableScan(schemaB, tableB),
                                         null,
-                                        gt(cre(bAst.rename("col2")), ocre(ast.rename("col2")))),
-                                    asList(new AliasExpression(cre(bAst.rename("col1")), "__expr0"))),
+                                        gt(cre("col2", tableB), ocre("col2", table))),
+                                    asList(new AliasExpression(cre("col1", tableB), "__expr0"))),
                             1),
                             Join.Type.LEFT,
                             null,
                             (IExpression) null,
-                            asSet(col(ast.rename("col2"), Type.Any)),
+                            asSet(ast("col2", Type.Any, table)),
                             false),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
                         asSet(),
                         true),
-                    asList(cre(ast), new AliasExpression(add(ce("__expr0"), ce("__expr1")), "value")));
+                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(table)), new AliasExpression(add(ce("__expr0"), ce("__expr1")), "value")));
         //@formatter:on
 
         // System.out.println(expected.print(0));

@@ -49,6 +49,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.core.StreamReadConstraints;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonDeserializer;
@@ -86,8 +87,20 @@ class ESDatasource implements IDatasource
     static final String DOCID_COLUMN = "__id";
     static final QualifiedName DOCID = QualifiedName.of(DOCID_COLUMN);
     static final QualifiedName META = QualifiedName.of("__meta");
-    static final ObjectMapper MAPPER = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
-    private static final ObjectReader READER = MAPPER.readerFor(ESResponse.class);
+    static final ObjectMapper MAPPER;
+    private static final ObjectReader READER;
+
+    static
+    {
+        MAPPER = new ObjectMapper().configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        MAPPER.getFactory()
+                // NOTE! Found some really weird ELK log post where a dynamic mapping had created
+                // a 65000-ish char long field name and PLB wasn't able to parse that data.
+                .setStreamReadConstraints(StreamReadConstraints.builder()
+                        .maxNameLength(100_000)
+                        .build());
+        READER = MAPPER.readerFor(ESResponse.class);
+    }
 
     private final int nodeId;
     private final ElasticStrategy strategy;

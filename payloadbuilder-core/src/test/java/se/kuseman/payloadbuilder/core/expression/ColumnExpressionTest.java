@@ -15,7 +15,6 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
@@ -28,9 +27,9 @@ public class ColumnExpressionTest extends APhysicalPlanTest
     public void test_illegal_args_no_ordinal_no_path_no_asterisk()
     {
         TableSourceReference tableSource = new TableSourceReference(0, "", QualifiedName.of("table"), "t");
-        ColumnReference colRef = new ColumnReference(tableSource, "col", ColumnReference.Type.REGULAR);
-
-        new ColumnExpression("col", null, ResolvedType.of(Type.Any), colRef, -1, false, -1);
+        ColumnExpression.Builder.of("col", ResolvedType.of(Type.Any))
+                .withTableSourceReference(tableSource)
+                .build();
     }
 
     @Test
@@ -167,7 +166,7 @@ public class ColumnExpressionTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_column_with_column_reference()
+    public void test_column_with_table_reference()
     {
         // CSOFF
         ColumnExpression e;
@@ -177,12 +176,8 @@ public class ColumnExpressionTest extends APhysicalPlanTest
 
         TableSourceReference tableSource = new TableSourceReference(0, "", QualifiedName.of("table"), "a");
         TableSourceReference tableSourceB = new TableSourceReference(1, "", QualifiedName.of("tableB"), "b");
-
-        ColumnReference colRef = tableSource.column("col");
-        ColumnReference colRefB = tableSourceB.column("col");
-
-        e = cre(colRef, ResolvedType.of(Type.Int));
-        tv = TupleVector.of(Schema.of(CoreColumn.of(colRefB, ResolvedType.of(Type.Int))), asList(vv(Type.Int, 0, 0)));
+        e = cre("col", tableSourceB, ResolvedType.of(Type.Int));
+        tv = TupleVector.of(Schema.of(CoreColumn.of("col", ResolvedType.of(Type.Int), tableSource)), asList(vv(Type.Int, 0, 0)));
 
         assertEquals("col", e.getAlias()
                 .getAlias());
@@ -201,14 +196,14 @@ public class ColumnExpressionTest extends APhysicalPlanTest
         assertVectorsEquals(ValueVector.literalNull(ResolvedType.of(Type.Any), 2), actual);
 
         // Matching table source, non matching column
-        tv = TupleVector.of(Schema.of(CoreColumn.of(colRefB, ResolvedType.of(Type.Int))), asList(vv(Type.Int, 0, 0)));
+        tv = TupleVector.of(Schema.of(CoreColumn.of("col2", ResolvedType.of(Type.Int), tableSourceB)), asList(vv(Type.Int, 0, 0)));
         assertEquals(Type.Int, e.getType()
                 .getType());
         actual = e.eval(tv, context);
         assertVectorsEquals(ValueVector.literalNull(ResolvedType.of(Type.Any), 2), actual);
 
         // Matching table source
-        tv = TupleVector.of(Schema.of(CoreColumn.of(colRef, ResolvedType.of(Type.Int))), asList(vv(Type.Int, 0, 0)));
+        tv = TupleVector.of(Schema.of(CoreColumn.of("col", ResolvedType.of(Type.Int), tableSourceB)), asList(vv(Type.Int, 0, 0)));
         assertEquals(Type.Int, e.getType()
                 .getType());
         actual = e.eval(tv, context);
@@ -241,10 +236,10 @@ public class ColumnExpressionTest extends APhysicalPlanTest
          */
 
         Schema innerSchema = Schema.of(col("b", Type.Int));
-        Schema schema = Schema.of(new CoreColumn("col", ResolvedType.table(innerSchema), colRef));
+        Schema schema = Schema.of(new CoreColumn("col", ResolvedType.table(innerSchema), "", false, tableSource, CoreColumn.Type.REGULAR));
 
         // Test nested tuple vector, this will return a vector of value vectors
-        e = cre(colRef, ResolvedType.array(Type.Any));
+        e = cre("col", tableSource, ResolvedType.array(Type.Any));
         //@formatter:off
         actual = e.eval(TupleVector.of(schema, asList(
                 vv(ResolvedType.table(innerSchema),
@@ -257,9 +252,8 @@ public class ColumnExpressionTest extends APhysicalPlanTest
         assertVectorsEquals(vv(ResolvedType.table(innerSchema), TupleVector.of(innerSchema, asList(vv(Type.Int, 4, 5))), TupleVector.of(innerSchema, asList(vv(Type.Int, 6, 7)))), actual);
 
         // Test nested map
-        e = cre(colRef);
         //@formatter:off
-        actual = e.eval(TupleVector.of(Schema.of(new CoreColumn("col", ResolvedType.of(Type.Any), colRef)), asList(
+        actual = e.eval(TupleVector.of(Schema.of(new CoreColumn("col", ResolvedType.of(Type.Any), "", false, tableSource, CoreColumn.Type.REGULAR)), asList(
                 vv(Type.Any, ofEntries(entry("b", 123)), null, ofEntries(entry("b", 456))))), context);
         //@formatter:on
         assertEquals(ResolvedType.of(Type.Any), actual.type());

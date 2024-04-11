@@ -5,7 +5,6 @@ import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.LinkedHashMap;
@@ -28,8 +27,6 @@ import se.kuseman.payloadbuilder.api.execution.NodeData;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.core.catalog.ColumnReference;
-import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
@@ -222,27 +219,15 @@ public class NestedLoop implements IPhysicalPlan
         Schema outerSchema = switchedInputs ? inner.getSchema()
                 : outer.getSchema();
 
-        List<Column> columns = new ArrayList<>(outerSchema.getColumns());
-
         Schema innerSchema = switchedInputs ? outer.getSchema()
                 : inner.getSchema();
 
         if (populateAlias != null)
         {
-            // Copy table source from inner schema if any exists
-            ColumnReference colRef = SchemaUtils.getColumnReference(innerSchema.getColumns()
-                    .get(0));
-            colRef = colRef != null ? colRef.rename(populateAlias)
-                    : null;
-
-            columns.add(CoreColumn.of(populateAlias, ResolvedType.table(innerSchema), colRef));
-        }
-        else
-        {
-            columns.addAll(innerSchema.getColumns());
+            return SchemaUtils.populate(outerSchema, populateAlias, innerSchema);
         }
 
-        return new Schema(columns);
+        return SchemaUtils.concat(outerSchema, innerSchema);
     }
 
     @Override
@@ -501,9 +486,8 @@ public class NestedLoop implements IPhysicalPlan
         {
             return true;
         }
-        else if (obj instanceof NestedLoop)
+        else if (obj instanceof NestedLoop that)
         {
-            NestedLoop that = (NestedLoop) obj;
             return nodeId == that.nodeId
                     && inner.equals(that.inner)
                     && outer.equals(that.outer)
