@@ -10,6 +10,7 @@ import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.ICaseExpression;
@@ -26,6 +27,34 @@ public class CaseExpressionTest extends APhysicalPlanTest
         assertEquals(ResolvedType.of(Type.String), e("case when 1 > 0 then 'hello' end").getType());
         assertEquals(ResolvedType.of(Type.Float), e("case when 1 > 0 then 10 else 10.0f end").getType());
         assertEquals(ResolvedType.of(Type.Int), e("case when 1 > 0 then 10 when false then true else 'hello' end").getType());
+    }
+
+    @Test
+    public void test_where_not_all_rows_can_be_evaluated_agaisnt_else()
+    {
+        // Test that verifies expressions like this:
+        // CASE WHEN value = '' THEN null ELSE CAST(value AS DATETIME) END
+        // Here we cannot evaluate all rows against ELSE since then we are breaking contract
+
+        CaseExpression e;
+        ValueVector actual;
+
+        IExpression col3 = ce("col3", ResolvedType.of(Type.String));
+
+        //@formatter:off
+        Schema schema = Schema.of(
+                Column.of("col3", ResolvedType.of(Type.String)));
+        TupleVector input = TupleVector.of(schema, asList(
+                vv(Type.String, "", "1900-01-01", "2010-10-10", "")
+                ));
+        //@formatter:on
+
+        e = new CaseExpression(asList(new ICaseExpression.WhenClause(eq(col3, new LiteralStringExpression("")), new LiteralNullExpression(ResolvedType.of(Type.String)))),
+                new CastExpression(col3, ResolvedType.of(Type.DateTime)));
+
+        actual = e.eval(input, context);
+
+        assertVectorsEquals(vv(ResolvedType.of(Type.DateTime), null, EpochDateTime.from("1900-01-01"), EpochDateTime.from("2010-10-10"), null), actual);
     }
 
     @Test

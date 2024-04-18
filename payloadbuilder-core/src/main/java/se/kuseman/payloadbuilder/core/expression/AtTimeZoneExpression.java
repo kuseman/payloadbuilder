@@ -116,7 +116,7 @@ public class AtTimeZoneExpression implements IAtTimeZoneExpression
     @Override
     public ResolvedType getType()
     {
-        return ResolvedType.of(Type.DateTime);
+        return ResolvedType.of(Type.DateTimeOffset);
     }
 
     @Override

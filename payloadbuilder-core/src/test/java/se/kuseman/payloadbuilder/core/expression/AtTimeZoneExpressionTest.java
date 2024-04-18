@@ -26,6 +26,7 @@ public class AtTimeZoneExpressionTest extends APhysicalPlanTest
         ValueVector actual;
 
         e = new AtTimeZoneExpression(new LiteralNullExpression(ResolvedType.of(Type.String)), new LiteralNullExpression(ResolvedType.of(Type.String)));
+        assertEquals(ResolvedType.of(Type.DateTimeOffset), e.getType());
         actual = e.eval(context);
         assertVectorsEquals(vv(ResolvedType.of(Type.DateTimeOffset), new Object[1]), actual);
 
