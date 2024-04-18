@@ -6,8 +6,10 @@ import static java.util.stream.Collectors.joining;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.IntStream;
 
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
+import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
@@ -15,6 +17,12 @@ import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
 import se.kuseman.payloadbuilder.api.expression.ICaseExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
+import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
+
+import it.unimi.dsi.fastutil.ints.Int2IntMap;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntList;
 
 /** CASE WHEN expression */
 public class CaseExpression implements ICaseExpression
@@ -106,56 +114,98 @@ public class CaseExpression implements ICaseExpression
     {
         ResolvedType type = getType();
         int size = whenClauses.size();
-        ValueVector[] whenConditions = new ValueVector[size];
         ValueVector[] whenResults = new ValueVector[size];
+        IntList[] whenMatchedRows = new IntArrayList[size];
         ValueVector elseResult = null;
 
         int rowCount = input.getRowCount();
         IValueVectorBuilder builder = context.getVectorBuilderFactory()
                 .getValueVectorBuilder(type, rowCount);
 
-        for (int i = 0; i < rowCount; i++)
+        Int2IntMap rowToResultVector = new Int2IntOpenHashMap(rowCount * 4 / 3 + 1)
         {
-            boolean allFalse = true;
-            for (int j = 0; j < size; j++)
             {
-                if (whenConditions[j] == null)
+                defRetValue = -1;
+            }
+        };
+
+        // Start with all rows as unmatched
+        IntList nonMatchedRows = new IntArrayList(IntStream.range(0, rowCount)
+                .toArray());
+        RowsTupleVector nonMatchedVector = new RowsTupleVector(input, nonMatchedRows);
+
+        for (int j = 0; j < size; j++)
+        {
+            WhenClause whenClause = whenClauses.get(j);
+
+            // Eval the condition for the current non matched rows
+            ValueVector condition = whenClause.getCondition()
+                    .eval(nonMatchedVector, context);
+
+            // Assemble current matched rows and map rows to result vector index
+            int currentSize = nonMatchedRows.size();
+            IntList currentMatchedRows = null;
+            for (int i = 0; i < currentSize; i++)
+            {
+                if (condition.getPredicateBoolean(i))
                 {
-                    whenConditions[j] = whenClauses.get(j)
-                            .getCondition()
-                            .eval(input, context);
-                }
-                if (whenConditions[j].getPredicateBoolean(i))
-                {
-                    if (whenResults[j] == null)
+                    int row = nonMatchedRows.getInt(i);
+                    if (currentMatchedRows == null)
                     {
-                        whenResults[j] = whenClauses.get(j)
-                                .getResult()
-                                .eval(input, context);
+                        currentMatchedRows = new IntArrayList(currentSize);
+                        whenMatchedRows[j] = currentMatchedRows;
                     }
-                    allFalse = false;
-                    builder.put(whenResults[j], i);
-                    break;
+                    currentMatchedRows.add(row);
+                    rowToResultVector.put(row, j);
                 }
             }
 
-            if (allFalse)
+            if (currentMatchedRows == null)
             {
-                if (elseExpression != null)
-                {
-                    if (elseResult == null)
-                    {
-                        elseResult = elseExpression.eval(input, context);
-                    }
-                    builder.put(elseResult, i);
-                }
-                else
-                {
-                    builder.putNull();
-                }
+                continue;
             }
+
+            nonMatchedRows.removeAll(currentMatchedRows);
+
+            // Eval the result with the matched rows
+            RowsTupleVector evalVector = new RowsTupleVector(input, currentMatchedRows);
+            whenResults[j] = whenClause.getResult()
+                    .eval(evalVector, context);
         }
 
+        if (elseExpression != null
+                && !nonMatchedRows.isEmpty())
+        {
+            elseResult = elseExpression.eval(nonMatchedVector, context);
+        }
+
+        // Finally assemble result
+        for (int i = 0; i < rowCount; i++)
+        {
+            int index = rowToResultVector.get(i);
+            IntList rows = null;
+            ValueVector result = null;
+            if (index < 0)
+            {
+                rows = elseResult != null ? nonMatchedRows
+                        : null;
+                result = elseResult;
+            }
+            else
+            {
+                rows = whenMatchedRows[index];
+                result = whenResults[index];
+            }
+
+            if (rows == null)
+            {
+                builder.putNull();
+            }
+            else
+            {
+                builder.put(result, rows.indexOf(i));
+            }
+        }
         return builder.build();
     }
 
@@ -198,5 +248,48 @@ public class CaseExpression implements ICaseExpression
                + (elseExpression != null ? (" ELSE " + elseExpression)
                        : "")
                + " END";
+    }
+
+    static class RowsTupleVector implements TupleVector
+    {
+        private final TupleVector vector;
+        private final IntList rows;
+
+        RowsTupleVector(TupleVector vector, IntList rows)
+        {
+            this.vector = vector;
+            this.rows = rows;
+        }
+
+        @Override
+        public int getRowCount()
+        {
+            return rows.size();
+        }
+
+        @Override
+        public ValueVector getColumn(int column)
+        {
+            return new ValueVectorAdapter(vector.getColumn(column))
+            {
+                @Override
+                protected int getRow(int row)
+                {
+                    return rows.getInt(row);
+                }
+
+                @Override
+                public int size()
+                {
+                    return rows.size();
+                }
+            };
+        }
+
+        @Override
+        public Schema getSchema()
+        {
+            return vector.getSchema();
+        }
     }
 }
