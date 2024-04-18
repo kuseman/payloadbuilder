@@ -13,6 +13,7 @@ import org.apache.hc.client5.http.auth.AuthScope;
 import org.apache.hc.client5.http.auth.UsernamePasswordCredentials;
 import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.config.RequestConfig;
+import org.apache.hc.client5.http.impl.DefaultHttpRequestRetryStrategy;
 import org.apache.hc.client5.http.impl.auth.BasicCredentialsProvider;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
@@ -26,10 +27,13 @@ import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpException;
 import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.http.HttpRequest;
 import org.apache.hc.core5.http.HttpStatus;
+import org.apache.hc.core5.http.Method;
 import org.apache.hc.core5.http.io.HttpClientResponseHandler;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.ssl.SSLContextBuilder;
+import org.apache.hc.core5.util.TimeValue;
 import org.apache.hc.core5.util.Timeout;
 
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
@@ -128,7 +132,21 @@ public final class HttpClientUtils
                 .setConnectionManager(manager.build())
                 .setDefaultRequestConfig(RequestConfig.custom()
                         .setContentCompressionEnabled(true)
-                        .build());
+                        .build())
+                .setRetryStrategy(new DefaultHttpRequestRetryStrategy(3, TimeValue.ofSeconds(1L))
+                {
+                    @Override
+                    protected boolean handleAsIdempotent(HttpRequest request)
+                    {
+                        // We handle POST as Idempotent because search requests are POST's
+                        Method method = Method.normalizedValueOf(request.getMethod());
+                        if (method == Method.POST)
+                        {
+                            return true;
+                        }
+                        return super.handleAsIdempotent(request);
+                    }
+                });
 
         if (authType != null
                 && authType != AuthType.NONE)
