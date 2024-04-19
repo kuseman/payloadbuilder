@@ -152,7 +152,6 @@ class OpenXmlFunction extends TableFunctionInfo
             TupleVector next;
             StringBuilder xmlBuilder = new StringBuilder();
             Map<String, XmlColumn> columnByName = new LinkedHashMap<>();
-            int actualColumnCount;
             boolean pathFound = xmlPathParts == null
                     || xmlPathParts.length <= 1;
             boolean endFound = false;
@@ -342,7 +341,6 @@ class OpenXmlFunction extends TableFunctionInfo
                 {
                     column.builder = null;
                 }
-                actualColumnCount = 0;
                 int rowCount = 0;
 
                 boolean insideRowElement = false;
@@ -405,8 +403,8 @@ class OpenXmlFunction extends TableFunctionInfo
                 }
 
                 // Build schema and vector from all builders
-                List<Column> columns = new ArrayList<>(actualColumnCount);
-                List<ValueVector> vectors = new ArrayList<>(actualColumnCount);
+                List<Column> columns = new ArrayList<>(columnByName.size());
+                List<ValueVector> vectors = new ArrayList<>(columnByName.size());
 
                 /* If we have specified columns then we must add those in order to follow schema */
                 if (schemaColumns != null)
@@ -426,6 +424,12 @@ class OpenXmlFunction extends TableFunctionInfo
                             if (vector != null)
                             {
                                 vectors.add(vector);
+                            }
+                            // No values added for this column -> add null vector
+                            else
+                            {
+                                // Add null column if we don't have and XML rows for current
+                                vectors.add(ValueVector.literalNull(ResolvedType.of(Column.Type.Any), rowCount));
                             }
                         }
                     }
@@ -624,13 +628,8 @@ class OpenXmlFunction extends TableFunctionInfo
 
             private XmlColumn getColumn(String name, int currentRowCount)
             {
-                XmlColumn column = columnByName.computeIfAbsent(schemaColumns != null ? name
+                return columnByName.computeIfAbsent(schemaColumns != null ? name
                         : name.toLowerCase(), k -> new XmlColumn(name));
-                if (column.value == null)
-                {
-                    actualColumnCount++;
-                }
-                return column;
             }
         };
     }

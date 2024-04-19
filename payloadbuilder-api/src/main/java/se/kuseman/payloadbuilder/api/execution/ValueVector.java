@@ -1247,6 +1247,15 @@ public interface ValueVector
                         break;
                     default:
                         value = valueAsObject(i);
+
+                        if (value instanceof UTF8String
+                                || value instanceof Decimal
+                                || value instanceof EpochDateTime
+                                || value instanceof EpochDateTimeOffset)
+                        {
+                            break;
+                        }
+
                         if (value instanceof ValueVector vv)
                         {
                             value = vv.toCsv(indent);

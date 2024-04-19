@@ -392,6 +392,46 @@ public class OpenXmlFunctionTest extends APhysicalPlanTest
     }
 
     @Test
+    public void test_columns_option_with_null_values()
+    {
+        TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
+                `<?xml version="1.0" encoding="UTF-8"?>
+                  <records>
+                  <record>
+                      <KEY some_fancy_attribute="10.10">123</KEY>
+                      <key2 />
+                  </record>
+                  <record>
+                      <key2 />
+                      <key>1230</key>
+                  </record>
+                </records>
+                `
+                """)), new DatasourceOptions(
+                List.of(new Option(OpenXmlFunction.XMLPATH, new LiteralStringExpression("/records/record")), new Option(OpenXmlFunction.XMLCOLUMNS, new LiteralStringExpression("KEY,key2")))));
+
+        int rowCount = 0;
+        while (it.hasNext())
+        {
+            assertTrue(it.hasNext());
+
+            TupleVector next = it.next();
+            //@formatter:off
+            VectorTestUtils.assertTupleVectorsEquals(
+                    TupleVector.of(Schema.of(Column.of("KEY", Column.Type.Any), Column.of("key2", Column.Type.Any)), List.of(
+                            VectorTestUtils.vv(Column.Type.Any, "123", null),
+                            VectorTestUtils.vv(Column.Type.Any, new Object[] { null, null })
+                            )), next);
+            //@formatter:on
+
+            rowCount += next.getRowCount();
+        }
+        it.close();
+
+        assertEquals(2, rowCount);
+    }
+
+    @Test
     public void test_pointer_to_a_deep_nested_element()
     {
         TupleIterator it = f.execute(context, "", Optional.ofNullable(null), asList(e("""
