@@ -9,12 +9,7 @@ import se.kuseman.payloadbuilder.api.execution.Decimal;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IDoubleVectorBuilder;
-import se.kuseman.payloadbuilder.api.execution.vector.IFloatVectorBuilder;
-import se.kuseman.payloadbuilder.api.execution.vector.IIntVectorBuilder;
-import se.kuseman.payloadbuilder.api.execution.vector.ILongVectorBuilder;
-import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
-import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Base class for unary math functions */
@@ -55,42 +50,42 @@ abstract class AUnaryMathFunction extends ScalarFunctionInfo
         Type type = arg.getType()
                 .getType();
         int rowCount = input.getRowCount();
-        IValueVectorBuilder builder = context.getVectorBuilderFactory()
-                .getValueVectorBuilder(arg.getType(), rowCount);
 
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(arg.getType(), rowCount);
         for (int i = 0; i < rowCount; i++)
         {
             if (value.isNull(i))
             {
-                builder.putNull();
+                resultVector.setNull(i);
                 continue;
             }
 
             switch (type)
             {
                 case Int:
-                    ((IIntVectorBuilder) builder).put(getValue(value.getInt(i)));
+                    resultVector.setInt(i, getValue(value.getInt(i)));
                     break;
                 case Long:
-                    ((ILongVectorBuilder) builder).put(getValue(value.getLong(i)));
+                    resultVector.setLong(i, getValue(value.getLong(i)));
                     break;
                 case Float:
-                    ((IFloatVectorBuilder) builder).put(getValue(value.getFloat(i)));
+                    resultVector.setFloat(i, getValue(value.getFloat(i)));
                     break;
                 case Double:
-                    ((IDoubleVectorBuilder) builder).put(getValue(value.getDouble(i)));
+                    resultVector.setDouble(i, getValue(value.getDouble(i)));
                     break;
                 case Decimal:
-                    ((IObjectVectorBuilder) builder).put(getValue(value.getDecimal(i)));
+                    resultVector.setDecimal(i, getValue(value.getDecimal(i)));
                     break;
                 case Any:
-                    ((IObjectVectorBuilder) builder).put(getValue(value.getAny(i)));
+                    resultVector.setAny(i, getValue(value.getAny(i)));
                     break;
                 default:
                     throw new IllegalArgumentException("Function " + getName() + " does not support type: " + type);
             }
         }
-        return builder.build();
+        return resultVector;
     }
 
     protected abstract int getValue(int value);

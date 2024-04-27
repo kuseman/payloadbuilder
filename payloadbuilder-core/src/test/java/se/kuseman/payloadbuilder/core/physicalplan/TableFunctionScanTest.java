@@ -21,7 +21,7 @@ public class TableFunctionScanTest extends APhysicalPlanTest
         IPhysicalPlan plan = new TableFunctionScan(0, schema, table, "", "System", SystemCatalog.get()
                 .getTableFunction("range"), asList(intLit(1), intLit(10)), emptyList());
 
-        TupleVector vector = PlanUtils.concat(context.getBufferAllocator(), plan.execute(context));
+        TupleVector vector = PlanUtils.concat(context, plan.execute(context));
 
         assertEquals(schema, vector.getSchema());
     }

@@ -41,6 +41,12 @@ public class LiteralDateTimeOffsetExpression extends LiteralExpression implement
     }
 
     @Override
+    public ValueVector eval(TupleVector input, ValueVector selection, IExecutionContext context)
+    {
+        return ValueVector.literalDateTimeOffset(value, selection.size());
+    }
+
+    @Override
     public int hashCode()
     {
         return value.hashCode();

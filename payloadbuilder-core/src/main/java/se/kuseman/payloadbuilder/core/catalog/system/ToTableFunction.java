@@ -16,7 +16,7 @@ import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
 import se.kuseman.payloadbuilder.api.execution.ObjectVector;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
@@ -49,30 +49,30 @@ class ToTableFunction extends ScalarFunctionInfo
                 .eval(input, context);
 
         int rowCount = input.getRowCount();
-        IObjectVectorBuilder builder = context.getVectorBuilderFactory()
-                .getObjectVectorBuilder(getType(arguments), rowCount);
 
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(getType(arguments), rowCount);
         for (int i = 0; i < rowCount; i++)
         {
             Object resultValue = result.valueAsObject(i);
             if (resultValue == null)
             {
-                builder.put(null);
+                resultVector.setNull(i);
                 continue;
             }
             Object value = VectorUtils.convert(resultValue);
             // Object vector can be transformed into a single row table
-            if (value instanceof ObjectVector)
+            if (value instanceof ObjectVector object)
             {
-                builder.put(convert((ObjectVector) value));
+                resultVector.setTable(i, convert(object));
             }
-            else if (value instanceof ValueVector)
+            else if (value instanceof ValueVector vector)
             {
-                builder.put(convert((ValueVector) value, resultValue));
+                resultVector.setTable(i, convert(vector, resultValue));
             }
-            else if (value instanceof TupleVector)
+            else if (value instanceof TupleVector vector)
             {
-                builder.put(value);
+                resultVector.setTable(i, vector);
             }
             else
             {
@@ -80,7 +80,7 @@ class ToTableFunction extends ScalarFunctionInfo
             }
         }
 
-        return builder.build();
+        return resultVector;
     }
 
     private TupleVector convert(final ObjectVector object)

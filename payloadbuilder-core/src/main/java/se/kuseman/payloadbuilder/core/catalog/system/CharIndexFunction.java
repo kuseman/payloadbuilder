@@ -10,7 +10,7 @@ import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.ILongVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Charindex string function */
@@ -45,15 +45,15 @@ class CharIndexFunction extends ScalarFunctionInfo
                 : null;
 
         int rowCount = input.getRowCount();
-        ILongVectorBuilder builder = context.getVectorBuilderFactory()
-                .getLongVectorBuilder(rowCount);
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(getType(arguments), rowCount);
 
         for (int i = 0; i < rowCount; i++)
         {
             if (search.isNull(i)
                     || find.isNull(i))
             {
-                builder.putNull();
+                resultVector.setNull(i);
             }
             else
             {
@@ -70,9 +70,9 @@ class CharIndexFunction extends ScalarFunctionInfo
 
                 long index = StringUtils.indexOf(string, findString, startLocation);
 
-                builder.put(index);
+                resultVector.setLong(i, index);
             }
         }
-        return builder.build();
+        return resultVector;
     }
 }

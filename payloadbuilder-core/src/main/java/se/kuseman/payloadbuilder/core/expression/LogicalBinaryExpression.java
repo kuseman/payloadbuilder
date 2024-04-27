@@ -7,11 +7,13 @@ import static se.kuseman.payloadbuilder.core.expression.LiteralBooleanExpression
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IBooleanVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.ILogicalBinaryExpression;
+import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 
 /** AND/OR expression */
 public class LogicalBinaryExpression extends ABinaryExpression implements ILogicalBinaryExpression
@@ -82,36 +84,35 @@ public class LogicalBinaryExpression extends ABinaryExpression implements ILogic
     }
 
     @Override
-    ValueVector eval(IExecutionContext context, int rowCount, ValueVector lvv, ValueVector rvv)
+    public ValueVector eval(TupleVector input, IExecutionContext context)
     {
-        Column.Type leftType = lvv.type()
-                .getType();
-        Column.Type rightType = rvv.type()
-                .getType();
+        return eval(input, ValueVector.range(0, input.getRowCount()), context);
+    }
 
-        if (!(leftType == Column.Type.Boolean
-                || leftType == Column.Type.Any)
-                || !(rightType == Column.Type.Boolean
-                        || rightType == Column.Type.Any))
-        {
-            throw new IllegalArgumentException("Performing logical binary operation between two value vectors requires boolean type.");
-        }
-
-        IBooleanVectorBuilder builder = context.getVectorBuilderFactory()
-                .getBooleanVectorBuilder(rowCount);
+    @Override
+    public ValueVector eval(TupleVector input, ValueVector selection, IExecutionContext context)
+    {
+        int size = selection.size();
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(ResolvedType.of(Column.Type.Boolean), size);
 
         boolean isAnd = type == Type.AND;
 
-        for (int i = 0; i < rowCount; i++)
+        // First evaluate the left side and set all null/true/false that don't need the right side
+        ValueVector lvv = left.eval(input, selection, context);
+        int[] selectionRows = null;
+        int[] inputRows = null;
+
+        int index = 0;
+        for (int i = 0; i < size; i++)
         {
             // Optimize for lazy eval, which means we should not touch right side
             // either for isNull or getBoolean if we don't need
             boolean leftNull = lvv.isNull(i);
-            boolean lv = !leftNull ? lvv.getBoolean(i)
-                    : false;
-
             if (!leftNull)
             {
+                boolean lv = lvv.getBoolean(i);
+
                 // true AND ? => Continue
                 // false AND ? => false
                 // true OR ? => true
@@ -121,21 +122,42 @@ public class LogicalBinaryExpression extends ABinaryExpression implements ILogic
                 if (!lv
                         && isAnd)
                 {
-                    builder.put(false);
+                    resultVector.setBoolean(i, false);
                     continue;
                 }
                 // true OR ? => true
                 else if (lv
                         && !isAnd)
                 {
-                    builder.put(true);
+                    resultVector.setBoolean(i, true);
                     continue;
                 }
             }
+            if (selectionRows == null)
+            {
+                selectionRows = new int[size - i];
+                inputRows = new int[size - i];
+            }
+            selectionRows[index] = selection.getInt(i);
+            inputRows[index] = i;
+            index++;
+        }
 
-            // Here we must start to look at the right side to continue
+        // All results could be resolved with only left side, return
+        if (selectionRows == null)
+        {
+            return resultVector;
+        }
+
+        // Now eval the right side with the needed rows
+        ValueVector rightSelection = VectorUtils.convertToSelectionVector(selectionRows, index);
+        ValueVector rvv = right.eval(input, rightSelection, context);
+
+        for (int i = 0; i < index; i++)
+        {
+            int inputRow = inputRows[i];
+            boolean leftNull = lvv.isNull(inputRow);
             boolean rightNull = rvv.isNull(i);
-
             boolean rv = !rightNull ? rvv.getBoolean(i)
                     : false;
 
@@ -143,14 +165,14 @@ public class LogicalBinaryExpression extends ABinaryExpression implements ILogic
                     && rightNull)
             {
                 // null AND/OR null => null
-                builder.putNull();
+                resultVector.setNull(inputRow);
                 continue;
             }
             else if (rightNull)
             {
                 // true AND null
                 // false OR null
-                builder.putNull();
+                resultVector.setNull(inputRow);
                 continue;
             }
             else if (leftNull)
@@ -159,33 +181,33 @@ public class LogicalBinaryExpression extends ABinaryExpression implements ILogic
                 if (!rv
                         && isAnd)
                 {
-                    builder.put(false);
+                    resultVector.setBoolean(inputRow, false);
                     continue;
                 }
                 // null OR true
                 else if (rv
                         && !isAnd)
                 {
-                    builder.put(true);
+                    resultVector.setBoolean(inputRow, true);
                     continue;
                 }
 
                 // null AND true
                 // null OR false
-                builder.putNull();
+                resultVector.setNull(inputRow);
                 continue;
             }
 
+            boolean lv = lvv.getBoolean(inputRow);
             boolean result = isAnd ? lv
                     && rv
                     : lv
                             || rv;
 
-            builder.put(result);
+            resultVector.setBoolean(inputRow, result);
         }
 
-        return builder.build();
-
+        return resultVector;
     }
 
     private boolean isTrue(IExpression expression)

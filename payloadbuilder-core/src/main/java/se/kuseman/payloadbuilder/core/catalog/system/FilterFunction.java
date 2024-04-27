@@ -11,14 +11,13 @@ import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
-import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.ITupleVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.LambdaFunction;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.LambdaUtils;
 import se.kuseman.payloadbuilder.core.execution.LambdaUtils.LambdaResultConsumer;
-import se.kuseman.payloadbuilder.core.execution.vector.TupleVectorBuilder;
 import se.kuseman.payloadbuilder.core.expression.LambdaExpression;
 
 /** Filter input argument with a lambda */
@@ -65,56 +64,67 @@ class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
         // Filter each individual vector
         if (LambdaUtils.supportsForEachLambdaResult(type))
         {
-            IObjectVectorBuilder builder = context.getVectorBuilderFactory()
-                    .getObjectVectorBuilder(value.type(), input.getRowCount());
+            MutableValueVector resultVector = context.getVectorFactory()
+                    .getMutableVector(value.type(), input.getRowCount());
 
-            LambdaResultConsumer consumer = (inputResult, lambdaResult, inputWasListType) ->
+            LambdaResultConsumer consumer = new LambdaResultConsumer()
             {
-                if (lambdaResult == null)
+                int index;
+
+                @Override
+                public void accept(Object inputResult, ValueVector lambdaResult, boolean inputWasListType, int row)
                 {
-                    builder.put(null);
-                    return;
-                }
-                else if (!inputWasListType)
-                {
-                    if (lambdaResult.getPredicateBoolean(0))
+                    if (lambdaResult == null)
                     {
-                        builder.put(inputResult);
+                        resultVector.setNull(index);
+                        index++;
+                        return;
                     }
-                    return;
-                }
-
-                if (inputResult instanceof ValueVector)
-                {
-                    builder.put(createFilteredVector(context, (ValueVector) inputResult, lambdaResult));
-                    return;
-                }
-                else if (inputResult instanceof TupleVector)
-                {
-                    TupleVector table = (TupleVector) inputResult;
-
-                    int cardinality = lambdaResult.getCardinality();
-                    if (cardinality == 0)
+                    else if (!inputWasListType)
                     {
-                        builder.put(TupleVector.of(table.getSchema(), emptyList()));
+                        if (lambdaResult.getPredicateBoolean(0))
+                        {
+                            resultVector.setAny(index, inputResult);
+                            index++;
+                        }
                         return;
                     }
 
-                    TupleVectorBuilder b = new TupleVectorBuilder(((ExecutionContext) context).getBufferAllocator(), cardinality);
-                    b.append(table, lambdaResult);
-                    builder.put(b.build());
-                }
-                else
-                {
-                    if (lambdaResult.getPredicateBoolean(0))
+                    if (inputResult instanceof ValueVector vector)
                     {
-                        builder.put(inputResult);
+                        resultVector.setArray(index, createFilteredVector(context, vector, lambdaResult));
+                        index++;
+                        return;
+                    }
+                    else if (inputResult instanceof TupleVector table)
+                    {
+                        int cardinality = lambdaResult.getCardinality();
+                        if (cardinality == 0)
+                        {
+                            resultVector.setTable(index, TupleVector.of(table.getSchema(), emptyList()));
+                            index++;
+                            return;
+                        }
+
+                        ITupleVectorBuilder b = context.getVectorFactory()
+                                .getTupleVectorBuilder(cardinality);
+                        b.append(table, lambdaResult);
+                        resultVector.setTable(index, b.build());
+                        index++;
+                    }
+                    else
+                    {
+                        if (lambdaResult.getPredicateBoolean(0))
+                        {
+                            resultVector.setAny(index, inputResult);
+                            index++;
+                        }
                     }
                 }
             };
 
             LambdaUtils.forEachLambdaResult(context, input, value, le, consumer);
-            return builder.build();
+            return resultVector;
         }
 
         // Filter the whole input
@@ -143,16 +153,16 @@ class FilterFunction extends ScalarFunctionInfo implements LambdaFunction
             return ValueVector.empty(value.type());
         }
 
-        IValueVectorBuilder builder = context.getVectorBuilderFactory()
-                .getValueVectorBuilder(value.type(), resultSize);
-
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(value.type(), resultSize);
+        int index = 0;
         for (int i = 0; i < rowCount; i++)
         {
             if (filter.getPredicateBoolean(i))
             {
-                builder.put(value, i);
+                resultVector.copy(index++, value, i);
             }
         }
-        return builder.build();
+        return resultVector;
     }
 }

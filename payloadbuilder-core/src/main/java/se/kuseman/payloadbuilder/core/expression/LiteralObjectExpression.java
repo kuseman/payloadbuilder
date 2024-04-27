@@ -41,6 +41,12 @@ public class LiteralObjectExpression extends LiteralExpression implements ILiter
     }
 
     @Override
+    public ValueVector eval(TupleVector input, ValueVector selection, IExecutionContext context)
+    {
+        return ValueVector.literalObject(value, selection.size());
+    }
+
+    @Override
     public int hashCode()
     {
         return value.hashCode();

@@ -9,7 +9,7 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Returns first item that is not a blank string (null or empty) */
@@ -51,9 +51,9 @@ class IsBlankFunction extends ScalarFunctionInfo
         ValueVector arg1 = null;
 
         int rowCount = input.getRowCount();
-        IObjectVectorBuilder builder = context.getVectorBuilderFactory()
-                .getObjectVectorBuilder(getType(arguments), rowCount);
 
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(getType(arguments), rowCount);
         for (int i = 0; i < rowCount; i++)
         {
             UTF8String str;
@@ -67,18 +67,18 @@ class IsBlankFunction extends ScalarFunctionInfo
                 }
                 if (arg1.isNull(i))
                 {
-                    builder.put(null);
+                    resultVector.setNull(i);
                 }
                 else
                 {
-                    builder.put(arg1.getString(i));
+                    resultVector.setString(i, arg1.getString(i));
                 }
             }
             else
             {
-                builder.put(str);
+                resultVector.setString(i, str);
             }
         }
-        return builder.build();
+        return resultVector;
     }
 }

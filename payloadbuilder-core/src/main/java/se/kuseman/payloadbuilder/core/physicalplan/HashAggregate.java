@@ -16,7 +16,6 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.lang3.time.DurationFormatUtils;
 
-import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -26,16 +25,13 @@ import se.kuseman.payloadbuilder.api.execution.NodeData;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
-import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.StatementContext;
-import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
-import se.kuseman.payloadbuilder.core.execution.vector.VectorBuilderFactory;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
@@ -181,7 +177,6 @@ public class HashAggregate implements IPhysicalPlan
 
         boolean distinct = aggregateExpressions.isEmpty();
 
-        VectorBuilderFactory vectorBuilderFactory = new VectorBuilderFactory(((ExecutionContext) context).getBufferAllocator());
         int aggregationSize = aggregateExpressions.size();
         ValueVector[] aggregateVectors = null;
         if (!distinct)
@@ -265,9 +260,10 @@ public class HashAggregate implements IPhysicalPlan
                         ValueVector[] rowValues = new ValueVector[vectorSize];
                         for (int j = 0; j < vectorSize; j++)
                         {
-                            IValueVectorBuilder vectorBuilder = vectorBuilderFactory.getValueVectorBuilder(aggregateVectors[j].type(), 1);
-                            vectorBuilder.put(aggregateVectors[j], i);
-                            rowValues[j] = vectorBuilder.build();
+                            MutableValueVector resultVector = context.getVectorFactory()
+                                    .getMutableVector(aggregateVectors[j].type(), 1);
+                            resultVector.copy(0, aggregateVectors[j], i);
+                            rowValues[j] = resultVector;
                         }
 
                         // TODO: find a good estimate of avg group row count
@@ -284,10 +280,21 @@ public class HashAggregate implements IPhysicalPlan
                 if (!distinct)
                 {
                     // Aggregate current vector
-                    GroupDataTupleVector groupDataVector = new GroupDataTupleVector(vector, new ArrayList<>(table.entrySet()));
+                    MutableValueVector groupIds = context.getVectorFactory()
+                            .getMutableVector(ResolvedType.of(Type.Int), table.size());
+                    MutableValueVector selections = context.getVectorFactory()
+                            .getMutableVector(ResolvedType.array(Type.Int), table.size());
+
+                    int index = 0;
+                    for (Entry<GroupKey, IntList> e : table.entrySet())
+                    {
+                        groupIds.setInt(index, e.getKey().groupId);
+                        selections.setArray(index, VectorUtils.convertToSelectionVector(e.getValue()));
+                        index++;
+                    }
                     for (IAggregator agg : aggregators)
                     {
-                        agg.appendGroup(groupDataVector, context);
+                        agg.appendGroup(vector, groupIds, selections, context);
                     }
 
                     // Clear the group row indices between every TupleVector but we keep the group keys
@@ -451,209 +458,6 @@ public class HashAggregate implements IPhysicalPlan
         {
             this.groupId = groupId;
             this.rowValues = rowValues;
-        }
-    }
-
-    private static class GroupDataTupleVector implements TupleVector
-    {
-        private final TupleVector wrapped;
-        private final List<Entry<GroupKey, IntList>> entries;
-        private final Schema schema;
-
-        GroupDataTupleVector(TupleVector wrapped, List<Entry<GroupKey, IntList>> entries)
-        {
-            this.wrapped = wrapped;
-            this.entries = entries;
-            this.schema = Schema.of(Column.of("groupTables", ResolvedType.table(wrapped.getSchema())), Column.of("groupId", Column.Type.Int));
-        }
-
-        private ValueVector groupTables = new ValueVector()
-        {
-            @Override
-            public ResolvedType type()
-            {
-                return ResolvedType.table(wrapped.getSchema());
-            }
-
-            @Override
-            public int size()
-            {
-                return entries.size();
-            }
-
-            @Override
-            public boolean isNull(int row)
-            {
-                return false;
-            }
-
-            @Override
-            public TupleVector getTable(int row)
-            {
-                // Copy the group indices since we are clearing those
-                // and aggregate expressions might use this tuple vector
-                final IntList group = new IntArrayList(entries.get(row)
-                        .getValue());
-                return new TupleVector()
-                {
-                    @Override
-                    public Schema getSchema()
-                    {
-                        return wrapped.getSchema();
-                    }
-
-                    @Override
-                    public int getRowCount()
-                    {
-                        return group.size();
-                    }
-
-                    @Override
-                    public ValueVector getColumn(int column)
-                    {
-                        final ValueVector vv = wrapped.getColumn(column);
-                        return new ValueVectorAdapter(vv)
-                        {
-                            @Override
-                            public int size()
-                            {
-                                return group.size();
-                            }
-
-                            @Override
-                            protected int getRow(int row)
-                            {
-                                // Return the group index from the "big" vector
-                                return group.getInt(row);
-                            }
-                        };
-                    }
-                };
-            }
-        };
-
-        private ValueVector groupIds = new ValueVector()
-        {
-            @Override
-            public ResolvedType type()
-            {
-                return ResolvedType.of(Type.Int);
-            }
-
-            @Override
-            public int size()
-            {
-                return entries.size();
-            }
-
-            @Override
-            public boolean isNull(int row)
-            {
-                return false;
-            }
-
-            @Override
-            public int getInt(int row)
-            {
-                return entries.get(row)
-                        .getKey().groupId;
-            }
-        };
-
-        @Override
-        public int getRowCount()
-        {
-            return entries.size();
-        }
-
-        @Override
-        public ValueVector getColumn(int column)
-        {
-            if (column == 1)
-            {
-                return groupIds;
-            }
-            return groupTables;
-        }
-
-        @Override
-        public Schema getSchema()
-        {
-            return schema;
-        }
-    }
-
-    /** Value vector that has all grouped rows as separate TupleVector's used by {@link IAggregateFunction}'s to evaluate result */
-    static class GroupsValueVector implements ValueVector
-    {
-        private final TupleVector vector;
-        private final List<IntList> groups;
-
-        GroupsValueVector(TupleVector vector, List<IntList> groups)
-        {
-            this.vector = vector;
-            this.groups = groups;
-        }
-
-        @Override
-        public int size()
-        {
-            return groups.size();
-        }
-
-        @Override
-        public ResolvedType type()
-        {
-            return ResolvedType.table(vector.getSchema());
-        }
-
-        @Override
-        public boolean isNull(int row)
-        {
-            return false;
-        }
-
-        @Override
-        public TupleVector getTable(int row)
-        {
-            // Return a tuple vector for row's group
-            final IntList group = groups.get(row);
-            return new TupleVector()
-            {
-                @Override
-                public Schema getSchema()
-                {
-                    // The schema is the same as the input to HashAggregate
-                    return vector.getSchema();
-                }
-
-                @Override
-                public int getRowCount()
-                {
-                    return group.size();
-                }
-
-                @Override
-                public ValueVector getColumn(int column)
-                {
-                    final ValueVector vv = vector.getColumn(column);
-                    return new ValueVectorAdapter(vv)
-                    {
-                        @Override
-                        public int size()
-                        {
-                            return group.size();
-                        }
-
-                        @Override
-                        protected int getRow(int row)
-                        {
-                            // Return the group index from the "big" vector
-                            return group.getInt(row);
-                        }
-                    };
-                }
-            };
         }
     }
 }

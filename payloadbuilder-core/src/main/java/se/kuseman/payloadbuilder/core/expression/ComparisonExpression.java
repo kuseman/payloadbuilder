@@ -5,8 +5,9 @@ import static java.util.Objects.requireNonNull;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IBooleanVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
@@ -58,7 +59,7 @@ public class ComparisonExpression extends ABinaryExpression implements IComparis
         {
             ValueVector l = left.eval(null);
             ValueVector r = right.eval(null);
-            Column.Type resultType = getResultType(l, r);
+            Column.Type resultType = getVectorComparisonType(l, r);
 
             if (l.isNull(0)
                     || r.isNull(0))
@@ -66,7 +67,7 @@ public class ComparisonExpression extends ABinaryExpression implements IComparis
                 return new LiteralNullExpression(ResolvedType.of(Column.Type.Boolean));
             }
 
-            return compare(l, r, resultType, 0) ? LiteralBooleanExpression.TRUE
+            return compare(l, r, resultType, 0, 0) ? LiteralBooleanExpression.TRUE
                     : LiteralBooleanExpression.FALSE;
         }
 
@@ -74,30 +75,72 @@ public class ComparisonExpression extends ABinaryExpression implements IComparis
     }
 
     @Override
-    ValueVector eval(IExecutionContext context, int rowCount, ValueVector lvv, ValueVector rvv)
+    public ValueVector eval(TupleVector input, ValueVector selection, IExecutionContext context)
     {
-        Column.Type resultType = getResultType(lvv, rvv);
-        IBooleanVectorBuilder builder = context.getVectorBuilderFactory()
-                .getBooleanVectorBuilder(rowCount);
-        for (int row = 0; row < rowCount; row++)
+        int size = selection.size();
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(ResolvedType.of(Column.Type.Boolean), size);
+
+        // First evaluate left side and take care of all nulls, these should not be evaluated on the right side
+        ValueVector leftVector = left.eval(input, selection, context);
+        int[] rightRows = null;
+        int[] leftRows = null;
+
+        int index = 0;
+        for (int i = 0; i < size; i++)
         {
-            boolean isNull = lvv.isNull(row)
-                    || rvv.isNull(row);
-            if (isNull)
+            if (leftVector.isNull(i))
             {
-                builder.putNull();
+                resultVector.setNull(i);
             }
             else
             {
-                boolean result = compare(lvv, rvv, resultType, row);
-                builder.put(result);
+                if (rightRows == null)
+                {
+                    rightRows = new int[size];
+                    leftRows = new int[size];
+                }
+                rightRows[index] = selection.getInt(i);
+                leftRows[index] = i;
+                index++;
             }
         }
 
-        return builder.build();
+        // All nulls, no need to evaluate right
+        if (rightRows == null)
+        {
+            return resultVector;
+        }
+
+        ValueVector rightSelection = VectorUtils.convertToSelectionVector(rightRows, index);
+        ValueVector rightVector = right.eval(input, rightSelection, context);
+
+        size = rightSelection.size();
+        Column.Type resultType = getVectorComparisonType(leftVector, rightVector);
+        for (int i = 0; i < size; i++)
+        {
+            int row = leftRows[i];
+            if (rightVector.isNull(i))
+            {
+                resultVector.setNull(row);
+            }
+            else
+            {
+                boolean result = compare(leftVector, rightVector, resultType, row, i);
+                resultVector.setBoolean(row, result);
+            }
+        }
+
+        return resultVector;
     }
 
-    private Column.Type getResultType(ValueVector lvv, ValueVector rvv)
+    @Override
+    public ValueVector eval(TupleVector input, IExecutionContext context)
+    {
+        return eval(input, ValueVector.range(0, input.getRowCount()), context);
+    }
+
+    private Column.Type getVectorComparisonType(ValueVector lvv, ValueVector rvv)
     {
         // Determine which type to use for vectors
         Column.Type leftType = lvv.type()
@@ -108,18 +151,18 @@ public class ComparisonExpression extends ABinaryExpression implements IComparis
                 : leftType;
     }
 
-    private boolean compare(ValueVector left, ValueVector right, Column.Type resultType, int row)
+    private boolean compare(ValueVector left, ValueVector right, Column.Type resultType, int leftRow, int rightRow)
     {
         if (type == Type.EQUAL)
         {
-            return VectorUtils.equals(left, right, resultType, row, row, false);
+            return VectorUtils.equals(left, right, resultType, leftRow, rightRow, false);
         }
         else if (type == Type.NOT_EQUAL)
         {
-            return !VectorUtils.equals(left, right, resultType, row, row, false);
+            return !VectorUtils.equals(left, right, resultType, leftRow, rightRow, false);
         }
 
-        int c = VectorUtils.compare(left, right, resultType, row, row);
+        int c = VectorUtils.compare(left, right, resultType, leftRow, rightRow);
         switch (type)
         {
             case GREATER_THAN:

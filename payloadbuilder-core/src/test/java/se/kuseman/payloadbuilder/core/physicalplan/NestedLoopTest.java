@@ -30,7 +30,6 @@ import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
-import se.kuseman.payloadbuilder.core.execution.vector.BufferAllocator;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.ArithmeticBinaryExpression;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
@@ -163,7 +162,7 @@ public class NestedLoopTest extends AJoinTest
         IPhysicalPlan plan = NestedLoop.innerJoin(2, new ConstantScan(0), scan(dsInner, tableB, innerSchemaLess), null, false);
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(innerSchema, actual.getSchema());
 
@@ -186,7 +185,7 @@ public class NestedLoopTest extends AJoinTest
         IPhysicalPlan plan = NestedLoop.innerJoin(2, scan(dsOuter, table, outerSchemaLess), scan(dsInner, tableB, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), "p", false);
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         VectorTestUtils.assertTupleVectorsEquals(TupleVector.EMPTY, actual);
 
@@ -204,7 +203,7 @@ public class NestedLoopTest extends AJoinTest
         assertEquals(innerSchemaLess, plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(Schema.EMPTY, actual.getSchema());
 
@@ -223,7 +222,7 @@ public class NestedLoopTest extends AJoinTest
         assertEquals(innerSchemaLess, plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(Schema.EMPTY, actual.getSchema());
 
@@ -258,7 +257,7 @@ public class NestedLoopTest extends AJoinTest
         IPhysicalPlan plan = NestedLoop.leftJoin(2, scan(dsOuter, table, outerSchemaLess), scan(dsInner, tableB, innerSchemaLess), outerReferences, null, outerSchemaLess);
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(new BufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
 
@@ -292,7 +291,7 @@ public class NestedLoopTest extends AJoinTest
         IPhysicalPlan plan = NestedLoop.leftJoin(2, scan(dsOuter, table, outerSchemaLess), scan(dsInner, tableB, innerSchemaLess, 1), null, false);
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
 
@@ -357,7 +356,7 @@ public class NestedLoopTest extends AJoinTest
 
         IPhysicalPlan plan = NestedLoop.leftJoin(2, scan(dsOuter, table, outerSchemaLess), scan(dsInner, tableB, innerSchemaLess), outerReferences, null, outerSchemaLess);
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(outerSchema, actual.getSchema());
         assertEquals(3, actual.getRowCount());
@@ -381,7 +380,7 @@ public class NestedLoopTest extends AJoinTest
 
         IPhysicalPlan plan = NestedLoop.leftJoin(2, scan(dsOuter, table, outerSchemaLess, 1), scan(dsInner, tableB, innerSchemaLess), outerReferences, null, outerSchemaLess);
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(outerSchema, actual.getSchema());
         assertEquals(3, actual.getRowCount());
@@ -428,7 +427,7 @@ public class NestedLoopTest extends AJoinTest
         //@formatter:on
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         //@formatter:off
         Schema expectedSchema = Schema.of(
@@ -488,7 +487,7 @@ public class NestedLoopTest extends AJoinTest
         IPhysicalPlan plan = NestedLoop.leftJoin(2, scan(dsOuter, table, outerSchemaLess), scan(dsInner, tableB, innerSchemaLess), outerReferences, null, outerSchemaLess);
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(new BufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         Schema actualSchema = SchemaUtils.joinSchema(outerSchema, innerSchema);
         assertEquals(actualSchema, actual.getSchema());
@@ -535,7 +534,7 @@ public class NestedLoopTest extends AJoinTest
         IPhysicalPlan plan = NestedLoop.leftJoin(2, scan(dsOuter, table, outerSchemaLess), scan(dsInner, tableB, innerSchemaLess), outerReferences, "p", outerSchemaLess);
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(new BufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         //@formatter:off
         Schema actualSchema = Schema.of(
@@ -601,7 +600,7 @@ public class NestedLoopTest extends AJoinTest
 
         IPhysicalPlan plan = NestedLoop.leftJoin(2, scan(dsOuter, table, outerSchemaLess), scan(dsInner, tableB, innerSchemaLess), outerReferences, "p", outerSchemaLess);
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchemaLess, "p"), actual.getSchema());
         assertEquals(3, actual.getRowCount());
@@ -641,7 +640,7 @@ public class NestedLoopTest extends AJoinTest
         IPhysicalPlan plan = NestedLoop.leftJoin(2, scan(dsOuter, table, outerSchemaLess), scan(dsInner, tableB, innerSchemaLess), outerReferences, "p", outerSchemaLess);
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(new BufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         //@formatter:off
         Schema actualSchema = Schema.of(

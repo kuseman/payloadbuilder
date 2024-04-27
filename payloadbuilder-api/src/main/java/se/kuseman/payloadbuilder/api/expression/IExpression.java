@@ -10,12 +10,26 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.SelectedTupleVector;
 
 /** Definition of an expression */
 public interface IExpression
 {
     /** Evaluate expression against input */
     ValueVector eval(TupleVector input, IExecutionContext context);
+
+    /**
+     * Evaluate this expression against input with a row selection. NOTE! This method should be overriden by expressions to avoid creating a filter vector. This is only for backwards compatibility and
+     * should be made non default.
+     *
+     * @param input Input vector
+     * @param selection Integer vector for rows to evaluate
+     * @param context Execution context
+     */
+    default ValueVector eval(TupleVector input, ValueVector selection, IExecutionContext context)
+    {
+        return eval(SelectedTupleVector.select(input, selection), context);
+    }
 
     /**
      * Evaluate expression. NOTE! This method should only be called on expression not needing any intput vector. Ie. from a {@link IPredicate}

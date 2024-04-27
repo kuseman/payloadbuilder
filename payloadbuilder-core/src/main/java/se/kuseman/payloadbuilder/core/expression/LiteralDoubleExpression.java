@@ -43,6 +43,12 @@ public class LiteralDoubleExpression extends LiteralExpression implements ILiter
     }
 
     @Override
+    public ValueVector eval(TupleVector input, ValueVector selection, IExecutionContext context)
+    {
+        return ValueVector.literalDouble(value, selection.size());
+    }
+
+    @Override
     public int hashCode()
     {
         return Double.hashCode(value);

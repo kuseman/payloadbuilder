@@ -15,6 +15,7 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.SelectedValueVector;
 import se.kuseman.payloadbuilder.api.expression.IColumnExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.core.QueryException;
@@ -136,6 +137,12 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
     public <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
     {
         return visitor.visit(this, context);
+    }
+
+    @Override
+    public ValueVector eval(TupleVector input, ValueVector selection, IExecutionContext context)
+    {
+        return SelectedValueVector.select(eval(input, context), selection);
     }
 
     @Override

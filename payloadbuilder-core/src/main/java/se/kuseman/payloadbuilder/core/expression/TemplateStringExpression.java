@@ -12,7 +12,7 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.ITemplateStringExpression;
@@ -62,15 +62,15 @@ public class TemplateStringExpression implements ITemplateStringExpression
         }
 
         int rowCount = input.getRowCount();
-        IObjectVectorBuilder builder = context.getVectorBuilderFactory()
-                .getObjectVectorBuilder(ResolvedType.of(Type.String), rowCount);
 
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(ResolvedType.of(Type.String), rowCount);
         List<UTF8String> strings = new ArrayList<>(size);
         for (int i = 0; i < rowCount; i++)
         {
-            builder.put(evalInternal(strings, vectors, i));
+            resultVector.setString(i, evalInternal(strings, vectors, i));
         }
-        return builder.build();
+        return resultVector;
     }
 
     @Override

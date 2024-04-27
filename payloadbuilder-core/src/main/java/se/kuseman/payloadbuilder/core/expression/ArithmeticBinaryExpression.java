@@ -7,6 +7,7 @@ import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.Decimal;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
+import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IArithmeticBinaryExpression;
@@ -46,7 +47,7 @@ public class ArithmeticBinaryExpression extends ABinaryExpression implements IAr
         if (lconstant
                 && rconstant)
         {
-            ValueVector v = eval(null, 1, left.eval(null), right.eval(null));
+            ValueVector v = eval(TupleVector.CONSTANT, ValueVector.range(0, 1), null);
             if (v.isNull(0))
             {
                 return new LiteralNullExpression(getType());
@@ -90,8 +91,17 @@ public class ArithmeticBinaryExpression extends ABinaryExpression implements IAr
     }
 
     @Override
-    ValueVector eval(IExecutionContext context, int rowCount, ValueVector lvv, ValueVector rvv)
+    public ValueVector eval(TupleVector input, IExecutionContext context)
     {
+        return eval(input, ValueVector.range(0, input.getRowCount()), context);
+    }
+
+    @Override
+    public ValueVector eval(TupleVector input, ValueVector selection, IExecutionContext context)
+    {
+        ValueVector lvv = left.eval(input, selection, context);
+        ValueVector rvv = right.eval(input, selection, context);
+        final int rowCount = selection.size();
         final Column.Type resultType = getType(lvv.type(), rvv.type()).getType();
         return new ValueVector()
         {

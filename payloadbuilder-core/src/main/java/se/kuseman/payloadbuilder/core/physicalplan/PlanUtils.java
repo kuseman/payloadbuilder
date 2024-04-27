@@ -1,21 +1,47 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
-import se.kuseman.payloadbuilder.core.execution.vector.BufferAllocator;
-import se.kuseman.payloadbuilder.core.execution.vector.TupleVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.ChainedTupleVector;
+import se.kuseman.payloadbuilder.api.execution.vector.ITupleVectorBuilder;
 
 /** Utils for plans */
 class PlanUtils
 {
     private static final int DEFAULT_SIZE = 500;
 
-    /** Concats provided iterator into a single tuple vector. NOTE! Closes the iterator */
-    static TupleVector concat(BufferAllocator allocator, TupleIterator iterator)
+    /**
+     * Chains provided iterator into a single tuple vector. NOTE! Closes the iterator. Requires that all iterated tuple vectors shares a common sub schema.
+     */
+    static TupleVector chain(IExecutionContext context, TupleIterator iterator)
     {
         try
         {
-            return concat(allocator, iterator, -1);
+            int estimatedBatchCount = iterator.estimatedBatchCount();
+            List<TupleVector> vectors = new ArrayList<>(estimatedBatchCount > 0 ? estimatedBatchCount
+                    : 10);
+            while (iterator.hasNext())
+            {
+                vectors.add(iterator.next());
+            }
+            return ChainedTupleVector.chain(vectors);
+        }
+        finally
+        {
+            iterator.close();
+        }
+    }
+
+    /** Concats provided iterator into a single tuple vector. NOTE! Closes the iterator */
+    static TupleVector concat(IExecutionContext context, TupleIterator iterator)
+    {
+        try
+        {
+            return concat(context, iterator, -1);
         }
         finally
         {
@@ -27,9 +53,9 @@ class PlanUtils
      * Concats provided iterator into a single tuple vector. Collects rows until maxRows are reached. NOTE! Resulting vector might overflow maxRows since this method doesn't split any vectors. Use -1
      * for concating whole iterator
      */
-    static TupleVector concat(BufferAllocator allocator, TupleIterator iterator, int maxRows)
+    static TupleVector concat(IExecutionContext context, TupleIterator iterator, int maxRows)
     {
-        TupleVectorBuilder b = null;
+        ITupleVectorBuilder b = null;
         TupleVector vector = null;
 
         int rowCount = 0;
@@ -60,7 +86,8 @@ class PlanUtils
                     estimatedSize = actualMaxRows;
                 }
 
-                b = new TupleVectorBuilder(allocator, estimatedSize);
+                b = context.getVectorFactory()
+                        .getTupleVectorBuilder(estimatedSize);
                 b.append(vector);
                 b.append(v);
             }

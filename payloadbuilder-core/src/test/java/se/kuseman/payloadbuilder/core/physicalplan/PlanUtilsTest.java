@@ -12,7 +12,6 @@ import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
-import se.kuseman.payloadbuilder.core.execution.vector.BufferAllocator;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
 
 /** Test of {@link PlanUtils} */
@@ -22,15 +21,16 @@ public class PlanUtilsTest extends APhysicalPlanTest
     public void test_no_allocations()
     {
         TupleVector vector = TupleVector.of(Schema.of(Column.of("col", Type.Int)), asList(ValueVector.literalInt(100, 500)));
-        BufferAllocator allocator = new BufferAllocator();
-        TupleVector actual = PlanUtils.concat(allocator, TupleIterator.singleton(vector));
+        TupleVector actual = PlanUtils.concat(context, TupleIterator.singleton(vector));
 
         assertEquals(500, actual.getRowCount());
 
         // Only one vector => no allocations
-        assertEquals(0, allocator.getStatistics()
+        assertEquals(0, context.getBufferAllocator()
+                .getStatistics()
                 .getIntAllocationSum());
-        assertEquals(0, allocator.getStatistics()
+        assertEquals(0, context.getBufferAllocator()
+                .getStatistics()
                 .getIntAllocationCount());
 
     }
@@ -39,16 +39,16 @@ public class PlanUtilsTest extends APhysicalPlanTest
     public void test_full_batching()
     {
         TupleVector vector = TupleVector.of(Schema.of(Column.of("col", Type.Int)), asList(range(500)));
-        BufferAllocator allocator = new BufferAllocator();
-
-        TupleVector actual = PlanUtils.concat(allocator, split(vector, -1));
+        TupleVector actual = PlanUtils.concat(context, split(vector, -1));
 
         VectorTestUtils.assertVectorsEquals(range(500), actual.getColumn(0));
 
         // 1 allocation of 500 ints
-        assertEquals(500, allocator.getStatistics()
+        assertEquals(500, context.getBufferAllocator()
+                .getStatistics()
                 .getIntAllocationSum());
-        assertEquals(1, allocator.getStatistics()
+        assertEquals(1, context.getBufferAllocator()
+                .getStatistics()
                 .getIntAllocationCount());
     }
 
@@ -56,19 +56,19 @@ public class PlanUtilsTest extends APhysicalPlanTest
     public void test_batching_with_estimated_batch_count()
     {
         TupleVector vector = TupleVector.of(Schema.of(Column.of("col", Type.Int)), asList(range(500)));
-        BufferAllocator allocator = new BufferAllocator();
-
         TupleIterator it = split(vector, vector.getRowCount());
 
-        TupleVector actual = PlanUtils.concat(allocator, it, 250);
+        TupleVector actual = PlanUtils.concat(context, it, 250);
         assertTrue(it.hasNext());
 
         VectorTestUtils.assertVectorsEquals(range(250), actual.getColumn(0));
 
         // 1 allocation of 250 ints
-        assertEquals(250, allocator.getStatistics()
+        assertEquals(250, context.getBufferAllocator()
+                .getStatistics()
                 .getIntAllocationSum());
-        assertEquals(1, allocator.getStatistics()
+        assertEquals(1, context.getBufferAllocator()
+                .getStatistics()
                 .getIntAllocationCount());
     }
 
@@ -76,19 +76,19 @@ public class PlanUtilsTest extends APhysicalPlanTest
     public void test_batching_with_no_estimated_batch_count()
     {
         TupleVector vector = TupleVector.of(Schema.of(Column.of("col", Type.Int)), asList(range(500)));
-        BufferAllocator allocator = new BufferAllocator();
-
         TupleIterator it = split(vector, -1);
 
-        TupleVector actual = PlanUtils.concat(allocator, it, 250);
+        TupleVector actual = PlanUtils.concat(context, it, 250);
         assertTrue(it.hasNext());
 
         VectorTestUtils.assertVectorsEquals(range(250), actual.getColumn(0));
 
         // 1 allocation of 250 ints
-        assertEquals(250, allocator.getStatistics()
+        assertEquals(250, context.getBufferAllocator()
+                .getStatistics()
                 .getIntAllocationSum());
-        assertEquals(1, allocator.getStatistics()
+        assertEquals(1, context.getBufferAllocator()
+                .getStatistics()
                 .getIntAllocationCount());
     }
 

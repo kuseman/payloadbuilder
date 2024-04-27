@@ -13,9 +13,9 @@ import se.kuseman.payloadbuilder.api.execution.Decimal;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.SelectedValueVector;
 import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
 
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.doubles.DoubleList;
@@ -95,21 +95,7 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
                 continue;
             }
 
-            final int groupRow = i;
-            aggregator.append(new ValueVectorAdapter(vv)
-            {
-                @Override
-                public int size()
-                {
-                    return 1;
-                }
-
-                @Override
-                protected int getRow(int row)
-                {
-                    return groupRow;
-                }
-            }, i, context);
+            aggregator.append(SelectedValueVector.select(vv, ValueVector.literalInt(i, 1)), i, context);
         }
 
         return aggregator.combine(context);
@@ -151,12 +137,9 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
         }
 
         @Override
-        public void appendGroup(TupleVector groupData, IExecutionContext context)
+        public void appendGroup(TupleVector input, ValueVector groupIds, ValueVector selections, IExecutionContext context)
         {
-            ValueVector groupTables = groupData.getColumn(0);
-            ValueVector groupIds = groupData.getColumn(1);
-
-            int groupCount = groupData.getRowCount();
+            int groupCount = groupIds.size();
 
             boolean typeIsSet = resultType != null;
             ValueVector[] result = new ValueVector[groupCount];
@@ -165,16 +148,16 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
 
             for (int i = 0; i < groupCount; i++)
             {
-                int group = groupIds.getInt(i);
-                size = Math.max(size, group + 1);
+                int groupId = groupIds.getInt(i);
+                ValueVector selection = selections.getArray(i);
+                size = Math.max(size, groupId + 1);
 
-                TupleVector vector = groupTables.getTable(i);
-                if (vector.getRowCount() == 0)
+                if (selection.size() == 0)
                 {
                     continue;
                 }
 
-                ValueVector vv = expression.eval(vector, context);
+                ValueVector vv = expression.eval(input, selection, context);
                 result[i] = vv;
 
                 // First vector de
@@ -195,11 +178,11 @@ abstract class ANumericAggregateFunction extends ScalarFunctionInfo
             // Append each evaluated group
             for (int i = 0; i < groupCount; i++)
             {
-                int group = groupIds.getInt(i);
+                int groupId = groupIds.getInt(i);
                 ValueVector vv = result[i];
                 if (vv != null)
                 {
-                    append(vv, group, context);
+                    append(vv, groupId, context);
                 }
             }
         }

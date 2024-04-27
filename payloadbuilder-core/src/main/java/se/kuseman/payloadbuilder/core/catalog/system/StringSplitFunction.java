@@ -18,8 +18,7 @@ import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IIntVectorBuilder;
-import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Table valued function that splits a string and returns a table from the splitted result */
@@ -71,17 +70,13 @@ class StringSplitFunction extends TableFunctionInfo
         String[] parts = StringUtils.split(strValue, strSeparator);
 
         int length = parts.length;
-        IIntVectorBuilder ordinalBuilder = context.getVectorBuilderFactory()
-                .getIntVectorBuilder(length);
-        IObjectVectorBuilder valueBuilder = context.getVectorBuilderFactory()
-                .getObjectVectorBuilder(ResolvedType.of(Type.String), length);
-
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(ResolvedType.of(Type.String), length);
         for (int i = 0; i < length; i++)
         {
-            ordinalBuilder.put(i);
-            valueBuilder.put(UTF8String.from(parts[i]));
+            resultVector.setString(i, UTF8String.from(parts[i]));
         }
 
-        return TupleIterator.singleton(TupleVector.of(schema.get(), List.of(valueBuilder.build(), ordinalBuilder.build())));
+        return TupleIterator.singleton(TupleVector.of(schema.get(), List.of(resultVector, ValueVector.range(0, length))));
     }
 }

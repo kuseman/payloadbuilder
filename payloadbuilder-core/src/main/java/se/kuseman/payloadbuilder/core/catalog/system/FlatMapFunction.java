@@ -11,8 +11,7 @@ import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
-import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.LambdaFunction;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
@@ -91,65 +90,79 @@ class FlatMapFunction extends ScalarFunctionInfo implements LambdaFunction
             ResolvedType resultType = functionType.getType() == Type.Array ? functionType.getSubType()
                     : functionType;
 
-            IObjectVectorBuilder builder = context.getVectorBuilderFactory()
-                    .getObjectVectorBuilder(functionType, input.getRowCount());
-
-            LambdaResultConsumer mapper = (inputResult, lambdaResult, inputWasListType) ->
+            MutableValueVector resultVector = context.getVectorFactory()
+                    .getMutableVector(functionType, input.getRowCount());
+            LambdaResultConsumer mapper = new LambdaResultConsumer()
             {
-                if (lambdaResult == null)
-                {
-                    builder.put(null);
-                    return;
-                }
-                else if (!inputWasListType)
-                {
-                    builder.copy(lambdaResult);
-                    return;
-                }
+                int outerIndex = 0;
 
-                // TODO: size will be off if there are alot of inner vectors
-                int size = lambdaResult.size();
-                IValueVectorBuilder vectorBuilder = context.getVectorBuilderFactory()
-                        .getValueVectorBuilder(resultType, size);
-
-                // Loop vector rows and add to builder
-                // If vector contains vectors then flatten one level adding it's values to builder
-
-                for (int i = 0; i < size; i++)
+                @Override
+                public void accept(Object inputResult, ValueVector lambdaResult, boolean inputWasListType, int row)
                 {
-                    if (lambdaResult.isNull(i))
+                    if (lambdaResult == null)
                     {
-                        vectorBuilder.put(lambdaResult, i);
-                        continue;
+                        resultVector.setNull(outerIndex);
+                        outerIndex++;
+                        return;
+                    }
+                    else if (!inputWasListType)
+                    {
+                        resultVector.copy(outerIndex, lambdaResult);
+                        outerIndex += lambdaResult.size();
+                        return;
                     }
 
-                    // Flatten the inner vector
-                    if (lambdaType.getType() == Column.Type.Array)
-                    {
-                        vectorBuilder.copy(lambdaResult.getArray(i));
-                        continue;
-                    }
-                    // Runtime check of value
-                    else if (lambdaType.getType() == Column.Type.Any)
-                    {
-                        Object vectorValue = VectorUtils.convert(lambdaResult.valueAsObject(i));
+                    // TODO: size will be off if there are alot of inner vectors
+                    int size = lambdaResult.size();
 
-                        // Flatten the inner vector
-                        if (vectorValue instanceof ValueVector)
+                    MutableValueVector innerResultVector = context.getVectorFactory()
+                            .getMutableVector(resultType, size);
+
+                    // Loop vector rows and add to builder
+                    // If vector contains vectors then flatten one level adding it's values to builder
+                    int index = 0;
+                    for (int i = 0; i < size; i++)
+                    {
+                        if (lambdaResult.isNull(i))
                         {
-                            vectorBuilder.copy((ValueVector) vectorValue);
+                            innerResultVector.setNull(index);
+                            index++;
                             continue;
                         }
-                    }
-                    vectorBuilder.put(lambdaResult, i);
-                }
 
-                builder.put(vectorBuilder.build());
+                        // Flatten the inner vector
+                        if (lambdaType.getType() == Column.Type.Array)
+                        {
+                            ValueVector vector = lambdaResult.getArray(i);
+                            innerResultVector.copy(index, vector);
+                            index += vector.size();
+                            continue;
+                        }
+                        // Runtime check of value
+                        else if (lambdaType.getType() == Column.Type.Any)
+                        {
+                            Object vectorValue = VectorUtils.convert(lambdaResult.valueAsObject(i));
+
+                            // Flatten the inner vector
+                            if (vectorValue instanceof ValueVector vector)
+                            {
+                                innerResultVector.copy(index, vector);
+                                index += vector.size();
+                                continue;
+                            }
+                        }
+                        innerResultVector.copy(index, lambdaResult, i);
+                        index++;
+                    }
+
+                    resultVector.setArray(outerIndex, innerResultVector);
+                    outerIndex++;
+                }
             };
 
             LambdaUtils.forEachLambdaResult(context, input, value, le, mapper);
 
-            return builder.build();
+            return resultVector;
         }
 
         ((ExecutionContext) context).getStatementContext()

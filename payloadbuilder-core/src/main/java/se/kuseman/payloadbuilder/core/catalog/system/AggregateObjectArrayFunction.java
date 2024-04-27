@@ -10,8 +10,7 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
-import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
@@ -43,7 +42,7 @@ class AggregateObjectArrayFunction extends ScalarFunctionInfo
     private static class ObjectArrayAggregator implements IAggregator
     {
         private final List<IExpression> arguments;
-        private ObjectList<List<IValueVectorBuilder>> groupBuilders;
+        private ObjectList<List<MutableValueVector>> groupVectors;
 
         ObjectArrayAggregator(List<IExpression> arguments)
         {
@@ -51,54 +50,51 @@ class AggregateObjectArrayFunction extends ScalarFunctionInfo
         }
 
         @Override
-        public void appendGroup(TupleVector groupData, IExecutionContext context)
+        public void appendGroup(TupleVector input, ValueVector groupIds, ValueVector selections, IExecutionContext context)
         {
-            ValueVector groupTables = groupData.getColumn(0);
-            ValueVector groupIds = groupData.getColumn(1);
+            int groupCount = groupIds.size();
 
-            int groupCount = groupData.getRowCount();
-
-            if (groupBuilders == null)
+            if (groupVectors == null)
             {
-                groupBuilders = new ObjectArrayList<>(groupCount + 1);
+                groupVectors = new ObjectArrayList<>(groupCount + 1);
             }
 
             int size = arguments.size();
 
             for (int i = 0; i < groupCount; i++)
             {
-                TupleVector group = groupTables.getTable(i);
                 int groupId = groupIds.getInt(i);
-                groupBuilders.size(Math.max(groupBuilders.size(), groupId + 1));
+                ValueVector selection = selections.getArray(i);
+                groupVectors.size(Math.max(groupVectors.size(), groupId + 1));
 
-                int rowCount = group.getRowCount();
+                int rowCount = selection.size();
                 if (rowCount == 0)
                 {
                     continue;
                 }
                 else
                 {
-                    List<IValueVectorBuilder> builders = groupBuilders.get(groupId);
-                    if (builders == null)
+                    List<MutableValueVector> vectors = groupVectors.get(groupId);
+                    if (vectors == null)
                     {
-                        builders = new ArrayList<>(Collections.nCopies(size, null));
-                        groupBuilders.set(groupId, builders);
+                        vectors = new ArrayList<>(Collections.nCopies(size, null));
+                        groupVectors.set(groupId, vectors);
                     }
 
                     for (int j = 0; j < size; j++)
                     {
                         ValueVector v = arguments.get(j)
-                                .eval(group, context);
+                                .eval(input, selection, context);
 
-                        IValueVectorBuilder builder = builders.get(j);
-                        if (builder == null)
+                        MutableValueVector vector = vectors.get(j);
+                        if (vector == null)
                         {
-                            builder = context.getVectorBuilderFactory()
-                                    .getValueVectorBuilder(v.type(), v.size());
-                            builders.set(j, builder);
+                            vector = context.getVectorFactory()
+                                    .getMutableVector(v.type(), v.size());
+                            vectors.set(j, vector);
                         }
 
-                        builder.copy(v);
+                        vector.copy(vector.size(), v);
                     }
                 }
             }
@@ -110,30 +106,23 @@ class AggregateObjectArrayFunction extends ScalarFunctionInfo
             ResolvedType aggregateType = ObjectArrayFunctionImpl.getAggregateType(arguments);
             Schema schema = aggregateType.getSchema();
 
-            int size = groupBuilders.size();
-            IObjectVectorBuilder objectVectorBuilder = context.getVectorBuilderFactory()
-                    .getObjectVectorBuilder(aggregateType, size);
+            int size = groupVectors.size();
+            MutableValueVector resultVector = context.getVectorFactory()
+                    .getMutableVector(aggregateType, size);
             for (int i = 0; i < size; i++)
             {
-                List<IValueVectorBuilder> builders = groupBuilders.get(i);
-                if (builders == null)
+                List<MutableValueVector> vectors = groupVectors.get(i);
+                if (vectors == null)
                 {
-                    objectVectorBuilder.putNull();
+                    resultVector.setNull(i);
                 }
                 else
                 {
-                    int bsize = builders.size();
-                    List<ValueVector> vectors = new ArrayList<>(bsize);
-                    for (int j = 0; j < bsize; j++)
-                    {
-                        vectors.add(builders.get(j)
-                                .build());
-                    }
-                    objectVectorBuilder.put(TupleVector.of(schema, vectors));
+                    resultVector.setTable(i, TupleVector.of(schema, vectors));
                 }
             }
 
-            return objectVectorBuilder.build();
+            return resultVector;
         }
     }
 }

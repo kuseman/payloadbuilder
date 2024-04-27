@@ -74,7 +74,7 @@ public class FilterTest extends APhysicalPlanTest
         assertEquals(Schema.EMPTY, plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
         assertEquals(Schema.of(col("col1", ResolvedType.of(Type.Any), table), CoreColumn.of("col2", ResolvedType.of(Type.Any), table)), actual.getSchema());
 
         assertEquals(3, actual.getRowCount());
@@ -112,7 +112,7 @@ public class FilterTest extends APhysicalPlanTest
             context.getStatementContext()
                     .setOuterTupleVector(TupleVector.of(outerSchema, asList(vv(Type.Any, i, i))));
             TupleIterator iterator = plan.execute(context);
-            TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), iterator);
+            TupleVector actual = PlanUtils.concat(context, iterator);
 
             // Traverse vectors to trigg evaluation
             for (int c = 0; c < actual.getSchema()

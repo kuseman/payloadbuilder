@@ -41,6 +41,12 @@ public class LiteralBooleanExpression extends LiteralExpression implements ILite
     }
 
     @Override
+    public ValueVector eval(TupleVector input, ValueVector selection, IExecutionContext context)
+    {
+        return ValueVector.literalBoolean(value, selection.size());
+    }
+
+    @Override
     public int hashCode()
     {
         return Boolean.hashCode(value);

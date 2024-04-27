@@ -105,34 +105,28 @@ class AggregateCountFunction extends ScalarFunctionInfo
         }
 
         @Override
-        public void appendGroup(TupleVector groupData, IExecutionContext context)
+        public void appendGroup(TupleVector input, ValueVector groupIds, ValueVector selections, IExecutionContext context)
         {
-            ValueVector groupTables = groupData.getColumn(0);
-            ValueVector groupIds = groupData.getColumn(1);
-
-            int groupCount = groupData.getRowCount();
+            int groupCount = groupIds.size();
 
             for (int i = 0; i < groupCount; i++)
             {
-                int group = groupIds.getInt(i);
-
-                result.size(Math.max(result.size(), group + 1));
-
-                TupleVector groupVector = groupTables.getTable(i);
-
+                ValueVector selection = selections.getArray(i);
+                int groupId = groupIds.getInt(i);
+                result.size(Math.max(result.size(), groupId + 1));
                 int count;
                 // Short cut, no need to evaluate and handle nulls here, just add the input count
                 if (expression instanceof AsteriskExpression
                         || expression.isConstant())
                 {
-                    count = groupVector.getRowCount();
+                    count = selection.size();
                 }
                 else
                 {
-                    ValueVector vv = expression.eval(groupVector, context);
+                    ValueVector vv = expression.eval(input, selection, context);
                     count = count(vv);
                 }
-                result.set(group, count + result.getInt(group));
+                result.set(groupId, count + result.getInt(groupId));
             }
         }
 

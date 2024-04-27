@@ -41,6 +41,12 @@ public class LiteralDateTimeExpression extends LiteralExpression implements ILit
     }
 
     @Override
+    public ValueVector eval(TupleVector input, ValueVector selection, IExecutionContext context)
+    {
+        return ValueVector.literalDateTime(value, selection.size());
+    }
+
+    @Override
     public int hashCode()
     {
         return value.hashCode();

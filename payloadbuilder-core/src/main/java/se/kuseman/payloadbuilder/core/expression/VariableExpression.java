@@ -68,17 +68,23 @@ public class VariableExpression implements IVariableExpression, HasAlias
     @Override
     public ValueVector eval(TupleVector input, IExecutionContext context)
     {
+        return eval(input, ValueVector.range(0, input.getRowCount()), context);
+    }
+
+    @Override
+    public ValueVector eval(TupleVector input, ValueVector selection, IExecutionContext context)
+    {
         ExecutionContext ctx = (ExecutionContext) context;
         if (system)
         {
             if (ROWCOUNT.equalsIgnoreCase(name))
             {
                 StatementContext sctx = (StatementContext) context.getStatementContext();
-                return ValueVector.literalInt(sctx.getRowCount(), input.getRowCount());
+                return ValueVector.literalInt(sctx.getRowCount(), selection.size());
             }
             else if (VERSION.equalsIgnoreCase(name))
             {
-                return ValueVector.literalString(UTF8String.from(ctx.getVersionString()), input.getRowCount());
+                return ValueVector.literalString(UTF8String.from(ctx.getVersionString()), selection.size());
             }
 
             return null;
@@ -87,7 +93,7 @@ public class VariableExpression implements IVariableExpression, HasAlias
         ValueVector value = ctx.getVariableValue(name);
         if (value == null)
         {
-            return ValueVector.literalNull(ResolvedType.of(Type.Any), input.getRowCount());
+            return ValueVector.literalNull(ResolvedType.of(Type.Any), selection.size());
         }
 
         return new ValueVectorAdapter(value)
@@ -95,7 +101,7 @@ public class VariableExpression implements IVariableExpression, HasAlias
             @Override
             public int size()
             {
-                return input.getRowCount();
+                return selection.size();
             }
 
             @Override

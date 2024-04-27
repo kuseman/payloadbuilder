@@ -30,7 +30,6 @@ import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.StatementContext;
 import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
-import se.kuseman.payloadbuilder.core.execution.vector.BufferAllocator;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.ComparisonExpression;
 import se.kuseman.payloadbuilder.test.VectorTestUtils;
@@ -149,7 +148,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assumeNotNull(plan);
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         VectorTestUtils.assertTupleVectorsEquals(TupleVector.EMPTY, actual);
 
@@ -171,7 +170,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assumeNotNull(plan);
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         VectorTestUtils.assertTupleVectorsEquals(TupleVector.EMPTY, actual);
 
@@ -193,7 +192,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assumeNotNull(plan);
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         //@formatter:off
         VectorTestUtils.assertTupleVectorsEquals(TupleVector.of(SchemaUtils.joinSchema(outerSchema, innerSchemaLess, "p"),
@@ -259,7 +258,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assumeNotNull(plan);
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess, "p"), plan.getSchema());
 
@@ -339,7 +338,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assumeNotNull(plan);
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess, "p"), plan.getSchema());
 
@@ -415,7 +414,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assumeNotNull(plan);
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
 
@@ -479,7 +478,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assumeNotNull(plan);
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
 
@@ -544,7 +543,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assumeNotNull(plan);
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
 
@@ -601,7 +600,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assumeNotNull(plan);
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
 
@@ -657,7 +656,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assumeNotNull(plan);
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
 
@@ -716,7 +715,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assumeNotNull(plan);
 
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
-        TupleVector actual = PlanUtils.concat(new BufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
 
@@ -772,7 +771,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assumeNotNull(plan);
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess, "a"), plan.getSchema());
 
@@ -857,7 +856,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
 
         assumeNotNull(plan);
 
-        TupleVector actual = PlanUtils.concat(new BufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
         //
@@ -930,7 +929,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assumeNotNull(plan);
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
 
-        TupleVector actual = PlanUtils.concat(new BufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
         //
@@ -1015,7 +1014,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assumeNotNull(plan);
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
 
-        TupleVector actual = PlanUtils.concat(new BufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
         //
@@ -1250,7 +1249,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
 
@@ -1281,7 +1280,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
 
@@ -1312,7 +1311,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
 
@@ -1343,7 +1342,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
 
@@ -1374,7 +1373,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
 
@@ -1408,7 +1407,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
 
@@ -1497,7 +1496,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess, "a"), plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema, "a"), actual.getSchema());
 
@@ -1527,7 +1526,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema, "a"), plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema, "a"), actual.getSchema());
 
@@ -1557,7 +1556,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess, "a"), plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema, "a"), actual.getSchema());
 
@@ -1587,7 +1586,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema, "a"), plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema, "a"), actual.getSchema());
 
@@ -1655,7 +1654,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
 
         IPhysicalPlan plan = new Limit(0, createInnerJoin(scan(dsOuter, table, outerSchema, 1), scanVectors(dsInner, innerSchema), (tv, ctx) -> predicate.eval(tv, ctx), "a"), intLit(1));
 
-        TupleVector actual = PlanUtils.concat(new BufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         assertEquals(1, actual.getRowCount());
 
@@ -1675,7 +1674,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
 
         IPhysicalPlan plan = new Limit(0, createLeftJoin(scan(dsOuter, table, outerSchema, 1), scanVectors(dsInner, innerSchema), (tv, ctx) -> predicate.eval(tv, ctx), "a"), intLit(1));
 
-        TupleVector actual = PlanUtils.concat(new BufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         assertEquals(1, actual.getRowCount());
 
@@ -1847,7 +1846,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         IPhysicalPlan plan = new Sort(0, createLeftJoin(scanVectors(dsOuter, outerSchema), scanVectors(dsInner, innerSchema), (tv, ctx) -> predicate.eval(tv, ctx), null),
                 asList(sortItem(ce("col1"), Order.ASC, NullOrder.UNDEFINED)));
 
-        TupleVector actual = PlanUtils.concat(new BufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
 
@@ -1962,7 +1961,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         IPhysicalPlan plan = new Sort(2, createLeftJoin(scanVectors(dsOuter, outerSchema), scanVectors(dsInner, innerSchema), (tv, ctx) -> predicate.eval(tv, ctx), null),
                 asList(sortItem(ce("col1"), Order.ASC, NullOrder.UNDEFINED)));
 
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
 
@@ -1992,7 +1991,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
         assertTrue(SchemaUtils.isAsterisk(plan.getSchema()));
 
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         assertEquals(outerSchema, actual.getSchema());
 
@@ -2018,7 +2017,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchemaLess), plan.getSchema());
         assertTrue(SchemaUtils.isAsterisk(plan.getSchema()));
 
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         assertEquals(outerSchema, actual.getSchema());
 
@@ -2044,7 +2043,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchema), plan.getSchema());
         assertTrue(SchemaUtils.isAsterisk(plan.getSchema()));
 
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         // Runtime schema is full concat of inner and outer since we have a static inner
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
@@ -2073,7 +2072,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), plan.getSchema());
         assertFalse(SchemaUtils.isAsterisk(plan.getSchema()));
 
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         // Runtime schema is full concat of inner and outer since we have a static inner
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
@@ -2102,7 +2101,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess, "a"), plan.getSchema());
         assertTrue(SchemaUtils.isAsterisk(plan.getSchema()));
 
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         // Populate always have a concated schema
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchemaLess, "a"), actual.getSchema());
@@ -2130,7 +2129,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchemaLess, "a"), plan.getSchema());
         assertTrue(SchemaUtils.isAsterisk(plan.getSchema()));
 
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         // Populate always have a concated schema
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchemaLess, "a"), actual.getSchema());
@@ -2158,7 +2157,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchema, "a"), plan.getSchema());
         assertTrue(SchemaUtils.isAsterisk(plan.getSchema()));
 
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         // Populate always have a concated schema
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema, "a"), actual.getSchema());
@@ -2186,7 +2185,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema, "a"), plan.getSchema());
         assertFalse(SchemaUtils.isAsterisk(plan.getSchema()));
 
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         // Populate always have a concated schema
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema, "a"), actual.getSchema());
@@ -2309,7 +2308,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess, "a"), plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema, "a"), actual.getSchema());
         assertEquals(2, actual.getRowCount());
@@ -2358,7 +2357,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
         assertVectorsEquals(vv(Type.Any, 0, 0, 1), actual.getColumn(0));
@@ -2414,7 +2413,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
          */
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
 
@@ -2442,7 +2441,7 @@ public abstract class AJoinTest extends APhysicalPlanTest
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess, "a"), plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         // Runtime schema
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema, "a"), actual.getSchema());

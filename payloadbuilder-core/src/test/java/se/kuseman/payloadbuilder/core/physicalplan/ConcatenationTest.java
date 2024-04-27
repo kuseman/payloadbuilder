@@ -37,7 +37,7 @@ public class ConcatenationTest extends APhysicalPlanTest
 
         assertEquals(Schema.EMPTY, plan.getSchema());
 
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         assertEquals(Schema.of(col("col1", ResolvedType.of(Type.Any), table), col("col2", ResolvedType.of(Type.Any), table)), actual.getSchema());
 

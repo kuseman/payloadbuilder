@@ -115,7 +115,7 @@ public interface TupleVector
     }
 
     /** Construct a {@link TupleVector} from provided columns and schema */
-    static TupleVector of(final Schema schema, final List<ValueVector> columns)
+    static TupleVector of(final Schema schema, final List<? extends ValueVector> columns)
     {
         final int rowCount = columns.isEmpty() ? 0
                 : columns.get(0)

@@ -11,7 +11,7 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IBooleanVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.IInExpression;
@@ -61,14 +61,14 @@ public class InExpression implements IInExpression
         ValueVector[] args = new ValueVector[argumentsSize];
 
         int rowCount = input.getRowCount();
-        IBooleanVectorBuilder builder = context.getVectorBuilderFactory()
-                .getBooleanVectorBuilder(rowCount);
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(ResolvedType.of(Type.Boolean), rowCount);
 
         for (int i = 0; i < rowCount; i++)
         {
             if (value.isNull(i))
             {
-                builder.putNull();
+                resultVector.setNull(i);
                 continue;
             }
 
@@ -108,15 +108,15 @@ public class InExpression implements IInExpression
 
             if (allNull)
             {
-                builder.putNull();
+                resultVector.setNull(i);
                 continue;
             }
 
-            builder.put(not ? !match
+            resultVector.setBoolean(i, not ? !match
                     : match);
         }
 
-        return builder.build();
+        return resultVector;
     }
 
     private Type getType(Type one, Type two)

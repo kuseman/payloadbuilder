@@ -11,7 +11,7 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Left/right string function */
@@ -47,15 +47,14 @@ class LeftRightFunction extends ScalarFunctionInfo
                 .eval(input, context);
 
         int rowCount = input.getRowCount();
-        IObjectVectorBuilder builder = context.getVectorBuilderFactory()
-                .getObjectVectorBuilder(ResolvedType.of(Type.String), rowCount);
-
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(ResolvedType.of(Type.String), rowCount);
         for (int i = 0; i < rowCount; i++)
         {
             if (value.isNull(i)
                     || size.isNull(i))
             {
-                builder.putNull();
+                resultVector.setNull(i);
             }
             else
             {
@@ -69,14 +68,14 @@ class LeftRightFunction extends ScalarFunctionInfo
 
                 if (left)
                 {
-                    builder.put(UTF8String.from(StringUtils.left(string.toString(), modSize)));
+                    resultVector.setString(i, UTF8String.from(StringUtils.left(string.toString(), modSize)));
                 }
                 else
                 {
-                    builder.put(UTF8String.from(StringUtils.right(string.toString(), modSize)));
+                    resultVector.setString(i, UTF8String.from(StringUtils.right(string.toString(), modSize)));
                 }
             }
         }
-        return builder.build();
+        return resultVector;
     }
 }

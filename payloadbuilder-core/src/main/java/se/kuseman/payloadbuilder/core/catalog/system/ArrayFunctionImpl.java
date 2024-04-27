@@ -9,8 +9,7 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
-import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 
@@ -92,9 +91,9 @@ class ArrayFunctionImpl
             vectors[i] = input.getColumn(i);
         }
 
-        IValueVectorBuilder arrayBuilder = context.getVectorBuilderFactory()
-                .getValueVectorBuilder(type.getSubType(), rowCount * size);
-
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(type.getSubType(), rowCount * size);
+        int index = 0;
         for (int k = 0; k < rowCount; k++)
         {
             for (int j = 0; j < size; j++)
@@ -104,11 +103,11 @@ class ArrayFunctionImpl
                     continue;
                 }
 
-                arrayBuilder.put(vectors[j], k);
+                resultVector.copy(index++, vectors[j], k);
             }
         }
 
-        return ValueVector.literalArray(arrayBuilder.build(), 1);
+        return ValueVector.literalArray(resultVector, 1);
     }
 
     /** Scalar eval */
@@ -126,20 +125,20 @@ class ArrayFunctionImpl
                     .eval(input, context);
         }
 
-        IObjectVectorBuilder builder = context.getVectorBuilderFactory()
-                .getObjectVectorBuilder(type, rowCount);
-
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(type, rowCount);
         for (int i = 0; i < rowCount; i++)
         {
-            IValueVectorBuilder arrayBuilder = context.getVectorBuilderFactory()
-                    .getValueVectorBuilder(type.getSubType(), size);
+            MutableValueVector arrayVector = context.getVectorFactory()
+                    .getMutableVector(type.getSubType(), size);
+
             for (int j = 0; j < size; j++)
             {
-                arrayBuilder.put(vectors[j], i);
+                arrayVector.copy(j, vectors[j], i);
             }
-            builder.put(arrayBuilder.build());
+            resultVector.setArray(i, arrayVector);
         }
 
-        return builder.build();
+        return resultVector;
     }
 }

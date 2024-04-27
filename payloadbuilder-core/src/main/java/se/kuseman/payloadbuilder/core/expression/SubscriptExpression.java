@@ -13,8 +13,7 @@ import se.kuseman.payloadbuilder.api.execution.ObjectVector;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
-import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.ISubscriptExpression;
@@ -186,28 +185,27 @@ public class SubscriptExpression implements ISubscriptExpression, HasAlias, HasC
             failArray(subscriptType);
         }
 
-        IValueVectorBuilder builder = context.getVectorBuilderFactory()
-                .getValueVectorBuilder(value.type()
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(value.type()
                         .getSubType(), rowCount);
-
         for (int i = 0; i < rowCount; i++)
         {
             // Subscript or value is null => null
             if (value.isNull(i)
                     || subscript.isNull(i))
             {
-                builder.putNull();
+                resultVector.setNull(i);
                 continue;
             }
 
             ValueVector array = value.getArray(i);
-            processArrayRow(array, subscriptType, subscript, i, builder);
+            processArrayRow(array, subscriptType, subscript, i, resultVector);
         }
 
-        return builder.build();
+        return resultVector;
     }
 
-    private void processArrayRow(ValueVector array, Type subscriptType, ValueVector subscript, int subscriptRow, IValueVectorBuilder builder)
+    private void processArrayRow(ValueVector array, Type subscriptType, ValueVector subscript, int subscriptRow, MutableValueVector resultVector)
     {
         int index = -1;
         if (subscriptType == Type.Int)
@@ -243,11 +241,11 @@ public class SubscriptExpression implements ISubscriptExpression, HasAlias, HasC
         if (index >= arraySize
                 || index < 0)
         {
-            builder.putNull();
+            resultVector.setNull(subscriptRow);
         }
         else
         {
-            builder.put(array, index);
+            resultVector.copy(subscriptRow, array, index);
         }
     }
 
@@ -261,24 +259,24 @@ public class SubscriptExpression implements ISubscriptExpression, HasAlias, HasC
         Type subscriptType = subscript.type()
                 .getType();
 
-        IObjectVectorBuilder builder = null;
+        MutableValueVector resultVector = null;
         if (subscriptType == Type.Int)
         {
-            builder = context.getVectorBuilderFactory()
-                    .getObjectVectorBuilder(ResolvedType.object(value.type()
+            resultVector = context.getVectorFactory()
+                    .getMutableVector(ResolvedType.object(value.type()
                             .getSchema()), rowCount);
         }
         else if (subscriptType == Type.String)
         {
             // TODO: check actual runtime column type if subscript is constant
-            builder = context.getVectorBuilderFactory()
-                    .getObjectVectorBuilder(ResolvedType.array(Type.Any), rowCount);
+            resultVector = context.getVectorFactory()
+                    .getMutableVector(ResolvedType.array(Type.Any), rowCount);
         }
         // Any
         else if (subscriptType == Type.Any)
         {
-            builder = context.getVectorBuilderFactory()
-                    .getObjectVectorBuilder(ResolvedType.of(Type.Any), rowCount);
+            resultVector = context.getVectorFactory()
+                    .getMutableVector(ResolvedType.of(Type.Any), rowCount);
         }
         else
         {
@@ -291,18 +289,18 @@ public class SubscriptExpression implements ISubscriptExpression, HasAlias, HasC
             if (value.isNull(i)
                     || subscript.isNull(i))
             {
-                builder.put(null);
+                resultVector.setNull(i);
                 continue;
             }
 
             TupleVector table = value.getTable(i);
-            processTableRow(context, table, subscriptType, subscript, i, builder);
+            processTableRow(context, table, subscriptType, subscript, i, resultVector);
         }
 
-        return builder.build();
+        return resultVector;
     }
 
-    private void processTableRow(ExecutionContext context, TupleVector table, Type subscriptType, ValueVector subscript, int subscriptRow, IObjectVectorBuilder builder)
+    private void processTableRow(ExecutionContext context, TupleVector table, Type subscriptType, ValueVector subscript, int subscriptRow, MutableValueVector resultVector)
     {
         Type currentSubscriptType = subscriptType;
         int row = -1;
@@ -354,11 +352,11 @@ public class SubscriptExpression implements ISubscriptExpression, HasAlias, HasC
             if (row >= currentRowCount
                     || row < 0)
             {
-                builder.put(null);
+                resultVector.setNull(subscriptRow);
                 return;
             }
 
-            builder.put(ObjectVector.wrap(table, row));
+            resultVector.setObject(subscriptRow, ObjectVector.wrap(table, row));
             return;
         }
 
@@ -380,10 +378,10 @@ public class SubscriptExpression implements ISubscriptExpression, HasAlias, HasC
         }
         if (ordinal < 0)
         {
-            builder.put(null);
+            resultVector.setNull(subscriptRow);
             return;
         }
-        builder.put(table.getColumn(ordinal));
+        resultVector.setArray(subscriptRow, table.getColumn(ordinal));
     }
 
     private ValueVector subscriptString(ExecutionContext context, int rowCount, ValueVector value, ValueVector subscript)
@@ -401,27 +399,26 @@ public class SubscriptExpression implements ISubscriptExpression, HasAlias, HasC
             failString(subscriptType);
         }
 
-        IObjectVectorBuilder builder = context.getVectorBuilderFactory()
-                .getObjectVectorBuilder(ResolvedType.of(Type.String), rowCount);
-
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(ResolvedType.of(Type.String), rowCount);
         for (int i = 0; i < rowCount; i++)
         {
             // Subscript or value is null => null
             if (value.isNull(i)
                     || subscript.isNull(i))
             {
-                builder.put(null);
+                resultVector.setNull(i);
                 continue;
             }
 
             UTF8String ut8String = value.getString(i);
-            processStringRow(String.valueOf(ut8String), subscriptType, subscript, i, builder);
+            processStringRow(String.valueOf(ut8String), subscriptType, subscript, i, resultVector);
         }
 
-        return builder.build();
+        return resultVector;
     }
 
-    private void processStringRow(String string, Type subscriptType, ValueVector subscript, int subscriptRow, IObjectVectorBuilder builder)
+    private void processStringRow(String string, Type subscriptType, ValueVector subscript, int subscriptRow, MutableValueVector resultVector)
     {
         int index = -1;
         if (subscriptType == Type.Int)
@@ -457,11 +454,11 @@ public class SubscriptExpression implements ISubscriptExpression, HasAlias, HasC
         if (index >= length
                 || index < 0)
         {
-            builder.putNull();
+            resultVector.setNull(subscriptRow);
         }
         else
         {
-            builder.put(UTF8String.from(string.charAt(index)));
+            resultVector.setString(subscriptRow, UTF8String.from(string.charAt(index)));
         }
     }
 
@@ -475,16 +472,15 @@ public class SubscriptExpression implements ISubscriptExpression, HasAlias, HasC
         Type subscriptType = subscript.type()
                 .getType();
 
-        IObjectVectorBuilder builder = context.getVectorBuilderFactory()
-                .getObjectVectorBuilder(ResolvedType.of(Type.Any), rowCount);
-
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(ResolvedType.of(Type.Any), rowCount);
         for (int i = 0; i < rowCount; i++)
         {
             // Subscript or value is null => null
             if (value.isNull(i)
                     || subscript.isNull(i))
             {
-                builder.put(null);
+                resultVector.setNull(i);
                 continue;
             }
 
@@ -492,16 +488,16 @@ public class SubscriptExpression implements ISubscriptExpression, HasAlias, HasC
 
             if (val instanceof TupleVector)
             {
-                processTableRow(context, (TupleVector) val, subscriptType, subscript, i, builder);
+                processTableRow(context, (TupleVector) val, subscriptType, subscript, i, resultVector);
             }
             else if (val instanceof ValueVector)
             {
-                processArrayRow((ValueVector) val, subscriptType, subscript, i, builder);
+                processArrayRow((ValueVector) val, subscriptType, subscript, i, resultVector);
             }
             else if (val instanceof String
                     || val instanceof UTF8String)
             {
-                processStringRow(String.valueOf(val), subscriptType, subscript, i, builder);
+                processStringRow(String.valueOf(val), subscriptType, subscript, i, resultVector);
             }
             else
             {
@@ -509,7 +505,7 @@ public class SubscriptExpression implements ISubscriptExpression, HasAlias, HasC
             }
         }
 
-        return builder.build();
+        return resultVector;
     }
 
     private void failTable(Type type)

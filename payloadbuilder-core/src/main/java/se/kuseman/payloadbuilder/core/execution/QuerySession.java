@@ -38,6 +38,8 @@ import se.kuseman.payloadbuilder.core.cache.InMemoryTempTableCache;
 import se.kuseman.payloadbuilder.core.cache.TempTableCache;
 import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
+import se.kuseman.payloadbuilder.core.execution.vector.BufferAllocator;
+import se.kuseman.payloadbuilder.core.execution.vector.VectorFactory;
 import se.kuseman.payloadbuilder.core.expression.VariableExpression;
 import se.kuseman.payloadbuilder.core.utils.WeakListenerList;
 
@@ -83,6 +85,7 @@ public class QuerySession implements IQuerySession
     private GenericCache genericCache = new InMemoryGenericCache("QuerySession");
     private long lastQueryExecutionTime;
     private long lastQueryRowCount;
+    private VectorFactory vectorFactory = new VectorFactory(new BufferAllocator());
 
     public QuerySession(CatalogRegistry catalogRegistry)
     {
@@ -116,6 +119,16 @@ public class QuerySession implements IQuerySession
     public String getDefaultCatalogAlias()
     {
         return defaultCatalogAlias;
+    }
+
+    public VectorFactory getVectorFactory()
+    {
+        return vectorFactory;
+    }
+
+    public void setVectorFactory(VectorFactory vectorFactory)
+    {
+        this.vectorFactory = requireNonNull(vectorFactory);
     }
 
     /**

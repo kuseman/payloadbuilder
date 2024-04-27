@@ -19,7 +19,6 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.QueryException;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
-import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.execution.StatementContext;
 import se.kuseman.payloadbuilder.core.execution.TemporaryTable;
@@ -134,7 +133,7 @@ public class InsertInto implements IPhysicalPlan
             }
         }
 
-        Supplier<TemporaryTable> tempTableSupplier = () -> new TemporaryTable(PlanUtils.concat(((ExecutionContext) context).getBufferAllocator(), input.execute(context)), indices);
+        Supplier<TemporaryTable> tempTableSupplier = () -> new TemporaryTable(PlanUtils.concat(context, input.execute(context)), indices);
         TemporaryTable temporaryTable;
         if (cacheTtl != null)
         {

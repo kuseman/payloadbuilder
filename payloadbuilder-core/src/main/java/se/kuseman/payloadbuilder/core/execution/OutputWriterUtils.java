@@ -128,7 +128,7 @@ public class OutputWriterUtils
     {
         if (vector.isNull(row))
         {
-            writer.writeValue(null);
+            writer.writeNull();
             return;
         }
         // CSOFF

@@ -10,9 +10,8 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.NodeData;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.vector.ITupleVectorBuilder;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
-import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
-import se.kuseman.payloadbuilder.core.execution.vector.TupleVectorBuilder;
 
 /**
  * Plan that caches the input and returns the cached values for each execution. Used for example in nested loops where we don't have index or correlation
@@ -54,7 +53,7 @@ public class CachePlan implements IPhysicalPlan
 
         return new TupleIterator()
         {
-            TupleVectorBuilder builder;
+            ITupleVectorBuilder builder;
             TupleIterator it;
             boolean complete;
 
@@ -70,7 +69,8 @@ public class CachePlan implements IPhysicalPlan
                     if (builder == null)
                     {
                         int rowCount = Math.max(next.getRowCount(), it.estimatedRowCount());
-                        builder = new TupleVectorBuilder(((ExecutionContext) context).getBufferAllocator(), rowCount);
+                        builder = context.getVectorFactory()
+                                .getTupleVectorBuilder(rowCount);
                     }
 
                     builder.append(next);

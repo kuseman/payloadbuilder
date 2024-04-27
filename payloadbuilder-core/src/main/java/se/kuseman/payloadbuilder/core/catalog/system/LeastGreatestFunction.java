@@ -7,7 +7,7 @@ import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 
@@ -64,8 +64,8 @@ class LeastGreatestFunction extends ScalarFunctionInfo
                     .eval(input, context);
         }
 
-        IValueVectorBuilder builder = context.getVectorBuilderFactory()
-                .getValueVectorBuilder(type, rowCount);
+        MutableValueVector vectorResult = context.getVectorFactory()
+                .getMutableVector(type, rowCount);
         for (int i = 0; i < rowCount; i++)
         {
             int currentIndex = 0;
@@ -95,9 +95,9 @@ class LeastGreatestFunction extends ScalarFunctionInfo
                 }
             }
 
-            builder.put(vectors[currentIndex], i);
+            vectorResult.copy(i, vectors[currentIndex], i);
         }
 
-        return builder.build();
+        return vectorResult;
     }
 }

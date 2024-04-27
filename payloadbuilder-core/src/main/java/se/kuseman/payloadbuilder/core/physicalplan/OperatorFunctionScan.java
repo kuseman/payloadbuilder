@@ -15,8 +15,8 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.core.common.DescribableNode;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
-import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 
 /** Operator function scan that transforms input according to a {@link OperatorFunctionInfo}. */
 public class OperatorFunctionScan implements IPhysicalPlan
@@ -66,7 +66,7 @@ public class OperatorFunctionScan implements IPhysicalPlan
     @Override
     public TupleIterator execute(IExecutionContext context)
     {
-        final TupleVector inputVector = PlanUtils.concat(((ExecutionContext) context).getBufferAllocator(), input.execute(context));
+        final TupleVector inputVector = PlanUtils.concat(context, input.execute(context));
         if (inputVector.getRowCount() == 0)
         {
             return TupleIterator.EMPTY;
@@ -92,6 +92,12 @@ public class OperatorFunctionScan implements IPhysicalPlan
 
     @Override
     public List<IPhysicalPlan> getChildren()
+    {
+        return singletonList(input);
+    }
+
+    @Override
+    public List<DescribableNode> getChildNodes()
     {
         return singletonList(input);
     }

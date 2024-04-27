@@ -5,9 +5,6 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 
-import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
-import se.kuseman.payloadbuilder.api.execution.TupleVector;
-import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Base class for binary expressions. Handling normalization of vectors etc. before evaluation */
@@ -37,17 +34,6 @@ abstract class ABinaryExpression implements IExpression
     {
         return asList(left, right);
     }
-
-    @Override
-    public ValueVector eval(TupleVector input, IExecutionContext context)
-    {
-        ValueVector lvv = left.eval(input, context);
-        ValueVector rvv = right.eval(input, context);
-        return eval(context, input.getRowCount(), lvv, rvv);
-    }
-
-    /** Evaluate left and right value vectors */
-    abstract ValueVector eval(IExecutionContext context, int rowCount, ValueVector left, ValueVector right);
 
     @Override
     public int hashCode()

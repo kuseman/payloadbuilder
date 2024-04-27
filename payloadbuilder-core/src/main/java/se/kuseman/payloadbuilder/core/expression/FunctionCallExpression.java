@@ -92,6 +92,17 @@ public class FunctionCallExpression implements IFunctionCallExpression, IAggrega
     }
 
     @Override
+    public ValueVector eval(TupleVector input, ValueVector selection, IExecutionContext context)
+    {
+        if (aggregateMode != null)
+        {
+            return function.evalScalar(context, aggregateMode, input, selection, catalogAlias, arguments);
+        }
+
+        return function.evalScalar(context, input, selection, catalogAlias, arguments);
+    }
+
+    @Override
     public ValueVector eval(TupleVector input, IExecutionContext context)
     {
         if (aggregateMode != null)

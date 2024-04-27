@@ -19,6 +19,7 @@ import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.ISeekKey;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.SelectedValueVector;
 
 import it.unimi.dsi.fastutil.Hash.Strategy;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -221,18 +222,18 @@ public class TemporaryTable
     static class IndexTupleVector implements TupleVector
     {
         final TupleVector vector;
-        final IntList rows;
+        final ValueVector selection;
 
         IndexTupleVector(TupleVector vector, IntList rows)
         {
             this.vector = vector;
-            this.rows = rows;
+            this.selection = VectorUtils.convertToSelectionVector(rows);
         }
 
         @Override
         public int getRowCount()
         {
-            return rows.size();
+            return selection.size();
         }
 
         @Override
@@ -244,21 +245,7 @@ public class TemporaryTable
         @Override
         public ValueVector getColumn(int column)
         {
-            final ValueVector valueVector = vector.getColumn(column);
-            return new ValueVectorAdapter(valueVector)
-            {
-                @Override
-                public int size()
-                {
-                    return rows.size();
-                };
-
-                @Override
-                protected int getRow(int row)
-                {
-                    return rows.getInt(row);
-                };
-            };
+            return SelectedValueVector.select(vector.getColumn(column), selection);
         }
     }
 

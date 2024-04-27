@@ -11,7 +11,7 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Reverse string function */
@@ -41,21 +41,21 @@ class ReverseFunction extends ScalarFunctionInfo
                 .eval(input, context);
 
         int rowCount = input.getRowCount();
-        IObjectVectorBuilder builder = context.getVectorBuilderFactory()
-                .getObjectVectorBuilder(ResolvedType.of(Type.String), rowCount);
 
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(ResolvedType.of(Type.String), rowCount);
         for (int i = 0; i < rowCount; i++)
         {
             if (value.isNull(i))
             {
-                builder.putNull();
+                resultVector.setNull(i);
             }
             else
             {
                 UTF8String string = value.getString(i);
-                builder.put(UTF8String.from(StringUtils.reverse(string.toString())));
+                resultVector.setString(i, UTF8String.from(StringUtils.reverse(string.toString())));
             }
         }
-        return builder.build();
+        return resultVector;
     }
 }

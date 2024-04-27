@@ -72,7 +72,7 @@ public class OperatorFunctionScanTest extends APhysicalPlanTest
         assertEquals(Schema.of(Column.of("expr1", ResolvedType.table(schema))), plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
         assertEquals(Schema.of(Column.of("expr1", ResolvedType.table(schema))), actual.getSchema());
         assertEquals(1, actual.getRowCount());
 

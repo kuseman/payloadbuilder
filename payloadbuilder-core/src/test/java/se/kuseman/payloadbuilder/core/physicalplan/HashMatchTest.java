@@ -22,7 +22,6 @@ import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
-import se.kuseman.payloadbuilder.core.execution.vector.BufferAllocator;
 
 /** Test of {@link HashMatch} */
 public class HashMatchTest extends AJoinTest
@@ -67,7 +66,7 @@ public class HashMatchTest extends AJoinTest
 
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
 
-        TupleVector actual = PlanUtils.concat(new BufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
         assertVectorsEquals(vv(Type.Any, null, null, null, null), actual.getColumn(0));
@@ -95,7 +94,7 @@ public class HashMatchTest extends AJoinTest
 
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
 
-        TupleVector actual = PlanUtils.concat(new BufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
         assertVectorsEquals(vv(Type.Any, 0, null, null, null), actual.getColumn(0));
@@ -125,7 +124,7 @@ public class HashMatchTest extends AJoinTest
 
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
 
-        TupleVector actual = PlanUtils.concat(new BufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
         assertVectorsEquals(vv(Type.Any, null, null, null, null, null, null, null, null, null), actual.getColumn(0));
@@ -153,7 +152,7 @@ public class HashMatchTest extends AJoinTest
 
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
 
-        TupleVector actual = PlanUtils.concat(new BufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
         assertVectorsEquals(vv(Type.Any, null, null, null, null), actual.getColumn(0));
@@ -462,7 +461,7 @@ public class HashMatchTest extends AJoinTest
 
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess, "a"), plan.getSchema());
 
-        TupleVector actual = PlanUtils.concat(new BufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema, "a"), actual.getSchema());
         assertVectorsEquals(vv(Type.Any, a, b), actual.getColumn(0));
@@ -730,7 +729,7 @@ public class HashMatchTest extends AJoinTest
 
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess, "a"), plan.getSchema());
 
-        TupleVector actual = PlanUtils.concat(new BufferAllocator(), plan.execute(context));
+        TupleVector actual = PlanUtils.concat(context, plan.execute(context));
 
         //@formatter:off
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema, "a"), actual.getSchema());
@@ -776,7 +775,7 @@ public class HashMatchTest extends AJoinTest
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
 
@@ -812,7 +811,7 @@ public class HashMatchTest extends AJoinTest
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
 
@@ -843,7 +842,7 @@ public class HashMatchTest extends AJoinTest
         assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
 

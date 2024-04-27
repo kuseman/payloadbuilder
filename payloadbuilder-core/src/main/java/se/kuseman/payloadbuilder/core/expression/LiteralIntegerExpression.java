@@ -43,6 +43,12 @@ public class LiteralIntegerExpression extends LiteralExpression implements ILite
     }
 
     @Override
+    public ValueVector eval(TupleVector input, ValueVector selection, IExecutionContext context)
+    {
+        return ValueVector.literalInt(value, selection.size());
+    }
+
+    @Override
     public int hashCode()
     {
         return value;

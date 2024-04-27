@@ -31,7 +31,7 @@ import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** TVF for opening a CSV argument and transform into a {@link TupleIterator} */
@@ -188,7 +188,7 @@ class OpenCsvFunction extends TableFunctionInfo
                 {
                     return true;
                 }
-                IObjectVectorBuilder[] builders = null;
+                MutableValueVector[] vectors = null;
                 int rowIndex = -1;
                 int columnIndex = 0;
                 while (parser.nextToken() != null)
@@ -213,14 +213,14 @@ class OpenCsvFunction extends TableFunctionInfo
                     }
 
                     // Create builders for this batch
-                    if (builders == null)
+                    if (vectors == null)
                     {
                         int size = schema.getSize();
-                        builders = new IObjectVectorBuilder[size];
+                        vectors = new MutableValueVector[size];
                         for (int i = 0; i < size; i++)
                         {
-                            builders[i] = context.getVectorBuilderFactory()
-                                    .getObjectVectorBuilder(ResolvedType.of(Type.String), batchSize);
+                            vectors[i] = context.getVectorFactory()
+                                    .getMutableVector(ResolvedType.of(Type.String), batchSize);
                         }
                     }
 
@@ -241,10 +241,10 @@ class OpenCsvFunction extends TableFunctionInfo
                         int size = schema.getSize();
                         for (int i = 0; i < size; i++)
                         {
-                            IObjectVectorBuilder builder = builders[i];
-                            if (builder.size() <= rowIndex)
+                            MutableValueVector vector = vectors[i];
+                            if (vector.size() <= rowIndex)
                             {
-                                builder.putNull();
+                                vector.setNull(rowIndex);
                             }
                         }
 
@@ -257,21 +257,14 @@ class OpenCsvFunction extends TableFunctionInfo
                     else if (currentToken == JsonToken.VALUE_STRING)
                     {
                         String value = parser.getValueAsString();
-                        builders[columnIndex].put(UTF8String.from(value));
+                        vectors[columnIndex].setString(rowIndex, UTF8String.from(value));
                         columnIndex++;
                     }
                 }
 
-                if (builders == null)
+                if (vectors == null)
                 {
                     return false;
-                }
-
-                int size = schema.getSize();
-                ValueVector[] vectors = new ValueVector[size];
-                for (int i = 0; i < size; i++)
-                {
-                    vectors[i] = builders[i].build();
                 }
 
                 next = TupleVector.of(schema, vectors);
