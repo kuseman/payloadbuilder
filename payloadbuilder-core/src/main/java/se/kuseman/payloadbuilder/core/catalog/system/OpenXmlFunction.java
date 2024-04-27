@@ -44,8 +44,8 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
-import se.kuseman.payloadbuilder.api.execution.vector.IVectorBuilderFactory;
+import se.kuseman.payloadbuilder.api.execution.vector.IVectorFactory;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 
@@ -171,7 +171,7 @@ class OpenXmlFunction extends TableFunctionInfo
             static class XmlColumn
             {
                 final String name;
-                IObjectVectorBuilder builder;
+                MutableValueVector resultVector;
                 List<String> value;
 
                 XmlColumn(String name)
@@ -198,53 +198,49 @@ class OpenXmlFunction extends TableFunctionInfo
                     }
                 }
 
-                void pushRow(int currentRowCount, IVectorBuilderFactory vectorFactory, int estimatedSize)
+                void pushRow(int currentRowCount, IVectorFactory vectorFactory, int estimatedSize)
                 {
                     // Nothing
-                    if (builder == null
+                    if (resultVector == null
                             && value == null)
                     {
                         return;
                     }
                     // Create a builder
-                    else if (builder == null)
+                    else if (resultVector == null)
                     {
-                        builder = vectorFactory.getObjectVectorBuilder(ResolvedType.of(Type.Any), estimatedSize);
+                        resultVector = vectorFactory.getMutableVector(ResolvedType.of(Type.Any), estimatedSize);
 
                         // Pad nulls if needed, this happens if we add a new column on a non first row
                         if (currentRowCount > 0)
                         {
                             for (int i = 0; i < currentRowCount; i++)
                             {
-                                builder.putNull();
+                                resultVector.setNull(i);
                             }
                         }
                     }
                     // Builder but no value => align builder to have the same size as all columns
                     else if (value == null)
                     {
-                        builder.putNull();
+                        resultVector.setNull(currentRowCount);
                         return;
                     }
 
                     if (value.size() == 1)
                     {
-                        builder.put(value.get(0));
+                        resultVector.setAny(currentRowCount, value.get(0));
                     }
                     // Multi value => create array
                     else
                     {
-                        builder.put(VectorUtils.convertToValueVector(value));
+                        resultVector.setAny(currentRowCount, VectorUtils.convertToValueVector(value));
                     }
                 }
 
                 ValueVector build()
                 {
-                    if (builder != null)
-                    {
-                        return builder.build();
-                    }
-                    return null;
+                    return resultVector;
                 }
             }
 
@@ -339,7 +335,7 @@ class OpenXmlFunction extends TableFunctionInfo
                 // Reset the column builders before each batch
                 for (XmlColumn column : columnByName.values())
                 {
-                    column.builder = null;
+                    column.resultVector = null;
                 }
                 int rowCount = 0;
 
@@ -490,7 +486,7 @@ class OpenXmlFunction extends TableFunctionInfo
                 {
                     XmlColumn column = getColumn(rowElementName, currentRowCount);
                     extractContents(column, null, event);
-                    column.pushRow(currentRowCount, context.getVectorBuilderFactory(), batchSize);
+                    column.pushRow(currentRowCount, context.getVectorFactory(), batchSize);
                     event = xmlReader.nextEvent();
                     return 1;
                 }
@@ -571,7 +567,7 @@ class OpenXmlFunction extends TableFunctionInfo
                 // Push the values into builders that we found for current row
                 for (XmlColumn column : columnByName.values())
                 {
-                    column.pushRow(currentRowCount, context.getVectorBuilderFactory(), batchSize);
+                    column.pushRow(currentRowCount, context.getVectorFactory(), batchSize);
                 }
 
                 return 1;

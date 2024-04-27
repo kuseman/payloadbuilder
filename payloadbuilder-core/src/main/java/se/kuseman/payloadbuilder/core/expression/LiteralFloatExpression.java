@@ -43,6 +43,12 @@ public class LiteralFloatExpression extends LiteralExpression implements ILitera
     }
 
     @Override
+    public ValueVector eval(TupleVector input, ValueVector selection, IExecutionContext context)
+    {
+        return ValueVector.literalFloat(value, selection.size());
+    }
+
+    @Override
     public int hashCode()
     {
         return Float.hashCode(value);

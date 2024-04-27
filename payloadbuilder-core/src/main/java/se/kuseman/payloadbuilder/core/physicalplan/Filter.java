@@ -16,9 +16,9 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.SelectedTupleVector;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
-import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
-import se.kuseman.payloadbuilder.core.execution.vector.TupleVectorBuilder;
+import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 
 /** Filter plan. Evaluates a predicate on input and return matched rows */
 public class Filter implements IPhysicalPlan
@@ -76,9 +76,7 @@ public class Filter implements IPhysicalPlan
     @Override
     public TupleIterator execute(IExecutionContext context)
     {
-        final ExecutionContext executionContext = (ExecutionContext) context;
         final TupleIterator iterator = input.execute(context);
-
         return new TupleIterator()
         {
             private TupleVector next;
@@ -127,9 +125,7 @@ public class Filter implements IPhysicalPlan
                         continue;
                     }
 
-                    TupleVectorBuilder b = new TupleVectorBuilder(executionContext.getBufferAllocator(), cardinality);
-                    b.append(vector, result);
-                    next = b.build();
+                    next = SelectedTupleVector.select(vector, VectorUtils.convertToSelectionVector(result));
                 }
                 return true;
             }

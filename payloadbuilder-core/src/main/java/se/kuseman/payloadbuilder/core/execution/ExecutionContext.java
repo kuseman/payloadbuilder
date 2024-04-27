@@ -10,10 +10,10 @@ import java.util.Map;
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IVectorBuilderFactory;
+import se.kuseman.payloadbuilder.api.execution.vector.IVectorFactory;
 import se.kuseman.payloadbuilder.api.expression.IExpressionFactory;
 import se.kuseman.payloadbuilder.core.execution.vector.BufferAllocator;
-import se.kuseman.payloadbuilder.core.execution.vector.VectorBuilderFactory;
+import se.kuseman.payloadbuilder.core.execution.vector.VectorFactory;
 
 /**
  * Context used during execution of a query
@@ -26,8 +26,7 @@ public class ExecutionContext implements IExecutionContext
 {
     private final QuerySession session;
     private final StatementContext statementContext;
-    private final BufferAllocator bufferAllocator;
-    private final VectorBuilderFactory vectorBuilderFactory;
+    private final VectorFactory vectorFactory;
     private final ExpressionFactory expressionFactory;
 
     /** Variables in context */
@@ -40,8 +39,7 @@ public class ExecutionContext implements IExecutionContext
         this.variables = session.getVariables() != null ? new HashMap<>(session.getVariables())
                 : null;
         this.statementContext = new StatementContext();
-        this.bufferAllocator = new BufferAllocator();
-        this.vectorBuilderFactory = new VectorBuilderFactory(bufferAllocator);
+        this.vectorFactory = session.getVectorFactory();
         this.expressionFactory = new ExpressionFactory();
     }
 
@@ -50,8 +48,7 @@ public class ExecutionContext implements IExecutionContext
         this.session = source.session;
         this.variables = source.variables;
         this.statementContext = new StatementContext(source.statementContext);
-        this.bufferAllocator = source.bufferAllocator;
-        this.vectorBuilderFactory = source.vectorBuilderFactory;
+        this.vectorFactory = source.vectorFactory;
         this.expressionFactory = new ExpressionFactory();
     }
 
@@ -63,9 +60,9 @@ public class ExecutionContext implements IExecutionContext
     }
 
     @Override
-    public IVectorBuilderFactory getVectorBuilderFactory()
+    public IVectorFactory getVectorFactory()
     {
-        return vectorBuilderFactory;
+        return vectorFactory;
     }
 
     @Override
@@ -76,7 +73,7 @@ public class ExecutionContext implements IExecutionContext
 
     public BufferAllocator getBufferAllocator()
     {
-        return bufferAllocator;
+        return vectorFactory.getAllocator();
     }
 
     /** Get variables map */

@@ -10,7 +10,7 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IBooleanVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.INullPredicateExpression;
@@ -51,8 +51,8 @@ public class NullPredicateExpression implements INullPredicateExpression, Invert
         final ValueVector value = expression.eval(input, context);
 
         int rowCount = input.getRowCount();
-        IBooleanVectorBuilder builder = context.getVectorBuilderFactory()
-                .getBooleanVectorBuilder(rowCount);
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(ResolvedType.of(Type.Boolean), rowCount);
         for (int i = 0; i < rowCount; i++)
         {
             boolean isNull = value.isNull(i);
@@ -65,10 +65,10 @@ public class NullPredicateExpression implements INullPredicateExpression, Invert
                 isNull = value.getAny(i) == null;
             }
 
-            builder.put(not ? !isNull
+            resultVector.setBoolean(i, not ? !isNull
                     : isNull);
         }
-        return builder.build();
+        return resultVector;
     }
 
     @Override

@@ -10,7 +10,7 @@ import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.LambdaFunction;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
@@ -75,23 +75,22 @@ class MapFunction extends ScalarFunctionInfo implements LambdaFunction
                 .getType();
         if (LambdaUtils.supportsForEachLambdaResult(type))
         {
-            IObjectVectorBuilder builder = context.getVectorBuilderFactory()
-                    .getObjectVectorBuilder(getType(arguments), input.getRowCount());
-
-            LambdaResultConsumer consumer = (inputResult, lambdaResult, inputWasListType) ->
+            MutableValueVector resultVector = context.getVectorFactory()
+                    .getMutableVector(getType(arguments), input.getRowCount());
+            LambdaResultConsumer consumer = (inputResult, lambdaResult, inputWasListType, row) ->
             {
                 if (inputWasListType)
                 {
-                    builder.put(lambdaResult);
+                    resultVector.setAny(resultVector.size(), lambdaResult);
                 }
                 else
                 {
-                    builder.copy(lambdaResult);
+                    resultVector.copy(resultVector.size(), lambdaResult);
                 }
             };
 
             LambdaUtils.forEachLambdaResult(context, input, value, le, consumer);
-            return builder.build();
+            return resultVector;
         }
 
         // Simple type just eval the lambda with inputs

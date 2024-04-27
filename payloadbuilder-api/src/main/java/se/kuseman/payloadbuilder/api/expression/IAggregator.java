@@ -11,22 +11,17 @@ public interface IAggregator
 {
     /**
      * Appends a group data to aggregator.
-     * 
-     * <pre>
-     * Schema of group data:
-     * 
-     *  groupTables: Table
-     *   - Table with the input schema but only with rows belonging to it's group
-     *  groupIds:    Int
-     *   - The unique id for each group corresponding to each table in 'groupTables' column
-     * 
-     * </pre>
+     *
+     * @param input The input vector
+     * @param groupIds Integer Vector with group ids
+     * @param selections Vector with selections for each group. Type is Array[Int]. Same size as @param groupIds
      */
-    void appendGroup(TupleVector groupData, IExecutionContext context);
+    void appendGroup(TupleVector input, ValueVector groupIds, ValueVector selections, IExecutionContext context);
 
     /**
      * Combine the aggregators state into a resulting ValueVector. The resulting vector must contain and be ordered by all the groupId's provided by
      * {@link #appendGroup(TupleVector, IExecutionContext)}
      */
     ValueVector combine(IExecutionContext context);
+
 }

@@ -27,7 +27,7 @@ public class TableScanTest extends APhysicalPlanTest
 
         assertEquals(Schema.EMPTY, plan.getSchema());
 
-        TupleVector vector = PlanUtils.concat(context.getBufferAllocator(), plan.execute(context));
+        TupleVector vector = PlanUtils.concat(context, plan.execute(context));
 
         assertEquals(Schema.of(col("col", ResolvedType.of(Type.Int), table)), vector.getSchema());
     }
@@ -46,7 +46,7 @@ public class TableScanTest extends APhysicalPlanTest
 
         try
         {
-            PlanUtils.concat(context.getBufferAllocator(), plan.execute(context));
+            PlanUtils.concat(context, plan.execute(context));
             fail("Should fail because of asterisks");
         }
         catch (QueryException e)

@@ -7,6 +7,7 @@ import java.util.List;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.SelectedTupleVector;
 import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
@@ -61,10 +62,20 @@ public abstract class ScalarFunctionInfo extends FunctionInfo
         return ResolvedType.of(Column.Type.Any);
     }
 
-    /** Evaluate this function in scalar mode. */
+    /**
+     * Evaluate this function in scalar mode.
+     */
     public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
     {
         throw new IllegalArgumentException("Scalar not implemented. eval: " + getClass().getSimpleName());
+    }
+
+    /**
+     * Evaluate this expression against input with a row selection.
+     */
+    public ValueVector evalScalar(IExecutionContext context, TupleVector input, ValueVector selection, String catalogAlias, List<IExpression> arguments)
+    {
+        return evalScalar(context, SelectedTupleVector.select(input, selection), catalogAlias, arguments);
     }
 
     /**
@@ -73,11 +84,11 @@ public abstract class ScalarFunctionInfo extends FunctionInfo
      * This is typically an aggregate function that can also act as a scalar function.
      *
      * Example function sum
-     * 
+     *
      * select sum(DISTINCT col1)                                &lt;--- aggregate function with aggregate mode
      * from table
      * group by col2
-     * 
+     *
      * select collection.map(x -&gt; x.col &gt; 10).sum(DISTINCT)     &lt;--- scalar function with aggregate mode
      * from .....
      * </pre>
@@ -85,6 +96,26 @@ public abstract class ScalarFunctionInfo extends FunctionInfo
     public ValueVector evalScalar(IExecutionContext context, AggregateMode mode, TupleVector input, String catalogAlias, List<IExpression> arguments)
     {
         throw new IllegalArgumentException("Scalar with aggregate mode not implemented. eval: " + getClass().getSimpleName());
+    }
+
+    /**
+     * <pre>
+     * Evaluate this function in scalar mode with an aggregation mode with a row selection.
+     * This is typically an aggregate function that can also act as a scalar function.
+     *
+     * Example function sum
+     *
+     * select sum(DISTINCT col1)                                &lt;--- aggregate function with aggregate mode
+     * from table
+     * group by col2
+     *
+     * select collection.map(x -&gt; x.col &gt; 10).sum(DISTINCT)     &lt;--- scalar function with aggregate mode
+     * from .....
+     * </pre>
+     */
+    public ValueVector evalScalar(IExecutionContext context, AggregateMode mode, TupleVector input, ValueVector selection, String catalogAlias, List<IExpression> arguments)
+    {
+        return evalScalar(context, mode, SelectedTupleVector.select(input, selection), catalogAlias, arguments);
     }
 
     /** Create an aggregator for this function */

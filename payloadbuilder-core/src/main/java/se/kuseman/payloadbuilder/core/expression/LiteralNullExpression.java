@@ -28,6 +28,12 @@ public class LiteralNullExpression extends LiteralExpression implements ILiteral
     }
 
     @Override
+    public ValueVector eval(TupleVector input, ValueVector selection, IExecutionContext context)
+    {
+        return ValueVector.literalNull(type, selection.size());
+    }
+
+    @Override
     public int hashCode()
     {
         return 0;

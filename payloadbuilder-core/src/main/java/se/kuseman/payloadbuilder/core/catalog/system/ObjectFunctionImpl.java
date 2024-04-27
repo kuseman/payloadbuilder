@@ -10,7 +10,7 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ObjectVector;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.ILiteralStringExpression;
 
@@ -89,13 +89,12 @@ class ObjectFunctionImpl
 
         final Schema schema = type.getSchema();
         int rowCount = input.getRowCount();
-        IObjectVectorBuilder builder = context.getVectorBuilderFactory()
-                .getObjectVectorBuilder(type, rowCount);
-
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(type, rowCount);
         for (int i = 0; i < rowCount; i++)
         {
             final int row = i;
-            builder.put(new ObjectVector()
+            resultVector.setObject(i, new ObjectVector()
             {
                 @Override
                 public int getRow()
@@ -117,6 +116,6 @@ class ObjectFunctionImpl
             });
         }
 
-        return builder.build();
+        return resultVector;
     }
 }

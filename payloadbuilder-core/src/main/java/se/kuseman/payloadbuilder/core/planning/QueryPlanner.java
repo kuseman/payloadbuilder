@@ -681,6 +681,12 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
                     }
 
                     @Override
+                    public int estimatedRowCount()
+                    {
+                        return indexIterator.estimatedRowCount();
+                    }
+
+                    @Override
                     public TupleVector next()
                     {
                         return wrap(schema, indexIterator.next());

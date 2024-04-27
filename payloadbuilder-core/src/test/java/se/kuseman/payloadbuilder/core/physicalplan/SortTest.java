@@ -253,7 +253,7 @@ public class SortTest extends APhysicalPlanTest
 
         try
         {
-            PlanUtils.concat(context.getBufferAllocator(), sort.execute(context));
+            PlanUtils.concat(context, sort.execute(context));
             fail("Should fail with out of range");
         }
         catch (QueryException e)
@@ -278,7 +278,7 @@ public class SortTest extends APhysicalPlanTest
 
         try
         {
-            PlanUtils.concat(context.getBufferAllocator(), sort.execute(context));
+            PlanUtils.concat(context, sort.execute(context));
             fail("Should fail with out of range");
         }
         catch (QueryException e)

@@ -10,7 +10,7 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.ICastExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
@@ -130,10 +130,10 @@ public class CastExpression implements ICastExpression
         if (!type.getType()
                 .isComplex())
         {
-            IValueVectorBuilder builder = context.getVectorBuilderFactory()
-                    .getValueVectorBuilder(type, input.getRowCount());
-            builder.copy(value);
-            return builder.build();
+            MutableValueVector resultVector = context.getVectorFactory()
+                    .getMutableVector(type, input.getRowCount());
+            resultVector.copy(0, value);
+            return resultVector;
         }
 
         return new ValueVectorAdapter(value)

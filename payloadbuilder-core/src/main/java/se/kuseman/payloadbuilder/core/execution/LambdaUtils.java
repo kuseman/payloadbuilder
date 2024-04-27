@@ -54,7 +54,7 @@ public class LambdaUtils
             if (value.isNull(i)
                     && type != Type.Any)
             {
-                consumer.accept(null, null, true);
+                consumer.accept(null, null, true, i);
                 continue;
             }
 
@@ -146,7 +146,7 @@ public class LambdaUtils
                     .setLambdaValue(le.getLambdaIds()[0], array);
 
             consumer.accept(inputResult, le.getExpression()
-                    .eval(inputTupleVector, ctx), inputWasListType);
+                    .eval(inputTupleVector, ctx), inputWasListType, i);
         }
     }
 
@@ -161,7 +161,7 @@ public class LambdaUtils
          * @param lambdaResult Resulting value for each lambda evaluation. Is null if input row was null
          * @param inputWasListType True if input result was of Array/Table type. NOTE! Can only be false when input type is Any and value was not of Array/Table type
          */
-        void accept(Object inputResult, ValueVector lambdaResult, boolean inputWasListType);
+        void accept(Object inputResult, ValueVector lambdaResult, boolean inputWasListType, int row);
     }
 
     /** Value vector wrapper that acts as a single row tuple vector. Used in each iteration for lambdas */

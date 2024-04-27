@@ -15,8 +15,7 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ObjectVector;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
-import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IDereferenceExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
@@ -123,17 +122,17 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
         final int rowCount = input.getRowCount();
         ValueVector leftResult = left.eval(input, context);
 
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(resolvedType, rowCount);
+
         if (leftResult.type()
                 .getType() == Type.Table)
         {
-            IObjectVectorBuilder builder = context.getVectorBuilderFactory()
-                    .getObjectVectorBuilder(resolvedType, rowCount);
-
             for (int i = 0; i < rowCount; i++)
             {
                 if (leftResult.isNull(i))
                 {
-                    builder.putNull();
+                    resultVector.setNull(i);
                 }
                 else
                 {
@@ -145,22 +144,19 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
                         ordinal = getOrdinalInternal(vector.getSchema(), right, null, false, false).getValue();
                         if (ordinal < 0)
                         {
-                            builder.put(ValueVector.literalNull(ResolvedType.of(Type.Any), 0));
+                            resultVector.setArray(i, ValueVector.literalNull(ResolvedType.of(Type.Any), 0));
                             continue;
                         }
                     }
 
-                    builder.put(vector.getColumn(ordinal));
+                    resultVector.setArray(i, vector.getColumn(ordinal));
                 }
             }
-            return builder.build();
+            return resultVector;
         }
         else if (leftResult.type()
                 .getType() == Type.Object)
         {
-            IValueVectorBuilder builder = context.getVectorBuilderFactory()
-                    .getValueVectorBuilder(resolvedType, rowCount);
-
             Schema schema = leftResult.type()
                     .getSchema();
 
@@ -168,7 +164,7 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
             {
                 if (leftResult.isNull(i))
                 {
-                    builder.putNull();
+                    resultVector.setNull(i);
                 }
                 else
                 {
@@ -179,7 +175,7 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
                         Pair<Column, Integer> pair = getOrdinalInternal(schema, right, null, false, false);
                         if (pair.getKey() == null)
                         {
-                            builder.putNull();
+                            resultVector.setNull(i);
                             continue;
                         }
                         ordinal = pair.getValue();
@@ -187,20 +183,17 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
 
                     ObjectVector object = leftResult.getObject(i);
                     ValueVector value = object.getValue(ordinal);
-                    builder.put(value, object.getRow());
+                    resultVector.copy(i, value, object.getRow());
                 }
             }
-            return builder.build();
+            return resultVector;
         }
-
-        IObjectVectorBuilder builder = context.getVectorBuilderFactory()
-                .getObjectVectorBuilder(resolvedType, rowCount);
 
         for (int i = 0; i < rowCount; i++)
         {
             if (leftResult.isNull(i))
             {
-                builder.putNull();
+                resultVector.setNull(i);
             }
             else
             {
@@ -211,12 +204,12 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
                     Pair<Column, Integer> pair = getOrdinalInternal(object.getSchema(), right, null, false, false);
                     if (pair.getKey() == null)
                     {
-                        builder.putNull();
+                        resultVector.setNull(i);
                     }
                     else
                     {
                         ValueVector objectValue = object.getValue(pair.getValue());
-                        builder.put(objectValue, object.getRow());
+                        resultVector.copy(i, objectValue, object.getRow());
                     }
                 }
                 else
@@ -226,7 +219,7 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
             }
         }
 
-        return builder.build();
+        return resultVector;
     }
 
     @Override

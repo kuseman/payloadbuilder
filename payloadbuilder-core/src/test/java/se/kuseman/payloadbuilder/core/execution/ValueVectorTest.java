@@ -288,6 +288,11 @@ public class ValueVectorTest extends APhysicalPlanTest
         vv = ValueVector.literalAny(1, 100);
         assertEquals(100, vv.getInt(0));
 
+        vv = ValueVector.literalAny(1, true);
+        assertEquals(1, vv.getInt(0));
+        vv = ValueVector.literalAny(1, false);
+        assertEquals(0, vv.getInt(0));
+
         vv = ValueVector.literalAny(1, "100");
         assertEquals(100, vv.getInt(0));
 
@@ -312,7 +317,7 @@ public class ValueVectorTest extends APhysicalPlanTest
         catch (IllegalArgumentException e)
         {
             assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast type Object to Int"));
+                    .contains("Cannot cast [se.kuseman.payloadbuilder.api.execution.ObjectVector"));
         }
     }
 
@@ -346,6 +351,11 @@ public class ValueVectorTest extends APhysicalPlanTest
 
         vv = ValueVector.literalAny(1, "100");
         assertEquals(100, vv.getLong(0));
+
+        vv = ValueVector.literalAny(1, true);
+        assertEquals(1L, vv.getLong(0));
+        vv = ValueVector.literalAny(1, false);
+        assertEquals(0L, vv.getLong(0));
 
         try
         {
@@ -453,6 +463,11 @@ public class ValueVectorTest extends APhysicalPlanTest
         vv = ValueVector.literalAny(1, "100");
         assertEquals(100, vv.getFloat(0), 0.01);
 
+        vv = ValueVector.literalAny(1, true);
+        assertEquals(1.0F, vv.getFloat(0), 0.0);
+        vv = ValueVector.literalAny(1, false);
+        assertEquals(0.0F, vv.getFloat(0), 0.0);
+
         try
         {
             vv = ValueVector.literalString("nono", 1);
@@ -508,6 +523,11 @@ public class ValueVectorTest extends APhysicalPlanTest
 
         vv = ValueVector.literalAny(1, "100");
         assertEquals(100, vv.getDouble(0), 0);
+
+        vv = ValueVector.literalAny(1, true);
+        assertEquals(1.0D, vv.getDouble(0), 0.0);
+        vv = ValueVector.literalAny(1, false);
+        assertEquals(0.0D, vv.getDouble(0), 0.0);
 
         try
         {

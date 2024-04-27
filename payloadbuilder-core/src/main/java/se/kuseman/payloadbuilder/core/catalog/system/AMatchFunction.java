@@ -11,7 +11,7 @@ import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IBooleanVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.LambdaFunction;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
@@ -67,26 +67,26 @@ class AMatchFunction extends ScalarFunctionInfo implements LambdaFunction
         }
 
         int rowCount = input.getRowCount();
-        IBooleanVectorBuilder builder = context.getVectorBuilderFactory()
-                .getBooleanVectorBuilder(rowCount);
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(ResolvedType.of(Type.Boolean), rowCount);
 
-        LambdaResultConsumer consumer = (inputResult, lambdaResult, inputWasListType) ->
+        LambdaResultConsumer consumer = (inputResult, lambdaResult, inputWasListType, row) ->
         {
             if (lambdaResult == null)
             {
-                builder.putNull();
+                resultVector.setNull(row);
                 return;
             }
             else if (!inputWasListType)
             {
                 if (lambdaResult.isNull(0))
                 {
-                    builder.putNull();
+                    resultVector.setNull(row);
                 }
                 else
                 {
                     boolean result = lambdaResult.getBoolean(0);
-                    builder.put(((matchType == MatchType.ALL
+                    resultVector.setBoolean(row, ((matchType == MatchType.ALL
                             || matchType == MatchType.ANY)
                             && result)
                             || (matchType == MatchType.NONE
@@ -99,7 +99,7 @@ class AMatchFunction extends ScalarFunctionInfo implements LambdaFunction
             int size = lambdaResult.size();
             if (size == 0)
             {
-                builder.put(result);
+                resultVector.setBoolean(row, result);
                 return;
             }
 
@@ -135,24 +135,24 @@ class AMatchFunction extends ScalarFunctionInfo implements LambdaFunction
             }
             if (allNull)
             {
-                builder.putNull();
+                resultVector.setNull(row);
             }
             else
             {
-                builder.put(result);
+                resultVector.setBoolean(row, result);
             }
         };
 
         LambdaUtils.forEachLambdaResult(context, input, value, le, consumer);
 
-        return builder.build();
+        return resultVector;
     }
 
     private ValueVector getSingleValueResult(IExecutionContext context, TupleVector input, LambdaExpression le, ValueVector value)
     {
         int rowCount = input.getRowCount();
-        IBooleanVectorBuilder builder = context.getVectorBuilderFactory()
-                .getBooleanVectorBuilder(rowCount);
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(ResolvedType.of(Type.Boolean), rowCount);
 
         ((ExecutionContext) context).getStatementContext()
                 .setLambdaValue(le.getLambdaIds()[0], value);
@@ -166,19 +166,19 @@ class AMatchFunction extends ScalarFunctionInfo implements LambdaFunction
         {
             if (lambdaResult.isNull(i))
             {
-                builder.putNull();
+                resultVector.setNull(i);
             }
             else
             {
                 boolean result = lambdaResult.getBoolean(i);
-                builder.put(((matchType == MatchType.ALL
+                resultVector.setBoolean(i, ((matchType == MatchType.ALL
                         || matchType == MatchType.ANY)
                         && result)
                         || (matchType == MatchType.NONE
                                 && !result));
             }
         }
-        return builder.build();
+        return resultVector;
     }
 
     /** Match type */

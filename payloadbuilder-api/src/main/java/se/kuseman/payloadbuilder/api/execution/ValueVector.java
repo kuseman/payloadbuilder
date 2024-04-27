@@ -439,7 +439,9 @@ public interface ValueVector
     /** Return the cardinality of this vector. Only applicable for boolean vectors. Used for predicates */
     default int getCardinality()
     {
-        if (type().getType() != Type.Boolean)
+        Type type = type().getType();
+        if (!(type == Type.Boolean
+                || type == Type.Any))
         {
             throw new IllegalArgumentException("Cardinality is only supported for boolean value vectors");
         }
@@ -772,6 +774,47 @@ public interface ValueVector
             public boolean isNull(int row)
             {
                 return true;
+            }
+        };
+    }
+
+    /** Create a range vector of value between from (inclusive) and to (exclusive) */
+    static ValueVector range(int from, int to)
+    {
+        int size = to - from;
+        if (size == 0)
+        {
+            return empty(ResolvedType.of(Type.Int));
+        }
+        else if (size < 0)
+        {
+            throw new IllegalArgumentException("Negative range");
+        }
+        return new ValueVector()
+        {
+
+            @Override
+            public ResolvedType type()
+            {
+                return ResolvedType.of(Type.Int);
+            }
+
+            @Override
+            public int size()
+            {
+                return to;
+            }
+
+            @Override
+            public boolean isNull(int row)
+            {
+                return false;
+            }
+
+            @Override
+            public int getInt(int row)
+            {
+                return from + row;
             }
         };
     }
@@ -1122,12 +1165,17 @@ public interface ValueVector
                 throw new IllegalArgumentException("Cannot cast '" + value + "' to " + Type.Int);
             }
         }
-        else if (value instanceof Number)
+        else if (value instanceof Number n)
         {
-            return ((Number) value).intValue();
+            return n.intValue();
+        }
+        else if (value instanceof Boolean b)
+        {
+            return b ? 1
+                    : 0;
         }
 
-        throw new IllegalArgumentException("Cannot cast type " + type.toTypeString() + " to " + Type.Int);
+        throw new IllegalArgumentException("Cannot cast [" + v + "] (" + type.toTypeString() + ") to " + Type.Int);
     }
 
     /** Cast provided value to long if possible else throws */
@@ -1150,9 +1198,14 @@ public interface ValueVector
                 throw new IllegalArgumentException("Cannot cast '" + value + "' to " + Type.Long);
             }
         }
-        else if (value instanceof Number)
+        else if (value instanceof Number n)
         {
-            return ((Number) value).longValue();
+            return n.longValue();
+        }
+        else if (value instanceof Boolean b)
+        {
+            return b ? 1L
+                    : 0L;
         }
 
         throw new IllegalArgumentException("Cannot cast type " + type.toTypeString() + " to " + Type.Long);
@@ -1178,9 +1231,14 @@ public interface ValueVector
                 throw new IllegalArgumentException("Cannot cast '" + value + "' to " + Type.Float);
             }
         }
-        else if (value instanceof Number)
+        else if (value instanceof Number n)
         {
-            return ((Number) value).floatValue();
+            return n.floatValue();
+        }
+        else if (value instanceof Boolean b)
+        {
+            return b ? 1.0F
+                    : 0.0F;
         }
 
         throw new IllegalArgumentException("Cannot cast type " + type.toTypeString() + " to " + Type.Float);
@@ -1206,9 +1264,14 @@ public interface ValueVector
                 throw new IllegalArgumentException("Cannot cast '" + value + "' to " + Type.Double);
             }
         }
-        else if (value instanceof Number)
+        else if (value instanceof Number n)
         {
-            return ((Number) value).doubleValue();
+            return n.doubleValue();
+        }
+        else if (value instanceof Boolean b)
+        {
+            return b ? 1.0D
+                    : 0.0D;
         }
 
         throw new IllegalArgumentException("Cannot cast type " + type.toTypeString() + " to " + Type.Double);

@@ -7,7 +7,7 @@ import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Returns first non null argument */
@@ -55,9 +55,9 @@ class CoalesceFunction extends ScalarFunctionInfo
         int size = arguments.size();
         ValueVector[] values = new ValueVector[size];
         int rowCount = input.getRowCount();
-        IValueVectorBuilder builder = context.getVectorBuilderFactory()
-                .getValueVectorBuilder(type, rowCount);
 
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(type, rowCount);
         for (int i = 0; i < rowCount; i++)
         {
             boolean allNull = true;
@@ -71,15 +71,15 @@ class CoalesceFunction extends ScalarFunctionInfo
                 if (!values[j].isNull(i))
                 {
                     allNull = false;
-                    builder.put(values[j], i);
+                    resultVector.copy(i, values[j], i);
                     break;
                 }
             }
             if (allNull)
             {
-                builder.putNull();
+                resultVector.setNull(i);
             }
         }
-        return builder.build();
+        return resultVector;
     }
 }

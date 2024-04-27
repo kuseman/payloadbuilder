@@ -18,7 +18,7 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Format function that can format numeric and date time values */
@@ -64,9 +64,8 @@ class FormatFunction extends ScalarFunctionInfo
                         : null;
 
         int rowCount = input.getRowCount();
-        IObjectVectorBuilder builder = context.getVectorBuilderFactory()
-                .getObjectVectorBuilder(ResolvedType.of(Type.String), rowCount);
-
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(ResolvedType.of(Type.String), rowCount);
         Type valueType = value.type()
                 .getType();
 
@@ -80,7 +79,7 @@ class FormatFunction extends ScalarFunctionInfo
                     || (locale != null
                             && locale.isNull(i)))
             {
-                builder.putNull();
+                resultVector.setNull(i);
                 continue;
             }
 
@@ -127,21 +126,21 @@ class FormatFunction extends ScalarFunctionInfo
                 if (valueType == Type.Int
                         || valueType == Type.Long)
                 {
-                    builder.put(UTF8String.from(numberFormat.format(value.getLong(rowCount))));
+                    resultVector.setString(i, UTF8String.from(numberFormat.format(value.getLong(rowCount))));
                 }
                 else if (valueType == Type.Float
                         || valueType == Type.Double)
                 {
-                    builder.put(UTF8String.from(numberFormat.format(value.getDouble(rowCount))));
+                    resultVector.setString(i, UTF8String.from(numberFormat.format(value.getDouble(rowCount))));
                 }
                 else if (valueType == Type.Decimal)
                 {
-                    builder.put(UTF8String.from(numberFormat.format(value.getDecimal(rowCount)
+                    resultVector.setString(i, UTF8String.from(numberFormat.format(value.getDecimal(rowCount)
                             .asBigDecimal())));
                 }
                 else
                 {
-                    builder.put(UTF8String.from(numberFormat.format(anyValue)));
+                    resultVector.setString(i, UTF8String.from(numberFormat.format(anyValue)));
                 }
 
                 continue;
@@ -178,25 +177,25 @@ class FormatFunction extends ScalarFunctionInfo
 
                 if (valueType == Type.DateTime)
                 {
-                    builder.put(UTF8String.from(dateTimeFormatter.format(value.getDateTime(i)
+                    resultVector.setString(i, UTF8String.from(dateTimeFormatter.format(value.getDateTime(i)
                             .getLocalDateTime())));
                 }
                 else if (valueType == Type.DateTimeOffset)
                 {
-                    builder.put(UTF8String.from(dateTimeFormatter.format(value.getDateTimeOffset(i)
+                    resultVector.setString(i, UTF8String.from(dateTimeFormatter.format(value.getDateTimeOffset(i)
                             .getZonedDateTime())));
                 }
                 else if (anyValue instanceof EpochDateTime)
                 {
-                    builder.put(UTF8String.from(dateTimeFormatter.format(((EpochDateTime) anyValue).getLocalDateTime())));
+                    resultVector.setString(i, UTF8String.from(dateTimeFormatter.format(((EpochDateTime) anyValue).getLocalDateTime())));
                 }
                 else if (anyValue instanceof EpochDateTimeOffset)
                 {
-                    builder.put(UTF8String.from(dateTimeFormatter.format(((EpochDateTimeOffset) anyValue).getZonedDateTime())));
+                    resultVector.setString(i, UTF8String.from(dateTimeFormatter.format(((EpochDateTimeOffset) anyValue).getZonedDateTime())));
                 }
                 else
                 {
-                    builder.put(UTF8String.from(dateTimeFormatter.format((Temporal) anyValue)));
+                    resultVector.setString(i, UTF8String.from(dateTimeFormatter.format((Temporal) anyValue)));
                 }
 
                 continue;
@@ -206,15 +205,15 @@ class FormatFunction extends ScalarFunctionInfo
             // bools etc.
             if (hasLocale)
             {
-                builder.put(UTF8String.from(String.format(LocaleUtils.toLocale(locale.valueAsString(i)), format.valueAsString(i), value.valueAsObject(i))));
+                resultVector.setString(i, UTF8String.from(String.format(LocaleUtils.toLocale(locale.valueAsString(i)), format.valueAsString(i), value.valueAsObject(i))));
             }
             else
             {
-                builder.put(UTF8String.from(String.format(format.valueAsString(i), value.valueAsObject(i))));
+                resultVector.setString(i, UTF8String.from(String.format(format.valueAsString(i), value.valueAsObject(i))));
             }
         }
 
-        return builder.build();
+        return resultVector;
     }
 
     private boolean isDateTime(Object value)

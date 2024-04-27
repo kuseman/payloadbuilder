@@ -162,7 +162,7 @@ public class ProjectionTest extends APhysicalPlanTest
         //@formatter:on
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         //@formatter:off
         Schema expectedSchema = Schema.of(
@@ -225,7 +225,7 @@ public class ProjectionTest extends APhysicalPlanTest
             context.getStatementContext()
                     .setOuterTupleVector(TupleVector.of(outerSchema, asList(vv(Type.Any, i, i))));
             TupleIterator iterator = plan.execute(context);
-            TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), iterator);
+            TupleVector actual = PlanUtils.concat(context, iterator);
 
             // Traverse vectors to trigg evaluation
             for (int c = 0; c < actual.getSchema()

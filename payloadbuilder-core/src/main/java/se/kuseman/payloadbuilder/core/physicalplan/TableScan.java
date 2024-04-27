@@ -23,7 +23,6 @@ import se.kuseman.payloadbuilder.core.QueryException;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
-import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 
 /** Scan operator that scans datasource */
 public class TableScan implements IPhysicalPlan
@@ -109,7 +108,7 @@ public class TableScan implements IPhysicalPlan
                 }
 
                 // Concat the data source up to batch size, this might happen if catalog don't implement batch size correct
-                final TupleVector next = PlanUtils.concat(((ExecutionContext) context).getBufferAllocator(), iterator, batchSize);
+                final TupleVector next = PlanUtils.concat(context, iterator, batchSize);
                 Schema vectorSchema = next.getSchema();
                 validate(context, vectorSchema, next.getRowCount());
                 if (!asteriskSchema)

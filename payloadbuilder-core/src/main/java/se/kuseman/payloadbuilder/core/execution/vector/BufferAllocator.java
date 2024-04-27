@@ -6,8 +6,6 @@ import java.nio.DoubleBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.LongBuffer;
-import java.util.ArrayList;
-import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
@@ -110,12 +108,12 @@ public class BufferAllocator
     }
 
     /** Get object buffer */
-    public <T> List<T> getObjectBuffer(int capacity)
+    public Object[] getObjectBuffer(int capacity)
     {
         statistics.objectAllocationSum += capacity;
         statistics.objectAllocationCount++;
 
-        return new ArrayList<>(capacity);
+        return new Object[capacity];
     }
 
     /** Get bit buffer */

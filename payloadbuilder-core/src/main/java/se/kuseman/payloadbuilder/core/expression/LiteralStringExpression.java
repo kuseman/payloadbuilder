@@ -48,6 +48,12 @@ public class LiteralStringExpression extends LiteralExpression implements ILiter
     }
 
     @Override
+    public ValueVector eval(TupleVector input, ValueVector selection, IExecutionContext context)
+    {
+        return ValueVector.literalString(string, selection.size());
+    }
+
+    @Override
     public int hashCode()
     {
         return string.hashCode();

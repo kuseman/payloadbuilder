@@ -27,6 +27,11 @@ class BitBuffer
         return bitSet.get(index);
     }
 
+    void clear()
+    {
+        bitSet.clear();
+    }
+
     @Override
     public String toString()
     {

@@ -5,17 +5,15 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
-
-import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import it.unimi.dsi.fastutil.objects.ObjectList;
 
 /** An aggregate expression that wrapps a ordinary expression and turns it into an aggregate result */
 public class AggregateWrapperExpression implements IAggregateExpression, HasAlias, HasColumnReference
@@ -142,7 +140,7 @@ public class AggregateWrapperExpression implements IAggregateExpression, HasAlia
     {
         private final boolean singleValue;
         private final IExpression expression;
-        private final ObjectList<ValueVector> result = new ObjectArrayList<>();
+        private MutableValueVector result;
 
         ExpressionAggregator(boolean singleValue, IExpression expression)
         {
@@ -151,26 +149,34 @@ public class AggregateWrapperExpression implements IAggregateExpression, HasAlia
         }
 
         @Override
-        public void appendGroup(TupleVector groupData, IExecutionContext context)
+        public void appendGroup(TupleVector input, ValueVector groupIds, ValueVector selections, IExecutionContext context)
         {
-            ValueVector groupTables = groupData.getColumn(0);
-            ValueVector groupIds = groupData.getColumn(1);
+            int groupCount = groupIds.size();
 
-            int groupCount = groupData.getRowCount();
+            if (result == null)
+            {
+                result = context.getVectorFactory()
+                        .getMutableVector(ResolvedType.of(Type.Any), groupCount);
+            }
 
             for (int i = 0; i < groupCount; i++)
             {
-                int group = groupIds.getInt(i);
-                result.size(Math.max(result.size(), group + 1));
-
-                TupleVector vector = groupTables.getTable(i);
-                if (vector.getRowCount() == 0)
+                int groupId = groupIds.getInt(i);
+                ValueVector selection = selections.getArray(i);
+                if (result.size() < groupId)
+                {
+                    result.setNull(groupId);
+                }
+                if (selection.size() == 0)
                 {
                     continue;
                 }
 
-                ValueVector groupResult = expression.eval(vector, context);
-                result.set(group, groupResult);
+                ValueVector groupResult = expression.eval(input, selection, context);
+                MutableValueVector groupResultCopy = context.getVectorFactory()
+                        .getMutableVector(groupResult.type(), groupResult.size());
+                groupResultCopy.copy(0, groupResult);
+                result.setAny(groupId, groupResultCopy);
             }
         }
 
@@ -181,14 +187,17 @@ public class AggregateWrapperExpression implements IAggregateExpression, HasAlia
             // Pick first row from all groups
             if (singleValue)
             {
-                IValueVectorBuilder builder = context.getVectorBuilderFactory()
-                        .getValueVectorBuilder(result.get(0)
-                                .type(), size);
+                ValueVector groupResult = (ValueVector) result.valueAsObject(0);
+
+                MutableValueVector resultVector = context.getVectorFactory()
+                        .getMutableVector(groupResult.type(), size);
                 for (int i = 0; i < size; i++)
                 {
-                    builder.put(result.get(i), 0);
+                    groupResult = (ValueVector) result.valueAsObject(i);
+                    resultVector.copy(i, groupResult, 0);
                 }
-                return builder.build();
+
+                return resultVector;
             }
 
             return new ValueVector()
@@ -214,7 +223,7 @@ public class AggregateWrapperExpression implements IAggregateExpression, HasAlia
                 @Override
                 public ValueVector getArray(int row)
                 {
-                    return result.get(row);
+                    return (ValueVector) result.valueAsObject(row);
                 }
             };
         }

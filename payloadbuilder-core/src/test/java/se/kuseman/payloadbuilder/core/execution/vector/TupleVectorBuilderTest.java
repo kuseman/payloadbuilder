@@ -23,7 +23,7 @@ public class TupleVectorBuilderTest extends APhysicalPlanTest
     @Test
     public void test_append_with_constant_scan_input()
     {
-        TupleVectorBuilder b = new TupleVectorBuilder(new BufferAllocator(new BufferAllocator.AllocatorSettings()), 5);
+        TupleVectorBuilder b = new TupleVectorBuilder(new VectorFactory(new BufferAllocator(new BufferAllocator.AllocatorSettings())), 5);
         b.append(TupleVector.CONSTANT, vv(Type.Boolean, true));
 
         TupleVector actual = b.build();
@@ -41,7 +41,7 @@ public class TupleVectorBuilderTest extends APhysicalPlanTest
     @Test
     public void test_invalid_filter_size()
     {
-        TupleVectorBuilder b = new TupleVectorBuilder(new BufferAllocator(new BufferAllocator.AllocatorSettings()), 5);
+        TupleVectorBuilder b = new TupleVectorBuilder(new VectorFactory(new BufferAllocator(new BufferAllocator.AllocatorSettings())), 5);
         //@formatter:off
         TupleVector vector = TupleVector.of(Schema.of(Column.of("col1", Type.Int), Column.of("col2", Type.Long)), asList(
                 vv(Type.Int, 1, null, 3),
@@ -62,7 +62,7 @@ public class TupleVectorBuilderTest extends APhysicalPlanTest
     @Test
     public void test_filter()
     {
-        TupleVectorBuilder b = new TupleVectorBuilder(new BufferAllocator(new BufferAllocator.AllocatorSettings()), 5);
+        TupleVectorBuilder b = new TupleVectorBuilder(new VectorFactory(new BufferAllocator(new BufferAllocator.AllocatorSettings())), 5);
         //@formatter:off
         TupleVector vector = TupleVector.of(Schema.of(Column.of("col1", Type.Int), Column.of("col2", Type.Long)), asList(
                 vv(Type.Int, 1, null, 3),
@@ -95,7 +95,7 @@ public class TupleVectorBuilderTest extends APhysicalPlanTest
     {
         Schema innerSchema = Schema.of(Column.of("col2", Type.Float), Column.of("col3", Type.String));
 
-        TupleVectorBuilder b = new TupleVectorBuilder(new BufferAllocator(new BufferAllocator.AllocatorSettings()), 5);
+        TupleVectorBuilder b = new TupleVectorBuilder(new VectorFactory(new BufferAllocator(new BufferAllocator.AllocatorSettings())), 5);
         //@formatter:off
         TupleVector outer = TupleVector.of(Schema.of(Column.of("col1", Type.Int), Column.of("col2", Type.Long)), asList(
                 vv(Type.Int, 1, 3, 7),
@@ -113,7 +113,7 @@ public class TupleVectorBuilderTest extends APhysicalPlanTest
         ValueVector filter = vv(Type.Boolean, true,    false, true,  false,   true, false, false, false, false);
         //@formatter:on
 
-        b.appendPopulate(filter, outer, inner, "p");
+        b.appendPopulate(outer, inner, filter, "p");
 
         TupleVector actual = b.build();
 
@@ -148,7 +148,7 @@ public class TupleVectorBuilderTest extends APhysicalPlanTest
     @Test
     public void test_filter_bitset()
     {
-        TupleVectorBuilder b = new TupleVectorBuilder(new BufferAllocator(new BufferAllocator.AllocatorSettings()), 5);
+        TupleVectorBuilder b = new TupleVectorBuilder(new VectorFactory(new BufferAllocator(new BufferAllocator.AllocatorSettings())), 5);
         //@formatter:off
         TupleVector vector = TupleVector.of(Schema.of(Column.of("col1", Type.Int), Column.of("col2", Type.Long)), asList(
                 vv(Type.Int, 1, null, 3),
@@ -181,7 +181,7 @@ public class TupleVectorBuilderTest extends APhysicalPlanTest
     @Test
     public void test()
     {
-        TupleVectorBuilder b = new TupleVectorBuilder(new BufferAllocator(new BufferAllocator.AllocatorSettings()), 5);
+        TupleVectorBuilder b = new TupleVectorBuilder(new VectorFactory(new BufferAllocator(new BufferAllocator.AllocatorSettings())), 5);
 
         VectorTestUtils.assertTupleVectorsEquals(TupleVector.EMPTY, b.build());
 

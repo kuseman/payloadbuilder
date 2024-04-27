@@ -8,8 +8,7 @@ import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IObjectVectorBuilder;
-import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
@@ -58,16 +57,17 @@ class ArrayFunction extends ScalarFunctionInfo
             ResolvedType type = ArrayFunctionImpl.getScalarType(arguments);
 
             int size = arguments.size();
-            IValueVectorBuilder builder = context.getVectorBuilderFactory()
-                    .getValueVectorBuilder(type.getSubType(), size);
+            MutableValueVector resultVector = context.getVectorFactory()
+                    .getMutableVector(type.getSubType(), size);
 
-            for (IExpression arg : arguments)
+            for (int i = 0; i < size; i++)
             {
-                builder.put(arg.eval(context), 0);
+                resultVector.copy(i, arguments.get(i)
+                        .eval(context), 0);
             }
 
             return context.getExpressionFactory()
-                    .createArrayExpression(builder.build());
+                    .createArrayExpression(resultVector);
         }
         return null;
     }
@@ -87,7 +87,7 @@ class ArrayFunction extends ScalarFunctionInfo
     private static class ArrayAggregator implements IAggregator
     {
         private final List<IExpression> arguments;
-        private ObjectList<IObjectVectorBuilder> groupBuilders;
+        private ObjectList<MutableValueVector> groupVectors;
 
         ArrayAggregator(List<IExpression> arguments)
         {
@@ -95,16 +95,13 @@ class ArrayFunction extends ScalarFunctionInfo
         }
 
         @Override
-        public void appendGroup(TupleVector groupData, IExecutionContext context)
+        public void appendGroup(TupleVector input, ValueVector groupIds, ValueVector selections, IExecutionContext context)
         {
-            ValueVector groupTables = groupData.getColumn(0);
-            ValueVector groupIds = groupData.getColumn(1);
+            int groupCount = groupIds.size();
 
-            int groupCount = groupData.getRowCount();
-
-            if (groupBuilders == null)
+            if (groupVectors == null)
             {
-                groupBuilders = new ObjectArrayList<>(groupCount + 1);
+                groupVectors = new ObjectArrayList<>(groupCount + 1);
             }
 
             int size = arguments.size();
@@ -112,35 +109,35 @@ class ArrayFunction extends ScalarFunctionInfo
 
             for (int i = 0; i < groupCount; i++)
             {
-                TupleVector group = groupTables.getTable(i);
                 int groupId = groupIds.getInt(i);
-                groupBuilders.size(Math.max(groupBuilders.size(), groupId + 1));
+                ValueVector selection = selections.getArray(i);
+                groupVectors.size(Math.max(groupVectors.size(), groupId + 1));
 
-                int rowCount = group.getRowCount();
+                int rowCount = selection.size();
                 if (rowCount == 0)
                 {
                     continue;
                 }
 
-                IObjectVectorBuilder builder = groupBuilders.get(groupId);
-                if (builder == null)
+                MutableValueVector vector = groupVectors.get(groupId);
+                if (vector == null)
                 {
-                    builder = context.getVectorBuilderFactory()
-                            .getObjectVectorBuilder(ResolvedType.of(Type.Any), rowCount * size);
-                    groupBuilders.set(groupId, builder);
+                    vector = context.getVectorFactory()
+                            .getMutableVector(ResolvedType.of(Type.Any), rowCount * size);
+                    groupVectors.set(groupId, vector);
                 }
 
                 for (int j = 0; j < size; j++)
                 {
                     vectors[j] = arguments.get(j)
-                            .eval(group, context);
+                            .eval(input, selection, context);
                 }
 
                 for (int k = 0; k < rowCount; k++)
                 {
                     for (int j = 0; j < size; j++)
                     {
-                        builder.put(vectors[j].valueAsObject(k));
+                        vector.setAny(vector.size(), vectors[j].valueAsObject(k));
                     }
                 }
             }
@@ -149,22 +146,22 @@ class ArrayFunction extends ScalarFunctionInfo
         @Override
         public ValueVector combine(IExecutionContext context)
         {
-            int size = groupBuilders.size();
-            IObjectVectorBuilder objectVectorBuilder = context.getVectorBuilderFactory()
-                    .getObjectVectorBuilder(ResolvedType.array(Type.Any), size);
+            int size = groupVectors.size();
+            MutableValueVector resultVector = context.getVectorFactory()
+                    .getMutableVector(ResolvedType.array(Type.Any), size);
             for (int i = 0; i < size; i++)
             {
-                IObjectVectorBuilder builder = groupBuilders.get(i);
-                if (builder == null)
+                MutableValueVector vector = groupVectors.get(i);
+                if (vector == null)
                 {
-                    objectVectorBuilder.putNull();
+                    resultVector.setNull(i);
                 }
                 else
                 {
-                    objectVectorBuilder.put(builder.build());
+                    resultVector.setArray(i, vector);
                 }
             }
-            return objectVectorBuilder.build();
+            return resultVector;
         }
     }
 }

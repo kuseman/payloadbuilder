@@ -43,6 +43,12 @@ public class LiteralLongExpression extends LiteralExpression implements ILiteral
     }
 
     @Override
+    public ValueVector eval(TupleVector input, ValueVector selection, IExecutionContext context)
+    {
+        return ValueVector.literalLong(value, selection.size());
+    }
+
+    @Override
     public int hashCode()
     {
         return Long.hashCode(value);

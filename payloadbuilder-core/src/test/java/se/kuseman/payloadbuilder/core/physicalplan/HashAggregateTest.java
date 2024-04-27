@@ -78,7 +78,7 @@ public class HashAggregateTest extends APhysicalPlanTest
         assertEquals(Schema.EMPTY, plan.getSchema());
 
         TupleIterator it = plan.execute(context);
-        TupleVector actual = PlanUtils.concat(context.getBufferAllocator(), it);
+        TupleVector actual = PlanUtils.concat(context, it);
 
         // Runtime schema
         //@formatter:off

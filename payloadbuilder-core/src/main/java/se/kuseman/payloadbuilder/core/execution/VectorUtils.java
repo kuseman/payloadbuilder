@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +26,9 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
+
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.ints.IntList;
 
 /** Utils for {@link ValueVector} and {@link TupleVector} */
 public class VectorUtils
@@ -498,6 +502,103 @@ public class VectorUtils
             return result;
         }
         return convertToObjectVector(result);
+    }
+
+    /** Convert provided boolean filter to a selection vector. */
+    public static ValueVector convertToSelectionVector(ValueVector filter)
+    {
+        IntList selection = new IntArrayList(filter.getCardinality());
+        int size = filter.size();
+        for (int i = 0; i < size; i++)
+        {
+            if (filter.getPredicateBoolean(i))
+            {
+                selection.add(i);
+            }
+        }
+        return convertToSelectionVector(selection);
+    }
+
+    /** Convert provided bit set to a selection vector. */
+    public static ValueVector convertToSelectionVector(int rowCount, BitSet filter)
+    {
+        IntList selection = new IntArrayList(filter.cardinality());
+        for (int i = 0; i < rowCount; i++)
+        {
+            if (filter.get(i))
+            {
+                selection.add(i);
+            }
+        }
+        return convertToSelectionVector(selection);
+    }
+
+    /** Convert provided IntList to a integer {@link ValueVector} */
+    public static ValueVector convertToSelectionVector(IntList selection)
+    {
+        requireNonNull(selection);
+        return new ValueVector()
+        {
+            @Override
+            public ResolvedType type()
+            {
+                return ResolvedType.of(Type.Int);
+            }
+
+            @Override
+            public int size()
+            {
+                return selection.size();
+            }
+
+            @Override
+            public boolean isNull(int row)
+            {
+                return false;
+            }
+
+            @Override
+            public int getInt(int row)
+            {
+                return selection.getInt(row);
+            }
+        };
+    }
+
+    /** Convert provided int array to a integer {@link ValueVector} */
+    public static ValueVector convertToSelectionVector(int[] selection, int size)
+    {
+        requireNonNull(selection);
+        if (size > selection.length)
+        {
+            throw new IllegalArgumentException("Size out of bounds. Array size: " + selection.length + ", size: " + size);
+        }
+        return new ValueVector()
+        {
+            @Override
+            public ResolvedType type()
+            {
+                return ResolvedType.of(Type.Int);
+            }
+
+            @Override
+            public int size()
+            {
+                return size;
+            }
+
+            @Override
+            public boolean isNull(int row)
+            {
+                return false;
+            }
+
+            @Override
+            public int getInt(int row)
+            {
+                return selection[row];
+            }
+        };
     }
 
     /** Converts provided value to a {@link ValueVector}. Transforms List/Collections/Arrays to value vector */

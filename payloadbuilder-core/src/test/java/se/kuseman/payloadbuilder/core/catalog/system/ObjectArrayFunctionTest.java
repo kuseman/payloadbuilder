@@ -34,54 +34,35 @@ public class ObjectArrayFunctionTest extends APhysicalPlanTest
     {
         TupleVector input;
         ValueVector actual;
-        ValueVector vv;
         Schema schema;
 
         // No input rows
         input = TupleVector.EMPTY;
-        vv = ValueVector.literalTable(input);
 
         //@formatter:off
         IAggregator aggregator = scalar.createAggregator(AggregateMode.ALL, "", asList(col1));
-        aggregator.appendGroup(TupleVector.of(Schema.of(
-                Column.of("groupTables", ResolvedType.table(Schema.EMPTY)),
-                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
-                        vv,
-                        vv(Type.Int, 0)
-                        )), context);
+        aggregator.appendGroup(input, vv(Type.Int), vv(ResolvedType.array(Type.Int), vv(Type.Int)), context);
+        
         //@formatter:on
 
         actual = aggregator.combine(context);
         schema = Schema.of(col("col1", Column.Type.Any, null));
         assertEquals(ResolvedType.table(schema), scalar.getAggregateType(asList(col1)));
-        assertVectorsEquals(vv(ResolvedType.table(schema), (TupleVector) null), actual);
+        assertVectorsEquals(vv(ResolvedType.table(schema)), actual);
 
         input = TupleVector.of(schema("col1", "col2"), asList(vv(Type.Any, 1, 2, 3), vv(Type.Any, 4, 5, 6)));
-        vv = ValueVector.literalTable(input);
 
         //@formatter:off
         aggregator = scalar.createAggregator(AggregateMode.ALL, "", asList(col1));
-        aggregator.appendGroup(TupleVector.of(Schema.of(
-                Column.of("groupTables", ResolvedType.table(input.getSchema())),
-                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
-                        vv,
-                        vv(Type.Int, 0)
-                        )), context);
+        aggregator.appendGroup(input, vv(Type.Int, 0), vv(ResolvedType.array(Type.Int), vv(Type.Int, 0, 1, 2)), context);
         //@formatter:on
 
         actual = aggregator.combine(context);
         assertVectorsEquals(vv(ResolvedType.table(schema), TupleVector.of(schema, asList(vv(Type.Any, 1, 2, 3)))), actual);
 
-        vv = ValueVector.literalTable(input);
-
         //@formatter:off
         aggregator = scalar.createAggregator(AggregateMode.ALL, "", asList(col1, col2));
-        aggregator.appendGroup(TupleVector.of(Schema.of(
-                Column.of("groupTables", ResolvedType.table(input.getSchema())),
-                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
-                        vv,
-                        vv(Type.Int, 0)
-                        )), context);
+        aggregator.appendGroup(input, vv(Type.Int, 0), vv(ResolvedType.array(Type.Int), vv(Type.Int, 0, 1, 2)), context);
         //@formatter:on
 
         actual = aggregator.combine(context);
@@ -91,19 +72,9 @@ public class ObjectArrayFunctionTest extends APhysicalPlanTest
         // Multi vector
         //@formatter:off
         aggregator = scalar.createAggregator(AggregateMode.ALL, "", asList(col1, col2));
-        aggregator.appendGroup(TupleVector.of(Schema.of(
-                Column.of("groupTables", ResolvedType.table(input.getSchema())),
-                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
-                        vv,
-                        vv(Type.Int, 0)
-                        )), context);
-        
-        aggregator.appendGroup(TupleVector.of(Schema.of(
-                Column.of("groupTables", ResolvedType.table(input.getSchema())),
-                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
-                        vv,
-                        vv(Type.Int, 0)
-                        )), context);
+        aggregator.appendGroup(input, vv(Type.Int, 0), vv(ResolvedType.array(Type.Int), vv(Type.Int, 0, 1, 2)), context);
+
+        aggregator.appendGroup(input, vv(Type.Int, 0), vv(ResolvedType.array(Type.Int), vv(Type.Int, 0, 1, 2)), context);
         //@formatter:on
 
         actual = aggregator.combine(context);

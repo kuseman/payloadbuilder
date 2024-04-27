@@ -23,7 +23,6 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.core.QueryException;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
 import se.kuseman.payloadbuilder.core.common.SortItem;
-import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 import se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression;
@@ -75,7 +74,7 @@ public class Sort implements IPhysicalPlan
     public TupleIterator execute(IExecutionContext context)
     {
         TupleIterator it = input.execute(context);
-        TupleVector all = PlanUtils.concat(((ExecutionContext) context).getBufferAllocator(), it);
+        TupleVector all = PlanUtils.concat(context, it);
 
         if (all.getRowCount() == 0)
         {

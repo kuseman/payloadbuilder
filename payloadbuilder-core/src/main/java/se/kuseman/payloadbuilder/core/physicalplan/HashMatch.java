@@ -28,13 +28,14 @@ import se.kuseman.payloadbuilder.api.execution.NodeData;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.ITupleVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.SelectedTupleVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
-import se.kuseman.payloadbuilder.core.execution.vector.TupleVectorBuilder;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
@@ -461,7 +462,7 @@ public class HashMatch implements IPhysicalPlan
                             && innerIt.hasNext())
                     {
                         // Populate then we need the whole concated inner
-                        TupleVector vector = populateAlias != null ? PlanUtils.concat(((ExecutionContext) context).getBufferAllocator(), innerIt)
+                        TupleVector vector = populateAlias != null ? PlanUtils.concat(context, innerIt)
                                 : innerIt.next();
 
                         // Clear reference, not needed any more
@@ -593,12 +594,17 @@ public class HashMatch implements IPhysicalPlan
                     return;
                 }
 
-                TupleVector inner = populateAlias != null ? PlanUtils.concat(((ExecutionContext) context).getBufferAllocator(), innerIt)
-                        : innerIt.next();
+                TupleVector inner;
                 if (populateAlias != null)
                 {
+                    inner = innerSchemaAsterisk ? PlanUtils.concat(context, innerIt)
+                            : PlanUtils.chain(context, innerIt);
                     // Stream is closed and not used any more
                     innerIt = null;
+                }
+                else
+                {
+                    inner = innerIt.next();
                 }
 
                 // Set schemas from runtime vectors
@@ -630,7 +636,7 @@ public class HashMatch implements IPhysicalPlan
                 }
 
                 int rowCount = inner.getRowCount();
-                TupleVectorBuilder builder = null;
+                ITupleVectorBuilder builder = null;
 
                 rows: for (int probeRow = 0; probeRow < rowCount; probeRow++)
                 {
@@ -672,7 +678,8 @@ public class HashMatch implements IPhysicalPlan
                                 if (builder == null)
                                 {
                                     int resultSize = estimateBufferSize(bucket.vector.getRowCount(), rowCount, cardinality);
-                                    builder = new TupleVectorBuilder(((ExecutionContext) context).getBufferAllocator(), resultSize);
+                                    builder = context.getVectorFactory()
+                                            .getTupleVectorBuilder(resultSize);
                                 }
                                 builder.append(replicatedTupleVectorOuter, filter);
                             }
@@ -753,7 +760,7 @@ public class HashMatch implements IPhysicalPlan
                 }
 
                 int rowCount = outer.getRowCount();
-                TupleVectorBuilder builder = null;
+                ITupleVectorBuilder builder = null;
 
                 if (innerPopulateMatches != null)
                 {
@@ -821,7 +828,8 @@ public class HashMatch implements IPhysicalPlan
                                 if (builder == null)
                                 {
                                     int resultSize = estimateBufferSize(bucket.vector.getRowCount(), rowCount, cardinality);
-                                    builder = new TupleVectorBuilder(((ExecutionContext) context).getBufferAllocator(), resultSize);
+                                    builder = context.getVectorFactory()
+                                            .getTupleVectorBuilder(resultSize);
                                 }
                                 builder.append(replicatedTupleVectorInner, filter);
                             }
@@ -939,7 +947,7 @@ public class HashMatch implements IPhysicalPlan
              */
             private TupleVector buildPopulatedVectorOuterHashMode(TupleVector inner)
             {
-                TupleVectorBuilder builder = null;
+                ITupleVectorBuilder builder = null;
                 List<TupleVector> innerVectors = new ArrayList<>();
                 for (HashValue value : table.values())
                 {
@@ -966,7 +974,7 @@ public class HashMatch implements IPhysicalPlan
              */
             private TupleVector buildPopulatedVectorInnerHashMode(TupleVector outer, List<BitSet> populatedMatches)
             {
-                TupleVectorBuilder builder = null;
+                ITupleVectorBuilder builder = null;
                 List<TupleVector> innerVectors = new ArrayList<>();
                 // We only have one inner vector in inner hash mode so pick the first one
                 // they are all the same
@@ -981,8 +989,16 @@ public class HashMatch implements IPhysicalPlan
                 return null;
             }
 
-            private TupleVectorBuilder appendPopulatedVector(TupleVector outer, TupleVector inner, List<TupleVector> innerVectors, List<BitSet> populatedMatches, TupleVectorBuilder builder)
+            private ITupleVectorBuilder appendPopulatedVector(TupleVector outer, TupleVector inner, List<TupleVector> innerVectors, List<BitSet> populatedMatches, ITupleVectorBuilder builder)
             {
+                // First make a copy of the inner vector
+                int rowCount = inner.getRowCount();
+                ITupleVectorBuilder innerBuilder = context.getVectorFactory()
+                        .getTupleVectorBuilder(rowCount);
+                innerBuilder.append(inner);
+                TupleVector newInner = innerBuilder.build();
+
+                // ... then create selected tuple vectors for each outer bit set
                 BitSet filter = new BitSet();
                 boolean allNull = true;
                 innerVectors.clear();
@@ -997,9 +1013,9 @@ public class HashMatch implements IPhysicalPlan
                     {
                         filter.set(index, true);
                         allNull = false;
-                        TupleVectorBuilder innerBuilder = new TupleVectorBuilder(((ExecutionContext) context).getBufferAllocator(), bitSet.cardinality());
-                        innerBuilder.append(inner, bitSet);
-                        innerVectors.add(innerBuilder.build());
+
+                        TupleVector currentInner = SelectedTupleVector.select(newInner, VectorUtils.convertToSelectionVector(rowCount, bitSet));
+                        innerVectors.add(currentInner);
                     }
                     index++;
                 }
@@ -1065,7 +1081,8 @@ public class HashMatch implements IPhysicalPlan
 
                 if (builder == null)
                 {
-                    builder = new TupleVectorBuilder(((ExecutionContext) context).getBufferAllocator(), table.size());
+                    builder = context.getVectorFactory()
+                            .getTupleVectorBuilder(table.size());
                 }
                 builder.append(vectorToAppend, filter);
                 return builder;
@@ -1127,7 +1144,7 @@ public class HashMatch implements IPhysicalPlan
 
                 IntSet seenVectors = new IntArraySet();
 
-                TupleVectorBuilder nonMatchedBuilder = null;
+                ITupleVectorBuilder nonMatchedBuilder = null;
                 for (HashValue value : table.values())
                 {
                     for (HashValueBucket bucket : value.buckets)
@@ -1151,7 +1168,8 @@ public class HashMatch implements IPhysicalPlan
 
                         if (nonMatchedBuilder == null)
                         {
-                            nonMatchedBuilder = new TupleVectorBuilder(((ExecutionContext) context).getBufferAllocator(), size);
+                            nonMatchedBuilder = context.getVectorFactory()
+                                    .getTupleVectorBuilder(size);
                         }
                         nonMatchedBuilder.append(vectorToAppend, bucket.matchedSet);
                     }
@@ -1217,7 +1235,8 @@ public class HashMatch implements IPhysicalPlan
                 int size = outerMatchedFilter == null ? vector.getRowCount()
                         : outerMatchedFilter.cardinality();
 
-                TupleVectorBuilder nonMatchedBuilder = new TupleVectorBuilder(((ExecutionContext) context).getBufferAllocator(), size);
+                ITupleVectorBuilder nonMatchedBuilder = context.getVectorFactory()
+                        .getTupleVectorBuilder(size);
                 // No matches for probed vector => return whole vector
                 if (outerMatchedFilter == null)
                 {

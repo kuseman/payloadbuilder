@@ -57,6 +57,8 @@ import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.ExpressionMath;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
+import se.kuseman.payloadbuilder.core.execution.vector.BufferAllocator;
+import se.kuseman.payloadbuilder.core.execution.vector.VectorFactory;
 import se.kuseman.payloadbuilder.core.test.AObjectOutputWriter.ColumnValue;
 
 /** Harness runner test */
@@ -164,6 +166,9 @@ public class TestHarnessRunner
                 .get(0)
                 .getAlias());
 
+        VectorFactory vectorFactory = new VectorFactory(new BufferAllocator());
+        session.setVectorFactory(vectorFactory);
+
         TimeZone defaultTimezone = TimeZone.getDefault();
         boolean fail = false;
         try
@@ -214,6 +219,8 @@ public class TestHarnessRunner
         finally
         {
             TimeZone.setDefault(defaultTimezone);
+
+            vectorFactory.printAllocationInformation();
         }
 
         int size = testCase.getExpectedResultSets()

@@ -5,7 +5,6 @@ import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
 import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.LinkedHashMap;
@@ -20,7 +19,6 @@ import java.util.function.BiFunction;
 import org.apache.commons.lang3.time.DurationFormatUtils;
 
 import se.kuseman.payloadbuilder.api.catalog.Column;
-import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -29,12 +27,12 @@ import se.kuseman.payloadbuilder.api.execution.NodeData;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.ITupleVectorBuilder;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
-import se.kuseman.payloadbuilder.core.execution.vector.TupleVectorBuilder;
 
 /**
  * Nested loop implementation of a physical plan
@@ -441,7 +439,8 @@ public class NestedLoop implements IPhysicalPlan
                         {
                             time = System.nanoTime();
                             // Build a matching vector from cartesian and filter
-                            TupleVectorBuilder b = new TupleVectorBuilder(executionContext.getBufferAllocator(), cardinality);
+                            ITupleVectorBuilder b = context.getVectorFactory()
+                                    .getTupleVectorBuilder(cardinality);
                             b.append(cartesian, filter);
 
                             // Mark matched outer rows
@@ -601,7 +600,7 @@ public class NestedLoop implements IPhysicalPlan
             if (concatOfInner == null
                     && !pushOuterReference)
             {
-                concatOfInner = PlanUtils.concat(context.getBufferAllocator(), inner.execute(context));
+                concatOfInner = PlanUtils.concat(context, inner.execute(context));
                 int rowCount = concatOfInner.getRowCount();
                 if (rowCount == 0
                         && !emitEmptyOuterRows)
@@ -685,7 +684,7 @@ public class NestedLoop implements IPhysicalPlan
                         ctx.getStatementContext()
                                 .setIndexSeekTupleVector(currentOuter);
 
-                        concatOfInner = PlanUtils.concat(context.getBufferAllocator(), inner.execute(ctx));
+                        concatOfInner = PlanUtils.concat(context, inner.execute(ctx));
 
                         int rowCount = concatOfInner.getRowCount();
                         if (rowCount == 0)
@@ -726,8 +725,9 @@ public class NestedLoop implements IPhysicalPlan
                     }
                     else
                     {
-                        TupleVectorBuilder b = new TupleVectorBuilder(context.getBufferAllocator(), currentOuter.getRowCount());
-                        b.appendPopulate(filter, currentOuter, concatOfInner, populateAlias);
+                        ITupleVectorBuilder b = context.getVectorFactory()
+                                .getTupleVectorBuilder(currentOuter.getRowCount());
+                        b.appendPopulate(currentOuter, concatOfInner, filter, populateAlias);
                         if (unmatched != null)
                         {
                             b.append(unmatched);
@@ -865,7 +865,7 @@ public class NestedLoop implements IPhysicalPlan
                     outerMatches = new BitSet(rowCount);
                 }
                 // CSOFF
-                TupleVectorBuilder builder = null;
+                ITupleVectorBuilder builder = null;
                 // CSON
 
                 rowTupleVector.sealed = false;
@@ -897,7 +897,7 @@ public class NestedLoop implements IPhysicalPlan
 
                     if (populateAlias != null)
                     {
-                        TupleVector concatOfInner = PlanUtils.concat(executionContext.getBufferAllocator(), innerIt);
+                        TupleVector concatOfInner = PlanUtils.concat(executionContext, innerIt);
                         if (concatOfInner.getRowCount() > 0)
                         {
                             // Use the first vectors schema as inner
@@ -914,7 +914,8 @@ public class NestedLoop implements IPhysicalPlan
                             matched = true;
                             if (builder == null)
                             {
-                                builder = new TupleVectorBuilder(executionContext.getBufferAllocator(), rowCount);
+                                builder = context.getVectorFactory()
+                                        .getTupleVectorBuilder(rowCount);
                             }
 
                             builder.append(VectorUtils.populateCartesian(rowTupleVector, concatOfInner, populateAlias));
@@ -946,30 +947,13 @@ public class NestedLoop implements IPhysicalPlan
 
                                     cartesian.init(rowTupleVector, inner, isAsteriskSchema, cartesianSchema);
 
-                                    // Special case for a one row result, then we avoid creating builders
-                                    // that will turn into literals anyways
-                                    if (next == null
-                                            && builder == null
-                                            && rowCount == 1
-                                            && innerRowCount == 1)
+                                    if (builder == null)
                                     {
-                                        next = copyRow(cartesian.getSchema(), currentOuter, inner, i, 0);
+                                        builder = context.getVectorFactory()
+                                                .getTupleVectorBuilder((int) (rowCount * inner.getRowCount() * 1.1));
                                     }
-                                    else
-                                    {
-                                        if (builder == null)
-                                        {
-                                            builder = new TupleVectorBuilder(executionContext.getBufferAllocator(), (int) (rowCount * inner.getRowCount() * 1.1));
-                                        }
 
-                                        if (next != null)
-                                        {
-                                            builder.append(next);
-                                            next = null;
-                                        }
-
-                                        builder.append(cartesian);
-                                    }
+                                    builder.append(cartesian);
                                     nodeData.tupleBuildTime += TimeUnit.MILLISECONDS.convert(System.nanoTime() - time, TimeUnit.NANOSECONDS);
                                 }
                             }
@@ -986,7 +970,9 @@ public class NestedLoop implements IPhysicalPlan
                     }
                 }
 
+                // CSOFF
                 long time = System.nanoTime();
+                // CSON
 
                 TupleVector unmatchedOuter = emitEmptyOuterRows ? createUnmatchedOuterTuple(context, innerSchema, outerMatches, currentOuter)
                         : null;
@@ -1011,58 +997,10 @@ public class NestedLoop implements IPhysicalPlan
                     }
                 }
                 currentOuter = null;
-
                 nodeData.tupleBuildTime += TimeUnit.MILLISECONDS.convert(System.nanoTime() - time, TimeUnit.NANOSECONDS);
             }
 
             return true;
-        }
-
-        /** Copipes one row from each vector into a resulting tuple vector. */
-        private TupleVector copyRow(Schema resultSchema, TupleVector outer, TupleVector inner, int outerRow, int innerRow)
-        {
-            int size = resultSchema.getSize();
-            int outerSize = outer.getSchema()
-                    .getSize();
-            List<ValueVector> vectors = new ArrayList<>(size);
-            for (int i = 0; i < size; i++)
-            {
-                boolean isOuter = i < outerSize;
-                ValueVector vector = isOuter ? outer.getColumn(i)
-                        : inner.getColumn(i - outerSize);
-                int row = isOuter ? outerRow
-                        : innerRow;
-
-                Type type = vector.type()
-                        .getType();
-                ResolvedType schemaType = resultSchema.getColumns()
-                        .get(i)
-                        .getType();
-                if (vector.isNull(row))
-                {
-                    vectors.add(ValueVector.literalNull(schemaType, 1));
-                    continue;
-                }
-
-                vectors.add(switch (type)
-                {
-                    case Any -> ValueVector.literalAny(1, vector.getAny(row));
-                    case Array -> ValueVector.literalArray(vector.getArray(row), schemaType, 1);
-                    case Boolean -> ValueVector.literalBoolean(vector.getBoolean(row), 1);
-                    case DateTime -> vector.getDateTime(row);
-                    case DateTimeOffset -> vector.getDateTimeOffset(row);
-                    case Decimal -> vector.getDecimal(row);
-                    case String -> vector.getString(row);
-                    case Double -> ValueVector.literalDouble(vector.getDouble(row), 1);
-                    case Float -> ValueVector.literalFloat(vector.getFloat(row), 1);
-                    case Int -> ValueVector.literalInt(vector.getInt(row), 1);
-                    case Long -> ValueVector.literalLong(vector.getLong(row), 1);
-                    case Object -> ValueVector.literalObject(vector.getObject(row), 1);
-                    case Table -> ValueVector.literalTable(vector.getTable(row), schemaType, 1);
-                });
-            }
-
-            return TupleVector.of(resultSchema, vectors);
         }
     }
 
@@ -1087,8 +1025,9 @@ public class NestedLoop implements IPhysicalPlan
         }
         else
         {
-            // Build an outer vector with un matched rows
-            TupleVectorBuilder b = new TupleVectorBuilder(context.getBufferAllocator(), cardinality);
+            // Build an outer vector with unmatched rows
+            ITupleVectorBuilder b = context.getVectorFactory()
+                    .getTupleVectorBuilder(cardinality);
             b.append(outer, outerMatches);
             unmatchedOuter = b.build();
         }
@@ -1096,16 +1035,17 @@ public class NestedLoop implements IPhysicalPlan
         Schema s = this.schema;
         if (this.isAsteriskSchema)
         {
-            // If the inner schema is asterisk then just return the outer vector
+            // If the inner schema is asterisk then just return the unmatched outer vector
+            // We do this if we have a non populated join because a populated join has an inner schema
+            // even if we have an asterisk query
             if (populateAlias == null
-                    && SchemaUtils.isAsterisk(innerSchema))
+                    && SchemaUtils.isAsterisk(innerSchema, false))
             {
-                return outer;
+                return unmatchedOuter;
             }
 
             s = SchemaUtils.joinSchema(outer.getSchema(), innerSchema, populateAlias);
         }
-
         Schema schema = s;
         final int outerSize = outer.getSchema()
                 .getSize();

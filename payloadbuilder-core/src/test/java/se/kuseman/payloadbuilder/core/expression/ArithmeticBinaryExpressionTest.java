@@ -100,6 +100,9 @@ public class ArithmeticBinaryExpressionTest extends APhysicalPlanTest
 
         e = new ArithmeticBinaryExpression(IArithmeticBinaryExpression.Type.ADD, new LiteralIntegerExpression(10), new LiteralDecimalExpression(Decimal.from(10))).fold();
         assertEquals(new LiteralDecimalExpression(Decimal.from(20)), e);
+
+        e = new ArithmeticBinaryExpression(IArithmeticBinaryExpression.Type.ADD, new LiteralNullExpression(ResolvedType.of(Type.Float)), intLit(10)).fold();
+        assertEquals(e, new LiteralNullExpression(ResolvedType.of(Type.Float)));
     }
 
     @Test

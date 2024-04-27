@@ -12,7 +12,7 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IBooleanVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.ILikeExpression;
@@ -106,8 +106,8 @@ public class LikeExpression implements ILikeExpression, Invertable
 
         int rowCount = input.getRowCount();
 
-        IBooleanVectorBuilder builder = context.getVectorBuilderFactory()
-                .getBooleanVectorBuilder(rowCount);
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(ResolvedType.of(Type.Boolean), rowCount);
 
         for (int i = 0; i < rowCount; i++)
         {
@@ -120,7 +120,7 @@ public class LikeExpression implements ILikeExpression, Invertable
 
             if (value.isNull(i))
             {
-                builder.putNull();
+                resultVector.setNull(i);
                 continue;
             }
 
@@ -129,10 +129,10 @@ public class LikeExpression implements ILikeExpression, Invertable
             boolean result = currentPattern.matcher(matchValue)
                     .find();
 
-            builder.put(not ? !result
+            resultVector.setBoolean(i, not ? !result
                     : result);
         }
-        return builder.build();
+        return resultVector;
     }
 
     private Pattern create(String pattern)

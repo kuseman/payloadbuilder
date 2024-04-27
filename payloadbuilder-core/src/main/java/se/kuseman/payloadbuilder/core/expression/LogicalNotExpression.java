@@ -10,7 +10,7 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IBooleanVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.ILogicalNotExpression;
@@ -54,9 +54,9 @@ public class LogicalNotExpression implements ILogicalNotExpression, Invertable
             return !vector.getBoolean(0) ? LiteralBooleanExpression.TRUE
                     : LiteralBooleanExpression.FALSE;
         }
-        else if (expression instanceof Invertable)
+        else if (expression instanceof Invertable i)
         {
-            return ((Invertable) expression).getInvertedExpression();
+            return i.getInvertedExpression();
         }
         return this;
     }
@@ -67,23 +67,23 @@ public class LogicalNotExpression implements ILogicalNotExpression, Invertable
         ValueVector vector = expression.eval(input, context);
 
         int rowCount = input.getRowCount();
-        IBooleanVectorBuilder builder = context.getVectorBuilderFactory()
-                .getBooleanVectorBuilder(rowCount);
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(ResolvedType.of(Type.Boolean), rowCount);
 
         for (int i = 0; i < rowCount; i++)
         {
             boolean isNull = vector.isNull(i);
             if (isNull)
             {
-                builder.putNull();
+                resultVector.setNull(i);
             }
             else
             {
-                builder.put(!vector.getBoolean(i));
+                resultVector.setBoolean(i, !vector.getBoolean(i));
             }
         }
 
-        return builder.build();
+        return resultVector;
     }
 
     @Override

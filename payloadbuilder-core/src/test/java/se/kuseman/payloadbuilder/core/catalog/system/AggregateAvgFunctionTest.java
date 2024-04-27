@@ -5,6 +5,7 @@ import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import org.junit.Test;
 
@@ -31,27 +32,23 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     @Test
     public void test_object()
     {
-        ValueVector one = ValueVector.literalAny(10, 20, -20F, -200D);
-        ValueVector two = ValueVector.literalAny(4, 10_000_000);
-        ValueVector three = ValueVector.literalNull(ResolvedType.of(Type.Any), 4);
-        ValueVector four = ValueVector.literalAny(new BigDecimal("100.10"), new BigDecimal("-200.10"), new BigDecimal("2000.10"));
-
-        Schema schema = schema(new Type[] { Type.Any }, "col1");
-
         //@formatter:off
-        ValueVector v = ValueVector.literalTable(
-                TupleVector.of(schema, asList(one)),
-                TupleVector.of(schema, asList(two)),
-                TupleVector.of(schema, asList(three)),
-                TupleVector.of(schema, asList(four)));
+        ValueVector one = ValueVector.literalAny(
+                10, 20, -20F, -200D,
+                10_000_000,10_000_000,10_000_000,10_000_000,
+                null,null,null,null,
+                new BigDecimal("100.10"), new BigDecimal("-200.10"), new BigDecimal("2000.10"), null
+                );
+
+        TupleVector input = TupleVector.of(Schema.of(Column.of("col1", Type.Any)), List.of(one));
         
         IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
-        aggregator.appendGroup(TupleVector.of(Schema.of(
-                Column.of("groupTables", ResolvedType.table(schema)),
-                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
-                        v,
-                        vv(Type.Int, 0, 1, 2, 3)
-                        )), context);
+        aggregator.appendGroup(input, vv(Type.Int, 0, 1, 2, 3), vv(ResolvedType.array(Type.Int),
+                vv(Type.Int, 0, 1, 2, 3),
+                vv(Type.Int, 4, 5, 6, 7),
+                vv(Type.Int, 8, 9, 10, 11),
+                vv(Type.Int, 12, 13, 14, 15)),
+                context);
         //@formatter:on
 
         ValueVector actual = aggregator.combine(context);
@@ -63,34 +60,30 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     @Test
     public void test_object_multi_vector()
     {
-        ValueVector one = ValueVector.literalAny(10, 20, -20F, -200D);
-        ValueVector two = ValueVector.literalAny(4, 10_000_000);
-        ValueVector three = ValueVector.literalNull(ResolvedType.of(Type.Any), 4);
-        ValueVector four = ValueVector.literalAny(new BigDecimal("100.10"), new BigDecimal("-200.10"), new BigDecimal("2000.10"));
-
-        Schema schema = schema(new Type[] { Type.Any }, "col1");
-
         //@formatter:off
-        ValueVector v = ValueVector.literalTable(
-                TupleVector.of(schema, asList(one)),
-                TupleVector.of(schema, asList(two)),
-                TupleVector.of(schema, asList(three)),
-                TupleVector.of(schema, asList(four)));
+        ValueVector one = ValueVector.literalAny(
+                10, 20, -20F, -200D,
+                10_000_000,10_000_000,10_000_000,10_000_000,
+                null,null,null,null,
+                new BigDecimal("100.10"), new BigDecimal("-200.10"), new BigDecimal("2000.10"), null
+                );
+
+        TupleVector input = TupleVector.of(Schema.of(Column.of("col1", Type.Any)), List.of(one));
         
         IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
-        aggregator.appendGroup(TupleVector.of(Schema.of(
-                Column.of("groupTables", ResolvedType.table(schema)),
-                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
-                        v,
-                        vv(Type.Int, 0, 1, 2, 3)
-                        )), context);
+        aggregator.appendGroup(input, vv(Type.Int, 0, 1, 2, 3), vv(ResolvedType.array(Type.Int),
+                vv(Type.Int, 0, 1, 2, 3),
+                vv(Type.Int, 4, 5, 6, 7),
+                vv(Type.Int, 8, 9, 10, 11),
+                vv(Type.Int, 12, 13, 14, 15)),
+                context);
         
-        aggregator.appendGroup(TupleVector.of(Schema.of(
-                Column.of("groupTables", ResolvedType.table(schema)),
-                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
-                        v,
-                        vv(Type.Int, 3, 1, 0, 4)
-                        )), context);
+        aggregator.appendGroup(input, vv(Type.Int, 3, 1, 0, 4), vv(ResolvedType.array(Type.Int),
+                vv(Type.Int, 0, 1, 2, 3),
+                vv(Type.Int, 4, 5, 6, 7),
+                vv(Type.Int, 8, 9, 10, 11),
+                vv(Type.Int, 12, 13, 14, 15)),
+                context);
         //@formatter:on
 
         ValueVector actual = aggregator.combine(context);
@@ -102,27 +95,22 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     @Test
     public void test_decimal()
     {
-        ValueVector one = ValueVector.literalDecimal(Decimal.from("10.00"), Decimal.from(20), Decimal.from(-20F), Decimal.from(-200D));
-        ValueVector two = ValueVector.literalDecimal(Decimal.from(10_000_000), 4);
-        ValueVector three = ValueVector.literalNull(ResolvedType.of(Type.Decimal), 4);
-        ValueVector four = ValueVector.literalDecimal(Decimal.from(new BigDecimal("100.10")), Decimal.from(new BigDecimal("-200.10")), Decimal.from(new BigDecimal("2000.10")));
-
-        Schema schema = schema(new Type[] { Type.Decimal }, "col1");
-
         //@formatter:off
-        ValueVector v = ValueVector.literalTable(
-                TupleVector.of(schema, asList(one)),
-                TupleVector.of(schema, asList(two)),
-                TupleVector.of(schema, asList(three)),
-                TupleVector.of(schema, asList(four)));
-        
+        ValueVector one = ValueVector.literalDecimal(
+                Decimal.from("10.00"), Decimal.from(20), Decimal.from(-20F), Decimal.from(-200D),
+                Decimal.from(10_000_000),Decimal.from(10_000_000),Decimal.from(10_000_000),Decimal.from(10_000_000),
+                null,null,null,null,
+                Decimal.from(new BigDecimal("100.10")), Decimal.from(new BigDecimal("-200.10")), Decimal.from(new BigDecimal("2000.10")), null
+                );
+
+        TupleVector input = TupleVector.of(Schema.of(Column.of("col1", Type.Decimal)), List.of(one));
         IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
-        aggregator.appendGroup(TupleVector.of(Schema.of(
-                Column.of("groupTables", ResolvedType.table(schema)),
-                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
-                        v,
-                        vv(Type.Int, 0, 1, 2, 3)
-                        )), context);
+        aggregator.appendGroup(input, vv(Type.Int, 0, 1, 2, 3), vv(ResolvedType.array(Type.Int),
+                vv(Type.Int, 0, 1, 2, 3),
+                vv(Type.Int, 4, 5, 6, 7),
+                vv(Type.Int, 8, 9, 10, 11),
+                vv(Type.Int, 12, 13, 14, 15)),
+                context);
         //@formatter:on
 
         ValueVector actual = aggregator.combine(context);
@@ -134,34 +122,28 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     @Test
     public void test_decimal_multi_vector()
     {
-        ValueVector one = ValueVector.literalDecimal(Decimal.from("10.00"), Decimal.from(20), Decimal.from(-20F), Decimal.from(-200D));
-        ValueVector two = ValueVector.literalDecimal(Decimal.from(10_000_000), 4);
-        ValueVector three = ValueVector.literalNull(ResolvedType.of(Type.Decimal), 4);
-        ValueVector four = ValueVector.literalDecimal(Decimal.from(new BigDecimal("100.10")), Decimal.from(new BigDecimal("-200.10")), Decimal.from(new BigDecimal("2000.10")));
-
-        Schema schema = schema(new Type[] { Type.Decimal }, "col1");
-
         //@formatter:off
-        ValueVector v = ValueVector.literalTable(
-                TupleVector.of(schema, asList(one)),
-                TupleVector.of(schema, asList(two)),
-                TupleVector.of(schema, asList(three)),
-                TupleVector.of(schema, asList(four)));
-        
+        ValueVector one = ValueVector.literalDecimal(
+                Decimal.from("10.00"), Decimal.from(20), Decimal.from(-20F), Decimal.from(-200D),
+                Decimal.from(10_000_000),Decimal.from(10_000_000),Decimal.from(10_000_000),Decimal.from(10_000_000),
+                null,null,null,null,
+                Decimal.from(new BigDecimal("100.10")), Decimal.from(new BigDecimal("-200.10")), Decimal.from(new BigDecimal("2000.10")), null
+                );
+
+        TupleVector input = TupleVector.of(Schema.of(Column.of("col1", Type.Decimal)), List.of(one));
         IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
-        aggregator.appendGroup(TupleVector.of(Schema.of(
-                Column.of("groupTables", ResolvedType.table(schema)),
-                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
-                        v,
-                        vv(Type.Int, 0, 1, 2, 3)
-                        )), context);
-        
-        aggregator.appendGroup(TupleVector.of(Schema.of(
-                Column.of("groupTables", ResolvedType.table(schema)),
-                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
-                        v,
-                        vv(Type.Int, 3, 2, 0, 1)
-                        )), context);
+        aggregator.appendGroup(input, vv(Type.Int, 0, 1, 2, 3), vv(ResolvedType.array(Type.Int),
+                vv(Type.Int, 0, 1, 2, 3),
+                vv(Type.Int, 4, 5, 6, 7),
+                vv(Type.Int, 8, 9, 10, 11),
+                vv(Type.Int, 12, 13, 14, 15)),
+                context);
+        aggregator.appendGroup(input, vv(Type.Int, 3, 2, 0, 1), vv(ResolvedType.array(Type.Int),
+                vv(Type.Int, 0, 1, 2, 3),
+                vv(Type.Int, 4, 5, 6, 7),
+                vv(Type.Int, 8, 9, 10, 11),
+                vv(Type.Int, 12, 13, 14, 15)),
+                context);
         //@formatter:on
 
         ValueVector actual = aggregator.combine(context);
@@ -173,25 +155,20 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     @Test
     public void test_int()
     {
-        ValueVector smallInts = vv(Type.Int, -10, 30, 200, -200);
-        ValueVector mediumInts = ValueVector.literalInt(10_000_000, 4);
-        ValueVector nulls = ValueVector.literalNull(ResolvedType.of(Type.Int), 4);
-
-        Schema schema = schema(new Type[] { Type.Int }, "col1");
-
         //@formatter:off
-        ValueVector v = ValueVector.literalTable(
-                TupleVector.of(schema, asList(smallInts)),
-                TupleVector.of(schema, asList(mediumInts)),
-                TupleVector.of(schema, asList(nulls)));
-        
+        ValueVector one = vv(Type.Int,
+                -10, 30, 200, -200,
+                10_000_000,10_000_000,10_000_000,10_000_000,
+                null,null,null,null
+                );
+
+        TupleVector input = TupleVector.of(Schema.of(Column.of("col1", Type.Int)), List.of(one));
         IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
-        aggregator.appendGroup(TupleVector.of(Schema.of(
-                Column.of("groupTables", ResolvedType.table(schema)),
-                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
-                        v,
-                        vv(Type.Int, 0, 1, 2)
-                        )), context);
+        aggregator.appendGroup(input, vv(Type.Int, 0, 1, 2), vv(ResolvedType.array(Type.Int),
+                vv(Type.Int, 0, 1, 2, 3),
+                vv(Type.Int, 4, 5, 6, 7),
+                vv(Type.Int, 8, 9, 10, 11)),
+                context);
         //@formatter:on
 
         ValueVector actual = aggregator.combine(context);
@@ -203,25 +180,20 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     @Test
     public void test_long()
     {
-        ValueVector smallLongs = vv(Type.Long, 10L, -1L, 100L, -200L);
-        ValueVector mediumLongs = ValueVector.literalLong(10_000_000L, 4);
-        ValueVector nulls = ValueVector.literalNull(ResolvedType.of(Type.Long), 4);
-
-        Schema schema = schema(new Type[] { Type.Long }, "col1");
-
         //@formatter:off
-        ValueVector v = ValueVector.literalTable(
-                TupleVector.of(schema, asList(smallLongs)),
-                TupleVector.of(schema, asList(mediumLongs)),
-                TupleVector.of(schema, asList(nulls)));
+        ValueVector one = vv(Type.Long,
+                10L, -1L, 100L, -200L,
+                10_000_000,10_000_000,10_000_000,10_000_000,
+                null,null,null,null
+                );
 
+        TupleVector input = TupleVector.of(Schema.of(Column.of("col1", Type.Long)), List.of(one));
         IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
-        aggregator.appendGroup(TupleVector.of(Schema.of(
-                Column.of("groupTables", ResolvedType.table(schema)),
-                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
-                        v,
-                        vv(Type.Int, 0, 1, 2)
-                        )), context);
+        aggregator.appendGroup(input, vv(Type.Int, 0, 1, 2), vv(ResolvedType.array(Type.Int),
+                vv(Type.Int, 0, 1, 2, 3),
+                vv(Type.Int, 4, 5, 6, 7),
+                vv(Type.Int, 8, 9, 10, 11)),
+                context);
         //@formatter:on
 
         ValueVector actual = aggregator.combine(context);
@@ -265,28 +237,23 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     @Test
     public void test_float()
     {
-        ValueVector one = vv(Type.Float, 10F, -1F, 100F, -200F);
-        ValueVector two = ValueVector.literalFloat(10, 4);
-        ValueVector three = ValueVector.literalFloat(10_000_000, 4);
-        ValueVector nulls = ValueVector.literalNull(ResolvedType.of(Type.Float), 4);
-
-        Schema schema = schema(new Type[] { Type.Float }, "col1");
-
         //@formatter:off
-        ValueVector v = ValueVector.literalTable(
-                TupleVector.of(schema, asList(one)),
-                TupleVector.of(schema, asList(two)),
-                TupleVector.of(schema, asList(three)),
-                TupleVector.of(schema, asList(nulls)));
-        
+        ValueVector one = vv(Type.Float,
+                10F, -1F, 100F, -200F,
+                10,10,10,10,
+                10_000_000,10_000_000,10_000_000,10_000_000,
+                null,null,null,null
+                );
+
+        TupleVector input = TupleVector.of(Schema.of(Column.of("col1", Type.Float)), List.of(one));
         IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
-        aggregator.appendGroup(TupleVector.of(Schema.of(
-                Column.of("groupTables", ResolvedType.table(schema)),
-                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
-                        v,
-                        vv(Type.Int, 0, 1, 2, 3)
-                        )), context);
-      //@formatter:on
+        aggregator.appendGroup(input, vv(Type.Int, 0, 1, 2, 3), vv(ResolvedType.array(Type.Int),
+                vv(Type.Int, 0, 1, 2, 3),
+                vv(Type.Int, 4, 5, 6, 7),
+                vv(Type.Int, 8, 9, 10, 11),
+                vv(Type.Int, 12, 13, 14, 15)),
+                context);
+        //@formatter:on
 
         ValueVector actual = aggregator.combine(context);
         assertEquals(ResolvedType.of(Type.Float), actual.type());
@@ -297,27 +264,22 @@ public class AggregateAvgFunctionTest extends APhysicalPlanTest
     @Test
     public void test_double()
     {
-        ValueVector one = vv(Type.Double, 10D, -1D, 100D, -200D);
-        ValueVector two = ValueVector.literalDouble(10, 4);
-        ValueVector three = ValueVector.literalDouble(10_000_000, 4);
-        ValueVector nulls = ValueVector.literalNull(ResolvedType.of(Type.Double), 4);
-
-        Schema schema = schema(new Type[] { Type.Double }, "col1");
-
         //@formatter:off
-        ValueVector v = ValueVector.literalTable(
-                TupleVector.of(schema, asList(one)),
-                TupleVector.of(schema, asList(two)),
-                TupleVector.of(schema, asList(three)),
-                TupleVector.of(schema, asList(nulls)));
-        
+        ValueVector one = vv(Type.Double,
+                10D, -1D, 100D, -200D,
+                10,10,10,10,
+                10_000_000,10_000_000,10_000_000,10_000_000,
+                null,null,null,null
+                );
+
+        TupleVector input = TupleVector.of(Schema.of(Column.of("col1", Type.Double)), List.of(one));
         IAggregator aggregator = function.createAggregator(AggregateMode.ALL, "", asList(col1));
-        aggregator.appendGroup(TupleVector.of(Schema.of(
-                Column.of("groupTables", ResolvedType.table(schema)),
-                Column.of("groupIds", ResolvedType.of(Type.Int))), asList(
-                        v,
-                        vv(Type.Int, 0, 1, 2, 3)
-                        )), context);
+        aggregator.appendGroup(input, vv(Type.Int, 0, 1, 2, 3), vv(ResolvedType.array(Type.Int),
+                vv(Type.Int, 0, 1, 2, 3),
+                vv(Type.Int, 4, 5, 6, 7),
+                vv(Type.Int, 8, 9, 10, 11),
+                vv(Type.Int, 12, 13, 14, 15)),
+                context);
         //@formatter:on
 
         ValueVector actual = aggregator.combine(context);

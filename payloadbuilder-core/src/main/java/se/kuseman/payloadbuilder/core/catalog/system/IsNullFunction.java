@@ -7,7 +7,7 @@ import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.execution.vector.IValueVectorBuilder;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Returns first item if not null else second item */
@@ -56,8 +56,9 @@ class IsNullFunction extends ScalarFunctionInfo
 
         ResolvedType type = getType(arguments);
         int rowCount = input.getRowCount();
-        IValueVectorBuilder builder = context.getVectorBuilderFactory()
-                .getValueVectorBuilder(type, rowCount);
+        MutableValueVector resultVector = context.getVectorFactory()
+                .getMutableVector(type, rowCount);
+
         for (int i = 0; i < rowCount; i++)
         {
             if (value.isNull(i))
@@ -67,13 +68,13 @@ class IsNullFunction extends ScalarFunctionInfo
                     arg1 = arguments.get(1)
                             .eval(input, context);
                 }
-                builder.put(arg1, i);
+                resultVector.copy(i, arg1, i);
             }
             else
             {
-                builder.put(value, i);
+                resultVector.copy(i, value, i);
             }
         }
-        return builder.build();
+        return resultVector;
     }
 }

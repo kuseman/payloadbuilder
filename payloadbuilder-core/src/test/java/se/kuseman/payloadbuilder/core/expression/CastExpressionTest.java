@@ -87,7 +87,7 @@ public class CastExpressionTest extends APhysicalPlanTest
         catch (IllegalArgumentException e)
         {
             assertTrue(e.getMessage(), e.getMessage()
-                    .contains("Cannot cast type DateTime to Int"));
+                    .contains("Cannot cast [2010-10-10T00:00:00] (DateTime) to Int"));
         }
 
         ce = new CastExpression(ce("stringInt"), ResolvedType.of(Type.Int));
