@@ -80,6 +80,10 @@ public class Sort implements IPhysicalPlan
         {
             return TupleIterator.EMPTY;
         }
+        else if (all.getRowCount() == 1)
+        {
+            return TupleIterator.singleton(all);
+        }
 
         final int itemSize = sortItems.size();
         final ValueVector[] expressionVectors = new ValueVector[itemSize];
@@ -225,9 +229,8 @@ public class Sort implements IPhysicalPlan
         {
             return true;
         }
-        else if (obj instanceof Sort)
+        else if (obj instanceof Sort that)
         {
-            Sort that = (Sort) obj;
             return nodeId == that.nodeId
                     && input.equals(that.input)
                     && sortItems.equals(that.sortItems);

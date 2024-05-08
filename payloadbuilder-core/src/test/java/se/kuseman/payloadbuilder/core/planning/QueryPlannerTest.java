@@ -36,7 +36,6 @@ import se.kuseman.payloadbuilder.api.catalog.ISortItem.NullOrder;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
 import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.Index.ColumnsType;
-import se.kuseman.payloadbuilder.api.catalog.Index.IndexType;
 import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
@@ -1489,7 +1488,8 @@ public class QueryPlannerTest extends APhysicalPlanTest
         Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
         
         SeekPredicate expectedSeekPredicate = new SeekPredicate(
-                new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), IndexType.SEEK_EQ, asList("col"), asList(cre("col", tableA)));
+                new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), List.of(
+                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(cre("col", tableA)))));
         
         IPhysicalPlan expected = new HashMatch(
                 3,
@@ -1519,6 +1519,351 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
+    public void test_that_not_in_expression_isnt_used_as_indexed_predicate_push_down()
+    {
+        //@formatter:off
+        String query = ""
+                + "select * "
+                + "from tableB b "
+                + "where col not in (1,2,3) ";
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap())
+        {
+            @Override
+            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            {
+                if (table.toString()
+                        .equalsIgnoreCase("tableB"))
+                {
+                    return new TableSchema(Schema.EMPTY, asList(new Index(table, asList("col"), ColumnsType.ANY_IN_ORDER)));
+                }
+                return super.getTableSchema(session, catalogAlias, table, options);
+            }
+        };
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
+                .get(0)).getSelect();
+
+        TableSourceReference tableB = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
+
+        //@formatter:off
+        Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
+
+        IPhysicalPlan expected =
+                new Filter(
+                    1,
+                    new TableScan(0, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(0), emptyList()),
+                    new ExpressionPredicate(in(cre("col", tableB), asList(intLit(1), intLit(2), intLit(3)), true)));
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_that_not_equal_isnt_used_as_indexed_predicate_push_down()
+    {
+        //@formatter:off
+        String query = ""
+                + "select * "
+                + "from tableB b "
+                + "where col != 3 ";
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(emptyMap())
+        {
+            @Override
+            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            {
+                if (table.toString()
+                        .equalsIgnoreCase("tableB"))
+                {
+                    return new TableSchema(Schema.EMPTY, asList(new Index(table, asList("col"), ColumnsType.ANY_IN_ORDER)));
+                }
+                return super.getTableSchema(session, catalogAlias, table, options);
+            }
+        };
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
+                .get(0)).getSelect();
+
+        TableSourceReference tableB = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
+
+        //@formatter:off
+        Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
+
+        IPhysicalPlan expected =
+                new Filter(
+                    1,
+                    new TableScan(0, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(0), emptyList()),
+                    new ExpressionPredicate(neq(cre("col", tableB), intLit(3))));
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_indexed_predicate_push_down_with_in_expression()
+    {
+        //@formatter:off
+        String query = ""
+                + "select * "
+                + "from tableB b "
+                + "where col in (1,2,3) ";
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(Map.of(QualifiedName.of("tableB"), Set.of("col", "col2")))
+        {
+            @Override
+            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            {
+                if (table.toString()
+                        .equalsIgnoreCase("tableB"))
+                {
+                    return new TableSchema(Schema.EMPTY, asList(new Index(table, asList("col"), ColumnsType.ANY_IN_ORDER)));
+                }
+                return super.getTableSchema(session, catalogAlias, table, options);
+            }
+        };
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
+                .get(0)).getSelect();
+
+        TableSourceReference tableB = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
+
+        //@formatter:off
+        Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
+
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(
+                new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), List.of(
+                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(intLit(1), intLit(2), intLit(3)))), true);
+
+        IPhysicalPlan expected = new IndexSeek(0, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList());
+        //@formatter:on
+
+        //@formatter:off
+        assertEquals(0, t.consumedPredicate.size());
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_indexed_predicate_push_down_with_in_expression_wildcard_index()
+    {
+        //@formatter:off
+        String query = ""
+                + "select * "
+                + "from tableB b "
+                + "where col in (1,2,3) ";
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(Map.of(QualifiedName.of("tableB"), Set.of("col", "col2")))
+        {
+            @Override
+            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            {
+                if (table.toString()
+                        .equalsIgnoreCase("tableB"))
+                {
+                    return new TableSchema(Schema.EMPTY, asList(new Index(table, emptyList(), ColumnsType.WILDCARD)));
+                }
+                return super.getTableSchema(session, catalogAlias, table, options);
+            }
+        };
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
+                .get(0)).getSelect();
+
+        TableSourceReference tableB = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
+
+        //@formatter:off
+        Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
+
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(
+                new Index(QualifiedName.of("tableB"), emptyList(), ColumnsType.WILDCARD), List.of(
+                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(intLit(1), intLit(2), intLit(3)))), true);
+
+        IPhysicalPlan expected = new IndexSeek(0, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList());
+        //@formatter:on
+
+        //@formatter:off
+        assertEquals(0, t.consumedPredicate.size());
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_indexed_predicate_push_down_with_equal_expression()
+    {
+        //@formatter:off
+        String query = ""
+                + "select * "
+                + "from tableB b "
+                + "where col = 3 "
+                + "and col2 = 10 ";
+        //@formatter:on
+
+        // NOTE! We consume col as predicate push down but the index should pick it up
+        TestCatalog t = new TestCatalog(Map.of(QualifiedName.of("tableB"), Set.of("col", "col2")))
+        {
+            @Override
+            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            {
+                if (table.toString()
+                        .equalsIgnoreCase("tableB"))
+                {
+                    return new TableSchema(Schema.EMPTY, asList(new Index(table, asList("col"), ColumnsType.ANY_IN_ORDER)));
+                }
+                return super.getTableSchema(session, catalogAlias, table, options);
+            }
+        };
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
+                .get(0)).getSelect();
+
+        TableSourceReference tableB = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
+
+        //@formatter:off
+        Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
+
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(
+                new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), List.of(
+                        new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(intLit(3)))
+                        ), true);
+
+        IPhysicalPlan expected = new IndexSeek(0, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList());
+        //@formatter:on
+
+        //@formatter:off
+        assertEquals(1, t.consumedPredicate.size());
+        assertEquals(asList(
+                Triple.of(QualifiedName.of("col2"), IPredicate.Type.COMPARISION, asList(intLit(10)))
+                ), t.consumedPredicate.get(QualifiedName.of("tableB")));
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_indexed_predicate_push_down_with_equal_expression_multi_column_index()
+    {
+        //@formatter:off
+        String query = ""
+                + "select * "
+                + "from tableB b "
+                + "where col = 3 "
+                + "and col2 = 10 ";
+        //@formatter:on
+
+        Index index = new Index(QualifiedName.of("tableB"), asList("col", "col2"), ColumnsType.ANY_IN_ORDER);
+
+        // NOTE! We consume col as predicate push down but the index should pick it up
+        TestCatalog t = new TestCatalog(Map.of(QualifiedName.of("tableB"), Set.of("col", "col2")))
+        {
+            @Override
+            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            {
+                if (table.toString()
+                        .equalsIgnoreCase("tableB"))
+                {
+                    return new TableSchema(Schema.EMPTY, asList(index));
+                }
+                return super.getTableSchema(session, catalogAlias, table, options);
+            }
+        };
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
+                .get(0)).getSelect();
+
+        TableSourceReference tableB = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
+
+        //@formatter:off
+        Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
+
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(index, List.of(
+                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(intLit(3))),
+                new SeekPredicate.SeekPredicateItem("col2", cre("col2", tableB), List.of(intLit(10)))
+                ), true);
+
+        IPhysicalPlan expected = new IndexSeek(0, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList());
+        //@formatter:on
+
+        //@formatter:off
+        assertEquals(0, t.consumedPredicate.size());
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
     public void test_indexed_join_with_force_nested_loop()
     {
         //@formatter:off
@@ -1529,7 +1874,6 @@ public class QueryPlannerTest extends APhysicalPlanTest
                 + "  on b.col = a.col "
                 + "  and a.active "
                 + "  and b.active ";
-               
         //@formatter:on
 
         TestCatalog t = new TestCatalog(emptyMap())
@@ -1561,9 +1905,10 @@ public class QueryPlannerTest extends APhysicalPlanTest
         //@formatter:off
         Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
         Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
-        
+
         SeekPredicate expectedSeekPredicate = new SeekPredicate(
-                new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), IndexType.SEEK_EQ, asList("col"), asList(cre("col", tableA)));
+                new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), List.of(
+                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(cre("col", tableA)))));
         
         IPhysicalPlan expected = NestedLoop.leftJoin(
                 3,
@@ -1633,10 +1978,12 @@ public class QueryPlannerTest extends APhysicalPlanTest
         Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
         Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
 
-        SeekPredicate expectedSeekPredicate = new SeekPredicate(new Index(QualifiedName.of("tableB"), asList("col", "active"), ColumnsType.ALL), IndexType.SEEK_EQ, asList("col", "active"),
-                asList(cre("col", tableA), cre("active", tableA)));
-
         //@formatter:off
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(
+                new Index(QualifiedName.of("tableB"), asList("col", "active"), ColumnsType.ALL), List.of(
+                    new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(cre("col", tableA))),
+                    new SeekPredicate.SeekPredicateItem("active", cre("active", tableB), List.of(cre("active", tableA)))));
+
         IPhysicalPlan expected = new HashMatch(
                 2,
                 new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
@@ -1703,8 +2050,12 @@ public class QueryPlannerTest extends APhysicalPlanTest
         Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
         Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
 
-        SeekPredicate expectedSeekPredicate = new SeekPredicate(new Index(QualifiedName.of("tableB"), asList(), ColumnsType.WILDCARD), IndexType.SEEK_EQ, asList("active", "col"),
-                asList(cre("active", tableA), cre("col", tableA)));
+        //@formatter:off
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(
+                new Index(QualifiedName.of("tableB"), asList(), ColumnsType.WILDCARD), asList(
+                new SeekPredicate.SeekPredicateItem("active", cre("active", tableB), List.of(cre("active", tableA))),
+                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(cre("col", tableA)))));
+        //@formatter:on
 
         //@formatter:off
         IPhysicalPlan expected = new HashMatch(
@@ -1852,12 +2203,14 @@ public class QueryPlannerTest extends APhysicalPlanTest
         Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
         Schema expectedSchemaC = Schema.of(ast("c", ResolvedType.of(Type.Any), tableC));
 
-        SeekPredicate expectedSeekPredicateB = new SeekPredicate(new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), IndexType.SEEK_EQ, asList("col"),
-                asList(cre("col", tableA)));
-        SeekPredicate expectedSeekPredicateC = new SeekPredicate(new Index(QualifiedName.of("tableC"), asList("col"), ColumnsType.ANY_IN_ORDER), IndexType.SEEK_EQ, asList("col"),
-                asList(cre("col", tableB)));
-
         //@formatter:off
+        SeekPredicate expectedSeekPredicateB = new SeekPredicate(
+                new Index(QualifiedName.of("tableB"), asList("col"), ColumnsType.ANY_IN_ORDER), List.of(
+                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(cre("col", tableA)))));
+        SeekPredicate expectedSeekPredicateC = new SeekPredicate(
+                new Index(QualifiedName.of("tableC"), asList("col"), ColumnsType.ANY_IN_ORDER), List.of(
+                new SeekPredicate.SeekPredicateItem("col", cre("col", tableC), List.of(cre("col", tableB)))));
+
         //CSOFF
         IPhysicalPlan expected = new HashMatch(
                 5,
@@ -1957,10 +2310,12 @@ public class QueryPlannerTest extends APhysicalPlanTest
         Schema expectedSchemaA = Schema.of(ast("a", ResolvedType.of(Type.Any), tableA));
         Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
 
-        SeekPredicate expectedSeekPredicate = new SeekPredicate(new Index(QualifiedName.of("tableB"), asList("col", "col2"), ColumnsType.ANY_IN_ORDER), IndexType.SEEK_EQ, asList("col", "col2"),
-                asList(cre("col", tableA), cre("col2", tableA)));
-
         //@formatter:off
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(
+                new Index(QualifiedName.of("tableB"), asList("col", "col2"), ColumnsType.ANY_IN_ORDER), List.of(
+                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(cre("col", tableA))),
+                new SeekPredicate.SeekPredicateItem("col2", cre("col2", tableB), List.of(cre("col2", tableA)))));
+
         IPhysicalPlan expected = new HashMatch(
                 2,
                 new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),

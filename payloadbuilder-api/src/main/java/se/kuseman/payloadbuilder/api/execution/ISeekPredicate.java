@@ -3,16 +3,12 @@ package se.kuseman.payloadbuilder.api.execution;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Index;
-import se.kuseman.payloadbuilder.api.catalog.Index.IndexType;
 
 /** Index seek predicate used when creating index seek scan operators from catalogs */
 public interface ISeekPredicate
 {
     /** Return the index for this predicate */
     Index getIndex();
-
-    /** Returns which type this seek predicates uses from the index */
-    IndexType getIndexType();
 
     /** Return the used columns for this predicate from {@link #getIndex()} */
     List<String> getIndexColumns();

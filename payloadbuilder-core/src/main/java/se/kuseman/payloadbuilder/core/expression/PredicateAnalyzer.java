@@ -582,9 +582,9 @@ public class PredicateAnalyzer
             ColumnExpressionVisitor.getTableSources(expression, tableSources);
 
             String column = null;
-            if (expression instanceof HasAlias a)
+            if (expression instanceof ColumnExpression ce)
             {
-                column = a.getAlias()
+                column = ce.getAlias()
                         .getAlias();
             }
 
