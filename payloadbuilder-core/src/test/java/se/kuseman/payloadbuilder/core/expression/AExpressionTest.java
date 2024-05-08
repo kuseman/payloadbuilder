@@ -251,6 +251,11 @@ public abstract class AExpressionTest extends Assert
         return new ComparisonExpression(IComparisonExpression.Type.EQUAL, left, right);
     }
 
+    protected IExpression neq(IExpression left, IExpression right)
+    {
+        return new ComparisonExpression(IComparisonExpression.Type.NOT_EQUAL, left, right);
+    }
+
     protected IExpression add(IExpression left, IExpression right)
     {
         return new ArithmeticBinaryExpression(IArithmeticBinaryExpression.Type.ADD, left, right);
@@ -259,6 +264,11 @@ public abstract class AExpressionTest extends Assert
     protected IExpression intLit(int value)
     {
         return new LiteralIntegerExpression(value);
+    }
+
+    protected IExpression stringLit(String value)
+    {
+        return new LiteralStringExpression(value);
     }
 
     protected IExpression not(IExpression expression)

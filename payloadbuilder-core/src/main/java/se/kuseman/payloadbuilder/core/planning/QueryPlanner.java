@@ -224,7 +224,9 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             sortItems = emptyList();
         }
 
+        // CSOFF
         boolean hasSortItems = !sortItems.isEmpty();
+        // CSON
 
         Catalog catalog = plan.isTempTable() ? SystemCatalog.get()
                 : context.getSession()
@@ -233,6 +235,21 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
 
         SeekPredicate seekPredicate = null;
         IDatasource dataSource;
+
+        /* @formatter:off
+         * See if we have a predicate that matches an index we can use
+         * ie.
+         *
+         * select *
+         * from tableA a
+         * where a.column in (1,2,3)  <-- if there is an index on 'column' we can utilize an index for this
+         * @formatter:on
+         */
+        if (context.seekPredicate == null
+                && predicatePairs != null)
+        {
+            context.seekPredicate = ConditionAnalyzer.getSeekPredicate(plan, predicatePairs);
+        }
 
         int nodeId = context.getNextNodeId();
 
@@ -773,6 +790,11 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         {
             this.analyzePair = analyzePair;
             this.tableSource = tableSource;
+        }
+
+        AnalyzePair getAnalyzePair()
+        {
+            return analyzePair;
         }
 
         @Override

@@ -1,6 +1,7 @@
 package se.kuseman.payloadbuilder.core.planning;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.assertVectorsEquals;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
@@ -13,7 +14,6 @@ import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.Index.ColumnsType;
-import se.kuseman.payloadbuilder.api.catalog.Index.IndexType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.ISeekKey;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
@@ -23,6 +23,14 @@ import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 /** Test of {@link SeekPredicate} */
 public class SeekPredicateTest extends APhysicalPlanTest
 {
+    @Test(
+            expected = IllegalArgumentException.class)
+    public void test_fail_with_empty_items()
+    {
+        Index index = new Index(QualifiedName.of("table"), asList("col1", "col2"), ColumnsType.ANY);
+        new SeekPredicate(index, emptyList());
+    }
+
     @Test
     public void test()
     {
@@ -30,10 +38,11 @@ public class SeekPredicateTest extends APhysicalPlanTest
 
         IExpression colValue = ce("value");
 
-        SeekPredicate p = new SeekPredicate(index, IndexType.SEEK_EQ, asList("col1"), asList(colValue));
+        List<SeekPredicate.SeekPredicateItem> items = List.of(new SeekPredicate.SeekPredicateItem("col1", colValue, List.of(colValue)));
+
+        SeekPredicate p = new SeekPredicate(index, items);
 
         assertEquals(index, p.getIndex());
-        assertEquals(IndexType.SEEK_EQ, p.getIndexType());
         assertEquals(asList("col1"), p.getIndexColumns());
 
         // Verify that nulls and duplicates are removed
@@ -46,6 +55,50 @@ public class SeekPredicateTest extends APhysicalPlanTest
         assertEquals(1, keys.size());
         assertVectorsEquals(vv(Type.Int, 1, 2, 3, 4, 5), keys.get(0)
                 .getValue());
-        assertEquals("col1 = value", p.toString());
+        assertEquals("col1 = [value]", p.toString());
+    }
+
+    @Test
+    public void test_push_down_equal()
+    {
+        Index index = new Index(QualifiedName.of("table"), asList("col1", "col2"), ColumnsType.ANY);
+
+        IExpression colValue = ce("value");
+
+        List<SeekPredicate.SeekPredicateItem> items = List.of(new SeekPredicate.SeekPredicateItem("col1", colValue, List.of(intLit(10))));
+
+        SeekPredicate p = new SeekPredicate(index, items, true);
+
+        assertEquals(index, p.getIndex());
+        assertEquals(asList("col1"), p.getIndexColumns());
+
+        List<ISeekKey> keys = p.getSeekKeys(context);
+
+        assertEquals(1, keys.size());
+        assertVectorsEquals(vv(Type.Int, 10), keys.get(0)
+                .getValue());
+        assertEquals("col1 = [10]", p.toString());
+    }
+
+    @Test
+    public void test_push_down_in()
+    {
+        Index index = new Index(QualifiedName.of("table"), asList("col1", "col2"), ColumnsType.ANY);
+
+        IExpression colValue = ce("value");
+
+        List<SeekPredicate.SeekPredicateItem> items = List.of(new SeekPredicate.SeekPredicateItem("col1", colValue, List.of(stringLit("10"), intLit(20), intLit(30))));
+
+        SeekPredicate p = new SeekPredicate(index, items, true);
+
+        assertEquals(index, p.getIndex());
+        assertEquals(asList("col1"), p.getIndexColumns());
+
+        List<ISeekKey> keys = p.getSeekKeys(context);
+
+        assertEquals(1, keys.size());
+        assertVectorsEquals(vv(Type.Int, 10, 20, 30), keys.get(0)
+                .getValue());
+        assertEquals("col1 = ['10', 20, 30]", p.toString());
     }
 }

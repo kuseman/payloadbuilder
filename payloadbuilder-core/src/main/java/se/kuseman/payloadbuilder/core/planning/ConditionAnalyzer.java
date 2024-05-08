@@ -1,29 +1,44 @@
 package se.kuseman.payloadbuilder.core.planning;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.IntStream;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
+import se.kuseman.payloadbuilder.api.catalog.IPredicate;
+import se.kuseman.payloadbuilder.api.catalog.IPredicate.Type;
 import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.Index.ColumnsType;
 import se.kuseman.payloadbuilder.api.catalog.Index.IndexType;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
+import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.api.expression.IInExpression;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.expression.HasColumnReference;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzePair;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzeResult;
+import se.kuseman.payloadbuilder.core.logicalplan.TableScan;
+import se.kuseman.payloadbuilder.core.planning.QueryPlanner.PredicatePair;
+import se.kuseman.payloadbuilder.core.planning.SeekPredicate.SeekPredicateItem;
 
 /**
  * Analyzer that analyses a join condition to see which type of join operator that can be used. Also finds available indices to apply
  */
 class ConditionAnalyzer
 {
+    /** Valid index types to use for In expressions */
+    private static final Set<ColumnsType> IN_EXPRESSION_PUSH_DOWN_COLUMNS_TYPES = EnumSet.of(ColumnsType.WILDCARD, ColumnsType.ANY, ColumnsType.ANY_IN_ORDER);
+
     private ConditionAnalyzer()
     {
     }
@@ -43,6 +58,92 @@ class ConditionAnalyzer
     //@formatter:on
     // CSON
     {
+    }
+
+    /** Analyzes predicate pairs and tries to find a suitable index in provided table scan to use */
+    static SeekPredicate getSeekPredicate(TableScan scan, List<IPredicate> predicates)
+    {
+        TableSourceReference tableSource = scan.getTableSource();
+        List<Index> indices = scan.getTableSchema()
+                .getIndices();
+        if (indices.isEmpty())
+        {
+            return null;
+        }
+
+        List<AnalyzePair> equiPairs = new ArrayList<>();
+        List<AnalyzePair> inPairs = new ArrayList<>();
+        for (IPredicate p : predicates)
+        {
+            PredicatePair pp = (PredicatePair) p;
+            AnalyzePair pair = pp.getAnalyzePair();
+            if (pair.getType() == Type.COMPARISION
+                    && pair.getComparisonType() == IComparisonExpression.Type.EQUAL)
+            {
+                equiPairs.add(pair);
+            }
+            else if (pair.getType() == Type.IN)
+            {
+                Pair<IExpression, IExpression> ine = pair.getExpressionPair(tableSource);
+                // Cannot be NOT
+                if (!((IInExpression) ine.getValue()).isNot())
+                {
+                    inPairs.add(pair);
+                }
+            }
+        }
+
+        // First try equi pairs
+        SplitResult splitResult = splitEquiPairs(equiPairs, tableSource, indices);
+        if (splitResult.index != null)
+        {
+            // Remove the predicates we used as index source
+            // This should not be used as pushed down later on
+            predicates.removeIf(p -> splitResult.indexPairs.contains(((PredicatePair) p).getAnalyzePair()));
+
+            int size = splitResult.indexPairs.size();
+            List<IExpression> outerValueExpressions = new ArrayList<>(size);
+            List<IExpression> innerValueExpressions = new ArrayList<>(size);
+
+            for (AnalyzePair pair : splitResult.indexPairs)
+            {
+                Pair<IExpression, IExpression> p = pair.getExpressionPair(tableSource);
+                outerValueExpressions.add(p.getRight());
+                innerValueExpressions.add(p.getLeft());
+            }
+
+            List<SeekPredicateItem> items = IntStream.range(0, size)
+                    .mapToObj(i -> new SeekPredicate.SeekPredicateItem(splitResult.indexColumns.get(i), innerValueExpressions.get(i), List.of(outerValueExpressions.get(i))))
+                    .toList();
+            return new SeekPredicate(splitResult.index, items, true);
+        }
+
+        // Try IN pairs
+        for (AnalyzePair pair : inPairs)
+        {
+            String column = pair.getColumn(tableSource);
+
+            for (Index index : indices)
+            {
+                if (index.supports(IndexType.SEEK_EQ)
+                        && IN_EXPRESSION_PUSH_DOWN_COLUMNS_TYPES.contains(index.getColumnsType())
+                        && (index.getColumnsType() == ColumnsType.WILDCARD
+                                || StringUtils.equalsIgnoreCase(column, index.getColumns()
+                                        .get(0))))
+                {
+                    // Remove the predicate we used as index source
+                    // This should not be used as pushed down later on
+                    predicates.removeIf(p -> pair == ((PredicatePair) p).getAnalyzePair());
+
+                    IInExpression ine = (IInExpression) pair.getExpressionPair(tableSource)
+                            .getValue();
+                    List<SeekPredicateItem> items = singletonList(new SeekPredicate.SeekPredicateItem(column, ine.getExpression(), ine.getArguments()));
+                    return new SeekPredicate(index, items, true);
+                }
+            }
+        }
+
+        return null;
     }
 
     /** Analyze condition */
@@ -113,9 +214,10 @@ class ConditionAnalyzer
         SplitResult splitResult = splitEquiPairs(equiPairs, tableSource, indices);
         List<AnalyzePair> valueExpressionsPairs = splitResult.index != null ? splitResult.indexPairs
                 : splitResult.conditionPairs;
+        int size = valueExpressionsPairs.size();
 
-        List<IExpression> outerValueExpressions = new ArrayList<>(valueExpressionsPairs.size());
-        List<IExpression> innerValueExpressions = new ArrayList<>(valueExpressionsPairs.size());
+        List<IExpression> outerValueExpressions = new ArrayList<>(size);
+        List<IExpression> innerValueExpressions = new ArrayList<>(size);
         SeekPredicate seekPredicate = null;
 
         for (AnalyzePair pair : valueExpressionsPairs)
@@ -127,7 +229,10 @@ class ConditionAnalyzer
 
         if (splitResult.index != null)
         {
-            seekPredicate = new SeekPredicate(splitResult.index, IndexType.SEEK_EQ, splitResult.indexColumns, outerValueExpressions);
+            List<SeekPredicateItem> items = IntStream.range(0, size)
+                    .mapToObj(i -> new SeekPredicate.SeekPredicateItem(splitResult.indexColumns.get(i), innerValueExpressions.get(i), List.of(outerValueExpressions.get(i))))
+                    .toList();
+            seekPredicate = new SeekPredicate(splitResult.index, items);
         }
         return new Result(outerValueExpressions, innerValueExpressions, seekPredicate);
     }
@@ -137,6 +242,11 @@ class ConditionAnalyzer
     private static SplitResult splitEquiPairs(List<AnalyzePair> equiPairs, TableSourceReference tableSource, List<Index> indices)
     // CSON
     {
+        if (equiPairs.isEmpty())
+        {
+            return new SplitResult(null, emptyList(), emptyList(), equiPairs);
+        }
+
         List<AnalyzePair> indexPairs = new ArrayList<>();
         List<String> columns = new ArrayList<>();
         List<String> indexColumns = new ArrayList<>();

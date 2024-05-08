@@ -83,9 +83,9 @@ class ContainsFunction extends ScalarFunctionInfo
                 if (arrayType == Type.Any)
                 {
                     Object arrayValue = VectorUtils.convertToValueVector(array.valueAsObject(row), false);
-                    if (arrayValue instanceof ValueVector)
+                    if (arrayValue instanceof ValueVector vector)
                     {
-                        currentArray = (ValueVector) arrayValue;
+                        currentArray = vector;
                     }
                 }
                 else if (arrayType == Type.Array)

@@ -34,6 +34,17 @@ public class Index
         {
             throw new IllegalArgumentException("Index types cannot be empty");
         }
+
+        if (columns.isEmpty()
+                && columnsType != ColumnsType.WILDCARD)
+        {
+            throw new IllegalArgumentException("Non wildcard indices must have atleast one column");
+        }
+        else if (!columns.isEmpty()
+                && columnsType == ColumnsType.WILDCARD)
+        {
+            throw new IllegalArgumentException("Wildcard indices cannot have columns");
+        }
     }
 
     public QualifiedName getTable()
