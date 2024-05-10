@@ -291,6 +291,16 @@ public class SystemCatalogTest extends AExpressionTest
     }
 
     @Test
+    public void test_function_string_agg() throws Exception
+    {
+        assertExpression(null, null, "string_agg(null, ',')");
+        assertExpression("10", null, "string_agg(10, null)");
+        assertExpression("10", null, "string_agg(10, ',')");
+        assertExpression("10,20,30", null, "string_agg(array(10,20,30), ',')");
+        assertExpression(null, null, "string_agg(array(null,null), ',')");
+    }
+
+    @Test
     public void test_function_array() throws Exception
     {
         assertExpression(asList(1, 2, 3), null, "array(1,2,3)");
