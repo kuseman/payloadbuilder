@@ -1475,6 +1475,7 @@
           [{"key":"name","value": "max"},                 {"key":"type","value": "SCALAR_AGGREGATE"}, {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "min"},                 {"key":"type","value": "SCALAR_AGGREGATE"}, {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "object"},              {"key":"type","value": "SCALAR_AGGREGATE"}, {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "string_agg"},          {"key":"type","value": "SCALAR_AGGREGATE"}, {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "sum"},                 {"key":"type","value": "SCALAR_AGGREGATE"}, {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "opencsv"},             {"key":"type","value": "TABLE"},            {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "openjson"},            {"key":"type","value": "TABLE"},            {"key":"description","value": "###IGNORE###"}],
