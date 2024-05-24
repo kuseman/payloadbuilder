@@ -60,7 +60,7 @@ final class ESQueryUtils
         String typePart = useType(type) ? ("/" + type)
                 : "";
 
-        return String.format("%s/%s%s/_search%s?filter_path=_scroll_id,hits.hits%s%s", endpoint, indexPart, typePart, isTemplate ? "/template"
+        return String.format("%s/%s%s/_search%s?filter_path=_scroll_id,hits.hits&ignore_unavailable=true%s%s", endpoint, indexPart, typePart, isTemplate ? "/template"
                 : "",
                 scrollMinutes != null ? ("&scroll=" + scrollMinutes + "m")
                         : "",

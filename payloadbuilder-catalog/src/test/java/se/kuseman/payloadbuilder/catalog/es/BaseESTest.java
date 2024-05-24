@@ -16,6 +16,7 @@ import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +24,7 @@ import java.util.Optional;
 import java.util.Set;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.ThreadUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.classic.methods.HttpDelete;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
@@ -1277,6 +1279,47 @@ abstract class BaseESTest extends Assert
         assertEquals(3, rowCount);
     }
 
+    @Test
+    public void test_ingore_unavailable_indices() throws IOException, InterruptedException
+    {
+        createIndex(endpoint, "ignoretest_opened");
+        createIndex(endpoint, "ignoretest_closed");
+
+        for (Pair<String, Map<String, Object>> p : testData)
+        {
+            index(endpoint, "ignoretest_opened", type, MAPPER.writeValueAsString(p.getValue()), p.getKey());
+            index(endpoint, "ignoretest_closed", type, MAPPER.writeValueAsString(p.getValue()), p.getKey());
+        }
+
+        // Let indices be created before closing
+        ThreadUtils.sleep(Duration.ofMillis(250));
+
+        closeIndex(endpoint, "ignoretest_closed");
+
+        ESDatasource.Data data = new ESDatasource.Data();
+        IExecutionContext context = mockExecutionContext(CATALOG_ALIAS, Map.of("endpoint", endpoint, "index", "ignoretest_opened,ignoretest_closed"), 0, data);
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(version.getStrategy()
+                .supportsTypes() ? type
+                        : ESCatalog.SINGLE_TYPE_TABLE_NAME),
+                new DatasourceData(0, Optional.empty(), emptyList(), emptyList(), emptyList(), emptyList()));
+
+        IDatasourceOptions options = mockOptions(500);
+
+        TupleIterator it = ds.execute(context, options);
+        int rowCount = 0;
+        while (it.hasNext())
+        {
+            TupleVector next = it.next();
+
+            assertVectorsEquals(vv(Type.Any, "ignoretest_opened", "ignoretest_opened", "ignoretest_opened"), next.getColumn(0));
+
+            rowCount += next.getRowCount();
+        }
+        it.close();
+
+        assertEquals(3, rowCount);
+    }
+
     protected Map<String, Object> modifyMappingProperties(Map<String, Object> mappings)
     {
         // Wrap the mapping with a type
@@ -1347,6 +1390,22 @@ abstract class BaseESTest extends Assert
                 return type;
             }
         };
+    }
+
+    protected void closeIndex(String endpoint, String index) throws IOException
+    {
+        HttpPost post = new HttpPost(endpoint + "/" + index + "/_close");
+        HttpClientUtils.execute("", post, null, null, null, null, null, null, response ->
+        {
+            if (!(response.getCode() >= 200
+                    && response.getCode() < 299))
+            {
+                String error = IOUtils.toString(response.getEntity()
+                        .getContent(), StandardCharsets.UTF_8);
+                throw new RuntimeException("Error closing index: " + error);
+            }
+            return null;
+        });
     }
 
     protected void createIndex(String endpoint, String index) throws IOException

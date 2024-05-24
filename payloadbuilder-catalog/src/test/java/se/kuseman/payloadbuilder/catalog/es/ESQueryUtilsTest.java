@@ -41,22 +41,27 @@ public class ESQueryUtilsTest extends Assert
     public void test_getSearchTemplateUrl()
     {
         // Global type (_doc)
-        assertEquals("http://localhost:9200/*/_search/template?filter_path=_scroll_id,hits.hits", ESQueryUtils.getSearchUrl("http://localhost:9200", null, "_doc", null, null, true));
-        assertEquals("http://localhost:9200/myIndex/_search/template?filter_path=_scroll_id,hits.hits", ESQueryUtils.getSearchUrl("http://localhost:9200", "myIndex", "_doc", null, null, true));
-        assertEquals("http://localhost:9200/myIndex/_search/template?filter_path=_scroll_id,hits.hits&size=100",
+        assertEquals("http://localhost:9200/*/_search/template?filter_path=_scroll_id,hits.hits&ignore_unavailable=true",
+                ESQueryUtils.getSearchUrl("http://localhost:9200", null, "_doc", null, null, true));
+        assertEquals("http://localhost:9200/myIndex/_search/template?filter_path=_scroll_id,hits.hits&ignore_unavailable=true",
+                ESQueryUtils.getSearchUrl("http://localhost:9200", "myIndex", "_doc", null, null, true));
+        assertEquals("http://localhost:9200/myIndex/_search/template?filter_path=_scroll_id,hits.hits&ignore_unavailable=true&size=100",
                 ESQueryUtils.getSearchUrl("http://localhost:9200", "myIndex", "_doc", 100, null, true));
-        assertEquals("http://localhost:9200/myIndex/_search/template?filter_path=_scroll_id,hits.hits&scroll=2m", ESQueryUtils.getSearchUrl("http://localhost:9200", "myIndex", "_doc", null, 2, true));
-        assertEquals("http://localhost:9200/myIndex/_search/template?filter_path=_scroll_id,hits.hits&scroll=2m&size=300",
+        assertEquals("http://localhost:9200/myIndex/_search/template?filter_path=_scroll_id,hits.hits&ignore_unavailable=true&scroll=2m",
+                ESQueryUtils.getSearchUrl("http://localhost:9200", "myIndex", "_doc", null, 2, true));
+        assertEquals("http://localhost:9200/myIndex/_search/template?filter_path=_scroll_id,hits.hits&ignore_unavailable=true&scroll=2m&size=300",
                 ESQueryUtils.getSearchUrl("http://localhost:9200", "myIndex", "_doc", 300, 2, true));
 
         // With specific type
-        assertEquals("http://localhost:9200/*/type/_search/template?filter_path=_scroll_id,hits.hits", ESQueryUtils.getSearchUrl("http://localhost:9200", null, "type", null, null, true));
-        assertEquals("http://localhost:9200/myIndex/type/_search/template?filter_path=_scroll_id,hits.hits", ESQueryUtils.getSearchUrl("http://localhost:9200", "myIndex", "type", null, null, true));
-        assertEquals("http://localhost:9200/myIndex/type/_search/template?filter_path=_scroll_id,hits.hits&size=100",
+        assertEquals("http://localhost:9200/*/type/_search/template?filter_path=_scroll_id,hits.hits&ignore_unavailable=true",
+                ESQueryUtils.getSearchUrl("http://localhost:9200", null, "type", null, null, true));
+        assertEquals("http://localhost:9200/myIndex/type/_search/template?filter_path=_scroll_id,hits.hits&ignore_unavailable=true",
+                ESQueryUtils.getSearchUrl("http://localhost:9200", "myIndex", "type", null, null, true));
+        assertEquals("http://localhost:9200/myIndex/type/_search/template?filter_path=_scroll_id,hits.hits&ignore_unavailable=true&size=100",
                 ESQueryUtils.getSearchUrl("http://localhost:9200", "myIndex", "type", 100, null, true));
-        assertEquals("http://localhost:9200/myIndex/type/_search/template?filter_path=_scroll_id,hits.hits&scroll=2m",
+        assertEquals("http://localhost:9200/myIndex/type/_search/template?filter_path=_scroll_id,hits.hits&ignore_unavailable=true&scroll=2m",
                 ESQueryUtils.getSearchUrl("http://localhost:9200", "myIndex", "type", null, 2, true));
-        assertEquals("http://localhost:9200/myIndex/type/_search/template?filter_path=_scroll_id,hits.hits&scroll=2m&size=300",
+        assertEquals("http://localhost:9200/myIndex/type/_search/template?filter_path=_scroll_id,hits.hits&ignore_unavailable=true&scroll=2m&size=300",
                 ESQueryUtils.getSearchUrl("http://localhost:9200", "myIndex", "type", 300, 2, true));
 
     }
@@ -64,12 +69,17 @@ public class ESQueryUtilsTest extends Assert
     @Test
     public void test_getSearchUrl()
     {
-        assertEquals("http://localhost:9200/*/_search?filter_path=_scroll_id,hits.hits", ESQueryUtils.getSearchUrl("http://localhost:9200", null, "_doc", null, null, false));
-        assertEquals("http://localhost:9200/myindex/_search?filter_path=_scroll_id,hits.hits", ESQueryUtils.getSearchUrl("http://localhost:9200", "myindex", null, null, null, false));
-        assertEquals("http://localhost:9200/myindex/_search?filter_path=_scroll_id,hits.hits", ESQueryUtils.getSearchUrl("http://localhost:9200", "myindex", "_doc", null, null, false));
-        assertEquals("http://localhost:9200/myindex/_search?filter_path=_scroll_id,hits.hits&size=100", ESQueryUtils.getSearchUrl("http://localhost:9200", "myindex", "_doc", 100, null, false));
-        assertEquals("http://localhost:9200/myindex/_search?filter_path=_scroll_id,hits.hits&scroll=2m", ESQueryUtils.getSearchUrl("http://localhost:9200", "myindex", "_doc", null, 2, false));
-        assertEquals("http://localhost:9200/myindex/_search?filter_path=_scroll_id,hits.hits&scroll=2m&size=200", ESQueryUtils.getSearchUrl("http://localhost:9200", "myindex", "_doc", 200, 2, false));
+        assertEquals("http://localhost:9200/*/_search?filter_path=_scroll_id,hits.hits&ignore_unavailable=true", ESQueryUtils.getSearchUrl("http://localhost:9200", null, "_doc", null, null, false));
+        assertEquals("http://localhost:9200/myindex/_search?filter_path=_scroll_id,hits.hits&ignore_unavailable=true",
+                ESQueryUtils.getSearchUrl("http://localhost:9200", "myindex", null, null, null, false));
+        assertEquals("http://localhost:9200/myindex/_search?filter_path=_scroll_id,hits.hits&ignore_unavailable=true",
+                ESQueryUtils.getSearchUrl("http://localhost:9200", "myindex", "_doc", null, null, false));
+        assertEquals("http://localhost:9200/myindex/_search?filter_path=_scroll_id,hits.hits&ignore_unavailable=true&size=100",
+                ESQueryUtils.getSearchUrl("http://localhost:9200", "myindex", "_doc", 100, null, false));
+        assertEquals("http://localhost:9200/myindex/_search?filter_path=_scroll_id,hits.hits&ignore_unavailable=true&scroll=2m",
+                ESQueryUtils.getSearchUrl("http://localhost:9200", "myindex", "_doc", null, 2, false));
+        assertEquals("http://localhost:9200/myindex/_search?filter_path=_scroll_id,hits.hits&ignore_unavailable=true&scroll=2m&size=200",
+                ESQueryUtils.getSearchUrl("http://localhost:9200", "myindex", "_doc", 200, 2, false));
     }
 
     @Test(
