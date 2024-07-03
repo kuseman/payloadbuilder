@@ -430,7 +430,14 @@ public abstract class AExpressionTest extends Assert
                 actual = list;
             }
 
-            assertEquals("Eval: " + expression, expected, actual);
+            if (actual instanceof byte[] bytes)
+            {
+                assertArrayEquals("Eval: " + expression, (byte[]) expected, (byte[]) actual);
+            }
+            else
+            {
+                assertEquals("Eval: " + expression, expected, actual);
+            }
         }
         catch (Exception e)
         {

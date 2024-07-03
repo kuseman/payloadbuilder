@@ -36,6 +36,17 @@ public class SystemCatalogTest extends AExpressionTest
     }
 
     @Test
+    public void test_base64() throws Exception
+    {
+        assertExpression(null, null, "base64_decode(null)");
+        assertExpression(null, null, "base64_encode(null)");
+        assertExpression("aGVsbG8gd29ybGQ=", null, "base64_encode('hello world')");
+        assertExpression(new byte[] { 104, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100 }, null, "base64_decode('aGVsbG8gd29ybGQ=')");
+        assertExpression("hello world", null, "cast(base64_decode('aGVsbG8gd29ybGQ=') as string)");
+        assertExpression("hello world", null, "cast(base64_decode(base64_encode('hello world')) as string)");
+    }
+
+    @Test
     public void test_reverse() throws Exception
     {
         assertExpression(null, null, "reverse(null)");
@@ -114,7 +125,6 @@ public class SystemCatalogTest extends AExpressionTest
     @Test
     public void test_floor() throws Exception
     {
-
         assertExpression(null, null, "floor(null)");
         assertExpression(1, null, "floor(1)");
         assertExpression(1L, null, "floor(1L)");

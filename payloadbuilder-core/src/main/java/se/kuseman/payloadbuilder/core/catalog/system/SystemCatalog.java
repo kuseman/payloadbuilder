@@ -108,6 +108,8 @@ public class SystemCatalog extends Catalog
         catalog.registerFunction(new ReverseFunction());
         catalog.registerFunction(new CharIndexFunction());
         catalog.registerFunction(new StringAggFunction());
+        catalog.registerFunction(new Base64Function(true));
+        catalog.registerFunction(new Base64Function(false));
 
         // Date functions
         catalog.registerFunction(new GetDateFunction(true));
