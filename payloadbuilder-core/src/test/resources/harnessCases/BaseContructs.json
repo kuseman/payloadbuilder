@@ -911,6 +911,46 @@
       ]
     },
     {
+      "name": "Subquery expression order by aliased column expression",
+      "query": [
+          "select d.id, (select s2Row.row_id row_id from (s2) s2Row order by s2Row.row_id for array) val ",
+          "from data d ",
+          "inner join source s ",
+          "  on s.col1 = d.id ",
+          "inner populate join data s2 ",
+          "  on s2.id = s.col1 "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 3 }, { "key": "val", "value": [1, 2, 3] }],
+          [{ "key": "id", "value": 3 }, { "key": "val", "value": [1, 2, 3] }],
+          [{ "key": "id", "value": 3 }, { "key": "val", "value": [1, 2, 3] }],
+          [{ "key": "id", "value": 1 }, { "key": "val", "value": [1, 2]    }],
+          [{ "key": "id", "value": 1 }, { "key": "val", "value": [1, 2]    }]
+        ]
+      ]
+    },
+    {
+      "name": "Subquery expression order by column expression",
+      "query": [
+          "select d.id, (select s2Row.row_id from (s2) s2Row order by s2Row.row_id desc for array) val ",
+          "from data d ",
+          "inner join source s ",
+          "  on s.col1 = d.id ",
+          "inner populate join data s2 ",
+          "  on s2.id = s.col1 "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "id", "value": 3 }, { "key": "val", "value": [3, 2, 1] }],
+          [{ "key": "id", "value": 3 }, { "key": "val", "value": [3, 2, 1] }],
+          [{ "key": "id", "value": 3 }, { "key": "val", "value": [3, 2, 1] }],
+          [{ "key": "id", "value": 1 }, { "key": "val", "value": [2, 1]    }],
+          [{ "key": "id", "value": 1 }, { "key": "val", "value": [2, 1]    }]
+        ]
+      ]
+    },
+    {
       "name": "Order by ordinal, out of range",
       "query": [
         "select id - row_id newCol from data order by 10 desc"

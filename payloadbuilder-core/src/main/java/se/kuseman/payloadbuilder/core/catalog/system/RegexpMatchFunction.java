@@ -103,7 +103,11 @@ class RegexpMatchFunction extends ScalarFunctionInfo
                 {
                     for (int i = 1; i <= groupCount; i++)
                     {
-                        matches.add(UTF8String.from(matcher.group(i)));
+                        String group = matcher.group(i);
+                        if (group != null)
+                        {
+                            matches.add(UTF8String.from(group));
+                        }
                     }
                 }
                 if (matches.isEmpty())

@@ -47,6 +47,7 @@ public class ChainedTupleVector implements TupleVector
             col = new ChainedValueVector(schema.getColumns()
                     .get(column)
                     .getType(), column);
+            columns[column] = col;
         }
         return col;
     }

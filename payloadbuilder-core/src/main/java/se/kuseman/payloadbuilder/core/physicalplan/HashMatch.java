@@ -991,14 +991,8 @@ public class HashMatch implements IPhysicalPlan
 
             private ITupleVectorBuilder appendPopulatedVector(TupleVector outer, TupleVector inner, List<TupleVector> innerVectors, List<BitSet> populatedMatches, ITupleVectorBuilder builder)
             {
-                // First make a copy of the inner vector
                 int rowCount = inner.getRowCount();
-                ITupleVectorBuilder innerBuilder = context.getVectorFactory()
-                        .getTupleVectorBuilder(rowCount);
-                innerBuilder.append(inner);
-                TupleVector newInner = innerBuilder.build();
-
-                // ... then create selected tuple vectors for each outer bit set
+                // Create selected tuple vectors for each outer bitset
                 BitSet filter = new BitSet();
                 boolean allNull = true;
                 innerVectors.clear();
@@ -1014,7 +1008,7 @@ public class HashMatch implements IPhysicalPlan
                         filter.set(index, true);
                         allNull = false;
 
-                        TupleVector currentInner = SelectedTupleVector.select(newInner, VectorUtils.convertToSelectionVector(rowCount, bitSet));
+                        TupleVector currentInner = SelectedTupleVector.select(inner, VectorUtils.convertToSelectionVector(rowCount, bitSet));
                         innerVectors.add(currentInner);
                     }
                     index++;
