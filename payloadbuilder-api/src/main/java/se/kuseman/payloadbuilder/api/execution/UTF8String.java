@@ -336,9 +336,14 @@ public class UTF8String implements Comparable<UTF8String>, ValueVector
             return ((Boolean) object).booleanValue() ? TRUE
                     : FALSE;
         }
-        else if (object instanceof UTF8String)
+        else if (object instanceof UTF8String utf8s)
         {
-            return (UTF8String) object;
+            return utf8s;
+        }
+        else if (object instanceof byte[] bytes)
+        {
+            // Assume utf8 bytes
+            return new UTF8String(bytes, 0, bytes.length);
         }
         return from(String.valueOf(object));
     }

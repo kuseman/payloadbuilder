@@ -23,6 +23,9 @@ public class UTF8StringTest extends Assert
 
         byte[] slice = str.getBytes();
         assertEquals("hello", new String(slice, StandardCharsets.UTF_8));
+
+        assertEquals("hello", UTF8String.from(slice)
+                .toString());
     }
 
     @Test

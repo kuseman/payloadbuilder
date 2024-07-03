@@ -1424,6 +1424,8 @@
           [{"key":"name","value": "abs"},                 {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "all"},                 {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "any"},                 {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "base64_decode"},       {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "base64_encode"},       {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "ceiling"},             {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "char"},                {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "charindex"},           {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],

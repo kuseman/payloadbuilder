@@ -11,7 +11,6 @@ import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 public class ResolvedType
 {
     private static final EnumMap<Type, ResolvedType> CONSTANTS;
-
     static
     {
         CONSTANTS = new EnumMap<>(Type.class);
@@ -25,6 +24,8 @@ public class ResolvedType
             }
         }
     }
+    public static ResolvedType STRING = ResolvedType.of(Type.String);
+    public static ResolvedType ANY = ResolvedType.of(Type.Any);
 
     private final Type type;
     /** Type used do specify the contained type if {@link #type} is {@link Type#Array} */
