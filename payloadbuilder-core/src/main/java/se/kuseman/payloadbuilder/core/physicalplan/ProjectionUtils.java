@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.core.physicalplan;
 import java.util.ArrayList;
 import java.util.List;
 
+import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -53,10 +54,10 @@ public class ProjectionUtils
             AsteriskExpression ae = (AsteriskExpression) e;
             for (TableSourceReference tableRef : ae.getTableSourceReferences())
             {
-                if (!findColumns(schema, false, tableRef, result, aggregate, aggregateSingleValue)
+                if (!findColumns(schema, false, tableRef, result, aggregate, aggregateSingleValue, ae.getQname())
                         && outerSchema != null)
                 {
-                    findColumns(outerSchema, true, tableRef, result, aggregate, aggregateSingleValue);
+                    findColumns(outerSchema, true, tableRef, result, aggregate, aggregateSingleValue, ae.getQname());
                 }
             }
         }
@@ -69,7 +70,8 @@ public class ProjectionUtils
         return result;
     }
 
-    private static boolean findColumns(Schema schema, boolean outer, TableSourceReference tableSource, List<IExpression> result, boolean aggregate, boolean aggregateSingleValue)
+    private static boolean findColumns(Schema schema, boolean outer, TableSourceReference tableSource, List<IExpression> result, boolean aggregate, boolean aggregateSingleValue,
+            QualifiedName asteriskQname)
     {
         boolean added = false;
         int size = schema.getColumns()
@@ -96,7 +98,9 @@ public class ProjectionUtils
                         .build();
 
                 // Populated column, add a dereference for all of the inner schema columns
-                if (SchemaUtils.isPopulated(column))
+                // We only do this when we target an alias
+                if (SchemaUtils.isPopulated(column)
+                        && asteriskQname.size() > 0)
                 {
                     Schema innerSchema = column.getType()
                             .getSchema();

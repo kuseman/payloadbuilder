@@ -277,6 +277,11 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
                     throw new ParseException(ORDER_BY_CONSTANT_ENCOUNTERED, item.getLocation());
                 }
 
+                if (!shouldReplaceSortItem(itemExpression, projectionExpression))
+                {
+                    continue;
+                }
+
                 String alias = projectionExpression instanceof HasAlias ha ? ha.getAlias()
                         .getAlias()
                         : null;
@@ -417,6 +422,35 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
         }
 
         return new Aggregate(planInput, plan.getAggregateExpressions(), planProjections);
+    }
+
+    private boolean shouldReplaceSortItem(IExpression sortItemExpression, IExpression projectionExpression)
+    {
+        // Literals must be replaced
+        if (sortItemExpression instanceof LiteralIntegerExpression)
+        {
+            return true;
+        }
+        else if (projectionExpression instanceof UnresolvedColumnExpression)
+        {
+            return false;
+        }
+
+        // If the sort items target column differs from the projected item then we need to replace the sort item
+        if (sortItemExpression instanceof HasAlias ha1
+                && projectionExpression instanceof HasAlias ha2)
+        {
+            String alias1 = ha1.getAlias()
+                    .getAlias();
+            String alias2 = ha2.getAlias()
+                    .getAlias();
+            if (!isBlank(alias1))
+            {
+                return !StringUtils.equalsIgnoreCase(alias1, alias2);
+            }
+        }
+
+        return true;
     }
 
     private void validateExpressions(
