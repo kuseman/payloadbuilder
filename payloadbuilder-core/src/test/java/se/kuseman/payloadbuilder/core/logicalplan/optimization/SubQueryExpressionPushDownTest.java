@@ -5,6 +5,7 @@ import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
@@ -133,6 +134,133 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
     }
 
     @Test
+    public void test_operator_function_with_nested_sub_query()
+    {
+        String q = """
+
+                SELECT
+                (
+                    SELECT c.name
+                    ,      c.id
+                    , (
+                        SELECT t2.*
+                        FROM (c.tbl) t
+                        CROSS APPLY (t.tbl2) t2
+                        WHERE t2.languagecode = 'sv'
+                        FOR OBJECT_ARRAY
+                      ) fields
+                    FOR OBJECT
+                )               category
+                FROM product p
+                INNER JOIN category c
+                  on c.id = p.categoryId
+                """;
+
+        ILogicalPlan plan = getColumnResolvedPlan(q);
+        ILogicalPlan actual = optimize(context, plan);
+
+        TableSourceReference tableProduct = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("product"), "p");
+        TableSourceReference tableCategory = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("category"), "c");
+        TableSourceReference t = new TableSourceReference(2, TableSourceReference.Type.EXPRESSION, "", QualifiedName.of("c.tbl"), "t");
+        TableSourceReference t2 = new TableSourceReference(3, TableSourceReference.Type.EXPRESSION, "", QualifiedName.of("t.tbl2"), "t2");
+
+        Schema schemaProduct = Schema.of(ast("p", Type.Any, tableProduct));
+        Schema schemaCategory = Schema.of(ast("c", Type.Any, tableCategory));
+
+        Schema schemaT = Schema.of(ast("t", Type.Any, t));
+        Schema schemaT2 = Schema.of(ast("t2", Type.Any, t2));
+
+        //@formatter:off
+        Schema categorySchema = Schema.of(
+                nast("name", Type.Any, tableCategory),
+                nast("id", Type.Any, tableCategory),
+                col("fields", ResolvedType.table(Schema.of(
+                        new CoreColumn("", ResolvedType.ANY, "t2.*", false, t2, CoreColumn.Type.ASTERISK))), null)
+                );
+
+        ILogicalPlan expected = projection(
+                new Join(
+                    new Join(
+                        tableScan(schemaProduct, tableProduct),
+                        tableScan(schemaCategory, tableCategory),
+                        Join.Type.INNER,
+                        null,
+                        eq(cre("id", tableCategory), cre("categoryId", tableProduct)),
+                        Set.of(),
+                        false,
+                        Schema.EMPTY),
+                    new OperatorFunctionScan(
+                        Schema.of(nast("__expr0", ResolvedType.object(categorySchema), null)),
+                        projection(
+                            new Join(
+                                ConstantScan.INSTANCE,
+                                new OperatorFunctionScan(
+                                    Schema.of(nast("__expr1", categorySchema.getColumns().get(2).getType(), null)),
+                                    projection(
+                                        new Filter(
+                                            new Join(
+                                                new ExpressionScan(t, schemaT, ocre("tbl", tableCategory), null),
+                                                new ExpressionScan(t2, schemaT2, ocre("tbl2", t), null),
+                                                Join.Type.INNER,
+                                                null,
+                                                null,
+                                                Set.of(nast("tbl2", Type.Any, t)),
+                                                false,
+                                                Schema.of(
+                                                    ast("p", Type.Any, tableProduct),
+                                                    ast("c", Type.Any, tableCategory),
+                                                    ast("t", Type.Any, t)
+                                                )),
+                                            null,
+                                            eq(cre("languagecode", t2), new LiteralStringExpression("sv"))),
+                                        List.of(new AsteriskExpression(QualifiedName.of("t2"), null, Set.of(t2)))),
+                                    "",
+                                    "OBJECT_ARRAY",
+                                    null),
+                                Join.Type.LEFT,
+                                null,
+                                null,
+                                Set.of(nast("tbl2", Type.Any, t), nast("tbl", Type.Any, tableCategory)),
+                                false,
+                                Schema.of(
+                                    ast("p", Type.Any, tableProduct),
+                                    ast("c", Type.Any, tableCategory)
+                                )),
+                            List.of(ocre("name", tableCategory),
+                                    ocre("id", tableCategory),
+                                    new AliasExpression(ce("__expr1", 0, categorySchema.getColumns().get(2).getType()), "fields"))),
+                        "",
+                        "OBJECT",
+                        null),
+                    Join.Type.LEFT,
+                    null,
+                    null,
+                    Set.of(
+                        nast("tbl2", Type.Any, t),
+                        nast("name", Type.Any, tableCategory),
+                        nast("id", Type.Any, tableCategory),
+                        nast("tbl", Type.Any, tableCategory)
+                    ),
+                    false,
+                    Schema.of(
+                        ast("p", Type.Any, tableProduct),
+                        ast("c", Type.Any, tableCategory)
+                    )),
+                List.of(new AliasExpression(ce("__expr0", ResolvedType.object(categorySchema)), "category")));
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
     public void test_operator_function_mixed_with_sub_query_scalar_and_correlation()
     {
         String q = """
@@ -193,57 +321,67 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             asSet(),
                             false,
                             schemaProductArticle),
-                        new OperatorFunctionScan(Schema.of(nast("__expr0", ResolvedType.table(objectArraySchema), null)),
-                            projection(
-                               new Join(
-                                   new Join(
+                        projection(
+                            new Join(
+                                ConstantScan.INSTANCE,
+                                new OperatorFunctionScan(Schema.of(nast("__expr1", ResolvedType.table(objectArraySchema), null)),
+                                    projection(
                                        new Join(
-                                           ConstantScan.INSTANCE,
+                                           new Join(
+                                               new Join(
+                                                   ConstantScan.INSTANCE,
+                                                   new MaxRowCountAssert(
+                                                           projection(
+                                                               tableScan(schemaArticle, tableArticle),
+                                                               asList(new AliasExpression(cre("col", tableArticle), "__expr2"))),
+                                                       1),
+                                                   Join.Type.LEFT,
+                                                   null,
+                                                   (IExpression) null,
+                                                   asSet(),
+                                                   false,
+                                                   Schema.EMPTY),
+                                               new ExpressionScan(
+                                                   e_bb,
+                                                   schemaBB,
+                                                   ocre("bb", tableB, ResolvedType.table(schemaTableB), CoreColumn.Type.POPULATED),
+                                                   null),
+                                               Join.Type.LEFT,
+                                               null,
+                                               (IExpression) null,
+                                               asSet(),
+                                               true,
+                                               SchemaUtils.joinSchema(SchemaUtils.joinSchema(schemaProductArticle, schemaTableB, "bb"), schemaBB)),
                                            new MaxRowCountAssert(
-                                                   projection(
-                                                       tableScan(schemaArticle, tableArticle),
-                                                       asList(new AliasExpression(cre("col", tableArticle), "__expr2"))),
+                                               projection(
+                                                   new Filter(
+                                                       tableScan(schemaProduct, tableProduct),
+                                                       null,
+                                                       eq(ocre("col", tableProductArticle), cre("col4", tableProduct))),
+                                                   asList(new AliasExpression(cre("col2", tableProduct), "__expr3"))),
                                                1),
                                            Join.Type.LEFT,
                                            null,
                                            (IExpression) null,
-                                           asSet(),
+                                           asSet(nast("col", Type.Any, tableProductArticle)),
                                            false,
-                                           Schema.EMPTY),
-                                       new ExpressionScan(
-                                           e_bb,
-                                           schemaBB,
-                                           ocre("bb", tableB, ResolvedType.table(schemaTableB), CoreColumn.Type.POPULATED),
-                                           null),
-                                       Join.Type.LEFT,
-                                       null,
-                                       (IExpression) null,
-                                       asSet(),
-                                       true,
-                                       SchemaUtils.joinSchema(SchemaUtils.joinSchema(schemaProductArticle, schemaTableB, "bb"), schemaBB)),
-                                   new MaxRowCountAssert(
-                                       projection(
-                                           new Filter(
-                                               tableScan(schemaProduct, tableProduct),
-                                               null,
-                                               eq(ocre("col", tableProductArticle), cre("col4", tableProduct))),
-                                           asList(new AliasExpression(cre("col2", tableProduct), "__expr3"))),
-                                       1),
-                                   Join.Type.LEFT,
-                                   null,
-                                   (IExpression) null,
-                                   asSet(nast("col", Type.Any, tableProductArticle)),
-                                   false,
-                                   SchemaUtils.joinSchema(
-                                       SchemaUtils.joinSchema(
-                                           SchemaUtils.joinSchema(schemaProductArticle, schemaTableB, "bb"), schemaBB),
-                                           Schema.of(nast("__expr2", ResolvedType.of(Type.Any), tableArticle)))),
-                               asList(new AliasExpression(cre("__expr2", tableArticle), "val"),
-                                       new AliasExpression(cre("__expr3", tableProduct), "val1"), ocre("col5", tableProductArticle))
-                            ),
-                            "",
-                            "object_array",
-                            null),
+                                           SchemaUtils.joinSchema(
+                                               SchemaUtils.joinSchema(
+                                                   SchemaUtils.joinSchema(schemaProductArticle, schemaTableB, "bb"), schemaBB),
+                                                   Schema.of(nast("__expr2", ResolvedType.of(Type.Any), tableArticle)))),
+                                       asList(new AliasExpression(cre("__expr2", tableArticle), "val"),
+                                               new AliasExpression(cre("__expr3", tableProduct), "val1"), ocre("col5", tableProductArticle))
+                                    ),
+                                    "",
+                                    "object_array",
+                                    null),
+                                Join.Type.LEFT,
+                                null,
+                                (IExpression) null,
+                                asSet(pop("bb", ResolvedType.table(schemaTableB), tableB), nast("col", Type.Any, tableProductArticle), nast("col5", Type.Any, tableProductArticle)),
+                                false,
+                                SchemaUtils.joinSchema(schemaProductArticle, schemaTableB, "bb")),
+                            asList(new AliasExpression(ce("__expr1", 0, ResolvedType.table(objectArraySchema)), "__expr0"))),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
@@ -941,11 +1079,11 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                     new Join(
                         new Join(
                             ConstantScan.INSTANCE,
-                            new MaxRowCountAssert(
-                                projection(
+                            projection(
+                                new MaxRowCountAssert(
                                     tableScan(schemaB, tableB),
-                                    asList(new AliasExpression(add(cre("col1", tableB), intLit(1)), "__expr0"))),
-                            1),
+                                    1),
+                                asList(new AliasExpression(add(cre("col1", tableB), intLit(1)), "__expr0"))),
                             Join.Type.LEFT,
                             null,
                             (IExpression) null,

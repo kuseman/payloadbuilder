@@ -202,7 +202,9 @@ public class SubQueryExpressionPushDown extends ALogicalPlanOptimizer<SubQueryEx
         context.current = input;
         context.outerSchema = SchemaUtils.joinSchema(context.outerSchema, input.getSchema());
 
+        // CSOFF
         int prevSubQueryExpressionOrdinal = context.subQueryExpressionOrdinal;
+        // CSON
 
         // Check if the projection is asterisk or not. Used to determine if we can use ordinals
         // or not for sub query expression substitute columns.
@@ -283,31 +285,23 @@ public class SubQueryExpressionPushDown extends ALogicalPlanOptimizer<SubQueryEx
         }
 
         // We have nested projections, combine these
-        if (context.current instanceof Projection p)
+        if (context.current instanceof MaxRowCountAssert a
+                && a.getInput() instanceof Projection p)
         {
+            // Projection
+            // -- MaxRowCountAssert <--- context.current
+            // ---- Projection
+            // ------- Input
+            //
+            // Merge this into:
+            // Projection <--- Projections merged into this one
+            // -- MaxRowCountAssert
+            // ---- Input
+
             // Rewrite this projection expressions with the inner
             expressions = ProjectionMerger.replace(expressions, p.getExpressions());
             // ... and remove the inner projection
-            context.current = p.getInput();
-        }
-        else if (context.current instanceof OperatorFunctionScan ofs)
-        {
-            // Remove this projection since the child is a operator function which already has correct schema
-            // just change it's name
-            if (alias != null
-                    && size == 1)
-            {
-                // Restore previous context values
-                context.current = prevCurrent;
-                context.subQueryExpressionOrdinal = prevSubQueryExpressionOrdinal;
-                context.outerSchema = prevOuterSchema;
-                context.inputSchemaAsterisk = prevInputSchemaAsterisk;
-
-                Schema schema = Schema.of(SchemaUtils.rename(ofs.getSchema()
-                        .getColumns()
-                        .get(0), alias));
-                return new OperatorFunctionScan(schema, ofs.getInput(), ofs.getCatalogAlias(), ofs.getFunction(), ofs.getLocation());
-            }
+            context.current = new MaxRowCountAssert(p.getInput(), a.getMaxRowCount());
         }
 
         // CSOFF
@@ -340,76 +334,73 @@ public class SubQueryExpressionPushDown extends ALogicalPlanOptimizer<SubQueryEx
             ILogicalPlan plan = expression.getInput()
                     .accept(ctx.visitor, ctx);
 
-            // The current plan is a constant scan, ie. a nested sub query expression with
-            // out a table source, then we unwrap this and don't create a join
-            if (ctx.current instanceof ConstantScan)
+            // We have a non operator function here then we need to make sure that the query
+            // don't return more than one row since a sub query expression is a scalar expression
+            if (wrapInAssert(expression))
             {
-                ctx.current = plan;
+                boolean has1Limit = (plan instanceof Limit l
+                        && l.getLimitExpression() instanceof LiteralIntegerExpression lie
+                        && lie.getValue() <= 1);
+
+                // If we have a limit plan with a literal 1 then we don't need an assert
+                if (!has1Limit)
+                {
+                    plan = new MaxRowCountAssert(plan, 1);
+                }
+            }
+
+            /*
+             * @formatter:off
+             *
+             * if we have a non-correlated sub query then we put the plan as outer in a nested loop (left) because
+             * then that will only execute once BUT we must make sure that the query never circuit breaks
+             * the main query by returning zero rows (that will be catastrophic because the main query will be empty)
+             * so we nest it in another nested loop (left)
+             * with a constant scan as outer, that way we are guaranteed that we always end up with at least one row.
+             *
+             * nested loop (left)
+             *   nested loop (left)             <-- Will always return at least 1 row
+             *     constant scan
+             *     sub query plan
+             *   current plan
+             *
+             * if we have a correlated sub query we simply put a nested loop with plan as inner and the existing plan will be outer.
+             * If we are on top (FROM part) it's safe because if that returns 0 rows we will get 0 rows in the main query.
+             *
+             * Top:
+             * nested loop (left)
+             *   FROM: current plan         (0 rows => whole query 0 rows)
+             *   sub query plan             (0 rows => null for subquery value)
+             *
+             * Nested:
+             * nested loop (left)
+             *   nested loop (left)         (0 rows => whole query 0 rows)
+             *     FROM: current plan
+             *     sub query plan
+             *   sub query plan             (0 rows => null for subquery value)
+             *
+             * @formatter:on
+             */
+
+            boolean correlated = !expression.getOuterReferences()
+                    .isEmpty();
+
+            // If the sub query is not correlated we put the sub query as the outer in the join
+            // this because we only want to execute that once since it doesn't change
+            // We also need to flag for schema switch to stay consistent
+            ILogicalPlan left = correlated ? ctx.current
+                    : plan;
+            ILogicalPlan right = correlated ? plan
+                    : ctx.current;
+
+            // If the right plan is a constant scan we don't need to wrap in a left join
+            // since that won't guard against anything only an extra join for no reason
+            if (right instanceof ConstantScan)
+            {
+                ctx.current = left;
             }
             else
             {
-                // We have a non operator function here then we need to make sure that the query
-                // don't return more than one row since a sub query expression is a scalar expression
-                // If the plan is a OperatorFunctionScan it always return one row
-                if (!(plan instanceof OperatorFunctionScan))
-                {
-                    boolean addAssert = true;
-
-                    // If we have a limit plan with a literal 1 then we don't need an assert
-                    if (plan instanceof Limit)
-                    {
-                        Limit limit = (Limit) plan;
-                        if (limit.getLimitExpression() instanceof LiteralIntegerExpression
-                                && ((LiteralIntegerExpression) limit.getLimitExpression()).getValue() <= 1)
-                        {
-                            addAssert = false;
-                        }
-                    }
-
-                    if (addAssert)
-                    {
-                        plan = new MaxRowCountAssert(plan, 1);
-                    }
-                }
-
-                /*
-                 * @formatter:off
-                 * 
-                 * if we have a non-correlated sub query then we put the plan as outer in a nested loop (left) because
-                 * then that will only execute once BUT we must make sure that the query never circuit breaks
-                 * the main query by returning zero rows (that will be catastrophic because the main query will be empty)
-                 * so we nest it in another nested loop (left)
-                 * with a constant scan as outer, that way we are guaranteed that we always end up with at least one row.
-                 * 
-                 * nested loop (left)
-                 *   nested loop (left)             <-- Will always return at least 1 row
-                 *     constant scan
-                 *     sub query plan
-                 *   current plan 
-                 * 
-                 * if we have a correlated sub query we simply put a nested loop with plan as  inner since the existing plan will be outer.
-                 * If we are on top it's safe because if that returns 0 rows we will get 0 rows in the main query. if it's a nested
-                 * sub query we are also safe because of previous bullet
-                 * 
-                 * nested loop (left)
-                 *   current plan
-                 *   sub query plan
-                 *   
-                 * 
-                 * @formatter:on
-                 */
-
-                boolean correlated = !expression.getOuterReferences()
-                        .isEmpty();
-
-                // If the sub query is not correlated we put the sub query as the outer in the join
-                // this because we only want to execute that once since it doesn't change
-                // We also need to flag for schema switch to stay consistent
-                ILogicalPlan left = correlated ? ctx.current
-                        : plan;
-                ILogicalPlan right = correlated ? plan
-                        : ctx.current;
-
                 // Nest plan in another nested loop to guarantee at least one row
                 if (!correlated)
                 {
@@ -444,6 +435,23 @@ public class SubQueryExpressionPushDown extends ALogicalPlanOptimizer<SubQueryEx
 
             // Return an alias expression for the current sub query
             return builder.build();
+        }
+
+        private boolean wrapInAssert(UnresolvedSubQueryExpression expression)
+        {
+            // Operator function scans always return one row
+            if (expression.getInput() instanceof OperatorFunctionScan)
+            {
+                return false;
+            }
+            // Constant scans always return one row
+            else if (expression.getInput() instanceof Projection p
+                    && p.getInput() instanceof ConstantScan)
+            {
+                return false;
+            }
+
+            return true;
         }
     }
 }
