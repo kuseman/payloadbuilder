@@ -24,8 +24,8 @@ public class ResolvedType
             }
         }
     }
-    public static ResolvedType STRING = ResolvedType.of(Type.String);
-    public static ResolvedType ANY = ResolvedType.of(Type.Any);
+    public static final ResolvedType STRING = ResolvedType.of(Type.String);
+    public static final ResolvedType ANY = ResolvedType.of(Type.Any);
 
     private final Type type;
     /** Type used do specify the contained type if {@link #type} is {@link Type#Array} */
