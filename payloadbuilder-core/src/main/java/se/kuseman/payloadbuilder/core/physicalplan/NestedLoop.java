@@ -31,6 +31,7 @@ import se.kuseman.payloadbuilder.api.execution.vector.ITupleVectorBuilder;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
+import se.kuseman.payloadbuilder.core.execution.StatementContext;
 import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 
@@ -247,6 +248,9 @@ public class NestedLoop implements IPhysicalPlan
     @Override
     public TupleIterator execute(IExecutionContext context)
     {
+        // Extract outer tuple vector before executing outer in case it's cleared inside that branch
+        TupleVector outerTupleVector = ((StatementContext) context.getStatementContext()).getOuterTupleVector();
+
         final TupleIterator outerIt = outer.execute(context);
 
         if (!outerIt.hasNext())
@@ -261,7 +265,7 @@ public class NestedLoop implements IPhysicalPlan
         if (condition == null
                 && !outerReferences.isEmpty())
         {
-            return new LoopTupleIterator((ExecutionContext) context, outerIt, nodeData);
+            return new LoopTupleIterator((ExecutionContext) context, outerIt, outerTupleVector, nodeData);
         }
         else if (populateAlias != null)
         {
@@ -788,13 +792,12 @@ public class NestedLoop implements IPhysicalPlan
         private Schema innerSchema = inner.getSchema();
         private boolean innerSchemaAsterisk = SchemaUtils.isAsterisk(innerSchema);
 
-        LoopTupleIterator(ExecutionContext context, TupleIterator iterator, LoopNodeData nodeData)
+        LoopTupleIterator(ExecutionContext context, TupleIterator iterator, TupleVector contextOuterTupleVector, LoopNodeData nodeData)
         {
             this.context = context;
             this.iterator = iterator;
             this.nodeData = nodeData;
-            this.outerTupleVector = new OuterTupleVector(context.getStatementContext()
-                    .getOuterTupleVector(), outerSchema, isAsteriskOuterSchema);
+            this.outerTupleVector = new OuterTupleVector(contextOuterTupleVector, outerSchema, isAsteriskOuterSchema);
         }
 
         @Override

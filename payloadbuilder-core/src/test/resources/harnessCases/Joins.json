@@ -77,6 +77,14 @@
             ["idx1", 1, [ { "wareh_id": 1, "qty": 1 } ]],
             ["idx2", 2, [ { "wareh_id": 2, "qty": 1 } ]]
           ]
+        },
+        {
+           "name": "pvalues",
+           "columns": ["pvalue"],
+           "rows": [
+             [ 1 ],
+             [ 2 ]
+           ]
         }
       ]
     }
@@ -619,6 +627,37 @@
         ],
         [
           [{ "key": "valueX", "value": 2 }, { "key": "valueY", "value": 2 }]
+        ]
+      ]
+    },
+    {
+      "name": "Nested applys",
+      "description": [
+        "Verify that the outer context isn't cleared during nested applys when a non loop join is in between.",
+        "Regression: Happend in schema full in nested loops"
+      ],
+      "query": [
+        "--set @@printplan = true ",
+        "set @@force_nested_loop = true ",
+        "",
+        "select * ",
+        "from range (1,3) x ",
+        "outer apply ( ",
+        "  select * ",
+        "  from range(1,3) z ",
+        "  inner join pvalues p ",
+        "    on p.pvalue = z.value ",
+        "  cross apply range(0, p.pvalue) zz ",
+        ") y"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "Value", "value": 1 }, { "key": "Value", "value": 1 }, { "key": "pvalue", "value": 1 }, { "key": "Value", "value": 0 }],
+          [{ "key": "Value", "value": 1 }, { "key": "Value", "value": 2 }, { "key": "pvalue", "value": 2 }, { "key": "Value", "value": 0 }],
+          [{ "key": "Value", "value": 1 }, { "key": "Value", "value": 2 }, { "key": "pvalue", "value": 2 }, { "key": "Value", "value": 1 }],
+          [{ "key": "Value", "value": 2 }, { "key": "Value", "value": 1 }, { "key": "pvalue", "value": 1 }, { "key": "Value", "value": 0 }],
+          [{ "key": "Value", "value": 2 }, { "key": "Value", "value": 2 }, { "key": "pvalue", "value": 2 }, { "key": "Value", "value": 0 }],
+          [{ "key": "Value", "value": 2 }, { "key": "Value", "value": 2 }, { "key": "pvalue", "value": 2 }, { "key": "Value", "value": 1 }]
         ]
       ]
     }
