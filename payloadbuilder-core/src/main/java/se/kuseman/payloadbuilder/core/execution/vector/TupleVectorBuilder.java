@@ -7,6 +7,8 @@ import java.util.BitSet;
 import java.util.List;
 import java.util.function.IntPredicate;
 
+import org.apache.commons.lang3.StringUtils;
+
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
@@ -276,8 +278,15 @@ public class TupleVectorBuilder
 
         for (int i = 0; i < size; i++)
         {
-            if (!existingColumns.get(i)
-                    .equals(schemaColumns.get(i)))
+            // NOTE! We only compare column names here and not it's type
+            // When running a asterisk query we might end up with same column names but different types.
+            // For example when having a left join with no matching inner rows we use the compile time schema
+            // for the inner and those will be ANY and if combined with a vector with rows we will have the real runtime
+            // type and we will end up with a wrong resulting vector.
+            if (!StringUtils.equalsIgnoreCase(existingColumns.get(i)
+                    .getName(),
+                    schemaColumns.get(i)
+                            .getName()))
             {
                 return false;
             }
