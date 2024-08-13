@@ -1,6 +1,7 @@
 package se.kuseman.payloadbuilder.catalog.es;
 
 import org.junit.AfterClass;
+import org.junit.Ignore;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.HostPortWaitStrategy;
 import org.testcontainers.utility.DockerImageName;
@@ -8,6 +9,7 @@ import org.testcontainers.utility.DockerImageName;
 import se.kuseman.payloadbuilder.catalog.es.ElasticsearchMeta.Version;
 
 /** Test with elastic search 1X */
+@Ignore("Ignored since this image cannot be fetched in GITHUB any longer")
 public class ES1XTest extends BaseESTest
 {
     private static final String TYPE = "testType";
