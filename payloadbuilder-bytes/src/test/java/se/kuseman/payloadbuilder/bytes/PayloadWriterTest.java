@@ -1298,6 +1298,57 @@ public class PayloadWriterTest extends Assert
         VectorTestUtils.assertVectorsEquals(v, actual);
     }
 
+    /**
+     * Regression where we had a mismatch in input schema and payload schema
+     * where equal arrays wasn't re-added correctly.
+     */
+    @Test
+    public void test_table_with_array_1()
+    {
+        ValueVector v;
+        byte[] bytes;
+        TupleVector expected;
+
+        // @formatter:off
+        Schema schema = Schema.of(
+                Column.of("integer", Column.Type.Int),
+                Column.of("array", ResolvedType.array(Type.Int)));
+
+        expected = TupleVector.of(schema,
+                asList(VectorTestUtils.vv(Type.Int, 2, 2, 2, 2, 2),
+                        vv(ResolvedType.array(Type.Int), vv(Type.Int, 1,2), vv(Type.Int, 3,4), vv(Type.Int, 5,6), vv(Type.Int, 7,8), vv(Type.Int, 9,10))
+                        ));
+        //@formatter:on
+
+        v = ValueVector.literalTable(expected, 1);
+        bytes = PayloadWriter.write(v);
+
+        assertEquals(120, bytes.length);
+
+        // Read with same schema
+
+        TupleVector actual = PayloadReader.readTupleVector(bytes, schema, false);
+
+        VectorTestUtils.assertTupleVectorsEquals(expected, actual);
+
+        // @formatter:off
+        Schema newSchema = Schema.of(
+                Column.of("integer", Column.Type.Boolean),          // Trigg a mismatch
+                Column.of("array", ResolvedType.array(Type.Int)));
+
+        // Read with a new schema that mismatches
+        actual = PayloadReader.readTupleVector(bytes, newSchema, false);
+
+        // Schema should reflect the new input schema
+        assertEquals(newSchema, actual.getSchema());
+
+        // .. but the vectors are of the actual payload types
+
+        VectorTestUtils.assertVectorsEquals(VectorTestUtils.vv(Type.Int, 2, 2, 2, 2, 2), actual.getColumn(0));
+        VectorTestUtils.assertVectorsEquals(vv(ResolvedType.array(Type.Int), vv(Type.Int, 1,2), vv(Type.Int, 3,4), vv(Type.Int, 5,6), vv(Type.Int, 7,8), vv(Type.Int, 9,10)), actual.getColumn(1));
+        // @formatter:on
+    }
+
     @Test
     public void test_table_with_array()
     {

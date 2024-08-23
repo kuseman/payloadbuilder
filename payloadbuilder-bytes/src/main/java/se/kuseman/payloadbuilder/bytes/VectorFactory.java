@@ -224,6 +224,11 @@ class VectorFactory
 
                         columns.add(new Column(expectedColumn.getName(), arrayType));
                     }
+                    // Equal => pick expected
+                    else
+                    {
+                        columns.add(new Column(expectedColumn.getName(), expectedColumn.getType()));
+                    }
                 }
                 // Equal => pick expected
                 else
