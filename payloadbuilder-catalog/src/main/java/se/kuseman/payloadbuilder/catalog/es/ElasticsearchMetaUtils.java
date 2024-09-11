@@ -25,6 +25,8 @@ import org.apache.commons.io.IOUtils;
 import org.apache.hc.client5.http.classic.methods.HttpGet;
 import org.apache.hc.core5.http.HttpEntity;
 import org.apache.hc.core5.http.HttpStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.execution.IQuerySession;
@@ -33,11 +35,24 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 /** Utils used to build meta about an elastic search instance */
 class ElasticsearchMetaUtils
 {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ElasticsearchMetaUtils.class);
     private static final int MAX_INDICES_TO_FETCH = 10;
     private static final QualifiedName CACHE_NAME = QualifiedName.of("ElasticSearch", "Meta");
     private static final String CACHE_MAPPINGS_TTL = "cache.mappings.ttl";
     /** Default cache time for mappings */
     private static final int MAPPINGS_CACHE_TTL = 60;
+
+    // CSOFF
+    //@formatter:off
+    private record DataStreamsResponse(List<DataStream> data_streams){}
+    private record DataStream(String template){}
+
+    private record IndexTemplatesResponse(List<IndexTemplateTop> index_templates){}
+    private record IndexTemplateTop(IndexTemplate index_template, String name){}
+    private record IndexTemplate(IndexTemplateTemplate template){}
+    private record IndexTemplateTemplate(Map<String, Object> mappings){}
+    //@formatter:on
+    // CSON
 
     /** Returns properties for current sessions endpoint/index */
     @SuppressWarnings("unchecked")
@@ -141,8 +156,47 @@ class ElasticsearchMetaUtils
                         }
                     }
 
+                    // Fetch data stream mappings
+                    appendDataStreamMappings(session, catalogAlias, endpoint, index, result);
+
                     return new ElasticsearchMeta(version, result);
                 });
+    }
+
+    private static void appendDataStreamMappings(IQuerySession session, String catalogAlias, String endpoint, String index, Map<String, MappedType> result)
+    {
+        try
+        {
+            DataStreamsResponse datastreams = get(DataStreamsResponse.class, session, catalogAlias, endpoint, "_data_stream/" + index);
+            Set<String> seenIndexTemplates = new HashSet<>();
+
+            for (DataStream dsi : datastreams.data_streams)
+            {
+                if (seenIndexTemplates.add(dsi.template))
+                {
+                    IndexTemplatesResponse indexTemplatesResponse = get(IndexTemplatesResponse.class, session, catalogAlias, endpoint, "_index_template/" + dsi.template);
+                    for (IndexTemplateTop itt : indexTemplatesResponse.index_templates)
+                    {
+                        if (itt.index_template != null
+                                && itt.index_template.template != null
+                                && itt.index_template.template.mappings != null)
+                        {
+                            Map<String, Object> mappings = itt.index_template.template.mappings;
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> properties = (Map<String, Object>) mappings.get("properties");
+
+                            mergeProperties(result, ESCatalog.SINGLE_TYPE_TABLE_NAME, mappings, properties, itt.name);
+                        }
+                    }
+
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            // Swallow this since all ES versions doesn't have datastreams
+            LOGGER.error("Error fetching data stream mappings", e);
+        }
     }
 
     private static void mergeProperties(Map<String, MappedType> result, String type, Map<String, Object> mappings, Map<String, Object> properties, String index)
@@ -233,10 +287,10 @@ class ElasticsearchMetaUtils
 
     private static <T> T get(Class<T> clazz, IQuerySession session, String catalogAlias, String endpoint, String path)
     {
-        HttpGet getAlias = new HttpGet(String.format("%s/%s", endpoint, path));
+        HttpGet get = new HttpGet(String.format("%s/%s", endpoint, path));
         try
         {
-            return execute(session, catalogAlias, getAlias, response ->
+            return execute(session, catalogAlias, get, response ->
             {
                 HttpEntity entity = response.getEntity();
                 if (response.getCode() != HttpStatus.SC_OK)
