@@ -25,6 +25,7 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IFunctionCallExpression;
 import se.kuseman.payloadbuilder.api.expression.IInExpression;
 import se.kuseman.payloadbuilder.api.expression.ILikeExpression;
+import se.kuseman.payloadbuilder.api.expression.INullPredicateExpression;
 
 /** Predicate for a property */
 @SuppressWarnings("deprecation")
@@ -160,6 +161,48 @@ class PropertyPredicate
                     .append("}}}");
             appendNested(sb);
         }
+        else if (predicate.getType() == Type.NULL)
+        {
+            INullPredicateExpression nullExpression = predicate.getNullPredicateExpression();
+
+            //@formatter:off
+            // Elasticsearch ignore null values and these cannot be searched/filtered which means
+            // that we can use exists for null predicate. If a field exists in a document that field cannot be null
+            // which in turn means that if a field does not exists on a document it must be null
+            // IS NULL
+            //
+            // "bool": {
+            //    "must_not": [
+            //      {
+            //        "exists": {
+            //          "field": <field>
+            //        }
+            //      }
+            //    ]
+            // }
+            //
+            // IS NOT NULL
+            // "bool": {
+            //    "filter": [
+            //      {
+            //        "exists": {
+            //          "field": <field>
+            //        }
+            //      }
+            //    ]
+            // }
+            //@formatter:on
+
+            // NOTE!
+            // IS NOT NULL -> must
+            // IS NULL -> must_not
+            StringBuilder sb = nullExpression.isNot() ? filterMust
+                    : filterMustNot;
+
+            sb.append("{\"exists\":{\"field\":\"")
+                    .append(property)
+                    .append("\"}}");
+        }
         else if (fullTextPredicate)
         {
             appendFullTextOperator(describe, context, predicate.getFunctionCallExpression(), filterMust);
@@ -294,6 +337,7 @@ class PropertyPredicate
     {
         IPredicate.Type type = predicate.getType();
         return type == Type.COMPARISION
+                || type == Type.NULL
                 || (type == Type.FUNCTION_CALL
                         && isFullTextSearchPredicate(predicate.getFunctionCallExpression(), catalogAlias))
                 || type == Type.IN

@@ -220,6 +220,13 @@ public class ESQueryUtilsTest extends Assert
                 ESQueryUtils.getSearchBody(false, new GenericStrategy(), emptyList(), pairs.stream()
                         .map(p -> new PropertyPredicate("", p, true))
                         .collect(toList()), null, null, false, context));
+
+        pairs = asList(IPredicateMock._null("field1", false), IPredicateMock._null("field2", true));
+        assertEquals("{\"sort\":[\"_doc\"],\"query\":{\"bool\":{\"filter\":[{\"exists\":{\"field\":\"field2\"}}],\"must_not\":[{\"exists\":{\"field\":\"field1\"}}]}}}",
+                ESQueryUtils.getSearchBody(false, new GenericStrategy(), emptyList(), pairs.stream()
+                        .map(p -> new PropertyPredicate(p.getQualifiedColumn()
+                                .toString(), p, false))
+                        .collect(toList()), null, null, false, context));
     }
 
     @Test
@@ -317,6 +324,13 @@ public class ESQueryUtilsTest extends Assert
         assertEquals("{\"sort\":[\"_doc\"],\"filter\":{\"bool\":{\"must\":[{\"query_string\":{\"query\":\"field4:'some phrase'\"}}]}}}",
                 ESQueryUtils.getSearchBody(false, new Elastic1XStrategy(), emptyList(), pairs.stream()
                         .map(p -> new PropertyPredicate("", p, true))
+                        .collect(toList()), null, null, false, context));
+
+        pairs = asList(IPredicateMock._null("field1", false), IPredicateMock._null("field2", true));
+        assertEquals("{\"sort\":[\"_doc\"],\"filter\":{\"bool\":{\"must\":[{\"exists\":{\"field\":\"field2\"}}],\"must_not\":[{\"exists\":{\"field\":\"field1\"}}]}}}",
+                ESQueryUtils.getSearchBody(false, new Elastic1XStrategy(), emptyList(), pairs.stream()
+                        .map(p -> new PropertyPredicate(p.getQualifiedColumn()
+                                .toString(), p, false))
                         .collect(toList()), null, null, false, context));
     }
 
