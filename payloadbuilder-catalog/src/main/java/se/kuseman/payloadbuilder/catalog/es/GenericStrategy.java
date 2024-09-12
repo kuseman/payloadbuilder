@@ -43,4 +43,10 @@ class GenericStrategy implements ElasticStrategy
     {
         return true;
     }
+
+    @Override
+    public boolean supportsDataStreams()
+    {
+        return true;
+    }
 }

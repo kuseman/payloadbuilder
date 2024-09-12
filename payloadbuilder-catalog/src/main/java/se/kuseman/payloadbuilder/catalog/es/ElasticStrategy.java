@@ -19,4 +19,7 @@ interface ElasticStrategy
 
     /** Returns whether this elastic needs the nested sort path in a nested object or a plain property */
     boolean wrapNestedSortPathInObject();
+
+    /** Returns true if this elastic supports data streams or not. */
+    boolean supportsDataStreams();
 }
