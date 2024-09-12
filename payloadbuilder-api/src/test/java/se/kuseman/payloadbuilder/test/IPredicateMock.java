@@ -23,6 +23,7 @@ import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IFunctionCallExpression;
 import se.kuseman.payloadbuilder.api.expression.IInExpression;
 import se.kuseman.payloadbuilder.api.expression.ILikeExpression;
+import se.kuseman.payloadbuilder.api.expression.INullPredicateExpression;
 
 /** Helper class for mocking {@link IAnalyzePair}'s */
 public class IPredicateMock
@@ -79,6 +80,20 @@ public class IPredicateMock
     public static IPredicate notIn(String column, List<Object> values)
     {
         return inPair(column, true, values);
+    }
+
+    /** Mock a {@link INullPredicateExpression} predicate. */
+    public static IPredicate _null(String column, boolean not)
+    {
+        IPredicate pair = mock(IPredicate.class);
+        when(pair.getQualifiedColumn()).thenReturn(QualifiedName.of(column));
+        when(pair.getType()).thenReturn(IPredicate.Type.NULL);
+
+        INullPredicateExpression expression = mock(INullPredicateExpression.class);
+
+        when(pair.getNullPredicateExpression()).thenReturn(expression);
+        when(expression.isNot()).thenReturn(not);
+        return pair;
     }
 
     /** Mock an IN pair */
