@@ -22,4 +22,10 @@ class Elastic2XStrategy extends GenericStrategy
     {
         return false;
     }
+
+    @Override
+    public boolean supportsDataStreams()
+    {
+        return false;
+    }
 }

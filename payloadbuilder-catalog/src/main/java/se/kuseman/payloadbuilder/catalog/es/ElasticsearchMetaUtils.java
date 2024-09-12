@@ -156,8 +156,12 @@ class ElasticsearchMetaUtils
                         }
                     }
 
-                    // Fetch data stream mappings
-                    appendDataStreamMappings(session, catalogAlias, endpoint, index, result);
+                    if (version.getStrategy()
+                            .supportsDataStreams())
+                    {
+                        // Fetch data stream mappings
+                        appendDataStreamMappings(session, catalogAlias, endpoint, index, result);
+                    }
 
                     return new ElasticsearchMeta(version, result);
                 });

@@ -39,4 +39,10 @@ class Elastic1XStrategy extends GenericStrategy
     {
         return false;
     }
+
+    @Override
+    public boolean supportsDataStreams()
+    {
+        return false;
+    }
 }
