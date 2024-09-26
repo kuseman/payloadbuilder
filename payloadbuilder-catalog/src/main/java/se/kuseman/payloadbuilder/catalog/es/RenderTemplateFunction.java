@@ -1,5 +1,6 @@
 package se.kuseman.payloadbuilder.catalog.es;
 
+import static java.util.Collections.emptyMap;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.entry;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
@@ -51,20 +52,30 @@ class RenderTemplateFunction extends ScalarFunctionInfo
         return Arity.TWO;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public ValueVector evalScalar(IExecutionContext context, TupleVector input, String catalogAlias, List<IExpression> arguments)
     {
-        Object templateObj = arguments.get(0)
+        ValueVector vv = arguments.get(0)
                 .eval(context);
-        if (!(templateObj instanceof String))
+        if (vv.isNull(0))
         {
-            throw new IllegalArgumentException("Expected template argument for " + getName() + " to return a String, got: " + templateObj);
+            return ValueVector.literalNull(ResolvedType.STRING, 1);
         }
-        Object paramsObj = arguments.get(1)
+
+        vv = arguments.get(1)
                 .eval(context);
-        if (!(paramsObj instanceof Map))
+
+        Map<String, Object> params = emptyMap();
+
+        if (!vv.isNull(0))
         {
-            throw new IllegalArgumentException("Expected params argument for " + getName() + " to return a Map, got: " + paramsObj);
+            Object paramsObj = vv.getAny(0);
+            if (!(paramsObj instanceof Map))
+            {
+                throw new IllegalArgumentException("Expected params argument for " + getName() + " to return a Map, got: " + paramsObj);
+            }
+            params = (Map<String, Object>) paramsObj;
         }
 
         String endpoint = context.getSession()
@@ -75,11 +86,8 @@ class RenderTemplateFunction extends ScalarFunctionInfo
         {
             throw new IllegalArgumentException("Missing endpoint in catalog properties.");
         }
-
-        String template = (String) templateObj;
-        @SuppressWarnings("unchecked")
-        Map<String, Object> params = (Map<String, Object>) paramsObj;
-
+        String template = vv.getString(0)
+                .toString();
         HttpPost post = new HttpPost(endpoint + "/_render/template/");
         post.setEntity(new StringEntity(serialize(ofEntries(entry("id", template), entry("params", params))), StandardCharsets.UTF_8));
 
