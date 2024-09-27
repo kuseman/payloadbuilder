@@ -1644,6 +1644,52 @@
           [{"key":"col1","value": "4"}, {"key":"col2","value": "hello \" world 2"}, {"key":"col3","value": 6}]
         ]
       ]
+    },
+    {
+      "name": "Access column which is present multiple times from the same column reference",
+      "description": "A regression that made it impossible to order by a column that was also present multiple times in projection",
+      "query": [
+        "select s.col1, s.* ",
+        "from source s ",
+        "order by s.col1 "
+      ],
+      "expectedResultSets": [
+        [
+          [{"key":"col1","value": 1}, {"key":"col1","value": 1}, {"key":"col2","value": 2 } ],
+          [{"key":"col1","value": 3}, {"key":"col1","value": 3}, {"key":"col2","value": 4 } ],
+          [{"key":"col1","value": 5}, {"key":"col1","value": 5}, {"key":"col2","value": 6 } ]
+        ]
+      ]
+    },
+    {
+      "name": "Access column which is present multiple times from different column references",
+      "query": [
+        "select s2.*, s.*, s.col2 ",
+        "from source s ",
+        "inner join source2 s2 ",
+        "  on s2.col1 = s.col1 ",
+        "order by s.col2 "
+      ],
+      "expectedResultSets": [
+        [
+          [{"key":"col1","value": 1}, {"key":"col2","value": 2 }, {"key":"col1","value": 1}, {"key":"col2","value": 2 }, {"key":"col2","value": 2 } ],
+          [{"key":"col1","value": 1}, {"key":"col2","value": 2 }, {"key":"col1","value": 1}, {"key":"col2","value": 2 }, {"key":"col2","value": 2 } ],
+          [{"key":"col1","value": 5}, {"key":"col2","value": 6 }, {"key":"col1","value": 5}, {"key":"col2","value": 6 }, {"key":"col2","value": 6 } ],
+          [{"key":"col1","value": 5}, {"key":"col2","value": 6 }, {"key":"col1","value": 5}, {"key":"col2","value": 6 }, {"key":"col2","value": 6 } ]
+        ]
+      ]
+    },
+    {
+      "name": "Fail when accessing a column that is present multiple times with different or none column references",
+      "query": [
+        "select s.* ",
+        "from source s ",
+        "inner join source2 s2 ",
+        "  on s2.col1 = s.col1 ",
+        "order by col1 "
+      ],
+      "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
+      "expectedMessageContains": "Ambiguous column: col1"
     }
   ]
 }

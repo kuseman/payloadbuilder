@@ -17,6 +17,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 
@@ -1265,6 +1266,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                                 && schemaColumn.getName()
                                         .equalsIgnoreCase(alias)))
                 {
+
                     // Multiple matches of named columns is not allowed
                     if (nonAsteriskIndexMatch >= 0)
                     {
@@ -1273,6 +1275,14 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                     nonAsteriskIndexMatch = i;
                     aliasMatch = schemaColumn.getName()
                             .equalsIgnoreCase(alias);
+
+                    // If we have a match with an alias we don't need to search any more
+                    if (alias != null
+                            && StringUtils.equalsIgnoreCase(alias, columnAlias))
+                    {
+                        break;
+                    }
+
                 }
             }
 

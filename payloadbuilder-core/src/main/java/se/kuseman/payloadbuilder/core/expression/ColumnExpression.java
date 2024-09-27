@@ -225,6 +225,13 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
                 }
 
                 indexMatch = i;
+
+                // If we have a match with a column reference we can break out here since
+                // we have found our match even if it's referenced multiple times
+                if (columnReference != null)
+                {
+                    break;
+                }
             }
         }
 
