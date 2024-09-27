@@ -28,11 +28,27 @@ public class SqlServer2017Test extends BaseJDBCTest
         SqlServer.stop();
     }
 
+    @Override
+    public void before()
+    {
+        org.junit.Assume.assumeTrue(SqlServer.CONTAINER.isRunning());
+        super.before();
+    }
+
+    @Override
+    public void shutdown()
+    {
+        if (SqlServer.CONTAINER.isRunning())
+        {
+            super.shutdown();
+        }
+    }
+
     static class SqlServer
     {
         private static final String PASSWORD = "A_Str0ng_Required_Password";
         private static final int PORT = 1433;
-        private static final String IMAGE_NAME = "mcr.microsoft.com/mssql/server:2017-latest-ubuntu";
+        private static final String IMAGE_NAME = "mcr.microsoft.com/mssql/server:2017-latest";
         private static final GenericContainer<?> CONTAINER = new GenericContainer<>(DockerImageName.parse(IMAGE_NAME)).withExposedPorts(PORT)
                 .withEnv("SA_PASSWORD", PASSWORD)
                 .withEnv("MSSQL_PID", "Developer")
@@ -46,7 +62,14 @@ public class SqlServer2017Test extends BaseJDBCTest
             CONTAINER.setWaitStrategy(new SqlWaitStrategy(() -> getDatasource()));
             // CONTAINER.setWaitStrategy(new LogMessageWaitStrategy().withRegEx(".*The tempdb database has [1-9]+.*"));
             CONTAINER.start();
-            createDb(getDatasource());
+            try
+            {
+                createDb(getDatasource());
+            }
+            catch (Throwable e)
+            {
+                System.err.println("Container did not start correctly: " + CONTAINER.getLogs());
+            }
         }
 
         static DataSource getDatasource()
