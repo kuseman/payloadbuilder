@@ -304,6 +304,12 @@ public class HashMatch implements IPhysicalPlan
                 /* Traverse the state machine until we have a result */
                 while (next == null)
                 {
+                    if (context.getSession()
+                            .abortQuery())
+                    {
+                        return false;
+                    }
+
                     long time = System.nanoTime();
                     switch (state)
                     {
