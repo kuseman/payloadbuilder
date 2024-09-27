@@ -63,6 +63,11 @@ class RenderTemplateFunction extends ScalarFunctionInfo
             return ValueVector.literalNull(ResolvedType.STRING, 1);
         }
 
+        // CSOFF
+        String template = vv.getString(0)
+                .toString();
+        // CSON
+
         vv = arguments.get(1)
                 .eval(context);
 
@@ -86,8 +91,7 @@ class RenderTemplateFunction extends ScalarFunctionInfo
         {
             throw new IllegalArgumentException("Missing endpoint in catalog properties.");
         }
-        String template = vv.getString(0)
-                .toString();
+
         HttpPost post = new HttpPost(endpoint + "/_render/template/");
         post.setEntity(new StringEntity(serialize(ofEntries(entry("id", template), entry("params", params))), StandardCharsets.UTF_8));
 
