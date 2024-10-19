@@ -1417,25 +1417,7 @@ public class QueryParser
                         .collect(toList());
                 insideProjection = prevInsideProjection;
 
-                long assignmentItems = expressions.stream()
-                        .filter(e -> e instanceof AssignmentExpression)
-                        .count();
-                assignmentSelect = assignmentItems > 0;
-                if (assignmentSelect
-                        && assignmentItems != expressions.size())
-                {
-                    throw new ParseException("Cannot combine variable assignment items with data retrieval items", ctx.selectItem(0));
-                }
-                else if (assignmentSelect
-                        && ctx.into != null)
-                {
-                    throw new ParseException("Cannot have assignments in a SELECT INTO statement", ctx);
-                }
-                else if (assignmentSelect
-                        && insideSubQuery)
-                {
-                    throw new ParseException("Assignment selects are not allowed in sub query context", ctx);
-                }
+                validateAssignmentProjection(expressions, ctx);
 
                 plan = new Projection(plan, expressions);
             }
@@ -1478,10 +1460,6 @@ public class QueryParser
                     throw new ParseException("Cannot have a GROUP BY clause without a FROM.", ctx.groupBy.get(0));
                 }
 
-                List<IExpression> aggregateExpressions = ctx.groupBy.stream()
-                        .map(this::getExpression)
-                        .collect(toList());
-
                 boolean prevInsideProjection = insideProjection;
                 insideProjection = true;
                 List<IAggregateExpression> projectionExpressions = ctx.selectItem()
@@ -1490,9 +1468,39 @@ public class QueryParser
                         .collect(toList());
                 insideProjection = prevInsideProjection;
 
+                validateAssignmentProjection(projectionExpressions, ctx);
+
+                List<IExpression> aggregateExpressions = ctx.groupBy.stream()
+                        .map(this::getExpression)
+                        .collect(toList());
                 plan = new Aggregate(plan, aggregateExpressions, projectionExpressions);
             }
             return plan;
+        }
+
+        private void validateAssignmentProjection(List<? extends IExpression> projections, SelectStatementContext ctx)
+        {
+            long assignmentItems = projections.stream()
+                    .filter(e -> (e instanceof AssignmentExpression)
+                            || (e instanceof AggregateWrapperExpression ae
+                                    && ae.getExpression() instanceof AssignmentExpression))
+                    .count();
+            assignmentSelect = assignmentItems > 0;
+            if (assignmentSelect
+                    && assignmentItems != projections.size())
+            {
+                throw new ParseException("Cannot combine variable assignment items with data retrieval items", ctx.selectItem(0));
+            }
+            else if (assignmentSelect
+                    && ctx.into != null)
+            {
+                throw new ParseException("Cannot have assignments in a SELECT INTO statement", ctx);
+            }
+            else if (assignmentSelect
+                    && insideSubQuery)
+            {
+                throw new ParseException("Assignment selects are not allowed in sub query context", ctx);
+            }
         }
 
         private ILogicalPlan getTableSource(SelectStatementContext ctx)

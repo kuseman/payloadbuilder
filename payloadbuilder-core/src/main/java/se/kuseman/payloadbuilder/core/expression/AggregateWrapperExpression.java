@@ -127,6 +127,12 @@ public class AggregateWrapperExpression implements IAggregateExpression, HasAlia
         {
             e = ((AliasExpression) expression).getExpression();
         }
+
+        if (e instanceof AssignmentExpression ase)
+        {
+            return ase.createAggregator();
+        }
+
         // A wrapped aggregate alias expression
         if (e instanceof IAggregateExpression)
         {
