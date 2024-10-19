@@ -260,6 +260,7 @@ public class QueryParserTest extends Assert
         assertSelect("select @var = 10");
         assertSelect("select @var = a.col from \"table\" a");
         assertSelectFail(ParseException.class, "Cannot combine variable assignment items with data retrieval items", "select @var = a.col, a.col2 from \"table\" a");
+        assertSelectFail(ParseException.class, "Cannot combine variable assignment items with data retrieval items", "select @var = a.col, a.col2 from \"table\" a group by 'dummy'");
 
         assertSelectFail(ParseException.class, "Cannot assign to system variables", "select @@rowcount = 1");
 
