@@ -1102,6 +1102,31 @@
       ]
     },
     {
+      "name": "Assignment select group by",
+      "query": [
+        "select @var = min(col1) from source group by 'dummy'",
+        "select @var"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "var", "value": 1 }]
+        ]
+      ]
+    },
+    {
+      "name": "Assignment select group by with multiple groups",
+      "query": [
+        "select @var = 0 ",
+        "select @var = min(@var + length(string1)) from strings group by id ",
+        "select @var"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "var", "value": 48 }]
+        ]
+      ]
+    },
+    {
       "name": "Calculated value",
       "query": [
         "select id + row_id calc ",

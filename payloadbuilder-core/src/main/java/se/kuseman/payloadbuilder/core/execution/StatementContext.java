@@ -14,6 +14,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
+import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
+import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.ISeekKey;
 import se.kuseman.payloadbuilder.api.execution.IStatementContext;
 import se.kuseman.payloadbuilder.api.execution.NodeData;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
@@ -47,6 +49,8 @@ public class StatementContext implements IStatementContext
 
     /** Reference to outer tuple used in index seek operations where the inner operator picks it's values from. */
     private TupleVector indexSeekTupleVector;
+    /** Cache of seeks keys for index seek predicate. Used to avoid multiple calculations if called twice. */
+    private List<ISeekPredicate.ISeekKey> indexSeekKeys;
 
     public StatementContext()
     {
@@ -83,6 +87,8 @@ public class StatementContext implements IStatementContext
         setNow();
         lambdaValues = null;
         nodeDataById.clear();
+        indexSeekTupleVector = null;
+        indexSeekKeys = null;
     }
 
     public Map<Integer, ? extends NodeData> getNodeData()
@@ -159,6 +165,17 @@ public class StatementContext implements IStatementContext
         }
 
         this.indexSeekTupleVector = indexSeekTupleVector;
+        this.indexSeekKeys = null;
+    }
+
+    public List<ISeekPredicate.ISeekKey> getIndexSeekKeys()
+    {
+        return indexSeekKeys;
+    }
+
+    public void setIndexSeekKeys(List<ISeekKey> indexSeekKeys)
+    {
+        this.indexSeekKeys = indexSeekKeys;
     }
 
     /**

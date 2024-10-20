@@ -11,6 +11,8 @@ import se.kuseman.payloadbuilder.api.catalog.Option;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
+import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.ISeekKey;
+import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 
 /** Seek operator that seeks a datasource with a set of seek keys */
@@ -39,6 +41,17 @@ public class IndexSeek extends TableScan
         properties.put(IDatasource.INDEX, seekPredicate.getIndexColumns());
         properties.put("Seek Keys", seekPredicate.toString());
         return properties;
+    }
+
+    @Override
+    public TupleIterator execute(IExecutionContext context)
+    {
+        List<ISeekKey> seekKeys = seekPredicate.getSeekKeys(context);
+        if (seekKeys.isEmpty())
+        {
+            return TupleIterator.EMPTY;
+        }
+        return super.execute(context);
     }
 
     @Override

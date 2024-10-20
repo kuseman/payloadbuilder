@@ -36,6 +36,11 @@ abstract class AMutableVector implements MutableValueVector
     @Override
     public boolean isNull(int row)
     {
+        if (size == 0)
+        {
+            return true;
+        }
+
         if (nullBuffer == null)
         {
             return false;

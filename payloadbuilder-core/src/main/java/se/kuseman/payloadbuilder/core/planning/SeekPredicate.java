@@ -1,5 +1,6 @@
 package se.kuseman.payloadbuilder.core.planning;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 
@@ -73,6 +74,17 @@ class SeekPredicate implements ISeekPredicate
     @Override
     public List<ISeekKey> getSeekKeys(IExecutionContext context)
     {
+        List<ISeekKey> seekKeys = ((StatementContext) context.getStatementContext()).getIndexSeekKeys();
+        if (seekKeys == null)
+        {
+            seekKeys = getSeekKeysInternal(context);
+            ((StatementContext) context.getStatementContext()).setIndexSeekKeys(seekKeys);
+        }
+        return seekKeys;
+    }
+
+    private List<ISeekKey> getSeekKeysInternal(IExecutionContext context)
+    {
         if (isPushDown)
         {
             return getPushDownSeekKeys(context);
@@ -95,6 +107,10 @@ class SeekPredicate implements ISeekPredicate
         }
 
         ValueVector selection = getUniqueRowSelection(vectors, tupleVector.getRowCount());
+        if (selection.size() == 0)
+        {
+            return emptyList();
+        }
         List<ISeekKey> seekKeys = new ArrayList<>(size);
         for (int i = 0; i < size; i++)
         {
@@ -140,7 +156,7 @@ class SeekPredicate implements ISeekPredicate
             {
                 if (vectors[j].isNull(i))
                 {
-                    break rows;
+                    continue rows;
                 }
             }
             set.add(i);

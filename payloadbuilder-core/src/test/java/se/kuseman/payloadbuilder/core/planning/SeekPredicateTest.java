@@ -46,7 +46,7 @@ public class SeekPredicateTest extends APhysicalPlanTest
         assertEquals(asList("col1"), p.getIndexColumns());
 
         // Verify that nulls and duplicates are removed
-        TupleVector tv = TupleVector.of(Schema.of(Column.of("value", Type.Int)), asList(vv(Type.Int, 1, 1, 2, 3, 4, 5, null)));
+        TupleVector tv = TupleVector.of(Schema.of(Column.of("value", Type.Int)), asList(vv(Type.Int, null, 1, 1, 2, 3, 4, 5)));
         context.getStatementContext()
                 .setIndexSeekTupleVector(tv);
 
