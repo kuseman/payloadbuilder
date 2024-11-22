@@ -129,9 +129,9 @@ abstract class AInMemoryCache<TValue> implements CacheProvider
     {
         final QualifiedName name;
         final Map<Object, CacheEntryImpl<T>> elements;
-        volatile int cacheHits;
-        volatile int cacheStaleHits;
-        volatile int cacheMisses;
+        AtomicInteger cacheHits = new AtomicInteger();
+        AtomicInteger cacheStaleHits = new AtomicInteger();
+        AtomicInteger cacheMisses = new AtomicInteger();
         volatile ZonedDateTime lastAccessTime;
         volatile ZonedDateTime lastReloadTime;
         private boolean alwaysLoadAsync;
@@ -146,6 +146,33 @@ abstract class AInMemoryCache<TValue> implements CacheProvider
         /** Compute or get value for key */
         T computeIfAbsent(Object key, final Duration ttl, final Supplier<T> supplier)
         {
+            // To save some locking/contention we do a
+            // simple get to see if the value is returnable without
+            // going into the compute section
+            CacheEntryImpl<T> ce = elements.get(key);
+            if (ce != null)
+            {
+                T value = ce.value;
+                boolean expired = ce.isExpired();
+                boolean reloading = ce.reloading;
+
+                if (value != null
+                        && (!expired
+                                || reloading))
+                {
+                    lastAccessTime = ZonedDateTime.now();
+                    if (reloading)
+                    {
+                        cacheStaleHits.incrementAndGet();
+                    }
+                    else
+                    {
+                        cacheHits.incrementAndGet();
+                    }
+                    return value;
+                }
+            }
+
             return elements.compute(key, (k, v) ->
             {
                 lastAccessTime = ZonedDateTime.now();
@@ -153,7 +180,7 @@ abstract class AInMemoryCache<TValue> implements CacheProvider
                 if (v == null
                         && !alwaysLoadAsync)
                 {
-                    cacheMisses++;
+                    cacheMisses.incrementAndGet();
                     return new CacheEntryImpl<>(k, supplier.get(), ttl);
                 }
 
@@ -190,11 +217,11 @@ abstract class AInMemoryCache<TValue> implements CacheProvider
                         });
                     }
 
-                    cacheStaleHits++;
+                    cacheStaleHits.incrementAndGet();
                 }
                 else
                 {
-                    cacheHits++;
+                    cacheHits.incrementAndGet();
                 }
 
                 return entry;
@@ -216,19 +243,19 @@ abstract class AInMemoryCache<TValue> implements CacheProvider
         @Override
         public int getCacheHits()
         {
-            return cacheHits;
+            return cacheHits.get();
         }
 
         @Override
         public int getCacheStaleHits()
         {
-            return cacheStaleHits;
+            return cacheStaleHits.get();
         }
 
         @Override
         public int getCacheMisses()
         {
-            return cacheMisses;
+            return cacheMisses.get();
         }
 
         @Override
@@ -284,12 +311,12 @@ abstract class AInMemoryCache<TValue> implements CacheProvider
         boolean isExpired()
         {
             return expireTime >= 0
-                    && System.currentTimeMillis() >= expireTime;
+                    && System.nanoTime() >= expireTime;
         }
 
         void setExpire(Duration ttl)
         {
-            this.expireTime = ttl != null ? (System.currentTimeMillis() + ttl.toMillis())
+            this.expireTime = ttl != null ? (System.nanoTime() + ttl.toNanos())
                     : -1;
         }
 
