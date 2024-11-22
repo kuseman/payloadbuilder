@@ -35,6 +35,12 @@ public class OutputWriterUtils
         writer.startObject();
         for (int i = 0; i < size; i++)
         {
+            if (context.getSession()
+                    .abortQuery())
+            {
+                break;
+            }
+
             Column column = schema.getColumns()
                     .get(i);
             String columnName = column.getName();
@@ -75,6 +81,7 @@ public class OutputWriterUtils
 
         for (int j = 0; j < rowCount; j++)
         {
+
             if (root)
             {
                 writer.startRow();
@@ -82,6 +89,11 @@ public class OutputWriterUtils
             writer.startObject();
             for (int i = 0; i < size; i++)
             {
+                if (context.getSession()
+                        .abortQuery())
+                {
+                    return;
+                }
                 Column column = schema.getColumns()
                         .get(i);
 
@@ -118,6 +130,11 @@ public class OutputWriterUtils
         writer.startArray();
         for (int i = 0; i < size; i++)
         {
+            if (context.getSession()
+                    .abortQuery())
+            {
+                break;
+            }
             write(vector, i, writer, context);
         }
         writer.endArray();
