@@ -1299,8 +1299,7 @@ public class PayloadWriterTest extends Assert
     }
 
     /**
-     * Regression where we had a mismatch in input schema and payload schema
-     * where equal arrays wasn't re-added correctly.
+     * Regression where we had a mismatch in input schema and payload schema where equal arrays wasn't re-added correctly.
      */
     @Test
     public void test_table_with_array_1()
