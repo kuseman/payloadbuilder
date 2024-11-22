@@ -27,6 +27,51 @@ import se.kuseman.payloadbuilder.core.expression.AExpressionTest;
 public class SystemCatalogTest extends AExpressionTest
 {
     @Test
+    public void test_parseduration() throws Exception
+    {
+        assertExpression(null, null, "parseduration(null)");
+        assertExpression(10_000L, null, "parseduration('00:00:10')");
+        assertExpression(100L, null, "parseduration('00:00:00.100')");
+        assertExpression(86400000L, null, "parseduration('24:00:00')");
+        assertExpression(86400000L * 2, null, "parseduration('48:00:00')");
+
+        assertExpression(10_000L, null, "parseduration('PT10S')");
+        assertExpression(86400000L, null, "parseduration('P1D')");
+    }
+
+    @Test
+    public void test_parsedatasize() throws Exception
+    {
+        assertExpression(null, null, "parsedatasize(null)");
+        assertExpression(10L, null, "parsedatasize('10b')");
+        assertExpression(10_240L, null, "parsedatasize('10kb')");
+        assertExpression(-11010048L, null, "parsedatasize('-10.5MB')");
+        assertExpression(-1181116032L, null, "parsedatasize('-1.1gB')");
+        assertExpression(2418925633536L, null, "parsedatasize('2.2tb')");
+
+        try
+        {
+            assertExpression(null, null, "parsedatasize('1.mb')", true);
+            fail();
+        }
+        catch (IllegalArgumentException e)
+        {
+            assertTrue(e.getMessage(), e.getMessage()
+                    .contains("Could not parse data size: 1.mb"));
+        }
+        try
+        {
+            assertExpression(null, null, "parsedatasize('1.2hb')", true);
+            fail();
+        }
+        catch (IllegalArgumentException e)
+        {
+            assertTrue(e.getMessage(), e.getMessage()
+                    .contains("Unkown data size unit: hb"));
+        }
+    }
+
+    @Test
     public void test_function_hash() throws Exception
     {
         assertExpression(null, null, "hash(null)");

@@ -139,6 +139,8 @@ public class SystemCatalog extends Catalog
         catalog.registerFunction(new ToTableFunction());
         catalog.registerFunction(new LeastGreatestFunction(false));
         catalog.registerFunction(new LeastGreatestFunction(true));
+        catalog.registerFunction(new ParseDurationFunction());
+        catalog.registerFunction(new ParseDataSizeFunction());
 
         // Mathematical functions
         catalog.registerFunction(new AbsFunction());
