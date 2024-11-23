@@ -14,6 +14,12 @@ public interface ICaseExpression extends IExpression
     /** Return else expression if any */
     IExpression getElseExpression();
 
+    @Override
+    default <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
+
     /** When clause */
     public static class WhenClause
     {

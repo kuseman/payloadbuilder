@@ -9,11 +9,7 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /**
- * Match function that is applicable in query predicates that uses ES query_string operator on free text fields
- *
- * <pre>
- * match(fields,
- * </pre>
+ * Query function that is applicable in query predicates that uses ES query_string operator on free text fields
  */
 class QueryFunction extends ScalarFunctionInfo
 {

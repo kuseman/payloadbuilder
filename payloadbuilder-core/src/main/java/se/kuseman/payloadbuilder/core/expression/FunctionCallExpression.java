@@ -17,7 +17,6 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IAggregator;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.IFunctionCallExpression;
 
 /** A resolved function (scalar, aggregate) call expression. Name and arguments. Used in physical plan when evaluating */
@@ -83,12 +82,6 @@ public class FunctionCallExpression implements IFunctionCallExpression, IAggrega
     public ResolvedType getAggregateType()
     {
         return function.getAggregateType(arguments);
-    }
-
-    @Override
-    public <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
-    {
-        return visitor.visit(this, context);
     }
 
     @Override

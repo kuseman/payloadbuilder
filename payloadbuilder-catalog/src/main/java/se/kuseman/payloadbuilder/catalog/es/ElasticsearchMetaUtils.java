@@ -7,8 +7,6 @@ import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 import static org.apache.commons.lang3.StringUtils.isBlank;
-import static se.kuseman.payloadbuilder.catalog.es.ESDatasource.MAPPER;
-import static se.kuseman.payloadbuilder.catalog.es.HttpClientUtils.execute;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -289,12 +287,13 @@ class ElasticsearchMetaUtils
         return new MappedProperty(name, type, index, nestedPath, fields, meta);
     }
 
+    @SuppressWarnings("resource")
     private static <T> T get(Class<T> clazz, IQuerySession session, String catalogAlias, String endpoint, String path)
     {
         HttpGet get = new HttpGet(String.format("%s/%s", endpoint, path));
         try
         {
-            return execute(session, catalogAlias, get, response ->
+            return HttpClientUtils.execute(session, catalogAlias, get, response ->
             {
                 HttpEntity entity = response.getEntity();
                 if (response.getCode() != HttpStatus.SC_OK)
@@ -302,7 +301,7 @@ class ElasticsearchMetaUtils
                     throw new RuntimeException("Error query Elastic: " + IOUtils.toString(entity.getContent(), StandardCharsets.UTF_8));
                 }
 
-                return MAPPER.readValue(entity.getContent(), clazz);
+                return ESDatasource.MAPPER.readValue(entity.getContent(), clazz);
             });
 
         }
@@ -364,6 +363,13 @@ class ElasticsearchMetaUtils
                     || "text".equals(type);
         }
 
+        /** Returns true if this is a string (non freetext) type of mapping. */
+        boolean isStringType()
+        {
+            return "string".equalsIgnoreCase(type)
+                    || "keyword".equalsIgnoreCase(type);
+        }
+
         /** Returns true if this property values should be quoted when used in queries */
         boolean shouldQuoteValues()
         {
@@ -388,6 +394,11 @@ class ElasticsearchMetaUtils
         static MappedProperty of(QualifiedName name, String type)
         {
             return new MappedProperty(name, type, null, null, emptyList(), emptyMap());
+        }
+
+        static MappedProperty of(QualifiedName name, String type, QualifiedName nestedPath)
+        {
+            return new MappedProperty(name, type, null, nestedPath, emptyList(), emptyMap());
         }
     }
 }

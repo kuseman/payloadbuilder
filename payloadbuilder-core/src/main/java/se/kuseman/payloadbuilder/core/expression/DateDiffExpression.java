@@ -14,7 +14,6 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IDateDiffExpression;
 import se.kuseman.payloadbuilder.api.expression.IDatePartExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 
 /** Date diff function expression */
 public class DateDiffExpression implements IDateDiffExpression
@@ -58,12 +57,6 @@ public class DateDiffExpression implements IDateDiffExpression
     public ResolvedType getType()
     {
         return ResolvedType.of(Type.Long);
-    }
-
-    @Override
-    public <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
-    {
-        return visitor.visit(this, context);
     }
 
     @Override

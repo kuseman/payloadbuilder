@@ -13,4 +13,10 @@ public interface IInExpression extends IExpression
 
     /** Return IN arguments */
     List<IExpression> getArguments();
+
+    @Override
+    default <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
 }

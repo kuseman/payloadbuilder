@@ -27,6 +27,7 @@ public class ES2XTest extends BaseESTest
     {
         private static final int PORT = 9200;
         private static final String IMAGE_NAME = "elasticsearch:2.4.6";
+        @SuppressWarnings("resource")
         private static final GenericContainer<?> ES_CONTAINER = new GenericContainer<>(DockerImageName.parse(IMAGE_NAME)).withExposedPorts(PORT);
 
         static final String ES_ENDPOINT;

@@ -3,7 +3,6 @@ package se.kuseman.payloadbuilder.catalog.http;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -151,7 +150,11 @@ class HttpDataSource implements IDatasource
 
             return FALLBACK_TRANSFORMER.transform(request, response, context, options);
         }
-        catch (IOException e)
+        catch (RuntimeException e)
+        {
+            throw e;
+        }
+        catch (Exception e)
         {
             if (response != null)
             {

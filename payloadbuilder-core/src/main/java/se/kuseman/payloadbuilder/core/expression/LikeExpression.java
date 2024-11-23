@@ -14,7 +14,6 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.ILikeExpression;
 
 /** Like expression */
@@ -78,12 +77,6 @@ public class LikeExpression implements ILikeExpression, Invertable
     public List<IExpression> getChildren()
     {
         return asList(expression, patternExpression);
-    }
-
-    @Override
-    public <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
-    {
-        return visitor.visit(this, context);
     }
 
     @Override

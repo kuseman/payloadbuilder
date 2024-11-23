@@ -93,6 +93,7 @@ public class ExecutionContext implements IExecutionContext
     }
 
     /** Get variable from context */
+    @Override
     public ValueVector getVariableValue(QualifiedName name)
     {
         return variables != null ? variables.get(name)

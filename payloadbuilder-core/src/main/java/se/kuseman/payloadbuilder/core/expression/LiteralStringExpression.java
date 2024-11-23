@@ -10,7 +10,6 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.ILiteralStringExpression;
 
 /** Literal string */
@@ -33,12 +32,6 @@ public class LiteralStringExpression extends LiteralExpression implements ILiter
     public UTF8String getValue()
     {
         return string;
-    }
-
-    @Override
-    public <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
-    {
-        return visitor.visit(this, context);
     }
 
     @Override

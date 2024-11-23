@@ -8,7 +8,6 @@ import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.ILiteralDateTimeExpression;
 
 /** Date time expression */
@@ -26,12 +25,6 @@ public class LiteralDateTimeExpression extends LiteralExpression implements ILit
     public EpochDateTime getValue()
     {
         return value;
-    }
-
-    @Override
-    public <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
-    {
-        return visitor.visit(this, context);
     }
 
     @Override

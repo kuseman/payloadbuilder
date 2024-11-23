@@ -108,11 +108,11 @@ class ESDatasource implements IDatasource
     private final ISeekPredicate indexPredicate;
     /** The mapped property used for the index */
     private final MappedProperty indexProperty;
-    private final List<PropertyPredicate> propertyPredicates;
+    private final List<IPropertyPredicate> propertyPredicates;
     private final List<SortItemMeta> sortItems;
 
     ESDatasource(int nodeId, ElasticStrategy strategy, String catalogAlias, QualifiedName table, ISeekPredicate indexPredicate, MappedProperty indexProperty,
-            List<PropertyPredicate> propertyPredicates, List<SortItemMeta> sortItems)
+            List<IPropertyPredicate> propertyPredicates, List<SortItemMeta> sortItems)
     {
         this.nodeId = nodeId;
         this.strategy = strategy;
@@ -132,7 +132,7 @@ class ESDatasource implements IDatasource
                 || indexProperty.shouldQuoteValues();
 
         Map<String, Object> result = ofEntries(true, entry(CATALOG, ESCatalog.NAME), entry(PREDICATE, propertyPredicates.stream()
-                .map(PropertyPredicate::getDescription)
+                .map(IPropertyPredicate::getDescription)
                 .collect(joining(" AND "))), entry("Sort",
                         sortItems.stream()
                                 .map(Object::toString)
@@ -148,6 +148,10 @@ class ESDatasource implements IDatasource
             result.put("Bytes sent", FileUtils.byteCountToDisplaySize(data.bytesSent));
             result.put("Bytes received", FileUtils.byteCountToDisplaySize(data.bytesReceived));
             result.put("Request and deserialization time", DurationFormatUtils.formatDurationHMS(data.requestTime.getTime(TimeUnit.MILLISECONDS)));
+            if (!isBlank(data.actualQuery))
+            {
+                result.put("Query", data.actualQuery);
+            }
         }
 
         return result;
@@ -184,7 +188,7 @@ class ESDatasource implements IDatasource
         boolean quoteValues = indexProperty == null
                 || indexProperty.shouldQuoteValues();
         String body = ESQueryUtils.getSearchBody(false, strategy, sortItems, propertyPredicates, indexSeekValues, indexField, quoteValues, context);
-
+        data.actualQuery = body;
         return getScrollingIterator(context, strategy, catalogAlias, esType.endpoint, data, searchUrl, scrollUrl, body);
     }
 
@@ -202,21 +206,26 @@ class ESDatasource implements IDatasource
         }
 
         // Filter on id, see if we can skip scroll
-        for (PropertyPredicate predicate : propertyPredicates)
+        for (IPropertyPredicate predicate : propertyPredicates)
         {
-            if (ID.equalsIgnoreCase(predicate.property))
+            if (ID.equalsIgnoreCase(predicate.getProperty()))
             {
-                if (predicate.predicate.getType() == Type.COMPARISION
-                        && predicate.predicate.getComparisonType() == IComparisonExpression.Type.EQUAL)
+                if (predicate.getPredicate()
+                        .getType() == Type.COMPARISION
+                        && predicate.getPredicate()
+                                .getComparisonType() == IComparisonExpression.Type.EQUAL)
                 {
                     min = min < 0 ? 1
                             : Math.min(min, 1);
                 }
-                else if (predicate.predicate.getType() == Type.IN
-                        && !predicate.predicate.getInExpression()
+                else if (predicate.getPredicate()
+                        .getType() == Type.IN
+                        && !predicate.getPredicate()
+                                .getInExpression()
                                 .isNot())
                 {
-                    int argSize = predicate.predicate.getInExpression()
+                    int argSize = predicate.getPredicate()
+                            .getInExpression()
                             .getArguments()
                             .size();
                     min = min < 0 ? argSize
@@ -760,6 +769,7 @@ class ESDatasource implements IDatasource
         long bytesSent;
         long bytesReceived;
         int scrollCount;
+        String actualQuery;
 
         Data()
         {

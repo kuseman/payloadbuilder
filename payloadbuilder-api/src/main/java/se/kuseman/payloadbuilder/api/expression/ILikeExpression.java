@@ -14,4 +14,10 @@ public interface ILikeExpression extends IExpression
 
     /** Return the escape character expression for this LIKE expression */
     IExpression getEscapeCharacterExpression();
+
+    @Override
+    default <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
 }

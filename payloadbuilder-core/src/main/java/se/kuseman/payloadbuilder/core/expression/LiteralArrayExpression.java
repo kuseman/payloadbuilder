@@ -9,7 +9,6 @@ import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.ILiteralArrayExpression;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 
@@ -28,12 +27,6 @@ public class LiteralArrayExpression extends LiteralExpression implements ILitera
     public ValueVector getValue()
     {
         return value;
-    }
-
-    @Override
-    public <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
-    {
-        return visitor.visit(this, context);
     }
 
     @Override

@@ -19,4 +19,10 @@ public interface IFunctionCallExpression extends IExpression
 
     /** Return catalog alias for this function call */
     String getCatalogAlias();
+
+    @Override
+    default <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
 }
