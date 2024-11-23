@@ -16,7 +16,6 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IDateAddExpression;
 import se.kuseman.payloadbuilder.api.expression.IDatePartExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 
 /** Date add function expression */
 public class DateAddExpression implements IDateAddExpression
@@ -54,12 +53,6 @@ public class DateAddExpression implements IDateAddExpression
     public List<IExpression> getChildren()
     {
         return asList(number, expression);
-    }
-
-    @Override
-    public <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
-    {
-        return visitor.visit(this, context);
     }
 
     @Override

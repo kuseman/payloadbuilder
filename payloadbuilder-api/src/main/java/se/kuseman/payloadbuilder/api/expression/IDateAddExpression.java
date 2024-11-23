@@ -13,4 +13,10 @@ public interface IDateAddExpression extends IExpression
 
     /** Return number expression */
     IExpression getNumber();
+
+    @Override
+    default <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
 }

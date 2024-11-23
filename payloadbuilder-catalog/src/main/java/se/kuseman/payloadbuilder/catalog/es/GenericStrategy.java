@@ -33,6 +33,12 @@ class GenericStrategy implements ElasticStrategy
     }
 
     @Override
+    public boolean supportsMatchNone()
+    {
+        return true;
+    }
+
+    @Override
     public boolean supportsTypes()
     {
         return true;

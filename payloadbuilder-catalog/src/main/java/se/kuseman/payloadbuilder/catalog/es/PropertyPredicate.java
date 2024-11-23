@@ -29,7 +29,7 @@ import se.kuseman.payloadbuilder.api.expression.INullPredicateExpression;
 
 /** Predicate for a property */
 @SuppressWarnings("deprecation")
-class PropertyPredicate
+class PropertyPredicate implements IPropertyPredicate
 {
     final String property;
     final String nestedPath;
@@ -49,21 +49,35 @@ class PropertyPredicate
         this.fullTextPredicate = fullTextPredicate;
     }
 
-    String getDescription()
+    @Override
+    public String getDescription()
     {
         return predicate.getSqlRepresentation();
     }
 
-    private ValueVector evalExpression(boolean describe, IExpression expression, IExecutionContext context)
+    @Override
+    public String getProperty()
+    {
+        return property;
+    }
+
+    @Override
+    public IPredicate getPredicate()
+    {
+        return predicate;
+    }
+
+    static ValueVector evalExpression(IExpression expression, IExecutionContext context)
     {
         return expression.eval(context);
     }
 
-    void appendBooleanClause(boolean describe, StringBuilder filterMust, StringBuilder filterMustNot, IExecutionContext context)
+    @Override
+    public void appendBooleanClause(ElasticStrategy strategy, StringBuilder filterMust, StringBuilder filterMustNot, IExecutionContext context)
     {
         if (predicate.getType() == IPredicate.Type.COMPARISION)
         {
-            ValueVector v = evalExpression(describe, predicate.getComparisonExpression(), context);
+            ValueVector v = evalExpression(predicate.getComparisonExpression(), context);
             if (v.isNull(0))
             {
                 // if we have null here this means we have a
@@ -115,12 +129,11 @@ class PropertyPredicate
         }
         else if (predicate.getType() == IPredicate.Type.IN)
         {
-            // { "terms": { "property": [ "value", "value2"] }}
-
             IInExpression inExpression = predicate.getInExpression();
             StringBuilder sb = inExpression.isNot() ? filterMustNot
                     : filterMust;
 
+            // { "terms": { "property": [ "value", "value2"] }}
             prependNested(sb);
             sb.append("{\"terms\":{\"")
                     .append(property)
@@ -128,7 +141,7 @@ class PropertyPredicate
 
             List<IExpression> arguments = inExpression.getArguments();
             sb.append(arguments.stream()
-                    .map(e -> evalExpression(describe, e, context))
+                    .map(e -> evalExpression(e, context))
                     .filter(v -> !v.isNull(0))
                     .map(o -> quote(o.valueAsObject(0)))
                     .collect(joining(",")));
@@ -142,7 +155,7 @@ class PropertyPredicate
             StringBuilder sb = likeExpression.isNot() ? filterMustNot
                     : filterMust;
 
-            Object value = evalExpression(describe, likeExpression.getPatternExpression(), context).valueAsObject(0);
+            Object value = evalExpression(likeExpression.getPatternExpression(), context).valueAsObject(0);
             String query = String.valueOf(value)
                     // Replace wildcard chars
                     .replace("?", "\\\\?")
@@ -205,7 +218,7 @@ class PropertyPredicate
         }
         else if (fullTextPredicate)
         {
-            appendFullTextOperator(describe, context, predicate.getFunctionCallExpression(), filterMust);
+            appendFullTextOperator(context, predicate.getFunctionCallExpression(), filterMust);
         }
     }
 
@@ -231,7 +244,7 @@ class PropertyPredicate
         sb.append("}}");
     }
 
-    private void appendFullTextOperator(boolean describe, IExecutionContext context, IFunctionCallExpression functionExpression, StringBuilder sb)
+    private void appendFullTextOperator(IExecutionContext context, IFunctionCallExpression functionExpression, StringBuilder sb)
     {
         FunctionInfo functionInfo = functionExpression.getFunctionInfo();
         List<IExpression> arguments = functionExpression.getArguments();
@@ -247,10 +260,10 @@ class PropertyPredicate
             }
             else
             {
-                arg0 = String.valueOf(evalExpression(describe, arguments.get(0), context).valueAsObject(0));
+                arg0 = String.valueOf(evalExpression(arguments.get(0), context).valueAsObject(0));
             }
 
-            String match = String.valueOf(evalExpression(describe, arguments.get(1), context).valueAsObject(0));
+            String match = String.valueOf(evalExpression(arguments.get(1), context).valueAsObject(0));
             String[] fields = arg0.split(",");
 
             // TODO: - options argument
@@ -280,7 +293,7 @@ class PropertyPredicate
         }
         else
         {
-            String query = String.valueOf(evalExpression(describe, arguments.get(0), context).valueAsObject(0));
+            String query = String.valueOf(evalExpression(arguments.get(0), context).valueAsObject(0));
 
             sb.append("{\"query_string\":{")
                     .append("\"query\":\"")
@@ -307,7 +320,7 @@ class PropertyPredicate
         }
     }
 
-    private String quote(Object val)
+    static String quote(Object val)
     {
         Object value = val;
         if (value == null)

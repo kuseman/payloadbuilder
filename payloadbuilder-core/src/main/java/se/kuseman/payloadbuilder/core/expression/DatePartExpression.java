@@ -13,7 +13,6 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IDatePartExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 
 /** Date part function expression */
 public class DatePartExpression implements IDatePartExpression
@@ -43,12 +42,6 @@ public class DatePartExpression implements IDatePartExpression
     public List<IExpression> getChildren()
     {
         return singletonList(expression);
-    }
-
-    @Override
-    public <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
-    {
-        return visitor.visit(this, context);
     }
 
     @Override

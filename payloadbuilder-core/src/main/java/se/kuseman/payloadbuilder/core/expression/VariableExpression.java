@@ -9,7 +9,6 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
-import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.IVariableExpression;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.StatementContext;
@@ -60,12 +59,6 @@ public class VariableExpression implements IVariableExpression, HasAlias
     }
 
     @Override
-    public <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
-    {
-        return visitor.visit(this, context);
-    }
-
-    @Override
     public ValueVector eval(TupleVector input, IExecutionContext context)
     {
         return eval(input, ValueVector.range(0, input.getRowCount()), context);
@@ -74,9 +67,9 @@ public class VariableExpression implements IVariableExpression, HasAlias
     @Override
     public ValueVector eval(TupleVector input, ValueVector selection, IExecutionContext context)
     {
-        ExecutionContext ctx = (ExecutionContext) context;
         if (system)
         {
+            ExecutionContext ctx = (ExecutionContext) context;
             if (ROWCOUNT.equalsIgnoreCase(name))
             {
                 StatementContext sctx = (StatementContext) context.getStatementContext();
@@ -90,7 +83,7 @@ public class VariableExpression implements IVariableExpression, HasAlias
             return null;
         }
 
-        ValueVector value = ctx.getVariableValue(name);
+        ValueVector value = context.getVariableValue(name);
         if (value == null)
         {
             return ValueVector.literalNull(ResolvedType.of(Type.Any), selection.size());

@@ -22,4 +22,7 @@ interface ElasticStrategy
 
     /** Returns true if this elastic supports data streams or not. */
     boolean supportsDataStreams();
+
+    /** Returns true if this elastic supports match none or not. */
+    boolean supportsMatchNone();
 }

@@ -8,6 +8,12 @@ public interface IDatePartExpression extends IUnaryExpression
     /** Return part */
     Part getPart();
 
+    @Override
+    default <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
+
     /** Date parts */
     public enum Part
     {

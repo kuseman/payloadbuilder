@@ -15,7 +15,6 @@ import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.ISubscriptExpression;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
@@ -162,12 +161,6 @@ public class SubscriptExpression implements ISubscriptExpression, HasAlias, HasC
         }
 
         throw new IllegalArgumentException("Cannot subscript " + resultType + " with " + subscriptResult.type());
-    }
-
-    @Override
-    public <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
-    {
-        return visitor.visit(this, context);
     }
 
     private ValueVector subscriptArray(ExecutionContext context, int rowCount, ValueVector value, ValueVector subscript)

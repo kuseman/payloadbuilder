@@ -55,7 +55,10 @@ public interface IExpression
     }
 
     /** Accept visitor */
-    <T, C> T accept(IExpressionVisitor<T, C> visitor, C context);
+    default <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
 
     /** Fold this expression. Eliminate constants etc. */
     default IExpression fold()

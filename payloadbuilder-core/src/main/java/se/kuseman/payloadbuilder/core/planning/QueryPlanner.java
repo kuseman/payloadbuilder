@@ -856,6 +856,12 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         }
 
         @Override
+        public IExpression getFullExpression()
+        {
+            return analyzePair.getPredicate();
+        }
+
+        @Override
         public IExpression getComparisonExpression()
         {
             assertType(IPredicate.Type.COMPARISION);

@@ -29,6 +29,7 @@ public class SqlServer2022Test extends BaseJDBCTest
         private static final String PASSWORD = "A_Str0ng_Required_Password";
         private static final int PORT = 1433;
         private static final String IMAGE_NAME = "mcr.microsoft.com/mssql/server:2022-latest";
+        @SuppressWarnings("resource")
         private static final GenericContainer<?> CONTAINER = new GenericContainer<>(DockerImageName.parse(IMAGE_NAME)).withExposedPorts(PORT)
                 .withEnv("SA_PASSWORD", PASSWORD)
                 .withEnv("MSSQL_PID", "Developer")

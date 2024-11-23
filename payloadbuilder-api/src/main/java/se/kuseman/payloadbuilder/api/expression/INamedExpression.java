@@ -5,4 +5,10 @@ public interface INamedExpression extends IUnaryExpression
 {
     /** Return the name of the expression */
     String getName();
+
+    @Override
+    default <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
 }

@@ -13,4 +13,10 @@ public interface IDateDiffExpression extends IExpression
 
     /** Return the end date expression */
     IExpression getEnd();
+
+    @Override
+    default <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
 }
