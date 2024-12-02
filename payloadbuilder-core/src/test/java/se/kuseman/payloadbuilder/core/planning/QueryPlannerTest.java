@@ -70,7 +70,6 @@ import se.kuseman.payloadbuilder.core.physicalplan.APhysicalPlanTest;
 import se.kuseman.payloadbuilder.core.physicalplan.AnalyzeInterceptor;
 import se.kuseman.payloadbuilder.core.physicalplan.Assert;
 import se.kuseman.payloadbuilder.core.physicalplan.CachePlan;
-import se.kuseman.payloadbuilder.core.physicalplan.ConstantScan;
 import se.kuseman.payloadbuilder.core.physicalplan.DescribePlan;
 import se.kuseman.payloadbuilder.core.physicalplan.ExpressionPredicate;
 import se.kuseman.payloadbuilder.core.physicalplan.ExpressionScan;
@@ -1299,7 +1298,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_sub_query_expression_with_switched_inputs()
+    public void test_sub_query_expression()
     {
         //@formatter:off
         String query = ""
@@ -1326,27 +1325,22 @@ public class QueryPlannerTest extends APhysicalPlanTest
 
         //@formatter:off
         IPhysicalPlan expected = new Projection(
-                8,
+                6,
                 NestedLoop.leftJoin(
-                    7,
-                    NestedLoop.leftJoin(
-                        5,
-                        new ConstantScan(0),
-                        new CachePlan(
-                            4,
-                            Assert.maxRowCount(
+                    5,
+                    new TableScan(0, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(0), emptyList()),
+                    new CachePlan(
+                        4,
+                        Assert.maxRowCount(
                                 3,
                                 new Projection(
                                     2,
-                                    new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(0), emptyList()),
-                                    asList(new AliasExpression(cre("col1", tableB), "__expr0"))),
+                                    new TableScan(1, expectedSchemaB, tableB, "test", false, t.scanDataSources.get(1), emptyList()),
+                                    asList(new AliasExpression(cre("col1", tableB), "__expr0", true))),
                                 1)
-                            ),
-                        null,
-                        false),
-                    new TableScan(6, expectedSchemaA, tableA, "test", false, t.scanDataSources.get(1), emptyList()),
+                        ),
                     null,
-                    true),
+                    false),
                 asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(tableA)), new AliasExpression(cre("__expr0", tableB), "values")));
         //@formatter:on
 
@@ -1362,7 +1356,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
-    public void test_sub_query_expression_with_switched_inputs_with_over()
+    public void test_sub_query_expression_with_switched_inputs_with_for()
     {
         //@formatter:off
         String query = ""
@@ -1425,7 +1419,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
                             asList(cre("col1", e_b), cre("col2", e_b))),
                         SystemCatalog.get().getOperatorFunction("object_array"),
                         "sys",
-                        Schema.of(nast("__expr0", ResolvedType.table(objectArraySchema), null))),
+                        Schema.of(col("__expr0", ResolvedType.table(objectArraySchema), null, true))),
                     asSet(pop("b", ResolvedType.table(expectedSchemaB), tableB)),
                     null,
                     SchemaUtils.joinSchema(expectedSchemaA, expectedSchemaB, "b")),

@@ -18,7 +18,6 @@ import java.util.Set;
 
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
@@ -42,7 +41,6 @@ import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.common.SortItem;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
-import se.kuseman.payloadbuilder.core.expression.AExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.ARewriteExpressionVisitor;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
 import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
@@ -157,27 +155,13 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         ILogicalPlan input = plan.getInput()
                 .accept(this, context);
 
+        // Rewrite projections according to input plan schema
         ResolveSchema schema = context.getSchema(input);
-
-        // Concat the schemas here, if we visit sub query expression further down
-        // this will be the actual outer schema for that sub plan
-        // This is a preparation for detecting a correlated sub query expression that will
-        // be optimized later on in SubQueryExpressionPushDown rule
-        // CSOFF
-        ResolveSchema prevOuterSchema = context.outerSchema;
-        // CSON
-        if (SubQueryExpressionDetector.hasSubQueryExpression(plan.getExpressions()))
-        {
-            context.outerSchema = ResolveSchema.concat(context.outerSchema, schema);
-        }
-        // Rewrite expressions according to input plan schema
         context.schema = schema;
         List<IExpression> expressions = ColumnResolverVisitor.rewrite(context, plan.getExpressions());
 
         // Expand all static asterisks, they should not be left for execution
         expressions = expandAsterisks(expressions, context.outerReferences, context.outerSchema, schema);
-
-        context.outerSchema = prevOuterSchema;
 
         // Might create the resulting schema from the expressions here and not do that on demand
         ILogicalPlan result = new Projection(input, expressions);
@@ -191,9 +175,9 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         // Re-write input
         ILogicalPlan input = plan.getInput()
                 .accept(this, context);
-        ResolveSchema schema = context.getSchema(input);
 
         // Rewrite predicate according to input plan schema
+        ResolveSchema schema = context.getSchema(input);
         context.schema = schema;
         IExpression predicate = ColumnResolverVisitor.rewrite(context, plan.getPredicate());
 
@@ -246,17 +230,12 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
 
         ResolveSchema leftSchema = context.getSchema(left);
 
-        // Outer reference are only supported in outer/cross apply's
+        context.outerReferences = new HashSet<>();
+        // Outer reference are only supported in outer/cross apply's so append the outer schema
         if (plan.getCondition() == null
                 && plan.getType() != Join.Type.CROSS)
         {
             context.outerSchema = ResolveSchema.concat(context.outerSchema, leftSchema);
-            context.outerReferences = new HashSet<>();
-        }
-        else
-        {
-            context.outerSchema = null;
-            context.outerReferences = null;
         }
 
         // CSOFF
@@ -531,13 +510,17 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         ILogicalPlan input = plan.getInput()
                 .accept(this, context);
 
-        boolean isAsterisk = SchemaUtils.isAsterisk(input.getSchema(), true);
+        Column column = plan.getSchema()
+                .getColumns()
+                .get(0);
 
-        // Create a temporary column name, this will be corrected in SubQueryExpressionPushDown later on
-        Schema schema = Schema.of(new CoreColumn("output", pair.getValue()
-                .getType(input.getSchema()), "", false, null,
-                isAsterisk ? CoreColumn.Type.NAMED_ASTERISK
-                        : CoreColumn.Type.REGULAR));
+        boolean isInternal = SchemaUtils.isInternal(column);
+
+        // Recreate the operator schema
+        Schema schema = Schema.of(new CoreColumn(column.getName(), pair.getValue()
+                .getType(input.getSchema()), "", isInternal, null, CoreColumn.Type.REGULAR));
+
+        context.planSchema.push(new ResolveSchema(schema));
         return new OperatorFunctionScan(schema, input, plan.getCatalogAlias(), plan.getFunction(), plan.getLocation());
     }
 
@@ -715,33 +698,6 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         return result;
     }
 
-    static class SubQueryExpressionDetector extends AExpressionVisitor<Void, MutableBoolean>
-    {
-        private static final SubQueryExpressionDetector INSTANCE = new SubQueryExpressionDetector();
-
-        static boolean hasSubQueryExpression(List<IExpression> expressions)
-        {
-            MutableBoolean hasSubQueries = new MutableBoolean(false);
-            for (IExpression e : expressions)
-            {
-                e.accept(INSTANCE, hasSubQueries);
-                if (hasSubQueries.booleanValue())
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        @Override
-        public Void visit(UnresolvedSubQueryExpression expression, MutableBoolean context)
-        {
-            context.setTrue();
-            // No need to visit the subquery nestedly since we found one already
-            return null;
-        }
-    }
-
     static class ColumnResolverVisitor extends ARewriteExpressionVisitor<ColumnResolver.Ctx>
     {
         private static final ColumnResolverVisitor INSTANCE = new ColumnResolverVisitor();
@@ -816,7 +772,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         {
             return DereferenceExpression.create(expression.getExpression()
                     .accept(this, context), QualifiedName.of(expression.getRight()), null);
-        };
+        }
 
         @Override
         public IExpression visit(IFunctionCallExpression expression, Ctx context)
@@ -892,13 +848,6 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         }
 
         @Override
-        public IExpression visit(UnresolvedFunctionCallExpression expression, Ctx context)
-        {
-            // Throw here catch errors early on if something was missed in schema resolver
-            throw new IllegalArgumentException("An unresolved function call should not exist at this stage. Verify SchemaResolver");
-        }
-
-        @Override
         public IExpression visit(AsteriskExpression expression, Ctx context)
         {
             String alias = expression.getQname()
@@ -927,8 +876,15 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                     int size = resolveSchema.getSize();
                     for (int i = 0; i < size; i++)
                     {
-                        TableSourceReference tableSource = SchemaUtils.getTableSource(resolveSchema.getColumn(i)
-                                .getRight());
+                        Column column = resolveSchema.getColumn(i)
+                                .getRight();
+                        boolean isInternal = SchemaUtils.isInternal(column);
+                        // Internal column's table sources should not be included
+                        if (isInternal)
+                        {
+                            continue;
+                        }
+                        TableSourceReference tableSource = SchemaUtils.getTableSource(column);
                         if (tableSource != null)
                         {
                             tableSourceReferences.add(tableSource);
@@ -961,8 +917,15 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                     int size = resolveSchema.getSize();
                     for (int i = 0; i < size; i++)
                     {
-                        TableSourceReference tableSource = SchemaUtils.getTableSource(resolveSchema.getColumn(i)
-                                .getRight());
+                        Column column = resolveSchema.getColumn(i)
+                                .getRight();
+                        boolean isInternal = SchemaUtils.isInternal(column);
+                        // Internal column's table sources should not be included
+                        if (isInternal)
+                        {
+                            continue;
+                        }
+                        TableSourceReference tableSource = SchemaUtils.getTableSource(column);
                         if (tableSource != null)
                         {
                             tableSourceReferences.add(tableSource);
@@ -974,39 +937,16 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
             return new AsteriskExpression(expression.getQname(), expression.getLocation(), tableSourceReferences);
         }
 
-        /**
-         * Dig down into sub query and resolve Since this will be a nested loop further down we collect outer references
-         */
+        @Override
+        public IExpression visit(UnresolvedFunctionCallExpression expression, Ctx context)
+        {
+            throw new IllegalArgumentException("UnresolvedFunctionCallExpression should not be present at this stage");
+        }
+
         @Override
         public IExpression visit(UnresolvedSubQueryExpression expression, ColumnResolver.Ctx context)
         {
-            // Reset the outer reference list before visiting the sub query expression plan
-            // to distinctly gather outer references for this sub query
-            // CSOFF
-            Set<Column> prevOuterReferences = context.outerReferences;
-            // CSON
-            context.outerReferences = new HashSet<>();
-
-            // Resolve the sub query plan
-            ILogicalPlan input = expression.getInput()
-                    .accept(context.columnResvoler, context);
-
-            // CSOFF
-            IExpression result = new UnresolvedSubQueryExpression(input, context.outerReferences, expression.getLocation());
-            // CSON
-
-            // Pop the top schema after we visit the logical plan to keep a clean state
-            context.planSchema.pop();
-
-            // Restore context values
-            // Add all new outer references to previous list to cascade the list upwards
-            if (prevOuterReferences != null)
-            {
-                prevOuterReferences.addAll(context.outerReferences);
-            }
-            context.outerReferences = prevOuterReferences;
-
-            return result;
+            throw new IllegalArgumentException("UnresolvedSubQueryExpression should not be present at this stage");
         }
 
         /**
@@ -1507,8 +1447,9 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         /** Append alias schema */
         void add(AliasSchema aliasSchema, Location location)
         {
-            if (schemas.stream()
-                    .anyMatch(s -> equalsAnyIgnoreCase(s.alias, aliasSchema.alias)))
+            if (!"".equalsIgnoreCase(aliasSchema.alias)
+                    && schemas.stream()
+                            .anyMatch(s -> equalsAnyIgnoreCase(s.alias, aliasSchema.alias)))
             {
                 throw new ParseException("Alias '" + aliasSchema.alias + "' is specified multiple times.", location);
             }

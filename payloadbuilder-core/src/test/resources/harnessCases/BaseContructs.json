@@ -166,6 +166,7 @@
     {
       "name": "Cross apply expression scan",
       "query": [
+        "--set @@debugplan = true ",
         "use complexColumns ",
         "select t.id, x.* ",
         "from \"table\" t ",
@@ -491,10 +492,10 @@
       ],
       "expectedResultSets": [
         [
-          [{ "key": "Node Id", "value": 3 }, { "key": "Name", "value": "+- Sort"                 }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": "[d.id ASC]" }, { "key": "Predicate", "value": null              }],
-          [{ "key": "Node Id", "value": 2 }, { "key": "Name", "value": "|  +- Filter"            }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": "__expr0 = 1"     }],
-          [{ "key": "Node Id", "value": 1 }, { "key": "Name", "value": "|     +- Hash Aggregate" }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": "__expr0: count(1)" }, { "key": "Group By", "value": "[d.id]" }, { "key": "Hash Time", "value": "00:00:00.000" }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
-          [{ "key": "Node Id", "value": 0 }, { "key": "Name", "value": "|        +- Scan: data"  }, { "key": "Output", "value": "id (Any), row_id (Any), data (Any)" }, { "key": "Catalog", "value": "Test#c" }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }]
+          [{ "key": "Node Id", "value": 3 }, { "key": "Parent Node Id", "value": null }, { "key": "Name", "value": "+- Sort"                 }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": "[d.id ASC]" }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 2 }, { "key": "Parent Node Id", "value": 3 },    { "key": "Name", "value": "|  +- Filter"            }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": "__expr0 = 1"     }],
+          [{ "key": "Node Id", "value": 1 }, { "key": "Parent Node Id", "value": 2 },    { "key": "Name", "value": "|     +- Hash Aggregate" }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": "__expr0: count(1)" }, { "key": "Group By", "value": "[d.id]" }, { "key": "Hash Time", "value": "00:00:00.000" }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 0 }, { "key": "Parent Node Id", "value": 1 },    { "key": "Name", "value": "|        +- Scan: data"  }, { "key": "Output", "value": "id (Any), row_id (Any), data (Any)" }, { "key": "Catalog", "value": "Test#c" }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }]
         ]
       ]
     },
@@ -535,10 +536,10 @@
       ],
       "expectedResultSets": [
         [
-          [{ "key": "Node Id", "value": 3 }, { "key": "Name", "value": "+- Sort"                 }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": "[d.id ASC]" }, { "key": "Predicate", "value": null              }],
-          [{ "key": "Node Id", "value": 2 }, { "key": "Name", "value": "|  +- Filter"            }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": "__expr0 = 1"     }],
-          [{ "key": "Node Id", "value": 1 }, { "key": "Name", "value": "|     +- Hash Aggregate" }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": "__expr0: count(1)" }, { "key": "Group By", "value": "[d.id]" }, { "key": "Hash Time", "value": "00:00:00.000" }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
-          [{ "key": "Node Id", "value": 0 }, { "key": "Name", "value": "|        +- Scan: data"  }, { "key": "Output", "value": "d (Any)"                            }, { "key": "Catalog", "value": "Test#c" }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }]
+          [{ "key": "Node Id", "value": 3 }, { "key": "Parent Node Id", "value": null }, { "key": "Name", "value": "+- Sort"                 }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": "[d.id ASC]" }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 2 }, { "key": "Parent Node Id", "value": 3 },    { "key": "Name", "value": "|  +- Filter"            }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": "__expr0 = 1"     }],
+          [{ "key": "Node Id", "value": 1 }, { "key": "Parent Node Id", "value": 2 },    { "key": "Name", "value": "|     +- Hash Aggregate" }, { "key": "Output", "value": "id (Any), max(d.row_id) (Any)"      }, { "key": "Catalog", "value": null     }, { "key": "Defined Values", "value": "__expr0: count(1)" }, { "key": "Group By", "value": "[d.id]" }, { "key": "Hash Time", "value": "00:00:00.000" }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }],
+          [{ "key": "Node Id", "value": 0 }, { "key": "Parent Node Id", "value": 1 },    { "key": "Name", "value": "|        +- Scan: data"  }, { "key": "Output", "value": "d (Any)"                            }, { "key": "Catalog", "value": "Test#c" }, { "key": "Defined Values", "value": null                }, { "key": "Group By", "value": null     }, { "key": "Hash Time", "value": null           }, { "key": "Order By", "value": null         }, { "key": "Predicate", "value": null              }]
         ]
       ]
     },
@@ -941,6 +942,7 @@
     {
       "name": "Subquery expression order by aliased column expression",
       "query": [
+          "--set @@debugplan = true ",
           "select d.id, (select s2Row.row_id row_id from (s2) s2Row order by s2Row.row_id for array) val ",
           "from data d ",
           "inner join source s ",
@@ -1340,6 +1342,7 @@
     {
       "name": "Selects with for output with no rows ",
       "query": [
+        "--set @@debugplan = true ",
         "select (select 'hello' col where false for object) no_empty, ",
         "       isnull((select 'hello' col where false for object), object()) empty_object, ",
         "       isnull((select 'hello' col where false for object), array()) empty_array "
@@ -1749,6 +1752,55 @@
       ],
       "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
       "expectedMessageContains": "Ambiguous column: col1"
+    },
+    {
+      "name": "Verify that subquery expression with operator function with no correlation don't break main query logic",
+      "query": [
+        "--set @@printplan = true ",
+        "--set @@debugplan = true ",
+        "select ( select * from source where false for object_array) value from source2 where col1 = 100"
+      ],
+      "expectedResultSets": [
+        []
+      ]
+    },
+    {
+      "name": "Verify that a pushed down subquery isn't included in asterisks",
+      "query": [
+        "select *, (select * from source for object_array) from data"
+      ],
+      "expectedResultSets": [
+        [
+          [{"key":"id","value": 1}, {"key":"row_id","value": 1 }, {"key":"data","value": "1_1"}, {"key":"__expr0","value": [ {"col1": 1, "col2": 2}, {"col1": 3, "col2": 4}, {"col1": 5, "col2": 6} ] } ],
+          [{"key":"id","value": 1}, {"key":"row_id","value": 2 }, {"key":"data","value": "1_2"}, {"key":"__expr0","value": [ {"col1": 1, "col2": 2}, {"col1": 3, "col2": 4}, {"col1": 5, "col2": 6} ] } ],
+          [{"key":"id","value": 2}, {"key":"row_id","value": 1 }, {"key":"data","value": "2_1"}, {"key":"__expr0","value": [ {"col1": 1, "col2": 2}, {"col1": 3, "col2": 4}, {"col1": 5, "col2": 6} ] } ],
+          [{"key":"id","value": 3}, {"key":"row_id","value": 1 }, {"key":"data","value": "3_1"}, {"key":"__expr0","value": [ {"col1": 1, "col2": 2}, {"col1": 3, "col2": 4}, {"col1": 5, "col2": 6} ] } ],
+          [{"key":"id","value": 3}, {"key":"row_id","value": 2 }, {"key":"data","value": "3_2"}, {"key":"__expr0","value": [ {"col1": 1, "col2": 2}, {"col1": 3, "col2": 4}, {"col1": 5, "col2": 6} ] } ],
+          [{"key":"id","value": 3}, {"key":"row_id","value": 3 }, {"key":"data","value": "3_3"}, {"key":"__expr0","value": [ {"col1": 1, "col2": 2}, {"col1": 3, "col2": 4}, {"col1": 5, "col2": 6} ] } ]
+        ]
+      ]
+    },
+    {
+      "name": "Verify that we can join on outer references",
+      "query": [
+        "--set @@printplan = true ",
+        "select ( ",
+        "  select s2.col2 ",
+        "  from source2 s2 ",
+        "  inner join data d ",
+        "    on d.id = s.col1 ",
+        "    and d.id = s2.col1 ",
+        "  for object_array ",
+        ") values",
+        "from source s"
+      ],
+      "expectedResultSets": [
+        [
+          [{"key":"values","value": [ {"col2": 2}, {"col2": 2}, {"col2": 2}, {"col2": 2} ] }],
+          [{"key":"values","value": null }],
+          [{"key":"values","value": null }]
+        ]
+      ]
     }
   ]
 }

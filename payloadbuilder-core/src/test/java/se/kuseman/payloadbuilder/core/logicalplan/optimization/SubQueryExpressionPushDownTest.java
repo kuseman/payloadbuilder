@@ -4,7 +4,6 @@ import static java.util.Arrays.asList;
 import static se.kuseman.payloadbuilder.core.utils.CollectionUtils.asSet;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
@@ -16,18 +15,20 @@ import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
+import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.core.catalog.CoreColumn;
 import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.catalog.system.SystemCatalog;
-import se.kuseman.payloadbuilder.core.common.SchemaUtils;
+import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
 import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.FunctionCallExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralBooleanExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
+import se.kuseman.payloadbuilder.core.logicalplan.Aggregate;
 import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
 import se.kuseman.payloadbuilder.core.logicalplan.ExpressionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
@@ -65,14 +66,13 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 .getStatements()
                 .get(0)).getSelect();
 
-        plan = LogicalPlanOptimizer.optimize(context, plan, new HashMap<>(), new HashMap<>());
+        plan = getSchemaResolvedPlan(q);
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference pdArticle = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("PDArticle"), "a");
         TableSourceReference a_resource = new TableSourceReference(1, TableSourceReference.Type.EXPRESSION, "", QualifiedName.of("a.resource"), "ar");
 
         Schema schemaPDArticle = Schema.of(ast("a", ResolvedType.of(Type.Any), pdArticle));
-        Schema schemaa_resource = Schema.of(ast("ar", ResolvedType.of(Type.Any), a_resource));
 
         //@formatter:off
         ILogicalPlan expected =
@@ -85,44 +85,41 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                     new Filter(
                                         new ExpressionScan(
                                             a_resource,
-                                            schemaa_resource,
-                                            ocre("resource", pdArticle, ResolvedType.of(Type.Any), CoreColumn.Type.NAMED_ASTERISK),
+                                            Schema.EMPTY,
+                                            uce("a", "resource"),
                                             null),
                                         null,
                                         or(
-                                            eq(cre("typeid", a_resource, ResolvedType.of(Type.Any)), new LiteralStringExpression("Fs")),
+                                            eq(uce("ar", "typeid"), new LiteralStringExpression("Fs")),
                                             eq(new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("isnull"), null,
-                                                    asList(cre("defaultfront", a_resource), intLit(0))), intLit(1))
+                                                    asList(uce("ar", "defaultfront"), intLit(0))), intLit(1))
                                         )
                                     ),
-                                    asList(
-                                        new AliasExpression(cre("filename", a_resource), "__expr0"),
-                                        new AliasExpression(cre("defaultfront", a_resource), "defaultfront", true)
-                                    )
+                                    asList(new AliasExpression(uce("ar", "filename"), "__expr0", true))
                                 ),
                                 asList(sortItem(new FunctionCallExpression("sys", SystemCatalog.get().getScalarFunction("isnull"), null,
-                                                    asList(cre("defaultfront", a_resource, ResolvedType.of(Type.Any)), intLit(0))), ISortItem.Order.ASC))
+                                                    asList(uce("ar", "defaultfront"), intLit(0))), ISortItem.Order.ASC))
                             ),
                             intLit(1)),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
-                        asSet(nast("resource", ResolvedType.of(Type.Any), pdArticle)),
+                        Set.of(),
                         false,
-                        schemaPDArticle),
-                    asList(new AliasExpression(cre("__expr0", a_resource, ResolvedType.of(Type.Any)), "images")));
+                        Schema.EMPTY),
+                    asList(new AliasExpression(uce("__expr0"), "images")));
         //@formatter:on
+
+        // System.out.println(expected.print(0));
+        // System.out.println(actual.print(0));
 
         //@formatter:off
         Assertions.assertThat(actual.getSchema())
             .usingRecursiveComparison()
             .ignoringFieldsOfTypes(Location.class, Random.class)
             .isEqualTo(Schema.of(
-                    nast("images", ResolvedType.of(Type.Any), a_resource)));
+                    col("images", ResolvedType.of(Type.Any), null)));
         //@formatter:on
-
-        // System.out.println(expected.print(0));
-        // System.out.println(actual.print(0));
 
         //@formatter:off
         Assertions.assertThat(actual)
@@ -137,7 +134,6 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
     public void test_operator_function_with_nested_sub_query()
     {
         String q = """
-
                 SELECT
                 (
                     SELECT c.name
@@ -156,7 +152,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                   on c.id = p.categoryId
                 """;
 
-        ILogicalPlan plan = getColumnResolvedPlan(q);
+        ILogicalPlan plan = getSchemaResolvedPlan(q);
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableProduct = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("product"), "p");
@@ -167,17 +163,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         Schema schemaProduct = Schema.of(ast("p", Type.Any, tableProduct));
         Schema schemaCategory = Schema.of(ast("c", Type.Any, tableCategory));
 
-        Schema schemaT = Schema.of(ast("t", Type.Any, t));
-        Schema schemaT2 = Schema.of(ast("t2", Type.Any, t2));
-
         //@formatter:off
-        Schema categorySchema = Schema.of(
-                nast("name", Type.Any, tableCategory),
-                nast("id", Type.Any, tableCategory),
-                col("fields", ResolvedType.table(Schema.of(
-                        new CoreColumn("", ResolvedType.ANY, "t2.*", false, t2, CoreColumn.Type.ASTERISK))), null)
-                );
-
         ILogicalPlan expected = projection(
                 new Join(
                     new Join(
@@ -185,68 +171,53 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                         tableScan(schemaCategory, tableCategory),
                         Join.Type.INNER,
                         null,
-                        eq(cre("id", tableCategory), cre("categoryId", tableProduct)),
+                        eq(uce("c", "id"), uce("p", "categoryId")),
                         Set.of(),
                         false,
                         Schema.EMPTY),
                     new OperatorFunctionScan(
-                        Schema.of(nast("__expr0", ResolvedType.object(categorySchema), null)),
+                        Schema.of(col("__expr0", ResolvedType.of(Type.Any), null, true)),
                         projection(
                             new Join(
                                 ConstantScan.INSTANCE,
                                 new OperatorFunctionScan(
-                                    Schema.of(nast("__expr1", categorySchema.getColumns().get(2).getType(), null)),
+                                    Schema.of(col("__expr1", ResolvedType.of(Type.Any), null, true)),
                                     projection(
                                         new Filter(
                                             new Join(
-                                                new ExpressionScan(t, schemaT, ocre("tbl", tableCategory), null),
-                                                new ExpressionScan(t2, schemaT2, ocre("tbl2", t), null),
+                                                new ExpressionScan(t, Schema.EMPTY, uce("c", "tbl"), null),
+                                                new ExpressionScan(t2, Schema.EMPTY, uce("t", "tbl2"), null),
                                                 Join.Type.INNER,
                                                 null,
                                                 null,
-                                                Set.of(nast("tbl2", Type.Any, t)),
+                                                Set.of(),
                                                 false,
-                                                Schema.of(
-                                                    ast("p", Type.Any, tableProduct),
-                                                    ast("c", Type.Any, tableCategory),
-                                                    ast("t", Type.Any, t)
-                                                )),
+                                                Schema.EMPTY),
                                             null,
-                                            eq(cre("languagecode", t2), new LiteralStringExpression("sv"))),
-                                        List.of(new AsteriskExpression(QualifiedName.of("t2"), null, Set.of(t2)))),
+                                            eq(uce("t2", "languagecode"), new LiteralStringExpression("sv"))),
+                                        List.of(new AsteriskExpression(QualifiedName.of("t2"), null, Set.of()))),
                                     "",
                                     "OBJECT_ARRAY",
                                     null),
                                 Join.Type.LEFT,
                                 null,
                                 null,
-                                Set.of(nast("tbl2", Type.Any, t), nast("tbl", Type.Any, tableCategory)),
+                                Set.of(),
                                 false,
-                                Schema.of(
-                                    ast("p", Type.Any, tableProduct),
-                                    ast("c", Type.Any, tableCategory)
-                                )),
-                            List.of(ocre("name", tableCategory),
-                                    ocre("id", tableCategory),
-                                    new AliasExpression(ce("__expr1", 0, categorySchema.getColumns().get(2).getType()), "fields"))),
+                                Schema.EMPTY),
+                            List.of(uce("c", "name"),
+                                    uce("c", "id"),
+                                    new AliasExpression(uce("__expr1"), "fields"))),
                         "",
                         "OBJECT",
                         null),
                     Join.Type.LEFT,
                     null,
                     null,
-                    Set.of(
-                        nast("tbl2", Type.Any, t),
-                        nast("name", Type.Any, tableCategory),
-                        nast("id", Type.Any, tableCategory),
-                        nast("tbl", Type.Any, tableCategory)
-                    ),
+                    Set.of(),
                     false,
-                    Schema.of(
-                        ast("p", Type.Any, tableProduct),
-                        ast("c", Type.Any, tableCategory)
-                    )),
-                List.of(new AliasExpression(ce("__expr0", ResolvedType.object(categorySchema)), "category")));
+                    Schema.EMPTY),
+                List.of(new AliasExpression(uce("__expr0"), "category")));
         //@formatter:on
 
         // System.out.println(actual.print(0));
@@ -287,7 +258,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                    cross populate apply tableB bb
                 """;
 
-        ILogicalPlan plan = getColumnResolvedPlan(q);
+        ILogicalPlan plan = getSchemaResolvedPlan(q);
 
         ILogicalPlan actual = optimize(context, plan);
 
@@ -301,14 +272,8 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         Schema schemaArticle = Schema.of(ast("a", Type.Any, tableArticle));
         Schema schemaProduct = Schema.of(ast("p", Type.Any, tableProduct));
         Schema schemaTableB = Schema.of(ast("bb", Type.Any, tableB));
-        Schema schemaBB = Schema.of(ast("bb", ResolvedType.of(Type.Any), e_bb));
 
         //@formatter:off
-        Schema objectArraySchema = Schema.of(
-                col("val", ResolvedType.of(Type.Any), null),
-                col("val1", ResolvedType.of(Type.Any), null),
-                nast("col5", ResolvedType.of(Type.Any), tableProductArticle));
-
         ILogicalPlan expected = 
                 projection(
                     new Join(
@@ -320,57 +285,47 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                             (IExpression) null,
                             asSet(),
                             false,
-                            schemaProductArticle),
+                            Schema.EMPTY),
                         projection(
                             new Join(
                                 ConstantScan.INSTANCE,
-                                new OperatorFunctionScan(Schema.of(nast("__expr1", ResolvedType.table(objectArraySchema), null)),
+                                new OperatorFunctionScan(
+                                    Schema.of(col("__expr1", ResolvedType.ANY, null, true)),
                                     projection(
                                        new Join(
                                            new Join(
-                                               new Join(
-                                                   ConstantScan.INSTANCE,
-                                                   new MaxRowCountAssert(
-                                                           projection(
-                                                               tableScan(schemaArticle, tableArticle),
-                                                               asList(new AliasExpression(cre("col", tableArticle), "__expr2"))),
-                                                       1),
-                                                   Join.Type.LEFT,
-                                                   null,
-                                                   (IExpression) null,
-                                                   asSet(),
-                                                   false,
-                                                   Schema.EMPTY),
                                                new ExpressionScan(
                                                    e_bb,
-                                                   schemaBB,
-                                                   ocre("bb", tableB, ResolvedType.table(schemaTableB), CoreColumn.Type.POPULATED),
+                                                   Schema.EMPTY,
+                                                   uce("bb"),
                                                    null),
+                                               new MaxRowCountAssert(
+                                                   projection(
+                                                       tableScan(schemaArticle, tableArticle),
+                                                       asList(new AliasExpression(uce("a", "col"), "__expr2", true))),
+                                                   1),
                                                Join.Type.LEFT,
                                                null,
                                                (IExpression) null,
                                                asSet(),
-                                               true,
-                                               SchemaUtils.joinSchema(SchemaUtils.joinSchema(schemaProductArticle, schemaTableB, "bb"), schemaBB)),
+                                               false,
+                                               Schema.EMPTY),
                                            new MaxRowCountAssert(
                                                projection(
                                                    new Filter(
                                                        tableScan(schemaProduct, tableProduct),
                                                        null,
-                                                       eq(ocre("col", tableProductArticle), cre("col4", tableProduct))),
-                                                   asList(new AliasExpression(cre("col2", tableProduct), "__expr3"))),
+                                                       eq(uce("a", "col"), uce("p", "col4"))),
+                                                   asList(new AliasExpression(uce("p", "col2"), "__expr3", true))),
                                                1),
                                            Join.Type.LEFT,
                                            null,
                                            (IExpression) null,
-                                           asSet(nast("col", Type.Any, tableProductArticle)),
+                                           Set.of(),
                                            false,
-                                           SchemaUtils.joinSchema(
-                                               SchemaUtils.joinSchema(
-                                                   SchemaUtils.joinSchema(schemaProductArticle, schemaTableB, "bb"), schemaBB),
-                                                   Schema.of(nast("__expr2", ResolvedType.of(Type.Any), tableArticle)))),
-                                       asList(new AliasExpression(cre("__expr2", tableArticle), "val"),
-                                               new AliasExpression(cre("__expr3", tableProduct), "val1"), ocre("col5", tableProductArticle))
+                                           Schema.EMPTY),
+                                       asList(new AliasExpression(uce("__expr2"), "val"),
+                                               new AliasExpression(uce("__expr3"), "val1"), uce("a", "col5"))
                                     ),
                                     "",
                                     "object_array",
@@ -378,18 +333,18 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                 Join.Type.LEFT,
                                 null,
                                 (IExpression) null,
-                                asSet(pop("bb", ResolvedType.table(schemaTableB), tableB), nast("col", Type.Any, tableProductArticle), nast("col5", Type.Any, tableProductArticle)),
+                                Set.of(),
                                 false,
-                                SchemaUtils.joinSchema(schemaProductArticle, schemaTableB, "bb")),
-                            asList(new AliasExpression(ce("__expr1", 0, ResolvedType.table(objectArraySchema)), "__expr0"))),
+                                Schema.EMPTY),
+                            asList(new AliasExpression(uce("__expr1"), "__expr0", true))),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
-                        asSet(pop("bb", ResolvedType.table(schemaTableB), tableB), nast("col", Type.Any, tableProductArticle), nast("col5", Type.Any, tableProductArticle)),
+                        Set.of(),
                         false,
-                        SchemaUtils.joinSchema(schemaProductArticle, schemaTableB, "bb")),
-                    asList(cre("column", tableProductArticle),
-                            new AliasExpression(ce("__expr0", ResolvedType.table(objectArraySchema)), "values")));
+                        Schema.EMPTY),
+                    asList(uce("a", "column"),
+                            new AliasExpression(uce("__expr0"), "values")));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -415,41 +370,29 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + ") values "
                 + "from \"stableA\" a";
         //@formatter:on
-        ILogicalPlan plan = getColumnResolvedPlan(query);
-
+        ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
-
-        Schema objectSchema = Schema.of(CoreColumn.of("col1", ResolvedType.of(Type.Int), null), CoreColumn.of("col2", ResolvedType.of(Type.Boolean), null));
 
         //@formatter:off
         ILogicalPlan expected =
                 projection(
                     new Join(
-                        new Join(
-                            ConstantScan.INSTANCE,
-                            new OperatorFunctionScan(
-                                    Schema.of(col("__expr0", ResolvedType.object(objectSchema), null)),
-                                    projection(
-                                        ConstantScan.INSTANCE,
-                                        asList(new AliasExpression(intLit(1), "col1"), new AliasExpression(LiteralBooleanExpression.TRUE, "col2"))),
-                                    "",
-                                    "object",
-                                    null),
-                            Join.Type.LEFT,
-                            null,
-                            (IExpression) null,
-                            asSet(),
-                            false,
-                            Schema.EMPTY),
                         tableScan(schemaSTableA, sTableA),
+                        new OperatorFunctionScan(
+                            Schema.of(col("__expr0", ResolvedType.ANY, null, true)),
+                            projection(
+                                ConstantScan.INSTANCE,
+                                asList(new AliasExpression(intLit(1), "col1"), new AliasExpression(LiteralBooleanExpression.TRUE, "col2"))),
+                            "",
+                            "object",
+                            null),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
                         asSet(),
-                        true,
-                        schemaSTableA),
-                    asList(cre("col3", sTableA, 2, ResolvedType.of(Type.Float)), new AliasExpression(ce("__expr0", 3,
-                            ResolvedType.object(objectSchema)), "values")));
+                        false,
+                        Schema.EMPTY),
+                    asList(uce("col3"), new AliasExpression(uce("__expr0"), "values")));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -459,8 +402,8 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         Assertions.assertThat(actual.getSchema())
                 .usingRecursiveComparison()
                 .ignoringFieldsOfTypes(Location.class, Random.class)
-                .isEqualTo(Schema.of(col("col3", Type.Float, sTableA),
-                        new CoreColumn("values", ResolvedType.object(objectSchema), "",
+                .isEqualTo(Schema.of(col("col3", Type.Any, null),
+                        new CoreColumn("values", ResolvedType.ANY, "",
                                 false, null, CoreColumn.Type.REGULAR)));
 
         // Validate the schema below the projection. The schema must stay consistent even if we switch outer/inner
@@ -472,7 +415,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                     col("col1", Type.Int, sTableA),
                     col("col2", Type.String, sTableA),
                     col("col3", Type.Float, sTableA),
-                    col("__expr0", ResolvedType.object(objectSchema), null)));
+                    col("__expr0", ResolvedType.ANY, null, true)));
         //@formatter:on
 
         Assertions.assertThat(actual)
@@ -494,25 +437,29 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + "  for object "
                 + ") values ";
         //@formatter:on
-        ILogicalPlan plan = getColumnResolvedPlan(query);
-
+        ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
-
-        Schema objectSchema = Schema.of(CoreColumn.of("col1", ResolvedType.of(Type.Int), null), CoreColumn.of("col2", ResolvedType.of(Type.Boolean), null));
 
         //@formatter:off
         ILogicalPlan expected =
                 projection(
-                    new OperatorFunctionScan(
-                            Schema.of(col("__expr0", ResolvedType.object(objectSchema), null)),
-                            projection(
-                                ConstantScan.INSTANCE,
-                                asList(new AliasExpression(intLit(1), "col1"), new AliasExpression(LiteralBooleanExpression.TRUE, "col2"))),
-                            "",
-                            "object",
-                            null),
-                    asList(new AliasExpression(intLit(1), "col3"), new AliasExpression(ce("__expr0", 0,
-                            ResolvedType.object(objectSchema)), "values")));
+                    new Join(
+                        ConstantScan.INSTANCE,
+                        new OperatorFunctionScan(
+                                Schema.of(col("__expr0", ResolvedType.ANY, null, true)),
+                                projection(
+                                    ConstantScan.INSTANCE,
+                                    asList(new AliasExpression(intLit(1), "col1"), new AliasExpression(LiteralBooleanExpression.TRUE, "col2"))),
+                                "",
+                                "object",
+                                null),
+                        Join.Type.LEFT,
+                        null,
+                        (IExpression) null,
+                        Set.of(),
+                        false,
+                        Schema.EMPTY),
+                    asList(new AliasExpression(intLit(1), "col3"), new AliasExpression(uce("__expr0"), "values")));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -523,7 +470,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 .usingRecursiveComparison()
                 .ignoringFieldsOfTypes(Location.class, Random.class)
                 .isEqualTo(Schema.of(col("col3", Type.Int, null),
-                        new CoreColumn("values", ResolvedType.object(objectSchema), "",
+                        new CoreColumn("values", ResolvedType.ANY, "",
                                 false, null, CoreColumn.Type.REGULAR)));
 
         // Validate the schema below the projection. The schema must stay consistent even if we switch outer/inner
@@ -532,7 +479,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
             .usingRecursiveComparison()
             .ignoringFieldsOfTypes(Location.class, Random.class)
             .isEqualTo(Schema.of(
-                    col("__expr0", ResolvedType.object(objectSchema), null)));
+                    col("__expr0", ResolvedType.ANY, null, true)));
         //@formatter:on
 
         Assertions.assertThat(actual)
@@ -555,7 +502,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + ") values "
                 + "from \"table\" ";
 
-        ILogicalPlan plan = getColumnResolvedPlan(query);
+        ILogicalPlan plan = getSchemaResolvedPlan(query);
 
         ILogicalPlan actual = optimize(context, plan);
         
@@ -568,27 +515,19 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan expected = 
                 projection(
                     new Join(
-                        new Join(
-                            ConstantScan.INSTANCE,
-                            new MaxRowCountAssert(
+                        tableScan(schema, table),
+                        new MaxRowCountAssert(
                                 projection(
                                     tableScan(schemaB, tableB),
-                                asList(new AliasExpression(cre("col1", tableB), "__expr0"))),
+                                asList(new AliasExpression(uce("b", "col1"), "__expr0", true))),
                             1),
-                            Join.Type.LEFT,
-                            null,
-                            (IExpression) null,
-                            asSet(),
-                            false,
-                            Schema.EMPTY),
-                        tableScan(schema, table),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
                         asSet(),
-                        true,
-                        schema),
-                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(table)), new AliasExpression(cre("__expr0", tableB), "values")));
+                        false,
+                        Schema.EMPTY),
+                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of()), new AliasExpression(uce("__expr0"), "values")));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -599,8 +538,8 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
             .usingRecursiveComparison()
             .ignoringFieldsOfTypes(Location.class, Random.class)
             .isEqualTo(Schema.of(
-                new CoreColumn("", ResolvedType.of(Type.Any), "*", false, table, CoreColumn.Type.ASTERISK),
-                new CoreColumn("values", ResolvedType.of(Type.Any), "", false, tableB, CoreColumn.Type.NAMED_ASTERISK)));
+                new CoreColumn("", ResolvedType.of(Type.Any), "*", false, null, CoreColumn.Type.ASTERISK),
+                new CoreColumn("values", ResolvedType.of(Type.Any), "", false, null, CoreColumn.Type.REGULAR)));
 
         // Validate the schema below the projection. The schema must stay consistent even if we switch outer/inner
         Assertions.assertThat(((Projection) actual).getInput()
@@ -609,7 +548,115 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
             .ignoringFieldsOfTypes(Location.class, Random.class)
             .isEqualTo(Schema.of(
                     new CoreColumn("", ResolvedType.of(Type.Any), "", false, table, CoreColumn.Type.ASTERISK),
-                    nast("__expr0", Type.Any, tableB)));
+                    col("__expr0", ResolvedType.ANY, null, true)));
+        //@formatter:on
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_aggregation_without_for()
+    {
+        //@formatter:off
+        String query = """
+                select *,
+                (
+                  select b.col1 MyCol
+                  from tableB b
+                  group by b.col1
+                ) values,
+                (
+                  select max(b.col1) MyCol2
+                  from tableB b
+                  group by b.col1
+                ) values2
+                from \"table\"
+                """;
+        //@formatter:on
+
+        ILogicalPlan plan = getSchemaResolvedPlan(query);
+
+        ILogicalPlan actual = optimize(context, plan);
+
+        TableSourceReference table = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "");
+        TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
+        TableSourceReference tableB2 = new TableSourceReference(2, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
+        Schema schema = Schema.of(ast("", Type.Any, table));
+        Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
+        Schema schemaB2 = Schema.of(ast("b", Type.Any, tableB2));
+
+        ScalarFunctionInfo max = SystemCatalog.get()
+                .getScalarFunction("max");
+
+        //@formatter:off
+        ILogicalPlan expected = 
+                projection(
+                    new Join(
+                        new Join(
+                            tableScan(schema, table),
+                            new MaxRowCountAssert(
+                                new Aggregate(
+                                    tableScan(schemaB, tableB),
+                                    List.of(uce("b", "col1")),
+                                    List.of(new AggregateWrapperExpression(new AliasExpression(uce("b", "col1"), "__expr0", true), false, true))),
+                                1
+                            ),
+                            Join.Type.LEFT,
+                            null,
+                            (IExpression) null,
+                            Set.of(),
+                            false,
+                            Schema.EMPTY),
+                        new MaxRowCountAssert(
+                            new Aggregate(
+                                tableScan(schemaB2, tableB2),
+                                List.of(uce("b", "col1")),
+                                List.of(new AggregateWrapperExpression(new AliasExpression(
+                                        new FunctionCallExpression("sys", max, null, List.of(uce("b", "col1"))), "__expr1", true),
+                                        false, true))),
+                                        //(new AliasExpression(uce("b", "col1"), "__expr1", true), false, true))),
+                            1
+                        ),
+                        Join.Type.LEFT,
+                        null,
+                        (IExpression) null,
+                        asSet(),
+                        false,
+                        Schema.EMPTY),
+                    asList(
+                        new AsteriskExpression(QualifiedName.EMPTY, null, Set.of()),
+                        new AliasExpression(uce("__expr0"), "values"),
+                        new AliasExpression(uce("__expr1"), "values2")
+                    ));
+        //@formatter:on
+
+        // System.out.println(expected.print(0));
+        // System.out.println(actual.print(0));
+
+        //@formatter:off
+        Assertions.assertThat(actual.getSchema())
+            .usingRecursiveComparison()
+            .ignoringFieldsOfTypes(Location.class, Random.class)
+            .isEqualTo(Schema.of(
+                new CoreColumn("", ResolvedType.of(Type.Any), "*", false, null, CoreColumn.Type.ASTERISK),
+                new CoreColumn("values", ResolvedType.of(Type.Any), "", false, null, CoreColumn.Type.REGULAR),
+                new CoreColumn("values2", ResolvedType.of(Type.Any), "", false, null, CoreColumn.Type.REGULAR)));
+
+        // Validate the schema below the projection. The schema must stay consistent even if we switch outer/inner
+        Assertions.assertThat(((Projection) actual).getInput()
+                .getSchema())
+            .usingRecursiveComparison()
+            .ignoringFieldsOfTypes(Location.class, Random.class)
+            .isEqualTo(Schema.of(
+                    new CoreColumn("", ResolvedType.of(Type.Any), "", false, table, CoreColumn.Type.ASTERISK),
+                    // NOTE! Single value is resolved at a later stage (ColumnResolver)
+                    col("__expr0", ResolvedType.array(ResolvedType.ANY), null, true),
+                    col("__expr1", ResolvedType.ANY, null, true)));
         //@formatter:on
 
         Assertions.assertThat(actual)
@@ -636,7 +683,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + ") otherValues "
                 + "from \"table\" ";
 
-        ILogicalPlan plan = getColumnResolvedPlan(query);
+        ILogicalPlan plan = getSchemaResolvedPlan(query);
 
         ILogicalPlan actual = optimize(context, plan);
         
@@ -652,48 +699,32 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 projection(
                     new Join(
                         new Join(
-                            ConstantScan.INSTANCE,
+                            tableScan(schema, table),
                             new MaxRowCountAssert(
                                 projection(
-                                    tableScan(schemaC, tableC),
-                                    asList(new AliasExpression(cre("col2", tableC), "__expr1"))),
-                            1),
+                                        tableScan(schemaB, tableB),
+                                        asList(new AliasExpression(uce("b", "col1"), "__expr0", true))),
+                                1),
                             Join.Type.LEFT,
                             null,
                             (IExpression) null,
                             asSet(),
                             false,
                             Schema.EMPTY),
-                        new Join(
-                            new Join(
-                                ConstantScan.INSTANCE,
-                                new MaxRowCountAssert(
-                                    projection(
-                                        tableScan(schemaB, tableB),
-                                        asList(new AliasExpression(cre("col1", tableB), "__expr0"))),
-                                1),
-                                Join.Type.LEFT,
-                                null,
-                                (IExpression) null,
-                                asSet(),
-                                false,
-                                Schema.EMPTY),
-                            tableScan(schema, table),
-                            Join.Type.LEFT,
-                            null,
-                            (IExpression) null,
-                            asSet(),
-                            true,
-                            schema),
+                        new MaxRowCountAssert(
+                            projection(
+                                    tableScan(schemaC, tableC),
+                                    asList(new AliasExpression(uce("c", "col2"), "__expr1", true))),
+                            1),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
                         asSet(),
-                        true,
-                        SchemaUtils.joinSchema(schema, Schema.of(nast("__expr0", ResolvedType.of(Type.Any), tableB)))),
-                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(table)),
-                            new AliasExpression(cre("__expr0", tableB), "values"),
-                            new AliasExpression(cre("__expr1", tableC), "otherValues")));
+                        false,
+                        Schema.EMPTY),
+                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of()),
+                            new AliasExpression(uce("__expr0"), "values"),
+                            new AliasExpression(uce("__expr1"), "otherValues")));
         //@formatter:on
 
         //@formatter:off
@@ -701,9 +732,9 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
             .usingRecursiveComparison()
             .ignoringFieldsOfTypes(Location.class, Random.class)
             .isEqualTo(Schema.of(
-                new CoreColumn("", ResolvedType.of(Type.Any), "*", false, table, CoreColumn.Type.ASTERISK),
-                nast("values", Type.Any, tableB),
-                nast("otherValues", Type.Any, tableC)));
+                new CoreColumn("", ResolvedType.of(Type.Any), "*", false, null, CoreColumn.Type.ASTERISK),
+                col("values", Type.Any, null),
+                col("otherValues", Type.Any, null)));
 
         // Validate the schema below the projection
         Assertions.assertThat( ((Projection) actual).getInput()
@@ -712,8 +743,8 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         .ignoringFieldsOfTypes(Location.class, Random.class)
         .isEqualTo(Schema.of(
                 new CoreColumn("", ResolvedType.of(Type.Any), "", false, table, CoreColumn.Type.ASTERISK),
-                nast("__expr0", Type.Any, tableB),
-                nast("__expr1", Type.Any, tableC)));
+                col("__expr0", ResolvedType.ANY, null, true),
+                col("__expr1", ResolvedType.ANY, null, true)));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -744,7 +775,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + ") otherValues "
                 + "from \"table\" a ";
 
-        ILogicalPlan plan = getColumnResolvedPlan(query);
+        ILogicalPlan plan = getSchemaResolvedPlan(query);
 
         ILogicalPlan actual = optimize(context, plan);
         
@@ -760,66 +791,53 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 projection(
                     new Join(
                         new Join(
-                            ConstantScan.INSTANCE,
-                            new MaxRowCountAssert(
-                                projection(
-                                    tableScan(schemaC, tableC),
-                                    asList(new AliasExpression(cre("col2", tableC), "__expr1"))),
-                            1),
-                            Join.Type.LEFT,
-                            null,
-                            (IExpression) null,
-                            asSet(),
-                            false,
-                            Schema.EMPTY),
-                        new Join(
-                            tableScan(schema, table),               // Correlated sub query below so this must be outer
+                            tableScan(schema, table),
                             new MaxRowCountAssert(
                                 projection(
                                     new Filter(
                                         tableScan(schemaB, tableB),
                                         null,
-                                        eq(cre("col2", tableB), ocre("col2", table))),
-                                    asList(new AliasExpression(cre("col1", tableB), "__expr0"))),
+                                        eq(uce("b", "col2"), uce("a", "col2"))),
+                                    asList(new AliasExpression(uce("b", "col1"), "__expr0", true))),
                             1),
                             Join.Type.LEFT,
                             null,
                             (IExpression) null,
-                            asSet(nast("col2", Type.Any, table)),
+                            Set.of(),
                             false,
-                            schema),
+                            Schema.EMPTY),
+                        new MaxRowCountAssert(
+                            projection(
+                                tableScan(schemaC, tableC),
+                                asList(new AliasExpression(uce("c", "col2"), "__expr1", true))),
+                            1),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
                         asSet(),
-                        true,
-                        SchemaUtils.joinSchema(schema, Schema.of(nast("__expr0", ResolvedType.of(Type.Any), tableB)))),
-                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(table)),
-                            new AliasExpression(cre("__expr0", tableB), "values"),
-                            new AliasExpression(cre("__expr1", tableC), "otherValues") ) );
-
-        //@formatter:off
-        Assertions.assertThat(actual.getSchema())
-            .usingRecursiveComparison()
-            .ignoringFieldsOfTypes(Location.class, Random.class)
-            .isEqualTo(Schema.of(
-                new CoreColumn("", ResolvedType.of(Type.Any), "*", false, table, CoreColumn.Type.ASTERISK),
-                nast("values", Type.Any, tableB),
-                nast("otherValues", Type.Any, tableC)));
-
-        // Validate the schema below the projection. The schema must stay consistent even if we switch outer/inner
-        Assertions.assertThat( ((Projection) actual).getInput()
-                .getSchema())
-        .usingRecursiveComparison()
-        .ignoringFieldsOfTypes(Location.class, Random.class)
-        .isEqualTo(Schema.of(
-                new CoreColumn("a", ResolvedType.of(Type.Any), "a", false, table, CoreColumn.Type.ASTERISK),
-                nast("__expr0", Type.Any, tableB),
-                nast("__expr1", Type.Any, tableC)));
+                        false,
+                        Schema.EMPTY),
+                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of()),
+                            new AliasExpression(uce("__expr0"), "values"),
+                            new AliasExpression(uce("__expr1"), "otherValues")));
         //@formatter:on
 
         // System.out.println(expected.print(0));
         // System.out.println(actual.print(0));
+
+        Assertions.assertThat(actual.getSchema())
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(Schema.of(new CoreColumn("", ResolvedType.of(Type.Any), "*", false, null, CoreColumn.Type.ASTERISK), col("values", Type.Any, null), col("otherValues", Type.Any, null)));
+
+        // Validate the schema below the projection. The schema must stay consistent even if we switch outer/inner
+        Assertions.assertThat(((Projection) actual).getInput()
+                .getSchema())
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(Schema.of(new CoreColumn("a", ResolvedType.of(Type.Any), "a", false, table, CoreColumn.Type.ASTERISK), col("__expr0", ResolvedType.ANY, null, true),
+                        col("__expr1", ResolvedType.ANY, null, true)));
+        //@formatter:on
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
@@ -846,7 +864,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + ") values "
                 + "from \"table\" a ";
 
-        ILogicalPlan plan = getColumnResolvedPlan(query);
+        ILogicalPlan plan = getSchemaResolvedPlan(query);
 
         ILogicalPlan actual = optimize(context, plan);
         
@@ -862,43 +880,35 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 projection(
                     new Join(
                         new Join(
-                            new Join(
-                                ConstantScan.INSTANCE,
-                                new MaxRowCountAssert(
-                                    projection(
-                                        tableScan(schemaC, tableC),
-                                        asList(new AliasExpression(cre("col2", tableC), "__expr0"))),
-                                1),
-                                Join.Type.LEFT,
-                                null,
-                                (IExpression) null,
-                                asSet(),
-                                false,
-                                Schema.EMPTY),
                             tableScan(schema, table),
+                            new MaxRowCountAssert(
+                                projection(
+                                        tableScan(schemaC, tableC),
+                                        asList(new AliasExpression(uce("c", "col2"), "__expr0", true))),
+                                1),
                             Join.Type.LEFT,
                             null,
                             (IExpression) null,
                             asSet(),
-                            true,
-                            schema),
+                            false,
+                            Schema.EMPTY),
                         new MaxRowCountAssert(
                             projection(
                                 new Filter(
                                     tableScan(schemaB, tableB),
                                     null,
-                                    eq(cre("col2", tableB), ocre("col2", table))),
-                                asList(new AliasExpression(cre("col1", tableB), "__expr1"))),
+                                    eq(uce("b", "col2"), uce("a", "col2"))),
+                                asList(new AliasExpression(uce("b", "col1"), "__expr1", true))),
                         1),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
-                        asSet(nast("col2", Type.Any, table)),
+                        Set.of(),
                         false,
-                        SchemaUtils.joinSchema(schema, Schema.of(nast("__expr0", ResolvedType.of(Type.Any), tableC)))),
-                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(table)),
-                            new AliasExpression(cre("__expr0", tableC), "otherValues"),
-                            new AliasExpression(cre("__expr1", tableB), "values")));
+                        Schema.EMPTY),
+                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of()),
+                            new AliasExpression(uce("__expr0"), "otherValues"),
+                            new AliasExpression(uce("__expr1"), "values")));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -930,7 +940,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + ") values "
                 + "from \"table\" a ";
 
-        ILogicalPlan plan = getColumnResolvedPlan(query);
+        ILogicalPlan plan = getSchemaResolvedPlan(query);
 
         ILogicalPlan actual = optimize(context, plan);
         
@@ -952,32 +962,32 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                     new Filter(
                                         tableScan(schemaC, tableC),
                                         null,
-                                        eq(cre("col3", tableC), ocre("col3", table))),
-                                    asList(new AliasExpression(cre("col2", tableC), "__expr0"))),
+                                        eq(uce("c", "col3"), uce("a", "col3"))),
+                                    asList(new AliasExpression(uce("c", "col2"), "__expr0", true))),
                             1),
                             Join.Type.LEFT,
                             null,
                             (IExpression) null,
-                            asSet(nast("col3", Type.Any, table)),
+                            Set.of(),
                             false,
-                            schema),
+                            Schema.EMPTY),
                         new MaxRowCountAssert(
                             projection(
                                 new Filter(
                                     tableScan(schemaB, tableB),
                                     null,
-                                    eq(cre("col2", tableB), ocre("col2", table))),
-                                asList(new AliasExpression(cre("col1", tableB), "__expr1"))),
+                                    eq(uce("b", "col2"), uce("a", "col2"))),
+                                asList(new AliasExpression(uce("b", "col1"), "__expr1", true))),
                         1),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
-                        asSet(nast("col2", Type.Any, table)),
+                        Set.of(),
                         false,
-                        SchemaUtils.joinSchema(schema, Schema.of(nast("__expr0", ResolvedType.of(Type.Any), tableC)))),
-                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(table)),
-                            new AliasExpression(cre("__expr0", tableC), "otherValues"),
-                            new AliasExpression(cre("__expr1", tableB), "values")));
+                        Schema.EMPTY),
+                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of()),
+                            new AliasExpression(uce("__expr0"), "otherValues"),
+                            new AliasExpression(uce("__expr1"), "values")));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -1003,7 +1013,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + ") + 1 values "
                 + "from \"table\" ";
 
-        ILogicalPlan plan = getColumnResolvedPlan(query);
+        ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
         
         TableSourceReference table = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "");
@@ -1015,28 +1025,20 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan expected = 
                 projection(
                     new Join(
-                        new Join(
-                            ConstantScan.INSTANCE,
-                            new MaxRowCountAssert(
-                                projection(
-                                    tableScan(schemaB, tableB),
-                                    asList(new AliasExpression(cre("col1", tableB), "__expr0"))),
-                            1),
-                            Join.Type.LEFT,
-                            null,
-                            (IExpression) null,
-                            asSet(),
-                            false,
-                            Schema.EMPTY),
                         tableScan(schema, table),
+                        new MaxRowCountAssert(
+                            projection(
+                                    tableScan(schemaB, tableB),
+                                    asList(new AliasExpression(uce("b", "col1"), "__expr0", true))),
+                            1),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
                         asSet(),
-                        true,
-                        schema),
-                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(table)),
-                            new AliasExpression(add(cre("__expr0", tableB), intLit(1)), "values")));
+                        false,
+                        Schema.EMPTY),
+                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of()),
+                            new AliasExpression(add(uce("__expr0"), intLit(1)), "values")));
         //@formatter:on
 
         // System.out.println(actual.print(0));
@@ -1065,7 +1067,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + ") values "
                 + "from \"table\" ";
 
-        ILogicalPlan plan = getColumnResolvedPlan(query);
+        ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
         
         TableSourceReference table = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "");
@@ -1077,27 +1079,30 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
         ILogicalPlan expected = 
                 projection(
                     new Join(
-                        new Join(
-                            ConstantScan.INSTANCE,
-                            projection(
-                                new MaxRowCountAssert(
-                                    tableScan(schemaB, tableB),
-                                    1),
-                                asList(new AliasExpression(add(cre("col1", tableB), intLit(1)), "__expr0"))),
-                            Join.Type.LEFT,
-                            null,
-                            (IExpression) null,
-                            asSet(),
-                            false,
-                            Schema.EMPTY),
                         tableScan(schema, table),
+                        projection(
+                            new Join(
+                                ConstantScan.INSTANCE,
+                                new MaxRowCountAssert(
+                                    projection(
+                                        tableScan(schemaB, tableB),
+                                        List.of(new AliasExpression(uce("b", "col1"), "__expr1", true))),
+                                    1),
+                                Join.Type.LEFT,
+                                null,
+                                (IExpression) null,
+                                Set.of(),
+                                false,
+                                Schema.EMPTY),
+                            asList(new AliasExpression(add(uce("__expr1"), intLit(1)), "__expr0", true))),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
                         asSet(),
-                        true,
-                        schema),
-                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(table)), new AliasExpression(ce("__expr0", ResolvedType.of(Type.Int)), "values")));
+                        false,
+                        Schema.EMPTY),
+                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of()),
+                            new AliasExpression(uce("__expr0"), "values")));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -1124,7 +1129,7 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + ") values "
                 + "from \"table\" a ";
 
-        ILogicalPlan plan = getColumnResolvedPlan(query);
+        ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
         
         TableSourceReference table = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "a");
@@ -1142,16 +1147,16 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                 new Filter(
                                     tableScan(schemaB, tableB),
                                     null,
-                                    gt(cre("col2", tableB), ocre("col2", table))),
-                                asList(new AliasExpression(cre("col1", tableB), "__expr0"))),
+                                    gt(uce("b", "col2"), uce("a", "col2"))),
+                                asList(new AliasExpression(uce("b", "col1"), "__expr0", true))),
                         1),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
-                        asSet(nast("col2", Type.Any, table)),
+                        Set.of(),
                         false,
-                        schema),
-                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(table)), new AliasExpression(cre("__expr0", tableB, ResolvedType.of(Type.Any)), "values")));
+                        Schema.EMPTY),
+                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of()), new AliasExpression(uce("__expr0"), "values")));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -1181,34 +1186,22 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                 + "  from tableC c "
                 + ") value "
                 + "from \"table\" a ";
+        //@formatter:on
 
-        ILogicalPlan plan = getColumnResolvedPlan(query);
+        ILogicalPlan plan = getSchemaResolvedPlan(query);
         ILogicalPlan actual = optimize(context, plan);
-        
+
         TableSourceReference table = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("table"), "a");
         TableSourceReference tableB = new TableSourceReference(1, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
         TableSourceReference tableC = new TableSourceReference(2, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableC"), "c");
         Schema schema = Schema.of(ast("a", Type.Any, table));
         Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
         Schema schemaC = Schema.of(ast("c", Type.Any, tableC));
-        
+
         //@formatter:off
         ILogicalPlan expected = 
                 projection(
                     new Join(
-                        new Join(
-                            ConstantScan.INSTANCE,
-                            new MaxRowCountAssert(
-                                projection(                                 // Non correlated sub query is placed outer
-                                    tableScan(schemaC, tableC), 
-                                    asList(new AliasExpression(cre("col2", tableC), "__expr1"))),
-                            1),
-                            Join.Type.LEFT,
-                            null,
-                            (IExpression) null,
-                            asSet(),
-                            false,
-                            Schema.EMPTY),
                         new Join(
                             tableScan(schema, table),
                             new MaxRowCountAssert(
@@ -1216,23 +1209,29 @@ public class SubQueryExpressionPushDownTest extends ALogicalPlanOptimizerTest
                                     new Filter(
                                         tableScan(schemaB, tableB),
                                         null,
-                                        gt(cre("col2", tableB), ocre("col2", table))),
-                                    asList(new AliasExpression(cre("col1", tableB), "__expr0"))),
-                            1),
+                                        gt(uce("b", "col2"), uce("a", "col2"))),
+                                    asList(new AliasExpression(uce("b", "col1"), "__expr0", true))),
+                                1),
                             Join.Type.LEFT,
                             null,
                             (IExpression) null,
-                            asSet(nast("col2", Type.Any, table)),
+                            Set.of(),
                             false,
-                            schema),
+                            Schema.EMPTY),
+                        new MaxRowCountAssert(
+                            projection(                                 // Non correlated sub query is placed outer
+                                tableScan(schemaC, tableC), 
+                                asList(new AliasExpression(uce("c", "col2"), "__expr1", true))),
+                            1),
                         Join.Type.LEFT,
                         null,
                         (IExpression) null,
                         asSet(),
-                        true,
-                        schema),
-                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(table)), new AliasExpression(
-                            add(cre("__expr0", tableB, ResolvedType.of(Type.Any)), cre("__expr1", tableC, ResolvedType.of(Type.Any))), "value")));
+                        false,
+                        Schema.EMPTY),
+                    asList(new AsteriskExpression(QualifiedName.EMPTY, null, Set.of()),
+                            new AliasExpression(
+                            add(uce("__expr0"), uce("__expr1")), "value")));
         //@formatter:on
 
         // System.out.println(expected.print(0));

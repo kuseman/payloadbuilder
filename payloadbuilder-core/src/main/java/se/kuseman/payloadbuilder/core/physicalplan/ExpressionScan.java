@@ -52,6 +52,7 @@ public class ExpressionScan implements IPhysicalPlan
     {
         Map<String, Object> properties = new HashMap<>();
         properties.put(IDatasource.OUTPUT, DescribeUtils.getOutputColumns(getSchema()));
+        properties.put("Expression", expression.toString());
         return properties;
     }
 

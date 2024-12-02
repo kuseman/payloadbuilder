@@ -1,13 +1,7 @@
 package se.kuseman.payloadbuilder.core.expression;
 
-import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
 
-import java.util.Set;
-
-import org.apache.commons.lang3.ObjectUtils;
-
-import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -25,18 +19,11 @@ import se.kuseman.payloadbuilder.core.parser.Location;
 public class UnresolvedSubQueryExpression implements IExpression
 {
     private final ILogicalPlan input;
-    private final Set<Column> outerReferences;
     private final Location location;
 
     public UnresolvedSubQueryExpression(ILogicalPlan input, Location location)
     {
-        this(input, null, location);
-    }
-
-    public UnresolvedSubQueryExpression(ILogicalPlan input, Set<Column> outerReferences, Location location)
-    {
         this.input = requireNonNull(input, "input");
-        this.outerReferences = ObjectUtils.defaultIfNull(outerReferences, emptySet());
         this.location = location;
     }
 
@@ -48,11 +35,6 @@ public class UnresolvedSubQueryExpression implements IExpression
     public Location getLocation()
     {
         return location;
-    }
-
-    public Set<Column> getOuterReferences()
-    {
-        return outerReferences;
     }
 
     @Override
@@ -105,8 +87,7 @@ public class UnresolvedSubQueryExpression implements IExpression
         }
         else if (obj instanceof UnresolvedSubQueryExpression that)
         {
-            return input.equals(that.input)
-                    && outerReferences.equals(that.outerReferences);
+            return input.equals(that.input);
         }
         return false;
     }

@@ -60,7 +60,7 @@ public class CoreColumn extends Column
     public CoreColumn(String name, ResolvedType type, String outputName, boolean internal, TableSourceReference tableSourceReference, Type columnType)
     {
         super(name, type);
-        this.outputName = outputName;
+        this.outputName = Objects.toString(outputName, "");
         this.internal = internal;
         this.tableSourceReference = tableSourceReference;
         this.columnType = requireNonNull(columnType, "columnType");
@@ -130,6 +130,11 @@ public class CoreColumn extends Column
     public static CoreColumn of(String name, ResolvedType type)
     {
         return new CoreColumn(name, type, "", false, null, Type.REGULAR);
+    }
+
+    public static CoreColumn of(String name, Column.Type type)
+    {
+        return new CoreColumn(name, ResolvedType.of(type), "", false, null, Type.REGULAR);
     }
 
     /** Return a {@link CoreColumn} with provided name and type and reference */

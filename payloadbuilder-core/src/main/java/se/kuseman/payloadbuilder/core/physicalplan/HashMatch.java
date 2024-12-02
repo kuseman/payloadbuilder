@@ -129,6 +129,13 @@ public class HashMatch implements IPhysicalPlan
         {
             properties.put("Hash Time", DurationFormatUtils.formatDurationHMS(TimeUnit.MILLISECONDS.convert(nodeData.hashTime, TimeUnit.NANOSECONDS)));
             properties.put("Probe Time", DurationFormatUtils.formatDurationHMS(TimeUnit.MILLISECONDS.convert(nodeData.probeTime, TimeUnit.NANOSECONDS)));
+            if (nodeData.outerIsHash != null)
+            {
+                properties.put("Hash Side", nodeData.outerIsHash ? "Outer"
+                        : "Inner");
+                properties.put("Probe Side", nodeData.outerIsHash ? "Inner"
+                        : "Outer");
+            }
         }
 
         properties.put(IDatasource.PREDICATE, condition.toString());
@@ -379,6 +386,8 @@ public class HashMatch implements IPhysicalPlan
                     state = IteratorState.HashOuter;
                     outerIsHash = true;
                 }
+
+                nodeData.outerIsHash = outerIsHash;
             }
 
             /** Handle next batch state */
@@ -1496,6 +1505,8 @@ public class HashMatch implements IPhysicalPlan
         // Nanos
         long hashTime;
         long probeTime;
+
+        Boolean outerIsHash;
     }
 
     /** Bucket in {@link HashValue} with row indices along with owning vector */

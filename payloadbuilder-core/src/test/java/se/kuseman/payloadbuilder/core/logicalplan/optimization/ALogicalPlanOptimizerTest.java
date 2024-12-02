@@ -2,6 +2,7 @@ package se.kuseman.payloadbuilder.core.logicalplan.optimization;
 
 import static se.kuseman.payloadbuilder.api.QualifiedName.of;
 
+import java.util.HashMap;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
@@ -30,7 +31,6 @@ public abstract class ALogicalPlanOptimizerTest extends ALogicalPlanTest
     protected static final String STABLE_E_ID = "stableEId";
 
     private final SchemaResolver schemaResolver = new SchemaResolver();
-    private final ColumnResolver columnResolver = new ColumnResolver();
 
     protected TableSourceReference table = new TableSourceReference(0, TableSourceReference.Type.TABLE, "es", of("table"), "t");
     protected TableSourceReference tableA = new TableSourceReference(1, TableSourceReference.Type.TABLE, "es", of("tableA"), "a");
@@ -124,16 +124,16 @@ public abstract class ALogicalPlanOptimizerTest extends ALogicalPlanTest
         session.setDefaultCatalogAlias(TEST);
     }
 
+    protected ILogicalPlan getPlanBeforeColumnResolver(String query)
+    {
+        ILogicalPlan plan = s(query);
+        return LogicalPlanOptimizer.optimizeInternal(context, plan, new HashMap<>(), new HashMap<>(), ColumnResolver.class);
+    }
+
     protected ILogicalPlan getSchemaResolvedPlan(String query)
     {
         ALogicalPlanOptimizer.Context ctx = schemaResolver.createContext(context);
         return schemaResolver.optimize(ctx, s(query));
-    }
-
-    protected ILogicalPlan getColumnResolvedPlan(String query)
-    {
-        ALogicalPlanOptimizer.Context ctx = columnResolver.createContext(context);
-        return columnResolver.optimize(ctx, getSchemaResolvedPlan(query));
     }
 
     protected ILogicalPlan s(String query)

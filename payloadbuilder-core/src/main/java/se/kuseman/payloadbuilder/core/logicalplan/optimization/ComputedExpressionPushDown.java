@@ -286,8 +286,13 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
                         .getAlias()
                         : null;
 
+                // Simply replace the ordinal with the projection expression if a column
+                if (projectionExpression instanceof UnresolvedColumnExpression)
+                {
+                    planData.sortItems.set(j, new SortItem(projectionExpression, item.getOrder(), item.getNullOrder(), item.getLocation()));
+                }
                 // Projected expression has an alias, point the sort item to the alias
-                if (!isBlank(alias))
+                else if (!isBlank(alias))
                 {
                     // Point the sort item to the projected alias
                     planData.sortItems.set(j, new SortItem(new UnresolvedColumnExpression(QualifiedName.of(alias), -1, null), item.getOrder(), item.getNullOrder(), item.getLocation()));
@@ -499,7 +504,7 @@ class ComputedExpressionPushDown extends ALogicalPlanOptimizer<ComputedExpressio
             ILogicalPlan plan = expression.getInput()
                     .accept(context.visitor, context);
             context.planDatas.pop();
-            return new UnresolvedSubQueryExpression(plan, expression.getOuterReferences(), expression.getLocation());
+            return new UnresolvedSubQueryExpression(plan, expression.getLocation());
         }
     }
 
