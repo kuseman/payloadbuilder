@@ -129,10 +129,6 @@ class ColumnOrdinalResolver extends ALogicalPlanOptimizer<ColumnOrdinalResolver.
         {
             context.outerSchema = SchemaUtils.joinSchema(context.outerSchema, outer.getSchema());
         }
-        else
-        {
-            context.outerSchema = null;
-        }
 
         ILogicalPlan inner = plan.getInner()
                 .accept(this, context);
@@ -158,7 +154,6 @@ class ColumnOrdinalResolver extends ALogicalPlanOptimizer<ColumnOrdinalResolver.
                 .accept(this, context);
 
         context.schema = input.getSchema();
-
         List<IExpression> aggregateExpressions = plan.getAggregateExpressions()
                 .stream()
                 .map(e -> ColumnOrdinalRewriter.INSTANCE.visit(e, context))

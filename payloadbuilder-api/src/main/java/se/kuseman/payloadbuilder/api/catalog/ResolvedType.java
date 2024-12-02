@@ -26,6 +26,7 @@ public class ResolvedType
     }
     public static final ResolvedType STRING = ResolvedType.of(Type.String);
     public static final ResolvedType ANY = ResolvedType.of(Type.Any);
+    public static final ResolvedType DOUBLE = ResolvedType.of(Type.Double);
 
     private final Type type;
     /** Type used do specify the contained type if {@link #type} is {@link Type#Array} */

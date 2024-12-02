@@ -364,9 +364,6 @@ public class NestedLoop implements IPhysicalPlan
                     if (innerIt == null)
                     {
                         ExecutionContext ctx = executionContext;
-                        // Outer references are not allowed in inner/left/cross joins so clear
-                        ctx.getStatementContext()
-                                .setOuterTupleVector(null);
                         if (pushOuterReference)
                         {
                             // Make a copy of the execution context here because we mutable the outer tuple vector
@@ -682,9 +679,6 @@ public class NestedLoop implements IPhysicalPlan
                         // Make a copy of the execution context here because we mutable the outer tuple vector
                         // and we risk evaluating against wrong tuple otherwise if expressions are lazy etc.
                         ctx = ctx.copy();
-                        // INNER/LEFT joins cannot have outer references, clear
-                        ctx.getStatementContext()
-                                .setOuterTupleVector(null);
                         ctx.getStatementContext()
                                 .setIndexSeekTupleVector(currentOuter);
 
@@ -1155,18 +1149,18 @@ public class NestedLoop implements IPhysicalPlan
 
             this.outer = outer;
 
-            if (outerSchemaIsAsterisk)
+            // Re-create the resulting schema if changed since last iteration
+            if (!Objects.equals(outerSchema, outer.getSchema()))
             {
-                // Re-create the resulting schema if changed since last iteration
-                if (!Objects.equals(outerSchema, outer.getSchema()))
-                {
-                    this.outerSchema = outer.getSchema();
-                    this.schema = SchemaUtils.joinSchema(prevOuterSchema, outerSchema);
-                }
+                this.outerSchema = outer.getSchema();
+                this.schema = SchemaUtils.joinSchema(prevOuterSchema, outerSchema);
             }
-            else
+
+            // TODO: Pre-calculation of outer schema was broken but is still not used
+            // We only assert that they are equal
+            if (!outerSchemaIsAsterisk)
             {
-                this.schema = planOuterSchema;
+                assert (planOuterSchema.equals(this.schema)) : "Planned outer schema should match actual outer schema. Planned: " + planOuterSchema + ", actual: " + this.schema;
             }
         }
 
@@ -1209,6 +1203,7 @@ public class NestedLoop implements IPhysicalPlan
         private CartesianColumn[] columns;
         private int rowCount;
         private int outerSize;
+        // private int innerSize;
         private int innerRowCount;
 
         /** Inits this vector with new outer/inner vectors. Calculates new schemas etc. */
@@ -1219,22 +1214,20 @@ public class NestedLoop implements IPhysicalPlan
             this.rowCount = outer.getRowCount() * inner.getRowCount();
             this.innerRowCount = inner.getRowCount();
 
-            // Only calculate resulting schema if it's an asterisk resulting schema
-            if (isAsteriskSchema)
+            // Recalculate resulting schema if differs
+            if (!Objects.equals(outerSchema, outer.getSchema())
+                    || !Objects.equals(innerSchema, inner.getSchema()))
             {
-                // Recalculate resulting schema if differs
-                if (!Objects.equals(outerSchema, outer.getSchema())
-                        || !Objects.equals(innerSchema, inner.getSchema()))
-                {
-                    this.outerSchema = outer.getSchema();
-                    this.innerSchema = inner.getSchema();
-                    this.schema = SchemaUtils.joinSchema(outerSchema, innerSchema);
-                }
-            }
-            else
-            {
-                this.schema = cartesianSchema;
                 this.outerSchema = outer.getSchema();
+                this.innerSchema = inner.getSchema();
+                this.schema = SchemaUtils.joinSchema(outerSchema, innerSchema);
+            }
+
+            // TODO: Pre-calculation of cartesian schema was broken but is still not used
+            // We only assert that they are equal
+            if (!isAsteriskSchema)
+            {
+                assert (cartesianSchema.equals(this.schema)) : "Planned cartesian schema should match actual schema. Planned: " + cartesianSchema + ", actual: " + this.schema;
             }
             this.outerSize = outerSchema.getSize();
 

@@ -33,7 +33,6 @@ import se.kuseman.payloadbuilder.core.expression.DereferenceExpression;
 import se.kuseman.payloadbuilder.core.expression.FunctionCallExpression;
 import se.kuseman.payloadbuilder.core.expression.LambdaExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression;
-import se.kuseman.payloadbuilder.core.expression.UnresolvedSubQueryExpression;
 import se.kuseman.payloadbuilder.core.expression.VariableExpression;
 import se.kuseman.payloadbuilder.core.logicalplan.Aggregate;
 import se.kuseman.payloadbuilder.core.logicalplan.ConstantScan;
@@ -41,6 +40,7 @@ import se.kuseman.payloadbuilder.core.logicalplan.ExpressionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.Join;
+import se.kuseman.payloadbuilder.core.logicalplan.MaxRowCountAssert;
 import se.kuseman.payloadbuilder.core.logicalplan.OperatorFunctionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Projection;
 import se.kuseman.payloadbuilder.core.logicalplan.Sort;
@@ -97,7 +97,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                     eq(cre("id", tableB), cre("id", a_table)),
                                     null,
                                     false,
-                                    Schema.EMPTY),
+                                    schemaA),
                                 asList(cre("col1", tableB), cre("col2", tableB))),
                         subQueryT),
                         Join.Type.LEFT,
@@ -370,7 +370,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 + "from tableA a";
         //@formatter:on
 
-        ILogicalPlan plan = getSchemaResolvedPlan(query);
+        ILogicalPlan plan = getPlanBeforeColumnResolver(query);
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableA = of(0, "", "tableA", "a");
@@ -379,24 +379,32 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         //@formatter:off
         ILogicalPlan expected =
                 projection(
-                    tableScan(schemaA, tableA),
-                    asList(new AliasExpression(
-                        new UnresolvedSubQueryExpression(
-                            projection(
-                                ConstantScan.INSTANCE,
-                                asList(DereferenceExpression.create(ocre("multi", tableA), QualifiedName.of(asList("part", "qualifier")), null))
-                            ),
-                            asSet(nast("multi", ResolvedType.of(Type.Any), tableA)),
-                            null), "val")));
+                    new Join(
+                        tableScan(schemaA, tableA),
+                        projection(
+                            ConstantScan.INSTANCE,
+                            asList(new AliasExpression(DereferenceExpression.create(ocre("multi", tableA), QualifiedName.of(asList("part", "qualifier")), null), "__expr0", true))
+                        ),
+                        Join.Type.LEFT,
+                        null,
+                        null,
+                        Set.of(
+                            nast("multi", ResolvedType.of(Type.Any), tableA)
+                        ),
+                        false,
+                        Schema.of(
+                            ast("a", ResolvedType.ANY, tableA)
+                        )),
+                    asList(new AliasExpression(cre("__expr0", tableA), "val")));
         //@formatter:on
+
+        // System.out.println(expected.print(0));
+        // System.out.println(actual.print(0));
 
         Assertions.assertThat(actual.getSchema())
                 .usingRecursiveComparison()
                 .ignoringFieldsOfTypes(Location.class, Random.class)
-                .isEqualTo(Schema.of(col("val", ResolvedType.of(Type.Any), null)));
-
-        // System.out.println(expected.print(0));
-        // System.out.println(actual.print(0));
+                .isEqualTo(Schema.of(nast("val", ResolvedType.of(Type.Any), tableA)));
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
@@ -497,7 +505,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 + "  on b.col1 = a.col1 ";
         //@formatter:on
 
-        ILogicalPlan plan = getSchemaResolvedPlan(query);
+        ILogicalPlan plan = getPlanBeforeColumnResolver(query);
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableA = of(0, "", "tableA", "a");
@@ -512,29 +520,31 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan expected =
                 new Projection(
                     new Join(
-                        tableScan(schemaA, tableA),
-                        tableScan(schemaB, tableB),
-                        Join.Type.INNER,
-                        "b",
-                        eq(cre("col1", tableB), cre("col1", tableA)),
-                        null,
-                        false,
-                        Schema.EMPTY),
-                    asList(new AliasExpression(
-                        new UnresolvedSubQueryExpression(
-                            new OperatorFunctionScan(
-                                Schema.of(nast("output", ResolvedType.table(objectArraySchema), null)),
-                                new Projection(
-                                    ConstantScan.INSTANCE,
-                                    asList(new AsteriskExpression(QualifiedName.of("b"), null, Set.of(tableB)))
-                                ),
-                                "",
-                                "object_array",
-                                null),
-                            asSet(ast("b", ResolvedType.table(schemaB), tableB)),
+                        new Join(
+                            tableScan(schemaA, tableA),
+                            tableScan(schemaB, tableB),
+                            Join.Type.INNER,
+                            "b",
+                            eq(cre("col1", tableB), cre("col1", tableA)),
+                            null,
+                            false,
+                            Schema.EMPTY),
+                        new OperatorFunctionScan(
+                            Schema.of(col("__expr0", ResolvedType.table(Schema.of(ast("", "b.*", Type.Any, tableB))), null, true)),
+                            projection(
+                                ConstantScan.INSTANCE,
+                                List.of(new AsteriskExpression(QualifiedName.of("b"), null, Set.of(tableB)))),
+                            "",
+                            "object_array",
                             null),
-                        "obj"))
-                    );
+                    Join.Type.LEFT,
+                    null,
+                    (IExpression) null,
+                    Set.of(ast("b", ResolvedType.table(schemaB), tableB)),
+                    false,
+                    Schema.of(ast("a", Type.Any, tableA), pop("b", ResolvedType.table(schemaB), tableB))),
+                    asList(new AliasExpression(ce("__expr0", ResolvedType.table(Schema.of(ast("", "b.*", Type.Any, tableB)))), "obj"))
+                );
         //@formatter:on
 
         Assertions.assertThat(actual.getSchema())
@@ -813,7 +823,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         +"where id = 1";
         //@formatter:on
 
-        ILogicalPlan plan = getSchemaResolvedPlan(query);
+        ILogicalPlan plan = getPlanBeforeColumnResolver(query);
 
         try
         {
@@ -921,7 +931,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
 
         session.setCatalogProperty(TEST, STABLE_D_ID, 3);
 
-        ILogicalPlan plan = getSchemaResolvedPlan(query);
+        ILogicalPlan plan = getPlanBeforeColumnResolver(query);
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableA = of(0, "", "tableA", "a");
@@ -949,61 +959,71 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         
         ILogicalPlan expected = 
                 projection(
-                    new Join( 
-                        new Join(
-                           new Join(
-                               tableScan(schemaA, tableA),
-                               tableScan(schemaB, tableB),
+                    new Join(
+                        new Join( 
+                            new Join(
+                               new Join(
+                                   tableScan(schemaA, tableA),
+                                   tableScan(schemaB, tableB),
+                                   Join.Type.INNER,
+                                   "b",
+                                   eq(cre("col1", tableB), cre("col1", tableA)),
+                                   null,
+                                   false,
+                                   Schema.EMPTY),
+                               tableScan(schemaC, tableC),
                                Join.Type.INNER,
-                               "b",
-                               eq(cre("col1", tableB), cre("col1", tableA)),
+                               "c",
+                               eq(cre("col1", tableC), cre("col1", tableA)),
                                null,
                                false,
                                Schema.EMPTY),
-                           tableScan(schemaC, tableC),
-                           Join.Type.INNER,
-                           "c",
-                           eq(cre("col1", tableC), cre("col1", tableA)),
-                           null,
-                           false,
-                           Schema.EMPTY),
-                        tableScan(schemaSTableD, sTableD),
-                        Join.Type.INNER,
+                            tableScan(schemaSTableD, sTableD),
+                            Join.Type.INNER,
+                            null,
+                            eq(cre("col1", sTableD, ResolvedType.of(Type.Double), CoreColumn.Type.REGULAR), cre("col1", tableA)),
+                            null,
+                            false,
+                            Schema.EMPTY),
+                        new OperatorFunctionScan(
+                                Schema.of(col("__expr0", ResolvedType.table(objectArraySchema), null, true)),
+                                projection(
+                                    new ExpressionScan(
+                                        e_b,
+                                        Schema.of(ast("b", ResolvedType.of(Type.Any), e_b)),
+                                        ocre("b", tableB, ResolvedType.table(schemaB), CoreColumn.Type.POPULATED),
+                                        null),
+                                    asList(
+                                        cre("col2", e_b),
+                                        new DereferenceExpression(ocre("c", tableC, "c", ResolvedType.table(schemaC), CoreColumn.Type.POPULATED),
+                                                "col3", -1, ResolvedType.array(Type.Any)),
+                                        cre("col4", e_b),
+                                        ocre("col3", tableA),
+                                        ocre("col6", sTableD, "col6", ResolvedType.of(Type.String), CoreColumn.Type.REGULAR),
+                                        ocre("c", tableC, "c", ResolvedType.table(schemaC), CoreColumn.Type.POPULATED)
+                                    )),
+                                "",
+                                "object_array",
+                                null),
+                        Join.Type.LEFT,
                         null,
-                        eq(cre("col1", sTableD, ResolvedType.of(Type.Double), CoreColumn.Type.REGULAR), cre("col1", tableA)),
                         null,
+                        asSet(
+                            pop("b", ResolvedType.table(schemaB), tableB),
+                            pop("col3", ResolvedType.table(schemaC), tableC),
+                            nast("col3", ResolvedType.of(Type.Any), tableA),
+                            col("col6", ResolvedType.of(Type.String), sTableD),     // static schema col6 was chosen instead of asterisk
+                            pop("c", ResolvedType.table(schemaC), tableC)
+                        ),
                         false,
-                        Schema.EMPTY),
-                    asList(new AliasExpression(new UnresolvedSubQueryExpression(
-                            new OperatorFunctionScan(
-                                    Schema.of(nast("output", ResolvedType.table(objectArraySchema), null)),
-                                    projection(
-                                        new ExpressionScan(
-                                            e_b,
-                                            Schema.of(ast("b", ResolvedType.of(Type.Any), e_b)),
-                                            ocre("b", tableB, ResolvedType.table(schemaB), CoreColumn.Type.POPULATED),
-                                            null),
-                                        asList(
-                                            cre("col2", e_b),
-                                            new DereferenceExpression(ocre("c", tableC, "c", ResolvedType.table(schemaC), CoreColumn.Type.POPULATED),
-                                                    "col3", -1, ResolvedType.array(Type.Any)),
-                                            cre("col4", e_b),
-                                            ocre("col3", tableA),
-                                            ocre("col6", sTableD, "col6", ResolvedType.of(Type.String), CoreColumn.Type.REGULAR),
-                                            ocre("c", tableC, "c", ResolvedType.table(schemaC), CoreColumn.Type.POPULATED)
-                                        )),
-                                    "",
-                                    "object_array",
-                                    null),
-                                    asSet(
-                                        pop("b", ResolvedType.table(schemaB), tableB),
-                                        pop("col3", ResolvedType.table(schemaC), tableC),
-                                        nast("col3", ResolvedType.of(Type.Any), tableA),
-                                        col("col6", ResolvedType.of(Type.String), sTableD),     // static schema col6 was chosen instead of asterisk
-                                        pop("c", ResolvedType.table(schemaC), tableC)
-                                        ),
-                                    null),
-                             "values")));
+                        Schema.of(
+                            ast("a", ResolvedType.ANY, tableA),
+                            pop("b", ResolvedType.table(schemaB), tableB),
+                            pop("c", ResolvedType.table(schemaC), tableC),
+                            col("col1", ResolvedType.DOUBLE, sTableD),
+                            col("col6", ResolvedType.STRING, sTableD)
+                        )),
+                    asList(new AliasExpression(ce("__expr0", ResolvedType.table(objectArraySchema)), "values")));
         //@formatter:on
 
         Assertions.assertThat(actual.getSchema())
@@ -1646,7 +1666,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     public void test_populate_join_expression_scan_schema_less()
     {
         //@formatter:off
-        // Here we are accessing what seems to be outer columns (b.col, b.col2 in sub query expression) but we have an over clause
+        // Here we are accessing what seems to be outer columns (b.col, b.col2 in sub query expression) but we have an for clause
         // here which makes this a plain column access since we are going to scan the tuple vector in alias b as 
         // plain table source
         String query = ""
@@ -1656,7 +1676,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 + "  on b.col2 = a.col2 ";
         //@formatter:on
 
-        ILogicalPlan plan = getSchemaResolvedPlan(query);
+        ILogicalPlan plan = getPlanBeforeColumnResolver(query);
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableA = of(0, "", "tableA", "a");
@@ -1667,43 +1687,55 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
 
         //@formatter:off
-        Schema objectArraySchema = Schema.of(
-            nast("col", ResolvedType.of(Type.Any), e_b),
-            nast("col2", ResolvedType.of(Type.Any), e_b),
-            nast("col3", ResolvedType.of(Type.Any), tableA)
-        );
-        
         ILogicalPlan expected =  projection(
                 new Join(
-                    tableScan(schemaA, tableA),
-                    tableScan(schemaB, tableB),
-                    Join.Type.INNER,
-                    "b",
-                    eq(cre("col2", tableB), cre("col2", tableA)),
-                    asSet(),
+                    new Join(
+                        tableScan(schemaA, tableA),
+                        tableScan(schemaB, tableB),
+                        Join.Type.INNER,
+                        "b",
+                        eq(cre("col2", tableB), cre("col2", tableA)),
+                        asSet(),
+                        false,
+                        Schema.EMPTY),
+                    new OperatorFunctionScan(
+                        Schema.of(col("__expr0", ResolvedType.table(Schema.of(
+                                nast("col", ResolvedType.ANY, e_b),
+                                nast("col2", ResolvedType.ANY, e_b),
+                                nast("col3", ResolvedType.ANY, tableA))), null, true)),
+                        projection(
+                            new ExpressionScan(
+                                e_b,
+                                Schema.of(ast("b", ResolvedType.ANY, e_b)),
+                                ocre("b", tableB, ResolvedType.table(schemaB), CoreColumn.Type.POPULATED),
+                                null),
+                            List.of(
+                                cre("col", e_b),
+                                cre("col2", e_b),
+                                ocre("col3", tableA)
+                            )),
+                        "",
+                        "object_array",
+                        null),
+                    Join.Type.LEFT,
+                    null,
+                    (IExpression) null,
+                    Set.of(
+                        pop("b", ResolvedType.table(schemaB), tableB),
+                        nast("col3", ResolvedType.ANY, tableA)
+                    ),
                     false,
-                    Schema.EMPTY),
+                    Schema.of(
+                        ast("a", ResolvedType.ANY, tableA),
+                        pop("b", ResolvedType.table(schemaB), tableB)
+                    )),
                 asList(cre("col", tableA), new AliasExpression(
                         new DereferenceExpression(cre("b", tableB, "b", ResolvedType.table(schemaB), CoreColumn.Type.POPULATED), "col", -1, ResolvedType.array(Type.Any)), "bOuterCol"),
-                            new UnresolvedSubQueryExpression(
-                                new OperatorFunctionScan(
-                                    Schema.of(nast("output", ResolvedType.table(objectArraySchema), null)),
-                                    projection(
-                                            new ExpressionScan(
-                                                e_b,
-                                                Schema.of(ast("b", ResolvedType.of(Type.Any), e_b)),
-                                                ocre("b", tableB, ResolvedType.table(schemaB), CoreColumn.Type.POPULATED),
-                                                null),
-                                            asList(
-                                                cre("col", e_b),
-                                                cre("col2", e_b),
-                                                ocre("col3", tableA)
-                                            )),
-                                    "",
-                                    "object_array",
-                                    null),
-                            asSet(pop("b", ResolvedType.table(schemaB), tableB), nast("col3", Type.Any, tableA)),
-                        null)));
+                        ce("__expr0", ResolvedType.table(Schema.of(
+                                nast("col", ResolvedType.ANY, e_b),
+                                nast("col2", ResolvedType.ANY, e_b),
+                                nast("col3", ResolvedType.ANY, tableA))))
+                ));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -1720,96 +1752,77 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
     @Test
     public void test_populate_join_with_expression_scan_schema_full()
     {
-//        //@formatter:off
-//        String query = ""
-//                + "select a.col, b.col bOuterCol, ( select b.col, b.col2, a.col3 from (b) b for object_array ) "
-//                + "from tableA a "
-//                + "inner populate join tableB b "
-//                + "  on b.col2 = a.col2 ";
-//        //@formatter:on
-
-        TableSourceReference tableA = of(0, "", "tableA", "a");
-        TableSourceReference tableB = of(0, "", "tableB", "b");
-        TableSourceReference e_b = new TableSourceReference(0, TableSourceReference.Type.EXPRESSION, "", QualifiedName.of("b"), "b");
-
-        Schema schemaA = Schema.of(col("col", Type.Int, tableA), col("col2", Type.String, tableA), col("col3", Type.Float, tableA));
-        Schema schemaB = Schema.of(col("col", Type.Boolean, tableB), col("col2", Type.Int, tableB));
+        TableSourceReference e_b = new TableSourceReference(2, TableSourceReference.Type.EXPRESSION, "", QualifiedName.of("b"), "b");
 
         //@formatter:off
-        ILogicalPlan plan =  projection(
-                new Join(
-                    tableScan(schemaA, tableA),
-                    tableScan(schemaB, tableB),
-                    Join.Type.INNER,
-                    "b",
-                    e("b.col2 = a.col2"),
-                    asSet(),
-                    false,
-                    Schema.EMPTY),
-                asList(e("a.col"), new AliasExpression(e("b.col"), "bOuterCol"), new UnresolvedSubQueryExpression(
-                        new OperatorFunctionScan(
-                                Schema.of(col("output", Type.Any)),
-                                projection(
-                                        new ExpressionScan(
-                                            e_b,
-                                            Schema.EMPTY,
-                                            e("b"),
-                                            null),
-                                        asList(
-                                            e("b.col"),
-                                            e("b.col2"),
-                                            e("a.col3")
-                                        )),
-                                "",
-                                "object_array",
-                                null),
-                        asSet(),
-                        null)));
-        //@formatter:on
+        String query = """
+                select a.col1, b.col2 bOuterCol, ( select b.col3, b.col2, a.col3 from (b) b for object_array )
+                from stableA a
+                inner populate join stableB b
+                  on b.col2 = a.col2
+                """;
+        //@formatter:off
 
-        ILogicalPlan actual = optimize(context, plan);
+        ILogicalPlan actual = getPlanBeforeColumnResolver(query);
+        actual = optimize(context, actual);
 
         //@formatter:off
         Schema objectArraySchema = Schema.of(
-            col("col", ResolvedType.of(Type.Boolean), e_b),
-            col("col2", ResolvedType.of(Type.Int), e_b),
-            col("col3", ResolvedType.of(Type.Float), tableA)
+            col("col3", ResolvedType.of(Type.Float), e_b),
+            col("col2", ResolvedType.of(Type.String), e_b),
+            col("col3", ResolvedType.of(Type.Float), sTableA)
         );
         
         ILogicalPlan expected =
                 projection(
                     new Join(
-                        tableScan(schemaA, tableA),
-                        tableScan(schemaB, tableB),
-                        Join.Type.INNER,
-                        "b",
-                        eq(cre("col2", tableB, 4, ResolvedType.of(Type.Int)), cre("col2", tableA, 1, ResolvedType.of(Type.String))),
-                        asSet(),
+                        new Join(
+                            tableScan(schemaSTableA, sTableA),
+                            tableScan(schemaSTableB, sTableB),
+                            Join.Type.INNER,
+                            "b",
+                            eq(cre("col2", sTableB, 4, ResolvedType.of(Type.String)), cre("col2", sTableA, 1, ResolvedType.of(Type.String))),
+                            asSet(),
+                            false,
+                            Schema.EMPTY),
+                        new OperatorFunctionScan(
+                            Schema.of(col("__expr0", ResolvedType.table(objectArraySchema), null, true)),
+                            projection(
+                                new ExpressionScan(
+                                    e_b,
+                                    Schema.of(
+                                        col("col1", ResolvedType.of(Type.Boolean), e_b),
+                                        col("col2", ResolvedType.of(Type.String), e_b),
+                                        col("col3", ResolvedType.of(Type.Float), e_b)),
+                                    ocre("b", sTableB, 3, ResolvedType.table(schemaSTableB), CoreColumn.Type.POPULATED),
+                                    null),
+                                asList(
+                                    cre("col3", e_b, 2, ResolvedType.of(Type.Float)),
+                                    cre("col2", e_b, 1, ResolvedType.of(Type.String)),
+                                    ocre("col3", sTableA, 2, ResolvedType.of(Type.Float))
+                                )),
+                            "",
+                            "object_array",
+                            null),
+                        Join.Type.LEFT,
+                        null,
+                        null,
+                        Set.of(
+                            pop("b", ResolvedType.table(schemaSTableB), sTableB),
+                            col("col3", Type.Float, sTableA)
+                        ),
                         false,
-                        Schema.EMPTY),
-                asList(cre("col", tableA, 0, ResolvedType.of(Type.Int)),
-                       new AliasExpression(new DereferenceExpression(cre("b", tableB, 3, ResolvedType.table(schemaB), CoreColumn.Type.POPULATED),
-                               "col", 0, ResolvedType.array(ResolvedType.of(Type.Boolean))),
+                        Schema.of(
+                            col("col1", Type.Int, sTableA),
+                            col("col2", Type.String, sTableA),
+                            col("col3", Type.Float, sTableA),
+                            pop("b", ResolvedType.table(schemaSTableB), sTableB)
+                        )),
+                asList(cre("col1", sTableA, 0, ResolvedType.of(Type.Int)),
+                       new AliasExpression(new DereferenceExpression(cre("b", sTableB, 3, ResolvedType.table(schemaSTableB), CoreColumn.Type.POPULATED),
+                               "col2", 1, ResolvedType.array(ResolvedType.of(Type.String))),
                             "bOuterCol"),
-                       new UnresolvedSubQueryExpression(
-                           new OperatorFunctionScan(
-                                Schema.of(col("output", ResolvedType.table(objectArraySchema), null)),
-                                projection(
-                                        new ExpressionScan(
-                                            e_b,
-                                            Schema.of(col("col", ResolvedType.of(Type.Boolean), e_b), col("col2", ResolvedType.of(Type.Int), e_b)),
-                                            ocre("b", tableB, 3, ResolvedType.table(schemaB), CoreColumn.Type.POPULATED),
-                                            null),
-                                        asList(
-                                            cre("col", e_b, 0, ResolvedType.of(Type.Boolean)),
-                                            cre("col2", e_b, 1, ResolvedType.of(Type.Int)),
-                                            ocre("col3", tableA, 2, ResolvedType.of(Type.Float))
-                                        )),
-                                "",
-                                "object_array",
-                                null),
-                        asSet(pop("b", ResolvedType.table(schemaB), tableB), col("col3", Type.Float, tableA)),
-                        null)));
+                       ce("__expr0", 4, ResolvedType.table(objectArraySchema))));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -1892,7 +1905,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 + "from tableA a ";
         //@formatter:on
 
-        ILogicalPlan plan = getSchemaResolvedPlan(query);
+        ILogicalPlan plan = getPlanBeforeColumnResolver(query);
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableA = of(0, "", "tableA", "a");
@@ -1900,14 +1913,23 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
 
         //@formatter:off
         ILogicalPlan expected =  projection(
-                tableScan(schemaA, tableA),
-                asList(cre("col", tableA), new AliasExpression(new UnresolvedSubQueryExpression(
-                        projection(
-                            ConstantScan.INSTANCE,
-                            asList(ocre("col2", tableA))),
-                        asSet(nast("col2", Type.Any, tableA)),
-                        null), "values"))
-                );
+                new Join(
+                    tableScan(schemaA, tableA),
+                    projection(
+                        ConstantScan.INSTANCE,
+                        asList(new AliasExpression(ocre("col2", tableA), "__expr0", true))),
+                    Join.Type.LEFT,
+                    null,
+                    null,
+                    Set.of(
+                        nast("col2", Type.Any, tableA)
+                    ),
+                    false,
+                    Schema.of(
+                        ast("a", ResolvedType.ANY, tableA)
+                    )),
+                asList(cre("col", tableA), new AliasExpression(cre("__expr0", tableA), "values")
+                ));
         //@formatter:on
 
         // System.out.println(expected.print(0));
@@ -1936,47 +1958,61 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
        * 
        * @formatter:on
        */
-        TableSourceReference tableA = of(0, "", "tableA", "a");
-        TableSourceReference tableB = of(0, "", "tableB", "b");
-        Schema schemaA = Schema.of(col("col1", Type.Int, tableA), col("col3", Type.Int, tableA));
-        Schema schemaB = Schema.of(col("col1", Type.Int, tableB), col("col2", Type.Int, tableB));
+        TableSourceReference tableB = of(1, "", "tableB", "b");
+        Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
 
         //@formatter:off
-        ILogicalPlan plan = projection(
-                tableScan(schemaA, tableA), 
-                asList(e("col1"), new AliasExpression(
-                        new UnresolvedSubQueryExpression(
-                            projection(
-                                tableScan(schemaB, tableB),
-                                asList(e("b.col1"), e("col3"))),
-                        null),
-                        "vals")));
+        String query = """
+                select col1,                   --- tableA
+                (
+                  select b.col1                --- tableB
+                  ,      col3                  --- stablea outer since it's schema full with col3
+                  from tableB b
+                  for object
+                ) vals
+                from stableA a
+                """;
         //@formatter:on
 
-        ILogicalPlan actual = optimize(context, plan);
+        ILogicalPlan actual = getPlanBeforeColumnResolver(query);// optimize(context, plan);
+        actual = optimize(context, actual);
 
         //@formatter:off
         ILogicalPlan expected =
                 projection(
-                    tableScan(schemaA, tableA),
-                    asList(cre("col1", tableA, 0, ResolvedType.of(Type.Int)), new AliasExpression(
-                        new UnresolvedSubQueryExpression(
+                    new Join(
+                        tableScan(schemaSTableA, sTableA),
+                        new OperatorFunctionScan(
+                            Schema.of(col("__expr0", ResolvedType.object(Schema.of(nast("col1", Type.Any, tableB), col("col3", Type.Float, sTableA))), null, true)),
                             projection(
                                 tableScan(schemaB, tableB),
-                                asList(cre("col1", tableB, 0, ResolvedType.of(Type.Int)), ocre("col3", tableA, 1, ResolvedType.of(Type.Int)))),
-                            asSet(col("col3", Type.Int, tableA)),
+                                List.of(
+                                    cre("col1", tableB),
+                                    ocre("col3", sTableA, 2, ResolvedType.of(Type.Float), CoreColumn.Type.REGULAR)
+                                )),
+                            "",
+                            "object",
                             null),
-                            "vals"))
+                        Join.Type.LEFT,
+                        null,
+                        (IExpression) null,
+                        Set.of(col("col3", Type.Float, sTableA)),
+                        false,
+                        schemaSTableA),
+                    asList(cre("col1", sTableA, 0, ResolvedType.of(Type.Int)),
+                            new AliasExpression(ce("__expr0", 3, ResolvedType.object(Schema.of(
+                                    nast("col1", Type.Any, tableB),
+                                    col("col3", Type.Float, sTableA)))), "vals"))
                 );
         //@formatter:on
+
+        // System.out.println(expected.print(0));
+        // System.out.println(actual.print(0));
 
         Assertions.assertThat(actual)
                 .usingRecursiveComparison()
                 .ignoringFieldsOfTypes(Location.class, Random.class)
                 .isEqualTo(expected);
-
-        // System.out.println(expected.print(0));
-        // System.out.println(actual.print(0));
 
         assertEquals(expected, actual);
     }
@@ -1994,7 +2030,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 + "from tableA a ";
         //@formatter:on
 
-        ILogicalPlan plan = getSchemaResolvedPlan(query);
+        ILogicalPlan plan = getPlanBeforeColumnResolver(query);
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableA = of(0, "", "tableA", "a");
@@ -2004,12 +2040,20 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
 
         //@formatter:off
         ILogicalPlan expected =  projection(
-                tableScan(schemaA, tableA),
-                asList(cre("col", tableA), new AliasExpression(new UnresolvedSubQueryExpression(
+                new Join(
+                    tableScan(schemaA, tableA),
+                    new MaxRowCountAssert(
                         projection(
                             tableScan(schemaB, tableB),
-                            asList(cre("col2", tableB))),
-                        null), "values"))
+                            asList(new AliasExpression(cre("col2", tableB), "__expr0", true))),
+                        1),
+                    Join.Type.LEFT,
+                    null,
+                    null,
+                    Set.of(),
+                    false,
+                    Schema.of(ast("a", ResolvedType.ANY, tableA))),
+                asList(cre("col", tableA), new AliasExpression(cre("__expr0", tableB), "values"))
                 );
         //@formatter:on
 
@@ -2044,7 +2088,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                 + "from tableA a ";
         //@formatter:on
 
-        ILogicalPlan plan = getSchemaResolvedPlan(query);
+        ILogicalPlan plan = getPlanBeforeColumnResolver(query);
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableA = of(0, "", "tableA", "a");
@@ -2056,28 +2100,50 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
 
         //@formatter:off
         ILogicalPlan expected =  projection(
-                tableScan(schemaA, tableA),
-                asList(cre("col", tableA), new AliasExpression(
-                        new UnresolvedSubQueryExpression(
-                            projection(
+                new Join(
+                    tableScan(schemaA, tableA),
+                    new MaxRowCountAssert(
+                        projection(
+                            new Join(
                                 new Filter(
                                     tableScan(schemaB, tableB),
                                     null,
                                     gt(cre("col3", tableB), ocre("col4", tableA))),
-                                asList(new AliasExpression(
-                                        new UnresolvedSubQueryExpression(
-                                                projection(
-                                                    new Filter(
-                                                        tableScan(schemaC, tableC),
-                                                        null,
-                                                        and(gt(cre("col1", tableC), ocre("col2", tableB)), gt(cre("col2", tableC), ocre("col3", tableA)))),
-                                                    asList(cre("col5", tableC))),
-                                            asSet(nast("col2", Type.Any, tableB), nast("col3", Type.Any, tableA)),
-                                            null),
-                                       "keys"))),
-                                asSet(nast("col2", Type.Any, tableB), nast("col3", Type.Any, tableA), nast("col4", Type.Any, tableA)),
-                            null), 
-                        "values"))
+                                new MaxRowCountAssert(
+                                    projection(
+                                        new Filter(
+                                            tableScan(schemaC, tableC),
+                                            null,
+                                            and(gt(cre("col1", tableC), ocre("col2", tableB)), gt(cre("col2", tableC), ocre("col3", tableA)))),
+                                        asList(new AliasExpression(cre("col5", tableC), "__expr1", true))),
+                                    1),
+                                Join.Type.LEFT,
+                                null,
+                                null,
+                                Set.of(
+                                    nast("col2", ResolvedType.ANY, tableB),
+                                    nast("col3", ResolvedType.ANY, tableA)
+                                ),
+                                false,
+                                Schema.of(
+                                    ast("a", ResolvedType.ANY, tableA),
+                                    ast("b", ResolvedType.ANY, tableB)
+                                )),
+                            asList(new AliasExpression(cre("__expr1", tableC), "__expr0", true))),
+                        1),
+                    Join.Type.LEFT,
+                    null,
+                    null,
+                    Set.of(
+                        nast("col4", ResolvedType.ANY, tableA),
+                        nast("col2", ResolvedType.ANY, tableB),
+                        nast("col3", ResolvedType.ANY, tableA)
+                    ),
+                    false,
+                    Schema.of(
+                        ast("a", ResolvedType.ANY, tableA)
+                    )),
+                asList(cre("col", tableA), new AliasExpression(cre("__expr0", tableC), "values"))
                 );
         //@formatter:on
 

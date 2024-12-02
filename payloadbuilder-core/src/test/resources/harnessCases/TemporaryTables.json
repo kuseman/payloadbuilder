@@ -84,9 +84,9 @@
           [{ "key": "newCol1", "value": 10 }, { "key": "newCol2", "value": 60 } ]
         ],
         [
-          [{ "key": "Node Id", "value": 2 }, { "key": "Name", "value": "+- Hash Match" }                           ],
-          [{ "key": "Node Id", "value": 0 }, { "key": "Name", "value": "|  +- Scan: data" }                        ],
-          [{ "key": "Node Id", "value": 1 }, { "key": "Name", "value": "|  +- Index Seek: #temp [newCol1] (ALL)" } ]
+          [{ "key": "Node Id", "value": 2 }, { "key": "Parent Node Id", "value": null }, { "key": "Name", "value": "+- Hash Match" }                           ],
+          [{ "key": "Node Id", "value": 0 }, { "key": "Parent Node Id", "value": 2    }, { "key": "Name", "value": "|  +- Scan: data" }                        ],
+          [{ "key": "Node Id", "value": 1 }, { "key": "Parent Node Id", "value": 2    }, { "key": "Name", "value": "|  +- Index Seek: #temp [newCol1] (ALL)" } ]
         ],
         [
           [{ "key": "id", "value": 2 }, { "key": "row_id", "value": 1 }, { "key": "data", "value": "2_1" }, { "key": "newCol1", "value": 2 }, { "key": "newCol2", "value": 20 } ]
@@ -118,9 +118,9 @@
       "expectedResultSets": [
         [],
         [
-          [{ "key": "Node Id", "value": 2 }, { "key": "Name", "value": "+- Hash Match" }                           ],
-          [{ "key": "Node Id", "value": 0 }, { "key": "Name", "value": "|  +- Scan: data" }                        ],
-          [{ "key": "Node Id", "value": 1 }, { "key": "Name", "value": "|  +- Index Seek: #temp [newCol1] (ALL)" } ]
+          [{ "key": "Node Id", "value": 2 }, { "key": "Parent Node Id", "value": null }, { "key": "Name", "value": "+- Hash Match" }                           ],
+          [{ "key": "Node Id", "value": 0 }, { "key": "Parent Node Id", "value": 2    }, { "key": "Name", "value": "|  +- Scan: data" }                        ],
+          [{ "key": "Node Id", "value": 1 }, { "key": "Parent Node Id", "value": 2    }, { "key": "Name", "value": "|  +- Index Seek: #temp [newCol1] (ALL)" } ]
         ],
         []
       ]

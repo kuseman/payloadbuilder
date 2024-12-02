@@ -174,7 +174,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
             if (ordinal >= vector.getSchema()
                     .getSize())
             {
-                return ValueVector.literalNull(ResolvedType.of(Type.Any), vector.getRowCount());
+                return ValueVector.literalNull(resolvedType, vector.getRowCount());
             }
 
             return vector.getColumn(ordinal);
@@ -185,7 +185,7 @@ public class ColumnExpression implements IColumnExpression, HasAlias, HasColumnR
         List<Column> columns = schema.getColumns();
         if (columns.isEmpty())
         {
-            throw new IllegalArgumentException("Expected tuple vector to have a schema");
+            return ValueVector.literalNull(resolvedType, vector.getRowCount());
         }
 
         int indexMatch = -1;

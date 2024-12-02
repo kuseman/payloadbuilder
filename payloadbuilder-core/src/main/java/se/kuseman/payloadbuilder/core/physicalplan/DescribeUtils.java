@@ -68,7 +68,7 @@ public class DescribeUtils
     static TupleVector getDescribeVector(IExecutionContext context, DescribableNode node)
     {
         final List<DescribableRow> describeRows = new ArrayList<>();
-        collectDescribableRows(context, describeRows, node, 0, "", false);
+        collectDescribableRows(context, describeRows, -1, node, 0, "", false);
 
         List<String> describeColumns = new ArrayList<>();
         Map<String, MutableInt> countByColumn = new HashMap<>();
@@ -99,7 +99,7 @@ public class DescribeUtils
         });
 
         // Insert first columns
-        describeColumns.addAll(0, asList("Node Id", "Name"));
+        describeColumns.addAll(0, asList("Node Id", "Parent Node Id", "Name"));
 
         final List<Object[]> rows = new ArrayList<>(describeRows.size());
         int size = describeColumns.size();
@@ -110,9 +110,13 @@ public class DescribeUtils
             {
                 values[0] = row.nodeId;
             }
-            values[1] = row.name;
+            if (row.parentNodeId >= 0)
+            {
+                values[1] = row.parentNodeId;
+            }
+            values[2] = row.name;
 
-            for (int i = 2; i < size; i++)
+            for (int i = 3; i < size; i++)
             {
                 values[i] = row.properties.get(describeColumns.get(i));
             }
@@ -174,19 +178,18 @@ public class DescribeUtils
         };
     }
 
-    private static void collectDescribableRows(IExecutionContext context, List<DescribableRow> rows, DescribableNode parent, int pos, String indent, boolean last)
+    private static void collectDescribableRows(IExecutionContext context, List<DescribableRow> rows, int parentNodeId, DescribableNode parent, int pos, String indent, boolean last)
     {
-        rows.add(new DescribableRow(parent.getNodeId(), indent + "+- " + parent.getName(), parent.getDescribeProperties(context)));
+        rows.add(new DescribableRow(parent.getNodeId(), parentNodeId, indent + "+- " + parent.getName(), parent.getDescribeProperties(context)));
         String nextIndent = indent + (last ? "   "
                 : "|  ");
-
         int size = parent.getChildNodes()
                 .size();
         for (int i = 0; i < size; i++)
         {
             DescribableNode child = parent.getChildNodes()
                     .get(i);
-            collectDescribableRows(context, rows, child, pos + 1, nextIndent, i == parent.getChildNodes()
+            collectDescribableRows(context, rows, parent.getNodeId(), child, pos + 1, nextIndent, i == parent.getChildNodes()
                     .size() - 1);
         }
     }
@@ -195,12 +198,14 @@ public class DescribeUtils
     private static class DescribableRow
     {
         final int nodeId;
+        final int parentNodeId;
         final String name;
         final Map<String, Object> properties;
 
-        DescribableRow(int nodeId, String name, Map<String, Object> properties)
+        DescribableRow(int nodeId, int parentNodeId, String name, Map<String, Object> properties)
         {
             this.nodeId = nodeId;
+            this.parentNodeId = parentNodeId;
             this.name = name;
             this.properties = properties;
         }
