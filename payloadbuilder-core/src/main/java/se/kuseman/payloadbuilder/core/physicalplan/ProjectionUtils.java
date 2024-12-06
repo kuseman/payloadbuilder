@@ -14,6 +14,7 @@ import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.expression.AggregateWrapperExpression;
 import se.kuseman.payloadbuilder.core.expression.AsteriskExpression;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
+import se.kuseman.payloadbuilder.core.expression.ColumnExpression.Builder;
 import se.kuseman.payloadbuilder.core.expression.DereferenceExpression;
 import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
 import se.kuseman.payloadbuilder.core.expression.IAggregateExpression;
@@ -29,9 +30,8 @@ public class ProjectionUtils
 
         for (IExpression e : expressions)
         {
-            boolean aggregate = e instanceof IAggregateExpression;
             boolean aggregateSingleValue = false;
-
+            boolean aggregate = e instanceof IAggregateExpression;
             if (e instanceof AggregateWrapperExpression awe)
             {
                 aggregateSingleValue = awe.isSingleValue();
@@ -50,8 +50,16 @@ public class ProjectionUtils
                 result.add(e);
                 continue;
             }
-
             AsteriskExpression ae = (AsteriskExpression) e;
+            // Non qualified asterisk, add all columns from input as expressions
+            // NOTE! A non qualified asterisk cannot be present in an outer context so we only use input schema here.
+            if (ae.getQname()
+                    .size() == 0)
+            {
+                findColumns(schema, false, null, result, aggregate, aggregateSingleValue, ae.getQname());
+                continue;
+            }
+
             for (TableSourceReference tableRef : ae.getTableSourceReferences())
             {
                 if (!findColumns(schema, false, tableRef, result, aggregate, aggregateSingleValue, ae.getQname())
@@ -80,22 +88,30 @@ public class ProjectionUtils
         {
             Column column = schema.getColumns()
                     .get(i);
-            TableSourceReference columnTableSource = SchemaUtils.getTableSource(column);
-            if (columnTableSource == null)
+            // Internal columns should not be expanded
+            if (SchemaUtils.isInternal(column))
             {
                 continue;
             }
 
-            // Matching table source, return expression
-            if (tableSource.getId() == columnTableSource.getId())
+            TableSourceReference columnTableSource = SchemaUtils.getTableSource(column);
+            // Matching table source or add all, return expression
+            if (tableSource == null
+                    || (columnTableSource != null
+                            && tableSource.getId() == columnTableSource.getId()))
             {
                 CoreColumn.Type columnType = SchemaUtils.getColumnType(column);
 
-                IExpression columnExpression = ColumnExpression.Builder.of(column.getName(), column.getType())
-                        .withColumnReference(new ColumnReference(columnTableSource, columnType))
+                Builder builder = ColumnExpression.Builder.of(column.getName(), column.getType())
                         .withOuterReference(outer)
-                        .withOrdinal(i)
-                        .build();
+                        .withOrdinal(i);
+
+                if (columnTableSource != null)
+                {
+                    builder.withColumnReference(new ColumnReference(columnTableSource, columnType));
+                }
+
+                IExpression columnExpression = builder.build();
 
                 // Populated column, add a dereference for all of the inner schema columns
                 // We only do this when we target an alias

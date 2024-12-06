@@ -783,6 +783,7 @@
     {
       "name": "Order by nested value",
       "query": [
+        "--set @@debugplan = true ",
         "select *, m.value.key from map_values m order by cast(m.value.key as int) desc nulls last"
       ],
       "expectedResultSets": [
