@@ -94,17 +94,17 @@ final class ESQueryUtils
     }
 
     /** Build search body **/
-    static String getSearchBody(boolean describe, ElasticStrategy strategy, List<SortItemMeta> sortItems, List<PropertyPredicate> propertyPredicates, ValueVector indexSeekValues, String indexField,
+    static String getSearchBody(boolean describe, ElasticStrategy strategy, List<SortItemMeta> sortItems, List<IPropertyPredicate> propertyPredicates, ValueVector indexSeekValues, String indexField,
             boolean quoteIndexFieldValues, IExecutionContext context)
     {
-        StringBuilder sb = new StringBuilder("{");
+        StringBuilder sb = new StringBuilder().append('{');
         appendSortItems(strategy, sortItems, sb);
         appendPropertyPredicates(describe, strategy, propertyPredicates, indexSeekValues, indexField, quoteIndexFieldValues, sb, context);
-        sb.append("}");
+        sb.append('}');
         return sb.toString();
     }
 
-    private static void appendPropertyPredicates(boolean describe, ElasticStrategy strategy, List<PropertyPredicate> propertyPredicates, ValueVector indexSeekValues, String indexField,
+    private static void appendPropertyPredicates(boolean describe, ElasticStrategy strategy, List<IPropertyPredicate> propertyPredicates, ValueVector indexSeekValues, String indexField,
             boolean quoteIndexFieldValues, StringBuilder sb, IExecutionContext context)
     {
         StringBuilder filterMust = new StringBuilder();
@@ -120,9 +120,9 @@ final class ESQueryUtils
 
             List<StringBuilder> sbs = asList(filterMust, filterMustNot);
             int length = sbs.size();
-            for (PropertyPredicate predicate : propertyPredicates)
+            for (IPropertyPredicate predicate : propertyPredicates)
             {
-                predicate.appendBooleanClause(describe, filterMust, filterMustNot, context);
+                predicate.appendBooleanClause(strategy, filterMust, filterMustNot, context);
 
                 for (int i = 0; i < length; i++)
                 {
@@ -130,7 +130,7 @@ final class ESQueryUtils
                     if (sbp.length() > 1
                             && sbp.charAt(sbp.length() - 1) != ',')
                     {
-                        sbp.append(",");
+                        sbp.append(',');
                     }
                 }
             }
@@ -147,7 +147,7 @@ final class ESQueryUtils
             return;
         }
 
-        sb.append(",");
+        sb.append(',');
 
         appendPredicates(strategy, sb, filterMust, filterMustNot);
     }
@@ -164,7 +164,7 @@ final class ESQueryUtils
 
         if (value == null)
         {
-            // No iterator here, that means we have a describe/analyze-call
+            // No vector here, that means we have a describe/analyze-call
             // so add a dummy value
             value = ValueVector.literalString("<index values>", 1);
         }
@@ -184,19 +184,19 @@ final class ESQueryUtils
             Object val = value.valueAsObject(i);
             if (!first)
             {
-                sb.append(",");
+                sb.append(',');
             }
 
             if (quoteValues)
             {
-                sb.append("\"");
+                sb.append('\"');
             }
 
             sb.append(val);
 
             if (quoteValues)
             {
-                sb.append("\"");
+                sb.append('\"');
             }
             first = false;
         }
@@ -241,7 +241,7 @@ final class ESQueryUtils
                 sb.append(",\"missing\":\"")
                         .append(sortItem.nullOrder == NullOrder.FIRST ? "_first"
                                 : "_last")
-                        .append("\"");
+                        .append('\"');
             }
 
             if (property.nestedPath != null)
@@ -256,15 +256,15 @@ final class ESQueryUtils
                 {
                     sb.append(",\"nested_path\":\"")
                             .append(property.nestedPath.toDotDelimited())
-                            .append("\"");
+                            .append('\"');
                 }
             }
 
             sb.append("}}")
-                    .append(",");
+                    .append(',');
         }
         stripLastComma(sb);
-        sb.append("]");
+        sb.append(']');
     }
 
     private static void appendPredicates(ElasticStrategy strategy, StringBuilder sb, StringBuilder filterMust, StringBuilder filterMustNot)
@@ -278,12 +278,6 @@ final class ESQueryUtils
                 sb.append(filterMust);
                 sb.append("],");
             }
-            if (filterMustNot.length() > 0)
-            {
-                sb.append("\"must_not\":[");
-                sb.append(filterMustNot);
-                sb.append("]");
-            }
         }
         else
         {
@@ -294,12 +288,12 @@ final class ESQueryUtils
                 sb.append(filterMust);
                 sb.append("],");
             }
-            if (filterMustNot.length() > 0)
-            {
-                sb.append("\"must_not\":[");
-                sb.append(filterMustNot);
-                sb.append("]");
-            }
+        }
+        if (filterMustNot.length() > 0)
+        {
+            sb.append("\"must_not\":[");
+            sb.append(filterMustNot);
+            sb.append(']');
         }
         stripLastComma(sb);
         sb.append("}}");

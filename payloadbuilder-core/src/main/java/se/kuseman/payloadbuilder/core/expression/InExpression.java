@@ -13,12 +13,11 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.api.expression.IInExpression;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 
 /** expression IN (expression1, expression2 [, expressionN ]) */
-public class InExpression implements IInExpression
+public class InExpression implements IInExpression, Invertable
 {
     private final IExpression expression;
     private final List<IExpression> arguments;
@@ -47,6 +46,14 @@ public class InExpression implements IInExpression
     public boolean isNot()
     {
         return not;
+    }
+
+    @Override
+    public IExpression getInvertedExpression()
+    {
+        // NOT (a IN (1,2,3)) => a NOT IN (1,2,3)
+        // NOT (a NOT IN (1,2,3)) = > a IN (1,2,3)
+        return new InExpression(expression, arguments, !not);
     }
 
     @Override
@@ -141,12 +148,6 @@ public class InExpression implements IInExpression
         children.add(expression);
         children.addAll(arguments);
         return children;
-    }
-
-    @Override
-    public <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
-    {
-        return visitor.visit(this, context);
     }
 
     @Override

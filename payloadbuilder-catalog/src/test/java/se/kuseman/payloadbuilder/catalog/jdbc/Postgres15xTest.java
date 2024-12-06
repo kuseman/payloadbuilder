@@ -27,6 +27,7 @@ public class Postgres15xTest extends BaseJDBCTest
         private static final String PASSWORD = "A_Str0ng_Required_Password";
         private static final int PORT = 5432;
         private static final String IMAGE_NAME = "postgres:15.3-bullseye";
+        @SuppressWarnings("resource")
         private static final GenericContainer<?> CONTAINER = new GenericContainer<>(DockerImageName.parse(IMAGE_NAME)).withExposedPorts(PORT)
                 .withEnv("POSTGRES_PASSWORD", PASSWORD)
                 .withEnv("POSTGRES_USER", "root");

@@ -28,6 +28,7 @@ public class MySql8xTest extends BaseJDBCTest
         private static final String PASSWORD = "A_Str0ng_Required_Password";
         private static final int PORT = 3306;
         private static final String IMAGE_NAME = "mysql:8.0.33-debian";
+        @SuppressWarnings("resource")
         private static final GenericContainer<?> CONTAINER = new GenericContainer<>(DockerImageName.parse(IMAGE_NAME)).withExposedPorts(PORT)
                 .withEnv("MYSQL_ROOT_PASSWORD", PASSWORD);
 

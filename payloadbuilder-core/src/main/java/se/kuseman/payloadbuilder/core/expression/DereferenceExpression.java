@@ -18,7 +18,6 @@ import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IDereferenceExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.VectorUtils;
 import se.kuseman.payloadbuilder.core.parser.Location;
@@ -84,18 +83,6 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
         if (left instanceof HasColumnReference htsr)
         {
             return htsr.getColumnReference();
-        }
-        return null;
-    }
-
-    @Override
-    public QualifiedName getQualifiedColumn()
-    {
-        QualifiedName qname = left.getQualifiedColumn();
-        if (qname != null)
-        {
-            // Combine the qname with right
-            return qname.extend(right);
         }
         return null;
     }
@@ -220,12 +207,6 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
         }
 
         return resultVector;
-    }
-
-    @Override
-    public <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
-    {
-        return visitor.visit(this, context);
     }
 
     private static Pair<Column, Integer> getOrdinalInternal(Schema schema, String right, Location location, boolean throwIfNotFound, boolean checkAsterisk)

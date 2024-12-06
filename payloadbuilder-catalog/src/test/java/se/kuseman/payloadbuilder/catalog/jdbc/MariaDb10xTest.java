@@ -29,6 +29,7 @@ public class MariaDb10xTest extends BaseJDBCTest
         private static final String PASSWORD = "A_Str0ng_Required_Password";
         private static final int PORT = 3306;
         private static final String IMAGE_NAME = "mariadb:10.6.14-focal";
+        @SuppressWarnings("resource")
         private static final GenericContainer<?> CONTAINER = new GenericContainer<>(DockerImageName.parse(IMAGE_NAME)).withExposedPorts(PORT)
                 .withEnv("MYSQL_ROOT_PASSWORD", PASSWORD);
 

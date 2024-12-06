@@ -24,6 +24,12 @@ class Elastic2XStrategy extends GenericStrategy
     }
 
     @Override
+    public boolean supportsMatchNone()
+    {
+        return false;
+    }
+
+    @Override
     public boolean supportsDataStreams()
     {
         return false;

@@ -36,6 +36,7 @@ public class Oracle21xTest extends BaseJDBCTest
         private static final String PASSWORD = "A_Str0ng_Required_Password";
         private static final int PORT = 1521;
         private static final String IMAGE_NAME = "gvenzl/oracle-xe:21-slim";
+        @SuppressWarnings("resource")
         private static final GenericContainer<?> CONTAINER = new GenericContainer<>(DockerImageName.parse(IMAGE_NAME)).withExposedPorts(PORT)
                 .withEnv("ORACLE_RANDOM_PASSWORD", "true")
                 .withEnv("APP_USER", TEST_DB)

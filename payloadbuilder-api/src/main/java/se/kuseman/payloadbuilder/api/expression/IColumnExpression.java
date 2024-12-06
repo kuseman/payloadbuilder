@@ -8,4 +8,10 @@ public interface IColumnExpression extends IExpression
 
     /** Return ordinal of column if present otherwise -1 */
     int getOrdinal();
+
+    @Override
+    default <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
 }

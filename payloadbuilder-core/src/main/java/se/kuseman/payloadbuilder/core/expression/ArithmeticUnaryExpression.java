@@ -13,7 +13,6 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IArithmeticUnaryExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 import se.kuseman.payloadbuilder.core.execution.ExpressionMath;
 
 /** Arithmetic unary expression */
@@ -164,12 +163,6 @@ public class ArithmeticUnaryExpression implements IArithmeticUnaryExpression
                 return ExpressionMath.negate(value.getAny(row));
             }
         };
-    }
-
-    @Override
-    public <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
-    {
-        return visitor.visit(this, context);
     }
 
     @Override

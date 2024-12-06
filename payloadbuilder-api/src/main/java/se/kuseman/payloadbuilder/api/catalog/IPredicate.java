@@ -57,6 +57,9 @@ public interface IPredicate
     /** Return the qualified column name of this predicate (if any exists). If no column is present null is returned */
     QualifiedName getQualifiedColumn();
 
+    /** Return the original predicate expression. Is used when a more complex traversal is used and all convenience methods below isn't used. */
+    IExpression getFullExpression();
+
     /**
      * Return comparison value expression. Only applicable if {@link #getType()} is {@link Type#COMPARISION}. This returns the "other" side of the comparison regarding the
      * {@link IPredicate#getQualifiedColumn()}.

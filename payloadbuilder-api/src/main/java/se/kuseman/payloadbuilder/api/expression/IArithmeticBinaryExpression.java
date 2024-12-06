@@ -6,6 +6,12 @@ public interface IArithmeticBinaryExpression extends IBinaryExpression
     /** Get type of arithmetics */
     Type getArithmeticType();
 
+    @Override
+    default <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
+
     /** Type */
     public enum Type
     {

@@ -6,6 +6,12 @@ public interface IComparisonExpression extends IBinaryExpression
     /** Return type of comparison */
     Type getComparisonType();
 
+    @Override
+    default <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
+    {
+        return visitor.visit(this, context);
+    }
+
     /** Type */
     public enum Type
     {

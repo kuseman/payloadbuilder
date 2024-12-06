@@ -16,7 +16,6 @@ import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IAtTimeZoneExpression;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
-import se.kuseman.payloadbuilder.api.expression.IExpressionVisitor;
 
 /** At time zone */
 public class AtTimeZoneExpression implements IAtTimeZoneExpression
@@ -117,12 +116,6 @@ public class AtTimeZoneExpression implements IAtTimeZoneExpression
     public ResolvedType getType()
     {
         return ResolvedType.of(Type.DateTimeOffset);
-    }
-
-    @Override
-    public <T, C> T accept(IExpressionVisitor<T, C> visitor, C context)
-    {
-        return visitor.visit(this, context);
     }
 
     @Override

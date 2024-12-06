@@ -35,6 +35,12 @@ class Elastic1XStrategy extends GenericStrategy
     }
 
     @Override
+    public boolean supportsMatchNone()
+    {
+        return false;
+    }
+
+    @Override
     public boolean wrapNestedSortPathInObject()
     {
         return false;

@@ -33,6 +33,12 @@ public class UnresolvedColumnExpression implements IExpression, HasAlias
         return qname;
     }
 
+    @Override
+    public QualifiedName getQualifiedColumn()
+    {
+        return qname;
+    }
+
     public int getLambdaId()
     {
         return lambdaId;

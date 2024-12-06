@@ -3,10 +3,10 @@ package se.kuseman.payloadbuilder.core.expression;
 import static java.util.Objects.requireNonNull;
 
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
-import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.api.expression.ILiteralExpression;
 
 /** Base class for literal expressions */
-public abstract class LiteralExpression implements IExpression
+public abstract class LiteralExpression implements ILiteralExpression
 {
     protected final ResolvedType type;
 

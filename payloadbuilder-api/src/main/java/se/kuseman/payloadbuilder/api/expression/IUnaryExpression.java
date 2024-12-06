@@ -5,7 +5,7 @@ import static java.util.Collections.singletonList;
 import java.util.List;
 
 /** Base interface for unary expressions */
-public interface IUnaryExpression extends IExpression
+public abstract interface IUnaryExpression extends IExpression
 {
     /** Return target expression */
     IExpression getExpression();

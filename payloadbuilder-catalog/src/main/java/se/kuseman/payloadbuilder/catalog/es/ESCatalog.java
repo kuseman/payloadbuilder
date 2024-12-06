@@ -38,6 +38,7 @@ import se.kuseman.payloadbuilder.api.execution.IQuerySession;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IComparisonExpression;
 import se.kuseman.payloadbuilder.catalog.es.ESQueryUtils.SortItemMeta;
 import se.kuseman.payloadbuilder.catalog.es.ElasticsearchMetaUtils.MappedProperty;
@@ -57,6 +58,8 @@ public class ESCatalog extends Catalog
     public static final String INDEX_KEY = "index";
     static final String SINGLE_TYPE_TABLE_NAME = "_doc";
     static final TableSchema INDICES_SCHEMA = new TableSchema(Schema.of(Column.of(SYS_INDICES_TABLE, ResolvedType.of(Type.String)), Column.of(SYS_INDICES_COLUMNS, ResolvedType.of(Type.Any))));
+    private static final String USE_LEGACY_EXPRESSION_BUILDER = "useLegacyExpressionBuilder";
+    static final String USE_LIKE_EXPRESSION = "useLikeExpression";
 
     /** Construct a new ES catalog */
     public ESCatalog()
@@ -189,7 +192,7 @@ public class ESCatalog extends Catalog
             }
         }
 
-        List<PropertyPredicate> propertyPredicates = collectPredicates(catalogAlias, data.getPredicates(), properties);
+        List<IPropertyPredicate> propertyPredicates = collectPredicates(session, catalogAlias, data.getPredicates(), properties);
         List<SortItemMeta> sortItems = collectSortItems(properties, data.getSortItems());
 
         return new ESDatasource(data.getNodeId(), meta.getStrategy(), catalogAlias, table, seekPredicate, indexProperty, propertyPredicates, sortItems);
@@ -220,9 +223,15 @@ public class ESCatalog extends Catalog
         return property;
     }
 
-    private List<PropertyPredicate> collectPredicates(String catalogAlias, List<IPredicate> predicates, Map<QualifiedName, MappedProperty> properties)
+    private List<IPropertyPredicate> collectPredicates(IQuerySession session, String catalogAlias, List<IPredicate> predicates, Map<QualifiedName, MappedProperty> properties)
     {
-        List<PropertyPredicate> propertyPredicates = new ArrayList<>();
+        if (!session.getCatalogProperty(catalogAlias, USE_LEGACY_EXPRESSION_BUILDER, ValueVector.literalBoolean(false, 1))
+                .getBoolean(0))
+        {
+            return ElasticQueryBuilder.collectPredicates(session, predicates, catalogAlias, properties);
+        }
+
+        List<IPropertyPredicate> propertyPredicates = new ArrayList<>();
         Iterator<IPredicate> it = predicates.iterator();
         while (it.hasNext())
         {
