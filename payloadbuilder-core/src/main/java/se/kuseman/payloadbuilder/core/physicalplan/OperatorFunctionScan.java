@@ -7,7 +7,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.OperatorFunctionInfo;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
@@ -77,9 +76,8 @@ public class OperatorFunctionScan implements IPhysicalPlan
         // Recreate the schema from input if planed one was asterisk
         if (schemaIsAsterisk)
         {
-            schema = Schema.of(Column.of(this.schema.getColumns()
-                    .get(0)
-                    .getName(), vv.type()));
+            schema = Schema.of(SchemaUtils.changeType(this.schema.getColumns()
+                    .get(0), vv.type()));
         }
         else
         {
