@@ -57,6 +57,12 @@ public class CoreColumn extends Column
         this(newName, source.getType(), source.outputName, source.internal, source.tableSourceReference, source.columnType);
     }
 
+    /** Copy ctor. New type of column */
+    public CoreColumn(CoreColumn source, ResolvedType type)
+    {
+        this(source.getName(), type, source.outputName, source.internal, source.tableSourceReference, source.columnType);
+    }
+
     public CoreColumn(String name, ResolvedType type, String outputName, boolean internal, TableSourceReference tableSourceReference, Type columnType)
     {
         super(name, type);

@@ -68,6 +68,17 @@ public class SchemaUtils
         return new Column(newName, column.getType());
     }
 
+    /** Creates a new column from provide column with a new type. */
+    public static Column changeType(Column column, ResolvedType type)
+    {
+        if (column instanceof CoreColumn cc)
+        {
+            return new CoreColumn(cc, type);
+        }
+
+        return new Column(column.getName(), type);
+    }
+
     /** Return a new schema which concats to other schemas */
     private static Schema concat(Schema schema1, Schema schema2)
     {
