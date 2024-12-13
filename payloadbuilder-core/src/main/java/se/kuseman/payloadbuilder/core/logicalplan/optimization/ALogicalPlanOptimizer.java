@@ -551,4 +551,46 @@ abstract class ALogicalPlanOptimizer<C extends ALogicalPlanOptimizer.Context> ex
             return null;
         }
     }
+
+    /** Collect all table sources from provided plan. */
+    protected Set<TableSourceReference> extractTableSources(ILogicalPlan plan)
+    {
+        Set<TableSourceReference> result = new HashSet<>();
+        plan.accept(TableSourceExtractor.INSTANCE, result);
+        return result;
+    }
+
+    /** Visitor that collects table sources from a {@link ILogicalPlan} */
+    private static class TableSourceExtractor extends ALogicalPlanVisitor<Void, Set<TableSourceReference>>
+    {
+        private static final TableSourceExtractor INSTANCE = new TableSourceExtractor();
+
+        @Override
+        public Void visit(TableScan plan, Set<TableSourceReference> context)
+        {
+            context.add(plan.getTableSource());
+            return super.visit(plan, context);
+        }
+
+        @Override
+        public Void visit(TableFunctionScan plan, Set<TableSourceReference> context)
+        {
+            context.add(plan.getTableSource());
+            return super.visit(plan, context);
+        }
+
+        @Override
+        public Void visit(ExpressionScan plan, Set<TableSourceReference> context)
+        {
+            context.add(plan.getTableSource());
+            return super.visit(plan, context);
+        }
+
+        @Override
+        public Void visit(SubQuery plan, Set<TableSourceReference> context)
+        {
+            context.add(plan.getTableSource());
+            return super.visit(plan, context);
+        }
+    }
 }

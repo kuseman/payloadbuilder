@@ -2121,8 +2121,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                 null,
                                 null,
                                 Set.of(
-                                    nast("col2", ResolvedType.ANY, tableB),
-                                    nast("col3", ResolvedType.ANY, tableA)
+                                    nast("col2", ResolvedType.ANY, tableB)
                                 ),
                                 false,
                                 Schema.of(
@@ -2136,7 +2135,6 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                     null,
                     Set.of(
                         nast("col4", ResolvedType.ANY, tableA),
-                        nast("col2", ResolvedType.ANY, tableB),
                         nast("col3", ResolvedType.ANY, tableA)
                     ),
                     false,
@@ -2893,9 +2891,12 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                                         Join.Type.INNER,
                                         null,
                                         (IExpression) null,
-                                        asSet(nast("col", Type.Any, tableB), nast("col2", Type.Any, tableA)),
+                                        asSet(
+                                            nast("col", Type.Any, tableB) // Only direct outer reference
+                                        ),
                                         false,
-                                        SchemaUtils.joinSchema(schemaA, schemaB)),
+                                        SchemaUtils.joinSchema(schemaA, schemaB)
+                                    ),
                                     null,
                                     and(eq(cre("col", tableB), ocre("col", tableA)), eq(cre("col3", tableC, CoreColumn.Type.NAMED_ASTERISK), cre("col3", tableB)))),
                                 asList(cre("col2", tableB), new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(tableB, tableC)))),
@@ -2903,7 +2904,100 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
                         Join.Type.INNER,
                         null,
                         (IExpression) null,
-                        asSet(nast("col", Type.Any, tableB), nast("col2", Type.Any, tableA), nast("col", Type.Any, tableA)),
+                        asSet(
+                            nast("col2", Type.Any, tableA),
+                            nast("col", Type.Any, tableA)),
+                        false,
+                        schemaA),
+                    null,
+                    eq(cre("col2", tableB, CoreColumn.Type.NAMED_ASTERISK), cre("col2", tableA)));
+        //@formatter:on
+
+        // System.out.println(expected.print(0));
+        // System.out.println(actual.print(0));
+
+        //@formatter:off
+        Assertions.assertThat(actual.getSchema())
+            .usingRecursiveComparison()
+            .ignoringFieldsOfTypes(Location.class, Random.class)
+            .isEqualTo(Schema.of(
+                ast("a", Type.Any, tableA),
+                nast("col2", Type.Any, tableB),
+                new CoreColumn("", ResolvedType.of(Type.Any), "*", false, null, CoreColumn.Type.ASTERISK)));
+        //@formatter:on
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .ignoringFieldsOfTypes(Location.class, Random.class)
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
+    public void test_nested_correlated_subquery_schema_less_2()
+    {
+        String query = "select * " + "from tableA a "
+                       + "cross apply " // ------------- This join has an outer reference in the inner most join a.col2
+                       + "( "
+                       + "  select b.col2, * "
+                       + "  from tableB b "
+                       + "  cross apply " // ----------- This join doesn't have any direct outer references
+                       + "  ( " // --------------------- and can be a non looping variant
+                       + "    select c.col3, * "
+                       + "    from tableC c "
+                       + "    where c.col2 = a.col2 " // -- a.col2 = Reference to outer outer schema
+                       + "  ) y "
+                       + "  where y.col3 = b.col3 "
+                       + ") x "
+                       + "where x.col2 = a.col2 ";
+
+        ILogicalPlan plan = getPlanBeforeColumnResolver(query);
+        ILogicalPlan actual = optimize(context, plan);
+
+        TableSourceReference tableA = of(0, "", "tableA", "a");
+        TableSourceReference tableB = of(1, "", "tableB", "b");
+        TableSourceReference tableC = of(2, "", "tableC", "c");
+        TableSourceReference subQueryY = new TableSourceReference(3, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("y"), "y");
+        TableSourceReference subQueryX = new TableSourceReference(4, TableSourceReference.Type.SUBQUERY, "", QualifiedName.of("x"), "x");
+        Schema schemaA = Schema.of(ast("a", Type.Any, tableA));
+        Schema schemaB = Schema.of(ast("b", Type.Any, tableB));
+        Schema schemaC = Schema.of(ast("c", Type.Any, tableC));
+        //@formatter:off
+        ILogicalPlan expected =
+                new Filter(
+                    new Join(
+                        tableScan(schemaA, tableA),
+                        subQuery(
+                            projection(
+                                new Filter(
+                                    new Join(
+                                        tableScan(schemaB, tableB),
+                                        subQuery(
+                                            projection(
+                                                new Filter(
+                                                    tableScan(schemaC, tableC),
+                                                    null,
+                                                    eq(cre("col2", tableC), ocre("col2", tableA))),
+                                                asList(cre("col3", tableC), new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(tableC)))),
+                                            subQueryY),
+                                        Join.Type.INNER,
+                                        null,
+                                        (IExpression) null,
+                                        asSet(),
+                                        false,
+                                        SchemaUtils.joinSchema(schemaA, schemaB)
+                                    ),
+                                    null,
+                                    eq(cre("col3", tableC, CoreColumn.Type.NAMED_ASTERISK), cre("col3", tableB))),
+                                asList(cre("col2", tableB), new AsteriskExpression(QualifiedName.EMPTY, null, Set.of(tableB, tableC)))),
+                            subQueryX),
+                        Join.Type.INNER,
+                        null,
+                        (IExpression) null,
+                        asSet(
+                            nast("col2", Type.Any, tableA)
+                        ),
                         false,
                         schemaA),
                     null,
