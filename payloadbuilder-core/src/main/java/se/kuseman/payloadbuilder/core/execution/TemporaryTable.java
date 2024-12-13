@@ -33,7 +33,7 @@ public class TemporaryTable
     private static final HashStrategy STRATEGY = new HashStrategy();
     private final TupleVector vector;
     private final List<Index> indices;
-    private final Map<Index, Object2ObjectMap<IndexKey, IntList>> indicesData;
+    private final Map<Index, IndicesData> indicesData;
 
     public TemporaryTable(TupleVector vector, List<Index> indices)
     {
@@ -60,12 +60,13 @@ public class TemporaryTable
         {
             throw new IllegalArgumentException("This tempoarary table does not have any indices");
         }
-        final Object2ObjectMap<IndexKey, IntList> table = indicesData.get(seekPredicate.getIndex());
+        final IndicesData data = indicesData.get(seekPredicate.getIndex());
 
-        if (table == null)
+        if (data == null)
         {
             throw new IllegalArgumentException("This tempoarary table does not have index: " + seekPredicate.getIndex());
         }
+        final Object2ObjectMap<IndexKey, IntList> table = data.map;
 
         List<ISeekKey> seekKeys = seekPredicate.getSeekKeys(context);
         int size = seekKeys.size();
@@ -76,15 +77,8 @@ public class TemporaryTable
                     .getValue();
         }
 
-        int tmp = 0;
-        for (IntList l : table.values())
-        {
-            tmp += l != null ? l.size()
-                    : 0;
-        }
-
         final int valuesSzie = vectors[0].size();
-        final int totalRowCount = tmp;
+        final int rowCount = valuesSzie * data.averageRowCount;
 
         return new TupleIterator()
         {
@@ -100,7 +94,7 @@ public class TemporaryTable
             @Override
             public int estimatedRowCount()
             {
-                return totalRowCount;
+                return rowCount;
             }
 
             @Override
@@ -143,7 +137,7 @@ public class TemporaryTable
         };
     }
 
-    private Map<Index, Object2ObjectMap<IndexKey, IntList>> index()
+    private Map<Index, IndicesData> index()
     {
         if (indices.isEmpty())
         {
@@ -152,7 +146,7 @@ public class TemporaryTable
 
         int rowCount = vector.getRowCount();
         int size = indices.size();
-        Map<Index, Object2ObjectMap<IndexKey, IntList>> result = new HashMap<>(size);
+        Map<Index, IndicesData> result = new HashMap<>(size);
 
         for (int i = 0; i < size; i++)
         {
@@ -180,7 +174,16 @@ public class TemporaryTable
                         .add(j);
             }
 
-            result.put(currentIndex, table);
+            int total = 0;
+            for (IntList l : table.values())
+            {
+                total += l != null ? l.size()
+                        : 0;
+            }
+            int averageRowCount = table.size() > 0 ? total / table.size()
+                    : 0;
+
+            result.put(currentIndex, new IndicesData(table, averageRowCount));
         }
 
         return result;
@@ -282,5 +285,15 @@ public class TemporaryTable
             this.vectors = vectors;
             this.index = index;
         }
+    }
+
+    /**
+     * Indices data with data and statistics.
+     *
+     * @param map Map with data
+     * @param averageRowCount The average row count for index entries in map. Is used to estimate the number of rows an index iterator will return.
+     */
+    private record IndicesData(Object2ObjectMap<IndexKey, IntList> map, int averageRowCount)
+    {
     }
 }
