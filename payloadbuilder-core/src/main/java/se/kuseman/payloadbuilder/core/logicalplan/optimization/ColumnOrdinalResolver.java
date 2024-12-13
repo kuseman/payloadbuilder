@@ -21,7 +21,6 @@ import se.kuseman.payloadbuilder.core.logicalplan.ExpressionScan;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.Join;
-import se.kuseman.payloadbuilder.core.logicalplan.Join.Type;
 import se.kuseman.payloadbuilder.core.logicalplan.Projection;
 import se.kuseman.payloadbuilder.core.logicalplan.Sort;
 import se.kuseman.payloadbuilder.core.logicalplan.TableFunctionScan;
@@ -123,9 +122,9 @@ class ColumnOrdinalResolver extends ALogicalPlanOptimizer<ColumnOrdinalResolver.
 
         Schema prevOuterSchema = context.outerSchema;
 
-        // Outer reference are only supported in outer/cross apply's
-        if (plan.getCondition() == null
-                && plan.getType() != Type.CROSS)
+        // This join has outer references, concat outer schemas
+        if (!plan.getOuterReferences()
+                .isEmpty())
         {
             context.outerSchema = SchemaUtils.joinSchema(context.outerSchema, outer.getSchema());
         }

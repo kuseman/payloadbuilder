@@ -11,7 +11,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
 
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
@@ -472,6 +471,8 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
         // System.out.println("Switch inputs of " + plan);
         // }
 
+        boolean correlated = !plan.getOuterReferences()
+                .isEmpty();
         boolean pushOuterReference = seekPredicate != null;
         context.seekPredicate = seekPredicate;
 
@@ -488,7 +489,8 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
 
         IPhysicalPlan join = null;
 
-        if (!outerEquiExpressions.isEmpty()
+        if (!correlated
+                && !outerEquiExpressions.isEmpty()
                 && !forceNestedLoop
                 && !context.joinPreserveOuterOrder)
         {
@@ -505,7 +507,7 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
             // We can cache the inner plan if we have a non correlated plain nested loop
             if (!pushOuterReference
                     && !forceNoInnerCache
-                    && CollectionUtils.isEmpty(plan.getOuterReferences())
+                    && !correlated
                     && !plan.isSwitchedInputs())
             {
                 inner = wrapWithAnalyze(context, new CachePlan(context.getNextNodeId(), inner));
@@ -576,8 +578,11 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
                         .isEmpty() ? NestedLoop.innerJoin(nodeId, outer, inner, plan.getPopulateAlias(), plan.isSwitchedInputs()) // Non correlated
                                 : NestedLoop.innerJoin(nodeId, outer, inner, plan.getOuterReferences(), plan.getPopulateAlias(), plan.getOuterSchema()); // Correlated
             }
+
             // INNER JOIN
-            return NestedLoop.innerJoin(nodeId, outer, inner, condition, plan.getPopulateAlias(), pushOuterReference);
+            return plan.getOuterReferences()
+                    .isEmpty() ? NestedLoop.innerJoin(nodeId, outer, inner, condition, plan.getPopulateAlias(), pushOuterReference)
+                            : NestedLoop.innerJoin(nodeId, outer, inner, plan.getOuterReferences(), condition, plan.getPopulateAlias(), false);
         }
         else if (plan.getType() == Type.LEFT)
         {
@@ -589,7 +594,9 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
                                 : NestedLoop.leftJoin(nodeId, outer, inner, plan.getOuterReferences(), plan.getPopulateAlias(), plan.getOuterSchema()); // Correlated
             }
             // LEFT JOIN
-            return NestedLoop.leftJoin(nodeId, outer, inner, condition, plan.getPopulateAlias(), pushOuterReference);
+            return plan.getOuterReferences()
+                    .isEmpty() ? NestedLoop.leftJoin(nodeId, outer, inner, condition, plan.getPopulateAlias(), pushOuterReference)
+                            : NestedLoop.leftJoin(nodeId, outer, inner, plan.getOuterReferences(), condition, plan.getPopulateAlias(), false);
         }
 
         throw new IllegalArgumentException("Cannot create a nested loop from: " + plan);

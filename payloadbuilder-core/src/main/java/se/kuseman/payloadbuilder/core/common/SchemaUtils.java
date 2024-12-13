@@ -1,5 +1,7 @@
 package se.kuseman.payloadbuilder.core.common;
 
+import static java.util.Collections.emptySet;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -206,6 +208,36 @@ public class SchemaUtils
             result = tableSource;
         }
         return result;
+    }
+
+    /** Collect all table sources referenced by provided column. */
+    public static Set<TableSourceReference> getTableSources(Column column)
+    {
+        if (column instanceof CoreColumn cc)
+        {
+            Set<TableSourceReference> result = new HashSet<>();
+            List<Column> queue = new ArrayList<>();
+            queue.add(cc);
+            while (queue.size() > 0)
+            {
+                Column c = queue.remove(0);
+                TableSourceReference tr = getTableSource(c);
+                if (tr != null)
+                {
+                    result.add(tr);
+                }
+                if (c.getType()
+                        .getSchema() != null)
+                {
+                    queue.addAll(c.getType()
+                            .getSchema()
+                            .getColumns());
+                }
+            }
+
+            return result;
+        }
+        return emptySet();
     }
 
     /** Create a schema from provided expressions. */

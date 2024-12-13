@@ -544,6 +544,9 @@ public class QueryParserTest extends Assert
         assertSelect("select a.art_id from article a inner populate join articleAttribute aa on aa.art_id = a.art_id ");
         assertSelect("select a.art_id from article a left populate join articleAttribute aa on aa.art_id = a.art_id ");
 
+        // Expression joins
+        assertSelect("select * from tableA a inner join (a.tableCol) c ON c.languageCode = @languageCode");
+
         // Nested
         LogicalSelectStatement s = (LogicalSelectStatement) assertSelect(
                 "select a.art_id from article a inner join (select * from articleAttribute aa  inner join articlePrice ap on ap.sku_id = aa.sku_id) aa with (populate=true) on aa.art_id = a.art_id ");

@@ -217,8 +217,13 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
     public ILogicalPlan visit(Join plan, Ctx context)
     {
         // Re-write input
-        ILogicalPlan left = plan.getOuter()
+        ILogicalPlan outer = plan.getOuter()
                 .accept(this, context);
+
+        // Collect outer table sources, these are used to know if this
+        // join is directly referencing any outer columns => we need to loop
+        // row by row, otherwise we can do more effective join algorithms
+        Set<TableSourceReference> outerTableSources = extractTableSources(outer);
 
         // CSOFF
         // Concat outer and left schema to detect outer references
@@ -228,14 +233,13 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         Set<Column> prevOuterReferences = context.outerReferences;
         // CSON
 
-        ResolveSchema leftSchema = context.getSchema(left);
+        ResolveSchema outerPlanSchema = context.getSchema(outer);
 
         context.outerReferences = new HashSet<>();
         // Outer reference are only supported in outer/cross apply's so append the outer schema
-        if (plan.getCondition() == null
-                && plan.getType() != Join.Type.CROSS)
+        if (plan.canHaveOuterReferences())
         {
-            context.outerSchema = ResolveSchema.concat(context.outerSchema, leftSchema);
+            context.outerSchema = ResolveSchema.concat(context.outerSchema, outerPlanSchema);
         }
 
         // CSOFF
@@ -243,22 +247,59 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 : Schema.EMPTY;
         // CSON
 
-        ILogicalPlan right = plan.getInner()
+        ILogicalPlan inner = plan.getInner()
                 .accept(this, context);
 
-        ResolveSchema rightSchema = context.getSchema(right);
+        // Outer references to this join is all collected outer references that references any of
+        // the outer plans table sources or columns that doesn't have a table source (computed columns)
+        // that is present in the outer plan
+        context.outerReferences.removeIf(or ->
+        {
+            Set<TableSourceReference> tableSources = SchemaUtils.getTableSources(or);
+            if (tableSources.isEmpty())
+            {
+                // TODO: Find out when this happens
+                return false;
+            }
+            boolean result = !CollectionUtils.containsAny(outerTableSources, tableSources);
+
+            // Add the removed outer references to the prev list to bubble up
+            if (result
+                    && prevOuterReferences != null)
+            {
+                prevOuterReferences.add(or);
+            }
+
+            return result;
+        });
+
+        // If this join can have outer references but didn't have any, recreate the inner plan without
+        // this joins outer context (but instead use the previous outer context which is perfectly fine to reference).
+        // This means that the query was for example an outer apply
+        // but in fact did not use any outer columns, recreate the input without outer schema to
+        // get correct column ordinals etc.
+        if (context.outerReferences.isEmpty()
+                && plan.canHaveOuterReferences())
+        {
+            context.outerSchema = prevOuterSchema;
+            inner = plan.getInner()
+                    .accept(this, context);
+            context.outerReferences.clear();
+        }
+
+        ResolveSchema innerPlanSchema = context.getSchema(inner);
 
         // Construct a resulting join schema
         ResolveSchema resultSchema = new ResolveSchema();
-        resultSchema.schemas.addAll(leftSchema.schemas);
+        resultSchema.schemas.addAll(outerPlanSchema.schemas);
         if (plan.getPopulateAlias() != null)
         {
-            Schema populatedSchema = Schema.of(SchemaUtils.getPopulatedColumn(plan.getPopulateAlias(), rightSchema.getSchema()));
+            Schema populatedSchema = Schema.of(SchemaUtils.getPopulatedColumn(plan.getPopulateAlias(), innerPlanSchema.getSchema()));
             resultSchema.add(new AliasSchema(populatedSchema, plan.getPopulateAlias()), null);
         }
         else
         {
-            resultSchema.addAll(rightSchema.schemas, null);
+            resultSchema.addAll(innerPlanSchema.schemas, null);
         }
 
         IExpression condition = plan.getCondition();
@@ -266,22 +307,16 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
         // Rewrite condition if present. Cross/outer joins doesn't have conditions
         if (condition != null)
         {
-            context.schema = ResolveSchema.concat(leftSchema, rightSchema);
+            context.schema = ResolveSchema.concat(outerPlanSchema, innerPlanSchema);
             condition = ColumnResolverVisitor.rewrite(context, condition);
         }
 
         // CSOFF
-        Join result = new Join(left, right, plan.getType(), plan.getPopulateAlias(), condition, context.outerReferences, plan.isSwitchedInputs(), outerSchema);
+        Join result = new Join(outer, inner, plan.getType(), plan.getPopulateAlias(), condition, context.outerReferences, plan.isSwitchedInputs(), outerSchema);
         // CSON
 
         // Restore context values
         context.outerSchema = prevOuterSchema;
-        // Add all new outer references to previous list to cascade the list upwards
-        if (prevOuterReferences != null
-                && context.outerReferences != null)
-        {
-            prevOuterReferences.addAll(context.outerReferences);
-        }
         context.outerReferences = prevOuterReferences;
 
         context.planSchema.push(resultSchema);

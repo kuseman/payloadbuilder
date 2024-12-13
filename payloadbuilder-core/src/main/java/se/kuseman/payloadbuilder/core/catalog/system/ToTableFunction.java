@@ -76,7 +76,7 @@ class ToTableFunction extends ScalarFunctionInfo
             }
             else
             {
-                throw new IllegalArgumentException("Cannot cast " + resultValue + " to " + Column.Type.Table);
+                throw new IllegalArgumentException("Cannot cast " + resultValue + "(" + resultValue.getClass() + ") to " + Column.Type.Table);
             }
         }
 

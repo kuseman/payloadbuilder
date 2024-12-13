@@ -585,6 +585,7 @@
     {
       "name": "Join with sub query with sub query expression (object)",
       "query": [
+        "--set @@debugplan = true ",
         "select x.* ",
         "from range(1, 3) v ",
         "inner join ",
@@ -637,7 +638,7 @@
         "Regression: Happend in schema full in nested loops"
       ],
       "query": [
-        "--set @@printplan = true ",
+        "--set @@debugplan = true ",
         "set @@force_nested_loop = true ",
         "",
         "select * ",

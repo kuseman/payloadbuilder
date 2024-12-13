@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.core.physicalplan;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 
 import java.util.Arrays;
@@ -28,6 +29,7 @@ import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.vector.ITupleVectorBuilder;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.DescribableNode;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
@@ -150,6 +152,18 @@ public class NestedLoop implements IPhysicalPlan
         return new NestedLoop(nodeId, outer, inner, condition, populateAlias, null, false, false, pushOuterReference, Schema.EMPTY);
     }
 
+    /** Create an inner join. Logical operations: INNER JOIN with outer references. This is used when having an expression scan as inner. */
+    public static NestedLoop innerJoin(int nodeId, IPhysicalPlan outer, IPhysicalPlan inner, Set<Column> outerReferences, BiFunction<TupleVector, IExecutionContext, ValueVector> condition,
+            String populateAlias, boolean pushOuterReference)
+    {
+        if (outerReferences == null
+                || outerReferences.isEmpty())
+        {
+            throw new IllegalArgumentException("outerReferences must be set");
+        }
+        return new NestedLoop(nodeId, outer, inner, condition, populateAlias, outerReferences, false, false, pushOuterReference, Schema.EMPTY);
+    }
+
     /** Create an inner join with no condition and no outer references. Logical operations: CROSS JOIN/CROSS APPLY */
     public static NestedLoop innerJoin(int nodeId, IPhysicalPlan outer, IPhysicalPlan inner, String populateAlias, boolean switchedInputs)
     {
@@ -165,6 +179,18 @@ public class NestedLoop implements IPhysicalPlan
             throw new IllegalArgumentException("outerReferences must be set");
         }
         return new NestedLoop(nodeId, outer, inner, null, populateAlias, outerReferences, false, false, true, outerSchema);
+    }
+
+    /** Create a left outer join. Logical operations: LEFT OUTER JOIN with outer references. This is used when having an expression scan as inner. */
+    public static NestedLoop leftJoin(int nodeId, IPhysicalPlan outer, IPhysicalPlan inner, Set<Column> outerReferences, BiFunction<TupleVector, IExecutionContext, ValueVector> condition,
+            String populateAlias, boolean pushOuterReference)
+    {
+        if (outerReferences == null
+                || outerReferences.isEmpty())
+        {
+            throw new IllegalArgumentException("outerReferences must be set");
+        }
+        return new NestedLoop(nodeId, outer, inner, condition, populateAlias, outerReferences, true, false, pushOuterReference, Schema.EMPTY);
     }
 
     /** Create a left outer join. Logical operations: LEFT OUTER JOIN */
@@ -262,8 +288,7 @@ public class NestedLoop implements IPhysicalPlan
         final LoopNodeData nodeData = context.getStatementContext()
                 .getOrCreateNodeData(nodeId, () -> new LoopNodeData());
 
-        if (condition == null
-                && !outerReferences.isEmpty())
+        if (!outerReferences.isEmpty())
         {
             return new LoopTupleIterator((ExecutionContext) context, outerIt, outerTupleVector, nodeData);
         }
@@ -293,7 +318,7 @@ public class NestedLoop implements IPhysicalPlan
             private TupleVector next;
             /** Bit set to keep track of outer matches. Used in left joins to know what outer indices to return */
             private BitSet outerMatches;
-            private CartesianTupleVector cartesian = new CartesianTupleVector();
+            private CartesianTupleVector cartesian = new CartesianTupleVector(cartesianSchema, isAsteriskSchema);
 
             // The inner schema used when emitting empty outer row, will be the plan schema from start
             // but if there are inner matches before the un matched ones we switch
@@ -430,7 +455,7 @@ public class NestedLoop implements IPhysicalPlan
                     {
                         long time = System.nanoTime();
                         // First construct a cartesian tuple vector that will be the one we run the predicate against
-                        cartesian.init(currentOuter, currentInner, isAsteriskSchema, cartesianSchema);
+                        cartesian.init(currentOuter, currentInner);
                         ValueVector filter = condition.apply(cartesian, context);
 
                         int cardinality = filter.getCardinality();
@@ -568,7 +593,7 @@ public class NestedLoop implements IPhysicalPlan
         private TupleVector next;
         /** Bit set to keep track of outer matches. Used in left joins to know what outer indices to return */
         private BitSet outerMatches;
-        private CartesianTupleVector cartesian = new CartesianTupleVector();
+        private CartesianTupleVector cartesian = new CartesianTupleVector(cartesianSchema, isAsteriskSchema);
 
         // The inner schema used when emitting empty outer row, will be the plan schema from start
         // but if there are inner matches before the un matched ones we switch
@@ -702,7 +727,7 @@ public class NestedLoop implements IPhysicalPlan
 
                     long time = System.nanoTime();
                     // First construct a cartesian tuple vector that will be the one we run the predicate against
-                    cartesian.init(currentOuter, concatOfInner, isAsteriskSchema, cartesianSchema);
+                    cartesian.init(currentOuter, concatOfInner);
                     ValueVector filter = condition.apply(cartesian, context);
 
                     nodeData.predicateTime += TimeUnit.MILLISECONDS.convert(System.nanoTime() - time, TimeUnit.NANOSECONDS);
@@ -775,7 +800,7 @@ public class NestedLoop implements IPhysicalPlan
          */
         private final OuterTupleVector outerTupleVector;
         private final RowTupleVector rowTupleVector = new RowTupleVector();
-        private final CartesianTupleVector cartesian = new CartesianTupleVector();
+        private final CartesianTupleVector cartesian = new CartesianTupleVector(cartesianSchema, isAsteriskSchema);
 
         private TupleVector currentOuter;
         private TupleVector next;
@@ -908,15 +933,27 @@ public class NestedLoop implements IPhysicalPlan
                             long time = System.nanoTime();
                             // CSON
 
-                            matched = true;
                             if (builder == null)
                             {
                                 builder = context.getVectorFactory()
                                         .getTupleVectorBuilder(rowCount);
                             }
 
-                            builder.append(VectorUtils.populateCartesian(rowTupleVector, concatOfInner, populateAlias));
+                            cartesian.init(rowTupleVector, concatOfInner);
 
+                            // All true filter
+                            ValueVector filter = ValueVector.literalBoolean(true, cartesian.rowCount);
+                            matched = true;
+                            // .. or a condition
+                            // Conditions in a loop iterator is when we have an expression scan along with
+                            // inner/left join, then we are both iterating outer plus evaluating
+                            if (condition != null)
+                            {
+                                filter = condition.apply(cartesian, context);
+                                matched = filter.getCardinality() > 0;
+                            }
+
+                            builder.appendPopulate(rowTupleVector, concatOfInner, filter, populateAlias);
                             nodeData.tupleBuildTime += TimeUnit.MILLISECONDS.convert(System.nanoTime() - time, TimeUnit.NANOSECONDS);
                         }
                     }
@@ -940,9 +977,20 @@ public class NestedLoop implements IPhysicalPlan
                                     // CSOFF
                                     long time = System.nanoTime();
                                     // CSON
-                                    matched = true;
 
-                                    cartesian.init(rowTupleVector, inner, isAsteriskSchema, cartesianSchema);
+                                    cartesian.init(rowTupleVector, inner);
+
+                                    // All true filter
+                                    ValueVector filter = ValueVector.literalBoolean(true, cartesian.rowCount);
+                                    matched = true;
+                                    // .. or a condition
+                                    // Conditions in a loop iterator is when we have an expression scan along with
+                                    // inner/left join, then we are both iterating outer plus evaluating
+                                    if (condition != null)
+                                    {
+                                        filter = condition.apply(cartesian, context);
+                                        matched = filter.getCardinality() > 0;
+                                    }
 
                                     if (builder == null)
                                     {
@@ -950,7 +998,7 @@ public class NestedLoop implements IPhysicalPlan
                                                 .getTupleVectorBuilder((int) (rowCount * inner.getRowCount() * 1.1));
                                     }
 
-                                    builder.append(cartesian);
+                                    builder.append(cartesian, filter);
                                     nodeData.tupleBuildTime += TimeUnit.MILLISECONDS.convert(System.nanoTime() - time, TimeUnit.NANOSECONDS);
                                 }
                             }
@@ -1156,11 +1204,36 @@ public class NestedLoop implements IPhysicalPlan
                 this.schema = SchemaUtils.joinSchema(prevOuterSchema, outerSchema);
             }
 
-            // TODO: Pre-calculation of outer schema was broken but is still not used
             // We only assert that they are equal
             if (!outerSchemaIsAsterisk)
             {
-                assert (planOuterSchema.equals(this.schema)) : "Planned outer schema should match actual outer schema. Planned: " + planOuterSchema + ", actual: " + this.schema;
+                assert (planOuterSchema.equals(this.schema)) : "Planned outer schema should match actual outer schema. Planned: " + planOuterSchema.getColumns()
+                        .stream()
+                        .map(o ->
+                        {
+                            String str = o.toString();
+                            TableSourceReference tableSource = SchemaUtils.getTableSource(o);
+                            if (tableSource != null)
+                            {
+                                str += " (" + tableSource + ")";
+                            }
+                            return str;
+                        })
+                        .collect(joining(", "))
+                                                               + ", actual: "
+                                                               + this.schema.getColumns()
+                                                                       .stream()
+                                                                       .map(o ->
+                                                                       {
+                                                                           String str = o.toString();
+                                                                           TableSourceReference tableSource = SchemaUtils.getTableSource(o);
+                                                                           if (tableSource != null)
+                                                                           {
+                                                                               str += " (" + tableSource + ")";
+                                                                           }
+                                                                           return str;
+                                                                       })
+                                                                       .collect(joining(", "));
             }
         }
 
@@ -1193,6 +1266,9 @@ public class NestedLoop implements IPhysicalPlan
      */
     private static class CartesianTupleVector implements TupleVector
     {
+        private final Schema cartesianSchema;
+        private final boolean isAsteriskSchema;
+
         private TupleVector outer;
         private TupleVector inner;
         private Schema outerSchema;
@@ -1206,8 +1282,14 @@ public class NestedLoop implements IPhysicalPlan
         // private int innerSize;
         private int innerRowCount;
 
+        CartesianTupleVector(Schema cartesianSchema, boolean isAsteriskSchema)
+        {
+            this.cartesianSchema = cartesianSchema;
+            this.isAsteriskSchema = isAsteriskSchema;
+        }
+
         /** Inits this vector with new outer/inner vectors. Calculates new schemas etc. */
-        void init(TupleVector outer, TupleVector inner, boolean isAsteriskSchema, Schema cartesianSchema)
+        void init(TupleVector outer, TupleVector inner)
         {
             this.outer = outer;
             this.inner = inner;
@@ -1223,11 +1305,36 @@ public class NestedLoop implements IPhysicalPlan
                 this.schema = SchemaUtils.joinSchema(outerSchema, innerSchema);
             }
 
-            // TODO: Pre-calculation of cartesian schema was broken but is still not used
             // We only assert that they are equal
             if (!isAsteriskSchema)
             {
-                assert (cartesianSchema.equals(this.schema)) : "Planned cartesian schema should match actual schema. Planned: " + cartesianSchema + ", actual: " + this.schema;
+                assert (cartesianSchema.equals(this.schema)) : "Planned cartesian schema should match actual schema. Planned: " + cartesianSchema.getColumns()
+                        .stream()
+                        .map(o ->
+                        {
+                            String str = o.toString();
+                            TableSourceReference tableSource = SchemaUtils.getTableSource(o);
+                            if (tableSource != null)
+                            {
+                                str += " (" + tableSource + ")";
+                            }
+                            return str;
+                        })
+                        .collect(joining(", "))
+                                                               + ", actual: "
+                                                               + this.schema.getColumns()
+                                                                       .stream()
+                                                                       .map(o ->
+                                                                       {
+                                                                           String str = o.toString();
+                                                                           TableSourceReference tableSource = SchemaUtils.getTableSource(o);
+                                                                           if (tableSource != null)
+                                                                           {
+                                                                               str += " (" + tableSource + ")";
+                                                                           }
+                                                                           return str;
+                                                                       })
+                                                                       .collect(joining(", "));
             }
             this.outerSize = outerSchema.getSize();
 

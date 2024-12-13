@@ -15,7 +15,6 @@ import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzePair;
 import se.kuseman.payloadbuilder.core.expression.PredicateAnalyzer.AnalyzeResult;
-import se.kuseman.payloadbuilder.core.logicalplan.ALogicalPlanVisitor;
 import se.kuseman.payloadbuilder.core.logicalplan.Filter;
 import se.kuseman.payloadbuilder.core.logicalplan.ILogicalPlan;
 import se.kuseman.payloadbuilder.core.logicalplan.Join;
@@ -260,9 +259,7 @@ class PredicatePushDown extends ALogicalPlanOptimizer<PredicatePushDown.Ctx>
         // That is up to the user to optimize at the moment.
         if (isLeft)
         {
-            constrainedTableSoueces = new HashSet<>();
-            plan.getInner()
-                    .accept(TableSourceVisitor.INSTANCE, constrainedTableSoueces);
+            constrainedTableSoueces = extractTableSources(plan.getInner());
         }
 
         Set<TableSourceReference> prevConstrainedTableSources = new HashSet<>(context.constrainedTableSources);
@@ -287,25 +284,5 @@ class PredicatePushDown extends ALogicalPlanOptimizer<PredicatePushDown.Ctx>
                 .getValue();
 
         return new Join(outer, inner, plan.getType(), plan.getPopulateAlias(), analyzeResult.getPredicate(), plan.getOuterReferences(), plan.isSwitchedInputs(), plan.getOuterSchema());
-    }
-
-    /** Visitor that collects table sources from a {@link ILogicalPlan} */
-    static class TableSourceVisitor extends ALogicalPlanVisitor<Void, Set<TableSourceReference>>
-    {
-        private static final TableSourceVisitor INSTANCE = new TableSourceVisitor();
-
-        @Override
-        public Void visit(TableScan plan, Set<TableSourceReference> context)
-        {
-            context.add(plan.getTableSource());
-            return super.visit(plan, context);
-        }
-
-        @Override
-        public Void visit(TableFunctionScan plan, Set<TableSourceReference> context)
-        {
-            context.add(plan.getTableSource());
-            return super.visit(plan, context);
-        }
     }
 }

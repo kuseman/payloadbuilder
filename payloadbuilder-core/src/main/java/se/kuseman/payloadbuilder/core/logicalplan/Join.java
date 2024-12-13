@@ -3,6 +3,7 @@ package se.kuseman.payloadbuilder.core.logicalplan;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptySet;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 
 import java.util.List;
 import java.util.Objects;
@@ -13,6 +14,7 @@ import org.apache.commons.lang3.ObjectUtils;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.core.catalog.TableSourceReference;
 import se.kuseman.payloadbuilder.core.common.SchemaUtils;
 
 /** Logical definition of a join */
@@ -85,6 +87,31 @@ public class Join implements ILogicalPlan
         return outerSchema;
     }
 
+    /** Returns true of this join can have outer references otherwise false */
+    public boolean canHaveOuterReferences()
+    {
+        // We support outer references with conditions when the inner is an expression scan
+        // that way one can write joins like this:
+        // select *
+        // from tableA a
+        // inner join (a.tableColumn) c
+        // on c.key = 123
+        if (condition != null
+                && inner instanceof ExpressionScan)
+        {
+            return true;
+        }
+
+        // Outer/cross apply's (lateral joins) can have outer references
+        if (condition == null
+                && type != Join.Type.CROSS)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     @Override
     public Schema getSchema()
     {
@@ -147,13 +174,36 @@ public class Join implements ILogicalPlan
                + ")"
                + (condition != null ? ", condition: " + condition.toVerboseString()
                        : "")
-               + (!outerReferences.isEmpty() ? ", outerReferences: " + outerReferences
+               + (!outerReferences.isEmpty() ? ", outerReferences: " + outerReferences.stream()
+                       .map(o ->
+                       {
+                           String str = o.toString();
+                           TableSourceReference tableSource = SchemaUtils.getTableSource(o);
+                           if (tableSource != null)
+                           {
+                               str += " (" + tableSource + ")";
+                           }
+                           return str;
+                       })
+                       .collect(joining(", "))
                        : "")
                + (switchedInputs ? ", switched inputs"
                        : "")
                + (populateAlias != null ? ", populate (" + populateAlias + ")"
                        : "")
-               + (outerSchema.getSize() > 0 ? ", outer schema: " + outerSchema
+               + (outerSchema.getSize() > 0 ? ", outer schema: " + outerSchema.getColumns()
+                       .stream()
+                       .map(o ->
+                       {
+                           String str = o.toString();
+                           TableSourceReference tableSource = SchemaUtils.getTableSource(o);
+                           if (tableSource != null)
+                           {
+                               str += " (" + tableSource + ")";
+                           }
+                           return str;
+                       })
+                       .collect(joining(", "))
                        : "");
     }
 
