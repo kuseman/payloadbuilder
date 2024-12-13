@@ -219,7 +219,7 @@
       "name": "e-com PDP",
       "query": [
         "use ecom ",
-        "--set @@printplan = true ",
+        "--set @@debugplan = true ",
         "select p.id productNumber",
         ", p.name ",
         ", ( ",
@@ -1785,22 +1785,119 @@
     {
       "name": "Verify that we can join on outer references",
       "query": [
-        "--set @@printplan = true ",
+        "--set @@debugplan = true ",
         "select ( ",
-        "  select s2.col2 ",
+        "  select s.col2, s2.col2, d.id, d.data ",
         "  from source2 s2 ",
         "  inner join data d ",
-        "    on d.id = s.col1 ",
-        "    and d.id = s2.col1 ",
+        "    on d.id = s.col2 ",
+        "  where s2.col2 = s.col2 ",
         "  for object_array ",
         ") values",
         "from source s"
       ],
       "expectedResultSets": [
         [
-          [{"key":"values","value": [ {"col2": 2}, {"col2": 2}, {"col2": 2}, {"col2": 2} ] }],
+          [{"key":"values","value": [{"col2":2, "id": 2, "data": "2_1"}, {"col2": 2, "id": 2, "data": "2_1"}]}],
           [{"key":"values","value": null }],
           [{"key":"values","value": null }]
+        ]
+      ]
+    },
+    {
+      "name": "Inner join with expression scan",
+      "query": [
+        "--set @@debugplan = true ",
+        "use complexColumns ",
+        "select t.id, tt.* ",
+        "from \"table\" t ",
+        "inner join (toTable(json_value(t.\"table\"))) tt ",
+        "  on tt.key = 123 "
+      ],
+      "expectedResultSets": [
+        [
+          [{"key":"id","value": 1}, {"key": "key", "value": 123}, {"key": "value", "value": 456}]
+        ]
+      ]
+    },
+    {
+      "name": "Inner populate join with expression scan",
+      "query": [
+        "--set @@debugplan = true ",
+        "use complexColumns ",
+        "select t.id, tt ",
+        "from \"table\" t ",
+        "inner populate join (toTable(json_value(t.\"table\"))) tt ",
+        "  on tt.key = 123 "
+      ],
+      "expectedResultSets": [
+        [
+          [{"key":"id","value": 1}, { "key": "tt", "value": [{"key": 123, "value": 456}]}]
+        ]
+      ]
+    },
+    {
+      "name": "Inner populate join with expression scan no matches",
+      "query": [
+        "--set @@debugplan = true ",
+        "use complexColumns ",
+        "select t.id, tt ",
+        "from \"table\" t ",
+        "inner populate join (toTable(json_value(t.\"table\"))) tt ",
+        "  on tt.key = 1230 "
+      ],
+      "expectedResultSets": [
+        [
+        ]
+      ]
+    },    {
+      "name": "Left join with expression scan",
+      "query": [
+        "--set @@debugplan = true ",
+        "use complexColumns ",
+        "select t.id, tt.* ",
+        "from \"table\" t ",
+        "left join (toTable(json_value(t.\"table\"))) tt ",
+        "  on tt.key = 123 "
+      ],
+      "expectedResultSets": [
+        [
+          [{"key":"id","value": 1}, {"key": "key", "value": 123}, {"key": "value", "value": 456}],
+          [{"key":"id","value": 2}, {"key": "key", "value": null}, {"key": "value", "value": null}]
+        ]
+      ]
+    },
+    {
+      "name": "Left populate join with expression scan",
+      "query": [
+        "--set @@debugplan = true ",
+        "use complexColumns ",
+        "select t.id, tt ",
+        "from \"table\" t ",
+        "left populate join (toTable(json_value(t.\"table\"))) tt ",
+        "  on tt.key = 123 "
+      ],
+      "expectedResultSets": [
+        [
+          [{"key":"id","value": 1}, { "key": "tt", "value": [{"key": 123, "value": 456}]}],
+          [{"key":"id","value": 2}, {"key": "tt", "value": null}]
+        ]
+      ]
+    },
+    {
+      "name": "Left populate join with expression scan no matches",
+      "query": [
+        "--set @@debugplan = true ",
+        "use complexColumns ",
+        "select t.id, tt ",
+        "from \"table\" t ",
+        "left populate join (toTable(json_value(t.\"table\"))) tt ",
+        "  on tt.key = 1230 "
+      ],
+      "expectedResultSets": [
+        [
+          [{"key":"id","value": 1}, { "key": "tt", "value": null}],
+          [{"key":"id","value": 2}, {"key": "tt", "value": null}]
         ]
       ]
     }
