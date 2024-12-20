@@ -55,6 +55,7 @@ public class SystemCatalog extends Catalog
     private static final Schema TABLES_SCHEMA = Schema.of(
             Column.of(SYS_TABLES_NAME, ResolvedType.of(se.kuseman.payloadbuilder.api.catalog.Column.Type.String)),
             Column.of("schema",        ResolvedType.of(se.kuseman.payloadbuilder.api.catalog.Column.Type.String)),
+            Column.of("indices",       ResolvedType.of(se.kuseman.payloadbuilder.api.catalog.Column.Type.String)),
             Column.of("rows",          ResolvedType.of(se.kuseman.payloadbuilder.api.catalog.Column.Type.Int)));
     
     private static final Schema CACHES_SCHEMA = Schema.of(
@@ -268,6 +269,14 @@ public class SystemCatalog extends Catalog
                                             .getColumns()
                                             .stream()
                                             .map(c -> c.getName() + " (" + c.getType() + ")")
+                                            .collect(joining(", "));
+                                }
+                                else if (col == 2)
+                                {
+                                    return e.getValue()
+                                            .getIndices()
+                                            .stream()
+                                            .map(i -> i.getColumnsType() + ": " + i.getColumns())
                                             .collect(joining(", "));
                                 }
 
