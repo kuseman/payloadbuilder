@@ -228,6 +228,10 @@ public class EpochDateTimeOffset implements Comparable<EpochDateTimeOffset>, Val
         {
             return from(s.toString());
         }
+        else if (object instanceof OffsetDateTime odt)
+        {
+            return new EpochDateTimeOffset(odt.toZonedDateTime());
+        }
         else if (object instanceof ZonedDateTime zdt)
         {
             return new EpochDateTimeOffset(zdt);

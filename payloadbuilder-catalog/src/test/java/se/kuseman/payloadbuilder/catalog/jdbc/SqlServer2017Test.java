@@ -15,7 +15,7 @@ import org.testcontainers.utility.DockerImageName;
 import com.microsoft.sqlserver.jdbc.SQLServerDataSource;
 
 /** Test of SqlServer 2017 */
-public class SqlServer2017Test extends BaseJDBCTest
+public class SqlServer2017Test extends ASqlServerTest
 {
     public SqlServer2017Test()
     {
