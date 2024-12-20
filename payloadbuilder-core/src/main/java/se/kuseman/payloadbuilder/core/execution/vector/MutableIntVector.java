@@ -61,8 +61,12 @@ class MutableIntVector extends AMutableVector
         }
         else if (buffer.limit() < limit)
         {
+            // We double the limit to avoid to much allocations
+            // For example if we fetch a lot of rows from a source with batch size 500
+            // we are going to resize and copy huge amount of times
+            // This can however cause OOM's if handling really huge amount of rows
             IntBuffer newBuffer = factory.getAllocator()
-                    .getIntBuffer(Math.max(estimatedCapacity, limit));
+                    .getIntBuffer(Math.max(estimatedCapacity, limit * 2));
             newBuffer.put(buffer);
             newBuffer.position(0);
             buffer = newBuffer;

@@ -62,7 +62,7 @@ class MutableLongVector extends AMutableVector
         else if (buffer.limit() < limit)
         {
             LongBuffer newBuffer = factory.getAllocator()
-                    .getLongBuffer(Math.max(estimatedCapacity, limit));
+                    .getLongBuffer(Math.max(estimatedCapacity, limit * 2));
             newBuffer.put(buffer);
             newBuffer.position(0);
             buffer = newBuffer;

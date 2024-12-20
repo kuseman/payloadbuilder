@@ -62,7 +62,7 @@ class MutableFloatVector extends AMutableVector
         else if (buffer.limit() < limit)
         {
             FloatBuffer newBuffer = factory.getAllocator()
-                    .getFloatBuffer(Math.max(estimatedCapacity, limit));
+                    .getFloatBuffer(Math.max(estimatedCapacity, limit * 2));
             newBuffer.put(buffer);
             newBuffer.position(0);
             buffer = newBuffer;

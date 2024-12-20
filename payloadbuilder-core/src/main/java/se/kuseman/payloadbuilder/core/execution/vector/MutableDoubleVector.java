@@ -62,7 +62,7 @@ class MutableDoubleVector extends AMutableVector
         else if (buffer.limit() < limit)
         {
             DoubleBuffer newBuffer = factory.getAllocator()
-                    .getDoubleBuffer(Math.max(estimatedCapacity, limit));
+                    .getDoubleBuffer(Math.max(estimatedCapacity, limit * 2));
             newBuffer.put(buffer);
             newBuffer.position(0);
             buffer = newBuffer;
