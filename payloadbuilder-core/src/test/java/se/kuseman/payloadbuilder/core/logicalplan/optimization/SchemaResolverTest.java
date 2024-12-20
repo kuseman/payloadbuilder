@@ -149,7 +149,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan actual = optimize(context, plan);
 
         TableSourceReference tableSource = new TableSourceReference(0, TableSourceReference.Type.TABLE, "sys", QualifiedName.of("tables"), "");
-        Schema expectedSchema = Schema.of(col("name", Type.String, tableSource), col("schema", Type.String, tableSource), col("rows", Type.Int, tableSource));
+        Schema expectedSchema = Schema.of(col("name", Type.String, tableSource), col("schema", Type.String, tableSource), col("indices", Type.String, tableSource), col("rows", Type.Int, tableSource));
 
         //@formatter:off
         ILogicalPlan expected = projection(
