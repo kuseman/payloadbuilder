@@ -95,16 +95,7 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
     @Override
     public Void visit(SetStatement statement, Void ctx)
     {
-        ValueVector value = statement.getExpression()
-                .eval(TupleVector.CONSTANT, context);
-        if (statement.isSystemProperty())
-        {
-            session.setSystemProperty(statement.getName(), value);
-        }
-        else
-        {
-            context.setVariable(statement.getName(), value);
-        }
+        statement.execute(context);
         return null;
     }
 

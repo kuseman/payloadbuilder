@@ -1632,8 +1632,8 @@
         "select * ",
         "from @tbl "
       ],
-      "expectedException": "java.lang.IllegalArgumentException",
-      "expectedMessageContains": "Cannot cast Int to Table"
+      "expectedException": "se.kuseman.payloadbuilder.core.parser.ParseException",
+      "expectedMessageContains": "Table variable expression must be of type: Table but got: Int"
     },
     {
       "name": "Test table option expressions get resolved",
