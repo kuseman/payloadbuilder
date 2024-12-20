@@ -125,11 +125,7 @@ class ConditionAnalyzer
 
             for (Index index : indices)
             {
-                if (index.supports(IndexType.SEEK_EQ)
-                        && IN_EXPRESSION_PUSH_DOWN_COLUMNS_TYPES.contains(index.getColumnsType())
-                        && (index.getColumnsType() == ColumnsType.WILDCARD
-                                || StringUtils.equalsIgnoreCase(column, index.getColumns()
-                                        .get(0))))
+                if (canUseIndexForInExpressionPushDown(index, column))
                 {
                     // Remove the predicate we used as index source
                     // This should not be used as pushed down later on
@@ -144,6 +140,28 @@ class ConditionAnalyzer
         }
 
         return null;
+    }
+
+    private static boolean canUseIndexForInExpressionPushDown(Index index, String pairColumn)
+    {
+        if (!index.supports(IndexType.SEEK_EQ))
+        {
+            return false;
+        }
+        // We can use the index if it's of ALL type and the index only have one column
+        if (index.getColumnsType() == ColumnsType.ALL
+                && index.getColumns()
+                        .size() == 1
+                && StringUtils.equalsIgnoreCase(pairColumn, index.getColumns()
+                        .get(0)))
+        {
+            return true;
+        }
+
+        return IN_EXPRESSION_PUSH_DOWN_COLUMNS_TYPES.contains(index.getColumnsType())
+                && (index.getColumnsType() == ColumnsType.WILDCARD
+                        || StringUtils.equalsIgnoreCase(pairColumn, index.getColumns()
+                                .get(0)));
     }
 
     /** Analyze condition */
