@@ -466,7 +466,7 @@ class ColumnResolver extends ALogicalPlanOptimizer<ColumnResolver.Ctx>
                 if (obj != null
                         && !(obj instanceof TupleVector))
                 {
-                    throw new ParseException("Table variable expression must be of type: " + Type.Table, plan.getLocation());
+                    throw new ParseException("Table variable expression must be of type: " + Type.Table + " but got: " + value.type(), plan.getLocation());
                 }
                 else if (obj instanceof TupleVector tv)
                 {

@@ -95,16 +95,10 @@ class StatementRewriter implements StatementVisitor<Statement, StatementPlanner.
     @Override
     public Statement visit(SetStatement statement, Context context)
     {
-        // Execute system properties at this stage to trigger settings that is needed
-        // during planning phase
-        if (statement.isSystemProperty())
-        {
-            ValueVector value = statement.getExpression()
-                    .eval(TupleVector.CONSTANT, context.context);
-            context.context.getSession()
-                    .setSystemProperty(statement.getName(), value);
-        }
-        return new SetStatement(statement.getName(), resolveExpression(context.context, statement.getExpression()), statement.isSystemProperty());
+        SetStatement result = new SetStatement(statement.getName(), resolveExpression(context.context, statement.getExpression()), statement.isSystemProperty());
+        // Eval and set Set-varibles at this stage to be able to use those in Use-statements etc.
+        result.execute(context.context);
+        return result;
     }
 
     @Override
