@@ -1733,6 +1733,63 @@ public class QueryPlannerTest extends APhysicalPlanTest
     }
 
     @Test
+    public void test_indexed_predicate_push_down_with_in_expression_all_index()
+    {
+        //@formatter:off
+        String query = ""
+                + "select * "
+                + "from tableB b "
+                + "where col in (1,2,3) ";
+        //@formatter:on
+
+        TestCatalog t = new TestCatalog(Map.of(QualifiedName.of("tableB"), Set.of("col", "col2")))
+        {
+            @Override
+            public TableSchema getTableSchema(IQuerySession session, String catalogAlias, QualifiedName table, List<Option> options)
+            {
+                if (table.toString()
+                        .equalsIgnoreCase("tableB"))
+                {
+                    return new TableSchema(Schema.EMPTY, asList(new Index(table, List.of("COL"), ColumnsType.ALL)));
+                }
+                return super.getTableSchema(session, catalogAlias, table, options);
+            }
+        };
+        catalogRegistry.registerCatalog("t", t);
+
+        QueryStatement queryStatement = parse(query);
+        queryStatement = StatementPlanner.plan(session, queryStatement);
+
+        IPhysicalPlan actual = ((PhysicalSelectStatement) queryStatement.getStatements()
+                .get(0)).getSelect();
+
+        TableSourceReference tableB = new TableSourceReference(0, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableB"), "b");
+
+        //@formatter:off
+        Schema expectedSchemaB = Schema.of(ast("b", ResolvedType.of(Type.Any), tableB));
+
+        SeekPredicate expectedSeekPredicate = new SeekPredicate(
+                new Index(QualifiedName.of("tableB"),  List.of("COL"), ColumnsType.ALL), List.of(
+                new SeekPredicate.SeekPredicateItem("col", cre("col", tableB), List.of(intLit(1), intLit(2), intLit(3)))), true);
+
+        IPhysicalPlan expected = new IndexSeek(0, expectedSchemaB, tableB, "test", false, expectedSeekPredicate, t.seekDataSources.get(0), emptyList());
+        //@formatter:on
+
+        //@formatter:off
+        assertEquals(0, t.consumedPredicate.size());
+        //@formatter:on
+
+        // System.out.println(actual.print(0));
+        // System.out.println(expected.print(0));
+
+        Assertions.assertThat(actual)
+                .usingRecursiveComparison()
+                .isEqualTo(expected);
+
+        assertEquals(expected, actual);
+    }
+
+    @Test
     public void test_indexed_predicate_push_down_with_equal_expression()
     {
         //@formatter:off
