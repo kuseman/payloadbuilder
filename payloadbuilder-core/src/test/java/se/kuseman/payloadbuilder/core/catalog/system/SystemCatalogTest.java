@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
@@ -17,6 +18,7 @@ import org.junit.Test;
 import se.kuseman.payloadbuilder.api.execution.Decimal;
 import se.kuseman.payloadbuilder.api.execution.EpochDateTime;
 import se.kuseman.payloadbuilder.api.execution.EpochDateTimeOffset;
+import se.kuseman.payloadbuilder.api.execution.UTF8String;
 import se.kuseman.payloadbuilder.api.utils.MapUtils;
 import se.kuseman.payloadbuilder.core.catalog.CatalogRegistry;
 import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
@@ -143,7 +145,6 @@ public class SystemCatalogTest extends AExpressionTest
     @Test
     public void test_ceiling() throws Exception
     {
-
         assertExpression(null, null, "ceiling(null)");
         assertExpression(1, null, "ceiling(1)");
         assertExpression(1L, null, "ceiling(1L)");
@@ -328,6 +329,15 @@ public class SystemCatalogTest extends AExpressionTest
         assertExpression("  hell", null, "rtrim('  hello  ', ' ho')");
 
         assertExpression("hello", null, "trim('  hello\n\r  ', ' ' + char(10) + char(13))");
+    }
+
+    @Test
+    public void test_function_stirng_split() throws Exception
+    {
+        assertExpression(null, null, "string_split(null, null)");
+        assertExpression(null, null, "string_split('hello', null)");
+        assertExpression(List.of(UTF8String.from("hello")), null, "string_split('hello', ';')");
+        assertExpression(List.of(UTF8String.from("he"), UTF8String.from("o")), null, "string_split('hello', 'll')");
     }
 
     @Test

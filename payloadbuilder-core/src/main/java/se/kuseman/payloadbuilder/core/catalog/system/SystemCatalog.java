@@ -111,6 +111,7 @@ public class SystemCatalog extends Catalog
         catalog.registerFunction(new StringAggFunction());
         catalog.registerFunction(new Base64Function(true));
         catalog.registerFunction(new Base64Function(false));
+        catalog.registerFunction(new StringSplitScalarFunction());
 
         // Date functions
         catalog.registerFunction(new GetDateFunction(true));
@@ -158,7 +159,7 @@ public class SystemCatalog extends Catalog
 
         // Table functions
         catalog.registerFunction(new RangeFunction());
-        catalog.registerFunction(new StringSplitFunction());
+        catalog.registerFunction(new StringSplitTableFunction());
         catalog.registerFunction(new OpenJsonFunction());
         catalog.registerFunction(new OpenCsvFunction());
         catalog.registerFunction(new OpenXmlFunction());
