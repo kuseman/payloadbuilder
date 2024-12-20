@@ -47,9 +47,19 @@ public class Column
         return new Column(name, type);
     }
 
+    public static Column of(String name, ResolvedType type, MetaData metaData)
+    {
+        return new Column(name, type, metaData);
+    }
+
     public static Column of(String name, Type type)
     {
         return new Column(name, ResolvedType.of(type));
+    }
+
+    public static Column of(String name, Type type, MetaData metaData)
+    {
+        return new Column(name, ResolvedType.of(type), metaData);
     }
 
     @Override

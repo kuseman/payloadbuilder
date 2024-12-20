@@ -1,18 +1,116 @@
 package se.kuseman.payloadbuilder.catalog.jdbc;
 
+import static java.util.Objects.requireNonNull;
+
 import java.io.IOException;
 import java.io.Writer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
+
+import org.apache.commons.lang3.Strings;
+
+import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
+import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
+import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.catalog.jdbc.JdbcCatalog.ColumnOption;
+import se.kuseman.payloadbuilder.catalog.jdbc.dialect.SqlDialect;
 
 /** Jdbc utils. Managing resources etc. */
 class JdbcUtils
 {
+    static final String JAVA_SQL_TYPE = "java.sql.Type";
+
+    record SchemaResult(Schema schema, int[] jdbcTypes)
+    {
+        SchemaResult
+        {
+            requireNonNull(schema);
+            requireNonNull(jdbcTypes);
+        }
+    }
+
+    static SchemaResult getSchemaFromResultSet(SqlDialect dialect, ResultSetMetaData rsmd, Map<String, ColumnOption> columnOptions) throws SQLException
+    {
+        int count = rsmd.getColumnCount();
+        int[] jdbcTypes = new int[count];
+        List<Column> columns = new ArrayList<>(count);
+        for (int i = 0; i < count; i++)
+        {
+            int ordinal = i + 1;
+            String columnName = rsmd.getColumnLabel(ordinal);
+            jdbcTypes[i] = rsmd.getColumnType(ordinal);
+            Column.Type type = null;
+            int precision = -1;
+            int scale = -1;
+            IExpression valueExp;
+
+            // Hint of PLB type
+            ColumnOption columnOption = columnOptions.get(columnName.toLowerCase());
+            if (columnOption != null
+                    && (valueExp = columnOption.values()
+                            .get(JdbcCatalog.PLBTYPE)) != null)
+            {
+                String value = valueExp.eval(null)
+                        .valueAsString(0);
+                if (value != null)
+                {
+                    type = Arrays.stream(Column.Type.values())
+                            .filter(e -> Strings.CI.equals(e.name(), value))
+                            .findAny()
+                            .orElse(null);
+                }
+            }
+
+            if (type == null)
+            {
+                type = dialect.getColumnType(rsmd, jdbcTypes[i], ordinal);
+                precision = rsmd.getPrecision(ordinal);
+                scale = rsmd.getScale(ordinal);
+            }
+
+            //@formatter:off
+            Column.MetaData metaData = new Column.MetaData(Map.of(
+                    Column.MetaData.NULLABLE, ResultSetMetaData.columnNullable == rsmd.isNullable(ordinal),
+                    Column.MetaData.SCALE, scale,
+                    Column.MetaData.PRECISION, precision
+                    //JAVA_SQL_TYPE, rsmd.getColumnType(ordinal)
+                    ));
+            //@formatter:on
+            columns.add(new Column(rsmd.getColumnLabel(ordinal), ResolvedType.of(type), metaData));
+        }
+        return new SchemaResult(new Schema(columns), jdbcTypes);
+    }
+
+    /** Sets result set values into vectors. */
+    static void setVectorValues(SqlDialect dialect, int row, ResultSet rs, SchemaResult schemaResult, List<MutableValueVector> vectors) throws SQLException, IOException
+    {
+        int count = schemaResult.schema.getSize();
+        for (int i = 0; i < count; i++)
+        {
+            Column.Type type = schemaResult.schema.getColumns()
+                    .get(i)
+                    .getType()
+                    .getType();
+            MutableValueVector vector = vectors.get(i);
+
+            int ordinal = i + 1;
+            int jdbcType = schemaResult.jdbcTypes[i];
+            dialect.setResultSetValue(type, rs, ordinal, row, jdbcType, vector);
+        }
+    }
+
     static void cancelQuiet(Statement statement)
     {
         if (statement != null)

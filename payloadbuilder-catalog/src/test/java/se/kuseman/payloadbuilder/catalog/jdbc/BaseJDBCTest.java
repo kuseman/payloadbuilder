@@ -6,6 +6,9 @@ import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static se.kuseman.payloadbuilder.api.catalog.Column.MetaData.NULLABLE;
+import static se.kuseman.payloadbuilder.api.catalog.Column.MetaData.PRECISION;
+import static se.kuseman.payloadbuilder.api.catalog.Column.MetaData.SCALE;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.entry;
 import static se.kuseman.payloadbuilder.api.utils.MapUtils.ofEntries;
 import static se.kuseman.payloadbuilder.catalog.TestUtils.mockSortItem;
@@ -15,11 +18,14 @@ import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
 import java.io.StringWriter;
 import java.io.Writer;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import javax.sql.DataSource;
 
@@ -27,6 +33,8 @@ import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
@@ -39,7 +47,6 @@ import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
 import se.kuseman.payloadbuilder.api.catalog.Index;
 import se.kuseman.payloadbuilder.api.catalog.Option;
-import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.catalog.TableFunctionInfo.FunctionData;
 import se.kuseman.payloadbuilder.api.catalog.TableSchema;
@@ -47,8 +54,8 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
-import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.catalog.TestUtils;
+import se.kuseman.payloadbuilder.core.expression.LiteralIntegerExpression;
 import se.kuseman.payloadbuilder.core.expression.LiteralStringExpression;
 import se.kuseman.payloadbuilder.test.ExpressionTestUtils;
 import se.kuseman.payloadbuilder.test.IPredicateMock;
@@ -59,16 +66,29 @@ import se.kuseman.payloadbuilder.test.VectorTestUtils;
 abstract class BaseJDBCTest extends Assert
 // CSON
 {
-    private static final String CATALOG_ALIAS = "jdbc";
+    private static final Logger LOGGER = LoggerFactory.getLogger(BaseJDBCTest.class);
+    protected static final String CATALOG_ALIAS = "jdbc";
     protected static final String TEST_DB = "test_db";
     protected static final String TEST_TABLE = "test_table";
 
-    private final DataSource datasource;
+    private static final String VARCHAR100_COL = "varchar100Col";
+    private static final String INT_COL = "intCol";
+    private static final String LONG_COL = "longCol";
+    private static final String BOOL_COL = "boolCol";
+    private static final String FLOAT_COL = "floatCol";
+    private static final String DOUBLE_COL = "doubleCol";
+    private static final String DECIMAL_COL = "decimalCol";
+    private static final String DATETIME_COL = "dateTimeCol";
+
+    protected final DataSource datasource;
     private final String jdbcUrl;
     private final String driverClassName;
     private final String username;
     private final String password;
-    private final JdbcCatalog catalog = new JdbcCatalog();
+    protected final JdbcCatalog catalog = new JdbcCatalog();
+
+    private Schema expectedFullSchema;
+    private List<Column.Type> expectedFullSchemaTypes;
 
     BaseJDBCTest(DataSource datasource, String jdbcUrl, String driverClassName, String username, String password)
     {
@@ -93,44 +113,101 @@ abstract class BaseJDBCTest extends Assert
         }
     }
 
-    protected String getColumn(String name)
+    protected String getColumnDeclaration(Column column)
     {
-        return name;
-    }
-
-    private ValueVector integer(ValueVector vector)
-    {
-        return new ValueVector()
+        switch (column.getType()
+                .getType())
         {
-            @Override
-            public ResolvedType type()
-            {
-                return ResolvedType.of(Type.Any);
-            }
-
-            @Override
-            public int size()
-            {
-                return vector.size();
-            }
-
-            @Override
-            public Object getAny(int row)
-            {
-                return integer(vector.getAny(row));
-            }
-
-            @Override
-            public boolean isNull(int row)
-            {
-                return vector.isNull(row);
-            }
-        };
+            case Boolean:
+                return "BIT";
+            case Int:
+                return "INT";
+            case Long:
+                return "BIGINT";
+            case Float:
+                return "REAL";
+            case Double:
+                return "FLOAT";
+            case Decimal:
+                return "NUMERIC(19,4)";
+            case DateTime:
+                return "TIMESTAMP";
+            case String:
+                return "VARCHAR(" + column.getMetaData()
+                        .getPrecision()
+                       + ")";
+            default:
+                throw new IllegalArgumentException("Unsupported type: " + column.getType());
+        }
     }
 
-    private int integer(Object value)
+    protected String getBooleanValue(boolean value)
     {
-        return ((Number) value).intValue();
+        return value ? "1"
+                : "0";
+    }
+
+    protected String getTimestampValue(String timestamp)
+    {
+        return timestamp;
+    }
+
+    protected Column getBooleanColumn(String name)
+    {
+        return getColumn(Type.Boolean, name, 1, 0);
+    }
+
+    protected Column getIntColumn(String name)
+    {
+        return getColumn(Type.Int, name, 10, 0);
+    }
+
+    protected Column getLongColumn(String name)
+    {
+        return getColumn(Type.Long, name, 19, 0);
+    }
+
+    protected Column getFloatColumn(String name)
+    {
+        return getColumn(Type.Float, name, 7, 0);
+    }
+
+    protected Column getDoubleColumn(String name)
+    {
+        return getColumn(Type.Double, name, 15, 0);
+    }
+
+    protected Column getDecimalColumn(String name)
+    {
+        return getColumn(Type.Decimal, name, 19, 4);
+    }
+
+    protected Column getDateTimeColumn(String name)
+    {
+        return getColumn(Type.DateTime, name, 0, 6);
+    }
+
+    protected Column getStringColumn(String name, int precision)
+    {
+        return getColumn(Type.String, name, precision, 0);
+    }
+
+    protected Column getColumn(Type type, String name, int precision, int scale)
+    {
+        switch (type)
+        {
+            case Boolean:
+            case Int:
+            case Long:
+            case Float:
+            case Double:
+            case Decimal:
+            case DateTime:
+            case String:
+                return Column.of(name, type, new Column.MetaData(Map.of(PRECISION, precision, NULLABLE, true, SCALE, scale)));
+            default:
+                throw new IllegalArgumentException("Unsupported type: " + type);
+        }
     }
 
     @After
@@ -154,23 +231,51 @@ abstract class BaseJDBCTest extends Assert
     @Before
     public void before()
     {
+        //@formatter:off
+        List<Column> columns = List.of(
+                getIntColumn(INT_COL),
+                getStringColumn(VARCHAR100_COL, 100),
+                getLongColumn(LONG_COL),
+                getBooleanColumn(BOOL_COL),
+                getFloatColumn(FLOAT_COL),
+                getDoubleColumn(DOUBLE_COL),
+                getDecimalColumn(DECIMAL_COL),
+                getDateTimeColumn(DATETIME_COL));
+        //@formatter:on
         // Create test data
         try (Connection con = datasource.getConnection())
         {
             con.setCatalog(TEST_DB);
-            con.prepareStatement("CREATE TABLE " + TEST_TABLE + " ( " + " col1 INT," + " col2 VARCHAR(100))")
+            String createTableStm = columns.stream()
+                    .map(c -> c.getName() + " " + getColumnDeclaration(c))
+                    .collect(Collectors.joining(",\n", "CREATE TABLE " + TEST_TABLE + " (\n", "\n)"));
+            LOGGER.info("Create test table:\n{}", createTableStm);
+
+            con.prepareStatement(createTableStm)
                     .execute();
 
-            String stms = """
-                    INSERT INTO %1$s ( col1, col2 ) VALUES (1, 'one')
-                    INSERT INTO %1$s ( col1, col2 ) VALUES (2, 'two')
-                    INSERT INTO %1$s ( col1, col2 ) VALUES (3, 'three')
-                    INSERT INTO %1$s ( col1, col2 ) VALUES (4, 'four')
-                    INSERT INTO %1$s ( col1, col2 ) VALUES (5, 'five')
-                    """.formatted(TEST_TABLE);
+            //@formatter:off
+            List<List<String>> columnValues = List.of(
+                    List.of("1", "'one'",   "10", getBooleanValue(false), "10.10", "100.100", "1000.1111", getTimestampValue("'2010-07-10 10:10:10'")),
+                    List.of("2", "'two'",   "20", getBooleanValue(true),  "20.22", "200.222", "2000.2222", getTimestampValue("'2011-08-11 11:11:11'")),
+                    List.of("3", "'three'", "30", getBooleanValue(false), "30.33", "300.333", "3000.3333", getTimestampValue("'2012-09-12 12:12:12'")),
+                    List.of("4", "'four'",  "40", getBooleanValue(true),  "40.44", "400.444", "4000.4444", getTimestampValue("'2013-10-13 13:13:13'")),
+                    List.of("5", "'five'",  "50", getBooleanValue(false), "50.55", "500.555", "5000.5555", getTimestampValue("'2014-11-14 14:14:14'"))
+                    );
 
-            for (String s : Arrays.stream(stms.split("[\\n\\r]"))
-                    .toArray(String[]::new))
+            String stmRow = "INSERT INTO %s ( %s, %s, %s, %s, %s, %s, %s, %s) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)";
+            List<String> stms = columnValues.stream().map(l ->
+            {
+                List<Object> args = new ArrayList<>();
+                args.addAll(List.of(TEST_TABLE, INT_COL, VARCHAR100_COL, LONG_COL, BOOL_COL, FLOAT_COL, DOUBLE_COL, DECIMAL_COL, DATETIME_COL));
+                args.addAll(l);
+                return stmRow.formatted(args.toArray());
+            })
+            .toList();
+            LOGGER.info("Insert into test table:\n{}", String.join("\n", stms));
+            //@formatter:on
+
+            for (String s : stms)
             {
                 con.prepareStatement(s)
                         .execute();
@@ -180,10 +285,15 @@ abstract class BaseJDBCTest extends Assert
         {
             throw new RuntimeException(e);
         }
+
+        //@formatter:off
+        expectedFullSchema = new Schema(columns);
+        expectedFullSchemaTypes = expectedFullSchema.getColumns().stream().map(c -> c.getType().getType()).toList();
+        //@formatter:on
     }
 
     @Test
-    public void test_warnings_exceptions()
+    public void test_sql_server_warnings_exceptions()
     {
         // Multi statement queries is not supported by all rdbms:es
         assumeTrue(jdbcUrl.contains("sqlserver"));
@@ -210,6 +320,9 @@ abstract class BaseJDBCTest extends Assert
 
         ), new FunctionData(0, emptyList()));
 
+        Column.MetaData stringMeta = new Column.MetaData(Map.of(NULLABLE, false, SCALE, 0, PRECISION, 4));
+        Column.MetaData intMeta = getIntColumn("a").getMetaData();
+
         int batchCount = 0;
         while (it.hasNext())
         {
@@ -217,11 +330,11 @@ abstract class BaseJDBCTest extends Assert
 
             if (batchCount == 0)
             {
-                assertTupleVectorsEquals(TupleVector.of(Schema.of(Column.of("rowId", Type.Any)), asList(vv(Type.Any, 1, 2))), next);
+                assertTupleVectorsEquals(TupleVector.of(Schema.of(Column.of("rowId", Type.Int, intMeta)), asList(vv(Type.Int, 1, 2))), next);
             }
             else
             {
-                assertTupleVectorsEquals(TupleVector.of(Schema.of(Column.of("", Type.Any)), asList(vv(Type.Any, "done"))), next);
+                assertTupleVectorsEquals(TupleVector.of(Schema.of(Column.of("", Type.String, stringMeta)), asList(vv(Type.String, "done"))), next);
             }
 
             batchCount++;
@@ -242,39 +355,114 @@ abstract class BaseJDBCTest extends Assert
     }
 
     @Test
+    public void test_sql_server_datetime_offset()
+    {
+        // Multi statement queries is not supported by all rdbms:es
+        assumeTrue(jdbcUrl.contains("sqlserver"));
+
+        IExecutionContext context = mockExecutionContext();
+        QueryFunction query = new QueryFunction(catalog);
+
+        TupleIterator it = query.execute(context, CATALOG_ALIAS, asList(ExpressionTestUtils.createStringExpression("""
+                select cast('2010-10-10' as datetimeoffset) _do
+                , cast('2010-10-10' as datetimeoffset) at time zone 'Central European Standard Time' _do1
+                , cast(null as datetimeoffset) _do2
+                """)
+
+        ), new FunctionData(0, emptyList()));
+
+        Column.MetaData datetimeOffsetMeta = new Column.MetaData(Map.of(NULLABLE, true, PRECISION, 34, SCALE, 7));
+
+        int batchCount = 0;
+        while (it.hasNext())
+        {
+            TupleVector next = it.next();
+            //@formatter:off
+            assertTupleVectorsEquals(
+                    TupleVector.of(Schema.of(
+                            Column.of("_do", Type.DateTimeOffset, datetimeOffsetMeta),
+                            Column.of("_do1", Type.DateTimeOffset, datetimeOffsetMeta),
+                            Column.of("_do2", Type.DateTimeOffset, datetimeOffsetMeta)),
+                            asList(vv(Type.DateTimeOffset, "2010-10-10"),
+                                    vv(Type.DateTimeOffset, "2010-10-10"),
+                                    vv(Type.DateTimeOffset, new Object[] { null }))),
+                    next);
+            //@formatter:on
+
+            batchCount++;
+        }
+        it.close();
+        assertEquals(1, batchCount);
+    }
+
+    @Test
     public void test_datasource_table_scan_projection()
     {
         IExecutionContext context = mockExecutionContext();
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
-                new DatasourceData(0, emptyList(), emptyList(), Projection.columns(asList("col2")), emptyList()));
+                new DatasourceData(0, emptyList(), emptyList(), Projection.columns(asList(VARCHAR100_COL)), emptyList()));
         TupleIterator it = ds.execute(context);
 
-        List<String> col2Expected = asList("one", "two", "three", "four", "five");
-        int expectedSize = col2Expected.size();
-
-        int rowCount = 0;
+        Column stringColumn = getStringColumn(VARCHAR100_COL, 100);
         while (it.hasNext())
         {
             TupleVector v = it.next();
-
-            assertEquals(Schema.of(Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
-
-            for (int i = 0; i < expectedSize; i++)
-            {
-                for (int j = 0; j < expectedSize; j++)
-                {
-                    if (col2Expected.get(i)
-                            .equals(v.getColumn(0)
-                                    .getAny(j)))
-                    {
-                        rowCount++;
-                    }
-                }
-            }
+            assertEquals(Schema.of(stringColumn), v.getSchema());
+            assertVectorsEquals(VectorTestUtils.vv(stringColumn.getType()
+                    .getType(), "one", "two", "three", "four", "five"), v.getColumn(0));
         }
         it.close();
+    }
 
-        assertEquals(expectedSize, rowCount);
+    @Test
+    public void test_datasource_table_scan_with_projection_option_override_plb_type()
+    {
+        IExecutionContext context = mockExecutionContext();
+
+        List<Option> options = List.of(new Option(JdbcCatalog.PROJECTION, new LiteralStringExpression(DOUBLE_COL)),
+                new Option(QualifiedName.of(JdbcCatalog.COLUMN, DOUBLE_COL, JdbcCatalog.PLBTYPE), new LiteralStringExpression("Int")));
+
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE), new DatasourceData(0, emptyList(), emptyList(), Projection.ALL, options));
+        TupleIterator it = ds.execute(context);
+
+        // Type should have been switched to int with reset precision and scale
+        Column intColumn = Column.of(getDoubleColumn(DOUBLE_COL).getName(), Type.Int, new Column.MetaData(Map.of(PRECISION, -1, NULLABLE, true, SCALE, -1)));
+        assertTrue(it.hasNext());
+        TupleVector v = it.next();
+        assertEquals(Schema.of(intColumn), v.getSchema());
+        assertVectorsEquals(VectorTestUtils.vv(getIntColumn(DOUBLE_COL).getType(), 100, 200, 300, 400, 500), v.getColumn(0));
+
+        assertFalse(it.hasNext());
+        it.close();
+    }
+
+    @Test
+    public void test_datasource_table_scan_with_projection_option_batch_size()
+    {
+        IExecutionContext context = mockExecutionContext();
+
+        List<Option> options = List.of(new Option(JdbcCatalog.PROJECTION, new LiteralStringExpression(VARCHAR100_COL)), new Option(IExecutionContext.BATCH_SIZE, new LiteralIntegerExpression(3)));
+
+        // Send in a PLB projection to verify that the table option wins
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
+                new DatasourceData(0, emptyList(), emptyList(), Projection.columns(asList(INT_COL)), options));
+        TupleIterator it = ds.execute(context);
+
+        Column stringColumn = getStringColumn(VARCHAR100_COL, 100);
+        assertTrue(it.hasNext());
+        TupleVector v = it.next();
+        assertEquals(Schema.of(stringColumn), v.getSchema());
+        assertVectorsEquals(VectorTestUtils.vv(stringColumn.getType()
+                .getType(), "one", "two", "three"), v.getColumn(0));
+
+        assertTrue(it.hasNext());
+        v = it.next();
+        assertEquals(Schema.of(stringColumn), v.getSchema());
+        assertVectorsEquals(VectorTestUtils.vv(stringColumn.getType()
+                .getType(), "four", "five"), v.getColumn(0));
+
+        assertFalse(it.hasNext());
+        it.close();
     }
 
     @Test
@@ -282,37 +470,22 @@ abstract class BaseJDBCTest extends Assert
     {
         IExecutionContext context = mockExecutionContext();
 
-        List<Option> options = List.of(new Option(JdbcCatalog.PROJECTION, new LiteralStringExpression("col2")));
+        List<Option> options = List.of(new Option(JdbcCatalog.PROJECTION, new LiteralStringExpression(VARCHAR100_COL)));
 
-        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE), new DatasourceData(0, emptyList(), emptyList(), Projection.ALL, options));
+        // Send in a PLB projection to verify that the table option wins
+        IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE),
+                new DatasourceData(0, emptyList(), emptyList(), Projection.columns(asList(INT_COL)), options));
         TupleIterator it = ds.execute(context);
 
-        List<String> col2Expected = asList("one", "two", "three", "four", "five");
-        int expectedSize = col2Expected.size();
-
-        int rowCount = 0;
+        Column stringColumn = getStringColumn(VARCHAR100_COL, 100);
         while (it.hasNext())
         {
             TupleVector v = it.next();
-
-            assertEquals(Schema.of(Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
-
-            for (int i = 0; i < expectedSize; i++)
-            {
-                for (int j = 0; j < expectedSize; j++)
-                {
-                    if (col2Expected.get(i)
-                            .equals(v.getColumn(0)
-                                    .getAny(j)))
-                    {
-                        rowCount++;
-                    }
-                }
-            }
+            assertEquals(Schema.of(stringColumn), v.getSchema());
+            assertVectorsEquals(VectorTestUtils.vv(stringColumn.getType()
+                    .getType(), "one", "two", "three", "four", "five"), v.getColumn(0));
         }
         it.close();
-
-        assertEquals(expectedSize, rowCount);
     }
 
     @Test
@@ -330,43 +503,33 @@ abstract class BaseJDBCTest extends Assert
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE), new DatasourceData(0, emptyList(), emptyList(), Projection.ALL, options));
         TupleIterator it = ds.execute(context);
 
-        List<Integer> col1Expected = asList(1, 2, 3, 4, 5);
-        List<String> col2Expected = asList("one", "two", "three", "four", "five");
-        int expectedSize = col1Expected.size();
-
         int rowCount = 0;
         while (it.hasNext())
         {
             TupleVector v = it.next();
-
-            assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Any)), Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
-
-            for (int i = 0; i < expectedSize; i++)
-            {
-                for (int j = 0; j < expectedSize; j++)
-                {
-                    if (col1Expected.get(i)
-                            .equals(integer(v.getColumn(0)
-                                    .getAny(j)))
-                            && col2Expected.get(i)
-                                    .equals(v.getColumn(1)
-                                            .getAny(j)))
-                    {
-                        rowCount++;
-                    }
-                }
-            }
+            // CSOFF
+            assertEquals(expectedFullSchema, v.getSchema());
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(0), 1, 2, 3, 4, 5), v.getColumn(0));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(1), "one", "two", "three", "four", "five"), v.getColumn(1));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(2), 10, 20, 30, 40, 50), v.getColumn(2));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(3), false, true, false, true, false), v.getColumn(3));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(4), 10.10F, 20.22F, 30.33F, 40.44F, 50.55F), v.getColumn(4));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(5), 100.100D, 200.222D, 300.333D, 400.444D, 500.555D), v.getColumn(5));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(6), bd("1000.1111"), bd("2000.2222"), bd("3000.3333"), bd("4000.4444"), bd("5000.5555")), v.getColumn(6));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(7), "2010-07-10T10:10:10", "2011-08-11T11:11:11", "2012-09-12T12:12:12", "2013-10-13T13:13:13", "2014-11-14T14:14:14"),
+                    v.getColumn(7));
+            // CSON
+            rowCount += v.getRowCount();
         }
         it.close();
-
-        assertEquals(expectedSize, rowCount);
+        assertEquals(5, rowCount);
     }
 
     @Test
     public void test_datasource_table_scan_asterisk_with_sortitems()
     {
         IExecutionContext context = mockExecutionContext();
-        List<ISortItem> sortItems = new ArrayList<>(asList(TestUtils.mockSortItem(QualifiedName.of("col1"), Order.DESC)));
+        List<ISortItem> sortItems = new ArrayList<>(asList(TestUtils.mockSortItem(QualifiedName.of(INT_COL), Order.DESC)));
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE), new DatasourceData(0, emptyList(), sortItems, Projection.ALL, emptyList()));
 
         // Verify sort items consumed
@@ -378,11 +541,18 @@ abstract class BaseJDBCTest extends Assert
         while (it.hasNext())
         {
             TupleVector v = it.next();
-
-            assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Any)), Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
-            assertVectorsEquals(VectorTestUtils.vv(Type.Any, 5, 4, 3, 2, 1), integer(v.getColumn(0)));
-            assertVectorsEquals(VectorTestUtils.vv(Type.Any, "five", "four", "three", "two", "one"), v.getColumn(1));
-
+            // CSOFF
+            assertEquals(expectedFullSchema, v.getSchema());
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(0), 5, 4, 3, 2, 1), v.getColumn(0));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(1), "five", "four", "three", "two", "one"), v.getColumn(1));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(2), 50, 40, 30, 20, 10), v.getColumn(2));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(3), false, true, false, true, false), v.getColumn(3));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(4), 50.55F, 40.44F, 30.33F, 20.22F, 10.10F), v.getColumn(4));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(5), 500.555D, 400.444D, 300.333D, 200.222D, 100.100D), v.getColumn(5));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(6), bd("5000.5555"), bd("4000.4444"), bd("3000.3333"), bd("2000.2222"), bd("1000.1111")), v.getColumn(6));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(7), "2014-11-14T14:14:14", "2013-10-13T13:13:13", "2012-09-12T12:12:12", "2011-08-11T11:11:11", "2010-07-10T10:10:10"),
+                    v.getColumn(7));
+            // CSON
             rowCount += v.getRowCount();
         }
         it.close();
@@ -394,8 +564,8 @@ abstract class BaseJDBCTest extends Assert
     public void test_datasource_table_scan_asterisk_with_sortitems_with_predicates()
     {
         IExecutionContext context = mockExecutionContext();
-        List<ISortItem> sortItems = new ArrayList<>(asList(mockSortItem(QualifiedName.of("col1"), Order.DESC)));
-        List<IPredicate> predicates = new ArrayList<>(asList(IPredicateMock.in("col2", asList("one", "four"))));
+        List<ISortItem> sortItems = new ArrayList<>(asList(mockSortItem(QualifiedName.of(INT_COL), Order.DESC)));
+        List<IPredicate> predicates = new ArrayList<>(asList(IPredicateMock.in(VARCHAR100_COL, asList("one", "four"))));
         IDatasource ds = catalog.getScanDataSource(context.getSession(), CATALOG_ALIAS, QualifiedName.of(TEST_TABLE), new DatasourceData(0, predicates, sortItems, Projection.ALL, emptyList()));
 
         // Verify sort items consumed
@@ -409,10 +579,15 @@ abstract class BaseJDBCTest extends Assert
         {
             TupleVector v = it.next();
 
-            assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Any)), Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
-            assertVectorsEquals(VectorTestUtils.vv(Type.Any, 4, 1), integer(v.getColumn(0)));
-            assertVectorsEquals(VectorTestUtils.vv(Type.Any, "four", "one"), v.getColumn(1));
-
+            assertEquals(expectedFullSchema, v.getSchema());
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(0), 4, 1), v.getColumn(0));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(1), "four", "one"), v.getColumn(1));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(2), 40, 10), v.getColumn(2));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(3), true, false), v.getColumn(3));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(4), 40.44F, 10.10F), v.getColumn(4));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(5), 400.444D, 100.100D), v.getColumn(5));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(6), bd("4000.4444"), bd("1000.1111")), v.getColumn(6));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(7), "2013-10-13T13:13:13", "2010-07-10T10:10:10"), v.getColumn(7));
             rowCount += v.getRowCount();
         }
         it.close();
@@ -424,8 +599,8 @@ abstract class BaseJDBCTest extends Assert
     public void test_datasource_index_seek_asterisk_with_sortitems()
     {
         IExecutionContext context = mockExecutionContext();
-        ISeekPredicate seekPredicate = mockSeekPrecidate(context, asList("col1"), Arrays.<Object[]>asList(new Object[] { 1, 3, 5 }));
-        List<ISortItem> sortItems = new ArrayList<>(asList(TestUtils.mockSortItem(QualifiedName.of("col1"), Order.DESC)));
+        ISeekPredicate seekPredicate = mockSeekPrecidate(context, asList(INT_COL), Arrays.<Object[]>asList(new Object[] { 1, 3, 5 }));
+        List<ISortItem> sortItems = new ArrayList<>(asList(TestUtils.mockSortItem(QualifiedName.of(INT_COL), Order.DESC)));
         IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, emptyList(), sortItems, Projection.ALL, emptyList()));
 
         // Verify sort items consumed
@@ -438,10 +613,15 @@ abstract class BaseJDBCTest extends Assert
         {
             TupleVector v = it.next();
 
-            assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Any)), Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
-            assertVectorsEquals(VectorTestUtils.vv(Type.Any, 5, 3, 1), integer(v.getColumn(0)));
-            assertVectorsEquals(VectorTestUtils.vv(Type.Any, "five", "three", "one"), v.getColumn(1));
-
+            assertEquals(expectedFullSchema, v.getSchema());
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(0), 5, 3, 1), v.getColumn(0));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(1), "five", "three", "one"), v.getColumn(1));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(2), 50, 30, 10), v.getColumn(2));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(3), false, false, false), v.getColumn(3));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(4), 50.55F, 30.33F, 10.10F), v.getColumn(4));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(5), 500.555D, 300.333D, 100.100D), v.getColumn(5));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(6), bd("5000.5555"), bd("3000.3333"), bd("1000.1111")), v.getColumn(6));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(7), "2014-11-14T14:14:14", "2012-09-12T12:12:12", "2010-07-10T10:10:10"), v.getColumn(7));
             rowCount += v.getRowCount();
         }
         it.close();
@@ -453,8 +633,8 @@ abstract class BaseJDBCTest extends Assert
     public void test_datasource_index_seek_multiple_columns_asterisk_with_sortitems()
     {
         IExecutionContext context = mockExecutionContext();
-        ISeekPredicate seekPredicate = mockSeekPrecidate(context, asList("col1", "col2"), Arrays.<Object[]>asList(new Object[] { 1, 3, 5 }, new Object[] { "one", "five", "three" }));
-        List<ISortItem> sortItems = new ArrayList<>(asList(TestUtils.mockSortItem(QualifiedName.of("col1"), Order.DESC)));
+        ISeekPredicate seekPredicate = mockSeekPrecidate(context, asList(INT_COL, VARCHAR100_COL), Arrays.<Object[]>asList(new Object[] { 1, 3, 5 }, new Object[] { "one", "five", "three" }));
+        List<ISortItem> sortItems = new ArrayList<>(asList(TestUtils.mockSortItem(QualifiedName.of(INT_COL), Order.DESC)));
         IDatasource ds = catalog.getSeekDataSource(context.getSession(), CATALOG_ALIAS, seekPredicate, new DatasourceData(0, emptyList(), sortItems, Projection.ALL, emptyList()));
 
         // Verify sort items consumed
@@ -467,10 +647,15 @@ abstract class BaseJDBCTest extends Assert
         {
             TupleVector v = it.next();
 
-            assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Any)), Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
-            assertVectorsEquals(VectorTestUtils.vv(Type.Any, 1), integer(v.getColumn(0)));
-            assertVectorsEquals(VectorTestUtils.vv(Type.Any, "one"), v.getColumn(1));
-
+            assertEquals(expectedFullSchema, v.getSchema());
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(0), 1), v.getColumn(0));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(1), "one"), v.getColumn(1));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(2), 10L), v.getColumn(2));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(3), false), v.getColumn(3));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(4), 10.10F), v.getColumn(4));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(5), 100.100D), v.getColumn(5));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(6), bd("1000.1111")), v.getColumn(6));
+            assertVectorsEquals(VectorTestUtils.vv(expectedFullSchemaTypes.get(7), "2010-07-10T10:10:10"), v.getColumn(7));
             rowCount += v.getRowCount();
         }
         it.close();
@@ -478,7 +663,7 @@ abstract class BaseJDBCTest extends Assert
         assertEquals(1, rowCount);
     }
 
-    private IExecutionContext mockExecutionContext()
+    protected IExecutionContext mockExecutionContext()
     {
         return mockExecutionContext(null);
     }
@@ -496,6 +681,11 @@ abstract class BaseJDBCTest extends Assert
                  ), 0, null, writer);
          //@formatter:on
         return context;
+    }
+
+    private BigDecimal bd(String value)
+    {
+        return new BigDecimal(value);
     }
 
     private ISeekPredicate mockSeekPrecidate(IExecutionContext context, List<String> columns, List<Object[]> values)

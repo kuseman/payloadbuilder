@@ -14,7 +14,6 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -23,26 +22,25 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.api.catalog.Column;
-import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.DatasourceData.Projection;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem;
 import se.kuseman.payloadbuilder.api.catalog.ISortItem.Order;
 import se.kuseman.payloadbuilder.api.catalog.Option;
-import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.ISeekKey;
-import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IInExpression;
 import se.kuseman.payloadbuilder.api.expression.ILikeExpression;
 import se.kuseman.payloadbuilder.api.expression.INullPredicateExpression;
+import se.kuseman.payloadbuilder.catalog.jdbc.JdbcCatalog.ColumnOption;
+import se.kuseman.payloadbuilder.catalog.jdbc.JdbcUtils.SchemaResult;
 import se.kuseman.payloadbuilder.catalog.jdbc.dialect.DialectProvider;
 import se.kuseman.payloadbuilder.catalog.jdbc.dialect.SqlDialect;
 
@@ -59,6 +57,7 @@ class JdbcDatasource implements IDatasource
     private final ISeekPredicate indexPredicate;
     private final IExpression tableHintsOption;
     private final List<Option> options;
+    private final Map<String, ColumnOption> columnOptions;
 
     JdbcDatasource(JdbcCatalog catalog, String catalogAlias, QualifiedName table, ISeekPredicate indexPredicate, Projection projection, List<IPredicate> predicates, List<ISortItem> sortItems,
             IExpression tableHintsOption, List<Option> options)
@@ -72,6 +71,7 @@ class JdbcDatasource implements IDatasource
         this.projection = projection;
         this.tableHintsOption = tableHintsOption;
         this.options = options;
+        this.columnOptions = ColumnOption.extract(options);
     }
 
     @Override
@@ -105,7 +105,7 @@ class JdbcDatasource implements IDatasource
         SqlDialect dialect = DialectProvider.getDialect(context.getSession(), catalogAlias);
         String sql = buildSql(dialect, context, false);
         LOGGER.debug("Table: {}, sql: {}", table, sql);
-        return getIterator(dialect, catalog, context, catalogAlias, sql, null, context.getBatchSize(options));
+        return getIterator(dialect, catalog, context, catalogAlias, sql, null, context.getBatchSize(options), columnOptions);
     }
 
     // CSOFF
@@ -297,7 +297,17 @@ class JdbcDatasource implements IDatasource
     }
 
     /** Returns a row iterator with provided query and parameters */
-    static TupleIterator getIterator(SqlDialect dialect, JdbcCatalog catalog, IExecutionContext context, String catalogAlias, String query, List<Object> parameters, int batchSize)
+    //@formatter:off
+    static TupleIterator getIterator(
+            SqlDialect dialect,
+            JdbcCatalog catalog,
+            IExecutionContext context,
+            String catalogAlias,
+            String query,
+            List<Object> parameters,
+            int batchSize,
+            Map<String, ColumnOption> columnOptions)
+    //@formatter:on
     {
         final String database = context.getSession()
                 .getCatalogProperty(catalogAlias, JdbcCatalog.DATABASE)
@@ -311,8 +321,8 @@ class JdbcDatasource implements IDatasource
             private Connection connection;
             private volatile Statement statement;
             private ResultSet rs;
-            private String[] columns;
-            private int[] jdbcTypes;
+            private SchemaResult schemaResult;
+            private List<MutableValueVector> vectors;
             private boolean resultSetEnded = false;
             private volatile boolean abort = false;
 
@@ -336,35 +346,35 @@ class JdbcDatasource implements IDatasource
             {
                 try
                 {
-                    if (columns == null)
+                    if (schemaResult == null)
                     {
-                        populateMeta();
+                        schemaResult = populateMeta();
+                    }
+                    int size = schemaResult.schema()
+                            .getSize();
+                    vectors = new ArrayList<>(size);
+                    for (int i = 0; i < size; i++)
+                    {
+                        vectors.add(context.getVectorFactory()
+                                .getMutableVector(schemaResult.schema()
+                                        .getColumns()
+                                        .get(i)
+                                        .getType(), batchSize));
                     }
 
-                    List<Object[]> batch = new ArrayList<>(batchSize);
-                    int length = columns.length;
+                    int rowsAdded = 0;
                     do
                     {
-                        Object[] values = new Object[length];
-                        for (int i = 0; i < length; i++)
-                        {
-                            if (abort)
-                            {
-                                break;
-                            }
-                            values[i] = dialect.getJdbcValue(rs, i + 1, jdbcTypes[i]);
-                        }
+                        JdbcUtils.setVectorValues(dialect, rowsAdded, rs, schemaResult, vectors);
+                        rowsAdded++;
 
                         if (abort)
                         {
                             break;
                         }
-
-                        batch.add(values);
-
                         resultSetEnded = !rs.next();
 
-                        if (batch.size() >= batchSize)
+                        if (rowsAdded >= batchSize)
                         {
                             break;
                         }
@@ -376,11 +386,7 @@ class JdbcDatasource implements IDatasource
                             .getPrintWriter());
                     JdbcUtils.printWarnings(connection, context.getSession()
                             .getPrintWriter());
-
-                    Schema schema = new Schema(Arrays.stream(columns)
-                            .map(c -> Column.of(c, Type.Any))
-                            .collect(toList()));
-                    return new ObjectTupleVector(schema, batch.size(), (row, col) -> batch.get(row)[col]);
+                    return TupleVector.of(schemaResult.schema(), vectors);
                 }
                 catch (Exception e)
                 {
@@ -423,8 +429,8 @@ class JdbcDatasource implements IDatasource
                         // Current result set ended, fetch next
                         if (resultSetEnded)
                         {
-                            columns = null;
-                            jdbcTypes = null;
+                            schemaResult = null;
+                            vectors = null;
                             rs = null;
                         }
                         else
@@ -454,25 +460,17 @@ class JdbcDatasource implements IDatasource
                 JdbcUtils.printWarnings(connection, context.getSession()
                         .getPrintWriter());
                 JdbcUtils.closeQuiet(connection, statement, rs);
-                columns = null;
-                jdbcTypes = null;
+                schemaResult = null;
+                vectors = null;
                 rs = null;
                 statement = null;
                 connection = null;
             }
 
-            private void populateMeta() throws SQLException
+            private SchemaResult populateMeta() throws SQLException
             {
                 ResultSetMetaData metaData = rs.getMetaData();
-                int count = metaData.getColumnCount();
-                columns = new String[count];
-                jdbcTypes = new int[count];
-
-                for (int i = 0; i < count; i++)
-                {
-                    columns[i] = metaData.getColumnLabel(i + 1);
-                    jdbcTypes[i] = metaData.getColumnType(i + 1);
-                }
+                return JdbcUtils.getSchemaFromResultSet(dialect, metaData, columnOptions);
             }
 
             private Statement getStatement() throws SQLException

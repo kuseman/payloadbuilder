@@ -1,7 +1,11 @@
 package se.kuseman.payloadbuilder.catalog.jdbc.dialect;
 
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 import java.util.List;
 
+import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.ISeekKey;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
@@ -13,6 +17,40 @@ class OracleDialect implements SqlDialect
     public boolean usesSchemaAsDatabase()
     {
         return true;
+    }
+
+    @Override
+    public Type getColumnType(ResultSetMetaData rsmd, int jdbcType, int ordinal) throws SQLException
+    {
+        Column.Type type = SqlDialect.super.getColumnType(rsmd, jdbcType, ordinal);
+
+        int scale = rsmd.getScale(ordinal);
+        int precision = rsmd.getPrecision(ordinal);
+        // Re-map the NUMBER type since that is used in multiple types in PLB
+        if (type == Type.Decimal)
+        {
+            if (scale == 0)
+            {
+                if (precision <= 10)
+                {
+                    return Type.Int;
+                }
+                else if (precision <= 19)
+                {
+                    return Type.Long;
+                }
+            }
+            else if (precision == 63)
+            {
+                return Type.Float;
+            }
+            else if (precision == 126)
+            {
+                return Type.Double;
+            }
+        }
+
+        return type;
     }
 
     @Override
