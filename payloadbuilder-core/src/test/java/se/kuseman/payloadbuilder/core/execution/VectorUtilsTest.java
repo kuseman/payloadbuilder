@@ -3,7 +3,12 @@ package se.kuseman.payloadbuilder.core.execution;
 import static java.util.Arrays.asList;
 import static se.kuseman.payloadbuilder.test.VectorTestUtils.vv;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 
 import org.junit.Test;
 
@@ -84,9 +89,50 @@ public class VectorUtilsTest extends APhysicalPlanTest
         assertEquals(630, VectorUtils.hash(new ValueVector[] { vv(Type.Boolean, false) }, 0));
         assertEquals(1379028554, VectorUtils.hash(new ValueVector[] { vv(Type.String, "hello") }, 0));
         assertEquals(1379028554, VectorUtils.hash(new ValueVector[] { vv(Type.String, UTF8String.utf8("hello".getBytes(StandardCharsets.UTF_8))) }, 0));
-        assertEquals(99162951, VectorUtils.hash(new ValueVector[] { vv(Type.Any, "hello") }, 0));
+        assertEquals(1379028554, VectorUtils.hash(new ValueVector[] { vv(Type.Any, "hello") }, 0));
         assertEquals(1086210677, VectorUtils.hash(new ValueVector[] { vv(Type.DateTime, EpochDateTime.from(160_000_000_000L)) }, 0));
         assertEquals(1086210677, VectorUtils.hash(new ValueVector[] { vv(Type.DateTimeOffset, EpochDateTimeOffset.from(160_000_000_000L)) }, 0));
+
+        assertEquals(1295, VectorUtils.hash(new ValueVector[] { vv(Type.Any, new Object()
+        {
+            @Override
+            public int hashCode()
+            {
+                return 666;
+            }
+        }) }, 0));
+    }
+
+    /** This test verifies that hash is equal for any's any actual types. This because hash match should work across types. */
+    @Test
+    public void test_hash_any_and_actual_types_get_the_same_values()
+    {
+        assertEquals(VectorUtils.hash(new ValueVector[] { vv(Type.String, UTF8String.from("hello")) }, 0), VectorUtils.hash(new ValueVector[] { vv(Type.Any, "hello") }, 0));
+        assertEquals(VectorUtils.hash(new ValueVector[] { vv(Type.String, UTF8String.from("hello")) }, 0), VectorUtils.hash(new ValueVector[] { vv(Type.Any, UTF8String.from("hello")) }, 0));
+        assertEquals(VectorUtils.hash(new ValueVector[] { vv(Type.Int, 1) }, 0), VectorUtils.hash(new ValueVector[] { vv(Type.Any, 1) }, 0));
+        assertEquals(VectorUtils.hash(new ValueVector[] { vv(Type.Long, 1L) }, 0), VectorUtils.hash(new ValueVector[] { vv(Type.Any, 1L) }, 0));
+        assertEquals(VectorUtils.hash(new ValueVector[] { vv(Type.Float, 1F) }, 0), VectorUtils.hash(new ValueVector[] { vv(Type.Any, 1F) }, 0));
+        assertEquals(VectorUtils.hash(new ValueVector[] { vv(Type.Double, 1D) }, 0), VectorUtils.hash(new ValueVector[] { vv(Type.Any, 1D) }, 0));
+        assertEquals(VectorUtils.hash(new ValueVector[] { vv(Type.Boolean, true) }, 0), VectorUtils.hash(new ValueVector[] { vv(Type.Any, true) }, 0));
+        assertEquals(VectorUtils.hash(new ValueVector[] { vv(Type.Boolean, false) }, 0), VectorUtils.hash(new ValueVector[] { vv(Type.Any, false) }, 0));
+        assertEquals(VectorUtils.hash(new ValueVector[] { vv(Type.Decimal, Decimal.from(1L)) }, 0),
+                VectorUtils.hash(new ValueVector[] { vv(Type.Any, new BigDecimal(1L).setScale(Decimal.SCALE, RoundingMode.HALF_UP)) }, 0));
+        assertEquals(VectorUtils.hash(new ValueVector[] { vv(Type.Decimal, Decimal.from(1L)) }, 0), VectorUtils.hash(new ValueVector[] { vv(Type.Any, Decimal.from(1L)) }, 0));
+        assertEquals(VectorUtils.hash(new ValueVector[] { vv(Type.DateTime, EpochDateTime.from(160000000)) }, 0),
+                VectorUtils.hash(new ValueVector[] { vv(Type.Any, EpochDateTime.from(160000000)) }, 0));
+        assertEquals(VectorUtils.hash(new ValueVector[] { vv(Type.DateTime, EpochDateTimeOffset.from(160000000)) }, 0),
+                VectorUtils.hash(new ValueVector[] { vv(Type.Any, EpochDateTimeOffset.from(160000000)) }, 0));
+        assertEquals(VectorUtils.hash(new ValueVector[] { vv(Type.DateTime, EpochDateTime.from(160000000)) }, 0), VectorUtils.hash(new ValueVector[] {
+                vv(Type.Any, Instant.ofEpochMilli(160000000)
+                        .atZone(ZoneId.of("UTC"))
+                        .toLocalDateTime()) },
+                0));
+        assertEquals(VectorUtils.hash(new ValueVector[] { vv(Type.DateTime, EpochDateTime.from(473391330)) }, 0),
+                VectorUtils.hash(new ValueVector[] { vv(Type.Any, LocalDate.parse("2000-10-10")) }, 0));
+        assertEquals(VectorUtils.hash(new ValueVector[] { vv(Type.DateTime, EpochDateTime.from(160000000)) }, 0), VectorUtils.hash(new ValueVector[] {
+                vv(Type.Any, Instant.ofEpochMilli(160000000)
+                        .atZone(ZoneId.of("UTC"))) },
+                0));
     }
 
     @Test

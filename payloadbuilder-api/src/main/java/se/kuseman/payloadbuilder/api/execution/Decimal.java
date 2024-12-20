@@ -14,7 +14,7 @@ import se.kuseman.payloadbuilder.api.expression.IArithmeticBinaryExpression;
 public class Decimal extends Number implements Comparable<Decimal>, ValueVector
 {
     /** NOTE! PLB doesn't have support for specifying scaling of decimals (unless created with String/BigDecinal), scale is set to this in factory methods */
-    private static final int SCALE = 6;
+    public static final int SCALE = 6;
 
     private final BigDecimal value;
 

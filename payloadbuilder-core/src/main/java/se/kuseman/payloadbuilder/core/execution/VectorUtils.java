@@ -5,6 +5,7 @@ import static java.util.stream.Collectors.toList;
 
 import java.lang.reflect.Array;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -256,7 +257,81 @@ public class VectorUtils
                             .getEpoch();
                     break;
                 case Any:
-                    hash = hash * CONSTANT + Objects.hashCode(vv.getAny(row));
+                    Object value = vv.getAny(row);
+                    if (value instanceof UTF8String u)
+                    {
+                        hash = hash * CONSTANT + u.hashCode();
+                    }
+                    else if (value instanceof EpochDateTime ed)
+                    {
+                        hash = hash * CONSTANT + (int) ed.getEpoch();
+                    }
+                    else if (value instanceof EpochDateTimeOffset ed)
+                    {
+                        hash = hash * CONSTANT + (int) ed.getEpoch();
+                    }
+                    else if (value instanceof Decimal d)
+                    {
+                        hash = hash * CONSTANT + d.hashCode();
+                    }
+                    else if (value instanceof String s)
+                    {
+                        hash = hash * CONSTANT + UTF8String.from(s)
+                                .hashCode();
+                    }
+                    else if (value instanceof Integer ii)
+                    {
+                        hash = hash * CONSTANT + ii;
+                    }
+                    else if (value instanceof Long ll)
+                    {
+                        hash = hash * CONSTANT + ((int) (ll ^ (ll >> 32)));
+                    }
+                    else if (value instanceof Float ff)
+                    {
+                        hash = hash * CONSTANT + Float.floatToIntBits(ff);
+                    }
+                    else if (value instanceof Double dd)
+                    {
+                        long db = Double.doubleToLongBits(dd);
+                        hash = hash * CONSTANT + ((int) (db ^ (db >> 32)));
+                    }
+                    else if (value instanceof Boolean bb)
+                    {
+                        hash = hash * CONSTANT + (bb ? 0
+                                : 1);
+                    }
+                    else if (value instanceof BigDecimal bd)
+                    {
+                        hash = hash * CONSTANT + Decimal.from(bd)
+                                .hashCode();
+                    }
+                    else if (value instanceof LocalDateTime ld)
+                    {
+                        hash = hash * CONSTANT + EpochDateTime.from(ld)
+                                .hashCode();
+                    }
+                    else if (value instanceof LocalDate ld)
+                    {
+                        hash = hash * CONSTANT + EpochDateTime.from(ld)
+                                .hashCode();
+                    }
+                    else if (value instanceof ZonedDateTime zd)
+                    {
+                        hash = hash * CONSTANT + EpochDateTimeOffset.from(zd)
+                                .hashCode();
+                    }
+                    else if (value instanceof ObjectVector
+                            || value instanceof ValueVector
+                            || value instanceof TupleVector)
+                    {
+                        throw new IllegalArgumentException("Hashing of type " + vv.type()
+                                .toTypeString() + " is not supported");
+                    }
+                    else
+                    {
+                        hash = hash * CONSTANT + Objects.hashCode(vv.getAny(row));
+                    }
                     break;
                 case Object:
                 case Array:
