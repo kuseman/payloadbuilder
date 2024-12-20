@@ -7,6 +7,7 @@ import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
+import se.kuseman.payloadbuilder.catalog.jdbc.JdbcCatalog.ColumnOption;
 import se.kuseman.payloadbuilder.catalog.jdbc.dialect.DialectProvider;
 import se.kuseman.payloadbuilder.catalog.jdbc.dialect.SqlDialect;
 
@@ -61,6 +62,6 @@ class QueryFunction extends TableFunctionInfo
 
         SqlDialect dialect = DialectProvider.getDialect(context.getSession(), catalogAlias);
 
-        return JdbcDatasource.getIterator(dialect, catalog, context, catalogAlias, query, parameters, context.getBatchSize(data.getOptions()));
+        return JdbcDatasource.getIterator(dialect, catalog, context, catalogAlias, query, parameters, context.getBatchSize(data.getOptions()), ColumnOption.extract(data.getOptions()));
     }
 }

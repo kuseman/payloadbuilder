@@ -11,7 +11,7 @@ import com.microsoft.sqlserver.jdbc.SQLServerDataSource;
 import se.kuseman.payloadbuilder.catalog.jdbc.SqlServer2017Test.SqlWaitStrategy;
 
 /** Test of SqlServer 2019 */
-public class SqlServer2019Test extends BaseJDBCTest
+public class SqlServer2019Test extends ASqlServerTest
 {
     public SqlServer2019Test()
     {
