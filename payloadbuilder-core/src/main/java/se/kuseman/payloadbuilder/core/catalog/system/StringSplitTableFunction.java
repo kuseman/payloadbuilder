@@ -22,11 +22,11 @@ import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** Table valued function that splits a string and returns a table from the splitted result */
-class StringSplitFunction extends TableFunctionInfo
+class StringSplitTableFunction extends TableFunctionInfo
 {
     private static final Schema SCHEMA = Schema.of(Column.of("Value", ResolvedType.of(Type.String)), Column.of("Ordinal", ResolvedType.of(Type.Int)));
 
-    StringSplitFunction()
+    StringSplitTableFunction()
     {
         super("string_split");
     }

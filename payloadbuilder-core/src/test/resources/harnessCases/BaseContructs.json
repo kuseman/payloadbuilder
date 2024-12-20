@@ -1567,6 +1567,7 @@
           [{"key":"name","value": "right"},               {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "rpad"},                {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "rtrim"},               {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
+          [{"key":"name","value": "string_split"},        {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "substring"},           {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "toarray"},             {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
           [{"key":"name","value": "totable"},             {"key":"type","value": "SCALAR"},           {"key":"description","value": "###IGNORE###"}],
