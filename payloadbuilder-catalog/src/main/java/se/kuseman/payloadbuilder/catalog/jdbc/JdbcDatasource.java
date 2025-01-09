@@ -13,14 +13,11 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
-import se.kuseman.payloadbuilder.api.catalog.Column;
-import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.IDatasource;
 import se.kuseman.payloadbuilder.api.catalog.IDatasourceOptions;
 import se.kuseman.payloadbuilder.api.catalog.IPredicate;
@@ -30,10 +27,10 @@ import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate;
 import se.kuseman.payloadbuilder.api.execution.ISeekPredicate.ISeekKey;
-import se.kuseman.payloadbuilder.api.execution.ObjectTupleVector;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
 import se.kuseman.payloadbuilder.api.expression.IExpression;
 import se.kuseman.payloadbuilder.api.expression.IInExpression;
 import se.kuseman.payloadbuilder.api.expression.ILikeExpression;
@@ -297,8 +294,8 @@ class JdbcDatasource implements IDatasource
             private Connection connection;
             private volatile Statement statement;
             private ResultSet rs;
-            private String[] columns;
-            private int[] jdbcTypes;
+            private Schema schema;
+            private List<MutableValueVector> vectors;
             private boolean resultSetEnded = false;
             private volatile boolean abort = false;
 
@@ -322,35 +319,24 @@ class JdbcDatasource implements IDatasource
             {
                 try
                 {
-                    if (columns == null)
+                    if (schema == null)
                     {
                         populateMeta();
                     }
 
-                    List<Object[]> batch = new ArrayList<>(batchSize);
-                    int length = columns.length;
+                    int rowsAdded = 0;
                     do
                     {
-                        Object[] values = new Object[length];
-                        for (int i = 0; i < length; i++)
-                        {
-                            if (abort)
-                            {
-                                break;
-                            }
-                            values[i] = JdbcUtils.getAndConvertValue(rs, i + 1, jdbcTypes[i]);
-                        }
+                        JdbcUtils.setVectorValues(dialect, rowsAdded, rs, schema, vectors);
+                        rowsAdded++;
 
                         if (abort)
                         {
                             break;
                         }
-
-                        batch.add(values);
-
                         resultSetEnded = !rs.next();
 
-                        if (batch.size() >= batchSize)
+                        if (rowsAdded >= batchSize)
                         {
                             break;
                         }
@@ -362,11 +348,7 @@ class JdbcDatasource implements IDatasource
                             .getPrintWriter());
                     JdbcUtils.printWarnings(connection, context.getSession()
                             .getPrintWriter());
-
-                    Schema schema = new Schema(Arrays.stream(columns)
-                            .map(c -> Column.of(c, Type.Any))
-                            .collect(toList()));
-                    return new ObjectTupleVector(schema, batch.size(), (row, col) -> batch.get(row)[col]);
+                    return TupleVector.of(schema, vectors);
                 }
                 catch (Exception e)
                 {
@@ -409,8 +391,8 @@ class JdbcDatasource implements IDatasource
                         // Current result set ended, fetch next
                         if (resultSetEnded)
                         {
-                            columns = null;
-                            jdbcTypes = null;
+                            schema = null;
+                            vectors = null;
                             rs = null;
                         }
                         else
@@ -440,8 +422,8 @@ class JdbcDatasource implements IDatasource
                 JdbcUtils.printWarnings(connection, context.getSession()
                         .getPrintWriter());
                 JdbcUtils.closeQuiet(connection, statement, rs);
-                columns = null;
-                jdbcTypes = null;
+                schema = null;
+                vectors = null;
                 rs = null;
                 statement = null;
                 connection = null;
@@ -450,14 +432,15 @@ class JdbcDatasource implements IDatasource
             private void populateMeta() throws SQLException
             {
                 ResultSetMetaData metaData = rs.getMetaData();
-                int count = metaData.getColumnCount();
-                columns = new String[count];
-                jdbcTypes = new int[count];
-
-                for (int i = 0; i < count; i++)
+                schema = JdbcUtils.getSchemaFromResultSet(dialect, metaData);
+                int size = schema.getSize();
+                vectors = new ArrayList<>(size);
+                for (int i = 0; i < size; i++)
                 {
-                    columns[i] = metaData.getColumnLabel(i + 1);
-                    jdbcTypes[i] = metaData.getColumnType(i + 1);
+                    vectors.add(context.getVectorFactory()
+                            .getMutableVector(schema.getColumns()
+                                    .get(i)
+                                    .getType(), batchSize));
                 }
             }
 

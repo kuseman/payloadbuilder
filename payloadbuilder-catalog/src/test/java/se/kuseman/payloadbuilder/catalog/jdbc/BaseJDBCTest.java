@@ -96,39 +96,9 @@ abstract class BaseJDBCTest extends Assert
         return name;
     }
 
-    private ValueVector integer(ValueVector vector)
+    protected String getIntegerColumnType()
     {
-        return new ValueVector()
-        {
-            @Override
-            public ResolvedType type()
-            {
-                return ResolvedType.of(Type.Any);
-            }
-
-            @Override
-            public int size()
-            {
-                return vector.size();
-            }
-
-            @Override
-            public Object getAny(int row)
-            {
-                return integer(vector.getAny(row));
-            }
-
-            @Override
-            public boolean isNull(int row)
-            {
-                return vector.isNull(row);
-            }
-        };
-    }
-
-    private int integer(Object value)
-    {
-        return ((Number) value).intValue();
+        return "INT";
     }
 
     @After
@@ -156,7 +126,7 @@ abstract class BaseJDBCTest extends Assert
         try (Connection con = datasource.getConnection())
         {
             con.setCatalog(TEST_DB);
-            con.prepareStatement("CREATE TABLE " + TEST_TABLE + " ( " + " col1 INT," + " col2 VARCHAR(100))")
+            con.prepareStatement("CREATE TABLE " + TEST_TABLE + " ( " + " col1 " + getIntegerColumnType() + "," + " col2 VARCHAR(100))")
                     .execute();
 
             String stms = """
@@ -181,7 +151,7 @@ abstract class BaseJDBCTest extends Assert
     }
 
     @Test
-    public void test_warnings_exceptions()
+    public void test_sql_server_warnings_exceptions()
     {
         // Multi statement queries is not supported by all rdbms:es
         assumeTrue(jdbcUrl.contains("sqlserver"));
@@ -215,11 +185,11 @@ abstract class BaseJDBCTest extends Assert
 
             if (batchCount == 0)
             {
-                assertTupleVectorsEquals(TupleVector.of(Schema.of(Column.of("rowId", Type.Any)), asList(vv(Type.Any, 1, 2))), next);
+                assertTupleVectorsEquals(TupleVector.of(Schema.of(Column.of("rowId", Type.Int)), asList(vv(Type.Int, 1, 2))), next);
             }
             else
             {
-                assertTupleVectorsEquals(TupleVector.of(Schema.of(Column.of("", Type.Any)), asList(vv(Type.Any, "done"))), next);
+                assertTupleVectorsEquals(TupleVector.of(Schema.of(Column.of("", Type.String)), asList(vv(Type.String, "done"))), next);
             }
 
             batchCount++;
@@ -240,6 +210,35 @@ abstract class BaseJDBCTest extends Assert
     }
 
     @Test
+    public void test_sql_server_datetime_offset()
+    {
+        // Multi statement queries is not supported by all rdbms:es
+        assumeTrue(jdbcUrl.contains("sqlserver"));
+
+        IExecutionContext context = mockExecutionContext();
+        QueryFunction query = new QueryFunction(catalog);
+
+        TupleIterator it = query.execute(context, CATALOG_ALIAS, Optional.empty(), asList(ExpressionTestUtils.createStringExpression("""
+                select cast('2010-10-10' as datetimeoffset) _do
+                , cast('2010-10-10' as datetimeoffset) at time zone 'Central European Standard Time' _do1
+                , cast(null as datetimeoffset) _do2
+                """)
+
+        ), mockOptions(500));
+
+        int batchCount = 0;
+        while (it.hasNext())
+        {
+            TupleVector next = it.next();
+            assertTupleVectorsEquals(TupleVector.of(Schema.of(Column.of("_do", Type.DateTimeOffset), Column.of("_do1", Type.DateTimeOffset), Column.of("_do2", Type.DateTimeOffset)),
+                    asList(vv(Type.DateTimeOffset, "2010-10-10"), vv(Type.DateTimeOffset, "2010-10-10"), vv(Type.DateTimeOffset, new Object[] { null }))), next);
+            batchCount++;
+        }
+        it.close();
+        assertEquals(1, batchCount);
+    }
+
+    @Test
     public void test_datasource_table_scan_projection()
     {
         IExecutionContext context = mockExecutionContext();
@@ -255,7 +254,7 @@ abstract class BaseJDBCTest extends Assert
         {
             TupleVector v = it.next();
 
-            assertEquals(Schema.of(Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
+            assertEquals(Schema.of(Column.of(getColumn("col2"), ResolvedType.of(Type.String))), v.getSchema());
 
             for (int i = 0; i < expectedSize; i++)
             {
@@ -263,7 +262,8 @@ abstract class BaseJDBCTest extends Assert
                 {
                     if (col2Expected.get(i)
                             .equals(v.getColumn(0)
-                                    .getAny(j)))
+                                    .getString(j)
+                                    .toString()))
                     {
                         rowCount++;
                     }
@@ -292,18 +292,19 @@ abstract class BaseJDBCTest extends Assert
         {
             TupleVector v = it.next();
 
-            assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Any)), Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
+            assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Int)), Column.of(getColumn("col2"), ResolvedType.of(Type.String))), v.getSchema());
 
             for (int i = 0; i < expectedSize; i++)
             {
                 for (int j = 0; j < expectedSize; j++)
                 {
                     if (col1Expected.get(i)
-                            .equals(integer(v.getColumn(0)
-                                    .getAny(j)))
+                            .equals(v.getColumn(0)
+                                    .getInt(j))
                             && col2Expected.get(i)
                                     .equals(v.getColumn(1)
-                                            .getAny(j)))
+                                            .getString(j)
+                                            .toString()))
                     {
                         rowCount++;
                     }
@@ -333,9 +334,9 @@ abstract class BaseJDBCTest extends Assert
         {
             TupleVector v = it.next();
 
-            assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Any)), Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
-            assertVectorsEquals(VectorTestUtils.vv(Type.Any, 5, 4, 3, 2, 1), integer(v.getColumn(0)));
-            assertVectorsEquals(VectorTestUtils.vv(Type.Any, "five", "four", "three", "two", "one"), v.getColumn(1));
+            assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Int)), Column.of(getColumn("col2"), ResolvedType.of(Type.String))), v.getSchema());
+            assertVectorsEquals(VectorTestUtils.vv(Type.Int, 5, 4, 3, 2, 1), v.getColumn(0));
+            assertVectorsEquals(VectorTestUtils.vv(Type.String, "five", "four", "three", "two", "one"), v.getColumn(1));
 
             rowCount += v.getRowCount();
         }
@@ -364,9 +365,9 @@ abstract class BaseJDBCTest extends Assert
         {
             TupleVector v = it.next();
 
-            assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Any)), Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
-            assertVectorsEquals(VectorTestUtils.vv(Type.Any, 4, 1), integer(v.getColumn(0)));
-            assertVectorsEquals(VectorTestUtils.vv(Type.Any, "four", "one"), v.getColumn(1));
+            assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Int)), Column.of(getColumn("col2"), ResolvedType.of(Type.String))), v.getSchema());
+            assertVectorsEquals(VectorTestUtils.vv(Type.Int, 4, 1), v.getColumn(0));
+            assertVectorsEquals(VectorTestUtils.vv(Type.String, "four", "one"), v.getColumn(1));
 
             rowCount += v.getRowCount();
         }
@@ -393,9 +394,9 @@ abstract class BaseJDBCTest extends Assert
         {
             TupleVector v = it.next();
 
-            assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Any)), Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
-            assertVectorsEquals(VectorTestUtils.vv(Type.Any, 5, 3, 1), integer(v.getColumn(0)));
-            assertVectorsEquals(VectorTestUtils.vv(Type.Any, "five", "three", "one"), v.getColumn(1));
+            assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Int)), Column.of(getColumn("col2"), ResolvedType.of(Type.String))), v.getSchema());
+            assertVectorsEquals(VectorTestUtils.vv(Type.Int, 5, 3, 1), v.getColumn(0));
+            assertVectorsEquals(VectorTestUtils.vv(Type.String, "five", "three", "one"), v.getColumn(1));
 
             rowCount += v.getRowCount();
         }
@@ -422,9 +423,9 @@ abstract class BaseJDBCTest extends Assert
         {
             TupleVector v = it.next();
 
-            assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Any)), Column.of(getColumn("col2"), ResolvedType.of(Type.Any))), v.getSchema());
-            assertVectorsEquals(VectorTestUtils.vv(Type.Any, 1), integer(v.getColumn(0)));
-            assertVectorsEquals(VectorTestUtils.vv(Type.Any, "one"), v.getColumn(1));
+            assertEquals(Schema.of(Column.of(getColumn("col1"), ResolvedType.of(Type.Int)), Column.of(getColumn("col2"), ResolvedType.of(Type.String))), v.getSchema());
+            assertVectorsEquals(VectorTestUtils.vv(Type.Int, 1), v.getColumn(0));
+            assertVectorsEquals(VectorTestUtils.vv(Type.String, "one"), v.getColumn(1));
 
             rowCount += v.getRowCount();
         }
