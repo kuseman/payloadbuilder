@@ -4,7 +4,6 @@ import static java.util.stream.Collectors.toList;
 
 import java.util.List;
 
-import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.expression.IArithmeticBinaryExpression;
 import se.kuseman.payloadbuilder.api.expression.IArithmeticUnaryExpression;
 import se.kuseman.payloadbuilder.api.expression.IAtTimeZoneExpression;
@@ -68,20 +67,20 @@ public abstract class ARewriteExpressionVisitor<C> extends AExpressionVisitor<IE
     {
         // Asterisk has no state
         return expression;
-    };
+    }
 
     @Override
     public IExpression visit(UnresolvedColumnExpression expression, C context)
     {
         // Column doesn't have any child expressions
         return expression;
-    };
+    }
 
     @Override
     public IExpression visit(AssignmentExpression expression, C context)
     {
         return new AssignmentExpression(expression.getExpression()
-                .accept(this, context), QualifiedName.of(expression.getVariable()));
+                .accept(this, context), expression.getVariable());
     }
 
     @Override
@@ -185,37 +184,37 @@ public abstract class ARewriteExpressionVisitor<C> extends AExpressionVisitor<IE
     public IExpression visit(ILogicalBinaryExpression expression, C context)
     {
         return new LogicalBinaryExpression(expression.getLogicalType(), visit(expression.getLeft(), context), visit(expression.getRight(), context));
-    };
+    }
 
     @Override
     public IExpression visit(ILogicalNotExpression expression, C context)
     {
         return new LogicalNotExpression(visit(expression.getExpression(), context));
-    };
+    }
 
     @Override
     public IExpression visit(INullPredicateExpression expression, C context)
     {
         return new NullPredicateExpression(visit(expression.getExpression(), context), expression.isNot());
-    };
+    }
 
     @Override
     public IExpression visit(IInExpression expression, C context)
     {
         return new InExpression(visit(expression.getExpression(), context), visit(expression.getArguments(), context), expression.isNot());
-    };
+    }
 
     @Override
     public IExpression visit(ILikeExpression expression, C context)
     {
         return new LikeExpression(visit(expression.getExpression(), context), visit(expression.getPatternExpression(), context), expression.isNot(), null);
-    };
+    }
 
     @Override
     public IExpression visit(IArithmeticUnaryExpression expression, C context)
     {
         return new ArithmeticUnaryExpression(expression.getArithmeticType(), visit(expression.getExpression(), context));
-    };
+    }
 
     @Override
     public IExpression visit(ICaseExpression expression, C context)
@@ -226,7 +225,7 @@ public abstract class ARewriteExpressionVisitor<C> extends AExpressionVisitor<IE
                 .collect(toList());
 
         return new CaseExpression(whenClauses, visit(expression.getElseExpression(), context));
-    };
+    }
 
     @Override
     public IExpression visit(IDereferenceExpression expression, C context)
@@ -236,25 +235,25 @@ public abstract class ARewriteExpressionVisitor<C> extends AExpressionVisitor<IE
             return new DereferenceExpression(visit(expression.getExpression(), context), expression.getRight(), ((DereferenceExpression) expression).getOrdinal(), expression.getType());
         }
         return new DereferenceExpression(visit(expression.getExpression(), context), expression.getRight());
-    };
+    }
 
     @Override
     public IExpression visit(INamedExpression expression, C context)
     {
         return new NamedExpression(expression.getName(), visit(expression.getExpression(), context));
-    };
+    }
 
     @Override
     public IExpression visit(INestedExpression expression, C context)
     {
         return new NestedExpression(visit(expression.getExpression(), context));
-    };
+    }
 
     @Override
     public IExpression visit(ISubscriptExpression expression, C context)
     {
         return new SubscriptExpression(visit(expression.getValue(), context), visit(expression.getSubscript(), context));
-    };
+    }
 
     @Override
     public IExpression visit(IVariableExpression expression, C context)

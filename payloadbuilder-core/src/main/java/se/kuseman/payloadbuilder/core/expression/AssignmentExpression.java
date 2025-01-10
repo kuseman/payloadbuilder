@@ -5,7 +5,6 @@ import static java.util.Objects.requireNonNull;
 
 import java.util.List;
 
-import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
@@ -22,12 +21,12 @@ import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
 public class AssignmentExpression implements IExpression
 {
     private final IExpression expression;
-    private final QualifiedName variable;
+    private final String variable;
 
-    public AssignmentExpression(IExpression expression, QualifiedName qname)
+    public AssignmentExpression(IExpression expression, String variable)
     {
         this.expression = requireNonNull(expression, "expression");
-        this.variable = requireNonNull(qname, "qname").toLowerCase();
+        this.variable = requireNonNull(variable, "variable").toLowerCase();
     }
 
     public IExpression getExpression()
@@ -35,7 +34,7 @@ public class AssignmentExpression implements IExpression
         return expression;
     }
 
-    public QualifiedName getVariable()
+    public String getVariable()
     {
         return variable;
     }

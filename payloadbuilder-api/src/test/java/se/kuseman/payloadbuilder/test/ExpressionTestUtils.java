@@ -161,7 +161,7 @@ public class ExpressionTestUtils
         IVariableExpression mock = Mockito.mock(IVariableExpression.class);
         when(mock.eval(any(IExecutionContext.class))).thenReturn(VectorTestUtils.vv(Type.Any, new Object[] { value }));
         when(mock.accept(any(), any())).thenCallRealMethod();
-        when(mock.getName()).thenReturn(QualifiedName.of(name));
+        when(mock.getName()).thenReturn(name);
         when(mock.getType()).thenReturn(ResolvedType.of(Type.Any));
         return mock;
     }

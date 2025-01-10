@@ -55,15 +55,15 @@ public class QuerySession implements IQuerySession
 {
     /* System properties */
     /** Enable to print logical and physical plans to session print writer */
-    public static final QualifiedName PRINT_PLAN = QualifiedName.of("printplan");
+    public static final String PRINT_PLAN = "printplan";
     /** Enable to print all logical plans for each optimisation rule. */
-    public static final QualifiedName DEBUG_PLAN = QualifiedName.of("debugplan");
+    public static final String DEBUG_PLAN = "debugplan";
 
     /** Force a nested loop where default would have been a hash match */
-    public static final QualifiedName FORCE_NESTED_LOOP = QualifiedName.of("force_nested_loop");
+    public static final String FORCE_NESTED_LOOP = "force_nested_loop";
 
     /** Force no inner cache for non correlated nested loops */
-    public static final QualifiedName FORCE_NO_INNER_CACHE = QualifiedName.of("force_no_inner_cache");
+    public static final String FORCE_NO_INNER_CACHE = "force_no_inner_cache";
     /* End system properties */
 
     /* Compile fields */
@@ -73,11 +73,11 @@ public class QuerySession implements IQuerySession
 
     /* Execution fields */
     /** Variable values for {@link VariableExpression}'s */
-    private final Map<QualifiedName, ValueVector> variables;
+    private final Map<String, ValueVector> variables;
     /** Catalog properties by catalog alias */
     private Map<String, Map<String, ValueVector>> catalogProperties;
     /** System properties */
-    private Map<QualifiedName, ValueVector> systemProperties;
+    private Map<String, ValueVector> systemProperties;
     private Writer printWriter;
     private ExceptionHandler exceptionHandler;
     private BooleanSupplier abortSupplier;
@@ -99,8 +99,8 @@ public class QuerySession implements IQuerySession
         this.catalogRegistry = requireNonNull(catalogRegistry, "catalogRegistry");
         this.variables = requireNonNull(variables, "variables").entrySet()
                 .stream()
-                .collect(toMap(k -> QualifiedName.of(k.getKey()
-                        .toLowerCase()), v -> ValueVector.literalAny(v.getValue())));
+                .collect(toMap(e -> e.getKey()
+                        .toLowerCase(), v -> ValueVector.literalAny(v.getValue())));
     }
 
     @Override
@@ -299,7 +299,7 @@ public class QuerySession implements IQuerySession
     }
 
     /** Return variables map */
-    Map<QualifiedName, ValueVector> getVariables()
+    Map<String, ValueVector> getVariables()
     {
         return variables;
     }
@@ -414,7 +414,7 @@ public class QuerySession implements IQuerySession
     }
 
     /** Set system property */
-    public void setSystemProperty(QualifiedName name, ValueVector value)
+    public void setSystemProperty(String name, ValueVector value)
     {
         requireNonNull(value);
         if (systemProperties == null)
@@ -425,7 +425,7 @@ public class QuerySession implements IQuerySession
     }
 
     /** Get system property */
-    public ValueVector getSystemProperty(QualifiedName name)
+    public ValueVector getSystemProperty(String name)
     {
         if (systemProperties == null)
         {

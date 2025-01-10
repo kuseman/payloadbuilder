@@ -1,6 +1,5 @@
 package se.kuseman.payloadbuilder.api.execution;
 
-import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.execution.vector.IVectorFactory;
 import se.kuseman.payloadbuilder.api.expression.IExpressionFactory;
 
@@ -20,5 +19,5 @@ public interface IExecutionContext
     IExpressionFactory getExpressionFactory();
 
     /** Return value of provided variable name. */
-    ValueVector getVariableValue(QualifiedName qname);
+    ValueVector getVariableValue(String name);
 }

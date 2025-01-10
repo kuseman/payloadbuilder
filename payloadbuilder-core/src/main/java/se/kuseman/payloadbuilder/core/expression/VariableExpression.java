@@ -2,7 +2,6 @@ package se.kuseman.payloadbuilder.core.expression;
 
 import static java.util.Objects.requireNonNull;
 
-import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
@@ -17,25 +16,25 @@ import se.kuseman.payloadbuilder.core.execution.ValueVectorAdapter;
 /** A variable (@var) */
 public class VariableExpression implements IVariableExpression, HasAlias
 {
-    private static final QualifiedName ROWCOUNT = QualifiedName.of("rowcount");
-    private static final QualifiedName VERSION = QualifiedName.of("version");
+    private static final String ROWCOUNT = "rowcount";
+    private static final String VERSION = "version";
 
-    private final QualifiedName name;
+    private final String name;
     private final boolean system;
 
-    public VariableExpression(QualifiedName qname)
+    public VariableExpression(String name)
     {
-        this(qname, false);
+        this(name, false);
     }
 
-    public VariableExpression(QualifiedName qname, boolean system)
+    public VariableExpression(String name, boolean system)
     {
-        this.name = requireNonNull(qname, "qname").toLowerCase();
+        this.name = requireNonNull(name, "name").toLowerCase();
         this.system = system;
     }
 
     @Override
-    public QualifiedName getName()
+    public String getName()
     {
         return name;
     }

@@ -459,7 +459,7 @@ public class TestHarnessRunner
                     ValueVector option = options.getOption(optionName, context);
                     if (option != null)
                     {
-                        ((ExecutionContext) context).setVariable(optionName, option);
+                        ((ExecutionContext) context).setVariable(optionName.getFirst(), option);
                     }
 
                     ObjectTupleVector tupleVector = new ObjectTupleVector(data.getSchema()

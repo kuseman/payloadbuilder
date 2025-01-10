@@ -328,7 +328,7 @@ public class QueryParser
         {
             boolean systemProperty = ctx.AT()
                     .size() == 2;
-            return new SetStatement(getQualifiedName(ctx.qname()).toLowerCase(), getExpression(ctx.expression()), systemProperty);
+            return new SetStatement(getIdentifier(ctx.identifier()).toLowerCase(), getExpression(ctx.expression()), systemProperty);
         }
 
         @Override
@@ -512,8 +512,8 @@ public class QueryParser
                     throw new ParseException("Cannot assign to system variables", ctx);
                 }
 
-                return new AssignmentExpression(expression, getQualifiedName(ctx.variable()
-                        .qname()).toLowerCase());
+                return new AssignmentExpression(expression, getIdentifier(ctx.variable()
+                        .identifier()).toLowerCase());
             }
 
             if (ctx.ASTERISK() != null)
@@ -651,10 +651,10 @@ public class QueryParser
                     throw new ParseException("Variable scans cannot be a system variable", ctx.variable());
                 }
 
-                QualifiedName qname = getQualifiedName(ctx.variable()
-                        .qname());
-                IExpression expression = new VariableExpression(qname);
-                TableSourceReference tableSource = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.EXPRESSION, "", qname, alias);
+                String variable = getIdentifier(ctx.variable()
+                        .identifier());
+                IExpression expression = new VariableExpression(variable);
+                TableSourceReference tableSource = new TableSourceReference(tableSourceCounter++, TableSourceReference.Type.EXPRESSION, "", QualifiedName.of(variable), alias);
                 return new ExpressionScan(tableSource, Schema.EMPTY, expression, Location.from(ctx.variable()));
             }
             else if (ctx.expression() != null)
@@ -734,8 +734,8 @@ public class QueryParser
         @Override
         public Object visitVariableExpression(VariableExpressionContext ctx)
         {
-            IExpression result = new VariableExpression(getQualifiedName(ctx.variable()
-                    .qname()), ctx.variable().system != null);
+            IExpression result = new VariableExpression(getIdentifier(ctx.variable()
+                    .identifier()), ctx.variable().system != null);
 
             if (!ctx.indirection()
                     .isEmpty())

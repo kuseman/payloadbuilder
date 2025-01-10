@@ -7,7 +7,6 @@ import static org.apache.commons.lang3.ObjectUtils.defaultIfNull;
 import java.util.HashMap;
 import java.util.Map;
 
-import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.ValueVector;
 import se.kuseman.payloadbuilder.api.execution.vector.IVectorFactory;
@@ -30,7 +29,7 @@ public class ExecutionContext implements IExecutionContext
     private final ExpressionFactory expressionFactory;
 
     /** Variables in context */
-    private Map<QualifiedName, ValueVector> variables;
+    private Map<String, ValueVector> variables;
 
     public ExecutionContext(QuerySession session)
     {
@@ -77,13 +76,13 @@ public class ExecutionContext implements IExecutionContext
     }
 
     /** Get variables map */
-    public Map<QualifiedName, ValueVector> getVariables()
+    public Map<String, ValueVector> getVariables()
     {
         return defaultIfNull(variables, emptyMap());
     }
 
     /** Set variable to context */
-    public void setVariable(QualifiedName name, ValueVector value)
+    public void setVariable(String name, ValueVector value)
     {
         if (variables == null)
         {
@@ -94,7 +93,7 @@ public class ExecutionContext implements IExecutionContext
 
     /** Get variable from context */
     @Override
-    public ValueVector getVariableValue(QualifiedName name)
+    public ValueVector getVariableValue(String name)
     {
         return variables != null ? variables.get(name)
                 : null;

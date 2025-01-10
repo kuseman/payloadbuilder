@@ -360,8 +360,8 @@ public class ElasticQueryBuilderTest
         StringBuilder filter = new StringBuilder();
         StringBuilder filterNot = new StringBuilder();
 
-        context.setVariable(QualifiedName.of("var"), ValueVector.literalString("world", 1));
-        context.setVariable(QualifiedName.of("int"), ValueVector.literalInt(1, 1));
+        context.setVariable("var", ValueVector.literalString("world", 1));
+        context.setVariable("int", ValueVector.literalInt(1, 1));
 
         for (IPropertyPredicate pp : predicatesResult)
         {
