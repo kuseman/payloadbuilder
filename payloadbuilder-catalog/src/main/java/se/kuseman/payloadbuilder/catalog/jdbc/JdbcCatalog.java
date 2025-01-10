@@ -70,7 +70,8 @@ public class JdbcCatalog extends Catalog
     {
         super(NAME);
         registerFunction(new QueryFunction(this));
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, new BasicThreadFactory.Builder().namingPattern("JdbcCatalog-Datasource-housekeeper-%d")
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1, new BasicThreadFactory.Builder().daemon(true)
+                .namingPattern("JdbcCatalog-Datasource-housekeeper-%d")
                 .build());
         houseKeepingFuture = scheduler.scheduleAtFixedRate(houseKeepingRunnable, 10, 10, TimeUnit.MINUTES);
     }
