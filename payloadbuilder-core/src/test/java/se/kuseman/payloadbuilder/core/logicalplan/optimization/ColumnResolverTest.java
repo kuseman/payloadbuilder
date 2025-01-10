@@ -254,7 +254,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
         //@formatter:on
 
         //@formatter:off
-        context.setVariable(QualifiedName.of("tbl"), ValueVector.literalTable(TupleVector.of(Schema.of(
+        context.setVariable("tbl", ValueVector.literalTable(TupleVector.of(Schema.of(
                 Column.of("col1", Type.Int),
                 Column.of("col2", Type.Boolean)
                 ), List.of(
@@ -270,7 +270,7 @@ public class ColumnResolverTest extends ALogicalPlanOptimizerTest
 
         Schema expectedSchema = Schema.of(col("col1", ResolvedType.of(Type.Int), expectedTable), col("col2", ResolvedType.of(Type.Boolean), expectedTable));
 
-        ILogicalPlan expected = new ExpressionScan(expectedTable, expectedSchema, new VariableExpression(QualifiedName.of("tbl")), null);
+        ILogicalPlan expected = new ExpressionScan(expectedTable, expectedSchema, new VariableExpression("tbl"), null);
 
         //@formatter:off
         Assertions.assertThat(actual.getSchema())

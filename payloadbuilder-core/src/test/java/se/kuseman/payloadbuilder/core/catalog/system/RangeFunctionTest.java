@@ -52,9 +52,9 @@ public class RangeFunctionTest extends APhysicalPlanTest
     public void test_batch_size()
     {
         Schema schema = Schema.of(Column.of("Value", ResolvedType.of(Type.Int)));
-        context.setVariable(QualifiedName.of("batch"), ValueVector.literalInt(3, 1));
+        context.setVariable("batch", ValueVector.literalInt(3, 1));
         TupleIterator it = f.execute(context, "", Optional.of(schema), asList(intLit(1), intLit(11)),
-                new DatasourceOptions(asList(new Option(QualifiedName.of("batch_size"), new VariableExpression(QualifiedName.of("batch"))))));
+                new DatasourceOptions(asList(new Option(QualifiedName.of("batch_size"), new VariableExpression("batch")))));
 
         int count = 0;
         while (it.hasNext())

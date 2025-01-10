@@ -413,8 +413,8 @@ public abstract class AExpressionTest extends Assert
             {
                 for (Entry<String, Object> e : variables.entrySet())
                 {
-                    context.setVariable(QualifiedName.of(e.getKey()
-                            .toLowerCase()), ValueVector.literalAny(e.getValue()));
+                    context.setVariable(e.getKey()
+                            .toLowerCase(), ValueVector.literalAny(e.getValue()));
                 }
             }
 

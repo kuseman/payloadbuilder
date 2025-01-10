@@ -35,7 +35,7 @@ miscStatement
  ;
 
 setStatement
- : SET AT? AT? qname EQUALS expression
+ : SET AT? AT? identifier EQUALS expression
  ;
 
 useStatement
@@ -321,7 +321,7 @@ templateStringAtom
     ;
 
 variable
- : AT (system=AT)? qname
+ : AT (system=AT)? identifier
  ;
 
 compareOperator

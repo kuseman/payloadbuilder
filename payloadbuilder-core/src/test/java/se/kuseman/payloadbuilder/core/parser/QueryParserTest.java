@@ -170,7 +170,7 @@ public class QueryParserTest extends Assert
     public void test_set()
     {
         assertQuery("set @var = 10");
-        assertQuery("set @@system.prop = false");
+        assertQuery("set @@system_prop = false");
     }
 
     @Test
@@ -221,12 +221,12 @@ public class QueryParserTest extends Assert
     @Test
     public void test_cast()
     {
-        assertExpression("cast(@var AS array)", new CastExpression(new VariableExpression(QualifiedName.of("var")), ResolvedType.array(Type.Any)));
-        assertExpression("cast(@var AS int)", new CastExpression(new VariableExpression(QualifiedName.of("var")), ResolvedType.of(Type.Int)));
-        assertExpression("cast(@var AS long)", new CastExpression(new VariableExpression(QualifiedName.of("var")), ResolvedType.of(Type.Long)));
-        assertExpression("cast(@var AS float)", new CastExpression(new VariableExpression(QualifiedName.of("var")), ResolvedType.of(Type.Float)));
-        assertExpression("cast(@var AS double)", new CastExpression(new VariableExpression(QualifiedName.of("var")), ResolvedType.of(Type.Double)));
-        assertExpression("cast(@var AS boolean)", new CastExpression(new VariableExpression(QualifiedName.of("var")), ResolvedType.of(Type.Boolean)));
+        assertExpression("cast(@var AS array)", new CastExpression(new VariableExpression("var"), ResolvedType.array(Type.Any)));
+        assertExpression("cast(@var AS int)", new CastExpression(new VariableExpression("var"), ResolvedType.of(Type.Int)));
+        assertExpression("cast(@var AS long)", new CastExpression(new VariableExpression("var"), ResolvedType.of(Type.Long)));
+        assertExpression("cast(@var AS float)", new CastExpression(new VariableExpression("var"), ResolvedType.of(Type.Float)));
+        assertExpression("cast(@var AS double)", new CastExpression(new VariableExpression("var"), ResolvedType.of(Type.Double)));
+        assertExpression("cast(@var AS boolean)", new CastExpression(new VariableExpression("var"), ResolvedType.of(Type.Boolean)));
 
         // Test folding
         assertExpression("cast(null AS int)", new LiteralNullExpression(ResolvedType.of(Type.Int)));
@@ -397,8 +397,7 @@ public class QueryParserTest extends Assert
 
         assertExpression("a.b.c", new UnresolvedColumnExpression(QualifiedName.of("a", "b", "c"), -1, null));
         assertExpression("@list.filter(x -> x.value)", new UnresolvedFunctionCallExpression("", "filter", null,
-                asList(new VariableExpression(QualifiedName.of("list")), new LambdaExpression(asList("x"), new UnresolvedColumnExpression(QualifiedName.of("x", "value"), 0, null), new int[] { 0 })),
-                null));
+                asList(new VariableExpression("list"), new LambdaExpression(asList("x"), new UnresolvedColumnExpression(QualifiedName.of("x", "value"), 0, null), new int[] { 0 })), null));
         assertExpression("a.hash()", new UnresolvedFunctionCallExpression("", "hash", null, asList(new UnresolvedColumnExpression(QualifiedName.of("a"), -1, null)), null));
         assertExpression("a.hash() + hash(a)",
                 new ArithmeticBinaryExpression(IArithmeticBinaryExpression.Type.ADD,

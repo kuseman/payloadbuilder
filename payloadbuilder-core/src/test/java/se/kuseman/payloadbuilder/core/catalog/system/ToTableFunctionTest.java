@@ -9,7 +9,6 @@ import java.util.Map;
 
 import org.junit.Test;
 
-import se.kuseman.payloadbuilder.api.QualifiedName;
 import se.kuseman.payloadbuilder.api.catalog.Column;
 import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
@@ -34,7 +33,7 @@ public class ToTableFunctionTest extends APhysicalPlanTest
     {
         // "select * from open_map_collection((@col).attribute1.buckets)";
         //@formatter:off
-        context.setVariable(QualifiedName.of("col"),
+        context.setVariable("col",
                 ValueVector.literalAny(
                 ofEntries(
                     entry("attribute1",
@@ -47,7 +46,7 @@ public class ToTableFunctionTest extends APhysicalPlanTest
         //@formatter:off
         IExpression arg = new DereferenceExpression(
             new DereferenceExpression(
-                new VariableExpression(QualifiedName.of("col")),
+                new VariableExpression("col"),
                 "attribute1",
                 -1,
                 ResolvedType.of(Type.Any)),

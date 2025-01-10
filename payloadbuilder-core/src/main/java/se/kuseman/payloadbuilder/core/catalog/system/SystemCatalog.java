@@ -394,12 +394,12 @@ public class SystemCatalog extends Catalog
             {
                 vector = ctx ->
                 {
-                    final List<Entry<QualifiedName, ValueVector>> variables = new ArrayList<>(((ExecutionContext) ctx).getVariables()
+                    final List<Entry<String, ValueVector>> variables = new ArrayList<>(((ExecutionContext) ctx).getVariables()
                             .entrySet());
                     return new ObjectTupleVector(data.getSchema()
                             .get(), variables.size(), (row, col) ->
                             {
-                                Entry<QualifiedName, ValueVector> e = variables.get(row);
+                                Entry<String, ValueVector> e = variables.get(row);
                                 if (col == 0)
                                 {
                                     return e.getKey();

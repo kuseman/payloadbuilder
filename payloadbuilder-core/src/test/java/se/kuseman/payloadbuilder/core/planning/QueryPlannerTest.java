@@ -2449,7 +2449,7 @@ public class QueryPlannerTest extends APhysicalPlanTest
         assertEquals(asList(
                 Triple.of(QualifiedName.of("col5"), IPredicate.Type.FUNCTION_CALL, asList(
                         new FunctionCallExpression(Catalog.SYSTEM_CATALOG_ALIAS, SystemCatalog.get().getScalarFunction("contains"), null, asList(
-                                new VariableExpression(QualifiedName.of("var")),
+                                new VariableExpression("var"),
                                 cre("col5", table))))),
                 Triple.of(null, IPredicate.Type.FUNCTION_CALL, asList(new FunctionCallExpression("t", someFunc, null, asList()))),
                 Triple.of(QualifiedName.of("col"), IPredicate.Type.COMPARISION, asList(intLit(10)))
