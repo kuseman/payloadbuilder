@@ -196,6 +196,13 @@ class ElasticsearchMetaUtils
         }
         catch (Exception e)
         {
+            // Skip logging error about alias
+            if (e.getMessage()
+                    .toLowerCase()
+                    .contains("specify the corresponding concrete indices instead"))
+            {
+                return;
+            }
             // Swallow this since all ES versions doesn't have datastreams
             LOGGER.error("Error fetching data stream mappings", e);
         }
