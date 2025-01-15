@@ -227,37 +227,42 @@ class QueryResultImpl implements QueryResult, StatementVisitor<Void, Void>
         try
         {
             Schema schema = plan.getSchema();
-            if (writer != null)
-            {
-                // Asterisk schema, then we cannot init the result with it since
-                // it's not the actual one that will come
-                if (SchemaUtils.isAsterisk(schema))
-                {
-                    writer.initResult(ArrayUtils.EMPTY_STRING_ARRAY);
-                }
-                else
-                {
-                    writer.initResult(schema.getColumns()
-                            .stream()
-                            .filter(c -> !(c instanceof CoreColumn)
-                                    || !((CoreColumn) c).isInternal())
-                            .map(c ->
-                            {
-                                String outputName = c.getName();
-                                if (c instanceof CoreColumn)
-                                {
-                                    outputName = ((CoreColumn) c).getOutputName();
-                                }
-                                return outputName;
-                            })
-                            .toArray(String[]::new));
-                }
-            }
             statementContext.setOuterTupleVector(null);
-
+            boolean initCompleted = false;
             iterator = plan.execute(context);
             while (iterator.hasNext())
             {
+                if (!initCompleted)
+                {
+                    if (writer != null)
+                    {
+                        // Asterisk schema, then we cannot init the result with it since
+                        // it's not the actual one that will come
+                        if (SchemaUtils.isAsterisk(schema))
+                        {
+                            writer.initResult(ArrayUtils.EMPTY_STRING_ARRAY);
+                        }
+                        else
+                        {
+                            writer.initResult(schema.getColumns()
+                                    .stream()
+                                    .filter(c -> !(c instanceof CoreColumn)
+                                            || !((CoreColumn) c).isInternal())
+                                    .map(c ->
+                                    {
+                                        String outputName = c.getName();
+                                        if (c instanceof CoreColumn)
+                                        {
+                                            outputName = ((CoreColumn) c).getOutputName();
+                                        }
+                                        return outputName;
+                                    })
+                                    .toArray(String[]::new));
+                        }
+                    }
+                    initCompleted = true;
+                }
+
                 if (session.abortQuery())
                 {
                     break;
