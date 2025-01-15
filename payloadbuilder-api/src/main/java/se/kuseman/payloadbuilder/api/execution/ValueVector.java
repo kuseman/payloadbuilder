@@ -27,6 +27,41 @@ public interface ValueVector
     /** Get string at provided row. */
     default UTF8String getString(int row)
     {
+        Type type = type().getType();
+
+        // Implicit casts
+        if (type == Type.Boolean)
+        {
+            return UTF8String.from(getBoolean(row));
+        }
+        else if (type == Type.DateTime)
+        {
+            return UTF8String.from(getDateTime(row));
+        }
+        else if (type == Type.DateTimeOffset)
+        {
+            return UTF8String.from(getDateTimeOffset(row));
+        }
+        else if (type == Type.Decimal)
+        {
+            return UTF8String.from(getDecimal(row));
+        }
+        else if (type == Type.Double)
+        {
+            return UTF8String.from(getDouble(row));
+        }
+        else if (type == Type.Float)
+        {
+            return UTF8String.from(getFloat(row));
+        }
+        else if (type == Type.Int)
+        {
+            return UTF8String.from(getInt(row));
+        }
+        else if (type == Type.Long)
+        {
+            return UTF8String.from(getInt(row));
+        }
         return UTF8String.from(getAny(row));
     }
 
