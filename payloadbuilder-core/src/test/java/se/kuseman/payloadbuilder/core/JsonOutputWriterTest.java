@@ -43,6 +43,20 @@ public class JsonOutputWriterTest extends Assert
     }
 
     @Test
+    public void test_allResultSetsAsOneArray_no_rows()
+    {
+        JsonSettings settings = new JsonSettings();
+        settings.setAllResultSetsAsOneArray(true);
+
+        Pair<StringWriter, JsonOutputWriter> p = writer(settings);
+        p.getValue()
+                .close();
+
+        assertEquals("", p.getKey()
+                .toString());
+    }
+
+    @Test
     public void test_allResultSetsAsOneArray()
     {
         JsonSettings settings = new JsonSettings();

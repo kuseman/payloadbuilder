@@ -108,7 +108,8 @@ public class JsonOutputWriter implements OutputWriter
     @Override
     public void close()
     {
-        if (settings.allResultSetsAsOneArray)
+        if (settings.allResultSetsAsOneArray
+                && !firstResultSet)
         {
             endArray();
         }
@@ -132,7 +133,8 @@ public class JsonOutputWriter implements OutputWriter
     @Override
     public void endResult()
     {
-        if (settings.resultSetsAsArrays)
+        if (settings.resultSetsAsArrays
+                && !firstResultSet)
         {
             endArray();
         }
