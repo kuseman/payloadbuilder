@@ -33,6 +33,10 @@ class MutableObjectVector extends AMutableVector
     @Override
     public boolean isNull(int row)
     {
+        if (buffer == null)
+        {
+            return true;
+        }
         return buffer[row] == null;
     }
 
