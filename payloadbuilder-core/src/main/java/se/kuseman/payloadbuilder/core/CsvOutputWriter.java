@@ -8,8 +8,10 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.util.Arrays;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 
 import se.kuseman.payloadbuilder.api.OutputWriter;
 
@@ -124,14 +126,18 @@ public class CsvOutputWriter implements OutputWriter
             return;
         }
 
-        startRow();
-
-        for (String column : columns)
+        if (Arrays.stream(columns)
+                .anyMatch(StringUtils::isNotBlank))
         {
-            writeValue(column);
-        }
+            startRow();
 
-        endRow();
+            for (String column : columns)
+            {
+                writeValue(column);
+            }
+
+            endRow();
+        }
     }
 
     @Override

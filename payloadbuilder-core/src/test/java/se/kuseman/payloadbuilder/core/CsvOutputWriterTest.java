@@ -159,6 +159,22 @@ public class CsvOutputWriterTest extends Assert
                 .toString());
     }
 
+    @Test
+    public void test_empty_columns_dont_yield_initial_new_line()
+    {
+        CsvSettings settings = new CsvSettings();
+        settings.setRowSeparator(System.lineSeparator());
+        Pair<StringWriter, CsvOutputWriter> p = writer(settings);
+        p.getValue()
+                .initResult(new String[] { "" });
+        p.getValue()
+                .endResult();
+        p.getValue()
+                .close();
+        assertEquals("", p.getKey()
+                .toString());
+    }
+
     private Pair<StringWriter, CsvOutputWriter> writer(CsvSettings settings)
     {
         StringWriter sw = new StringWriter();
