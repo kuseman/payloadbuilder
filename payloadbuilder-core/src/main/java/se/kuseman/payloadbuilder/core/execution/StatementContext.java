@@ -63,7 +63,7 @@ public class StatementContext implements IStatementContext
         this.nodeDataById = source.nodeDataById;
         this.lambdaValues = source.lambdaValues;
         this.now = source.now;
-
+        this.nowUtc = source.nowUtc;
     }
 
     private void setNow()
