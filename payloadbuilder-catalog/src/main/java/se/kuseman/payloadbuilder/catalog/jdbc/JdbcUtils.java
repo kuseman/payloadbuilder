@@ -6,16 +6,53 @@ import java.io.Writer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Consumer;
 
 import org.apache.commons.io.IOUtils;
 
+import se.kuseman.payloadbuilder.api.catalog.Column;
+import se.kuseman.payloadbuilder.api.catalog.Schema;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
+import se.kuseman.payloadbuilder.catalog.jdbc.dialect.SqlDialect;
+
 /** Jdbc utils. Managing resources etc. */
 class JdbcUtils
 {
+    static Schema getSchemaFromResultSet(SqlDialect dialect, ResultSetMetaData rsmd) throws SQLException
+    {
+        int count = rsmd.getColumnCount();
+        List<Column> columns = new ArrayList<>(count);
+        for (int i = 0; i < count; i++)
+        {
+            Column.Type type = dialect.getColumnType(rsmd, i + 1);
+            columns.add(Column.of(rsmd.getColumnLabel(i + 1), type));
+        }
+        return new Schema(columns);
+    }
+
+    /** Sets result set values into vectors. */
+    static void setVectorValues(SqlDialect dialect, int row, ResultSet rs, Schema schema, List<MutableValueVector> vectors) throws SQLException, IOException
+    {
+        int count = schema.getSize();
+        for (int i = 0; i < count; i++)
+        {
+            Column.Type type = schema.getColumns()
+                    .get(i)
+                    .getType()
+                    .getType();
+            MutableValueVector vector = vectors.get(i);
+
+            int ordinal = i + 1;
+            dialect.setResultSetValue(type, rs, ordinal, row, vector);
+        }
+    }
+
     /**
      * Converts provided value according to jdbc type. Stringifies LOBs etc.
      */
