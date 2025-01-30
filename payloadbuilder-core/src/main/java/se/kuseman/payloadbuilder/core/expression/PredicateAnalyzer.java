@@ -587,6 +587,11 @@ public class PredicateAnalyzer
                 column = ce.getAlias()
                         .getAlias();
             }
+            else if (expression instanceof DereferenceExpression de)
+            {
+                column = de.getQualifiedColumn()
+                        .toDotDelimited();
+            }
 
             return new AnalyzeItem(expression, tableSources, column);
         }

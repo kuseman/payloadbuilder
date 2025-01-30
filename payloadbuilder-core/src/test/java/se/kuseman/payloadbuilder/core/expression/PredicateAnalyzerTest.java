@@ -32,6 +32,38 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     private TableSourceReference tableC = new TableSourceReference(2, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableC"), "c");
 
     @Test
+    public void test_dereference_expressions_and_columnname_gets_set()
+    {
+        AnalyzeResult actual;
+        AnalyzeResult expected;
+        Pair<List<AnalyzePair>, AnalyzeResult> actualPairs;
+        AnalyzePair actualPair;
+
+        IExpression de = DereferenceExpression.create(cre("col1", tableA), QualifiedName.of("nested", "value"), null);
+
+        actual = PredicateAnalyzer.analyze(eq(de, ocre("col2", tableB)));
+        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.EQUAL, de, asSet(tableA), "col1.nested.value", ocre("col2", tableB), emptySet(), "col2"));
+
+        assertEquals(expected, actual);
+        assertEquals(eq(de, ocre("col2", tableB)), actual.getPredicate());
+        actualPairs = actual.extractPushdownPairs(tableA);
+        assertEquals(expected.getPairs(), actualPairs.getLeft());
+        assertEquals(AnalyzeResult.EMPTY, actualPairs.getValue());
+
+        actualPair = actualPairs.getLeft()
+                .get(0);
+
+        assertEquals("a.col1.nested.value = b.col2", actualPair.getSqlRepresentation());
+        assertEquals(IPredicate.Type.COMPARISION, actualPair.getType());
+        assertEquals(IComparisonExpression.Type.EQUAL, actualPair.getComparisonType());
+        assertEquals("col1.nested.value", actualPair.getColumn(tableA));
+        assertNull(actualPair.getColumn(tableB));
+
+        assertTrue(actualPair.isEqui(tableA));
+        assertFalse(actualPair.isEqui(tableB));
+    }
+
+    @Test
     public void test_outerreference_column_expressions()
     {
         AnalyzeResult actual;
