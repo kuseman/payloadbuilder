@@ -32,7 +32,7 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
     private TableSourceReference tableC = new TableSourceReference(2, TableSourceReference.Type.TABLE, "", QualifiedName.of("tableC"), "c");
 
     @Test
-    public void test_dereference_expressions_and_columnname_gets_set()
+    public void test_dereference_expression_with_qualified_column()
     {
         AnalyzeResult actual;
         AnalyzeResult expected;
@@ -61,6 +61,25 @@ public class PredicateAnalyzerTest extends APhysicalPlanTest
 
         assertTrue(actualPair.isEqui(tableA));
         assertFalse(actualPair.isEqui(tableB));
+    }
+
+    @Test
+    public void test_dereference_expression_with_no_qualified_column()
+    {
+        AnalyzeResult actual;
+        AnalyzeResult expected;
+        Pair<List<AnalyzePair>, AnalyzeResult> actualPairs;
+
+        IExpression de = DereferenceExpression.create(new VariableExpression("var"), QualifiedName.of("nested", "value"), null);
+
+        actual = PredicateAnalyzer.analyze(eq(de, ocre("col2", tableB)));
+        expected = result(pair(IPredicate.Type.COMPARISION, IComparisonExpression.Type.EQUAL, de, asSet(), null, ocre("col2", tableB), emptySet(), "col2"));
+
+        assertEquals(expected, actual);
+        assertEquals(eq(de, ocre("col2", tableB)), actual.getPredicate());
+        actualPairs = actual.extractPushdownPairs(tableA);
+        assertEquals(emptyList(), actualPairs.getLeft());
+        assertEquals(expected, actualPairs.getValue());
     }
 
     @Test

@@ -589,8 +589,9 @@ public class PredicateAnalyzer
             }
             else if (expression instanceof DereferenceExpression de)
             {
-                column = de.getQualifiedColumn()
-                        .toDotDelimited();
+                QualifiedName qname = de.getQualifiedColumn();
+                column = qname != null ? qname.toDotDelimited()
+                        : null;
             }
 
             return new AnalyzeItem(expression, tableSources, column);
