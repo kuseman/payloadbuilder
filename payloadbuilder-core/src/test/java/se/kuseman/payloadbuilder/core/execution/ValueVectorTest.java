@@ -26,6 +26,13 @@ import se.kuseman.payloadbuilder.test.VectorTestUtils;
 public class ValueVectorTest extends APhysicalPlanTest
 {
     @Test
+    public void test_range()
+    {
+        VectorTestUtils.assertVectorsEquals(vv(Type.Int, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9), ValueVector.range(0, 10));
+        VectorTestUtils.assertVectorsEquals(vv(Type.Int, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19), ValueVector.range(10, 20));
+    }
+
+    @Test
     public void test_table_implicit_casts()
     {
         ValueVector vv;
