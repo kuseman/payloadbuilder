@@ -34,8 +34,8 @@ public class TableScan implements IPhysicalPlan
     protected final IDatasource datasource;
     private final Schema schema;
     protected final boolean tempTable;
-    private final List<Option> options;
-    private final boolean asteriskSchema;
+    protected final List<Option> options;
+    protected final boolean asteriskSchema;
 
     public TableScan(int nodeId, Schema schema, TableSourceReference tableSource, String catalogName, boolean tempTable, IDatasource datasource, List<Option> options)
     {
@@ -160,7 +160,7 @@ public class TableScan implements IPhysicalPlan
         return emptyList();
     }
 
-    private boolean validate(IExecutionContext context, Schema vectorSchema, int rowCount)
+    protected void validate(IExecutionContext context, Schema vectorSchema, int rowCount)
     {
         if (!asteriskSchema
                 && rowCount > 0
@@ -190,7 +190,6 @@ public class TableScan implements IPhysicalPlan
                                      + System.lineSeparator()
                                      + "Make sure to provide the actual runtime schema of the vector when using an asterisk schema.");
         }
-        return true;
     }
 
     static Schema recreateSchema(TableSourceReference tableSource, Schema schema)

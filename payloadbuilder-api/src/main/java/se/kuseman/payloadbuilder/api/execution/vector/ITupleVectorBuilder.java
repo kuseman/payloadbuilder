@@ -17,7 +17,7 @@ public interface ITupleVectorBuilder
     void append(TupleVector source, ValueVector filter);
 
     /** Append a source tuple vector along with a boolean filter to this builder. */
-    void append(TupleVector inner, BitSet bitSet);
+    void append(TupleVector source, BitSet bitSet);
 
     /** Append a source tuple vector to this builder. */
     void append(TupleVector source);

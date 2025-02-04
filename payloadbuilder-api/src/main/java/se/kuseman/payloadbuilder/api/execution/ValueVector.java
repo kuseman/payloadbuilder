@@ -837,7 +837,7 @@ public interface ValueVector
             @Override
             public int size()
             {
-                return to;
+                return size;
             }
 
             @Override
