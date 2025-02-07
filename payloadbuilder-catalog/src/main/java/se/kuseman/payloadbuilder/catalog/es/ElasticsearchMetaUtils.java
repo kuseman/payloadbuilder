@@ -186,8 +186,10 @@ class ElasticsearchMetaUtils
                             Map<String, Object> mappings = itt.index_template.template.mappings;
                             @SuppressWarnings("unchecked")
                             Map<String, Object> properties = (Map<String, Object>) mappings.get("properties");
-
-                            mergeProperties(result, ESCatalog.SINGLE_TYPE_TABLE_NAME, mappings, properties, itt.name);
+                            if (properties != null)
+                            {
+                                mergeProperties(result, ESCatalog.SINGLE_TYPE_TABLE_NAME, mappings, properties, itt.name);
+                            }
                         }
                     }
 
