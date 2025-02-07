@@ -113,7 +113,7 @@ public class HttpCatalogTest
 
         IDatasource dataSource = catalog.getSeekDataSource(context.getSession(), "http", seekPrecidate, data);
 
-        Expectation[] mocks = mockServer.when(HttpRequest.request("/123,456")
+        Expectation[] mocks = mockServer.when(HttpRequest.request("/123%2C456")
                 .withMethod("get"))
                 .respond(HttpResponse.response("{\"key\":123}")
                         .withHeader("Content-Type", "application/json"));
@@ -326,7 +326,7 @@ public class HttpCatalogTest
 
         assertEquals("predicate for 'id' column should be consumed", 1, predicates.size());
 
-        Expectation[] mocks = mockServer.when(HttpRequest.request("/value1,+value2")
+        Expectation[] mocks = mockServer.when(HttpRequest.request("/value1%2C%2Bvalue2")
                 .withMethod("get"))
                 .respond(HttpResponse.response("{\"key\":123}")
                         .withHeader("Content-Type", "application/json"));

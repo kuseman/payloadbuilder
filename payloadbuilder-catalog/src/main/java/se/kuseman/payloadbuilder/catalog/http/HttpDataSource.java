@@ -3,8 +3,14 @@ package se.kuseman.payloadbuilder.catalog.http;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 
+import java.io.IOException;
+import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.net.URLConnection;
 import java.net.URLEncoder;
+import java.net.URLStreamHandler;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,6 +30,8 @@ import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
+import org.apache.hc.core5.net.URIAuthority;
+import org.apache.hc.core5.net.URIBuilder;
 import org.apache.hc.core5.util.Timeout;
 
 import se.kuseman.payloadbuilder.api.QualifiedName;
@@ -320,7 +328,7 @@ class HttpDataSource implements IDatasource
                                 .toString()
                                 .toUpperCase();
 
-        HttpUriRequestBase httpRequest = new HttpUriRequestBase(method, URI.create(endpoint));
+        HttpUriRequestBase httpRequest = new HttpUriRequestBase(method, getURI(endpoint));
         for (Option option : options.getOptions())
         {
             QualifiedName name = option.getOption();
@@ -344,5 +352,37 @@ class HttpDataSource implements IDatasource
                 .map(e -> e.eval(context)
                         .valueAsObject(0))
                 .toList();
+    }
+
+    /** Dummy handler to ensure URL to not do any stupid connections we don't want. */
+    static final URLStreamHandler DUMMY = new URLStreamHandler()
+    {
+        @Override
+        protected URLConnection openConnection(URL u) throws IOException
+        {
+            return null;
+        }
+    };
+
+    static URI getURI(String endpoint)
+    {
+        try
+        {
+            // We first use URL to parse the endpoint since that wont throw URISyntaxException
+            // and then we use URIBuilder to construct a friendly URI
+            URL url = new URL(null, endpoint, DUMMY);
+            return new URIBuilder().setCharset(StandardCharsets.UTF_8)
+                    .setAuthority(URIAuthority.create(url.getAuthority()))
+                    .setScheme(url.getProtocol())
+                    .setPort(url.getPort())
+                    .setPath(url.getPath())
+                    .setCustomQuery(url.getQuery())
+                    .setFragment(url.getRef())
+                    .build();
+        }
+        catch (MalformedURLException | URISyntaxException e)
+        {
+            throw new RuntimeException(e);
+        }
     }
 }
