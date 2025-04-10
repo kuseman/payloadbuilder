@@ -346,9 +346,9 @@ public class HashMatch implements IPhysicalPlan
                             break;
                         default:
                             throw new IllegalStateException("Unknown iterator state: " + state);
-
                     }
                 }
+
                 return next != null;
             }
 
@@ -401,7 +401,7 @@ public class HashMatch implements IPhysicalPlan
                         next = nonMatchedOuterNext;
                         nonMatchedOuterNext = null;
                     }
-                    // Else stream out empty vectors or non matched vector in outer hash mode
+                    // ... else stream out empty vectors or non matched vector in outer hash mode
                     else if (outerIsHash
                             && (innerIt == null
                                     || !innerIt.hasNext()))
@@ -444,13 +444,19 @@ public class HashMatch implements IPhysicalPlan
                 if (pushOuterReference)
                 {
                     outerReference = outerIt.next();
-                    ((ExecutionContext) context).getStatementContext()
-                            .setIndexSeekTupleVector(outerReference);
-
                     if (innerIt != null)
                     {
                         innerIt.close();
                     }
+                    // No more outer rows => we're done
+                    if (outerReference.getRowCount() <= 0)
+                    {
+                        state = IteratorState.End;
+                        return;
+                    }
+
+                    ((ExecutionContext) context).getStatementContext()
+                            .setIndexSeekTupleVector(outerReference);
 
                     // Fetch next inner batch
                     innerIt = inner.execute(context);
@@ -1243,6 +1249,11 @@ public class HashMatch implements IPhysicalPlan
 
                 int size = outerMatchedFilter == null ? vector.getRowCount()
                         : outerMatchedFilter.cardinality();
+
+                if (size == 0)
+                {
+                    return null;
+                }
 
                 ITupleVectorBuilder nonMatchedBuilder = context.getVectorFactory()
                         .getTupleVectorBuilder(size);

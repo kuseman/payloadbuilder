@@ -50,6 +50,130 @@ public class HashMatchTest extends AJoinTest
         return new HashMatch(0, outer, inner, List.of(ce("col1")), List.of(ce("col3")), predicate, populateAlias, true, true);
     }
 
+    /** Empty second batch to verify regression when we tried to execute the inner with an outer empty tuple vector that is not allowed. */
+    @Test
+    public void test_indexed_inner_join_no_outer_rows_second_batch()
+    {
+        AtomicBoolean outerClosed = new AtomicBoolean();
+        AtomicBoolean innerClosed = new AtomicBoolean();
+
+        //@formatter:off
+        List<TupleVector> outer = asList(
+                TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 1, 2), vv(Type.Any, 4, 5, 6))),
+                TupleVector.of(outerSchema, asList(vv(Type.Any), vv(Type.Any)))
+                );
+        List<TupleVector> inner = asList(
+                TupleVector.of(innerSchema, asList(vv(Type.Any, 0), vv(Type.Any, 1))),
+                TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 2, 3))));
+        //@formatter:on
+
+        IDatasource dsOuter = schemaLessDS(() -> outerClosed.set(true), false, outer.toArray(new TupleVector[0]));
+        IDatasource dsInner = schemaLessDS(() -> innerClosed.set(true), false, inner.toArray(new TupleVector[0]));
+
+        IPhysicalPlan plan = createIndexInnerJoin(scanVectors(dsOuter, outerSchemaLess), scanVectors(dsInner, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), null);
+
+        assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
+
+        TupleIterator it = plan.execute(context);
+        TupleVector actual = PlanUtils.concat(context, it);
+
+        assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
+
+        assertVectorsEquals(vv(Type.Any, 0, 0, 1), actual.getColumn(0));
+        assertVectorsEquals(vv(Type.Any, 4, 4, 5), actual.getColumn(1));
+        assertVectorsEquals(vv(Type.Any, 0, 0, 1), actual.getColumn(2));
+        assertVectorsEquals(vv(Type.Any, 1, 2, 3), actual.getColumn(3));
+
+        assertTrue(innerClosed.get());
+        assertTrue(outerClosed.get());
+    }
+
+    /** Verify that we don't return an empty Tuple Vector when we have full match of all outer rows. (Outer hash mode) */
+    @Test
+    public void test_left_join_all_outer_matches_outer_hash()
+    {
+        AtomicBoolean outerClosed = new AtomicBoolean();
+        AtomicBoolean innerClosed = new AtomicBoolean();
+
+        //@formatter:off
+        List<TupleVector> outer = asList(
+                TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 4, 5)))
+                );
+        List<TupleVector> inner = asList(
+                TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 1, 2), vv(Type.Any, 2, 3, 4))));
+        //@formatter:on
+
+        IDatasource dsOuter = schemaLessDS(() -> outerClosed.set(true), false, outer.toArray(new TupleVector[0]));
+        IDatasource dsInner = schemaLessDS(() -> innerClosed.set(true), false, inner.toArray(new TupleVector[0]));
+
+        IPhysicalPlan plan = createLeftJoin(scanVectors(dsOuter, outerSchemaLess), scanVectors(dsInner, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), null);
+
+        assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
+
+        TupleIterator it = plan.execute(context);
+
+        while (it.hasNext())
+        {
+            TupleVector actual = it.next();
+
+            assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
+
+            assertVectorsEquals(vv(Type.Any, 0, 1), actual.getColumn(0));
+            assertVectorsEquals(vv(Type.Any, 4, 5), actual.getColumn(1));
+            assertVectorsEquals(vv(Type.Any, 0, 1), actual.getColumn(2));
+            assertVectorsEquals(vv(Type.Any, 2, 3), actual.getColumn(3));
+
+            assertTrue(!it.hasNext());
+        }
+        it.close();
+
+        assertTrue(innerClosed.get());
+        assertTrue(outerClosed.get());
+    }
+
+    /** Verify that we don't return an empty Tuple Vector when we have full match of all outer rows. (Inner hash mode) */
+    @Test
+    public void test_left_join_all_outer_matches_inner_hash()
+    {
+        AtomicBoolean outerClosed = new AtomicBoolean();
+        AtomicBoolean innerClosed = new AtomicBoolean();
+
+        //@formatter:off
+        List<TupleVector> outer = asList(
+                TupleVector.of(outerSchema, asList(vv(Type.Any, 0, 1, 1), vv(Type.Any, 4, 5, 6)))
+                );
+        List<TupleVector> inner = asList(
+                TupleVector.of(innerSchema, asList(vv(Type.Any, 0, 1), vv(Type.Any, 2, 3))));
+        //@formatter:on
+
+        IDatasource dsOuter = schemaLessDS(() -> outerClosed.set(true), false, outer.toArray(new TupleVector[0]));
+        IDatasource dsInner = schemaLessDS(() -> innerClosed.set(true), false, inner.toArray(new TupleVector[0]));
+
+        IPhysicalPlan plan = createLeftJoin(scanVectors(dsOuter, outerSchemaLess), scanVectors(dsInner, innerSchemaLess), (tv, ctx) -> predicate.eval(tv, ctx), null);
+
+        assertEquals(SchemaUtils.joinSchema(outerSchemaLess, innerSchemaLess), plan.getSchema());
+
+        TupleIterator it = plan.execute(context);
+
+        while (it.hasNext())
+        {
+            TupleVector actual = it.next();
+
+            assertEquals(SchemaUtils.joinSchema(outerSchema, innerSchema), actual.getSchema());
+
+            assertVectorsEquals(vv(Type.Any, 0, 1, 1), actual.getColumn(0));
+            assertVectorsEquals(vv(Type.Any, 4, 5, 6), actual.getColumn(1));
+            assertVectorsEquals(vv(Type.Any, 0, 1, 1), actual.getColumn(2));
+            assertVectorsEquals(vv(Type.Any, 2, 3, 3), actual.getColumn(3));
+
+            assertTrue(!it.hasNext());
+        }
+        it.close();
+
+        assertTrue(innerClosed.get());
+        assertTrue(outerClosed.get());
+    }
+
     @Test
     public void test_left_join_no_populate_schema_less_no_hashed_values()
     {
