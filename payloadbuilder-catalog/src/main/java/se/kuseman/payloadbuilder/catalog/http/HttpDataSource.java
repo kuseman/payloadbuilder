@@ -28,6 +28,7 @@ import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
 import org.apache.hc.client5.http.impl.classic.RequestFailedException;
 import org.apache.hc.core5.http.ClassicHttpResponse;
 import org.apache.hc.core5.http.ContentType;
+import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.net.URIAuthority;
@@ -105,6 +106,11 @@ class HttpDataSource implements IDatasource
                 || vv.isNull(0) ? HttpCatalog.DEFAULT_RECIEVE_TIMEOUT
                         : vv.getInt(0);
 
+        vv = options.getOption(QualifiedName.of(HttpCatalog.PRINT_HEADERS), context);
+        boolean printHeaders = vv == null
+                || vv.isNull(0) ? false
+                        : vv.getBoolean(0);
+
         if (connectTimeout != HttpCatalog.DEFAULT_CONNECT_TIMEOUT
                 || receiveTimeout != HttpCatalog.DEFAULT_RECIEVE_TIMEOUT)
         {
@@ -134,6 +140,20 @@ class HttpDataSource implements IDatasource
         try
         {
             response = httpClient.execute(request);
+            if (printHeaders)
+            {
+                for (Header header : response.getHeaders())
+                {
+                    context.getSession()
+                            .getPrintWriter()
+                            .append(header.getName())
+                            .append(':')
+                            .append(' ')
+                            .append(header.getValue())
+                            .append('\n');
+                }
+            }
+
             if (response.getCode() != 200)
             {
                 if (!failOnNon200)

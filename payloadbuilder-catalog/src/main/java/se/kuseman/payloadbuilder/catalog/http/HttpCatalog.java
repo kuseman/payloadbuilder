@@ -93,6 +93,7 @@ public class HttpCatalog extends Catalog
     static final QualifiedName FAIL_ON_NON_200 = QualifiedName.of("failonnon200");
     static final QualifiedName CONNECT_TIMEOUT = QualifiedName.of("connecttimeout");
     static final QualifiedName RECEIVE_TIMEOUT = QualifiedName.of("receivetimeout");
+    static final QualifiedName PRINT_HEADERS = QualifiedName.of("printheaders");
     static final int DEFAULT_RECIEVE_TIMEOUT = 15000;
     static final int DEFAULT_CONNECT_TIMEOUT = 1500;
 
