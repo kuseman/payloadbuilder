@@ -121,6 +121,13 @@ public class AssignmentExpression implements IExpression
     }
 
     @Override
+    public boolean isConstant()
+    {
+        // An assignment expression is not constant even if the wrapped expression is
+        return false;
+    }
+
+    @Override
     public ResolvedType getType()
     {
         return expression.getType();

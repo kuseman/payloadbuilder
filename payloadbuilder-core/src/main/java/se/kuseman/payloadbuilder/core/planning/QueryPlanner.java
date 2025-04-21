@@ -44,6 +44,7 @@ import se.kuseman.payloadbuilder.core.execution.ExecutionContext;
 import se.kuseman.payloadbuilder.core.execution.QuerySession;
 import se.kuseman.payloadbuilder.core.execution.TemporaryTable;
 import se.kuseman.payloadbuilder.core.expression.AExpressionVisitor;
+import se.kuseman.payloadbuilder.core.expression.AliasExpression;
 import se.kuseman.payloadbuilder.core.expression.ColumnExpression;
 import se.kuseman.payloadbuilder.core.expression.HasColumnReference.ColumnReference;
 import se.kuseman.payloadbuilder.core.expression.LogicalBinaryExpression;
@@ -554,7 +555,42 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
     @Override
     public IPhysicalPlan visit(ConstantScan plan, Context context)
     {
-        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId()));
+        if (ConstantScan.ONE_ROW_EMPTY_SCHEMA.equals(plan))
+        {
+            return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), TupleVector.CONSTANT));
+        }
+        else if (ConstantScan.ZERO_ROWS_EMPTY_SCHEMA.equals(plan))
+        {
+            return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), TupleVector.EMPTY));
+        }
+
+        // Zero row scan with a schema
+        if (plan.getRowsExpressions()
+                .isEmpty())
+        {
+            return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), TupleVector.of(plan.getSchema())));
+        }
+
+        // Strip all alias expression here since they are not needed anymore
+        List<List<IExpression>> rowsExpressions = plan.getRowsExpressions()
+                .stream()
+                .map(list -> list.stream()
+                        .map(e -> e instanceof AliasExpression ae ? ae.getExpression()
+                                : e)
+                        .toList())
+                .toList();
+
+        // If all the constant scans expressions are constant then we can calculate a result TupleVector
+        // now instead of upon every execution
+        if (rowsExpressions.stream()
+                .allMatch(l -> l.stream()
+                        .allMatch(IExpression::isConstant)))
+        {
+            TupleVector vector = se.kuseman.payloadbuilder.core.physicalplan.ConstantScan.vectorize(plan.getSchema(), rowsExpressions, context.context);
+            return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), vector));
+        }
+
+        return wrapWithAnalyze(context, new se.kuseman.payloadbuilder.core.physicalplan.ConstantScan(context.getNextNodeId(), plan.getSchema(), rowsExpressions));
     }
 
     @Override
@@ -580,7 +616,7 @@ class QueryPlanner implements ILogicalPlanVisitor<IPhysicalPlan, StatementPlanne
                 .stream()
                 .map(c -> c.accept(this, context))
                 .collect(toList());
-        return new se.kuseman.payloadbuilder.core.physicalplan.Concatenation(context.getNextNodeId(), inputs);
+        return new se.kuseman.payloadbuilder.core.physicalplan.Concatenation(context.getNextNodeId(), plan.getSchema(), inputs);
     }
 
     private IPhysicalPlan createNestedLoop(Join plan, int nodeId, IPhysicalPlan outer, IPhysicalPlan inner, BiFunction<TupleVector, IExecutionContext, ValueVector> condition,

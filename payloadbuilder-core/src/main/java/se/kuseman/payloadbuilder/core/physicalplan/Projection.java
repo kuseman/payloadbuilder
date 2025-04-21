@@ -38,7 +38,7 @@ public class Projection implements IPhysicalPlan
         this.nodeId = nodeId;
         this.input = requireNonNull(input, "input");
         this.expressions = requireNonNull(expressions, "expressions");
-        this.schema = SchemaUtils.getSchema(input.getSchema(), expressions, false);
+        this.schema = SchemaUtils.getSchema(expressions, false);
         this.hasAsteriskProjection = expressions.stream()
                 .anyMatch(e -> e instanceof AsteriskExpression);
         this.hasAsteriskSchema = hasAsteriskProjection
