@@ -304,7 +304,7 @@
       "expectedMessageContains": "d.id cannot be bound"
     },
     {
-      "name": "Like ",
+      "name": "Like",
       "query": [
         "select 'hello' like '%ell%' _like, 'hello' not like '%ell%' _notLike "
       ],
@@ -1328,6 +1328,7 @@
     {
       "name": "Selects with for output and case ",
       "query": [
+        "--set @@debugplan = true ",
         "select ",
         " case when d.row_id = 1 then (select id, data for object_array)  else null end obj",
         "from data d ",
@@ -1793,7 +1794,7 @@
         "    on d.id = s.col2 ",
         "  where s2.col2 = s.col2 ",
         "  for object_array ",
-        ") values",
+        ") \"values\"",
         "from source s"
       ],
       "expectedResultSets": [
@@ -1898,6 +1899,139 @@
         [
           [{"key":"id","value": 1}, { "key": "tt", "value": null}],
           [{"key":"id","value": 2}, {"key": "tt", "value": null}]
+        ]
+      ]
+    },
+    {
+      "name": "Table values ctor",
+      "query": [
+        "select * ",
+        "from ( ",
+        "  VALUES (1, 'hello'), (2, 'WORLD') ",
+        " ) x (col1, col2) "
+      ],
+      "expectedResultSets": [
+        [
+          [{"key":"col1","value": 1}, { "key": "col2", "value": "hello"}],
+          [{"key":"col1","value": 2}, { "key": "col2", "value": "WORLD"}]
+        ]
+      ]
+    },
+    {
+      "name": "Table values ctor with sub query expressions",
+      "query": [
+        "--set @@debugplan = true ",
+        "select * ",
+        "from ( ",
+        "  VALUES (1, (select 'world' col1, 'hello' col2 for object_array)), (2, (select 'hello' col1, 'world' col2 for object_array)) ",
+        " ) x (col1, col2) "
+      ],
+      "expectedResultSets": [
+        [
+          [{"key":"col1","value": 1}, { "key": "col2", "value": [{"col1":"world","col2":"hello"}]}],
+          [{"key":"col1","value": 2}, { "key": "col2", "value": [{"col1":"hello","col2":"world"}]}]
+        ]
+      ]
+    },
+    {
+      "name": "Table values ctor with outer references",
+      "query": [
+        "--set @@debugplan = true ",
+        "select * ",
+        "from source s ",
+        "outer apply ( ",
+        "  values (s.col1 + s.col2, s.col1 * s.col2) ",
+        ") y (col3, col4) "
+      ],
+      "expectedResultSets": [
+        [
+          [{"key":"col1","value": 1}, { "key": "col2", "value": 2}, { "key": "col3", "value": 3},  { "key": "col4", "value": 2}],
+          [{"key":"col1","value": 3}, { "key": "col2", "value": 4}, { "key": "col3", "value": 7},  { "key": "col4", "value": 12}],
+          [{"key":"col1","value": 5}, { "key": "col2", "value": 6}, { "key": "col3", "value": 11}, { "key": "col4", "value": 30}]
+        ]
+      ]
+    },
+    {
+      "name": "Table values ctor multiple",
+      "query": [
+        "--set @@debugplan = true ",
+        "select * ",
+        "from ( ",
+        "  values (1, 2) ",
+        ") y (col3, col4) ",
+        "outer apply ( ",
+        "  values (y.col3 * 2, y.col4 * 4) ",
+        ") z (col1, col2) "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col3", "value": 1},  { "key": "col4", "value": 2}, {"key":"col1","value": 2}, { "key": "col2", "value": 8}]
+        ]
+      ]
+    },
+    {
+      "name": "Operator function from table values ctor",
+      "query": [
+        "--set @@debugplan = true ",
+        "select (select * from (values (1,2), (3,4)) x(col1, col2) for object_array) \"values\""
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "values", "value": [{"col1": 1, "col2": 2}, {"col1": 3, "col2": 4}]}]
+        ]
+      ]
+    },
+    {
+      "name": "Multiple Operator function from table values ctor",
+      "query": [
+        "--set @@debugplan = true ",
+        "select * ",
+        "from ( ",
+        "  values (1,2,(select 1 col for object)), (10,20,(select 30 col for object)) ",
+        " )x (a,b,c)"
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "a", "value": 1  }, { "key": "b", "value": 2  }, {"key": "c", "value": {"col": 1}}],
+          [{ "key": "a", "value": 10 }, { "key": "b", "value": 20 }, {"key": "c", "value": {"col": 30}}]
+        ]
+      ]
+    },
+    {
+      "name": "Sub queries with table values ctor with different alias but same columns",
+      "query": [
+        "--set @@debugplan = true ",
+        "select top 1 y.col1, z.col1, y.col2, z.col2 ",
+        "from source s ",
+        "outer apply ( ",
+        "  values (1, 2) ",
+        ") y (col1, col2) ",
+        "outer apply ( ",
+        "  values (3, 4) ",
+        ") z (col1, col2) "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1},  { "key": "col1", "value": 3}, {"key":"col2","value": 2}, { "key": "col2", "value": 4}]
+        ]
+      ]
+    },
+    {
+      "name": "Sub queries with selects with different alias but same columns",
+      "query": [
+        "--set @@debugplan = true ",
+        "select top 1 y.col1, z.col1, y.col2, z.col2 ",
+        "from source s ",
+        "outer apply ( ",
+        "  select 1 col1, 2 col2 ",
+        ") y ",
+        "outer apply ( ",
+        "  select 3 col1, 4 col2 ",
+        ") z  "
+      ],
+      "expectedResultSets": [
+        [
+          [{ "key": "col1", "value": 1},  { "key": "col1", "value": 3}, {"key":"col2","value": 2}, { "key": "col2", "value": 4}]
         ]
       ]
     }

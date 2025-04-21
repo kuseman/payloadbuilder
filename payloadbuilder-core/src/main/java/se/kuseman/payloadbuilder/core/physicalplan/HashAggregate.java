@@ -62,7 +62,7 @@ public class HashAggregate implements IPhysicalPlan
         this.projectionExpressions = requireNonNull(projectionExpressions, "projectionExpressions");
         this.aggregateExpressions = requireNonNull(aggregateExpressions, "aggregateExpressions");
         this.schema = projectionExpressions.isEmpty() ? input.getSchema()
-                : SchemaUtils.getSchema(input.getSchema(), projectionExpressions, true);
+                : SchemaUtils.getSchema(projectionExpressions, true);
         this.hasAsteriskProjection = projectionExpressions.stream()
                 .anyMatch(e -> e instanceof AggregateWrapperExpression awe
                         && awe.getExpression() instanceof AsteriskExpression);

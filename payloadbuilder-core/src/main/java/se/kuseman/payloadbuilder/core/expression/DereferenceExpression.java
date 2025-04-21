@@ -92,7 +92,7 @@ public class DereferenceExpression implements IDereferenceExpression, HasAlias, 
     {
         if (resolvedType == null)
         {
-            throw new IllegalArgumentException("An un-resolved dereference expression has no type");
+            return ResolvedType.ANY;
         }
 
         return resolvedType;

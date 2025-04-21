@@ -84,7 +84,7 @@ public class AssignmentPlan implements IPhysicalPlan
     }
 
     @Override
-    public List<DescribableNode> getChildNodes()
+    public List<? extends DescribableNode> getChildNodes()
     {
         /// Skip this node since it's only a wrapper around a plain select
         return input.getChildNodes();

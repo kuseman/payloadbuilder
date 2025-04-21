@@ -84,7 +84,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         ILogicalPlan plan = s("select concat('hello', 123)");
         ILogicalPlan actual = optimize(context, plan);
 
-        Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.String), "'hello123'", false, null, CoreColumn.Type.REGULAR));
+        Schema expectedSchema = Schema.of(new CoreColumn("", ResolvedType.of(Type.String), "concat('hello', 123)", false, null, CoreColumn.Type.REGULAR));
         assertEquals(expectedSchema, actual.getSchema());
     }
 
@@ -152,8 +152,7 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
         Schema expectedSchema = Schema.of(col("name", Type.String, tableSource), col("schema", Type.String, tableSource), col("indices", Type.String, tableSource), col("rows", Type.Int, tableSource));
 
         //@formatter:off
-        ILogicalPlan expected = projection(
-                ConstantScan.INSTANCE,
+        ILogicalPlan expected = ConstantScan.create(
                 asList(
                         intLit(12345),
                         new AliasExpression(
@@ -165,8 +164,8 @@ public class SchemaResolverTest extends ALogicalPlanOptimizerTest
                                    "object_array",
                                    null
                                 ), null),
-                            "tables"))
-                );
+                            "tables")),
+                null);
         //@formatter:on
 
         Assertions.assertThat(actual)

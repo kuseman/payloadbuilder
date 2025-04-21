@@ -74,6 +74,7 @@ TIME         : T I M E;
 TOP          : T O P;
 TRUE         : T R U E;
 USE          : U S E;
+VALUES       : V A L U E S;
 VARIABLES    : V A R I A B L E S;
 WHEN         : W H E N;
 WITH         : W I T H;

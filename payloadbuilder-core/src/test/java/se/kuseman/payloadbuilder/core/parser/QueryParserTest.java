@@ -501,6 +501,9 @@ public class QueryParserTest extends Assert
         assertSelectFail(ParseException.class, "SELECT INTO are not allowed in sub query context", "select * from (select 1,2 into #temp from tableA) x");
         assertSelectFail(ParseException.class, "mismatched input '<EOF>'", "select * from (select 1 col1 ,2 col2 from tableA for object)");
 
+        assertSelectFail(ParseException.class, "Columns alias(es) is not supported on sub query statements", "select * from (select 1 col1 ,2 col2 from tableA for object) x (a,b)");
+        assertSelectFail(ParseException.class, "Columns alias(es) is not supported on expression selects", "select * from (@tbl) x (a,b)");
+
         // Verify that sub queries are allowed inside projections
         //@formatter:off
         assertQuery(""
@@ -570,7 +573,7 @@ public class QueryParserTest extends Assert
     public void test_select()
     {
         // Selects without table source
-        assertEquals(new LogicalSelectStatement(new Projection(ConstantScan.INSTANCE, asList(litInt(1))), false), assertSelect("select 1"));
+        assertEquals(new LogicalSelectStatement(ConstantScan.create(asList(litInt(1)), null), false), assertSelect("select 1"));
         assertSelect("select 1 where false");
         assertSelect("select 1 order by 1");
         assertSelect("select top 10 1");
@@ -589,6 +592,37 @@ public class QueryParserTest extends Assert
         assertSelectFail(ParseException.class, "Must specify table source", "select *");
         assertSelectFail(ParseException.class, "Must specify table source", "select (select *)");
         assertSelectFail(ParseException.class, "Must specify table source", "select (select * for object)");
+    }
+
+    @Test
+    public void test_table_value_ctor()
+    {
+        assertSelectFail(ParseException.class, "Count of each row must equal the column count.", """
+                select *
+                from
+                (
+                    values (1,2,3), (4,5,6)
+                ) x
+                """);
+
+        assertSelectFail(ParseException.class, "All rows expressions must be of equal size", """
+                select *
+                from
+                (
+                    values (1,2,3), (4,6)
+                ) x (a,b,c)
+                """);
+
+        assertSelect("""
+                select *
+                from
+                (
+                    values (1,2,3), (4,5,6)
+                ) x (a,b,c)
+                """);
+
+        // assertEquals(ConstantScan.ONE_ROW_EMPTY_SCHEMA, ConstantScan.create("", List.of(), List.of(List.of()), null));
+        // assertEquals(ConstantScan.ZERO_ROWS_EMPTY_SCHEMA, ConstantScan.create("", List.of(), List.of(), null));
     }
 
     @Test

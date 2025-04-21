@@ -33,7 +33,7 @@ public interface DescribableNode
     }
 
     /** Return child nodes if any */
-    default List<DescribableNode> getChildNodes()
+    default List<? extends DescribableNode> getChildNodes()
     {
         return emptyList();
     }
