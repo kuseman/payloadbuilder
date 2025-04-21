@@ -37,7 +37,7 @@ public class Projection implements ILogicalPlan
     @Override
     public Schema getSchema()
     {
-        return SchemaUtils.getSchema(input.getSchema(), expressions, false);
+        return SchemaUtils.getSchema(expressions, false);
     }
 
     @Override

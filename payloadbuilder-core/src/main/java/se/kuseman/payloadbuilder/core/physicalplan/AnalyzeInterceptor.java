@@ -35,7 +35,7 @@ public class AnalyzeInterceptor implements IPhysicalPlan
     }
 
     @Override
-    public List<DescribableNode> getChildNodes()
+    public List<? extends DescribableNode> getChildNodes()
     {
         // We skip this node in tree because we want the query plan to look like if
         // these operators did not exist

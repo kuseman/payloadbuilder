@@ -33,7 +33,7 @@ public class ConcatenationTest extends APhysicalPlanTest
         IPhysicalPlan input3 = scan(schemaLessDS(() -> closed3.setTrue(), TupleVector.of(schema3, asList(vv(ResolvedType.of(Type.Any), 100, 200, 300), vv(ResolvedType.of(Type.Any), 400, 500, 600)))),
                 table, Schema.EMPTY);
 
-        IPhysicalPlan plan = new Concatenation(1, asList(input1, input2, input3));
+        IPhysicalPlan plan = new Concatenation(1, Schema.EMPTY, asList(input1, input2, input3));
 
         assertEquals(Schema.EMPTY, plan.getSchema());
 

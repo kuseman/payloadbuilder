@@ -25,6 +25,7 @@ public class ResolvedType
         }
     }
     public static final ResolvedType STRING = ResolvedType.of(Type.String);
+    public static final ResolvedType INT = ResolvedType.of(Type.Int);
     public static final ResolvedType ANY = ResolvedType.of(Type.Any);
     public static final ResolvedType DOUBLE = ResolvedType.of(Type.Double);
 

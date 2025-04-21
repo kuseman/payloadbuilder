@@ -6,6 +6,7 @@ import static java.util.stream.Collectors.joining;
 import java.util.List;
 import java.util.Objects;
 
+import se.kuseman.payloadbuilder.api.catalog.Column.Type;
 import se.kuseman.payloadbuilder.api.catalog.ResolvedType;
 import se.kuseman.payloadbuilder.api.catalog.ScalarFunctionInfo.AggregateMode;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
@@ -74,13 +75,13 @@ public class UnresolvedFunctionCallExpression implements IExpression, IAggregate
     @Override
     public ResolvedType getType()
     {
-        throw new IllegalArgumentException("An unresolved function call expression have no type");
+        return ResolvedType.of(Type.Any);
     }
 
     @Override
     public ResolvedType getAggregateType()
     {
-        throw new IllegalArgumentException("An unresolved function call expression have no type");
+        return ResolvedType.of(Type.Any);
     }
 
     @Override
