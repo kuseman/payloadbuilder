@@ -570,7 +570,7 @@ public class QueryParserTest extends Assert
     public void test_select()
     {
         // Selects without table source
-        assertEquals(new LogicalSelectStatement(new Projection(ConstantScan.INSTANCE, asList(litInt(1))), false), assertSelect("select 1"));
+        assertEquals(new LogicalSelectStatement(ConstantScan.create(asList(litInt(1)), null), false), assertSelect("select 1"));
         assertSelect("select 1 where false");
         assertSelect("select 1 order by 1");
         assertSelect("select top 10 1");
@@ -589,6 +589,37 @@ public class QueryParserTest extends Assert
         assertSelectFail(ParseException.class, "Must specify table source", "select *");
         assertSelectFail(ParseException.class, "Must specify table source", "select (select *)");
         assertSelectFail(ParseException.class, "Must specify table source", "select (select * for object)");
+    }
+
+    @Test
+    public void test_table_value_ctor()
+    {
+        assertSelectFail(ParseException.class, "Rows expressions size must equal column names size", """
+                select *
+                from
+                (
+                    values (1,2,3), (4,5,6)
+                ) x
+                """);
+
+        assertSelectFail(ParseException.class, "All rows expressions must be of equal size", """
+                select *
+                from
+                (
+                    values (1,2,3), (4,6)
+                ) x (a,b,c)
+                """);
+
+        assertSelect("""
+                select *
+                from
+                (
+                    values (1,2,3), (4,5,6)
+                ) x (a,b,c)
+                """);
+
+        // assertEquals(ConstantScan.ONE_ROW_EMPTY_SCHEMA, ConstantScan.create("", List.of(), List.of(List.of()), null));
+        // assertEquals(ConstantScan.ZERO_ROWS_EMPTY_SCHEMA, ConstantScan.create("", List.of(), List.of(), null));
     }
 
     @Test

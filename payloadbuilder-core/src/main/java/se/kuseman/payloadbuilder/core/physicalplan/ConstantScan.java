@@ -1,22 +1,41 @@
 package se.kuseman.payloadbuilder.core.physicalplan;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import se.kuseman.payloadbuilder.api.catalog.Schema;
 import se.kuseman.payloadbuilder.api.execution.IExecutionContext;
 import se.kuseman.payloadbuilder.api.execution.TupleIterator;
 import se.kuseman.payloadbuilder.api.execution.TupleVector;
+import se.kuseman.payloadbuilder.api.execution.ValueVector;
+import se.kuseman.payloadbuilder.api.execution.vector.MutableValueVector;
+import se.kuseman.payloadbuilder.api.expression.IExpression;
 
 /** A scan operator returning one row with no schema. Used for example when having a query without a from clause etc. */
 public class ConstantScan implements IPhysicalPlan
 {
     private final int nodeId;
+    private final Schema schema;
+    private final List<List<IExpression>> rowsExpressions;
+    private final TupleVector vector;
 
-    public ConstantScan(int nodeId)
+    public ConstantScan(int nodeId, Schema schema, List<List<IExpression>> rowsExpressions)
     {
         this.nodeId = nodeId;
+        this.schema = schema;
+        this.rowsExpressions = requireNonNull(rowsExpressions);
+        this.vector = null;
+    }
+
+    public ConstantScan(int nodeId, TupleVector vector)
+    {
+        this.nodeId = nodeId;
+        this.schema = null;
+        this.rowsExpressions = null;
+        this.vector = requireNonNull(vector);
     }
 
     @Override
@@ -34,13 +53,40 @@ public class ConstantScan implements IPhysicalPlan
     @Override
     public Schema getSchema()
     {
-        return Schema.EMPTY;
+        return vector != null ? vector.getSchema()
+                : schema;
     }
 
     @Override
     public TupleIterator execute(IExecutionContext context)
     {
-        return TupleIterator.singleton(TupleVector.CONSTANT);
+        if (vector != null)
+        {
+            return TupleIterator.singleton(vector);
+        }
+
+        int rowSize = rowsExpressions.size();
+        int columnSize = rowsExpressions.get(0)
+                .size();
+        List<ValueVector> values = new ArrayList<>(columnSize);
+
+        for (int i = 0; i < columnSize; i++)
+        {
+            MutableValueVector mutableVector = context.getVectorFactory()
+                    .getMutableVector(schema.getColumns()
+                            .get(i)
+                            .getType(), rowSize);
+            values.add(mutableVector);
+
+            for (int j = 0; j < rowSize; j++)
+            {
+                mutableVector.copy(j, rowsExpressions.get(j)
+                        .get(i)
+                        .eval(context));
+            }
+        }
+
+        return TupleIterator.singleton(TupleVector.of(schema, values));
     }
 
     @Override
@@ -77,6 +123,12 @@ public class ConstantScan implements IPhysicalPlan
     @Override
     public String toString()
     {
+        if (vector != null
+                && Schema.EMPTY.equals(vector.getSchema()))
+        {
+            return vector.getRowCount() == 1 ? "Constant Scan (Single row)"
+                    : "Constant Scan (No rows)";
+        }
         return "Constant scan (" + nodeId + ")";
     }
 }
